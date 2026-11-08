@@ -1,51 +1,13 @@
 /**
  * From what an endpoint answered to what a widget reads.
  *
- * Two producers, one envelope: a statement's columns arrive already typed, a
- * spreadsheet range's are read off its values. What is asserted here is that
- * both come out the same shape and that neither can hand a widget a row it
- * would index past the end of.
+ * A statement's columns arrive already typed. What is asserted here is that
+ * they come out in the envelope a widget reads, and that it cannot hand a
+ * widget a row it would index past the end of.
  */
 import { describe, expect, it } from "vitest";
 
-import { emptyDataFor, normalizeQueryRows, normalizeSheetRange } from "./normalize";
-
-describe("normalizeSheetRange", () => {
-  const doc = (cells: Record<string, unknown>, name = "Sheet1") =>
-    ({ content: { sheets: [{ id: "s1", name, cells }] } }) as never;
-
-  it("extracts an A1 range in row-major order", () => {
-    const range = normalizeSheetRange(
-      doc({ "0:0": "Stage", "0:1": "Count", "1:0": "Leads", "1:1": 100 }),
-      "Sheet1",
-      "A1:B2"
-    );
-    expect(range).toEqual({
-      columns: [
-        { name: "Stage", type: "text" },
-        { name: "Count", type: "number" },
-      ],
-      rows: [["Leads", 100]],
-    });
-  });
-
-  it("treats an all-text first row as headers only when rows follow", () => {
-    const range = normalizeSheetRange(doc({ "0:0": "Only", "0:1": "Headers" }), null, "A1:B1");
-    expect(range?.columns.map((column) => column.name)).toEqual(["Column 1", "Column 2"]);
-    expect(range?.rows).toEqual([["Only", "Headers"]]);
-  });
-
-  it("nulls a cell holding anything that is not a scalar", () => {
-    const range = normalizeSheetRange(doc({ "0:0": { nested: true } }), null, "A1");
-    expect(range?.rows).toEqual([[null]]);
-  });
-
-  it("returns null for an unusable binding rather than throwing", () => {
-    expect(normalizeSheetRange(doc({}), "Nope", "A1")).toBeNull();
-    expect(normalizeSheetRange(doc({}), "Sheet1", "not-a-range")).toBeNull();
-    expect(normalizeSheetRange({ content: null } as never, null, "A1")).toBeNull();
-  });
-});
+import { emptyDataFor, normalizeQueryRows } from "./normalize";
 
 describe("normalizeQueryRows", () => {
   it("preserves calendar-date metadata without marking true timestamps", () => {
@@ -112,10 +74,8 @@ describe("normalizeQueryRows", () => {
 });
 
 describe("emptyDataFor", () => {
-  it("gives a tabular binding an empty tabular envelope", () => {
-    for (const source of ["query", "sheet_range"] as const) {
-      expect(emptyDataFor(source)).toEqual({ source: "rows", columns: [], rows: [] });
-    }
+  it("gives a statement an empty tabular envelope", () => {
+    expect(emptyDataFor("query")).toEqual({ source: "rows", columns: [], rows: [] });
   });
 
   it("gives a plug-in binding its own empty envelope", () => {

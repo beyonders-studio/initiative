@@ -1,7 +1,7 @@
 /**
  * `/settings/layouts` — how each tool in this initiative draws what it holds,
  * in the sidebar's order: the calendar's and the notices' details, and each
- * project's, queue's, gallery's and counter group's layouts. Each layout says when it was last changed, and a project which list
+ * project's and counter group's layouts. Each layout says when it was last changed, and a project which list
  * it opens on; each has a way into its layout editor.
  */
 
@@ -13,16 +13,14 @@ import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiative
 import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutList } from "@/components/layouts/LayoutList";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
   INSTANCE_LAYOUT_TOOLS,
+  instanceTarget,
   sharedTarget,
   useInitiativeLayouts,
   useToolLayouts,
 } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   isToolEnabled,
@@ -31,6 +29,9 @@ import {
   toolListRoute,
   toolNavLabelKey,
 } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 
 export const InitiativeSettingsLayoutsPage = () => {
   const { initiativeId, initiative, canManageMembers } = useInitiativeSettings();
@@ -94,8 +95,8 @@ const InitiativeLayouts = ({
   );
 };
 
-/** One instance's layouts (a project's, a queue's), opening its editor where
- *  the reader may change them and has the room the editor needs. */
+/** One instance's layouts (a project's, a counter group's), opening its editor
+ *  where the reader may change them and has the room the editor needs. */
 const InstanceLayouts = ({
   initiativeId,
   entry,
@@ -123,7 +124,10 @@ const InstanceLayouts = ({
           </Button>
         ) : null}
       </div>
-      <LayoutList layouts={entry.layouts} />
+      <LayoutList
+        layouts={entry.layouts}
+        target={entry.can_configure ? instanceTarget(entry.tool, entry.tool_id) : undefined}
+      />
     </section>
   );
 };

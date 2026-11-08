@@ -1,16 +1,19 @@
 import { format } from "date-fns";
 import {
+  createContext,
   type ReactNode,
   type RefObject,
   useContext,
   useEffect,
   useEffectEvent,
   useMemo,
+  useRef,
 } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
   SearchEntityType,
+  type TaskListRead,
   type TaskPriority,
   type TaskRead,
   type TaskStatusRead,
@@ -19,37 +22,34 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
+import type { Written } from "@/components/layouts/AddItemDialog";
+import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
+import { PART_MARK, SmartTitleParts } from "@/components/tasks/SmartTitleParts";
 import { TaskChecklist } from "@/components/tasks/TaskChecklist";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
+import { TaskReminderField } from "@/components/tasks/TaskReminderField";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
-import { useDateLocale } from "@/hooks/useDateLocale";
-import { ItemDraftContext } from "@/hooks/useFieldSave";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
+import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import {
   TASK_SAVES,
   type TaskEdit,
   useGenerateTaskDescription,
   useTaskFieldSave,
   useTaskSaveOptions,
+  useUpdateTask,
 } from "@/hooks/useTasks";
+import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { dateRangeBounds } from "@/lib/dateRange";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -60,8 +60,9 @@ import {
   type TaskRecurrenceValue,
 } from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
+import { type Applied, NOTHING_APPLIED, readingEdit } from "@/lib/smartTaskTitle";
 import { PRIORITY_ORDER } from "@/lib/sorting";
-import { dateTimePattern } from "@/lib/timeFormat";
+import { startedFrom, startsWith } from "@/lib/taskTypeStart";
 import { taskRoute } from "@/lib/tools";
 import {
   getAvatarSrc,
@@ -69,10 +70,29 @@ import {
   getUserDisplayName,
   isAnonymizedUser,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
+import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
+import { dateTimePattern } from "@/ui/lib/timeFormat";
+import { useDateLocale } from "@/ui/lib/useDateLocale";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import {
+  filledBy,
+  hasAny,
+  hasText,
+  missingRequired,
+  requiredKeys,
+  type StoredRegions,
+  sentOr,
+} from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
+import { PROPERTY_FIELD_PREFIX } from "./fields";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
 
 /** What the task's detail shares with its parts, beside the task itself. */
@@ -103,8 +123,15 @@ const useTaskLayout = useItemContext<TaskLayoutContext>;
 
 type EditorProps = { item: TaskRead; label: string };
 
-/** The task's title, which is the detail's heading. */
-const TitleEditor = ({ item: task, label }: EditorProps) => {
+/** The task's title, which is the detail's heading. One being added is read
+ *  for its details where the reader has that on. */
+const TitleEditor = (props: EditorProps) => {
+  const adding = useContext(ItemDraftContext) !== null;
+  const smart = useSmartTitlesOn();
+  return adding && smart ? <SmartTitleEditor {...props} /> : <PlainTitleEditor {...props} />;
+};
+
+const PlainTitleEditor = ({ item: task, label }: EditorProps) => {
   const { t } = useTranslation("tasks");
   const { readOnly, askScope } = useTaskLayout();
   return (
@@ -115,6 +142,65 @@ const TitleEditor = ({ item: task, label }: EditorProps) => {
       save={useTaskFieldSave(task, label, askScope)}
       readOnly={readOnly}
       placeholder={t("taskForm.titlePlaceholder")}
+    />
+  );
+};
+
+/**
+ * The title of a task being added, read as it is typed: the due date, repeat,
+ * priority, tags and people it names are set on the task's own fields, marked
+ * in the title and listed under it, and the title is added without them.
+ */
+const SmartTitleEditor = ({ item: task, label }: EditorProps) => {
+  const { t } = useTranslation("tasks");
+  const { readOnly, askScope } = useTaskLayout();
+  const drafting = useContext(ItemDraftContext);
+  const save = useTaskFieldSave(task, label, askScope);
+  // The field shows the title as typed; the task is added as it reads.
+  const smart = useSmartTitle({
+    text: task.title,
+    communityId: useActiveCommunityId(),
+    projectId: task.project_id,
+    enabled: true,
+  });
+  const applied = useRef<Applied>({ ...NOTHING_APPLIED, title: task.title });
+  const latest = useRef(task);
+  latest.current = task;
+  // A reading that moved — the title typed on, a name looked up, a part kept —
+  // sets what it says on the task's fields.
+  useEffect(() => {
+    if (!smart.reading || !drafting) return;
+    const { edit, applied: next } = readingEdit(latest.current, smart.reading, applied.current);
+    applied.current = next;
+    if (edit) drafting.edit(edit as ItemEdit<unknown, unknown>);
+  }, [smart.reading, drafting]);
+  // Add can follow a change in the same event (Enter), before the reading
+  // above has run, so each change already sends the title as it reads.
+  const titleSave: typeof save = {
+    ...save,
+    save: (edit, undo) => {
+      if (!("patch" in edit) || typeof edit.patch.title !== "string") return save.save(edit, undo);
+      const title = smart.read(edit.patch.title).title;
+      applied.current = { ...applied.current, title };
+      return save.save({ patch: { ...edit.patch, title }, shows: edit.shows }, undo);
+    },
+  };
+  const parts = smart.reading?.parts ?? [];
+  return (
+    <TitleField
+      id="task-title"
+      label={label}
+      value={task.title}
+      save={titleSave}
+      readOnly={readOnly}
+      placeholder={t("taskForm.titlePlaceholder")}
+      marks={parts.map((part) => ({ ...part, className: PART_MARK[part.type] }))}
+      below={<SmartTitleParts reading={smart.reading} onKeep={smart.keep} className="px-3 pt-1" />}
+      trailing={<SmartTitleHints />}
+      mention={{
+        members: { type: "canOpen", tool: Tool.project, id: task.project_id },
+        onPick: smart.picked,
+      }}
     />
   );
 };
@@ -147,9 +233,17 @@ const DescriptionEditor = ({ item: task, label }: EditorProps) => {
           ? {
               label: t("edit.aiGenerate"),
               run: async () => {
-                const { description } = await generate.mutateAsync(task.id);
-                toast.success(t("edit.descriptionGenerated"));
-                return description;
+                const written = await generate.mutateAsync(task.id);
+                toast.success(t("edit.descriptionGenerated"), {
+                  description:
+                    written.comments_read < written.comments_total
+                      ? t("ai.fromComments", {
+                          read: written.comments_read,
+                          count: written.comments_total,
+                        })
+                      : undefined,
+                });
+                return written.description;
               },
             }
           : undefined
@@ -209,35 +303,161 @@ const StatusEditor = ({ task }: { task: TaskRead }) => {
   );
 };
 
-/** What a new task of `type` starts with where it is drawn: its description
- *  outline and its priority. (Its checklist lines and repeat are added by the
- *  server when it is made.) */
-const startsWith = (type: TaskTypeRead) => ({
-  description: type.starting_values?.description ?? null,
-  priority: type.starting_values?.priority ?? "medium",
+/** What the fields a change of a task asks for are drawn in: writable, and
+ *  with nothing of its page around them. */
+export const taskFillContext = (initiativeId: number | null): TaskLayoutContext => ({
+  readOnly: false,
+  readOnlyMessage: null,
+  statuses: [],
+  types: [],
+  initiativeId,
+  askScope: async () => null,
+  actions: null,
+  leaving: { current: false },
 });
 
-/** What a task being added takes from `type` in place of what it took from
- *  `was`: each of the fields above the person has left as it started. */
-const startedFrom = (task: TaskRead, was: TaskTypeRead, type: TaskTypeRead) => {
-  const before = startsWith(was);
-  const after = startsWith(type);
+/** `task` with what `keys` names left empty, as a change the server refused
+ *  for them leaves it: a move drops the people who cannot open the
+ *  destination and the values it cannot carry, so what is asked for starts
+ *  from nothing rather than from what the task held before. */
+export const withoutValues = (task: TaskRead, keys: readonly string[]): TaskRead => {
+  const asked = new Set(keys);
   return {
-    ...((task.description ?? "") === (before.description ?? "")
-      ? { description: after.description }
-      : {}),
-    ...(task.priority === before.priority ? { priority: after.priority } : {}),
+    ...task,
+    ...(asked.has("description") ? { description: null } : {}),
+    ...(asked.has("assignees") ? { assignees: [] } : {}),
+    ...(asked.has("checklist") ? { checklist: [] } : {}),
+    ...(asked.has("recurrence") ? { recurrence: null } : {}),
+    ...(asked.has("tags") ? { tags: [] } : {}),
+    ...(asked.has("dates") ? { start_date: null, due_date: null } : {}),
+    properties: task.properties.filter(
+      (each) => !asked.has(`${PROPERTY_FIELD_PREFIX}${each.property_id}`)
+    ),
   };
+};
+
+/** What was filled in for a change of a task, as the change sends it: its
+ *  fields, and the properties it was given beside those it holds. */
+export const taskChanges = ({ fields, properties }: Written<TaskRead, TaskUpdate>): TaskUpdate => ({
+  ...fields,
+  ...(properties.length > 0 ? { properties, merge_properties: true } : {}),
+});
+
+/** What a task of `projectId` would leave empty that its page as another of
+ *  the project's types requires, with `patch` applied: nothing until the
+ *  project's layouts and fields are read, when the server still holds it to
+ *  them. */
+export const useMissingAsType = (projectId: number, initiativeId: number | null) => {
+  const { missing } = useMissingByType(projectId, initiativeId);
+  return (task: TaskRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+    missing(typeId, (key) => TASK_DETAIL.filled?.(task, key, patch) ?? true);
+};
+
+/** The same, of a task as a list reads it: what a change of type made to many
+ *  tasks at once checks, without reading each one. Until `ready`, it can't
+ *  tell, and many tasks have nobody to ask for what each leaves empty. */
+export const useListedMissingAsType = (projectId: number, initiativeId: number | null) => {
+  const { ready, missing } = useMissingByType(projectId, initiativeId);
+  return {
+    ready,
+    missing: (task: TaskListRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+      missing(typeId, (key) => filledInList(task, key, patch)),
+  };
+};
+
+/** What a type's page requires that `filled` says is empty, once the
+ *  project's layouts and fields are read (`ready`). */
+const useMissingByType = (projectId: number, initiativeId: number | null) => {
+  const layouts = useToolLayouts(instanceTarget(Tool.project, projectId)).data;
+  const definitions = useOwnedDefinitions({
+    initiativeId: initiativeId ?? undefined,
+    owner: { kind: "project", id: projectId },
+    enabled: initiativeId !== null,
+  }).data;
+  return {
+    ready: Boolean(layouts && definitions),
+    missing: (typeId: number, filled: (key: string) => boolean): string[] =>
+      layouts && definitions
+        ? missingRequired(
+            requiredKeys(detailLayoutOf(layouts, "task", typeId) as StoredRegions | null),
+            filled,
+            definitions
+          )
+        : [],
+  };
+};
+
+/** How a listed task reads as filled, as `TASK_DETAIL.filled` reads a whole
+ *  one: the list carries whether it has a description and checklist, not
+ *  their text. */
+const filledInList = filledBy<TaskListRead, TaskUpdate>(
+  {
+    description: (task, sent) =>
+      Object.hasOwn(sent, "description") ? hasText(sent.description) : task.has_description,
+    assignees: (task, sent) => hasAny(sentOr(sent, "assignee_ids", task.assignees)),
+    checklist: (task) => (task.checklist_progress?.total ?? 0) > 0,
+    recurrence: (task, sent) => sentOr(sent, "recurrence", task.recurrence) != null,
+    tags: (task) => hasAny(task.tags),
+    dates: (task, sent) =>
+      sentOr(sent, "start_date", task.start_date) != null ||
+      sentOr(sent, "due_date", task.due_date) != null,
+  },
+  (task) => task.properties
+);
+
+/** Asks for what a type's page requires before a task becomes one, and makes
+ *  the change with it: the task page's own, above its layout. */
+const Retyping = createContext<
+  ((task: TaskRead, type: TaskTypeRead, keys: string[]) => void) | null
+>(null);
+
+/**
+ * Holds the question a change of type asks above the layout it changes, so a
+ * type whose page leaves out the type picker still keeps what was filled in
+ * until the change is saved. The task shows its new type once it is.
+ */
+const TaskShell = ({ context, children }: { context: TaskLayoutContext; children: ReactNode }) => {
+  const { t } = useTranslation("layouts");
+  const fill = useFillRequired(TASK_DETAIL);
+  const update = useUpdateTask(undefined, "common:error");
+  const retype = (task: TaskRead, type: TaskTypeRead, keys: string[]) =>
+    fill.ask({
+      item: { ...task, task_type_id: type.id, task_type: type },
+      context: taskFillContext(context.initiativeId),
+      keys,
+      title: t("required.retypeTitle", { type: type.name }),
+      send: async (written) => {
+        // A repeating task's type is its series', so whose it is asked first.
+        const scope = task.recurrence
+          ? await context.askScope("edit", { tool: "tasks", count: task.series_size })
+          : undefined;
+        if (scope === null) throw new Error("not sent");
+        return update.mutateAsync({
+          taskId: task.id,
+          data: { task_type_id: type.id, ...taskChanges(written), ...(scope ? { scope } : {}) },
+        });
+      },
+    });
+  return (
+    <Retyping.Provider value={retype}>
+      {children}
+      {fill.dialog}
+    </Retyping.Provider>
+  );
 };
 
 /** Which of the project's types the task is. Changing it redraws the page as
  *  the new type lays it out; nothing the task holds is lost, only what the new
- *  page leaves out is not shown. While the task is being added, what it starts
- *  with follows the type, until the person changes it. */
+ *  page leaves out is not shown. A type whose page requires what the task
+ *  leaves empty asks for it first, and the change is sent with it. While the
+ *  task is being added, what it starts with follows the type, until the
+ *  person changes it. */
 const TypeEditor = ({ item: task, label }: EditorProps) => {
-  const { readOnly, types, askScope } = useTaskLayout();
+  const { readOnly, types, askScope, initiativeId } = useTaskLayout();
   const save = useTaskFieldSave(task, label, askScope);
   const adding = useContext(ItemDraftContext) !== null;
+  const missingAs = useMissingAsType(task.project_id, initiativeId);
+  const retype = useContext(Retyping);
   if (types.length < 2) return null;
   const options = types.some((type) => type.id === task.task_type_id)
     ? types
@@ -255,9 +475,14 @@ const TypeEditor = ({ item: task, label }: EditorProps) => {
         value={String(task.task_type_id)}
         onValueChange={(selected) => {
           const next = options.find((type) => String(type.id) === selected);
-          if (next && next.id !== task.task_type_id) {
+          if (!next || next.id === task.task_type_id) return;
+          // One being added draws its whole page, required fields up front.
+          const keys = adding || !retype ? [] : missingAs(task, next.id);
+          if (keys.length === 0) {
             void save.save(edit(next), edit(task.task_type));
+            return;
           }
+          retype?.(task, next, keys);
         }}
         disabled={readOnly}
       >
@@ -355,14 +580,6 @@ const TagsEditor = ({ item: task, label }: EditorProps) => {
   );
 };
 
-/** A stored date as the pickers hold it: local, to the minute. */
-const toLocalInputValue = (value: string | null) => {
-  const date = value ? new Date(value) : null;
-  if (!date || Number.isNaN(date.getTime())) return "";
-  const pad = (segment: number) => segment.toString().padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
 const DATE_FIELDS = [
   { key: "start", field: "start_date", label: "taskForm.startDateLabel", id: "task-start-date" },
   { key: "due", field: "due_date", label: "taskForm.dueDateLabel", id: "task-due-date" },
@@ -376,8 +593,8 @@ const DatesEditor = ({ task }: { task: TaskRead }) => {
   const { readOnly, askScope } = useTaskLayout();
   const save = useTaskFieldSave(task, t("taskForm.sections.schedule"), askScope);
   const saved: DatePair = {
-    start: toLocalInputValue(task.start_date),
-    due: toLocalInputValue(task.due_date),
+    start: toPickerValue(task.start_date),
+    due: toPickerValue(task.due_date),
   };
   const inverted = (pair: DatePair) => dateRangeBounds(pair.start, pair.due).isInverted;
   // Only the dates that moved are sent; Undo puts back what was stored.
@@ -385,7 +602,7 @@ const DatesEditor = ({ task }: { task: TaskRead }) => {
     saved,
     (pair) => {
       const moved = DATE_FIELDS.filter(({ key }) => pair[key] !== saved[key]);
-      const at = (local: string) => (local ? new Date(local).toISOString() : null);
+      const at = fromPickerValue;
       const edit: TaskEdit = { patch: {}, shows: {} };
       const undo: TaskEdit = { patch: {}, shows: {} };
       for (const { key, field } of moved) {
@@ -430,6 +647,9 @@ const DatesEditor = ({ task }: { task: TaskRead }) => {
           {t("dates:invalidRange")}
         </p>
       ) : null}
+      {/* The reader's own, so it is theirs to set where the task is read-only,
+          and there once the task is. */}
+      {task.id > 0 ? <TaskReminderField task={task} /> : null}
     </FieldFrame>
   );
 };
@@ -512,11 +732,23 @@ const TaskRecurrenceEditor = ({ item: task, label }: EditorProps) => {
   );
 };
 
-const Checklist = ({ item: task }: EditorProps) => {
-  const { readOnly } = useTaskLayout();
-  // Its items are each saved on a task that exists.
-  if (useContext(ItemDraftContext) !== null) return null;
-  return <TaskChecklist taskId={task.id} items={task.checklist ?? []} canEdit={!readOnly} />;
+const Checklist = ({ item: task, label }: EditorProps) => {
+  const { readOnly, askScope } = useTaskLayout();
+  const save = useTaskFieldSave(task, label, askScope);
+  // A task being added keeps its list in the draft, sent with it.
+  const adding = useContext(ItemDraftContext) !== null;
+  return (
+    <TaskChecklist
+      taskId={task.id}
+      items={task.checklist ?? []}
+      canEdit={!readOnly}
+      onDraftChange={
+        adding
+          ? (checklist) => void save.save({ patch: { checklist }, shows: { checklist } })
+          : undefined
+      }
+    />
+  );
 };
 
 /** Who made the task and when. */
@@ -641,6 +873,7 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
     canOpen: { tool: Tool.project, id: task.project_id },
+    owner: { kind: "project", id: task.project_id },
     links: {
       entity: { id: task.project_id, initiative_id: task.project?.initiative_id ?? null },
       target: { type: SearchEntityType.task, id: task.id },
@@ -650,7 +883,24 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     actions: context.actions,
   }),
   taskRoute: (task, context, taskId) => taskRoute(context.initiativeId, task.project_id, taskId),
+  Shell: TaskShell,
   addingParts: ["status", "dates"],
+  // The type picks the page the rest is laid out as.
+  addingUpFront: ["type"],
+  filled: filledBy<TaskRead, TaskUpdate>(
+    {
+      description: (task, sent) => hasText(sentOr(sent, "description", task.description)),
+      assignees: (task, sent) => hasAny(sentOr(sent, "assignee_ids", task.assignees)),
+      checklist: (task, sent) => hasAny(sentOr(sent, "checklist", task.checklist)),
+      recurrence: (task, sent) => sentOr(sent, "recurrence", task.recurrence) != null,
+      tags: (task, sent) => hasAny(sentOr(sent, "tag_ids", task.tags)),
+      // Either date fills them.
+      dates: (task, sent) =>
+        sentOr(sent, "start_date", task.start_date) != null ||
+        sentOr(sent, "due_date", task.due_date) != null,
+    },
+    (task) => task.properties
+  ),
 };
 
 /** A task not yet added to `projectId`, in `status` and of `type`, as its
@@ -693,7 +943,8 @@ export const blankTask = (
   project: null,
   checklist: [],
   checklist_progress: null,
+  parent: null,
+  subtask_progress: null,
   tags: [],
   properties: [],
-  plugin_values: [],
 });

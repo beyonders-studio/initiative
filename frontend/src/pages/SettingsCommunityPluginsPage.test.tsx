@@ -18,6 +18,8 @@ import type { CommunityPluginUninstallNotice } from "@/api/generated/initiativeA
 import { SettingsCommunityPluginsPage } from "./SettingsCommunityPluginsPage";
 
 let notice: CommunityPluginUninstallNotice | undefined;
+let closedSurfaces: string[] | null = null;
+let pendingVersion: string | null = null;
 const openAddress = vi.fn();
 const uninstall = vi.hoisted(() => vi.fn());
 
@@ -30,7 +32,12 @@ vi.mock("@/hooks/useCommunities", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useCommunities")>()),
   useCommunities: () => ({
     activeCommunityId: 1,
-    activeCommunity: { id: 1, role: "superadmin", can: communityCan("superadmin") },
+    activeCommunity: {
+      id: 1,
+      role: "superadmin",
+      can: communityCan("superadmin"),
+      closed_surfaces: closedSurfaces,
+    },
   }),
 }));
 vi.mock("@/hooks/useBillingPortal", () => ({
@@ -40,15 +47,29 @@ vi.mock("@/hooks/useCommunityPlugins", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useCommunityPlugins")>()),
   useCommunityPlugins: () => ({
     data: {
-      items: [{ id: 4, name: "PaidCo", enabled: true, created_at: "2026-10-01T00:00:00Z" }],
+      items: [
+        {
+          id: 4,
+          name: "PaidCo",
+          enabled: true,
+          created_at: "2026-10-01T00:00:00Z",
+          pending_version: pendingVersion,
+        },
+      ],
     },
     isLoading: false,
   }),
   useUninstallNotice: () => ({ data: notice }),
 }));
+vi.mock("@/hooks/useCommunityPluginDetail", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useCommunityPluginDetail")>()),
+  useCommunityPluginDetail: () => ({ isLoading: true }),
+}));
 
 beforeEach(() => {
   notice = undefined;
+  closedSurfaces = null;
+  pendingVersion = null;
   openAddress.mockReset();
   uninstall.mockReset();
   uninstall.mockResolvedValue(undefined);
@@ -106,5 +127,37 @@ describe("erasing its data", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove and erase" }));
 
     await waitFor(() => expect(uninstall).toHaveBeenCalledWith(1, 4, { erase: true }));
+  });
+});
+
+describe("when whoever runs the server manages plug-ins", () => {
+  it("lists what is installed, says so, and offers nothing to change", async () => {
+    closedSurfaces = ["plugins"];
+    pendingVersion = "1.1.0";
+    renderPage(SettingsCommunityPluginsPage);
+
+    expect(
+      await screen.findByText("Whoever runs this server manages plug-ins for this community.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("PaidCo")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Rename" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Turn off" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.queryByText("Update waiting")).toBeNull();
+  });
+});
+
+describe("a version waiting for the seat", () => {
+  it("marks its row, and the notice's link opens that row", async () => {
+    pendingVersion = "1.1.0";
+    const { router } = renderPage(SettingsCommunityPluginsPage);
+
+    expect(await screen.findByText("Update waiting")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Open settings" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // Followed while the page is already open.
+    await router.navigate({ to: ".", search: { plugin: 4 } });
+    await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "true"));
   });
 });

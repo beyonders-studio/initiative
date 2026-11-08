@@ -1,4 +1,4 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
 import {
@@ -7,6 +7,7 @@ import {
 } from "@/api/generated/task-statuses/task-statuses";
 import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
+import { TaskEditPage } from "@/pages/initiativeTools/projects/TaskEditPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/tasks/$taskId"
@@ -44,9 +45,5 @@ export const Route = createFileRoute(
       }),
     ]).catch(() => {});
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/projects/TaskEditPage").then((m) => ({
-      default: m.TaskEditPage,
-    }))
-  ),
+  component: TaskEditPage,
 });

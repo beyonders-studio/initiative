@@ -1,42 +1,52 @@
 import { Link } from "@tanstack/react-router";
-import type { LucideIcon } from "lucide-react";
-import { type ComponentType, memo, useMemo } from "react";
+import { CornerLeftUp, type LucideIcon } from "lucide-react";
+import { type ComponentType, memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
   ChecklistProgress,
+  FileSummary,
   PropertyDefinitionRead,
   PropertySummary,
   TagSummary,
   TaskAssigneeSummary,
   TaskListRead,
+  TaskParentSummary,
   TaskPriority,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType, type PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { FileTypeBadge } from "@/components/files/fileColumns";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
 import { TaskAssigneeList, TaskAssigneeStack } from "@/components/projects/TaskAssigneeList";
 import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
+import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
+import type { FieldDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { DateCell } from "@/components/tasks/TaskDateCell";
 import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Badge } from "@/components/ui/badge";
 import { MentionText } from "@/components/user/MentionText";
+import { useStepCounter } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatDateTime } from "@/lib/formatDate";
 import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
-import { cn } from "@/lib/utils";
+import { entityRefRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
 
 import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 
-/** What a view draws. Tasks for now; other kinds join as their tools move. */
+/** What a view draws: tasks, and a collection's files, which its own fields
+ *  (`lib/layouts/files.ts`) read. */
 export type LayoutItem = TaskListRead;
 
 /** Where a field is drawn. On a detail it is its editor, which the
@@ -50,17 +60,78 @@ export type FieldKind =
   | "date"
   | "recurrence"
   | "checklist"
+  | "subtasks"
+  | "parent"
   | "priority"
   | "count"
   | "tags"
   | "taskType"
   | "property"
-  | "plugin";
+  | "plugin"
+  | "fileName"
+  | "fileType"
+  | "fileSize";
 
 /** A property's field, by its definition id: what a view stores, so renaming
  *  the property keeps every view that shows it. */
 export const PROPERTY_FIELD_PREFIX = "property:";
 export const propertyFieldId = (definitionId: number) => `${PROPERTY_FIELD_PREFIX}${definitionId}`;
+
+/** Fields of one owner, under the heading a list of them shows. */
+export type FieldGroup = {
+  key: string;
+  /** An i18n key, or a plug-in's own name where `plugin` is set. */
+  heading: string;
+  /** The install whose fields these are. */
+  plugin?: number;
+  fields: FieldDef[];
+};
+
+/** The owners a field may have, in the order they are listed, by heading. */
+const OWNER_GROUPS = [
+  ["builtIn", "layouts:builtIn"],
+  ["projectMetadata", "layouts:projectProperties"],
+  ["collectionMetadata", "layouts:collectionProperties"],
+  ["properties", "layouts:initiativeMetadata"],
+] as const;
+
+const ownerOf = (field: FieldDef): (typeof OWNER_GROUPS)[number][0] =>
+  field.source === "builtin"
+    ? "builtIn"
+    : field.property?.project_id
+      ? "projectMetadata"
+      : field.property?.collection_id
+        ? "collectionMetadata"
+        : "properties";
+
+/**
+ * `fields` grouped by who they belong to: the tool's own, a project's or a
+ * collection's metadata, the initiative's properties, then each plug-in's
+ * under its name. A group with nothing in it is left out.
+ */
+export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
+  const installs = new Map<number, FieldGroup>();
+  for (const field of fields) {
+    if (!field.plugin) continue;
+    const { install, on } = field.plugin;
+    const group = installs.get(install) ?? {
+      key: `plugin:${install}`,
+      heading: on.name,
+      plugin: install,
+      fields: [],
+    };
+    group.fields.push(field);
+    installs.set(install, group);
+  }
+  return [
+    ...OWNER_GROUPS.map(([owner, heading]) => ({
+      key: owner,
+      heading,
+      fields: fields.filter((field) => !field.plugin && ownerOf(field) === owner),
+    })),
+    ...installs.values(),
+  ].filter((group) => group.fields.length > 0);
+};
 
 /** Anything a view can show about an item. */
 export type FieldDef = {
@@ -78,11 +149,21 @@ export type FieldDef = {
   typeOf?: (item: LayoutItem) => TaskTypeRead | null;
   /** A title cannot be hidden: a card with no title is not a card. */
   hideable: boolean;
+  /** Whether an item's page can require it: a value a person fills in that
+   *  can be left empty. A title is always required; what is never empty, what
+   *  a plug-in fills and what nobody fills cannot be. */
+  requireable: boolean;
   /** A plug-in field's install and declaration, and the install as the
    *  reader meets it on this kind of item. */
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
+  /** How a scale or a counter is drawn where the list showing it says. */
+  display?: FieldDisplay;
+  /** A property drawn on a card as its value alone, not named: a
+   *  collection's card under a picture, which reads as a caption or a price
+   *  rather than a row of labelled chips. */
+  plain?: boolean;
   /** The sentence the value sits in, as an i18n key ("Due: {{date}}"). */
   phrase?: string;
   icon?: LucideIcon;
@@ -104,6 +185,14 @@ export type LayoutEnv = {
   /** What can be done with an item from where it is drawn, beside its title
    *  on a card: a board its reader may change. */
   itemActions?: ComponentType<{ item: LayoutItem }>;
+  /** Steps a counter on an item where the list's reader may change it there,
+   *  answering with the item's values as the server then holds them. Left
+   *  out, or answering null for an item they may not change, a counter is
+   *  drawn without its buttons. */
+  stepCounter?: (
+    item: LayoutItem,
+    definition: PropertyDefinitionRead
+  ) => ((up: boolean) => Promise<PropertySummary[]>) | null;
 };
 
 // The namespaces a layout's names are in, loaded together so none shows as a
@@ -117,6 +206,21 @@ export const LAYOUT_NAMESPACES = [
   "relations",
   "calendars",
 ] as const;
+
+/** How a list of `target`s steps its counters: an item's, where `may` says
+ *  its reader may change that counter on it from the list. `may` is kept
+ *  between renders by its caller. */
+export const useCounterSteps = (
+  target: PropertyTarget,
+  may: (item: LayoutItem, definition: PropertyDefinitionRead) => boolean
+): NonNullable<LayoutEnv["stepCounter"]> => {
+  const { mutateAsync } = useStepCounter(target);
+  return useCallback(
+    (item, definition) =>
+      may(item, definition) ? (up) => mutateAsync({ itemId: item.id, definition, up }) : null,
+    [may, mutateAsync]
+  );
+};
 
 /** The env of a project's views: one community, and its tasks' pages. */
 export const useProjectLayoutEnv = (taskHref: (taskId: number) => string): LayoutEnv => {
@@ -134,6 +238,8 @@ export type FieldRendererProps = {
   field: FieldDef;
   variant: LayoutVariant;
   env: LayoutEnv;
+  /** Drawn on one line ({@link LayoutContext}'s `oneLine`). */
+  oneLine?: boolean;
 };
 
 /** Whether a value has nothing to show. A count of none is null by then. */
@@ -168,10 +274,11 @@ const TitleCell = ({
       )
     : null;
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex w-full min-w-60 flex-col items-start text-left">
-        <div className="flex items-center gap-1.5">
-          {type ? <TaskTypeMark type={type} /> : null}
+    <div className="flex w-full min-w-60 items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+        <div className="flex items-start gap-1.5">
+          {/* One line of the title tall, so it sits on the first line's middle. */}
+          {type ? <TaskTypeMark type={type} className="h-lh" /> : null}
           <Link
             to={env.taskHref(task)}
             draggable={false}
@@ -186,6 +293,7 @@ const TitleCell = ({
         ) : null}
         <TaskChecklistProgress progress={task.checklist_progress} className="mt-2 max-w-[200px]" />
       </div>
+      <TaskSubtasksHoverCard task={task} />
       <TaskBlockersHoverCard task={task} />
       <TaskDescriptionHoverCard task={task} />
     </div>
@@ -281,6 +389,41 @@ const ChecklistField = ({ value }: FieldRendererProps) => (
   <TaskChecklistProgress progress={value as ChecklistProgress} className="w-full pt-1" />
 );
 
+const SubtasksField = ({ value }: FieldRendererProps) => (
+  <TaskChecklistProgress
+    of="subtasks"
+    progress={value as ChecklistProgress}
+    className="w-full min-w-24 pt-1"
+  />
+);
+
+// The task this one is part of, as a link to it: on a card a line above what
+// the card says, in a cell its name.
+const ParentField = ({ value, item, variant, env }: FieldRendererProps) => {
+  const parent = value as TaskParentSummary | null;
+  if (!parent) {
+    return variant === "cell" ? (
+      <span className="text-muted-foreground text-sm">&mdash;</span>
+    ) : null;
+  }
+  return (
+    <Link
+      // By the task alone: a parent may be in another of the initiative's
+      // projects, which a project's own task links would name wrongly.
+      to={env.communityPath(entityRefRoute("task", parent.id), item)}
+      draggable={false}
+      title={env.t("tasks:subtasks.partOf", { title: parent.title })}
+      className={cn(
+        "flex min-w-0 max-w-full items-center gap-1 rounded-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring",
+        variant === "cell" ? "text-sm" : "text-xs"
+      )}
+    >
+      <CornerLeftUp className="h-3 w-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">{parent.title}</span>
+    </Link>
+  );
+};
+
 const PriorityField = ({ value, field, env }: FieldRendererProps) => {
   const priority = value as TaskPriority;
   const text = priority.replace("_", " ");
@@ -346,12 +489,62 @@ const TaskTypeField = ({ value, variant }: FieldRendererProps) => {
   return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
 };
 
-const PropertyField = ({ value, variant }: FieldRendererProps) => (
-  <PropertyValueCell
-    summary={(value as PropertySummary | null) ?? undefined}
-    variant={variant === "cell" ? "cell" : "chip"}
-  />
+const PropertyField = ({ value, item, field, variant, env, oneLine }: FieldRendererProps) => {
+  const summary = (value as PropertySummary | null) ?? undefined;
+  const step =
+    summary && field.property?.type === MetadataType.counter
+      ? env.stepCounter?.(item, field.property)
+      : null;
+  return (
+    <PropertyValueCell
+      summary={summary}
+      variant={variant === "cell" || field.plain ? "cell" : "chip"}
+      display={field.display}
+      oneLine={oneLine}
+      onStep={step ?? undefined}
+    />
+  );
+};
+
+/** `fields`, each scale or counter drawn as a list's `displays` say. */
+export const withDisplays = <F extends Pick<FieldDef, "display">>(
+  fields: ReadonlyMap<string, F>,
+  displays: Readonly<Record<string, FieldDisplay>> | null | undefined
+): ReadonlyMap<string, F> =>
+  displays && Object.keys(displays).length > 0
+    ? new Map(
+        [...fields].map(([id, field]) => [
+          id,
+          id in displays ? { ...field, display: displays[id] } : field,
+        ])
+      )
+    : fields;
+
+// A file's own fields hold the file, or its size, as their value.
+const FileNameField = ({ value, variant }: FieldRendererProps) => (
+  <p className={cn("min-w-0 truncate", variant === "card" ? "font-medium text-sm" : "text-sm")}>
+    {(value as FileSummary).name}
+  </p>
 );
+
+const FileTypeField = ({ value }: FieldRendererProps) => (
+  <FileTypeBadge file={value as FileSummary} />
+);
+
+// A file of the app's own has no size; a cell says so.
+const FileSizeField = ({ value, variant }: FieldRendererProps) =>
+  typeof value === "number" ? (
+    <span
+      className={cn(
+        "tabular-nums",
+        variant === "card" ? "text-muted-foreground text-xs" : "text-sm"
+      )}
+    >
+      {formatBytes(value)}
+    </span>
+  ) : variant === "cell" ? (
+    <span className="text-muted-foreground text-sm">&mdash;</span>
+  ) : null;
 
 /** One renderer per kind of field, each skipping a redraw its props don't call
  *  for. */
@@ -362,10 +555,15 @@ export const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps
   date: memo(DateField),
   recurrence: memo(RecurrenceField),
   checklist: memo(ChecklistField),
+  subtasks: memo(SubtasksField),
+  parent: memo(ParentField),
   priority: memo(PriorityField),
   count: memo(CountField),
   tags: memo(TagsField),
   taskType: memo(TaskTypeField),
   property: memo(PropertyField),
   plugin: memo(PluginField),
+  fileName: memo(FileNameField),
+  fileType: memo(FileTypeField),
+  fileSize: memo(FileSizeField),
 };

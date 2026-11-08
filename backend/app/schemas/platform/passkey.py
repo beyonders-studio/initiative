@@ -2,16 +2,35 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
-from pydantic import ConfigDict, EmailStr, Field, field_validator
+from pydantic import AfterValidator, ConfigDict, EmailStr, Field
 
 from app.schemas.base import SanitizedBaseModel, TitleStr
 from app.schemas.platform.guild import NewCommunity
-from app.services.auth.native_handoff import is_challenge
+from app.services.auth.native_handoff import is_challenge, is_verifier
 
 #: The longest name a passkey may be given. Mirrors the service's cap.
 NAME_MAX_LENGTH = 64
+
+
+def _challenge_shape(value: str) -> str:
+    if value and not is_challenge(value):
+        raise ValueError("code_challenge is not an S256 challenge")
+    return value
+
+
+def _verifier_shape(value: str) -> str:
+    if value and not is_verifier(value):
+        raise ValueError("code_verifier is not an RFC 7636 verifier")
+    return value
+
+
+#: The app's S256 challenge, which a sign-in or sign-up the app begins is
+#: bound to: only the app holding the verifier behind it can finish it.
+AppChallenge = Annotated[str, AfterValidator(_challenge_shape)]
+#: The verifier behind the challenge the ceremony was begun with.
+AppVerifier = Annotated[str, AfterValidator(_verifier_shape)]
 
 
 class PasskeyRead(SanitizedBaseModel):
@@ -90,15 +109,12 @@ class PasskeySignInStart(SanitizedBaseModel):
     """Beginning a sign-in. No account is named: the authenticator offers what
     it holds for this domain, and the assertion names the credential."""
 
+    #: From the app, which finishes the sign-in itself with the verifier.
+    code_challenge: AppChallenge = ""
 
-class PasskeySignUpStart(SanitizedBaseModel):
-    """Registering an account whose way in is a key rather than a password.
 
-    The same things a password registration says about itself, minus the
-    password. A deployment that has withdrawn passwords has no other door of
-    its own; before this, it could only take a registration through an
-    identity provider.
-    """
+class _PasskeySignUpDetails(SanitizedBaseModel):
+    """What a passkey registration says about the account, at both calls."""
 
     email: EmailStr
     # The name part of the handle. The number behind it is drawn server-side —
@@ -118,7 +134,20 @@ class PasskeySignUpStart(SanitizedBaseModel):
     accepted_documents: list[str] = Field(default_factory=list, max_length=32)
 
 
-class PasskeySignUpFinish(PasskeySignUpStart):
+class PasskeySignUpStart(_PasskeySignUpDetails):
+    """Registering an account whose way in is a key rather than a password.
+
+    The same things a password registration says about itself, minus the
+    password. A deployment that has withdrawn passwords has no other door of
+    its own; before this, it could only take a registration through an
+    identity provider.
+    """
+
+    #: From the app, which finishes the registration itself with the verifier.
+    code_challenge: AppChallenge = ""
+
+
+class PasskeySignUpFinish(_PasskeySignUpDetails):
     """The browser's answer, with the same details it began with.
 
     Said again rather than kept: nothing about the account exists between the
@@ -129,6 +158,8 @@ class PasskeySignUpFinish(PasskeySignUpStart):
     credential: dict[str, Any]
     #: What to call the credential in the account's own list.
     name: TitleStr = Field(default="Passkey", min_length=1, max_length=NAME_MAX_LENGTH)
+    #: The verifier behind ``code_challenge``, where the begin carried one.
+    code_verifier: AppVerifier = ""
 
 
 class PasskeySignUpResult(SanitizedBaseModel):
@@ -141,6 +172,9 @@ class PasskeySignUpResult(SanitizedBaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    #: For the app, which keeps its own refresh token. A browser gets it as a
+    #: cookie, and this stays absent.
+    refresh_token: Optional[str] = None
     codes: list[str] = Field(default_factory=list)
 
 
@@ -156,31 +190,10 @@ class PasskeySignInFinish(SanitizedBaseModel):
 
     #: ``AuthenticationResponseJSON`` — the assertion as the browser returned it.
     credential: dict[str, Any]
-    #: As on begin. The device name is what the app's device list shows.
-    mobile: bool = False
+    #: What the app's device list calls the device signing in.
     device_name: str = Field(default="", max_length=255)
-    #: For a mobile sign-in: the app's S256 challenge, which the code handed
-    #: back is bound to.
-    code_challenge: str = ""
-
-    @field_validator("code_challenge")
-    @classmethod
-    def _challenge_shape(cls, value: str) -> str:
-        if value and not is_challenge(value):
-            raise ValueError("code_challenge is not an S256 challenge")
-        return value
-
-
-class PasskeySignInResult(SanitizedBaseModel):
-    """A session for a browser, or a way back to the app for a phone."""
-
-    #: The session's access token, for a browser sign-in. The refresh token is
-    #: set as a cookie the page never reads.
-    access_token: Optional[str] = None
-    token_type: str = "bearer"
-    #: For a mobile sign-in: the app's own callback address carrying the
-    #: one-time code, which the relay page navigates to.
-    redirect_to: Optional[str] = None
+    #: The verifier behind ``code_challenge``, where the begin carried one.
+    code_verifier: AppVerifier = ""
 
 
 class PasskeyStepUpFinish(SanitizedBaseModel):

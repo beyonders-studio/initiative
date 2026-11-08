@@ -43,22 +43,15 @@
     "task": "Una tarea",
     "file": "Un archivo",
     "project": "Un proyecto",
-    "queue": "Una cola",
-    "queue_item": "Un elemento",
-    "gallery": "Una galería",
-    "gallery_image": "Una imagen",
     "calendar": "Un calendario",
     "calendar_event": "Un evento",
     "counter": "Un contador",
     "counter_group": "Un grupo de contadores",
     "dashboard": "Un panel",
     "wiki": "Una wiki",
-    "wiki_page": "Una página de wiki"
-  },
-  "paging": {
-    "newer": "Más recientes",
-    "older": "Más antiguas",
-    "page": "Página {{page}}"
+    "wiki_page": "Una página de wiki",
+    "contact": "Un contacto",
+    "collection": "Una colección"
   },
   "report": {
     "action": "Denunciar",

@@ -2,11 +2,11 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { FindOptions } from "@/lib/spreadsheet/find";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 interface SpreadsheetFindBarProps {
   query: string;

@@ -1,7 +1,7 @@
 import type { PaginationState, SortingState } from "@tanstack/react-table";
 import { useState } from "react";
 
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /** How long typing settles before the list is asked again. */
 const SEARCH_SETTLES_MS = 250;

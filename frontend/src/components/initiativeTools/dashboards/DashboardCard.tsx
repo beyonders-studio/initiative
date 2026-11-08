@@ -8,12 +8,12 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { DashboardCanvas } from "@/components/initiativeTools/dashboards/DashboardCanvas";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWidgetCatalog } from "@/hooks/useDashboards";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import { readConfig, readDefinition } from "@/lib/widgets/definition";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
 
 interface DashboardCardProps {
   dashboard: DashboardSummary;

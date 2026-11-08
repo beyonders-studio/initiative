@@ -1,7 +1,7 @@
 import type { RecurrenceStrategy } from "@/api/generated/initiativeAPI.schemas";
-import { dateTimeFormat, listFormat } from "@/lib/intl";
 import { browserTimezone } from "@/lib/timezones";
 import type { TranslateFn } from "@/types/i18n";
+import { dateTimeFormat, listFormat } from "@/ui/lib/intl";
 
 /** The task's rule, completion strategy and optional daily maximum change together. */
 export type TaskRecurrenceValue = {
@@ -891,6 +891,18 @@ export const rulePayload = (
   if (rule === "custom") return {};
   if (rule === null) return { recurrence: null };
   return { recurrence: toRRule(rule, options), tz: browserTimezone() };
+};
+
+/**
+ * The shift the server keeps beside `rule` picked here for a series starting
+ * at `start`, as `app.core.recurrence.shift_for` works it out: the browser's
+ * offset for a rule of hours, otherwise the whole days between the start's
+ * local date and its UTC one. What {@link fromStored} is given to read the rule
+ * back as it was picked.
+ */
+export const shiftFor = (rule: RecurrenceRule, start: Date): number => {
+  if (rule.frequency === "hourly") return -start.getTimezoneOffset();
+  return (localDayNumber(start) - utcDayNumber(start)) * 1440;
 };
 
 /**

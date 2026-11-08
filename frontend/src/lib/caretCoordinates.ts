@@ -1,4 +1,5 @@
-// Pixel position of the text caret inside a <textarea>, relative to the
+// Pixel position of the text caret inside a <textarea> or a one-line
+// <input>, relative to the
 // element's top-left (border box). Used to anchor the mention popover under
 // the word being typed rather than under the whole field.
 //
@@ -49,7 +50,7 @@ export interface CaretCoordinates {
 }
 
 export function getCaretCoordinates(
-  element: HTMLTextAreaElement,
+  element: HTMLTextAreaElement | HTMLInputElement,
   position: number
 ): CaretCoordinates {
   const computed = window.getComputedStyle(element);
@@ -60,7 +61,8 @@ export function getCaretCoordinates(
 
   style.position = "absolute";
   style.visibility = "hidden";
-  style.whiteSpace = "pre-wrap";
+  // A one-line field never wraps; it scrolls, which `scrollLeft` below undoes.
+  style.whiteSpace = element instanceof HTMLInputElement ? "pre" : "pre-wrap";
   style.wordWrap = "break-word";
   style.overflow = "hidden";
   for (const prop of MIRRORED_PROPERTIES) {

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type ComponentProps, useMemo } from "react";
 
 import { CommentReferences } from "@/components/comments/CommentReferences";
 import { Markdown } from "@/components/Markdown";
@@ -8,6 +8,7 @@ interface TaskDescriptionProps {
   /** The community the task is in, where that is not the one the page is in. */
   communityId?: number;
   className?: string;
+  onChange?: ComponentProps<typeof Markdown>["onChange"];
 }
 
 /**
@@ -19,11 +20,16 @@ interface TaskDescriptionProps {
  * screen. A board of cards shows each card's excerpt instead, with the people
  * in all of them asked about once for the board.
  */
-export const TaskDescription = ({ content, communityId, className }: TaskDescriptionProps) => {
+export const TaskDescription = ({
+  content,
+  communityId,
+  className,
+  onChange,
+}: TaskDescriptionProps) => {
   const contents = useMemo(() => [content], [content]);
   return (
     <CommentReferences contents={contents} communityId={communityId}>
-      <Markdown content={content} className={className} mentions />
+      <Markdown content={content} className={className} onChange={onChange} mentions />
     </CommentReferences>
   );
 };

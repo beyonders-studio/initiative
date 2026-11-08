@@ -7,21 +7,21 @@
  * from, and where ``/.well-known/security.txt`` sends people to do it.
  */
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FiledTicketRead } from "@/api/generated/initiativeAPI.schemas";
-import { SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import {
   ReportSecurityProblemButton,
   SecurityReportDialog,
 } from "@/components/tickets/ReportSecurityProblem";
 import { TicketStateBadge } from "@/components/tickets/TicketStateBadge";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useFiledTickets } from "@/hooks/useTickets";
 import { ticketTitle } from "@/lib/ticketTitle";
+import { Card } from "@/ui/card";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { SkeletonRegion } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 const TicketRow = ({ ticket }: { ticket: FiledTicketRead }) => {
   const { t } = useTranslation("intake");
@@ -54,9 +54,11 @@ export const MyTicketsPage = () => {
   const [reporting, setReporting] = useState(report === "security");
   // Asked for again while already here — the command palette, say — opens it
   // too, not only on arrival.
-  useEffect(() => {
+  const [prevReport, setPrevReport] = useState(report);
+  if (prevReport !== report) {
+    setPrevReport(report);
     if (report === "security") setReporting(true);
-  }, [report]);
+  }
 
   const closeReport = (open: boolean) => {
     setReporting(open);

@@ -23,7 +23,7 @@
  * dialog is what answers it, at the moment it starts to matter.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
@@ -33,14 +33,14 @@ import {
   SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Switch } from "@/ui/switch";
 
 import { CommunityAutoJoinPrompt } from "./CommunityAutoJoinPrompt";
 import { PublishCommunityDialog } from "./PublishCommunityDialog";
@@ -58,10 +58,12 @@ export const CommunityDiscoveryPanel = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [prevCommunity, setPrevCommunity] = useState(activeCommunity);
+  if (prevCommunity !== activeCommunity) {
+    setPrevCommunity(activeCommunity);
     setMessage(null);
     setError(null);
-  }, [activeCommunity]);
+  }
 
   if (!communityDirectoryEnabled || !activeCommunity?.can.administer) {
     return null;

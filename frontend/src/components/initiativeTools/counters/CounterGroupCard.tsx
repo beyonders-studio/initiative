@@ -6,12 +6,12 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getContrastingTextColor } from "@/lib/counter-color";
-import { numberFormat } from "@/lib/intl";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { numberFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
 
 interface CounterGroupCardProps {
   group: CounterGroupSummary;

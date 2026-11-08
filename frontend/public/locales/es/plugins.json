@@ -33,9 +33,11 @@
     "autoUpdateOff": "Las actualizaciones ahora se aplican a mano.",
     "upgradeTo": "Actualizar a {{version}}",
     "upToDate": "Actualizada",
+    "updateWaiting": "Actualización pendiente",
     "upgraded": "Actualizada a {{version}}.",
     "removeManagedNeutral": "Los cargos de este complemento los gestiona tu proveedor.",
-    "removeManagedAction": "Gestionar"
+    "removeManagedAction": "Gestionar",
+    "closed": "Quien gestiona este servidor administra los complementos de esta comunidad."
   },
   "updates": {
     "wants": "La versión {{version}} quiere:",
@@ -44,7 +46,8 @@
     "decline": "Rechazar",
     "declined": "Rechazaste la versión {{version}}. El complemento se queda en su versión actual.",
     "declinedDone": "Versión {{version}} rechazada.",
-    "moved": "Ahora hay otra versión disponible. Revisa lo que pide."
+    "moved": "Ahora hay otra versión disponible. Revisa lo que pide.",
+    "refused": "La versión {{version}} no puede ejecutarse en este servidor."
   },
   "install": {
     "title": "Añadir {{name}}",
@@ -250,7 +253,7 @@
       "comments": "Comentarios",
       "relationships": "Vínculos",
       "tags": "Etiquetas",
-      "properties": "Propiedades",
+      "properties": "Metadatos",
       "sharing": "Uso compartido",
       "members": "Miembros",
       "initiatives": "Iniciativas",
@@ -264,10 +267,6 @@
       "files": {
         "read": "Leer archivos",
         "write": "Leer y cambiar archivos"
-      },
-      "queues": {
-        "read": "Leer colas",
-        "write": "Leer y cambiar colas"
       },
       "counter_groups": {
         "read": "Leer contadores",
@@ -285,13 +284,13 @@
         "read": "Leer publicaciones",
         "write": "Leer y cambiar publicaciones"
       },
-      "galleries": {
-        "read": "Leer galerías",
-        "write": "Leer y cambiar galerías"
-      },
       "wikis": {
         "read": "Leer wikis",
         "write": "Leer y cambiar wikis"
+      },
+      "contacts": {
+        "read": "Leer contactos",
+        "write": "Leer y cambiar contactos"
       },
       "comments": {
         "read": "Leer comentarios",
@@ -306,8 +305,8 @@
         "write": "Leer y cambiar etiquetas"
       },
       "properties": {
-        "read": "Leer propiedades personalizadas y sus opciones",
-        "write": "Leer, crear y cambiar propiedades personalizadas"
+        "read": "Leer los metadatos de la iniciativa y sus opciones",
+        "write": "Leer, crear y cambiar los metadatos de la iniciativa"
       },
       "sharing": {
         "read": "Ver quién tiene acceso a qué",

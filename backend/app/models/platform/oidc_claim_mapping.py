@@ -65,8 +65,17 @@ class OIDCClaimMapping(SQLModel, table=True):
     scope_value: Optional[str] = Field(
         default=None, sa_column=Column(String(256), nullable=True)
     )
+    #: Whether the rule also places people in one of the community's
+    #: initiatives. Which one is the community's own, kept in its schema under
+    #: the rule's id (``claim_rule_initiatives``) and read there.
     target_type: OIDCMappingTargetType = Field(
         sa_column=Column(String(20), nullable=False),
+    )
+    #: Which of the rule's rows in ``claim_rule_initiatives`` is its own: the
+    #: one written for the claims it matches now.
+    placement_version: int = Field(
+        default=0,
+        sa_column=Column(Integer, nullable=False, server_default="0"),
     )
     guild_id: int = Field(
         sa_column=Column(
@@ -78,36 +87,6 @@ class OIDCClaimMapping(SQLModel, table=True):
     guild_role: str = Field(
         max_length=20,
         sa_column=Column(String(20), nullable=False, server_default="member"),
-    )
-    # --- ARCHITECTURE DEBT: deliberate, documented, not an oversight ---
-    # These are plain integer columns, NOT foreign keys.
-    #
-    # Why it's wrong: this is a PLATFORM table (lives in `public`, shared across
-    # all guilds), but `initiatives` / `initiative_roles` are GUILD-SCOPED — under
-    # schema-per-guild they move into per-guild schemas. So these columns reach
-    # from shared data down into per-guild data, crossing the tenancy boundary.
-    # A real FK can't span that (the target lives in a different schema per row),
-    # so there is no DB-level referential integrity here: nothing stops a stale
-    # or wrong id, and nothing cleans these up when an initiative/role is deleted.
-    #
-    # The clean fix (if this is ever worth it): move initiative-level OIDC
-    # mappings into a separate GUILD-SCOPED table that lives alongside initiatives,
-    # where the FKs are intra-schema and valid; keep this platform table
-    # guild-target only. We chose not to, because OIDC->initiative provisioning is
-    # a niche self-hoster feature and didn't justify the split.
-    #
-    # Guardrails that compensate for the missing FK:
-    #   - whoever writes a rule validates the initiative/role exists and
-    #     belongs to the mapping's guild before inserting;
-    #   - oidc_sync skips any initiative/role reference that no longer resolves,
-    #     so a dangling row can't crash a login sync.
-    initiative_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, nullable=True),
-    )
-    initiative_role_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, nullable=True),
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

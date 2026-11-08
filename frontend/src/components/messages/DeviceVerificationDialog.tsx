@@ -1,7 +1,8 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useVerification, useVerificationActions } from "@/hooks/useMyMessages";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,8 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useVerification, useVerificationActions } from "@/hooks/useMyMessages";
+} from "@/ui/dialog";
 
 /**
  * A comparison between two of this account's devices, on whichever of them

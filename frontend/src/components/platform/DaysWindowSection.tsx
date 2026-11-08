@@ -12,13 +12,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useCommunitySettings, useUpdateCommunitySettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { readOptionalWholeNumber } from "@/lib/text";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 const MIN_DAYS = 1;
 const MAX_DAYS = 3650;

@@ -167,3 +167,49 @@ def toggle_params(*, task_id: int, item_id: str, done: bool, now: Any) -> dict:
         "now": now,
         "probe": json.dumps([{"id": item_id}]),
     }
+
+
+#: Takes one item out, matching it by id and leaving the rest of the array in
+#: its order. ``WHERE`` matches nothing unless the task still holds the item as
+#: :func:`remove_params` was given it, so a line ticked or reworded meanwhile is
+#: kept as it is.
+_REMOVE = text(
+    """
+    UPDATE tasks
+       SET checklist = (
+               SELECT coalesce(
+                          jsonb_agg(elem ORDER BY ord)
+                              FILTER (WHERE elem->>'id' <> :item_id),
+                          '[]'::jsonb
+                      )
+                 FROM jsonb_array_elements(checklist)
+                      WITH ORDINALITY AS entry(elem, ord)
+           ),
+           updated_at = :now
+     WHERE id = :task_id
+       AND checklist @> :probe ::jsonb
+    RETURNING checklist
+    """
+)
+
+
+def remove_statement() -> TextClause:
+    """The single statement that takes one item out. :func:`remove_params`
+    binds it."""
+    return _REMOVE
+
+
+def remove_params(*, task_id: int, item: dict[str, Any], now: Any) -> dict:
+    """Bind :func:`remove_statement` to take ``item`` out of the task's list,
+    only while the item still reads as it does here."""
+    held = {
+        "id": item["id"],
+        "text": item.get("text", ""),
+        "done": bool(item.get("done")),
+    }
+    return {
+        "task_id": task_id,
+        "item_id": held["id"],
+        "now": now,
+        "probe": json.dumps([held]),
+    }

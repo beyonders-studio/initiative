@@ -1,4 +1,4 @@
-// The widths are Tailwind's sm: … xl:, set in styles.css, and the canvas-sm: …
+// The widths are Tailwind's sm: … xl:, set in src/ui/styles.css, and the canvas-sm: …
 // canvas-xl: variants beside them. Any other width is refused: 2xl:,
 // Tailwind's container sizes as variants (@xs:, @md: …), an arbitrary width
 // variant, and a width media or container query written into a string.
@@ -17,7 +17,7 @@ or {
   },
   register_diagnostic(
     span=$text,
-    message="Only sm:, md:, lg: and xl: set a width (canvas-sm: … for a region; useWidthClass and useRegionWidthClass in code). Grids, forms and rows fill or wrap instead (grid-cols-fill-*, grid-cols-pair, flex-wrap). See the widths in styles.css.",
+    message="Only sm:, md:, lg: and xl: set a width (canvas-sm: … for a region; useWidthClass and useRegionWidthClass in code). Grids, forms and rows fill or wrap instead (grid-cols-fill-*, grid-cols-pair, flex-wrap). See the widths in src/ui/styles.css.",
     severity="error"
   )
 }

@@ -1,6 +1,6 @@
 """What one member keeps about one item: their last open, a bookmark, a
-subscription or an unsubscription, and where they put a project in their own
-list.
+subscription or an unsubscription, a reminder, and where they put a project in
+their own list.
 
 One row per ``(user_id, entity_type, entity_id)``, in the item's community's
 schema, its initiative resolved through the item it names. ``entity_id`` is a
@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Float, Index, Text
+from sqlalchemy import CheckConstraint, Column, DateTime, Float, Index, Text, text
 from sqlmodel import Field, SQLModel
 
 from app.core.tools import CONTENT_KINDS, Tool
@@ -75,17 +75,31 @@ class PersonalItem(SQLModel, table=True):
         ),
         CheckConstraint(
             "num_nonnulls(viewed_at, bookmarked_at, subscribed_at,"
-            " unsubscribed_at, sort_order) > 0",
+            " unsubscribed_at, sort_order, remind_at) > 0",
             name="ck_personal_items_holds_something",
         ),
         CheckConstraint(
             "subscribed_at IS NULL OR unsubscribed_at IS NULL",
             name="ck_personal_items_subscribed_or_not",
         ),
+        CheckConstraint(
+            "remind_at IS NULL OR entity_type = 'task'",
+            name="ck_personal_items_remind_at_task",
+        ),
+        CheckConstraint(
+            "reminded_at IS NULL OR remind_at IS NOT NULL",
+            name="ck_personal_items_reminded_with_reminder",
+        ),
         # A purge drops everyone's rows on an item.
         Index("ix_personal_items_entity", "entity_type", "entity_id"),
         # The tabs bar reads a person's newest opens.
         Index("ix_personal_items_user_viewed_at", "user_id", "viewed_at"),
+        # The reminder sweep reads the reminders not yet sent.
+        Index(
+            "ix_personal_items_remind_at",
+            "remind_at",
+            postgresql_where=text("remind_at IS NOT NULL AND reminded_at IS NULL"),
+        ),
     )
 
     user_id: int = Field(foreign_key="users.id", primary_key=True)
@@ -107,6 +121,16 @@ class PersonalItem(SQLModel, table=True):
     )
     #: Unsubscribed: nothing about it reaches them, whatever ties them to it.
     unsubscribed_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    #: When to remind the member of this task. A repeating task's next one
+    #: takes it at the same distance from its due date
+    #: (``task_series.next_reminders``).
+    remind_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    #: When that reminder went out; setting another clears it.
+    reminded_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Where the member put this project in their own list.

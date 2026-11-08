@@ -41,6 +41,7 @@ from app.models.platform.user_email import UserEmail
 from app.services.auth import addresses
 from app.services.platform import email_outbox
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.models.platform.federated_identity_secret import FederatedIdentitySecret
 from app.models.platform.user import User, UserStatus
 from app.services.auth.oidc.flow_state import s256
@@ -90,7 +91,8 @@ async def test_bootstrap_status_with_users(
         "demo": False,
     }
 
-    monkeypatch.setattr(settings, "DISABLE_GUILD_CREATION", True)
+    await rules.put(session, "community_creation_enabled", False)
+    await session.commit()
     monkeypatch.setattr(settings, "DEMO_MODE", True)
     response = await client.get("/api/v1/auth/bootstrap")
     assert response.json()["public_registration_enabled"] is False
@@ -231,9 +233,9 @@ async def test_register_refuses_anyone_under_the_minimum_where_they_are(
 async def test_register_asks_no_age_where_the_deployment_does_not_check(
     client: AsyncClient, session: AsyncSession
 ):
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False, community_age_gate_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "community_age_gate_enabled", False)
+    await session.commit()
     today = date.today()
 
     response = await _register_born(client, "young", date(today.year - 10, 1, 1))
@@ -410,9 +412,9 @@ async def test_closed_registration_says_nothing_about_the_address(
     """Where registration needs an invite, a held address and a free one are
     refused the same way: whether one is held is only told to somebody the
     deployment would register."""
-    from app.core import config as cfg
 
-    monkeypatch.setattr(cfg.settings, "ENABLE_PUBLIC_REGISTRATION", False)
+    await rules.put(session, "public_registration_enabled", False)
+    await session.commit()
     await create_user(session, email="held-closed@example.com")
 
     answers = []
@@ -805,14 +807,14 @@ async def test_signing_in_starts_the_address_count_over(
     ).status_code == 200
 
 
-@pytest.mark.parametrize("recovery", ["reset", "moderator"])
+@pytest.mark.parametrize("recovery", ["reset", "support"])
 async def test_lifting_a_lock_starts_the_address_count_over(
     client: AsyncClient,
     session: AsyncSession,
     two_per_address,
     recovery: str,
 ) -> None:
-    """The refusal tells them to reset their password, and a moderator's unlock
+    """The refusal tells them to reset their password, and support's unlock
     says the account is open again, so either has to let them in, whichever of
     the two counts was refusing them."""
     from app.models.platform.user import UserRole
@@ -848,10 +850,10 @@ async def test_lifting_a_lock_starts_the_address_count_over(
         )
     else:
         password = "right-password"
-        moderator = await create_user(session, role=UserRole.moderator)
+        support = await create_user(session, role=UserRole.support)
         lifted = await client.delete(
             f"/api/v1/operator/users/{user_id}/sign-in-lock",
-            headers=get_auth_headers(moderator),
+            headers=get_auth_headers(support),
         )
     assert lifted.status_code == 200, lifted.text
     signed_in = await _sign_in(client, "reset@example.com", password)
@@ -2105,12 +2107,11 @@ async def test_oidc_callback_blocks_new_user_when_registration_disabled(
     guild_creation_disabled: bool,
 ):
     """OIDC callback must honor the same no-invite registration gate as /register."""
-    from app.core import config as cfg
 
-    monkeypatch.setattr(
-        cfg.settings, "ENABLE_PUBLIC_REGISTRATION", public_registration_enabled
-    )
-    monkeypatch.setattr(cfg.settings, "DISABLE_GUILD_CREATION", guild_creation_disabled)
+    await rules.put(session, "public_registration_enabled", public_registration_enabled)
+    await session.commit()
+    await rules.put(session, "community_creation_enabled", not guild_creation_disabled)
+    await session.commit()
     # Must have at least one existing user so the bootstrap exception is off.
     await create_user(session)
     await _enable_platform_oidc(session)

@@ -51,10 +51,13 @@ from app.core.config import settings
 from app.db import gucs
 from app.db.authorization import (
     GUILD_ADMIN,
+    HOLDS_EVERY_SURFACE,
     SETTINGS_ADMIN,
     SYSTEM_SESSION,
+    holds,
     live_membership,
 )
+from app.models.platform.guild import GUILD_ADMIN_ROLES, AdminSurface
 from app.models.platform.user import UserRole
 
 logger = logging.getLogger(__name__)
@@ -89,17 +92,12 @@ __all__ = [
 # what it reaches is the community's work, not its settings, so the two are kept
 # apart here rather than in each policy.
 CONFIGURED_GID = f"COALESCE({gucs.GUILD_ID}, {gucs.SETTINGS_GUILD_ID})"
-#: The reader administers the routed community. A lookup on the membership
-#: row, made by the standing statement and written where a policy can read it
-#: — the same leg the guild schemas' gates carry, from one definition — beside
-#: the rung a live settings grant confers, which is its own axis.
-ROUTED_ADMIN = f"({SYSTEM_SESSION} OR {GUILD_ADMIN} OR {SETTINGS_ADMIN})"
-#: The reader changes what they administer. The membership row's admin does;
-#: a settings rung reads, and writes only beside a live read_write content
-#: grant — the two asks together.
-ROUTED_ADMIN_WRITE = (
-    f"({SYSTEM_SESSION} OR {GUILD_ADMIN} OR ({SETTINGS_ADMIN} AND {gucs.PAM_WRITE}))"
-)
+
+#: The rungs that administer a community, as a policy lists them.
+_ADMIN_RUNGS = ", ".join(f"'{rung.value}'" for rung in sorted(GUILD_ADMIN_ROLES))
+#: Who may take a membership off the admin rung: a holder of every surface,
+#: a settings rung, or the system engine — the same answer the routes ask.
+_UNMAKES_AN_ADMIN = f"({SYSTEM_SESSION} OR {HOLDS_EVERY_SURFACE} OR {SETTINGS_ADMIN})"
 
 # --- Predicate builders -------------------------------------------------------
 # Each returns the SQL of a policy predicate. ``{table}`` is replaced with the
@@ -120,17 +118,28 @@ def guild_scoped(col: str = "guild_id") -> str:
     return f"{col} = {CONFIGURED_GID}"
 
 
-def routed_admin(col: str = "guild_id") -> str:
+def routed_admin(col: str = "guild_id", surface: AdminSurface | None = None) -> str:
     """The row belongs to this request's community and the reader administers
-    it — as its admin, or at the rung a live settings grant confers."""
-    return f"{col} = {CONFIGURED_GID} AND {ROUTED_ADMIN}"
+    it — holding ``surface`` where the row is part of one, as its admin
+    otherwise: lookups the standing statement made, the same legs the guild
+    schemas' gates carry — or holds the rung a live settings grant confers,
+    which is its own axis."""
+    administers = GUILD_ADMIN if surface is None else holds(surface)
+    return (
+        f"{col} = {CONFIGURED_GID} AND ({SYSTEM_SESSION}"
+        f" OR {administers} OR {SETTINGS_ADMIN})"
+    )
 
 
-def routed_admin_write(col: str = "guild_id") -> str:
-    """The row belongs to this request's community and the reader changes what
-    they administer — as its admin, or on a settings grant beside a read_write
-    content grant."""
-    return f"{col} = {CONFIGURED_GID} AND {ROUTED_ADMIN_WRITE}"
+def routed_admin_write(col: str, surface: AdminSurface) -> str:
+    """The row belongs to this request's community and the reader changes the
+    ``surface`` it is part of: holding it, or on a settings grant, which
+    reads, and writes only beside a live read_write content grant — the two
+    asks together."""
+    return (
+        f"{col} = {CONFIGURED_GID} AND ({SYSTEM_SESSION} OR {holds(surface)}"
+        f" OR ({SETTINGS_ADMIN} AND {gucs.PAM_WRITE}))"
+    )
 
 
 def routed_or_own(guild_col: str, user_col: str) -> str:
@@ -184,6 +193,11 @@ def seat_write(col: str = "guild_id") -> str:
     """The seat, changing what it holds: by the membership row, or lent by a
     settings grant beside a live read_write content grant."""
     return f"{seat(col)} AND ({GUILD_ADMIN} OR {gucs.PAM_WRITE})"
+
+
+#: Which of a community's rule rows are its own, and which the deployment's.
+COMMUNITY_RULE_SET_BY_COMMUNITY = "set_by = 'community'"
+COMMUNITY_RULE_SET_BY_DEPLOYMENT = "set_by = 'deployment'"
 
 
 # Predicates one table family shares, named once.
@@ -305,6 +319,7 @@ SHARED_ROLES = frozenset(
         "app_guild_base_ro",
         "app_billing_log",
         "app_dm_reader",
+        "app_presence_reader",
         "app_profile_reader",
         "app_superadmin",
         "guest_base",
@@ -628,6 +643,113 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     ),
     # Who an account has agreed to hear from. Per-account and cross-guild, like
     # ``user_dm_settings``.
+    "community_rules": SharedTable(
+        rls=TableRls(
+            policies=(
+                # Before routing and on the platform path: the communities the
+                # reader belongs to (a sign-in reads every one it is in).
+                Policy(
+                    "community_rules_select",
+                    SELECT,
+                    (
+                        "app_user",
+                        "platform_base",
+                    ),
+                    using=routed_or_member("guild_id"),
+                ),
+                # A routed request, the seat's, a read-only one's and a guest's
+                # included, reads its own community's rules: the sign-in gate
+                # asks one of them.
+                Policy(
+                    "community_rules_routed_read",
+                    SELECT,
+                    (
+                        "app_guild_base",
+                        "app_guild_base_ro",
+                        "app_superadmin",
+                        "guest_base",
+                    ),
+                    using=routed_or_pam("guild_id"),
+                ),
+                Policy(
+                    "community_rules_pam_read",
+                    SELECT,
+                    ("public",),
+                    using=pam_read("guild_id"),
+                ),
+                # A settings rung routed read-only reads the community it
+                # administers.
+                Policy(
+                    "community_rules_settings_read",
+                    SELECT,
+                    ("app_guild_base_ro",),
+                    using=routed_admin("guild_id"),
+                ),
+                # The staff list of every community reads each one's plan: the
+                # deployment's rows, never the community's own.
+                Policy(
+                    "community_rules_plan_read",
+                    SELECT,
+                    Capability.COMMUNITIES_READ,
+                    using=COMMUNITY_RULE_SET_BY_DEPLOYMENT,
+                ),
+                # The seat writes the community's own rows, through the floor
+                # its role holds; a deployment row is the deployment's.
+                Policy(
+                    "community_rules_seat_delete",
+                    DELETE,
+                    ("app_superadmin",),
+                    using=f"{seat_write('guild_id')} AND {COMMUNITY_RULE_SET_BY_COMMUNITY}",
+                ),
+                Policy(
+                    "community_rules_seat_insert",
+                    INSERT,
+                    ("app_superadmin",),
+                    check=f"{seat_write('guild_id')} AND {COMMUNITY_RULE_SET_BY_COMMUNITY}",
+                ),
+                Policy(
+                    "community_rules_seat_update",
+                    UPDATE,
+                    ("app_superadmin",),
+                    using=f"{seat_write('guild_id')} AND {COMMUNITY_RULE_SET_BY_COMMUNITY}",
+                ),
+                # Billing's sync writes the deployment's rows of the community
+                # it was routed to: what the plan gives (``rules.put``).
+                *(
+                    Policy(
+                        f"billing_community_rules_{name}",
+                        command,
+                        ("initiative_billing",),
+                        **{
+                            clause: f"{billing_scoped('guild_id')}"
+                            f" AND {COMMUNITY_RULE_SET_BY_DEPLOYMENT}"
+                        },
+                    )
+                    for name, command, clause in (
+                        ("select", SELECT, "using"),
+                        ("insert", INSERT, "check"),
+                        ("update", UPDATE, "using"),
+                        ("delete", DELETE, "using"),
+                    )
+                ),
+            ),
+        ),
+        grants=Grants(
+            # A community's stored rules (app.core.rules), written by its seat
+            # and, for the deployment's rows, by the operator on the system
+            # engine and billing's sync under its own role (granted in the
+            # migration, like its other tables); read wherever one is
+            # enforced. The system engine reads them for a notification's send
+            # and a sweep, and drops them with the community.
+            app_admin=DML,
+            # A sign-in reads the rules of every community the account is in.
+            app_user=frozenset({SELECT}),
+            app_guild_base=frozenset({SELECT}),
+            platform_base=frozenset({SELECT}),
+            app_superadmin=DML,
+            guest_base=frozenset({SELECT}),
+        ),
+    ),
     "contact_grants": SharedTable(
         rls=TableRls(
             policies=(
@@ -1001,67 +1123,6 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
         ),
     ),
     # A community's sign-in requirement, read before routing by the gate.
-    "guild_auth_policies": SharedTable(
-        rls=TableRls(
-            policies=(
-                # The gate reads a community's rule before any routing exists.
-                Policy("guild_auth_policies_read", SELECT, ("app_user",), using=OPEN),
-                # The platform path reads the rules of the communities the reader
-                # belongs to.
-                Policy(
-                    "guild_auth_policies_member_read",
-                    SELECT,
-                    ("platform_base",),
-                    using=member_of_guild("guild_id"),
-                ),
-                # A routed request, the seat's and a guest's included, reads its
-                # own community's rule.
-                Policy(
-                    "guild_auth_policies_routed_read",
-                    SELECT,
-                    (
-                        "app_guild_base",
-                        "app_guild_base_ro",
-                        "app_superadmin",
-                        "guest_base",
-                    ),
-                    using=routed_or_pam("guild_id"),
-                ),
-                Policy(
-                    "guild_auth_policies_seat_delete",
-                    DELETE,
-                    ("public",),
-                    using=seat_write("guild_id"),
-                ),
-                Policy(
-                    "guild_auth_policies_seat_insert",
-                    INSERT,
-                    ("public",),
-                    check=seat_write("guild_id"),
-                ),
-                Policy(
-                    "guild_auth_policies_seat_update",
-                    UPDATE,
-                    ("public",),
-                    using=seat_write("guild_id"),
-                ),
-            ),
-        ),
-        grants=Grants(
-            # per-guild sign-in requirement — written via the guild-admin endpoint
-            # (provider validation happens on the system engine)
-            app_admin=DML,
-            # the guild-access gate reads the policy on the bare login role, pre-routing
-            app_user=frozenset({SELECT}),
-            # 0147 granted SELECT: the routed community's gate reads its requirement
-            # (guild_auth_policies_routed_read, 0360). 0297 added the three writes and
-            # 0349 moved them to app_superadmin, the floor only a seat route inherits.
-            app_guild_base=frozenset({SELECT}),
-            platform_base=frozenset({SELECT}),
-            app_superadmin=DML,
-            guest_base=frozenset({SELECT}),
-        ),
-    ),
     # The pictures a guild is known by — its icon, and the two renditions of its banner.
     # Identity, like the name and description they sit beside, and read by people
     # browsing the directory, who hold no role in any guild schema.
@@ -1118,13 +1179,13 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     "guild_delete",
                     DELETE,
                     ("app_guild_base",),
-                    using=routed_admin_write("guild_id"),
+                    using=routed_admin_write("guild_id", AdminSurface.invites),
                 ),
                 Policy(
                     "guild_insert",
                     INSERT,
                     ("app_guild_base",),
-                    check=routed_admin_write("guild_id"),
+                    check=routed_admin_write("guild_id", AdminSurface.invites),
                 ),
                 Policy(
                     "guild_select",
@@ -1133,7 +1194,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                         "app_guild_base",
                         "app_guild_base_ro",
                     ),
-                    using=routed_admin("guild_id"),
+                    using=routed_admin("guild_id", AdminSurface.invites),
                 ),
             ),
         ),
@@ -1180,12 +1241,17 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     ("public",),
                     using=routed_and_own("guild_id", "user_id"),
                 ),
-                # The routed community's admin removes one of its members.
+                # The routed community's roster holder removes one of its
+                # members; an admin only while holding every surface, as the
+                # admin rung does.
                 Policy(
                     "guild_memberships_admin_delete",
                     DELETE,
                     ("app_guild_base",),
-                    using=routed_admin_write("guild_id"),
+                    using=(
+                        f"{routed_admin_write('guild_id', AdminSurface.members)}"
+                        f" AND ({_UNMAKES_AN_ADMIN} OR role::text NOT IN ({_ADMIN_RUNGS}))"
+                    ),
                 ),
                 # The reader's own rows and the routed community's, for the bare
                 # login, the platform floor, and the roles that own the member
@@ -1350,7 +1416,10 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     using=routed_or_pam("id"),
                 ),
                 Policy(
-                    "guild_update", UPDATE, ("public",), using=routed_admin_write("id")
+                    "guild_update",
+                    UPDATE,
+                    ("public",),
+                    using=routed_admin_write("id", AdminSurface.profile),
                 ),
                 # The staff list of every community.
                 Policy(
@@ -1390,13 +1459,9 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             # system engine.
             app_guild_base=frozenset({SELECT}),
             platform_base=frozenset({SELECT}),
-            # No TABLE grant: a community's name, its icon and its lifecycle status are
-            # not the seat's. It holds a column-scoped UPDATE on the six switches its
-            # own routes set — what may be used to reach the community, and what its
-            # notifications may leave carrying (migration 20260923_0355). Column grants
-            # live in pg_attribute, not relacl, so they are asserted separately
-            # (security_invariants_test). SELECT comes from app_guild_base_ro, which
-            # guild_<id>_superadmin also inherits.
+            # No grant: a community's name, its icon and its lifecycle status are not
+            # the seat's. The rules it sets are rows of community_rules. SELECT comes
+            # from app_guild_base_ro, which guild_<id>_superadmin also inherits.
             app_superadmin=None,
             # No TABLE grant: a column-scoped SELECT on (id, status), which the
             # install standing statement reads for the routed community alone
@@ -1633,6 +1698,39 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     ),
     # The picture on a user's profile. Public-plane identity like the row it hangs off:
     # one user spans guilds, and the bytes are served to anyone holding the URL.
+    # The values each ``choice`` rule may take (app.core.rules). Written by the
+    # migrations and read by no role: the foreign key that holds a rule's
+    # ``choice`` to them checks it as the table's owner.
+    "rule_choices": SharedTable(rls=FORCED_NO_POLICY, grants=Grants()),
+    # Who may write each community rule (app.core.rules.writers). Written by
+    # the migrations and read by no role, like ``rule_choices``.
+    "rule_key_writers": SharedTable(rls=FORCED_NO_POLICY, grants=Grants()),
+    "platform_rules": SharedTable(
+        rls=TableRls(
+            policies=(
+                Policy(
+                    "platform_rules_owner", ALL, Capability.CONFIG_MANAGE, using=OPEN
+                ),
+                Policy("platform_rules_read", SELECT, ("public",), using=OPEN),
+            ),
+        ),
+        grants=Grants(
+            # The deployment's stored rules (app.core.rules): written by the
+            # owner, on the system engine or under the tier that manages
+            # configuration, and read from anywhere, as the settings row is.
+            app_admin=DML,
+            app_user=frozenset({SELECT}),
+            app_guild_base=frozenset({SELECT}),
+            platform_base=frozenset({SELECT}),
+            # Whether guests are on, which every guest membership is read
+            # under, a plug-in's reads included.
+            plugin_install_base=frozenset({SELECT}),
+            guest_base=frozenset({SELECT}),
+        ),
+        tiers={
+            Capability.CONFIG_MANAGE: frozenset({INSERT, UPDATE, DELETE}),
+        },
+    ),
     "user_avatars": SharedTable(
         rls=TableRls(
             policies=(
@@ -2406,6 +2504,16 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             # An account's date of birth, encrypted — written when the person
             # answers and read to check a plug-in's minimum age, both on the
             # system engine. No request role sees a date.
+            app_admin=DML,
+        ),
+    ),
+    # The key a community's stored objects are encrypted under, wrapped, when
+    # STORAGE_ENCRYPTION is set (app.services.storage_keys).
+    "guild_storage_keys": SharedTable(
+        rls=FORCED_NO_POLICY,
+        grants=Grants(
+            # Made, read and destroyed on the system engine alone. No request
+            # role holds a community's key, wrapped or not.
             app_admin=DML,
         ),
     ),

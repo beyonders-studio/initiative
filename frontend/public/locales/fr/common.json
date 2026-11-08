@@ -1,4 +1,7 @@
 {
+  "appName": "Initiative",
+  "help": "Aide",
+  "helpDraft": "Brouillon de la demande d'aide",
   "user": "Utilisateur",
   "userWithId": "Utilisateur n° {{id}}",
   "formerMember": "Ancien membre",
@@ -18,32 +21,12 @@
   "submit": "Valider",
   "reset": "Réinitialiser",
   "done": "Terminé",
-  "pullToRefresh": {
-    "pull": "Tirez pour actualiser",
-    "release": "Relâchez pour actualiser",
-    "refreshing": "Actualisation…"
-  },
   "toolViewFilter": {
     "label": "Afficher",
     "all": "Tous",
     "active": "Actifs",
     "templates": "Modèles",
     "archived": "Archivés"
-  },
-  "dateRange": {
-    "any": "Toutes les dates",
-    "fromOnly": "À partir du {{date}}",
-    "untilOnly": "Jusqu’au {{date}}",
-    "thisMonth": "Ce mois-ci",
-    "lastMonth": "Le mois dernier",
-    "thisQuarter": "Ce trimestre",
-    "thisYear": "Cette année",
-    "fromLabel": "Du",
-    "untilLabel": "Au",
-    "open": "Ouvert",
-    "fromRemove": "Retirer la date de début",
-    "untilRemove": "Retirer la date de fin",
-    "clear": "Effacer les dates"
   },
   "yes": "Oui",
   "no": "Non",
@@ -52,7 +35,6 @@
   "success": "Réussite",
   "warning": "Avertissement",
   "info": "Info",
-  "none": "Aucun",
   "all": "Tous",
   "name": "Nom",
   "description": "Description",
@@ -62,46 +44,26 @@
   "optional": "Facultatif",
   "actions": "Actions",
   "adding": "Ajout…",
-  "rowActionsFor": "Actions pour {{subject}}",
   "more": "Plus",
+  "moreOptions": "Plus d’options",
   "less": "Moins",
   "noResults": "Aucun résultat",
   "tryAgain": "Réessayer",
   "learnMore": "En savoir plus",
   "viewAll": "Tout afficher",
   "copyToClipboard": "Copier dans le presse-papiers",
-  "copied": "Copié !",
   "copy": "Copier",
-  "copyUnavailable": "Copie impossible — copiez-le à la main",
   "untitled": "Sans titre",
   "appName": "initiative",
   "beta": "Bêta",
+  "pageTitle": "{{name}} - Initiative",
   "send": "Envoyer",
   "submitting": "Envoi en cours…",
   "clear": "Effacer",
-  "pickEmoji": "Choisir un emoji",
   "previous": "Précédent",
-  "rowsPerPage": "Lignes par page :",
-  "pageOf": "Page {{current}} sur {{total}}",
-  "stepOf": "Étape {{current}} sur {{total}}",
-  "select": "Sélectionner",
-  "exitSelection": "Quitter la sélection",
-  "enableSelectionMode": "Activer le mode sélection",
-  "exitSelectionMode": "Quitter le mode sélection",
-  "resetSorting": "Réinitialiser le tri",
-  "groupBy": "Regrouper par",
-  "chooseGrouping": "Choisir un regroupement",
-  "columns": "Colonnes",
-  "tableOptions": "Options du tableau",
-  "rowsSelected": "{{selected}} ligne(s) sélectionnée(s) sur {{total}}",
-  "rowsSelectedFiltered": "{{selected}} sélectionnée(s) ({{total}} correspondent au filtre)",
   "selectAll": "Tout sélectionner",
   "selectRow": "Sélectionner la ligne",
   "noResultsDot": "Aucun résultat.",
-  "allSelected": "Tout est sélectionné",
-  "countSelected": "{{count}} sélectionné",
-  "selectEllipsis": "Sélectionner…",
-  "noOptionsAvailable": "Aucune option disponible",
   "clearAll": "Tout effacer",
   "calendar": {
     "today": "Aujourd'hui",
@@ -169,7 +131,7 @@
     "tags": "Étiquettes",
     "tagsDescription": "Ajoutez des étiquettes pour organiser et filtrer.",
     "tagsNoAccess": "Vous avez besoin d'un accès en écriture pour gérer les étiquettes.",
-    "propertiesDescription": "Valeurs des propriétés personnalisées définies par cette initiative.",
+    "propertiesDescription": "Valeurs des métadonnées définies par cette initiative.",
     "comments": "Commentaires",
     "commentsDescription": "Autorisez les commentaires sur cet élément. Si vous les désactivez, tout ce qui a déjà été publié est conservé et réapparaît lorsque vous les réactivez.",
     "commentsToggle": "Activer les commentaires",
@@ -242,11 +204,6 @@
     "viewTags": "Étiquettes",
     "details": "Détails"
   },
-  "emojiPicker": {
-    "searchPlaceholder": "Rechercher un emoji…",
-    "empty": "Aucun emoji trouvé.",
-    "prompt": "Sélectionnez un emoji…"
-  },
   "reactions": {
     "add": "Ajouter une réaction",
     "quick": "Réagir avec {{emoji}}",
@@ -258,16 +215,7 @@
     "namesAndMore_other": "{{names}} et {{count}} autres",
     "error": "Votre réaction n'a pas pu être enregistrée."
   },
-  "pagination": {
-    "perPage": "Par page :",
-    "rangeOf": "{{start}}–{{end}} sur {{total}}"
-  },
   "lightbox": {
-    "title": "Image",
-    "description": "Utilisez les flèches ou faites glisser pour passer d’une image à l’autre.",
-    "position": "{{current}} / {{total}}",
-    "zoomIn": "Zoom avant",
-    "zoomOut": "Zoom arrière",
     "open": "Voir cette image en taille réelle",
     "openNamed": "Voir {{name}} en taille réelle"
   },
@@ -281,18 +229,8 @@
     "lastUpdated": "Dernière mise à jour {{when}}"
   },
   "imagePicker": {
-    "chooseImage": "Choisir une image",
     "takePhoto": "Prendre une photo",
-    "chooseFromLibrary": "Choisir dans la galerie",
-    "chooseFile": "Choisir un fichier",
-    "permission": "Initiative a besoin d'accéder à votre appareil photo et à vos photos. Autorisez-le dans les réglages de l'appareil, puis réessayez.",
-    "unavailable": "Cet appareil n'a pas d'appareil photo pour prendre une photo.",
-    "failed": "Cette photo n'a pas pu être lue. Réessayez."
-  },
-  "fileDrop": {
-    "release": "Dépose-le ici",
-    "unsupported": "Ce type de fichier ne peut pas être envoyé ici.",
-    "tooLarge": "Ce fichier dépasse la taille acceptée par ce serveur."
+    "chooseFromLibrary": "Choisir dans la galerie"
   },
   "archiveError": "Impossible d'archiver cet élément. Veuillez réessayer.",
   "unarchiveError": "Impossible de désarchiver cet élément. Veuillez réessayer.",
@@ -313,6 +251,8 @@
     "taskList": "Liste de tâches",
     "more": "Plus de mise en forme",
     "image": "Image",
+    "uploadImage": "Téléverser une image",
+    "imageFromFiles": "Depuis Fichiers",
     "uploadingImage": "Envoi de {{name}}…",
     "imageUploadFailed": "Impossible d'ajouter cette image."
   },
@@ -334,7 +274,13 @@
     "ready": "La version {{version}} est prête. Rechargez pour l'utiliser.",
     "reload": "Recharger",
     "updated": "Mis à jour vers la version {{version}}.",
-    "whatsNew": "Nouveautés"
+    "whatsNew": "Nouveautés",
+    "update": "Mettre à jour",
+    "action": {
+      "reload": "Rechargez pour utiliser la nouvelle version",
+      "restart": "Redémarrez pour terminer la mise à jour de l'app",
+      "install": "Obtenez l'app plus récente dont cette version a besoin"
+    }
   },
   "nativeUpdate": {
     "unsigned": "La mise à jour de ce serveur n'a pas été publiée par Initiative, l'application reste donc en version {{version}}.",
@@ -382,7 +328,8 @@
     "unsavedTitle": "Abandonner les modifications non enregistrées ?",
     "unsavedBody": "Vous avez une description non enregistrée. Si vous partez maintenant, elle sera perdue.",
     "leave": "Quitter",
-    "stay": "Rester"
+    "stay": "Rester",
+    "undoSuggestion": "Annuler la suggestion"
   },
   "kinds": {
     "project": {
@@ -394,11 +341,6 @@
       "name": "Fichier",
       "this": "ce fichier",
       "plural": "fichiers"
-    },
-    "queue": {
-      "name": "File",
-      "this": "cette file",
-      "plural": "files"
     },
     "counter_group": {
       "name": "Groupe de compteurs",
@@ -420,25 +362,20 @@
       "this": "cette publication",
       "plural": "publications"
     },
-    "gallery": {
-      "name": "Galerie",
-      "this": "cette galerie",
-      "plural": "galeries"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "ce wiki",
       "plural": "wikis"
     },
+    "contact": {
+      "name": "Contact",
+      "this": "ce contact",
+      "plural": "contacts"
+    },
     "task": {
       "name": "Tâche",
       "this": "cette tâche",
       "plural": "tâches"
-    },
-    "queue_item": {
-      "name": "Élément de file",
-      "this": "cet élément de file",
-      "plural": "éléments de file"
     },
     "calendar_event": {
       "name": "Événement",
@@ -450,11 +387,6 @@
       "this": "ce compteur",
       "plural": "compteurs"
     },
-    "gallery_image": {
-      "name": "Image",
-      "this": "cette image",
-      "plural": "images"
-    },
     "wiki_page": {
       "name": "Page",
       "this": "cette page",
@@ -464,6 +396,11 @@
       "name": "Étiquette",
       "this": "cette étiquette",
       "plural": "étiquettes"
+    },
+    "collection": {
+      "name": "Collection",
+      "this": "cette collection",
+      "plural": "collections"
     }
   }
 }

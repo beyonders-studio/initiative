@@ -7,7 +7,6 @@
  * prompt that produced nothing has to leave the form as it was, so a second
  * attempt is one click rather than a retype.
  */
-import { Browser } from "@capacitor/browser";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,18 +25,6 @@ const mocks = vi.hoisted(() => ({
   startRegistration: vi.fn(),
   browserSupportsWebAuthn: vi.fn(() => true),
 }));
-
-const app = vi.hoisted(() => ({ runsPasskeys: false, createCredential: vi.fn() }));
-
-vi.mock("@/lib/passkeys", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/passkeys")>();
-  return {
-    ...actual,
-    appRunsPasskeys: () => app.runsPasskeys,
-    createCredential: (options: unknown) =>
-      app.runsPasskeys ? app.createCredential(options) : actual.createCredential(options),
-  };
-});
 
 vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -128,7 +115,6 @@ describe("PasskeysSection", () => {
     mocks.browserSupportsWebAuthn.mockReturnValue(true);
     mocks.startRegistration.mockResolvedValue({ id: "credential-id", type: "public-key" });
     mocks.list.mockReturnValue(held([passkey()]));
-    app.runsPasskeys = false;
   });
 
   it("names what the account holds, and marks the ones that travel", () => {
@@ -339,50 +325,5 @@ describe("PasskeysSection", () => {
     expect(screen.getByText(/doesn't offer passkeys/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /rename/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
-  });
-
-  it("sends a phone to the system browser instead of running the ceremony", async () => {
-    // A passkey belongs to the deployment's domain, and the browser is what
-    // decides which domain it is in.
-    const user = userEvent.setup();
-    renderWithProviders(<PasskeysSection />, {
-      server: {
-        isNativePlatform: true,
-        serverUrl: "https://example.test/api/v1",
-        getServerOrigin: vi.fn().mockReturnValue("https://example.test"),
-      },
-    });
-
-    await user.click(screen.getByRole("button", { name: /add a passkey/i }));
-
-    expect(Browser.open).toHaveBeenCalledWith({ url: "https://example.test/profile/security" });
-    expect(mocks.begin).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText(/current password/i)).not.toBeInTheDocument();
-  });
-
-  it("makes the credential in the app, and goes to the browser if the phone refuses", async () => {
-    const { PasskeyNeedsBrowserError } = await import("@/lib/passkeys");
-    app.runsPasskeys = true;
-    app.createCredential.mockRejectedValue(new PasskeyNeedsBrowserError());
-    const user = userEvent.setup();
-    renderWithProviders(<PasskeysSection />, {
-      server: {
-        isNativePlatform: true,
-        serverUrl: "https://example.test/api/v1",
-        getServerOrigin: vi.fn().mockReturnValue("https://example.test"),
-      },
-    });
-
-    await user.click(screen.getByRole("button", { name: /add a passkey/i }));
-    await user.type(await screen.findByLabelText(/^name$/i), "Phone");
-    await user.type(screen.getByLabelText(/current password/i), "a-password");
-    await user.click(screen.getByRole("button", { name: /continue/i }));
-
-    await waitFor(() =>
-      expect(Browser.open).toHaveBeenCalledWith({ url: "https://example.test/profile/security" })
-    );
-    expect(app.createCredential).toHaveBeenCalledWith({ challenge: "a-challenge" });
-    expect(mocks.finish).not.toHaveBeenCalled();
-    expect(mocks.startRegistration).not.toHaveBeenCalled();
   });
 });

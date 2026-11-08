@@ -22,7 +22,9 @@ describe("ToolRelationsPanel", () => {
   it("names itself after the tool it sits on", async () => {
     noLinks();
     renderPage(
-      () => <ToolRelationsPanel tool={Tool.gallery} entity={{ id: 3, initiative_id: 7 }} canEdit />,
+      () => (
+        <ToolRelationsPanel tool={Tool.dashboard} entity={{ id: 3, initiative_id: 7 }} canEdit />
+      ),
       { initialRoute: "/c/1" }
     );
 
@@ -64,7 +66,7 @@ describe("ToolRelationsPanel", () => {
   it("draws nothing while the row is still arriving", () => {
     noLinks();
     const { container } = renderPage(
-      () => <ToolRelationsPanel tool={Tool.queue} entity={undefined} canEdit />,
+      () => <ToolRelationsPanel tool={Tool.counter_group} entity={undefined} canEdit />,
       { initialRoute: "/c/1" }
     );
 

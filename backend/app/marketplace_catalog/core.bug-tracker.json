@@ -5,11 +5,11 @@
   "name": "Bug tracker",
   "publisher": "Initiative",
   "description": "Reports come in, get sorted, get fixed. In that order, ideally.",
-  "long_description": "New bugs land in Triage, where somebody decides how bad each one is before it goes to the Backlog. From there it is In progress, In review and Done, or Won't fix for the ones that are really features.\n\nEvery report has a severity, the part of the product it is in, the version it was found in and whether anyone has made it happen twice. Severity says how bad it is for the person who hit it. Priority says when you will get to it. They are allowed to disagree.",
+  "long_description": "New bugs land in Triage, where somebody decides how bad each one is before it goes to the Backlog. From there it is In progress, In review and Done, or Won't fix for the ones that are really features.\n\nEvery report has a severity, the part of the product it is in, the version it was found in and whether anyone has made it happen twice. Severity says how bad it is for the person who hit it. Priority says when you will get to it. They are allowed to disagree.\n\nNot everything is a bug. Feature requests get a page that is mostly the conversation, and chores, like the upgrade nobody asked for, get a plain one.",
   "avatar_url": "/marketplace/core-bug-tracker.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Opens on the board. Each card shows its severity and component, and a bug's page keeps its details together.",
+  "version": "1.2.0",
+  "release_notes": "Bugs, feature requests and chores are each their own type, with a page of their own. A new bug starts with steps to reproduce, and a card shows its type beside its title. The project's fields are its own properties rather than the initiative's metadata.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -75,6 +75,38 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Bug",
+        "is_default": true,
+        "color": "#F87171",
+        "icon": "bug",
+        "layout_preset": "fix",
+        "starting_values": {
+          "description": "**Steps to reproduce**\n\n1. \n\n**What happened**\n\n\n**What should have happened**\n\n"
+        },
+        "position": 0
+      },
+      {
+        "name": "Feature request",
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "sparkles",
+        "layout_preset": "discussion",
+        "starting_values": {
+          "description": "**Who asked, and what for**\n\n\n**What they do today instead**\n\n"
+        },
+        "position": 1
+      },
+      {
+        "name": "Chore",
+        "is_default": false,
+        "color": "#94A3B8",
+        "icon": "wrench",
+        "layout_preset": "plain",
+        "position": 2
+      }
+    ],
     "property_definitions": [
       {
         "name": "Severity",
@@ -102,28 +134,32 @@
             "label": "Cosmetic",
             "color": "#94A3B8"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Component",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Version found",
         "type": "text",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Reproducible",
         "type": "checkbox",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [],
@@ -141,10 +177,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -248,6 +300,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -284,6 +339,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -309,6 +367,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -317,6 +376,18 @@
                 "title": "Bug"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -342,6 +413,117 @@
                   "type": "field",
                   "props": {
                     "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Request"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Chore"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
                   }
                 }
               ]
@@ -460,6 +642,38 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Bug",
+        "is_default": true,
+        "color": "#F87171",
+        "icon": "bug",
+        "layout_preset": "fix",
+        "starting_values": {
+          "description": "**Steps to reproduce**\n\n1. \n\n**What happened**\n\n\n**What should have happened**\n\n"
+        },
+        "position": 0
+      },
+      {
+        "name": "Feature request",
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "sparkles",
+        "layout_preset": "discussion",
+        "starting_values": {
+          "description": "**Who asked, and what for**\n\n\n**What they do today instead**\n\n"
+        },
+        "position": 1
+      },
+      {
+        "name": "Chore",
+        "is_default": false,
+        "color": "#94A3B8",
+        "icon": "wrench",
+        "layout_preset": "plain",
+        "position": 2
+      }
+    ],
     "property_definitions": [
       {
         "name": "Severity",
@@ -487,28 +701,32 @@
             "label": "Cosmetic",
             "color": "#94A3B8"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Component",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Version found",
         "type": "text",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Reproducible",
         "type": "checkbox",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [
@@ -528,24 +746,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "critical"
+            "value_text": "critical",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Checkout"
+            "value_text": "Checkout",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.4.0"
+            "value_text": "2.4.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": false
+            "value_boolean": false,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "Dates show a day early for customers west of London",
@@ -563,24 +786,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Orders"
+            "value_text": "Orders",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.4.0"
+            "value_text": "2.4.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "Search ignores accents",
@@ -598,24 +826,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "minor"
+            "value_text": "minor",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Search"
+            "value_text": "Search",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.3.1"
+            "value_text": "2.3.1",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "Password reset email arrives after the link expires",
@@ -646,24 +879,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Accounts"
+            "value_text": "Accounts",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.3.0"
+            "value_text": "2.3.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "Export cuts off at 1,000 rows",
@@ -694,24 +932,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Reports"
+            "value_text": "Reports",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.2.0"
+            "value_text": "2.2.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "Logo is blurry on high-resolution screens",
@@ -729,24 +972,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "cosmetic"
+            "value_text": "cosmetic",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Branding"
+            "value_text": "Branding",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.1.0"
+            "value_text": "2.1.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "Dark mode makes the error messages invisible",
@@ -764,24 +1012,29 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Design system"
+            "value_text": "Design system",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.3.0"
+            "value_text": "2.3.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
       },
       {
         "title": "App does not work in a browser from 2009",
@@ -799,24 +1052,75 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "minor"
+            "value_text": "minor",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Browser support"
+            "value_text": "Browser support",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.4.0"
+            "value_text": "2.4.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Bug"
+      },
+      {
+        "title": "Save a cart for later",
+        "description": "**Who asked, and what for**\n\nThree customers this month, all building one order over a week.\n\n**What they do today instead**\n\nScreenshots of the cart.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": null,
+        "recurrence": null,
+        "status_name": "Backlog",
+        "position": 3.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Component",
+            "property_type": "text",
+            "value_text": "Checkout",
+            "project": true
+          }
+        ],
+        "type_name": "Feature request",
+        "completed_at": null
+      },
+      {
+        "title": "Upgrade the payment library before its support ends",
+        "description": "Nothing is broken yet. That is the point.",
+        "priority": "high",
+        "start_date": null,
+        "due_date": null,
+        "recurrence": null,
+        "status_name": "Backlog",
+        "position": 4.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Component",
+            "property_type": "text",
+            "value_text": "Checkout",
+            "project": true
+          }
+        ],
+        "type_name": "Chore",
+        "completed_at": null
       }
     ],
     "layouts": [
@@ -833,10 +1137,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -940,6 +1260,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -976,6 +1299,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -1001,6 +1327,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -1009,6 +1336,18 @@
                 "title": "Bug"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -1034,6 +1373,117 @@
                   "type": "field",
                   "props": {
                     "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Request"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Chore"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
                   }
                 }
               ]

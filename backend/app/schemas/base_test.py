@@ -238,12 +238,19 @@ _SIGIL_EXEMPT: frozenset[str] = frozenset(
         # written into the search index.
         "app.schemas.ai_settings.AIConnectionCreate.label",
         "app.schemas.ai_settings.AIConnectionUpdate.label",
+        # A contact detail's label ("Office", "Mobile") says which detail it
+        # is. It may be blank, and only the contact's name is searched.
+        "app.schemas.tenant.contact.ContactAddress.label",
+        "app.schemas.tenant.contact.ContactEmail.label",
+        "app.schemas.tenant.contact.ContactPhone.label",
+        "app.schemas.tenant.contact.ContactWebsite.label",
         "app.schemas.platform.api_key.ApiKeyCreateRequest.name",
         "app.schemas.tenant.guild_plugin.CommunityPluginInstall.name",
         "app.schemas.tenant.guild_plugin.CommunityPluginUpdate.name",
         "app.schemas.tenant.initiative.InitiativeRoleCreate.name",
         "app.schemas.tenant.property.PropertyDefinitionCreate.name",
         "app.schemas.tenant.property.PropertyDefinitionUpdate.name",
+        "app.schemas.tenant.property.PropertyDefinitionPromote.name",
         "app.schemas.tenant.task_status.TaskStatusCreate.name",
         "app.schemas.tenant.task_status.TaskStatusUpdate.name",
         "app.schemas.tenant.task_type.TaskTypeCreate.name",

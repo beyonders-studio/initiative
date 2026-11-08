@@ -26,22 +26,9 @@ import { EditCounterDialog } from "@/components/initiativeTools/counters/EditCou
 import { AddItemDialog } from "@/components/layouts/AddItemDialog";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { computeMidpoint } from "@/components/projects/taskOrdering";
-import {
-  CardGridSkeleton,
-  DetailPageSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
@@ -67,6 +54,15 @@ import { pickRandomCounterColor } from "@/lib/counter-color";
 import { blankCounter, COUNTER_DETAIL, counterReady } from "@/lib/layouts/counterLayout";
 import { toast } from "@/lib/mascotToast";
 import { counterRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { CardGridSkeleton, DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where an older release kept a group's rows or grid. */
 const layoutStorageKey = (groupId: number) => `counter-group-${groupId}-layout`;
@@ -112,8 +108,8 @@ export function CounterGroupDetailPage() {
   const communityId = useActiveCommunityId();
   const viewSpec = useMemo(
     () =>
-      layoutViewSpec(viewKey(communityId, "counter-group", groupId ?? 0), (items) =>
-        groupId !== null ? items[layoutStorageKey(groupId)] : undefined
+      layoutViewSpec(communityId, viewKey("counter-group", groupId ?? 0), (account) =>
+        groupId !== null ? account[layoutStorageKey(groupId)] : undefined
       ),
     [communityId, groupId]
   );
@@ -195,6 +191,7 @@ export function CounterGroupDetailPage() {
         keys="counterGroups:"
         backTo={gp(toolListRoute(Tool.counter_group, initiativeId))}
         backLabel={t("backToGroups")}
+        entity={groupId === null ? undefined : { kind: "counter_group", id: groupId }}
       />
     );
   }

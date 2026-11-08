@@ -29,11 +29,13 @@
   "removed": "Verknüpfung entfernt.",
   "dialog": {
     "title": "Verknüpfung hinzufügen",
-    "description": "Such zuerst das Objekt, sag dann, wie die beiden zusammenhängen.",
-    "descriptionUpload": "Such zuerst das Objekt oder lade eine Datei hoch, sag dann, wie die beiden zusammenhängen.",
+    "description": "Such zuerst das Objekt oder die Person, sag dann, wie die beiden zusammenhängen.",
+    "descriptionUpload": "Such zuerst das Objekt oder die Person oder lade eine Datei hoch, sag dann, wie die beiden zusammenhängen.",
     "entity": "Objekt",
     "entityPlaceholder": "Nach Namen suchen…",
     "noResults": "Keine Treffer.",
+    "person": "Person",
+    "noPeople": "Niemand gefunden.",
     "relationship": "Beziehung",
     "sentenceLabel": "Wie die beiden zusammenhängen",
     "submit": "Verknüpfung hinzufügen",
@@ -49,6 +51,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · verknüpft {{date}}",
+    "person": "Person",
     "unreachable": "Diese Version der App kann das nicht öffnen.",
     "remove": "Verknüpfung zu {{title}} entfernen"
   },
@@ -111,16 +114,14 @@
     "counter_group": "Diese Gruppe",
     "dashboard": "Dieses Dashboard",
     "file": "Diese Datei",
-    "gallery": "Diese Galerie",
-    "gallery_image": "Dieses Bild",
     "generic": "Dies",
     "post": "Dieser Beitrag",
     "project": "Dieses Projekt",
-    "queue": "Diese Warteschlange",
-    "queue_item": "Dieser Eintrag",
     "task": "Diese Aufgabe",
     "wiki": "Dieses Wiki",
-    "wiki_page": "Diese Seite"
+    "wiki_page": "Diese Seite",
+    "contact": "Dieser Kontakt",
+    "collection": "Diese Sammlung"
   },
   "blockers": {
     "label_one": "{{count}} Sache hält dies auf",
@@ -132,10 +133,8 @@
   "empty_counter": "Noch nichts verknüpft. Verknüpfe die Aufgabe, auf die das einzahlt, oder das Projekt, über das es berichtet.",
   "empty_counter_group": "Noch nichts verknüpft. Verknüpfe das Projekt, um dessen Zahlen es geht.",
   "empty_dashboard": "Noch nichts verknüpft. Verknüpfe das Projekt, über das dies berichtet, oder die Datei, die es auswertet.",
-  "empty_gallery": "Noch nichts verknüpft. Verknüpfe das Projekt, für das diese Bilder sind.",
-  "empty_gallery_image": "Noch nichts verknüpft. Verknüpfe die Aufgabe, für die das Bild ist, oder die Datei, in die es gehört.",
   "empty_post": "Noch nichts verknüpft. Verknüpfe das Projekt, das hier angekündigt wird, oder die Datei dahinter.",
-  "empty_queue": "Noch nichts verknüpft. Verknüpfe das Projekt, das diese Warteschlange speist.",
-  "empty_queue_item": "Noch nichts verknüpft. Verknüpfe die Aufgabe, die daraus wurde, oder die Datei, aus der es stammt.",
-  "empty_wiki_page": "Noch nichts verknüpft. Erwähne diese Seite mit [[ von irgendwo – dann erscheint sie hier."
+  "empty_wiki_page": "Noch nichts verknüpft. Erwähne diese Seite mit [[ von irgendwo – dann erscheint sie hier.",
+  "empty_contact": "Noch nichts verknüpft. Verknüpfe die Aufgabe für sie, den Termin, bei dem sie dabei sind, oder ihren Vertrag.",
+  "empty_collection": "Noch nichts verknüpft. Verknüpfe das Projekt, für das diese Dateien sind."
 }

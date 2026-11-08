@@ -37,6 +37,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.deps import SessionDep, UserSessionDep, SystemSessionDep, CurrentUser
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
 from app.core.audit_events import AuditEventType
+from app.core.image_headers import image_response
 from app.core.messages import MarketplaceMessages
 from app.core.messages import MarketplaceRegistryMessages as RegistryCodes
 from app.models.platform.marketplace_registry import MarketplaceMedia
@@ -64,6 +65,7 @@ from app.services.tenant.attachments import FileTooLargeError, read_upload_bound
 from app.services.marketplace import tuf_registry as registry_service
 from app.services.marketplace.catalog import CatalogError
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import auth_posture
 from app.services.marketplace import operator_catalog as operator_catalog_service
 
 router = APIRouter()
@@ -158,14 +160,7 @@ async def read_marketplace_media(digest: str, session: SessionDep) -> Response:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MarketplaceMessages.MEDIA_NOT_FOUND,
         )
-    return Response(
-        content=media.data,
-        media_type=media.content_type,
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return image_response(media.data, media.content_type, shared=True)
 
 
 # --- the registry (operator) --------------------------------------------------
@@ -262,10 +257,13 @@ async def update_registry_settings(
 ) -> RegistrySettings:
     """Follow the registry, or stop (``config.manage``). What already arrived
     stays; switching back on picks up from where it left off."""
-    row = await app_settings_service.update_marketplace_registry_settings(
-        session, enabled=payload.enabled, actor_user_id=owner.id
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner),
+        {"marketplace_registry_enabled": payload.enabled},
     )
-    return RegistrySettings(enabled=row.marketplace_registry_enabled)
+    return RegistrySettings(
+        enabled=await app_settings_service.marketplace_registry_enabled(session)
+    )
 
 
 @router.post("/registry/refresh", response_model=RegistryRefreshRead)
@@ -340,13 +338,14 @@ async def update_local_marketplace_settings(
 ) -> MarketplaceLocalSettings:
     """Let members publish straight to the shelf, or have each share wait for
     review. Changing it moves nothing already waiting."""
-    row = await app_settings_service.update_marketplace_settings(
-        session,
-        members_publish_directly=payload.members_publish_directly,
-        actor_user_id=owner.id,
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner),
+        {"marketplace_members_publish_directly": payload.members_publish_directly},
     )
     return MarketplaceLocalSettings(
-        members_publish_directly=row.marketplace_members_publish_directly
+        members_publish_directly=await app_settings_service.marketplace_members_publish_directly(
+            session
+        )
     )
 
 
@@ -525,7 +524,7 @@ async def upload_listing_picture(
     """Upload a picture for a listing file (``config.manage``).
 
     Returns the path the marketplace serves it from, for the manifest to name —
-    as the listing's artwork, or as a picture in its content (a gallery's, an
+    as the listing's artwork, or as a picture in its content (a library's, an
     image in a document). A listing's pictures are only ever uploaded like
     this; none is taken from a community.
     """

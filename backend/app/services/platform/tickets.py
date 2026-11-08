@@ -21,11 +21,12 @@ from enum import Enum
 from typing import TYPE_CHECKING, AsyncIterator, Optional, Sequence
 
 from limits import parse
-from sqlalchemy import String, cast
+from sqlalchemy import String, cast, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import (
+    STREAMS,
     Conversation,
     FeedbackTopic,
     IntakeStream,
@@ -38,7 +39,7 @@ from app.db import cohorts
 from app.db.session import routed_guild_id
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -334,12 +335,43 @@ def _ticket_from(row) -> FiledTicket:
     )
 
 
+def latest_reply():
+    """The newest comment said to a case's filer by anybody but the filer."""
+    return (
+        select(func.max(Comment.id))
+        .where(Comment.task_id == IntakeCase.task_id)
+        .where(Comment.audience == CommentAudience.filer)
+        .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
+        .where(Comment.created_by.is_distinct_from(IntakeCase.filer_user_id))  # type: ignore[union-attr]
+        .correlate(IntakeCase)
+        .scalar_subquery()
+    )
+
+
+#: The streams whose conversation the team starts.
+_TEAM_STARTS = tuple(
+    stream.value
+    for stream, declared in STREAMS.items()
+    if declared.conversation is Conversation.staff_first
+)
+
+
+def reaches_filer():
+    """Whether a case is its filer's to follow: from the start, or, where the
+    team starts the conversation, once the team has written to them."""
+    return or_(
+        IntakeCase.stream.not_in(_TEAM_STARTS),  # type: ignore[attr-defined]
+        latest_reply().is_not(None),
+    )
+
+
 def _tickets_query():
     return (
         select(*_ticket_columns())
         .join(Task, Task.id == IntakeCase.task_id)
         .join(TaskStatus, TaskStatus.id == Task.task_status_id)
         .outerjoin(IntakeBinding, IntakeBinding.stream == IntakeCase.stream)
+        .where(reaches_filer())
     )
 
 
@@ -395,8 +427,7 @@ async def read_filed(user: User, task_id: int) -> FiledTicketDetail:
                     Evidence.size_bytes,
                     Evidence.created_at,
                 )
-                .join(IntakeCase, IntakeCase.id == Evidence.case_id)
-                .where(IntakeCase.task_id == task_id)
+                .where(Evidence.case_task_id == task_id)
                 .order_by(Evidence.created_at, Evidence.id)
             )
         ).all()
@@ -443,9 +474,8 @@ async def filed_evidence(user: User, task_id: int, evidence_id: int) -> int:
         found = (
             await session.exec(
                 select(Evidence.id)
-                .join(IntakeCase, IntakeCase.id == Evidence.case_id)
                 .where(Evidence.id == evidence_id)
-                .where(IntakeCase.task_id == task_id)
+                .where(Evidence.case_task_id == task_id)
             )
         ).first()
         guild_id = routed_guild_id(session)

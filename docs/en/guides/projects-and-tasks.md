@@ -21,7 +21,7 @@ If you only ever learn one part of Initiative, make it this one. It's where basi
 
 ![Creating a project](../images/projects/create-project.png)
 
-The top of the project shows how far along it is and its dates, beside its status, tags and properties — the same [header every tool has](tools.md#the-top-of-every-tool-page).
+The top of the project shows how far along it is and its dates, beside its status, tags and metadata — the same [header every tool has](tools.md#the-top-of-every-tool-page).
 
 ### Bookmarks, pinning and your own order
 
@@ -34,7 +34,7 @@ Drag projects on the first page of the list to put them in your own order.
 
 ## Adding tasks
 
-Click **Add task**. Only the **title** is required. Everything else is in the same dialog, laid out exactly as the task will be once it exists, so there's one layout to learn instead of two. Fill in what you know. The rest can wait, possibly forever, and nothing will nag you about it.
+Click **Add task**. Only the **title** is required, unless the task type says otherwise: a type's page can [require fields](layouts.md#required-fields), and those sit up top in the dialog until they're filled. Everything else is in the same dialog, laid out exactly as the task will be once it exists, so there's one layout to learn instead of two. Fill in what you know. The rest can wait, possibly forever, and nothing will nag you about it.
 
 Nothing is saved until **Create task**. Close the dialog and it's gone.
 
@@ -54,9 +54,32 @@ A task can hold:
 | **Checklist** | The smaller steps, ticked off, with a progress count. |
 | **Tags** | Labels for finding things later — see [Tags](tags.md). |
 | **Recurring** | Make it come back on a schedule. |
-| **Properties** | Your initiative's own fields — see [Custom properties](initiatives.md#custom-properties). |
+| **Metadata** | Your initiative's own fields — see [Metadata](initiatives.md#metadata). |
+| **Properties** | Fields only this project's tasks have — see [Project properties](#project-properties). |
 
 ![Editing a task's details](../images/projects/task-details.png)
+
+### Typing the details into the title
+
+A new task's title fills in the rest as you type. "Email the caretaker about the hall keys friday at 3pm !high #fete @sam" becomes a task called "Email the caretaker about the hall keys", due Friday at three, high priority, tagged fete and given to Sam.
+
+| Write | And it sets |
+|---|---|
+| `today`, `tomorrow`, `friday`, `next friday`, `next week`, `in 3 days`, `oct 30` | The due date. On its own, a date is due by the end of that day. |
+| `at 3pm`, `9:30am`, `17:00`, `noon` | The time it's due. A time with no date is today's, or tomorrow's if today's has already gone. |
+| `every day`, `every other week`, `every 3 months`, `every mon, wed and fri`, `every weekday`, `every weekend` | A repeat, starting on the next day it falls on. |
+| `every third tuesday`, `the last friday of every month`, `every 1st and 15th`, `every last day of the month`, `every last weekday of the month`, `every oct 30` | A repeat by its place in the month or the year. |
+| `every! 6 weeks`, `ev! month`, `every 4 hours` | A repeat counted from when you finish each one, so the haircut is due six weeks after the last haircut, not six weeks after you first wrote it down. `ev` is short for `every`. Hourly repeats always count this way. |
+| `until dec 18`, `10 times`, after any of the above | When the repeat stops. |
+| `!urgent`, `!high`, `!medium`, `!low`, or `!1` (urgent) to `!4` (low) | The priority. |
+| `#name` | A tag the community already has. `#bug-fix` finds "Bug fix". |
+| `@name`, `@me` | Somebody who can open the project. Type `@` and a list of them opens, so you never have to remember how Sam spells their handle. |
+
+A repeat it can't set up properly isn't set at all, and its words stay in the title. Every third second of the month, for one.
+
+Whatever it reads is highlighted in the title and listed underneath, and the fields in the dialog show it too, so you see exactly what you're getting before **Create task**. Take a chip off the list and its words stay in the title as you typed them, for the day you really do need a task called "Plan next week". Delete the words and the field goes back to how it was.
+
+It reads the language you've set the app in, and works in the home page's quick add box too. Rather your titles stayed exactly as typed? Switch off **Read details from the title** in [Preferences](../account/profile-and-preferences.md#preferences).
 
 ### Statuses
 
@@ -110,6 +133,14 @@ Break a big task into steps. As you tick them off, the task shows its progress �
 Enter starts the next line. Paste a list and you get one item per line, which saves a surprising amount of your life.
 
 Good for the tasks that are secretly three tasks wearing a coat.
+
+### Subtasks
+
+When one of those steps turns out to need its own person, its own deadline and its own opinions, click the arrow on its line: **Make it a task**. The line leaves the checklist and comes back as a whole task in the same project, **Part of** the one it came from. A ticked line arrives done.
+
+A subtask is a task like any other. It has an assignee, dates, a status and comments, and it turns up in calendars and **My tasks**. Its parent counts how many of its subtasks are done ("2/7 subtasks"), so you can see how far a post has got without opening it.
+
+To put an existing task under another, link it as [**Part of**](mentions-and-links.md#connections) it, from the task's links or by dragging on the [Gantt](#gantt).
 
 ### Recurring tasks
 
@@ -175,10 +206,11 @@ A spreadsheet-style list. One row per task, with columns for status, priority, d
 **Best for:** scanning a lot of tasks, sorting, and editing several at once.
 
 - Click a column heading to **sort** by it. Hold ++shift++ and click another to sort by both.
-- **Group** rows by any field whose values repeat: date window (Overdue, Today, This Week, This Month, Later), status, priority, assignees, tags, who created it, or a select, person or checkbox property. Dates group by day, week, month, quarter or year. Each group says how many tasks it holds.
+- **Group** rows by any field whose values repeat: date window (Overdue, Today, This Week, This Month, Later), status, priority, assignees, tags, who created it, or any select, person or checkbox metadata or property. Dates group by day, week, month, quarter or year. Each group says how many tasks it holds.
 - **Filter** down to exactly what you want.
 - **Select** several rows and edit them together.
 - **Assign to me** in the **Assignees** column takes a task without opening it. Missing the column? Add it in **Edit layouts**.
+- [Subtasks](#subtasks) sit under their parent, indented, and fold away with the arrow beside it.
 
 ![A project in Table view](../images/projects/view-table.png)
 
@@ -191,6 +223,7 @@ Cards in columns, one column per status. Drag a card along as the work moves.
 - **Drag and drop** between columns to change status.
 - **Collapse** a column you're deliberately not thinking about.
 - **Group** the board too, and each group becomes a band across the columns: one per person, say, or per priority.
+- Group by **Parent task** and every task with subtasks gets a band of its own, holding it and its subtasks across the columns. Drag a card into another band and it becomes part of that task instead.
 - A card's menu assigns you, unassigns you, or moves the task to another column.
 - A column with a **limit** counts its open tasks against it in its header ("4 / 5"). Once it's full, nobody can add a task to it or move one in until one leaves. What's already there stays.
 
@@ -204,14 +237,25 @@ Each task is a bar from its start date to its due date, on a timeline you scroll
 
 **Best for:** planning, seeing what has to finish before what, and noticing the Thursday onto which you have cheerfully scheduled six deadlines.
 
-- **Drag a bar** to move the task, or drag one end to change just that date.
+Moving things:
+
+- **Drag a bar** to move the task, or drag one end to change just that date. Move a task later and the tasks waiting on it are offered the same move, all the way down the line, so a slipped delivery doesn't leave six tasks starting before it arrives.
 - **Drag across an empty row** to give a task its dates.
-- **Arrows** run from a task to the ones [blocked by](mentions-and-links.md#connections) it. An arrow turns red when a task starts before the thing it's waiting on is done, which is your cue to have a word with somebody.
-- **Drag from the dot** at the end of a bar onto another task's row, and that task waits on this one. The arrow turns up straight away.
+- **No mouse?** The rows take the arrow keys: up and down to move, right and left to open and fold a task's parts, **Enter** to open one, and **Alt** with left or right to move it a day. Add **Shift** and only its due date moves.
+
+What depends on what:
+
+- **Arrows** run from a task to the ones [blocked by](mentions-and-links.md#connections) it. An arrow turns red when a task starts before the thing it's waiting on is done, which is your cue to have a word with somebody. Click one to take the link back.
+- **Drag from the dot** at the end of a bar onto another task's row, then pick whether that task waits on this one or is part of it.
 - A task's **parts** (the tasks that are **Part of** it) sit under it and fold away with it. The thin line over its row shows how far they stretch.
+- **Critical path** fades everything but the chain that decides when the work finishes. Shorten that chain and the project ends sooner; shorten anything else and it doesn't.
+- Tasks in **other projects** that yours are linked to sit in a band at the bottom, with their arrows. You can open them from here, but not move them.
+
+And the rest:
+
+- A **repeating task** shows its next few dates as dashed outlines along its row.
 - **Day**, **Week** and **Month** set how much fits on screen. **Today** brings you back.
 - **Group** it like the board, and each group gets a band of its own.
-- **No mouse?** The rows take the arrow keys: up and down to move, right and left to open and fold a task's parts, **Enter** to open one, and **Alt** with left or right to move it a day. Add **Shift** and only its due date moves.
 
 The initiative's [calendar](calendar.md) shows the same dated tasks by month, week or day, beside everybody's events.
 
@@ -253,14 +297,14 @@ Each of the project's four lists has a layout, and so does a task:
 | Layout | What it decides |
 |---|---|
 | **Table** | Which columns, in what order. |
-| **Board** | What a card holds: priority, dates, tags, the checklist bar, comment and blocker counts, any property. And each column's limit. |
+| **Board** | What a card holds: priority, dates, tags, the checklist and subtask bars, the task it's part of, comment and blocker counts, any metadata or property. And each column's limit. |
 | **Gantt** | Only its presets and groupings. Bars are bars. |
 | **Calendar** | Only its presets. A calendar is a calendar. |
 | **Task pages** | Where everything sits when a task is open, and in **Create task**. One per [task type](#task-types), each starting from a shape that suits it. |
 
 Each list also offers **presets** in **Filters** — **Incomplete**, **Unassigned** and **Mine** to start with. Picking one sets your filters; it doesn't change anybody else's. It also goes in the page's address, so the link opens the list with it picked.
 
-Each list can be **shown in the layout menu** or not. A new project shows its board alone; at least one list always stays shown, and the project opens on one of those.
+Each list can be **shown in the layout menu** or not, in the editor or straight from **Project settings → Layouts**, where the views and the task pages are listed apart. A new project shows all four; at least one list always stays shown, and the project opens on one of those.
 
 The table, board and Gantt also say what you can group by, what they start grouped by, and which groups they leave out (finished sprints, for instance).
 
@@ -273,11 +317,20 @@ Change any of it from **Project settings → Layouts → Edit layouts**. That's 
 - **Layouts** — how its lists and tasks are laid out, and which list it opens on. See [Layouts](#layouts).
 - **Task statuses** — your workflow.
 - **Task types** — the kinds of task the project holds, and a shortcut to each one's page. See [Task types](#task-types).
+- **Properties** — fields of the project's own. See below.
 - **Advanced** — save as a template, [duplicate](tools.md#duplicating) it here or into another initiative, export, archive, delete.
+
+### Project properties
+
+Some things only matter in one project. The sprint a bug landed in. Which van the delivery goes on. Nobody planning the summer fete needs a "Van" box on their tasks, so it doesn't belong to the whole initiative.
+
+That's a **property**: a field that belongs to the project and turns up on its tasks alone. Make one in **Project settings → Properties**, or from **Add** in the [layout editor](layouts.md), which asks whether a new field is the project's property or the initiative's [metadata](initiatives.md#metadata). Properties take the same types metadata does.
+
+Rename, reorder or delete them in the same settings tab, or in the editor: click the layout's name at the top of its outline and the project's properties are listed on the right, each saying which layouts show it. Whoever can edit the project can change its properties. [Initiative settings → Metadata](initiatives.md#everything-in-one-place) lists them too, beside every other project's.
 
 ### Moving a task to another project
 
-You can move a task from its menu. One thing that catches people out: because every project can have its own statuses, a moved task restarts at the new project's default status. Its type comes along if the new project has one with the same name, and becomes that project's default type if not.
+You can move a task from its menu. One thing that catches people out: because every project can have its own statuses, a moved task restarts at the new project's default status. Its type comes along if the new project has one with the same name, and becomes that project's default type if not. Each of its properties keeps its value wherever the new project has a property with the same name and type, and the rest are dropped.
 
 Nothing's broken and you haven't lost anything. Set the new status and carry on.
 

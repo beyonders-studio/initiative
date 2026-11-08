@@ -10,11 +10,13 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import { ConnectProviderWizard, ProbeReport } from "@/components/platform/ConnectProviderWizard";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { CopyButton } from "@/components/ui/copy-button";
+import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { CopyButton } from "@/ui/copy-button";
 import {
   Dialog,
   DialogContent,
@@ -22,12 +24,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 interface ProviderFormState {
   slug: string;
@@ -511,7 +511,6 @@ export const ProviderRegistrySection = ({
         title={t("authProviders.deleteTitle", { name: deleting?.display_name ?? "" })}
         description={t("authProviders.deleteDescription")}
         confirmLabel={t("authProviders.delete")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteProvider.isPending}
         onConfirm={() => {

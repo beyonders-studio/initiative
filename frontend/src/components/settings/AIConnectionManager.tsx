@@ -7,10 +7,10 @@ import type {
   AIProvider,
   ConnectionScope,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 import { AIConnectionDialog } from "./AIConnectionDialog";
 import { AIConnectionRow } from "./AIConnectionRow";
@@ -26,6 +26,8 @@ interface AIConnectionManagerProps {
   /** Providers selectable in this scope (platform allows Ollama, community does not). */
   providers: AIProvider[];
   mutations: ConnectionMutations;
+  /** AI is off where these connections serve, so none can be turned on. */
+  locked?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export const AIConnectionManager = ({
   isError,
   providers,
   mutations,
+  locked = false,
 }: AIConnectionManagerProps) => {
   const { t } = useTranslation("settings");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -69,6 +72,15 @@ export const AIConnectionManager = ({
     });
   };
 
+  const handleToggle = (connection: AIConnectionResponse, enabled: boolean) => {
+    mutations.update.mutate(
+      { connectionId: connection.id, data: { enabled } },
+      {
+        onError: (error) => toast.error(getErrorMessage(error, "settings:aiConnections.saveError")),
+      }
+    );
+  };
+
   const confirmDelete = () => {
     if (!pendingDelete) return;
     mutations.remove.mutate(pendingDelete.id, {
@@ -85,7 +97,8 @@ export const AIConnectionManager = ({
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="font-medium">{t("aiConnections.title")}</h3>
-          <p className="text-muted-foreground text-sm">{t("aiConnections.subtitle")}</p>
+          <p className="text-muted-foreground text-sm">{t(`aiConnections.subtitle_${scope}`)}</p>
+          {locked && <p className="text-muted-foreground text-sm">{t("aiConnections.locked")}</p>}
         </div>
         <Button type="button" onClick={openCreate} className="shrink-0">
           <Plus className="h-4 w-4" />
@@ -104,17 +117,25 @@ export const AIConnectionManager = ({
         </div>
       ) : (
         <ul className="space-y-2">
-          {connections.map((connection) => (
-            <AIConnectionRow
-              key={connection.id}
-              connection={connection}
-              isTesting={mutations.test.isPending && mutations.test.variables === connection.id}
-              testDisabled={mutations.test.isPending}
-              onTest={() => handleTest(connection)}
-              onEdit={() => openEdit(connection)}
-              onDelete={() => setPendingDelete(connection)}
-            />
-          ))}
+          {connections.map((connection) => {
+            const toggling = mutations.update.isPending ? mutations.update.variables : undefined;
+            const pending =
+              toggling?.connectionId === connection.id ? toggling.data.enabled : undefined;
+            return (
+              <AIConnectionRow
+                key={connection.id}
+                connection={connection}
+                enabled={!locked && (pending ?? connection.enabled)}
+                toggleDisabled={locked || mutations.update.isPending}
+                onToggle={(enabled) => handleToggle(connection, enabled)}
+                isTesting={mutations.test.isPending && mutations.test.variables === connection.id}
+                testDisabled={mutations.test.isPending}
+                onTest={() => handleTest(connection)}
+                onEdit={() => openEdit(connection)}
+                onDelete={() => setPendingDelete(connection)}
+              />
+            );
+          })}
         </ul>
       )}
 
@@ -135,7 +156,6 @@ export const AIConnectionManager = ({
         title={t("aiConnections.deleteTitle")}
         description={t("aiConnections.deleteDescription", { label: pendingDelete?.label ?? "" })}
         confirmLabel={t("aiConnections.delete")}
-        cancelLabel={t("aiConnections.cancel")}
         onConfirm={confirmDelete}
         isLoading={mutations.remove.isPending}
         destructive

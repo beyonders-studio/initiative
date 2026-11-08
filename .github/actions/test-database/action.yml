@@ -7,6 +7,25 @@ description: >-
 runs:
   using: composite
   steps:
+    - name: Trade durability for speed
+      # The suite writes several GB of WAL (a TRUNCATE per test, a guild schema
+      # per guild id above the pool), and with the defaults every commit waits
+      # on a flush and every checkpoint syncs hundreds of thousands of relation
+      # files. The cluster is thrown away with the job, so it runs as the local
+      # docker-compose db does (CLAUDE.md, Running Tests). A service container
+      # takes no command line, but these three reload.
+      shell: bash
+      env:
+        PGPASSWORD: initiative
+      run: |
+        psql -h localhost -U initiative -d initiative_test -v ON_ERROR_STOP=1 -q \
+          -c "ALTER SYSTEM SET fsync = off" \
+          -c "ALTER SYSTEM SET synchronous_commit = off" \
+          -c "ALTER SYSTEM SET full_page_writes = off" \
+          -c "SELECT pg_reload_conf()"
+        psql -h localhost -U initiative -d initiative_test -At \
+          -c "SELECT name || '=' || setting FROM pg_settings WHERE name IN ('fsync', 'synchronous_commit', 'full_page_writes') ORDER BY name"
+
     - name: Bootstrap database roles
       # The same module a deployment runs at startup, over the same kind of
       # owner connection: it creates the three login roles, hands the app's

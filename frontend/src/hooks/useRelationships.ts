@@ -5,8 +5,8 @@
  * of things rather than about either: the same hook serves a project's
  * attachments, a task's dependencies and a file's backlinks.
  *
- * The per-tool attach hooks in `useProjects` / `useQueues` stay, because they
- * keep a shape their own callers already expect. What is different here is that
+ * The per-tool attach hooks in `useProjects` stay, because they keep a shape
+ * their own callers already expect. What is different here is that
  * a write says which tool sits at *each* end and refreshes both.
  */
 
@@ -77,7 +77,7 @@ const toolRefOf = (end: RelatedEnd): ToolRef | null =>
  *
  * Both ends, because a link is a fact about a pair and several tools still
  * serialise their own side of one — a project lists its files, a file
- * lists its projects, a queue item its files and tasks. Those shapes read
+ * lists its projects. Those shapes read
  * differently the moment an edge moves, whichever end was clicked.
  */
 const invalidateEdge = (...ends: (ToolRef | null | undefined)[]) =>
@@ -106,20 +106,18 @@ export const useRelate = (
     options
   );
 
+/** An edge to take back: the row, so the far end's tool is refreshed too, or
+ *  its id alone where the far end is in the anchor's own tool. */
+type UnrelatedEdge = Pick<RelationshipRead, "id"> & Partial<Pick<RelationshipRead, "other">>;
+
 /**
  * Take one edge back.
- *
- * Given the whole row rather than its id, so the far end's tool can be
- * invalidated too — the row is already on screen wherever this is called.
  */
-export const useUnrelate = (
-  anchor?: ToolRef | null,
-  options?: MutationOpts<void, RelationshipRead>
-) =>
-  useCommunityMutation<void, RelationshipRead>(
+export const useUnrelate = (anchor?: ToolRef | null, options?: MutationOpts<void, UnrelatedEdge>) =>
+  useCommunityMutation<void, UnrelatedEdge>(
     {
       mutationFn: (communityId, row) => removeRelationship(communityId, row.id),
-      invalidate: (_data, row) => invalidateEdge(anchor, toolRefOf(row.other)),
+      invalidate: (_data, row) => invalidateEdge(anchor, row.other ? toolRefOf(row.other) : null),
       errorKey: "relations:removeError",
     },
     options
@@ -153,7 +151,7 @@ export interface Neighbourhood {
   walkFailed: boolean;
 }
 
-const keyOf = (ref: { type: SearchEntityType; id: number }) => `${ref.type}:${ref.id}`;
+const keyOf = (ref: EndpointRef) => `${ref.type}:${ref.id}`;
 
 /**
  * Everything within `hops` of one thing.
@@ -245,7 +243,7 @@ export const useRelationsNeighbourhood = (
 /** The links an item is set to have, of every kind. */
 interface ItemLinks {
   /** The item, which the tool `useSetItemLinks` was given holds. */
-  item: { type: SearchEntityType; id: number };
+  item: EndpointRef;
   links: LinkedRef[];
   /** What it was last set to, so only the kinds that moved are written. */
   previous: LinkedRef[];

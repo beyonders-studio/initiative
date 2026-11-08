@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 
-import type { RelationshipRead, SmartChipState } from "@/api/generated/initiativeAPI.schemas";
+import {
+  EndpointKind,
+  type RelationshipRead,
+  type SmartChipState,
+} from "@/api/generated/initiativeAPI.schemas";
 import { useChipStates } from "@/hooks/useSmartChips";
 import { chipAspect, chipKindsFor, chipRef } from "@/lib/smartChips";
 
@@ -14,8 +18,10 @@ import { chipAspect, chipKindsFor, chipRef } from "@/lib/smartChips";
  */
 const HEADLINE_ASPECT = ["status", "progress", "when", "value"];
 
-/** The chip reference for one far end, or null where its kind shows nothing. */
+/** The chip reference for one far end, or null where its kind shows nothing —
+ *  as a person never does. */
 const headlineRef = (type: RelationshipRead["other"]["type"], id: number): string | null => {
+  if (type === EndpointKind.user) return null;
   const kinds = chipKindsFor(type);
   for (const aspect of HEADLINE_ASPECT) {
     const kind = kinds.find((candidate) => chipAspect(candidate) === aspect);

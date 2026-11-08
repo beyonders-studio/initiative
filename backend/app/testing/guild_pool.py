@@ -152,7 +152,9 @@ async def install(engine: AsyncEngine) -> None:
     A guild schema left under its own name is a run that stopped mid-test, so
     it goes. A parked one is kept, and its permissions are recorded again: the
     bootstrap every session starts with re-grants the guild roles to the
-    provisioning login.
+    provisioning login. One whose roles are gone goes too: recording it would
+    take the missing roles as the slot's permissions, and every later session
+    would hand it out without them.
     """
     async with engine.begin() as conn:
         raw = await conn.get_raw_connection()
@@ -183,9 +185,19 @@ async def install(engine: AsyncEngine) -> None:
             .all()
         )
         for schema in parked:
-            await _record_permissions(
-                conn, schema, int(schema.removeprefix("test_pool_"))
+            guild_id = int(schema.removeprefix("test_pool_"))
+            roles = [guild_role_name(guild_id, kind) for kind in GuildRoleKind]
+            present = await conn.scalar(
+                text("SELECT count(*) FROM pg_roles WHERE rolname = ANY(:r)"),
+                {"r": roles},
             )
+            if present != len(roles):
+                await conn.exec_driver_sql(
+                    f'DROP SCHEMA "{parked_name(guild_id)}" CASCADE'
+                )
+                await drop_guild_schema(conn, guild_id)
+                continue
+            await _record_permissions(conn, schema, guild_id)
         await conn.execute(text("DELETE FROM test_harness.ddl_log"))
 
 

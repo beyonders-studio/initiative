@@ -269,6 +269,9 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: Whether this install tracks its listing. True unless a guild admin chose
     #: to apply versions by hand.
     auto_update: bool = True
+    #: A version that asks for more than the install holds, waiting for the
+    #: seat to accept or decline it.
+    pending_version: Optional[str] = None
     #: What the install produced — for a tool instance, the row it created, so
     #: the sidebar can link straight to it.
     artifacts: List[CommunityPluginArtifact] = []
@@ -398,6 +401,16 @@ class CommunityPluginUpgradeAsks(SanitizedBaseModel):
     declined: bool = False
 
 
+class CommunityPluginUpdateRefused(SanitizedBaseModel):
+    """A newer version than the install's that this server cannot run.
+    ``reason`` is the ``messages.py`` code of the refusal."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    version: str
+    reason: str
+
+
 class CommunityPluginUpgrade(SanitizedBaseModel):
     """The seat's consent to a version that asks for more.
 
@@ -460,12 +473,14 @@ class CommunityPluginDetail(CommunityPluginRead):
     #: purpose, the plug-in-wide one first. Nobody else's.
     consents: List[CommunityPluginConsentRead] = []
     #: The version this install would move to if it updated now, and absent
-    #: when there is none — an install already on the newest, and one whose
-    #: listing is gone or has published nothing this build can run, are one
-    #: answer to the only question being asked. Only the detail read carries it:
-    #: it costs a catalog lookup, and it is the page offering the Update button
-    #: that needs the answer.
+    #: when there is none: the install is on the newest, or the listing is gone
+    #: or withdrawn, or its newest is one this server cannot run
+    #: (``update_refused``). Only the detail read carries it: it costs a catalog
+    #: lookup, and it is the page offering the Update button that needs it.
     update_version: Optional[str] = None
+    #: A newer version this server cannot run, and why, so the page can say
+    #: so rather than "Up to date".
+    update_refused: Optional[CommunityPluginUpdateRefused] = None
     #: The scopes the pinned manifest asks for, in vocabulary order. Using a
     #: plug-in the community does not have is left out until it does.
     requested_scopes: List[str] = []
@@ -642,6 +657,7 @@ def serialize_guild_plugin(
         name=plugin.name,
         enabled=plugin.enabled,
         auto_update=plugin.auto_update,
+        pending_version=plugin.pending_version,
         artifacts=[CommunityPluginArtifact(**artifact) for artifact in artifacts],
         needs_config=state.needs_config,
         config_state=state.state,
@@ -747,6 +763,7 @@ def serialize_guild_plugin_detail(
     install_state: Optional[InstallState] = None,
     avatar_url: Optional[str] = None,
     update_offer: Any = None,
+    update_refused: Any = None,
     installed: Collection[str] = (),
     placements: Sequence[Any] = (),
     artifacts: Sequence[Dict[str, Any]] = (),
@@ -758,9 +775,10 @@ def serialize_guild_plugin_detail(
 ) -> CommunityPluginDetail:
     """The install and its connections, from the viewer's own perspective.
 
-    ``update_offer`` (an ``plugin_updates.UpdateOffer``) is resolved by the
-    caller, which is the layer holding a session that can read the catalog,
-    and so are ``listing`` (the install's ``MarketplaceListing``, if any) and
+    ``update_offer`` (a ``plugin_updates.UpdateOffer``) and ``update_refused``
+    (a ``plugin_updates.RefusedUpdate``) are resolved by the caller, which is
+    the layer holding a session that can read the catalog, and so are
+    ``listing`` (the install's ``MarketplaceListing``, if any) and
     ``installed``, the public ids of the plug-ins the community has.
     """
     base = serialize_guild_plugin(
@@ -801,6 +819,13 @@ def serialize_guild_plugin_detail(
         ],
         consents=[serialize_consent(row) for row in consent_rows],
         update_version=update_offer.version if update_offer is not None else None,
+        update_refused=(
+            CommunityPluginUpdateRefused(
+                version=update_refused.version, reason=update_refused.reason
+            )
+            if update_refused is not None
+            else None
+        ),
         pending_update=serialize_upgrade_asks(plugin, update_offer),
         requested_scopes=offered_scopes(plugin.definition, installed),
         grantable_scopes=grantable_scopes(

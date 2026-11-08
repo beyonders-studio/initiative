@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import ColumnElement, Select, func
 from sqlalchemy.orm import contains_eager, selectinload, undefer
 from sqlmodel import select
@@ -18,8 +18,7 @@ from app.api.deps import (
     get_current_active_user,
     get_guild_membership,
     GuildContext,
-    require_guild_roles,
-    GuildAdminContext,
+    require_surface,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import (
@@ -37,12 +36,14 @@ from app.models.tenant.initiative import (
     JoinRequestStatus,
     LOCKED_PERMISSION_ROLE_NAMES,
 )
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import Presence, User
 from app.models.platform.user_profile_view import MemberProfile
 from app.schemas.tenant.initiative import (
     InitiativeCreate,
+    InitiativeDefaultsRead,
+    InitiativeDefaultsUpdate,
     InitiativeDirectoryEntry,
     InitiativeJoinRequestCreate,
     InitiativeJoinRequestRead,
@@ -57,6 +58,7 @@ from app.schemas.tenant.initiative import (
     InitiativeUpdate,
     serialize_initiative,
     serialize_initiative_member,
+    community_holds_role,
     serialize_role,
 )
 from app.schemas.platform.user import UserSummaryListResponse
@@ -79,6 +81,11 @@ from app.services.content_sockets import sockets as content_sockets
 from app.services import rls as rls_service
 from app.services.membership import initiative_scope_clause
 
+
+#: A route that administers the community's initiatives.
+InitiativesContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.initiatives))
+]
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -133,10 +140,7 @@ _ROLE_AUDIT_FIELDS = ("display_name", "is_manager")
 
 def _role_permissions(role: InitiativeRoleModel) -> dict[str, bool]:
     """A role's permission toggles, by key."""
-    return {
-        getattr(p.permission_key, "value", p.permission_key): p.enabled
-        for p in role.permissions
-    }
+    return {p.key: p.enabled for p in role.permissions}
 
 
 async def _get_initiative_or_404(
@@ -186,8 +190,11 @@ async def _require_manager_access(
     *,
     guild_context: GuildContext | None = None,
 ) -> None:
-    """Require that the user has manager-level access to the initiative."""
-    if guild_context is not None and guild_context.is_admin:
+    """Require that the user has manager-level access to the initiative:
+    a manager of it, or a holder of the community's initiatives."""
+    if guild_context is not None and guild_context.holds_surface(
+        AdminSurface.initiatives
+    ):
         return
     is_manager = (
         initiative.id in guild_context.manager_initiatives
@@ -277,7 +284,8 @@ async def list_initiatives(
     scope: Annotated[InitiativeListScope, Query()] = InitiativeListScope.member,
 ) -> List[InitiativeRead]:
     """The initiatives the caller belongs to, or — for a guild admin asking for
-    ``scope=community`` — every initiative in the guild.
+    ``scope=community`` — every initiative in the guild, which the admin rung's
+    reach into all content already reads.
 
     The default is the caller's own workspace: what the sidebar and the
     initiative pickers show. A guild admin's authority over their whole guild is
@@ -354,6 +362,49 @@ async def list_initiative_directory(
         user_id=current_user.id,
         is_guild_admin=guild_context.is_admin,
     )
+
+
+@router.get("/defaults", response_model=InitiativeDefaultsRead)
+async def get_initiative_defaults(
+    session: RLSSessionDep,
+    guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
+) -> InitiativeDefaultsRead:
+    """What the community sets for every initiative in it: each initiative's
+    managers see these as set, and may not change them.
+
+    Declared before ``/{initiative_id}`` so the literal path wins the match.
+    """
+    return await initiatives_service.community_defaults(session)
+
+
+@router.patch("/defaults", response_model=InitiativeDefaultsRead)
+async def update_initiative_defaults(
+    changes: InitiativeDefaultsUpdate,
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
+) -> InitiativeDefaultsRead:
+    """Set what every initiative in the community starts from and keeps. The
+    community's admins only. A tool's switch or a member permission set here
+    is written to every initiative at once, archived and trashed ones too."""
+    if not guild_context.holds_surface(AdminSurface.initiatives):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=InitiativeMessages.DEFAULTS_ADMIN_ONLY,
+        )
+    defaults = await initiatives_service.set_community_defaults(
+        session,
+        guild_id=guild_context.guild_id,
+        changes=changes,
+        actor_user_id=current_user.id,
+    )
+    await session.commit()
+    # What each open connection may see and edit has moved with the switches.
+    guild_id = guild_context.guild_id
+    await content_sockets.refresh_users(
+        guild_id, content_sockets.users_in_guild(guild_id)
+    )
+    return defaults
 
 
 @router.post("/{initiative_id}/join", response_model=InitiativeRead)
@@ -759,9 +810,7 @@ async def create_initiative(
     initiative_in: InitiativeCreate,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: Annotated[
-        GuildContext, Depends(require_guild_roles(CommunityRole.admin))
-    ],
+    guild_context: InitiativesContext,
 ) -> InitiativeRead:
     guild_id = guild_context.guild_id
     await ensure_name_free(
@@ -831,6 +880,20 @@ async def update_initiative(
     )
 
     update_data = initiative_in.model_dump(exclude_unset=True)
+    if any(tool.view_permission in update_data for tool in Tool):
+        defaults = await initiatives_service.community_defaults(session)
+        if any(
+            update_data.get(tool.view_permission, enabled) != enabled
+            for tool, enabled in defaults.tools.items()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=InitiativeMessages.SET_BY_COMMUNITY,
+            )
+        # The community's switch is shown back as the initiative's; the
+        # initiative's own value under it is left as it was.
+        for tool in defaults.tools:
+            update_data.pop(tool.view_permission, None)
     # Auto-join enrols every future guild member, so it shapes onboarding for
     # the whole guild rather than for one initiative — guild admins only, the
     # same shape as the archive toggle above. join_policy stays with whoever may
@@ -838,7 +901,7 @@ async def update_initiative(
     if (
         update_data.get("auto_join") is not None
         and update_data["auto_join"] != initiative.auto_join
-        and not guild_context.is_admin
+        and not guild_context.holds_surface(AdminSurface.initiatives)
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -886,13 +949,13 @@ async def update_initiative(
 async def delete_initiative(
     initiative_id: int,
     session: RLSSessionDep,
-    guild_context: GuildAdminContext,
+    guild_context: InitiativesContext,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> None:
     """Soft-delete an initiative. Cascades the same deleted_at to its
-    projects, files, queues, and calendar events; their descendants
-    (tasks, comments, queue items) follow recursively. Restoring the
-    initiative resurfaces everything that was cascaded together."""
+    projects, files and calendar events; their descendants (tasks, comments)
+    follow recursively. Restoring the initiative resurfaces everything that
+    was cascaded together."""
     from app.services.tenant.soft_delete import trash
 
     initiative = await _get_initiative_or_404(initiative_id, session)
@@ -945,7 +1008,11 @@ async def list_initiative_roles(
     counts = await initiatives_service.count_members_by_role(
         session, initiative_id=initiative_id
     )
-    return [serialize_role(role, member_count=counts.get(role.id, 0)) for role in roles]
+    defaults = await initiatives_service.community_defaults(session)
+    return [
+        serialize_role(role, member_count=counts.get(role.id, 0), defaults=defaults)
+        for role in roles
+    ]
 
 
 @router.post(
@@ -965,6 +1032,12 @@ async def create_initiative_role(
     await _require_manager_access(
         session, initiative, current_user, guild_context=guild_context
     )
+    defaults = await initiatives_service.community_defaults(session)
+    if not defaults.custom_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=InitiativeMessages.CUSTOM_ROLES_OFF,
+        )
 
     # Check for duplicate name
     existing = await initiatives_service.get_role_by_name(
@@ -1085,9 +1158,27 @@ async def update_initiative_role(
         session.add(role)
 
     # Update permissions if provided
-    if role_in.permissions is not None:
+    permissions = role_in.permissions
+    if permissions is not None:
+        defaults = await initiatives_service.community_defaults(session)
+        if community_holds_role(role, defaults):
+            if any(
+                permissions.get(key, enabled) != enabled
+                for key, enabled in defaults.member_permissions.items()
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=InitiativeMessages.SET_BY_COMMUNITY,
+                )
+            # Shown back as the role's own; the role's own values under them
+            # are left as they were.
+            permissions = {
+                key: on
+                for key, on in permissions.items()
+                if key not in defaults.member_permissions
+            }
         role = await initiatives_service.update_role_permissions(
-            session, role=role, permissions=role_in.permissions
+            session, role=role, permissions=permissions
         )
 
     changed = audit_service.changed_fields(
@@ -1125,7 +1216,11 @@ async def update_initiative_role(
     member_count = await initiatives_service.count_role_members(
         session, role_id=role.id
     )
-    return serialize_role(role, member_count=member_count)
+    return serialize_role(
+        role,
+        member_count=member_count,
+        defaults=await initiatives_service.community_defaults(session),
+    )
 
 
 @router.delete(
@@ -1522,15 +1617,18 @@ async def add_initiative_member(
     return read
 
 
-@router.delete("/{initiative_id}/members/{user_id}", response_model=InitiativeRead)
+@router.delete(
+    "/{initiative_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def remove_initiative_member(
     initiative_id: int,
     user_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
-) -> InitiativeRead:
-    """Remove a member from an initiative."""
+) -> Response:
+    """Remove a member from an initiative. Nothing comes back: a manager who
+    leaves a private initiative no longer reads it."""
     initiative = await _get_initiative_or_404(initiative_id, session)
     await _require_manager_access(
         session,
@@ -1580,7 +1678,7 @@ async def remove_initiative_member(
         # the guild immediately (initiative-level access change).
         await content_sockets.revoke_user(guild_context.guild_id, user_id)
 
-    return await _read_initiative(initiative_id, session, guild_context)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/{initiative_id}/members/{user_id}", response_model=InitiativeRead)

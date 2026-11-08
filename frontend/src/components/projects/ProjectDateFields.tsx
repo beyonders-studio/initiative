@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
 import { dateRangeBounds } from "@/lib/dateRange";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
 
 type ProjectDateFieldsProps = {
   /** Namespaces the two field ids so several instances can share a page. */

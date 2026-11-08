@@ -3,52 +3,70 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CounterSettingsInput,
+  type CurrencyCode,
+  MetadataType,
   type PropertyDefinitionCreate,
   type PropertyDefinitionRead,
   type PropertyOption,
-  PropertyType,
-  type PropertyType as PropertyTypeValue,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { useCreateProperty } from "@/hooks/useProperties";
+import { type MetadataOwner, ownerColumns, useCreateProperty } from "@/hooks/useProperties";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 
+import { CounterSettingsFields, counterSettingsValid } from "./CounterSettingsFields";
+import { CurrencySelect, useDefaultCurrency } from "./CurrencySelect";
 import { normalizeOptionList, typeRequiresOptions } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
-/** The kinds of property there are, in the order they are offered. */
-export const PROPERTY_TYPES: PropertyTypeValue[] = [
-  PropertyType.text,
-  PropertyType.number,
-  PropertyType.checkbox,
-  PropertyType.date,
-  PropertyType.datetime,
-  PropertyType.url,
-  PropertyType.select,
-  PropertyType.multi_select,
-  PropertyType.user_reference,
+/** The types people define a property or metadata as, in the order they are
+ *  offered. The rest of {@link MetadataType} are a plug-in's alone. */
+export const PROPERTY_TYPES: MetadataType[] = [
+  MetadataType.text,
+  MetadataType.number,
+  MetadataType.checkbox,
+  MetadataType.date,
+  MetadataType.datetime,
+  MetadataType.url,
+  MetadataType.select,
+  MetadataType.multi_select,
+  MetadataType.user_reference,
+  MetadataType.currency,
+  MetadataType.scale,
+  MetadataType.counter,
+  MetadataType.file,
+  MetadataType.signature,
 ];
 
 /**
- * A new property for an initiative: its name, its kind and, for a select, its
- * options. Where an item's properties are added to, and where a layout adds a
- * field, it is the one way a property is made there.
+ * A new property for an initiative, or metadata of one of its projects or
+ * collections: its name, its type and, for a select, its options, for money
+ * its currency, for a counter its step and bounds. Where an item's properties
+ * are added to, and where a layout adds a field, it is the one way either is
+ * made there.
+ *
+ * Given an `owner` that may also hold it, it asks whose it is: the owner's
+ * metadata, or the initiative's property.
  */
 export const NewPropertyForm = ({
   initiativeId,
+  owner,
   name: startName = "",
-  type: startType = PropertyType.text,
+  type: startType = MetadataType.text,
   onCreated,
   onCancel,
   onPendingChange,
 }: {
   initiativeId: number;
+  /** The project or collection it may be metadata of; left out, it is the
+   *  initiative's property. */
+  owner?: MetadataOwner;
   /** What the name starts as: what was searched for, say. */
   name?: string;
-  /** The kind it starts as. */
-  type?: PropertyTypeValue;
+  /** The type it starts as. */
+  type?: MetadataType;
   onCreated: (definition: PropertyDefinitionRead) => void;
   onCancel: () => void;
   /** Told when creating starts and ends. */
@@ -56,10 +74,15 @@ export const NewPropertyForm = ({
 }) => {
   const { t } = useTranslation(["properties", "common"]);
   const [newName, setNewName] = useState(startName);
-  const [newType, setNewType] = useState<PropertyTypeValue>(startType);
+  const [newType, setNewType] = useState<MetadataType>(startType);
+  // An owner's metadata, until the initiative's property is asked for.
+  const [owned, setOwned] = useState(owner !== undefined);
   const [newOptions, setNewOptions] = useState<PropertyOption[]>(() =>
     typeRequiresOptions(startType) ? [{ value: "", label: "" }] : []
   );
+  const defaultCurrency = useDefaultCurrency();
+  const [newCurrency, setNewCurrency] = useState<CurrencyCode>(defaultCurrency);
+  const [newCounter, setNewCounter] = useState<CounterSettingsInput>({});
   const createPropertyMutation = useCreateProperty();
 
   const handleAddOption = () => setNewOptions((prev) => [...prev, { value: "", label: "" }]);
@@ -82,7 +105,10 @@ export const NewPropertyForm = ({
       name,
       type: newType,
       initiative_id: initiativeId,
+      ...ownerColumns(owned ? owner : undefined),
       options,
+      ...(newType === MetadataType.currency ? { currency: newCurrency } : {}),
+      ...(newType === MetadataType.counter ? { counter: newCounter } : {}),
     };
     onPendingChange?.(true);
     try {
@@ -99,12 +125,38 @@ export const NewPropertyForm = ({
     if (typeRequiresOptions(newType)) {
       return normalizeOptionList(newOptions).length > 0;
     }
+    if (newType === MetadataType.counter) return counterSettingsValid(newCounter);
     return true;
-  }, [newName, newType, newOptions]);
+  }, [newName, newType, newOptions, newCounter]);
 
   return (
     <div className="space-y-3 p-3">
-      <div className="font-medium text-sm">{t("properties:picker.createHeading")}</div>
+      <div className="font-medium text-sm">
+        {t(owned ? "properties:picker.createPropertyHeading" : "properties:picker.createHeading")}
+      </div>
+      {owner !== undefined ? (
+        <div className="space-y-2">
+          <Label htmlFor="property-new-owner" className="font-normal text-xs">
+            {t("properties:picker.ownerLabel")}
+          </Label>
+          <Select
+            value={owned ? owner.kind : "initiative"}
+            onValueChange={(value) => setOwned(value !== "initiative")}
+          >
+            <SelectTrigger id="property-new-owner">
+              <span className="truncate">
+                {t(`properties:picker.owner.${owned ? owner.kind : "initiative"}`)}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={owner.kind}>
+                {t(`properties:picker.owner.${owner.kind}`)}
+              </SelectItem>
+              <SelectItem value="initiative">{t("properties:picker.owner.initiative")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <div className="space-y-2">
         <Label htmlFor="property-new-name" className="font-normal text-xs">
           {t("properties:picker.namePlaceholder")}
@@ -124,7 +176,7 @@ export const NewPropertyForm = ({
         <Select
           value={newType}
           onValueChange={(value) => {
-            const nextType = value as PropertyTypeValue;
+            const nextType = value as MetadataType;
             setNewType(nextType);
             if (!typeRequiresOptions(nextType)) {
               setNewOptions([]);
@@ -158,6 +210,17 @@ export const NewPropertyForm = ({
           </SelectContent>
         </Select>
       </div>
+
+      {newType === MetadataType.currency ? (
+        <div className="space-y-2">
+          <Label className="font-normal text-xs">{t("properties:currency.label")}</Label>
+          <CurrencySelect value={newCurrency} onChange={setNewCurrency} />
+        </div>
+      ) : null}
+
+      {newType === MetadataType.counter ? (
+        <CounterSettingsFields value={newCounter} onChange={setNewCounter} />
+      ) : null}
 
       {typeRequiresOptions(newType) ? (
         <div className="space-y-2">

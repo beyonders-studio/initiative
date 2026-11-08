@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { type ApiKeyMetadata, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { useCreateApiKey, useMyApiKeys } from "@/hooks/useSecurity";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { buildApiUrl } from "@/lib/wsUrl";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,11 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useCreateApiKey, useMyApiKeys } from "@/hooks/useSecurity";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { buildApiUrl } from "@/lib/wsUrl";
+} from "@/ui/dialog";
 
 /** The longest name an API key takes. */
 const KEY_NAME_MAX = 100;
@@ -90,6 +90,58 @@ export const CalendarSubscribeDialog = ({
   );
 };
 
+/**
+ * A calendar's subscription link, made on request and shown once: a new
+ * personal API key that names the calendar, replacing any it had.
+ */
+export const useSubscriptionLink = (communityId: number, calendarId: number) => {
+  const [link, setLink] = useState<string | null>(null);
+  const createLink = useCreateApiKey({
+    onSuccess: (data) => {
+      const url = buildApiUrl(`c/${communityId}/calendars/${calendarId}/feed.ics`);
+      url.searchParams.set("token", data.secret);
+      setLink(url.toString());
+    },
+    onError: (error) => toast.error(getErrorMessage(error, "calendars:subscribe.error")),
+  });
+  const create = (name: string) =>
+    createLink.mutate({
+      name: name.slice(0, KEY_NAME_MAX),
+      community_id: communityId,
+      resource_type: Tool.calendar,
+      resource_id: calendarId,
+    });
+  return { link, create, isPending: createLink.isPending };
+};
+
+/** A subscription link, to copy or open in a calendar app. */
+export const SubscriptionLink = ({ link }: { link: string }) => {
+  const { t } = useTranslation("calendars");
+  const copyLink = () => {
+    if (!navigator?.clipboard) {
+      return;
+    }
+    void navigator.clipboard.writeText(link).then(() => {
+      toast.success(t("subscribe.copied"));
+    });
+  };
+  return (
+    <>
+      <code className="block break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+        {link}
+      </code>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={copyLink}>
+          {t("subscribe.copy")}
+        </Button>
+        <Button type="button" size="sm" variant="outline" asChild>
+          <a href={link.replace(/^https?:/, "webcal:")}>{t("subscribe.open")}</a>
+        </Button>
+      </div>
+    </>
+  );
+};
+
 /** One calendar's link: made on request and shown once. */
 const SubscribeRow = ({
   communityId,
@@ -103,25 +155,7 @@ const SubscribeRow = ({
   showName: boolean;
 }) => {
   const { t } = useTranslation("calendars");
-  const [link, setLink] = useState<string | null>(null);
-
-  const createLink = useCreateApiKey({
-    onSuccess: (data) => {
-      const url = buildApiUrl(`c/${communityId}/calendars/${calendar.id}/feed.ics`);
-      url.searchParams.set("token", data.secret);
-      setLink(url.toString());
-    },
-    onError: (error) => toast.error(getErrorMessage(error, "calendars:subscribe.error")),
-  });
-
-  const copyLink = () => {
-    if (!link || !navigator?.clipboard) {
-      return;
-    }
-    void navigator.clipboard.writeText(link).then(() => {
-      toast.success(t("subscribe.copied"));
-    });
-  };
+  const { link, create, isPending } = useSubscriptionLink(communityId, calendar.id);
 
   return (
     <li className="space-y-2 rounded-md border p-3">
@@ -136,35 +170,74 @@ const SubscribeRow = ({
           <Button
             type="button"
             size="sm"
-            disabled={createLink.isPending}
-            onClick={() =>
-              createLink.mutate({
-                name: t("subscribe.keyName", { name: calendar.name }).slice(0, KEY_NAME_MAX),
-                community_id: communityId,
-                resource_type: Tool.calendar,
-                resource_id: calendar.id,
-              })
-            }
+            disabled={isPending}
+            onClick={() => create(t("subscribe.keyName", { name: calendar.name }))}
           >
             {hasLink ? t("subscribe.getNewLink") : t("subscribe.getLink")}
           </Button>
         )}
       </div>
-      {link ? (
-        <>
-          <code className="block break-all rounded-md border bg-muted px-3 py-2 font-mono text-sm">
-            {link}
-          </code>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={copyLink}>
-              {t("subscribe.copy")}
-            </Button>
-            <Button type="button" size="sm" variant="outline" asChild>
-              <a href={link.replace(/^https?:/, "webcal:")}>{t("subscribe.open")}</a>
-            </Button>
-          </div>
-        </>
-      ) : null}
+      {link ? <SubscriptionLink link={link} /> : null}
     </li>
+  );
+};
+
+/** A subscription key with its calendar's community: one a new link can be
+ *  made in place of. */
+export type SubscriptionKey = ApiKeyMetadata & { community_id: number; resource_id: number };
+
+export const isSubscription = (key: ApiKeyMetadata): key is SubscriptionKey =>
+  key.resource_type === Tool.calendar && key.resource_id != null && key.community_id != null;
+
+/**
+ * A new link for a calendar subscription, whose own link was shown once. It
+ * replaces the key, keeping its name, so the old link stops working.
+ */
+export const NewSubscriptionLinkDialog = ({
+  apiKey,
+  onClose,
+}: {
+  apiKey: SubscriptionKey;
+  onClose: () => void;
+}) => {
+  const { t } = useTranslation(["calendars", "common"]);
+  const { link, create, isPending } = useSubscriptionLink(apiKey.community_id, apiKey.resource_id);
+  // Once asked for, the old link is replaced whatever happens here, so the
+  // dialog stays until the new one is shown.
+  const close = () => {
+    if (!isPending) onClose();
+  };
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : close())}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("subscribe.newLinkTitle", { name: apiKey.name })}</DialogTitle>
+          <DialogDescription>{t("subscribe.newLinkDescription")}</DialogDescription>
+        </DialogHeader>
+        {link ? (
+          <div className="space-y-2">
+            <SubscriptionLink link={link} />
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">{t("subscribe.secret")}</p>
+        )}
+        <DialogFooter>
+          {link ? (
+            <Button type="button" onClick={onClose}>
+              {t("common:done")}
+            </Button>
+          ) : (
+            <>
+              <Button type="button" variant="outline" disabled={isPending} onClick={close}>
+                {t("common:cancel")}
+              </Button>
+              <Button type="button" disabled={isPending} onClick={() => create(apiKey.name)}>
+                {t("subscribe.getNewLink")}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

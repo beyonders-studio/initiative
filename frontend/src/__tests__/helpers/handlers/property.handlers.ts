@@ -1,8 +1,25 @@
 import { HttpResponse } from "msw";
 
-import { buildPropertyDefinition } from "@/__tests__/factories/properties";
+import { buildPropertyDefinition, buildPropertyGroup } from "@/__tests__/factories/properties";
+import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { communityHttp } from "../communityHttp";
+
+/**
+ * The definitions list as the server answers it: the initiative's
+ * properties, or, asked with `project_id` or `collection_id`, that project's
+ * or collection's metadata.
+ */
+export const definitionsHandler = (
+  properties: PropertyDefinitionRead[],
+  metadata: { project?: PropertyDefinitionRead[]; collection?: PropertyDefinitionRead[] } = {}
+) =>
+  communityHttp.get("/property-definitions/", ({ request }) => {
+    const asked = new URL(request.url).searchParams;
+    if (asked.has("project_id")) return HttpResponse.json(metadata.project ?? []);
+    if (asked.has("collection_id")) return HttpResponse.json(metadata.collection ?? []);
+    return HttpResponse.json(properties);
+  });
 
 /**
  * Default MSW handlers for the property endpoints.
@@ -13,8 +30,24 @@ import { communityHttp } from "../communityHttp";
  */
 export const propertyHandlers = [
   // ── Property definitions ──────────────────────────────────────────────────
-  communityHttp.get("/property-definitions/", () => {
-    return HttpResponse.json([]);
+  definitionsHandler([]),
+
+  communityHttp.get("/property-definitions/by-owner", () =>
+    HttpResponse.json({ groups: [buildPropertyGroup()] })
+  ),
+
+  communityHttp.post("/property-definitions/bulk-delete", () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  communityHttp.post("/property-definitions/promote", async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(
+      buildPropertyDefinition({
+        name: String(body.name),
+        initiative_id: typeof body.initiative_id === "number" ? body.initiative_id : 1,
+      })
+    );
   }),
 
   communityHttp.post("/property-definitions/", async ({ request }) => {

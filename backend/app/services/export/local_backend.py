@@ -10,9 +10,8 @@ and stays deterministic across images (no dependence on host fonts).
 
 Non-PDF formats dispatch to lightweight renderers: the tabular module
 (csv/xlsx/md over columns/rows payloads, or a spreadsheet file's sparse
-grid), verbatim JSON, and the ``file`` passthrough (an uploaded blob exported
-unconverted — the one format whose content type and filename come from the
-stored object, not a static map).
+grid) and verbatim JSON. An uploaded file exported unconverted (``file``) is
+not rendered: the engine copies it from storage.
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ import asyncio
 import json
 import re
 from pathlib import Path
-from typing import Any
 
 import typst
 
@@ -50,7 +48,6 @@ _CONTENT_TYPES = {
     "json": "application/json",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "ics": "text/calendar; charset=utf-8",
-    "file": "application/octet-stream",  # per-item override from the blob
 }
 
 
@@ -113,12 +110,7 @@ def _render_item(req: RenderRequest, item: RenderItem) -> RenderedArtifact:
     filename: str | None = item.filename or (
         f"{item.key}.{format}" if item.format is not None else None
     )
-    if format == "file":
-        content, content_type, blob_name = _read_passthrough(req.guild_id, item.data)
-        # A bundle path set by the adapter (e.g. assets/{key}) wins over the
-        # blob's own name; standalone passthroughs keep the original name.
-        filename = filename or blob_name
-    elif format == "csv":
+    if format == "csv":
         content = (
             spreadsheet.render_csv(item.data["grid"])
             if "grid" in item.data
@@ -175,8 +167,8 @@ def _render_item(req: RenderRequest, item: RenderItem) -> RenderedArtifact:
 
 def _blob_reader(guild_id: int):
     """Bytes-by-storage-key reader for renderers that embed uploads (asset
-    images, file passthrough). Keys are derived by adapters from file
-    rows under the caller's RLS session — never from raw user input."""
+    images). Keys are derived by adapters from file rows under the caller's
+    RLS session — never from raw user input."""
     from app.services.storage import get_guild_storage
 
     storage = get_guild_storage(guild_id)
@@ -187,28 +179,9 @@ def _blob_reader(guild_id: int):
             raise FileNotFoundError(key)
         if blob.path is not None:
             return Path(blob.path).read_bytes()
-        return blob.stream.read()  # type: ignore[union-attr]
+        return b"".join(blob.stream or ())
 
     return read
-
-
-def _read_passthrough(
-    guild_id: int, data: dict[str, Any]
-) -> tuple[bytes, str, str | None]:
-    """Read a stored upload blob for unconverted export."""
-    from app.services.storage import get_guild_storage
-
-    blob = get_guild_storage(guild_id).open_readable(str(data["storage_key"]))
-    if blob is None:
-        raise FileNotFoundError(data["storage_key"])
-    content = _blob_reader(guild_id)(str(data["storage_key"]))
-    content_type = (
-        str(data.get("content_type") or "")
-        or blob.content_type
-        or "application/octet-stream"
-    )
-    filename = str(data.get("filename") or "") or None
-    return content, content_type, filename
 
 
 def _compile(template: Path, format: str, item: RenderItem) -> bytes:

@@ -109,10 +109,9 @@
     "deleteConfirmPasswordPlaceholder": "Tu contraseña",
     "deleteConfirmLabel": "Escribe <bold>{{phrase}}</bold> para confirmar:",
     "unableToDelete": "No se pudo eliminar la comunidad.",
-    "retentionTitle": "Retención de la papelera",
-    "retentionDescription": "Cuánto tiempo permanecen los elementos eliminados en la papelera antes de ser borrados permanentemente. Selecciona \"Nunca\" para conservarlos hasta que un administrador los elimine manualmente.",
     "retentionDaysLabel": "Días",
-    "retentionNeverLabel": "Nunca purgar automáticamente",
+    "retentionAfter_one": "Eliminar definitivamente tras <days/> día",
+    "retentionAfter_other": "Eliminar definitivamente tras <days/> días",
     "retentionUpdatedSuccessfully": "Retención actualizada.",
     "discoveryTitle": "Directorio de comunidades",
     "discoveryDescription": "Una comunidad publicada aparece en el directorio, donde cualquier persona con la sesión iniciada puede encontrarla y unirse sin invitación.",
@@ -162,12 +161,14 @@
     "communityRole": {
       "admin": "Administrador",
       "member": "Miembro",
-      "superadmin": "Superadministrador"
+      "superadmin": "Superadministrador",
+      "guest": "Invitado"
     },
     "communityRoleHelp": {
       "member": "Participa en aquello a lo que se le añade.",
       "admin": "Dirige la comunidad: miembros, invitaciones, iniciativas, ajustes.",
-      "superadmin": "Todo eso, y además cómo entra la gente: inicio de sesión, IA y complementos. Solo un superadministrador puede nombrar a otro."
+      "superadmin": "Todo eso, y además cómo entra la gente: inicio de sesión, IA y complementos. Solo un superadministrador puede nombrar a otro.",
+      "guest": "Está aquí durante un número fijo de días y solo ve lo que le dio su invitación."
     },
     "loadingSettings": "Cargando configuración…",
     "unableToLoadSettings": "No se pudo cargar la configuración.",
@@ -201,6 +202,7 @@
     "userIdColumn": "ID de usuario",
     "userColumn": "Usuario",
     "communityRoleColumn": "Rol en la comunidad",
+    "communityRolePickerLabel": "Rol en la comunidad de {{name}}",
     "sourceColumn": "Origen",
     "actionsColumn": "Acciones",
     "sourceOidc": "OIDC",
@@ -269,10 +271,23 @@
     "initiativeJoinRequested": "{{requester}} ha solicitado unirse a {{initiativeName}}.",
     "initiativeJoinApproved": "Tu solicitud para unirte a {{initiativeName}} fue aprobada.",
     "initiativeJoinDenied": "Tu solicitud para unirte a {{initiativeName}} fue rechazada.",
+    "shareRequested": {
+      "read_one": "{{requester}} pide ver {{title}}.",
+      "read_other": "{{requester}} pide ver {{count}} archivos.",
+      "write_one": "{{requester}} pide editar {{title}}.",
+      "write_other": "{{requester}} pide editar {{count}} archivos."
+    },
+    "shareGranted": {
+      "read_one": "{{answerer}} te dio acceso para ver {{title}}.",
+      "read_other": "{{answerer}} te dio acceso para ver {{count}} archivos.",
+      "write_one": "{{answerer}} te dio acceso para editar {{title}}.",
+      "write_other": "{{answerer}} te dio acceso para editar {{count}} archivos."
+    },
+    "shareDeclined_one": "{{answerer}} rechazó tu solicitud.",
+    "shareDeclined_other": "{{answerer}} rechazó tu solicitud de {{count}} archivos.",
     "projectAdded": "{{projectName}} fue agregado a {{initiativeName}} de la que formas parte.",
     "mentionComment": "{{mentionedBy}} te mencionó en un comentario en {{contextTitle}}.",
-    "mentionFile": "{{mentionedBy}} te mencionó en {{fileTitle}}.",
-    "mentionTaskDescription": "{{mentionedBy}} te mencionó en {{taskTitle}}.",
+    "mentionIn": "{{mentionedBy}} te mencionó en {{title}}.",
     "commentOnTask": "{{commenterName}} comentó en {{taskTitle}}.",
     "commentOnResource": "{{commenterName}} comentó en {{entityName}}.",
     "postPublished": "{{authorName}} publicó {{postName}}.",
@@ -299,6 +314,7 @@
     "eventCancelled": "{{canceller}} canceló {{eventTitle}}.",
     "eventRsvp": "{{responder}} respondió {{status}} a {{eventTitle}}.",
     "eventReminder": "{{eventTitle}} está por comenzar.",
+    "taskReminder": "Recordatorio: {{taskTitle}}",
     "accessLevelRead": "de solo lectura",
     "accessLevelReadWrite": "de lectura y escritura",
     "usernameChanged": "Un moderador cambió tu nombre de usuario. Antes eras {{previousHandle}}.",
@@ -307,6 +323,7 @@
     "accountSuspended": "Tu cuenta ha sido suspendida.",
     "accountSuspendedWithReason": "Tu cuenta ha sido suspendida: {{reason}}",
     "accountUnsuspended": "Tu cuenta ya no está suspendida.",
+    "announcement": "Anuncio: {{title}}",
     "communityOnHold": "{{community}} está en pausa. Ponte en contacto con quien gestiona este servidor para resolverlo.",
     "pluginConsentRequested": "{{plugin}} pide actuar en tu nombre: «{{label}}»",
     "pluginUpdatePending": "{{plugin}}, versión {{version}}, pide más acceso",
@@ -357,7 +374,6 @@
     "inbox": {
       "title": "Notificaciones",
       "empty": "Aquí no hay nada todavía.",
-      "loadMore": "Cargar más",
       "markRead": "Marcar como leída",
       "markUnread": "Marcar como no leída",
       "dismiss": "Descartar",
@@ -557,7 +573,6 @@
     "noDescription": "Todavía no hay descripción.",
     "resultCount_one": "{{count}} comunidad",
     "resultCount_other": "{{count}} comunidades",
-    "showMore": "Mostrar más",
     "emptyTitle": "Aún no hay comunidades",
     "emptyDescription": "Ninguna comunidad de aquí aparece en el directorio. Un administrador de comunidad puede publicarla desde los ajustes de la comunidad.",
     "noResultsTitle": "Sin resultados",

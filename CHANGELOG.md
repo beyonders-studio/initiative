@@ -9,6 +9,128 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` in a statement reads one of a plug-in's endpoints, so its rows join tasks, spreadsheets and other plug-ins. A tile's **Build** tab has **Plug-in data** beside **Spreadsheet**, the SQL box suggests plug-ins and their settings, and tiles that read a plug-in through a statement are rewritten to use it. Plug-in widgets and tiles follow **Run dashboard as**: on **Initiative** they use the community's connection.
+
+### Changed
+
+- **Send feedback starts from what you want to say:** suggest an idea, something's not right, or give a compliment, each with its own question. It docks beside the page on a wide screen, keeps your draft when you close it, and takes a screenshot pasted into it. Feedback goes one way unless you tick that the team can contact you with questions; **Something's not right** points you to **Ask for help** for anything you need sorted out.
+- **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
+- **The desktop app has its own title bar.** It holds the app's name, **Help**, and an **Update** button when a new app is ready. It still drags the window, a double click still maximizes it, and the window's own buttons stay at its end. The File, Edit, View and Window menu row no longer takes space under it.
+- **An Update button stays until you update.** When a newer version is waiting, **Update** sits under your name in the sidebar after its first prompt is closed: it reloads on the web and phones, and in the desktop app it restarts into the new app or says where to get it. The version number and **What's new** moved to the foot of **My Settings**.
+- **Help leads with the user guide.** The question mark under your name opens a Help panel that links the user guide first and searches it from inside the app, with answers for the page you're on before you type and each FAQ question as its own answer. Where your server takes help requests, **Ask the team** under the results starts one with your search: write first, pick a topic, paste, drop or pick screenshots, and close it whenever you like, as the draft waits. Requests now carry the device details feedback already sends, with a switch to leave them out. **Ask for help** on notices opens the same request. The separate documentation and lifebuoy icons are gone.
+- **Announcements you close stay in your notifications.** Each one leaves a line, already read, that opens it again. It replaces the **Past announcements** page.
+- **Search forgives typos.** The command palette, the icon picker and every list you pick from find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.
+- **Lists you tick several in work from the keyboard.** Task filters, the calendar's and My tools' community filters, dashboard filters, plug-in settings, tags, a property's options and bulk access take the arrow keys and Enter and stay open while you tick, have a search box, and list **Select all** and **Clear all** with the rest. Every picker ticks what's chosen the same way, and offers to create a tag, an option or a property at the top of its list.
+- **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
+- **A Beta badge** sits by the Initiative mark on the sign-in pages and in the app's left rail, until version 1.0.
+
+### Fixed
+
+- **Every passkey button works in the apps.** Signing in, creating an account, adding a passkey, a community's passkey ask, making a waiting change now, breaking glass and the billing console open your browser for the passkey and carry on in the app, with no second sign-in. The Android and Windows apps do the same for a server they can't use passkeys with directly.
+- **Messages fit the screen.** The conversation takes the page and scrolls on its own, on phones too, with the message box always in view, and it stays on the newest message as you type. The page title is gone, and the encryption note is a shield beside the person's name.
+- **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, the notice opens that row, and what the version asks for comes first. A newer version this server can't run says why instead of **Up to date**, and nobody is asked while whoever runs the server manages your plug-ins.
+- **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
+- **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
+- **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
+- **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
+- **The members table no longer offers page sizes that change nothing.** It always shows 25 members a page, and its menu offered 10 to 100.
+- **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
+
+## [0.78.0] - 2026-11-06
+
+### Added
+
+- **Contacts.** An address book for the people and organizations your work involves, such as clients, vendors and venues: their emails, phones and addresses, and the tasks, events and files linked to them. Switch it on per initiative, or install **Community contacts** for one the whole community shares. Contacts export to CSV and import from one, so a list kept in a spreadsheet comes in.
+- **Upload large files, and resume dropped ones.** Files go up in pieces with a progress bar, as large as the community's storage allows, and picking the same file again carries on where it stopped. Backups and Confluence exports go up the same way, up to 20 GB, and restore whole, and Jira and Confluence imports bring attachments of any size, pictures up to 10 MB. **Server operators:** nothing to change; behind a reverse proxy that passes less than 50 MB per request, they go up in smaller pieces.
+- **Custom roles.** Community admins make roles under **Community settings → Roles**, below the built-in ones, and give them from **Users** or by sign-in group on the **Security** tab: a few jobs for a member, such as invites or the member list, or fewer for an admin. Whoever holds those jobs does them from the community's front page and **Members** page.
+- **Digests, each on its own schedule.** **My Settings › Notifications** has a **Digests** section: **Overdue tasks**, and **Coming up** for what's due or starting before the next one (off until you turn it on), each by email, phone or both, daily or weekly at its own time. **Email arrives** sits there too.
+- **Ask for access to what you can't open.** In your initiatives, a link to something not shared with you asks for **View** or **Edit**, with a note, and something you can only read has **Ask to edit**. Whoever can share it answers from the notice or the **Access** tab.
+- **Edit an uploaded document or spreadsheet.** **Edit** on a Word, OpenDocument, Excel, CSV, Markdown or text file turns it into a document or spreadsheet you edit in the app, keeping its name, sharing, comments and links. The upload and its versions are replaced; export gets a file back out.
+- **Dashboards read spreadsheets.** A tile's **Build** tab can read one of the initiative's spreadsheets: pick the file, the sheet and a range such as `A1:D` or `A:D`. In SQL, `sheet('Budget', 'Q3!A1:D')` reads a range beside tasks and projects. Columns take their header's name and formulas give their results. Tiles that read a sheet range read it this way, so they follow **Run dashboard as** like every other tile.
+- **Play videos and recordings in the app.** An uploaded video or audio file plays on its page instead of only downloading, and one kept on S3-compatible storage can be skipped through.
+- **Writing help in the editor.** Select text in a document, wiki page or post to rewrite, shorten, correct or translate it, or type `/` for **Continue writing**. Nothing goes in until you choose **Replace** or **Insert below**.
+- **Catch me up.** Where AI is switched on, a community's front page and each project have a **Catch me up** button that sums up what changed since your last visit, from activity you can see, up to a week back.
+- **Remind me about a task.** A task's schedule has a **Remind me** time only you see, which arrives as subscription news under your **Subscribed** notification settings. A repeating task's next one keeps it at the same distance from its due date.
+- **Required fields.** The layout editor can mark a field required on a task type's page, the event page, the posts page or a collection's file page. Adding an item, or retyping or moving a task, asks for it up top and nobody can empty it; existing items show what's missing.
+- **Counter fields.** Metadata and properties can be a **Counter**: a number with − and + buttons that moves by its step, stays between its minimum and maximum, and resets to its initial value. Two people tapping it at once both count, and a layout can draw it as a number, a bar or a clock.
+- **File fields.** Metadata and properties can be a **File**: one file of the initiative, picked from Files or made from the field with Files' own **New file** dialog. On the item's page a document, whiteboard, spreadsheet or smart link shows right there, so a design kept as a smart link opens in the task, and any other file is a link to it. The **Feature** and **Art** task types come with a **Design files** field.
+- **Signature fields.** Metadata and properties can be a **Signature**: **Sign** asks for your name under a statement of what signing means, and the field then shows who signed and when. Only you can sign as yourself, so plug-ins, imports and copies never carry one, each signing is recorded in the audit log, and the item's page says when it was updated after it was signed. A layout can require one, and it is signed as the item is added.
+- **Pick a task's type in its title.** Start a new task's title with a type and a colon, such as `bug: Login fails`, and it is added as that type. The **?** beside the title lists everything a title can say.
+- **Link things to people.** **Add link** can pick a community member, so a task can depend on someone or a file relate to them, and an `@` mention in a description, document, wiki page or post links them too. Anyone who can see the item sees the link.
+- **Pictures from Files where you write.** The editor's image dialog has a **Files** tab, and descriptions, comments and featured images offer **From Files**. The picture goes in as the file is now, and anyone who can read the page sees it.
+- **Unread count on the phone app's icon.** On an iPhone the icon shows how many notifications are unread; an Android launcher counts those in the tray. Both clear once nothing in the bell is unread.
+- **Thumbnails for pictures and videos.** Pictures uploaded as files, old and new, get a small copy for their cards, so a files list loads faster. A video's card shows a frame of it once somebody who can edit it opens it.
+- **Icons for design files, 3D models and more.** A `.psd`, `.blend`, `.stl`, font, camera raw, code, e-book or CAD file shows its category's icon and format, and **Filter by type** narrows to each category, files already uploaded included.
+- **Summaries for wiki pages, written as you watch.** A wiki page can be summarized like a file, and either summary appears as it is written. A document too long to fit says how much the summary covers.
+- **Change the type of many tasks at once.** **Edit tasks** on a selection has **Type** under **Details**. A type that requires a field some selected task leaves empty isn't offered until the task has it.
+- **Properties for projects and collections.** A project's tasks and a collection's files can have properties of their own beside the initiative's metadata, made in **Settings › Properties** or the layout editor. A new collection can start as a Gallery, Catalog, Log or another collection's shape.
+- **Every field in one place.** **Initiative settings › Metadata** lists the initiative's metadata and the properties of each project and collection you can edit. Delete several at once, or **Promote to metadata** to turn properties of one type into one metadata field, values and layouts included.
+- **Money and scale types.** A money value holds an amount in one currency; a scale holds 0 to 100, shown as a number, stars or a bar. Either can be metadata or a property.
+- **Set what every initiative uses.** Under **Settings → Initiatives → Every initiative**, community admins choose the tools, what the Member role can see and make, and whether managers can add roles, for all initiatives at once. **Each initiative decides** hands a setting back.
+- **A plant care project in the marketplace.** Watering, fertilizing and repotting each have their own type, and watering and fertilizing repeat from when you last did them.
+- **Plug-ins can upload files and filter by person.** A plug-in can narrow lists by assignee, author or a person property, upload files and versions and add them to collections (`files:write`), and read and write contacts (`contacts:read`, `contacts:write`). Webhooks get `files.updated` with `added_to_collection` or `removed_from_collection`.
+- **Settings your server sets show as such.** Where whoever runs the server sets a community's security, notification, AI, guest-stay or API-key settings, or defines custom roles for it, the community's settings pages show them and who sets them, without offering a change.
+- **Switch off a community's own AI or plug-ins.** In the operator's community sheet, **Its own AI connections** and **Its own plug-ins** stop that community's admins setting either up. Its AI connections are kept unused and its plug-ins keep running.
+- **Tell a community when platform staff reach it.** Access for a support case emails the community's superadmins when it starts, naming the level and kind of case. For a security or moderation case, whoever asks chooses on the Access page: at the start, once it has ended, or not at all.
+- **Scan uploads for malware (server operators, opt-in).** With `UPLOAD_SCANNER_URL` and `UPLOAD_SCANNER_TOKEN` set, your scanner checks every upload before it is kept, and uploads pause while it can't answer. See [File & object storage](docs/en/running-a-server/object-storage.md#scanning-uploads).
+- **Encrypt stored files (server operators, opt-in).** With `STORAGE_ENCRYPTION=local` or `gcp_kms`, each community's files are encrypted before they reach disk or the bucket, under a key of its own wrapped by `SECRET_KEY` or a Cloud KMS key (`STORAGE_ENCRYPTION_KMS_KEY`). Files already stored keep opening and are encrypted in the background, and deleting a community destroys its key. See [File & object storage](docs/en/running-a-server/object-storage.md#encrypting-stored-files).
+
+### Changed
+
+- **Galleries are now collections, in Files.** A collection groups files, a file can be in several, and each person sees only the files in it they can open. Upgrading turns each gallery into a collection and each picture into a file, with its comments, tags, links, sharing and caption (the Caption property); where galleries were used, Files is switched on and roles that could view or add to galleries can view or add files. Links to a picture open its file, and backups with galleries restore as collections. A plug-in's gallery access and webhook subscriptions to gallery events are removed, and dashboard SQL reading the gallery tables needs rewriting.
+- **A smaller Create task dialog.** It opens with the title, the type and the type's main column; status, priority, people, dates and the rest are under **More options**.
+- **A private initiative stays out of sight.** Community members outside it can't read it, and its pages answer as though it isn't there; in the API, removing someone from an initiative answers `204`. An export downloads only while every initiative in it is still yours to open.
+- **Sign-up rules move into settings.** **Settings › Platform › Community** has **Let anyone sign up**, **Let anyone create a community**, the daily community limit and the hours between community exports; **Security** has the breached-password check. **Server operators:** `ENABLE_PUBLIC_REGISTRATION`, `DISABLE_GUILD_CREATION`, `GUILD_CREATION_DAILY_LIMIT`, `HIBP_CHECK_ENABLED` and `EXPORT_GUILD_COOLDOWN_HOURS` are read once, on the upgrade to this release; after that, change them in the settings.
+- **An initiative's custom properties are its metadata.** Initiative settings › **Custom properties** is now **Metadata**; a project's or collection's own are its properties.
+- **A file's type is its format.** Each file says what it is, such as a PDF or a PNG, and a new version can change format within its kind, so a JPEG can replace a PNG. In the API, plug-ins and dashboards, `file_type` holds the format (`lexical`, `excalidraw`, `sheet`, `url`, or an upload's `pdf`, `png` …) and a new `kind` says how it is shown; a dashboard statement comparing `file_type` to an old value needs the new one.
+- **Upload any file but a program.** Audio, video, archives, CSV, OpenDocument and unrecognized formats upload as files; programs and scripts (`.exe`, `.sh`, `.bat`, app packages) are refused with a message saying so. A file is typed by what it contains, not just its name.
+- **Marketplace projects bring their own types and fields.** Each ready-made project has task types to suit it, such as candidates or deals, each with its own task page, in place of Task, Bug, Idea and Milestone. Its fields, such as a grant's funder or a deal's value in US dollars, are the project's properties rather than the initiative's metadata.
+- **Delete a task type from a project's layouts.** Each type's page under **Settings › Layouts** has a delete button that asks where its tasks go.
+- **Plug-in values are properties.** A plug-in can keep text, numbers, dates, checkboxes, links, money, choices, people and a scale (its old `progress` kind) on items, shown and filtered as properties are. In the API, item reads drop `plugin_values` (a plug-in's values come in `properties` with its `install_id` and `key`) and a collection file's `fields` are its `metadata`; dashboards read `metadata_definitions` and `metadata_values`, and saved statements are updated on upgrade.
+- **Imports and exports are one list in the API.** `GET /c/{id}/data-jobs/` and `GET /c/{id}/data-jobs/{job_id}` replace reading jobs from `/imports/jobs` and `/exports/jobs`; each job says its `direction`. A notification about an export made before the upgrade no longer opens it.
+- **Moving operations work clears the community it leaves.** Picking a different community on **Settings → Platform → Intake** leaves the old one's cases as ordinary tasks, but deletes their attachments, clears its project choices and takes the cases out of requesters' **My Tickets**. Choosing no community keeps everything for when you pick it again.
+- **Smaller downloads.** The app's JSON, text and SVG go out compressed to browsers that accept it.
+
+### Removed
+
+- **Queues.** Upgrading turns each queue into a project in the same initiative and each item into a task, in the queue's order: the item it was on is **Up now**, held items **Held**, hidden ones **Sitting out** and the rest **Waiting**. An item's member is linked to its task, and comments, sharing, tags and links come along; item colours don't. Where queues were in use, Projects is switched on, and roles that could view or add queues can view or add projects. **Next**, rounds and holds have no replacement: move a task to **Up now** when it's someone's turn. A backup's queues aren't restored, a plug-in's queue access and webhook subscriptions to queue events are removed, and dashboard SQL reading the queue tables needs rewriting.
+- **Seven decoration packs.** Pride, Disability, Faith and Belief, Black heritage, First Nations, Multicultural and Family leave the marketplace. Their pieces come off every profile wearing them and out of every collection.
+
+### Fixed
+
+- **Restored dashboards read what was restored with them.** Where a dashboard's SQL names a project, file or other item by id, a backup or import points it at the copy that came with it. An item that didn't come along matches nothing.
+- **Sign-in rules that place people in initiatives.** Each community's rules decide only its own initiatives' members, and a rule whose initiative or role was deleted places people in the community alone.
+- **A full community takes nobody new through sign-in rules.** A group rule that places people in a community stops at its member limit; a sign-in that would pass it is placed everywhere else as usual.
+- **Reaction emails after an account is deleted.** One still waiting to go out names the person as "Deleted user", as an assignment email already did.
+- **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` rather than `.apk`, so Obtainium downloads the app. **Server operators:** on Alpine, install it with `apk add` as before.
+- **A superadmin's role on the Users tab.** An admin saw a blank role picker on a superadmin's row. It now shows the role, and a picker the reader can't change is greyed out.
+- **Connection notifications open somewhere.** A request to connect, or one accepted, opens **Privacy** settings, where connections are answered.
+- **Checklists in descriptions and comments.** A `- [ ]` item shows its box, and ticking it in **Preview** ticks it in the text (#2989). PDF task reports draw checklists with boxes and print comments with their formatting.
+- **Subtasks made from a checklist line with a mention.** The new task's title shows the mention, not its markup.
+
+## [0.77.1] - 2026-10-23
+
+### Added
+
+- **Subtasks in tables and boards.** A table folds each task's subtasks under it, and cards show subtask progress and the task they are part of. Group by **Parent task** for a band per task; drag a card into another band to move it (#2936).
+
+  ![A project table with Survive the Death House open and its three subtasks indented and shaded beneath it](docs/images/releases/subtasks-table.webp)
+  ![A board grouped by parent task: the Death House's band holds it and its subtasks across To Do, In Progress and Done](docs/images/releases/subtasks-board.webp)
+
+- **Make a checklist item a task.** **Make it a task** on a checklist line turns it into a task in the same project, part of the one it came from, and done if it was ticked (#2936).
+- **A new subscription link from Settings.** A calendar subscription under **Settings › Security** offers **Get a new link**, which shows a fresh link to copy; the old one stops working (#2911).
+
+### Fixed
+
+- **Saving a layout again.** **Edit layouts** saves changes to a table, Gantt or calendar layout that was saved before (#2911).
+- **Phones held sideways.** A project's table shows its tasks, and pages use the whole width of the screen.
+- **The calendar's list in your language.** Weekday and month names in the list view follow your language.
+- **Task type icons in project tables.** They show as soon as a project opens and stay steady while you change tasks.
+
+## [0.77.0] - 2026-10-23
+
+### Added
+
 - **Task types.** Every project starts with **Task**, **Bug**, **Idea** and **Milestone**, each with its own task page and starting content; add more from a shelf of ready-made types in **Project settings → Task types**. Existing tasks become **Task**, keeping any task page you had changed.
 
   ![A project's task types in Project settings: Task, Bug, Idea and Milestone, each with its own icon, color and page](docs/images/releases/task-types.webp)
@@ -17,11 +139,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ![A project's Gantt view: tasks as bars across six weeks, a milestone at the end, and arrows from each task to what it waits on](docs/images/releases/gantt.webp)
 
+- **Type a task's details into its title.** "Send the invoice every third tuesday at 3pm !high #billing @sam" sets the repeat, time, priority, tag and assignee; `every!` counts the repeat from when you finish, and `@` opens a member search. Switch it off with **Read details from the title** in **Preferences**.
+
+  ![Create task with "Restock the healing potions every third tuesday at 3pm !high #quest" and a person in its title, each part highlighted and listed underneath, and the priority, assignee and due date filled in](docs/images/releases/title-details.webp)
+
 - **Group by any field.** Group a table, board or Gantt by any field whose values repeat, from assignees and tags to a property or a date by week or month. Choose what each view offers in **Edit layouts**.
 
   ![A project's Gantt grouped by assignee, each person's tasks under their name and unassigned work at the end](docs/images/releases/group-by-assignees.webp)
 
-- **Choose a project's views.** Show or hide Table, Board, Gantt and Calendar in **Edit layouts**. New projects start with the board alone; existing projects keep the views they had.
+- **Choose a project's views.** Show or hide Table, Board, Gantt and Calendar in **Edit layouts**. Every project shows all four until you hide some.
 - **Several My tasks widgets on Home.** Each keeps its own filters and columns, so one can show this week's work and another everything high priority.
 - **Task exports match your table.** PDF, spreadsheet and Markdown exports use the table's columns, properties included, and its grouping (#2911). A project's report from its settings does the same.
 - **Hourly repeats after completion.** Repeat a task a set number of hours after it is finished, with an optional daily maximum.
@@ -35,10 +161,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **The phone and desktop apps sign in to Initiative Cloud** ([initiativetasks.com](https://initiativetasks.com)) unless you give them a server of your own. **Your own server** is still one tap away in the server menu on the sign-in page, and an app already connected to a server stays on it.
-- **A Beta badge** sits by the Initiative mark on the sign-in pages and in the app's left rail, until version 1.0.
+- **Finished things are no longer struck through.** Done checklist items, tasks and steps stay readable; the ticked checkbox and muted text show they are finished.
 - **AI connections name their model.** After saving a connection, pick a model from its provider's list; a connection without one, including any that relied on a default, is not used until somebody picks one. Changing a connection's provider or address clears its key unless you enter it again.
 - **New versions no longer interrupt you.** A small message offers **Reload** when a new version is ready, and **What's new** shows what changed.
+- **The browser tab names the tool you are in.** Every tool's page, settings and what it holds (a task, a wiki page) show its name in the tab, as projects already did.
 - **Release notes show what changed.** The version window opens the newest release, with pictures of what is new, and folds older releases away until you open them.
 - **Moderators moderate only.** The platform ladder runs member → moderator → support → operator → owner: a moderator finds, renames and suspends accounts, clears their profiles, and asks for **Moderate** grants on a community, and nothing more. **Server operators:** account recovery moved to support, so give that role to anyone who does it.
 
@@ -51,18 +177,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Calendar times and dates.** All-day and timed events keep their days and hours across clock changes, long events show across the whole month or year, and invalid or nonexistent local times show an error.
 - **Repeating tasks and calendar feeds.** Extra and skipped dates keep a task's cadence and remaining count, yearly month-end repeats keep every month, and calendar imports and exports keep durations and time zones.
-- **Dashboard Gantt progress counts finished work.** Give the tile a column saying whether work is **Done** to fill each bar as its work finishes; without one, bars stay unfilled instead of counting anything past its end as done.
+- **Dashboard Gantt progress counts finished work.** Give the tile a column saying whether work is **Done** to fill each bar as its work finishes; without one, bars stay unfilled.
 - **Statistics and dashboard dates.** Completion statistics use when a task was completed, and SQL calendar dates keep their day in every time zone. Calendar and notice API inputs that are instants need an explicit time zone offset.
 - **Email-code sign-in works in the apps.** On servers that ask for a captcha, the phone and desktop apps show it and send the code, with no change to the captcha provider's settings.
 - **Bitwarden passkeys work in the Android app.** **Server operators:** Bitwarden checks your server through Google, so this needs a server Google can reach.
-- **Export selected and Focus work again.** Export selected no longer fails with "Invalid filter conditions", and Focus shows your pinned tasks.
-- **AI works with current Claude models.** Suggestions and summaries from a model that thinks before it answers no longer fail with a provider error.
+- **Export selected and Focus work again.** Export selected works with any filter, and Focus shows your pinned tasks.
+- **AI works with current Claude models.** Suggestions and summaries work with models that think before they answer.
 - **Running as a non-root user.** The container starts under Docker's `user:` or Kubernetes' `runAsUser` and runs as that user, without `PUID`/`PGID`, so the uploads folder must already be writable by it. The first log line says how it started.
 - **"Starts grouped by" reaches everyone.** A project list opens grouped the way its layout says for anyone who hasn't picked a grouping of their own.
 - **Calendar subscriptions.** A subscribed calendar is named after the calendar and its initiative, in your own time zone. To rename one you already subscribed to, subscribe to its link again.
 - **Updating the app.** The phone and desktop apps show one prompt for a new version, and **Reload** always installs it.
 - **Home on a phone.** Customizing keeps the view tabs and widget buttons clear of each other and of widget titles, long names wrap, and the calendar widget is no longer a card inside a card.
+- **A long title shows whole on a phone.** The title of a task, event, counter or picture wraps onto more lines, with its buttons on a row above it.
 - **Spacing on a layout you changed.** Board cards and pages you changed in **Edit layouts** keep their spacing.
+
+### Security
+
+- **Node.js October 2026 security releases.** The desktop app downloads app updates through its built-in browser instead of Node.js, and the image is built on Node.js 24.22.1.
 
 ## [0.76.0] - 2026-10-20
 

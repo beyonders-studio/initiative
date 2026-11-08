@@ -88,7 +88,8 @@
         "location": "Location",
         "link": "Link",
         "amount": "Amount",
-        "cost": "Cost"
+        "cost": "Cost",
+        "design_files": "Design files"
       },
       "outlines": {
         "bug": "**What happened**\n\n\n**What should have happened**\n\n\n**How to make it happen again**\n\n",

@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Estados de tarea",
-    "tabTaskTypes": "Tipos de tarea"
+    "tabTaskTypes": "Tipos de tarea",
+    "tabProperties": "Propiedades"
   },
   "files": {
     "newFile": "Nuevo archivo"
@@ -252,7 +253,20 @@
     "ganttSchedule": "Arrastra sobre los días para dar fechas a esta tarea",
     "ganttFold": "Ocultar las partes de {{title}}",
     "ganttUnfold": "Mostrar las partes de {{title}}",
-    "ganttLink": "Arrastra hasta la tarea que espera a esta",
+    "ganttLink": "Arrastra sobre otra tarea para enlazarlas",
+    "ganttOutside": "Vinculadas desde otros proyectos",
+    "ganttLinkQuestion": "¿Cómo se relaciona «{{task}}» con «{{other}}»?",
+    "ganttBlockedBy": "Bloqueada por ella",
+    "ganttBlockedByHint": "No puede empezar hasta que esa tarea esté hecha",
+    "ganttPartOf": "Parte de ella",
+    "ganttPartOfHint": "Pasa a ser una de las partes de esa tarea",
+    "ganttRemoveLink": "Quitar el vínculo: {{task}} espera a {{other}}",
+    "ganttCriticalPath": "Ruta crítica",
+    "ganttChainTitle": "¿Mover también lo que espera a esta?",
+    "ganttChain_one": "{{count}} tarea espera a «{{title}}». ¿Moverla los mismos días más tarde?",
+    "ganttChain_other": "{{count}} tareas esperan a «{{title}}». ¿Moverlas los mismos días más tarde?",
+    "ganttChainMove": "Moverlas también",
+    "ganttChainKeep": "Solo esta",
     "ganttKeys": "Arriba y abajo pasan de una tarea a otra, derecha e izquierda abren y pliegan las partes de una tarea, y Intro abre una tarea.",
     "ganttKeysMove": "Arriba y abajo pasan de una tarea a otra, derecha e izquierda abren y pliegan las partes de una tarea, e Intro abre una tarea. Alt con izquierda o derecha mueve una tarea un día; añadiendo Mayús, solo su fecha de vencimiento.",
     "archiveDoneTasks": "Archivar tareas terminadas",
@@ -282,6 +296,7 @@
     "markDone": "Marcar tarea como terminada",
     "taskColumn": "Tarea",
     "untagged": "Sin etiqueta",
+    "noParent": "No forma parte de una tarea",
     "noValue": "Sin {{name}}",
     "checked": "{{name}}: sí",
     "unchecked": "{{name}}: no",
@@ -314,6 +329,8 @@
       "dueDate": "Fecha de vencimiento",
       "recurrence": "Se repite",
       "checklist": "Lista de tareas",
+      "subtasks": "Subtareas",
+      "parent": "Parte de",
       "priority": "Prioridad",
       "comments": "Comentarios",
       "blockers": "Bloqueos",
@@ -404,5 +421,14 @@
     "unassigned": "Ya no estás en esta tarea",
     "assignError": "No se pudo cambiar quién está en esta tarea.",
     "moveTo": "Mover a"
+  },
+  "properties": {
+    "description": "Lo que las tareas de este proyecto pueden tener además de los metadatos de la iniciativa. Una tarea movida a otro proyecto conserva un valor solo si ese proyecto tiene una propiedad con el mismo nombre y tipo.",
+    "create": "Nueva propiedad",
+    "edit": "Editar propiedad",
+    "delete": "Eliminar propiedad",
+    "deleteTitle": "¿Eliminar esta propiedad?",
+    "deleteBody": "Se eliminarán la propiedad y el valor que cada tarea tenga en este proyecto.",
+    "none": "Aún no hay propiedades"
   }
 }

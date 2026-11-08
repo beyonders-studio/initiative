@@ -12,12 +12,21 @@
  * reason rather than run.
  */
 
-import { Braces, Columns3, Spline, Table2, UserRound } from "lucide-react";
+import {
+  Blocks,
+  Braces,
+  Columns3,
+  FileSpreadsheet,
+  Plug,
+  SlidersHorizontal,
+  Spline,
+  Table2,
+  UserRound,
+} from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getCaretCoordinates } from "@/lib/caretCoordinates";
-import { cn } from "@/lib/utils";
 import {
   applyCompletion,
   type Completion,
@@ -25,8 +34,11 @@ import {
   completionsFor,
   type DatasetFields,
   datasetsNamed,
+  type PluginReads,
+  type WordAt,
   wordAt,
 } from "@/lib/widgets/completion";
+import { cn } from "@/ui/lib/utils";
 
 /** How many names the list offers at once. */
 const LIMIT = 8;
@@ -38,6 +50,10 @@ const ICONS: Record<CompletionKind, typeof Table2> = {
   function: Braces,
   token: UserRound,
   relation: Spline,
+  spreadsheet: FileSpreadsheet,
+  plugin: Blocks,
+  endpoint: Plug,
+  param: SlidersHorizontal,
 };
 
 export interface SqlEditorProps {
@@ -48,6 +64,13 @@ export interface SqlEditorProps {
   fields: DatasetFields[];
   /** Names that stand for who is asking, offered beside the fields. */
   tokens?: string[];
+  /** The ranges the statement read when last checked, under the names each
+   *  is read under. */
+  ranges?: DatasetFields[];
+  /** The spreadsheets a `sheet()` call may name. */
+  spreadsheets?: string[];
+  /** The installed plug-ins a `plugin()` call may name. */
+  plugins?: readonly PluginReads[];
   id?: string;
   rows?: number;
   disabled?: boolean;
@@ -61,6 +84,9 @@ export function SqlEditor({
   functions,
   fields,
   tokens,
+  ranges,
+  spreadsheets,
+  plugins,
   id,
   rows = 6,
   disabled,
@@ -68,12 +94,7 @@ export function SqlEditor({
 }: SqlEditorProps) {
   const { t } = useTranslation("dashboards");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [active, setActive] = useState<{
-    word: string;
-    start: number;
-    caret: number;
-    qualifier?: string;
-  } | null>(null);
+  const [active, setActive] = useState<(WordAt & { caret: number }) | null>(null);
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const [highlighted, setHighlighted] = useState(0);
 
@@ -92,8 +113,13 @@ export function SqlEditor({
       tokens,
       named,
       qualifier: active.qualifier,
+      ranges,
+      spreadsheets,
+      plugins,
+      quoted: active.quoted,
+      call: active.call,
     }).slice(0, LIMIT);
-  }, [active, datasets, functions, fields, tokens, named]);
+  }, [active, datasets, functions, fields, tokens, named, ranges, spreadsheets, plugins]);
 
   const close = useCallback(() => {
     setActive(null);

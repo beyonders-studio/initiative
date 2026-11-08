@@ -32,11 +32,10 @@
 import type { ParseKeys } from "i18next";
 import {
   BookText,
+  BookUser,
   CalendarDays,
   Files,
-  GalleryHorizontalEnd,
   Gauge,
-  Images,
   LayoutDashboard,
   ListTodo,
   type LucideIcon,
@@ -53,13 +52,12 @@ import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.project]: ListTodo,
   [Tool.file]: Files,
-  [Tool.queue]: GalleryHorizontalEnd,
   [Tool.counter_group]: Gauge,
   [Tool.calendar]: CalendarDays,
   [Tool.dashboard]: LayoutDashboard,
   [Tool.post]: Megaphone,
-  [Tool.gallery]: Images,
   [Tool.wiki]: BookText,
+  [Tool.contact]: BookUser,
 };
 
 /** Every tool, in canonical enum order. */
@@ -170,11 +168,10 @@ export const toolViewParams = (tool: Tool, view: ToolView): ToolViewParams =>
  */
 export const SIDEBAR_TOOLS: Tool[] = [
   Tool.calendar,
+  Tool.contact,
   Tool.dashboard,
   Tool.file,
-  Tool.gallery,
   Tool.post,
-  Tool.queue,
   Tool.counter_group,
   Tool.wiki,
   Tool.project,
@@ -185,7 +182,7 @@ export const SIDEBAR_TOOLS: Tool[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * "counter_group" → "counter_groups", "gallery" → "galleries".
+ * "counter_group" → "counter_groups", "collection" → "collections".
  *
  * One rule, mirrored from the backend's `Tool.plural`: a trailing `y` after a
  * consonant becomes `ies`, and everything else takes an `s`.
@@ -195,7 +192,7 @@ export const toolPlural = (tool: Tool | ChildKind): string =>
 
 /**
  * Inverse of {@link toolPlural} for any table-ish plural the bus names —
- * "galleries" → "gallery", "counter_groups" → "counter_group". The one
+ * "collections" → "collection", "counter_groups" → "counter_group". The one
  * spelling rule, read backwards, so a resource type is never singularized by
  * chopping an `s` off.
  */
@@ -213,6 +210,24 @@ export const toolRouteSegment = (tool: Tool | ChildKind): string =>
 export const toolForRouteSegment = (segment: string): Tool | null =>
   TOOLS.find((tool) => toolRouteSegment(tool) === segment) ?? null;
 
+/**
+ * The tool entity a path is inside, e.g. "/c/1/i/2/projects/3/tasks/5" →
+ * project 3. The OUTERMOST one wins: a task, a wiki's page, a file read
+ * inside a wiki and a tool's settings all nest under their tool's id, so they
+ * read as that tool. Null anywhere that is no tool's page.
+ */
+export const toolInPath = (pathname: string): { tool: Tool; id: number } | null => {
+  const segments = pathname.split("/");
+  for (let i = 0; i < segments.length - 1; i++) {
+    const tool = toolForRouteSegment(segments[i]);
+    const id = Number(segments[i + 1]);
+    if (tool && /^\d+$/.test(segments[i + 1]) && id > 0) {
+      return { tool, id };
+    }
+  }
+  return null;
+};
+
 /** "counter_group" → "counterGroups" — i18n namespace, palette group key. */
 export const toolCamelPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
@@ -225,7 +240,7 @@ export const toolCamelSingular = (tool: Tool): string =>
 export const toolPascalSingular = (tool: Tool): string =>
   tool.replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "CounterGroups", "gallery" → "Galleries" — the stem of
+/** "counter_group" → "CounterGroups", "post" → "Posts" — the stem of
  *  the per-tool permission label keys. */
 export const toolPascalPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
@@ -253,10 +268,10 @@ export const initiativeRoute = (initiativeId: number): string =>
  * Community-relative list route for a tool inside one initiative — which is also
  * the initiative page with that tool's tab selected, e.g. "/i/12/counter-groups".
  *
- * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars are the only
- * tool that has any (an plugin-installed calendar has no `initiative_id`), and
- * they keep their community routes. Treat `null` as "address me at the community
- * route", never as "initiative unknown".
+ * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars and contacts
+ * are the tools that have any (one a community plug-in holds has no
+ * `initiative_id`), and they keep their community routes. Treat `null` as
+ * "address me at the community route", never as "initiative unknown".
  */
 export const toolListRoute = (tool: Tool, initiativeId: number | null): string =>
   initiativeId === null
@@ -323,6 +338,13 @@ export const counterRoute = (
   counterId: number
 ): string => `${toolDetailRoute(Tool.counter_group, initiativeId, groupId)}/counter/${counterId}`;
 
+/**
+ * e.g. "/i/1/files/collections/5": a collection, which is in the initiative's
+ * Files rather than in one file.
+ */
+export const collectionRoute = (initiativeId: number | null, collectionId: number): string =>
+  `${toolListRoute(Tool.file, initiativeId)}/collections/${collectionId}`;
+
 /** e.g. "/i/1/wikis/4/pages/11". */
 export const wikiPageRoute = (
   initiativeId: number | null,
@@ -350,8 +372,8 @@ export const wikiFileRoute = (
  * with the canonical address.
  *
  * Use ONLY where the caller genuinely holds nothing but an id — a @mention, a
- * queue item's linked entity, a stored notification target. Anywhere the parent
- * is already loaded, build the real route: the resolver costs a round trip.
+ * stored notification target. Anywhere the parent is already loaded, build the
+ * real route: the resolver costs a round trip.
  */
 export const entityRefRoute = (refType: string, id: number): string => `/go/${refType}/${id}`;
 
@@ -458,8 +480,7 @@ export const PARENT_TOOL = {
   task: Tool.project,
   calendar_event: Tool.calendar,
   counter: Tool.counter_group,
-  gallery_image: Tool.gallery,
-  queue_item: Tool.queue,
+  collection: Tool.file,
   wiki_page: Tool.wiki,
 } as const satisfies Record<string, Tool>;
 

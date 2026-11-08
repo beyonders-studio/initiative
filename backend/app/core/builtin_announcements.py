@@ -352,33 +352,78 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         ),
     ),
     BuiltinAnnouncement(
-        slug="0-77-initiative-cloud-is-live",
-        title="Initiative Cloud is live",
+        slug="0-78-galleries-and-queues",
+        title="Galleries are now collections, and queues projects",
         category=AnnouncementCategory.info,
-        published_at=datetime(2026, 10, 20, tzinfo=timezone.utc),
-        # For the people already here, who will meet the apps' new starting
-        # server the next time they set one up. Worded to read true on the
-        # Cloud too, which upgrades into it like any other deployment.
+        published_at=datetime(2026, 10, 27, tzinfo=timezone.utc),
+        # For the people who had galleries or queues. A new account and a fresh
+        # install start with neither and have nothing to look for.
         audience_accounts=AnnouncementAudienceAccounts.existing,
-        only_upgrading_from_below="0.77.0",
+        only_upgrading_from_below="0.78.0",
+        trigger_route="/c/**",
         sections=(
             AnnouncementSection(
-                heading="What's new",
+                heading="Why",
                 body=(
-                    "Initiative now has a hosted service, **Initiative Cloud**, "
-                    "at [initiativetasks.com](https://initiativetasks.com). "
-                    "Sign up and start, and keeping it running, backed up and "
-                    "current is ours.\n\n"
-                    "The phone and desktop apps now start on Initiative Cloud."
+                    "Files started out as documents. Over time they grew to hold "
+                    "every kind of file, and once all of them lived in one place, "
+                    "keeping pictures in a separate container stopped making "
+                    "sense.\n\n"
+                    "So each gallery is now a **collection**, in **Files**, with "
+                    "its comments, tags and links. Each picture is a file, shared "
+                    "as its gallery was, and its caption is in the collection's "
+                    "**Caption** field."
                 ),
             ),
             AnnouncementSection(
-                heading="If you use your own server",
+                heading="What a collection is",
                 body=(
-                    "Nothing changes for it, and an app already connected stays "
-                    "connected. When you sign in on a new phone or computer, "
-                    "tap the server name on the sign-in page and choose **Your "
-                    "own server**."
+                    "Add any files to it and lay it out however suits you: a "
+                    "gallery, a library, a catalog, whatever makes the most sense. "
+                    "A file can be in several collections and stays in the Files "
+                    "list, and a collection can have fields of its own, such as a "
+                    "price or a rating."
+                ),
+                image_url="/announcement-images/collections.png",
+                image_alt=(
+                    "A collection of maps and handouts in Files, laid out as a "
+                    "masonry gallery"
+                ),
+            ),
+            AnnouncementSection(
+                starts_page=True,
+                heading="Upload almost anything",
+                body=(
+                    "Audio, video, archives, OpenDocument, design files, 3D "
+                    "models, fonts, e-books and more upload as files, each with "
+                    "its category's icon. Videos and recordings play in the app, "
+                    "and a Word or OpenDocument file can be turned into a "
+                    "document you edit here.\n\n"
+                    "Programs and scripts are the one thing refused."
+                ),
+            ),
+            AnnouncementSection(
+                starts_page=True,
+                heading="Queues are now projects",
+                body=(
+                    "We want Initiative to stay focused on project management. "
+                    "Projects now have task types, statuses, properties and "
+                    "board, table, Gantt and calendar views, so most of what we "
+                    "built queues for is done better in a project.\n\n"
+                    "Each queue is now a **project** in the same initiative, and "
+                    "each of its items a task, in the order the queue showed "
+                    "them. The item it was on is **Up now**, held items are "
+                    "**Held**, hidden ones **Sitting out** and the rest "
+                    "**Waiting**. An item's member is linked to its task, and its "
+                    "comments, sharing, tags and links came with it."
+                ),
+            ),
+            AnnouncementSection(
+                heading="Taking turns",
+                body=(
+                    "A project has no **Next** button or rounds. Move a task to "
+                    "**Up now** when it's someone's turn, and to **Done** once "
+                    "it's finished."
                 ),
             ),
         ),

@@ -9,7 +9,8 @@ from httpx import AsyncClient
 from sqlalchemy.orm import undefer
 
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobStatus
+from app.services import data_jobs
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import worker as import_worker
 from app.services.storage import get_guild_storage
@@ -24,13 +25,14 @@ from app.testing.factories import (
     create_file,
     create_import_job,
     create_initiative,
-    create_queue,
     create_tag,
     create_task,
     grant_role_permission,
+    png_bytes,
     route_session_to_guild,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.import_engine.atlassian_test import answered
 from app.schemas.tenant.tag import annotated_tags
 from app.services.tenant import tags as tags_service
 from app.db.request_context import SystemGuild
@@ -65,68 +67,14 @@ async def _second_initiative(session, a, **flags):
     return initiative
 
 
-async def test_envelope_import_roundtrips_queue(client, acting_user, session):
-    """Export a queue as its envelope, import it into another initiative:
-    items, rotation state, and the queue's tags survive; the importer gets an
-    owner grant; tags match-or-create against the guild."""
-    from sqlmodel import select
-
-    from app.models.tenant.queue import Queue, QueueItem
-    from app.models.tenant.resource_grant import ResourceGrant
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    queue = await create_queue(session, a.initiative, a.user, name="Turn Order")
-    from app.models.tenant.queue import QueueItem as QI
-
-    for i, label in enumerate(["Aria", "Brock"]):
-        session.add(QI(queue_id=queue.id, label=label, position=float(i)))
-    await assign_tag(session, queue, await create_tag(session, a.guild, name="Raid"))
-    await session.commit()
-
-    envelope = await _export_json(client, a, "/exports/queue", {"ids": [queue.id]})
-    assert envelope["type"] == "initiative-queue"
-    # A name listed again in another case is the same tag, attached once.
-    envelope["tags"].append("raid")
-
-    target = await _second_initiative(session, a, queues_enabled=True)
-    resp = await _import_envelope(client, a, envelope, target.id)
-    assert resp.status_code == 201, resp.text
-    result = resp.json()["result"]
-    assert result["created"]["queues"] == 1
-    assert result["created"]["items"] == 2
-    assert result["matched"]["tags"] == 1
-
-    imported = (
-        await session.exec(
-            select(Queue).where(
-                Queue.initiative_id == target.id, Queue.name == "Turn Order"
-            )
-        )
-    ).one()
-    items = list(
-        await session.exec(select(QueueItem).where(QueueItem.queue_id == imported.id))
-    )
-    assert {i.label for i in items} == {"Aria", "Brock"}
-    await tags_service.annotate_tags(session, [imported])
-    assert [tag.name for tag in annotated_tags(imported)] == ["Raid"]
-    grant = (
-        await session.exec(
-            select(ResourceGrant).where(
-                ResourceGrant.resource_type == "queue",
-                ResourceGrant.resource_id == imported.id,
-                ResourceGrant.user_id == a.user.id,
-            )
-        )
-    ).one()
-    assert str(grant.level) in ("owner", "ResourceAccessLevel.owner")
-
-
 async def test_envelope_import_roundtrips_counter_group(client, acting_user, session):
+    """Export a counter group as its envelope, import it into another
+    initiative: its counters and tags survive; the importer gets an owner
+    grant; tags match-or-create against the guild."""
     from sqlmodel import select
 
     from app.models.tenant.counter import Counter, CounterGroup
+    from app.models.tenant.resource_grant import ResourceGrant
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -152,9 +100,12 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
         client, a, "/exports/counter_group", {"ids": [group.id]}
     )
     assert envelope["tags"] == ["Loot"]
+    # A name listed again in another case is the same tag, attached once.
+    envelope["tags"].append("loot")
     target = await _second_initiative(session, a, counter_groups_enabled=True)
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
+    assert resp.json()["result"]["matched"]["tags"] == 1
 
     imported = (
         await session.exec(
@@ -173,6 +124,16 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
     assert float(counter.count) == 42.5
     await tags_service.annotate_tags(session, [imported])
     assert [tag.name for tag in annotated_tags(imported)] == ["Loot"]
+    grant = (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == "counter_group",
+                ResourceGrant.resource_id == imported.id,
+                ResourceGrant.user_id == a.user.id,
+            )
+        )
+    ).one()
+    assert str(grant.level) in ("owner", "ResourceAccessLevel.owner")
 
 
 async def test_envelope_import_roundtrips_file_types(client, acting_user, session):
@@ -181,7 +142,9 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
     file shape, spreadsheet re-normalized)."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+
+    from app.models.tenant.file import File
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -200,7 +163,7 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
         a.initiative,
         a.user,
         name="Map",
-        file_type=FileType.whiteboard,
+        file_type=FileType.excalidraw,
         content={"elements": [{"type": "rectangle"}], "appState": {}, "files": {}},
     )
     link = await create_file(
@@ -208,14 +171,14 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
         a.initiative,
         a.user,
         name="Spec",
-        file_type=FileType.smart_link,
+        file_type=FileType.url,
         content={"url": "https://example.com/spec"},
     )
 
     for doc, doc_type in (
-        (native, "native"),
-        (board, "whiteboard"),
-        (link, "smart_link"),
+        (native, "lexical"),
+        (board, "excalidraw"),
+        (link, "url"),
     ):
         envelope = await _export_json(client, a, "/exports/file", {"ids": [doc.id]})
         resp = await _import_envelope(client, a, envelope, target.id)
@@ -330,10 +293,8 @@ async def _tool_with_a_row(session, a, tool):
     "tool",
     [
         "project",
-        "queue",
         "counter_group",
         "calendar",
-        "gallery",
         "wiki",
         "dashboard",
         "post",
@@ -350,12 +311,12 @@ async def test_a_tools_tags_and_properties_survive_export_and_import(
 
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
     from app.core.config import settings
-    from app.models.tenant.property import (
-        PropertyDefinition,
-        PropertyType,
-        PropertyValue,
+    from app.models.tenant.metadata import (
+        MetadataDefinition,
+        MetadataType,
+        MetadataValue,
     )
-    from app.services.tenant.properties import PROPERTY_LINKS, link_for
+    from app.services.tenant.metadata import PROPERTY_LINKS, link_for
     from app.testing.factories import create_property_definition, create_property_value
 
     monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
@@ -365,7 +326,7 @@ async def test_a_tools_tags_and_properties_survive_export_and_import(
     await _all_tools_enabled(session, target)
     stage = await create_property_definition(session, a.initiative, name="Stage")
     owner = await create_property_definition(
-        session, a.initiative, name="Owner", type=PropertyType.user_reference
+        session, a.initiative, name="Owner", type=MetadataType.user_reference
     )
     row, inner = await _tool_with_a_row(session, a, tool)
     await assign_tag(session, row, await create_tag(session, a.guild, name="Flagship"))
@@ -397,15 +358,15 @@ async def test_a_tools_tags_and_properties_survive_export_and_import(
         return (
             await session.exec(
                 select(
-                    PropertyDefinition.name,
-                    PropertyDefinition.initiative_id,
-                    PropertyValue.value_text,
-                    PropertyValue.value_user_id,
+                    MetadataDefinition.name,
+                    MetadataDefinition.initiative_id,
+                    MetadataValue.value_text,
+                    MetadataValue.value_user_id,
                 )
-                .join(PropertyDefinition)
+                .join(MetadataDefinition)
                 .where(
-                    PropertyValue.entity_type == target_name,
-                    PropertyValue.entity_id == entity_id,
+                    MetadataValue.entity_type == target_name,
+                    MetadataValue.entity_id == entity_id,
                 )
             )
         ).all()
@@ -445,16 +406,15 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     from sqlmodel import select
 
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-    from app.models.tenant.property import (
-        PropertyDefinition,
-        PropertyType,
-        PropertyValue,
+    from app.models.tenant.metadata import (
+        MetadataDefinition,
+        MetadataType,
+        MetadataValue,
     )
     from app.testing.factories import (
         create_property_definition,
+        create_counter,
         create_property_value,
-        create_queue,
-        create_queue_item,
     )
 
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
@@ -463,24 +423,26 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     await _all_tools_enabled(session, target)
     status = await create_property_definition(session, a.initiative, name="Status")
     await create_property_definition(
-        session, target, name="Status", type=PropertyType.number
+        session, target, name="Status", type=MetadataType.number
     )
-    queue = await create_queue(session, a.initiative, a.user)
-    for label in ("First", "Second"):
-        item = await create_queue_item(session, queue, label=label)
-        await create_property_value(session, item, status, value_text=label)
+    group = await create_counter_group(session, a.initiative, a.user)
+    for name in ("First", "Second"):
+        counter = await create_counter(session, group, name=name)
+        await create_property_value(session, counter, status, value_text=name)
 
-    envelope = await _export_json(client, a, "/exports/queue", {"ids": [queue.id]})
+    envelope = await _export_json(
+        client, a, "/exports/counter_group", {"ids": [group.id]}
+    )
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
 
     names = (
         await session.exec(
-            select(PropertyDefinition.name)
-            .join(PropertyValue)
+            select(MetadataDefinition.name)
+            .join(MetadataValue)
             .where(
-                PropertyValue.entity_type == "queue_item",
-                PropertyDefinition.initiative_id == target.id,
+                MetadataValue.entity_type == "counter",
+                MetadataDefinition.initiative_id == target.id,
             )
         )
     ).all()
@@ -490,8 +452,8 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     assert again.status_code == 201, again.text
     definitions = (
         await session.exec(
-            select(PropertyDefinition.name).where(
-                PropertyDefinition.initiative_id == target.id
+            select(MetadataDefinition.name).where(
+                MetadataDefinition.initiative_id == target.id
             )
         )
     ).all()
@@ -549,7 +511,7 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     doc_envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Doc",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -577,16 +539,16 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     assert not_a_link.status_code == 400
     assert not_a_link.json()["detail"] == "FILE_SMART_LINK_URL_INVALID"
 
-    queue_envelope = {
-        "type": "initiative-queue",
+    group_envelope = {
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "name": "Q",
-        "items": [],
+        "counters": [],
     }
-    a.initiative.queues_enabled = False
+    a.initiative.counter_groups_enabled = False
     session.add(a.initiative)
     await session.commit()
-    disabled = await _import_envelope(client, a, queue_envelope, a.initiative.id)
+    disabled = await _import_envelope(client, a, group_envelope, a.initiative.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
 
@@ -601,12 +563,12 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     assert denied.status_code == 403
     assert denied.json()["detail"] == "IMPORT_PERMISSION_REQUIRED"
 
-    # A guild member outside the initiative: the structural initiative row is
-    # guild-visible (only content is initiative-hidden), so this is a clean
-    # permission refusal, not a 404.
+    # A guild member outside the initiative: a private initiative's row reads
+    # as absent to them, so there is nothing to import into.
     outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     hidden = await _import_envelope(client, outsider, doc_envelope, a.initiative.id)
-    assert hidden.status_code == 403
+    assert hidden.status_code == 404
+    assert hidden.json()["detail"] == "IMPORT_INVALID_PARAMS"
 
 
 async def test_large_envelope_becomes_job_and_worker_applies_it(
@@ -618,46 +580,46 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     from sqlmodel import select
 
     from app.models.platform.notification import Notification, NotificationType
-    from app.models.tenant.queue import Queue
+    from app.models.tenant.counter import CounterGroup
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
-        "name": "Big Queue",
-        "items": [{"label": f"Item {i}", "position": float(i)} for i in range(3)],
+        "name": "Big Tally",
+        "counters": [{"name": f"Counter {i}", "position": float(i)} for i in range(3)],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202, resp.text
     body = resp.json()
     job_id = body["id"]
-    assert body["status"] == ImportJobStatus.queued.value
+    assert body["status"] == DataJobStatus.queued.value
     assert body["params"] == {"initiative_id": a.initiative.id}
     # The row holds options only — the envelope content is staged in storage,
     # and the storage key itself is not exposed through the API.
-    assert "items" not in json.dumps(body)
-    assert "payload_ref" not in body
+    assert "counters" not in json.dumps(body)
+    assert "file_ref" not in body
 
     await _run_import_worker(monkeypatch, role_session)
 
-    status_resp = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
+    status_resp = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     job = status_resp.json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
-    assert job["result"]["created"]["queues"] == 1
-    assert job["result"]["created"]["items"] == 3
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+    assert job["result"]["created"]["counter_groups"] == 1
+    assert job["result"]["created"]["counters"] == 3
 
     # The staged payload was deleted on the terminal transition.
     from app.testing import route_session_to_guild
 
     await route_session_to_guild(session, a.guild.id)
-    row = await session.get(ImportJob, job_id)
-    assert row is not None and row.payload_ref is None
+    row = await session.get(DataJob, job_id)
+    assert row is not None and row.file_ref is None
 
     imported = (
-        await session.exec(select(Queue).where(Queue.name == "Big Queue"))
+        await session.exec(select(CounterGroup).where(CounterGroup.name == "Big Tally"))
     ).one()
     assert imported.created_by == a.user.id  # applied AS the creator
 
@@ -680,18 +642,18 @@ async def test_worker_fails_closed_on_revoked_permission(
     from sqlalchemy import delete as sa_delete
     from sqlmodel import select
 
+    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.initiative import InitiativeMember
-    from app.models.tenant.queue import Queue
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
-        "name": "Doomed Queue",
-        "items": [],
+        "name": "Doomed Tally",
+        "counters": [],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202
@@ -707,13 +669,15 @@ async def test_worker_fails_closed_on_revoked_permission(
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     # RLS hides the initiative from a non-member (404-shaped), or the
     # permission check refuses — both fail closed.
     assert job["error"] in ("IMPORT_PERMISSION_REQUIRED", "IMPORT_INVALID_PARAMS")
     assert (
-        await session.exec(select(Queue).where(Queue.name == "Doomed Queue"))
+        await session.exec(
+            select(CounterGroup).where(CounterGroup.name == "Doomed Tally")
+        )
     ).one_or_none() is None
 
 
@@ -733,10 +697,10 @@ async def test_stale_running_import_fails_closed_not_reapplied(
         session,
         a.guild,
         a.user,
-        source="initiative-queue",
+        source="initiative-counter-group",
         params={"initiative_id": a.initiative.id},
-        payload_ref="imports/gone.json",
-        status=ImportJobStatus.running,
+        file_ref="imports/gone.json",
+        status=DataJobStatus.running,
         created_at=stale_time,
         updated_at=stale_time,
     )
@@ -744,7 +708,7 @@ async def test_stale_running_import_fails_closed_not_reapplied(
     await _run_import_worker(monkeypatch, role_session)
 
     await session.refresh(job)
-    assert job.status == ImportJobStatus.failed
+    assert job.status == DataJobStatus.failed
     assert job.error == "IMPORT_INTERRUPTED"
 
 
@@ -755,10 +719,10 @@ async def test_import_job_cap_and_cancel(client, acting_user, session, monkeypat
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "name": "Q",
-        "items": [],
+        "counters": [],
     }
     first = await _import_envelope(client, a, envelope, a.initiative.id)
     assert first.status_code == 202
@@ -769,7 +733,7 @@ async def test_import_job_cap_and_cancel(client, acting_user, session, monkeypat
     job_id = first.json()["id"]
     cancelled = await client.delete(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
     assert cancelled.status_code == 200
-    assert cancelled.json()["status"] == ImportJobStatus.cancelled.value
+    assert cancelled.json()["status"] == DataJobStatus.cancelled.value
 
     # Cancelling freed the cap slot.
     third = await _import_envelope(client, a, envelope, a.initiative.id)
@@ -790,10 +754,10 @@ async def test_import_jobs_are_own_row_isolated(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "name": "Mine",
-        "items": [],
+        "counters": [],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     job_id = resp.json()["id"]
@@ -801,10 +765,10 @@ async def test_import_jobs_are_own_row_isolated(
     other = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
 
-    denied = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=other.headers)
+    denied = await client.get(a.g(f"/data-jobs/{job_id}"), headers=other.headers)
     assert denied.status_code == 404
-    assert (await client.get(a.g("/imports/jobs"), headers=other.headers)).json() == []
-    allowed = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=admin.headers)
+    assert (await client.get(a.g("/data-jobs/"), headers=other.headers)).json() == []
+    allowed = await client.get(a.g(f"/data-jobs/{job_id}"), headers=admin.headers)
     assert allowed.status_code == 200
 
 
@@ -824,10 +788,10 @@ async def test_envelope_byte_bound_enforced_before_body_is_read(
         {
             "initiative_id": a.initiative.id,
             "envelope": {
-                "type": "initiative-queue",
+                "type": "initiative-counter-group",
                 "schema_version": 1,
                 "name": "Q",
-                "items": [],
+                "counters": [],
                 "padding": "x" * 4096,
             },
         }
@@ -860,7 +824,12 @@ async def test_envelope_byte_bound_enforced_before_body_is_read(
     ok = await _import_envelope(
         client,
         a,
-        {"type": "initiative-queue", "schema_version": 1, "name": "Q", "items": []},
+        {
+            "type": "initiative-counter-group",
+            "schema_version": 1,
+            "name": "Q",
+            "counters": [],
+        },
         a.initiative.id,
     )
     assert ok.status_code == 201
@@ -899,8 +868,8 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
                 "tools": {
                     "project": "included",
                     "file": "included",
-                    "queue": "included",
-                    "counter_group": "disabled",
+                    "counter_group": "included",
+                    "dashboard": "disabled",
                     "calendar_event": "included",
                 },
             }
@@ -911,20 +880,23 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
     }
 
 
-def _queue_entry(initiative_id=1):
+def _counter_group_entry(initiative_id=1):
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
-        "name": "Restored Queue",
-        "items": [{"label": "Aria", "position": 1.0}],
+        "name": "Restored Tally",
+        "counters": [{"name": "Aria", "position": 1.0}],
     }
     entry = {
-        "path": "initiatives/1-restored/queues/1-restored-queue.initiative-queue.json",
-        "tool": "queue",
-        "type": "initiative-queue",
+        "path": (
+            "initiatives/1-restored/counter_groups/"
+            "1-restored-tally.initiative-counter-group.json"
+        ),
+        "tool": "counter_group",
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "entity_id": 1,
-        "title": "Restored Queue",
+        "title": "Restored Tally",
         "initiative_id": initiative_id,
         "tags": [],
         "properties": [],
@@ -987,7 +959,7 @@ async def _apply_backup(client, actor, zip_bytes, monkeypatch, role_session) -> 
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
     return (
-        await client.get(actor.g(f"/imports/jobs/{job_id}"), headers=actor.headers)
+        await client.get(actor.g(f"/data-jobs/{job_id}"), headers=actor.headers)
     ).json()
 
 
@@ -1008,9 +980,9 @@ async def test_backup_import_end_to_end_with_assets(
     (deduped here — same guild, key already exists) and quota-checked."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.counter import CounterGroup
+    from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative, InitiativeMember
-    from app.models.tenant.queue import Queue
 
     from app.testing.factories import create_upload
 
@@ -1032,7 +1004,7 @@ async def test_backup_import_end_to_end_with_assets(
         content_type="application/pdf",
     )
 
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     file_entry = _file_entry("restore-me.pdf", entity_id=2, tags=["restored"])
     manifest = _minimal_manifest(
         entries=[entry, file_entry],
@@ -1057,11 +1029,11 @@ async def test_backup_import_end_to_end_with_assets(
     assert resp.status_code == 201, resp.text
     body = resp.json()
     job_id = body["id"]
-    assert body["status"] == ImportJobStatus.staged.value
+    assert body["status"] == DataJobStatus.staged.value
     plan = body["plan"]
     assert plan["source_community_name"] == "Source Guild"
     assert plan["initiatives"][0]["proposed_name"] == "Restored"
-    assert plan["initiatives"][0]["entry_counts"] == {"queue": 1, "file": 1}
+    assert plan["initiatives"][0]["entry_counts"] == {"counter_group": 1, "file": 1}
     assert plan["asset_count"] == 1
     assert plan["asset_bytes"] == len(payload)
 
@@ -1069,14 +1041,14 @@ async def test_backup_import_end_to_end_with_assets(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     assert confirmed.status_code == 200
-    assert confirmed.json()["status"] == ImportJobStatus.queued.value
+    assert confirmed.json()["status"] == DataJobStatus.queued.value
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     result = job["result"]
-    assert result["per_tool"]["queue"]["created"] == 1
+    assert result["per_tool"]["counter_group"]["created"] == 1
     assert result["per_tool"]["file"]["created"] == 1
     # Same guild: the storage key already existed, so the blob deduped.
     assert result["assets_deduped"] == 1
@@ -1086,8 +1058,8 @@ async def test_backup_import_end_to_end_with_assets(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one()
     assert restored.description == "from backup"
-    assert restored.queues_enabled is True
-    assert restored.counter_groups_enabled is False  # "disabled" in manifest
+    assert restored.counter_groups_enabled is True
+    assert restored.dashboards_enabled is False  # "disabled" in manifest
     member = (
         await session.exec(
             select(InitiativeMember).where(
@@ -1097,15 +1069,17 @@ async def test_backup_import_end_to_end_with_assets(
     ).one()
     assert member.user_id == a.user.id
 
-    queue = (
-        await session.exec(select(Queue).where(Queue.initiative_id == restored.id))
+    group = (
+        await session.exec(
+            select(CounterGroup).where(CounterGroup.initiative_id == restored.id)
+        )
     ).one()
-    assert queue.name == "Restored Queue"
+    assert group.name == "Restored Tally"
     file_doc = (
         await session.exec(
             select(File).where(
                 File.initiative_id == restored.id,
-                File.file_type == FileType.file,
+                File.current_version_id.is_not(None),
             )
         )
     ).one()
@@ -1149,8 +1123,9 @@ async def test_backup_rejects_invalid_and_bomb_zips(
     assert escaped.status_code == 400
     assert escaped.json()["detail"] == "IMPORT_ZIP_INVALID"
 
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_MEMBERS", 1)
-    entry, envelope = _queue_entry()
+    # A backup is held to the bundle bounds.
+    monkeypatch.setattr(import_limits, "IMPORT_MAX_BUNDLE_MEMBERS", 1)
+    entry, envelope = _counter_group_entry()
     bomb = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1159,7 +1134,7 @@ async def test_backup_rejects_invalid_and_bomb_zips(
     assert too_many.status_code == 400
     assert too_many.json()["detail"] == "IMPORT_TOO_LARGE"
 
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_MEMBERS", 20_000)
+    monkeypatch.undo()
     future = _make_backup_zip({**_minimal_manifest(), "schema_version": 99})
     unsupported = await _upload_backup(client, a, future)
     assert unsupported.status_code == 400
@@ -1283,7 +1258,7 @@ async def test_backup_confirm_include_map_skips_tools(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1293,15 +1268,15 @@ async def test_backup_confirm_include_map_skips_tools(
     confirmed = await client.post(
         a.g(f"/imports/jobs/{job_id}/confirm"),
         headers=a.headers,
-        json={"include": {"queue": False}},
+        json={"include": {"counter_group": False}},
     )
     assert confirmed.status_code == 200
 
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["queue"]["skipped"] == 1
-    assert job["result"]["per_tool"]["queue"]["created"] == 0
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+    assert job["result"]["per_tool"]["counter_group"]["skipped"] == 1
+    assert job["result"]["per_tool"]["counter_group"]["created"] == 0
 
 
 async def test_an_archive_from_before_files_restores_its_documents(
@@ -1312,7 +1287,9 @@ async def test_an_archive_from_before_files_restores_its_documents(
     file's type. A restore reads each as the file it is."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+
+    from app.models.tenant.file import File
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1320,7 +1297,7 @@ async def test_an_archive_from_before_files_restores_its_documents(
     envelope = {
         "type": "initiative-document",
         "schema_version": 1,
-        "document_type": "smart_link",
+        "document_type": "url",
         "name": "Old link",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -1347,12 +1324,363 @@ async def test_an_archive_from_before_files_restores_its_documents(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["per_tool"]["file"]["created"] == 1
 
     await route_session_to_guild(session, a.guild.id)
     restored = (await session.exec(select(File).where(File.name == "Old link"))).one()
-    assert restored.file_type == FileType.smart_link
+    assert restored.file_type == FileType.url
+
+
+async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """An archive written while galleries were a tool carries a gallery entry.
+    A restore makes each picture a file of the initiative and gathers the
+    files into a collection named as the gallery was, made as the Gallery
+    shape with each caption its file's Caption."""
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection, CollectionFile
+    from app.models.tenant.file import File
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    payload = png_bytes()
+    path = "initiatives/1-restored/galleries/1-old-wall"
+    envelope = {
+        "type": "initiative-gallery",
+        "schema_version": 1,
+        "name": "Old wall",
+        "tags": [],
+        "properties": [],
+        "images": [
+            {
+                "storage_key": "shot.png",
+                "title": "Shot",
+                "caption": "From the pier",
+                "content_type": "image/png",
+                "size_bytes": len(payload),
+                "original_filename": "shot.png",
+            }
+        ],
+    }
+    entry = {
+        "path": f"{path}.json",
+        "tool": "gallery",
+        "type": "initiative-gallery",
+        "schema_version": 1,
+        "entity_id": 1,
+        "title": "Old wall",
+        "initiative_id": 1,
+        "tags": [],
+        "properties": [],
+        "asset": None,
+    }
+    manifest = _minimal_manifest(
+        entries=[entry],
+        assets=[
+            _asset_record(
+                "shot.png",
+                size_bytes=len(payload),
+                content_type="image/png",
+                referenced_by=[path],
+            )
+        ],
+    )
+    manifest["initiatives"][0]["tools"] = {"gallery": "included"}
+    job = await _apply_backup(
+        client,
+        a,
+        _make_backup_zip(
+            manifest,
+            {entry["path"]: json.dumps(envelope).encode(), "assets/shot.png": payload},
+        ),
+        monkeypatch,
+        role_session,
+    )
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+    assert job["result"]["per_tool"]["file"]["created"] == 1
+
+    await route_session_to_guild(session, a.guild.id)
+    restored = (
+        await session.exec(select(Collection).where(Collection.name == "Old wall"))
+    ).one()
+    files = (
+        await session.exec(
+            select(File.name, MetadataValue.value_text)
+            .join(CollectionFile, CollectionFile.file_id == File.id)
+            .join(MetadataValue, MetadataValue.entity_id == File.id)
+            .join(
+                MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id
+            )
+            .where(
+                CollectionFile.collection_id == restored.id,
+                MetadataDefinition.collection_id == restored.id,
+                MetadataDefinition.name == "Caption",
+            )
+        )
+    ).all()
+    assert files == [("Shot", "From the pier")]
+
+
+async def test_restored_collections_keep_their_own_files_and_cover(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A backup carries each collection by the id it had, so two of one name
+    come back as two, each with its own files, description, cover, metadata,
+    its values and the layouts that place it."""
+    from decimal import Decimal
+
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection, CollectionFile
+    from app.models.tenant.file import File
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
+    from app.models.tenant.tool_layout import ToolLayout
+    from app.services.tenant import collections as collections_service
+    from app.testing import (
+        create_collection,
+        create_property_definition,
+        create_property_value,
+    )
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    sunset = await create_file(session, a.initiative, a.user, name="Sunset")
+    dunes = await create_file(session, a.initiative, a.user, name="Dunes")
+    shop = await create_collection(
+        session,
+        a.initiative,
+        a.user,
+        files=[sunset, dunes],
+        name="Photos",
+        description="Studio shots",
+        cover_file_id=sunset.id,
+        shape="catalog",
+    )
+    price, _rating = (await collections_service.metadata_of(session, [shop.id]))[
+        shop.id
+    ]
+    await create_property_value(session, sunset, price, value_number=Decimal("12.50"))
+    # Its table shows one of the initiative's properties too.
+    shelf = await create_property_definition(session, a.initiative, name="Shelf")
+    table = (
+        await session.exec(
+            select(ToolLayout).where(
+                ToolLayout.tool == "collection",
+                ToolLayout.tool_id == shop.id,
+                ToolLayout.kind == "table",
+            )
+        )
+    ).one()
+    table.definition = {
+        **table.definition,
+        "columns": [*table.definition["columns"], f"property:{shelf.id}"],
+    }
+    session.add(table)
+    await session.commit()
+    await create_collection(session, a.initiative, a.user, files=[dunes], name="Photos")
+
+    restored_id = await _restore_referencing_backup(
+        client, a, monkeypatch, role_session, elsewhere=False
+    )
+
+    await route_session_to_guild(session, a.guild.id)
+    names = {
+        file.id: file.name
+        for file in (
+            await session.exec(select(File).where(File.initiative_id == restored_id))
+        ).all()
+    }
+    collections = (
+        await session.exec(
+            select(Collection)
+            .where(Collection.initiative_id == restored_id)
+            .order_by(Collection.id)
+        )
+    ).all()
+    held = (
+        await session.exec(
+            select(CollectionFile.collection_id, CollectionFile.file_id).where(
+                CollectionFile.initiative_id == restored_id
+            )
+        )
+    ).all()
+    assert [
+        (
+            c.name,
+            c.description,
+            names.get(c.cover_file_id or 0),
+            sorted(names[f] for cid, f in held if cid == c.id),
+        )
+        for c in collections
+    ] == [
+        ("Photos", "Studio shots", "Sunset", ["Dunes", "Sunset"]),
+        ("Photos", None, None, ["Dunes"]),
+    ]
+    values = (
+        await session.exec(
+            select(
+                MetadataDefinition.name,
+                MetadataDefinition.currency,
+                MetadataValue.entity_id,
+                MetadataValue.value_number,
+            )
+            .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+            .where(MetadataDefinition.collection_id == collections[0].id)
+        )
+    ).all()
+    assert [(n, c, names[f], v) for n, c, f, v in values] == [
+        ("Price", "USD", "Sunset", Decimal("12.50"))
+    ]
+    # Its layouts come back naming its own metadata there.
+    restored = {
+        defn.name: defn.id
+        for defn in (
+            await collections_service.metadata_of(session, [collections[0].id])
+        )[collections[0].id]
+    }
+    tables = (
+        await session.exec(
+            select(ToolLayout.definition).where(
+                ToolLayout.tool == "collection",
+                ToolLayout.tool_id == collections[0].id,
+                ToolLayout.kind == "table",
+            )
+        )
+    ).all()
+    restored_shelf = (
+        await session.exec(
+            select(MetadataDefinition.id).where(
+                MetadataDefinition.of_initiative(restored_id),
+                MetadataDefinition.name == "Shelf",
+            )
+        )
+    ).one()
+    assert [table["columns"] for table in tables] == [
+        [
+            "name",
+            f"property:{restored['Price']}",
+            f"property:{restored['Rating']}",
+            "added",
+            f"property:{restored_shelf}",
+        ]
+    ]
+
+
+async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A collection has no sharing: a person its values name who cannot open a
+    file in it is taken off it, and nothing is shared with them — least of all
+    a file that happens to have the collection's id."""
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection
+    from app.models.tenant.metadata import MetadataValue
+    from app.models.tenant.resource_grant import ResourceGrant
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    b = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+    secret = await create_file(session, a.initiative, a.user, name="Secret")
+    folder = "initiatives/1-restored"
+    file_entry = {
+        "path": f"{folder}/files/5-notes.initiative-file.json",
+        "tool": "file",
+        "type": "initiative-file",
+        "schema_version": 1,
+        "entity_id": 5,
+        "title": "Notes",
+        "initiative_id": 1,
+        "asset": None,
+    }
+    collections_entry = {
+        "path": f"{folder}/collections.json",
+        "tool": "initiative",
+        "type": "initiative-collections",
+        "schema_version": 1,
+        "entity_id": 1,
+        "title": "Restored",
+        "initiative_id": 1,
+        "asset": None,
+    }
+    collections = {
+        "type": "initiative-collections",
+        "schema_version": 1,
+        "collections": [
+            {
+                "id": 3,
+                "name": "Shelf",
+                "file_ids": [5],
+                "properties": [
+                    {
+                        "property_name": "Owner",
+                        "property_type": "user_reference",
+                        "value_handle": "stranger#4321",
+                        "value_name": "Bea",
+                    }
+                ],
+            }
+        ],
+    }
+    file_envelope = {
+        "type": "initiative-file",
+        "schema_version": 1,
+        "file_type": "lexical",
+        "name": "Notes",
+        "content": _editor_state(),
+    }
+    manifest = _minimal_manifest(entries=[file_entry, collections_entry])
+    manifest["people"] = [
+        {"handle": "stranger#4321", "name": "Bea", "comment_count": 0}
+    ]
+    resp = await _upload_backup(
+        client,
+        a,
+        _make_backup_zip(
+            manifest,
+            {
+                file_entry["path"]: json.dumps(file_envelope).encode(),
+                collections_entry["path"]: json.dumps(collections).encode(),
+            },
+        ),
+    )
+    assert resp.status_code == 201, resp.text
+    job_id = resp.json()["id"]
+    confirmed = await client.post(
+        a.g(f"/imports/jobs/{job_id}/confirm"),
+        headers=a.headers,
+        json={"people_map": {"stranger#4321": b.user.id}},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    await _run_import_worker(monkeypatch, role_session)
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+
+    await route_session_to_guild(session, a.guild.id)
+    shelf = (
+        await session.exec(select(Collection).where(Collection.name == "Shelf"))
+    ).one()
+    assert shelf.id == secret.id
+    assert (
+        await session.exec(
+            select(MetadataValue.value_user_id).where(
+                MetadataValue.entity_type == "collection",
+                MetadataValue.entity_id == shelf.id,
+            )
+        )
+    ).all() == [None]
+    assert (
+        await session.exec(
+            select(ResourceGrant).where(ResourceGrant.user_id == b.user.id)
+        )
+    ).all() == []
 
 
 async def test_backup_corrupt_entry_fails_alone(
@@ -1363,10 +1691,12 @@ async def test_backup_corrupt_entry_fails_alone(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    good_entry, good_envelope = _queue_entry()
+    good_entry, good_envelope = _counter_group_entry()
     bad_entry = dict(good_entry)
-    bad_entry["path"] = "initiatives/1-restored/queues/2-bad.initiative-queue.json"
-    bad_entry["title"] = "Bad Queue"
+    bad_entry["path"] = (
+        "initiatives/1-restored/counter_groups/2-bad.initiative-counter-group.json"
+    )
+    bad_entry["title"] = "Bad Tally"
     bad_entry["entity_id"] = 2
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[good_entry, bad_entry]),
@@ -1383,15 +1713,15 @@ async def test_backup_corrupt_entry_fails_alone(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["queue"] == {
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+    assert job["result"]["per_tool"]["counter_group"] == {
         "created": 1,
         "failed": 1,
         "skipped": 0,
     }
     statuses = {e["title"]: e["status"] for e in job["result"]["entries"]}
-    assert statuses == {"Restored Queue": "created", "Bad Queue": "failed"}
+    assert statuses == {"Restored Tally": "created", "Bad Tally": "failed"}
 
 
 async def test_backup_seat_vacated_before_apply_fails_closed(
@@ -1400,7 +1730,7 @@ async def test_backup_seat_vacated_before_apply_fails_closed(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1417,8 +1747,8 @@ async def test_backup_seat_vacated_before_apply_fails_closed(
     await session.commit()
 
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_SUPERADMIN_REQUIRED"
 
 
@@ -1452,9 +1782,136 @@ async def test_backup_quota_exceeded_fails_job(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_QUOTA_EXCEEDED"
+
+
+async def test_a_backup_sent_in_pieces_is_restored_from_where_it_arrived(
+    client, acting_user, session, monkeypatch, role_session
+):
+    from sqlmodel import select
+
+    from app.models.tenant.pending_upload import PendingUpload
+    from app.testing import route_session_to_guild
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    upload_id = await send_in_pieces(
+        client,
+        a,
+        _make_backup_zip(_minimal_manifest()),
+        purpose="backup",
+        filename="backup.zip",
+    )
+
+    staged = await client.post(
+        a.g("/imports/backup"), headers=a.headers, data={"upload_id": upload_id}
+    )
+
+    assert staged.status_code == 201, staged.text
+    await route_session_to_guild(session, a.guild.id)
+    job = await session.get(DataJob, staged.json()["id"])
+    assert job.file_ref == f"resumable-{upload_id}"
+    assert (await session.exec(select(PendingUpload))).first() is None
+    await client.post(
+        a.g(f"/imports/jobs/{job.id}/confirm"), headers=a.headers, json={}
+    )
+    await _run_import_worker(monkeypatch, role_session)
+    done = (await client.get(a.g(f"/data-jobs/{job.id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
+
+
+async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
+    from app.testing.resumable import TUS, upload_metadata
+
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+
+    refused = await client.post(
+        admin.g("/resumable-uploads"),
+        headers={
+            **admin.headers,
+            **TUS,
+            "Upload-Length": "10",
+            "Upload-Metadata": upload_metadata(purpose="backup", filename="b.zip"),
+        },
+    )
+
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == "IMPORT_SUPERADMIN_REQUIRED"
+
+
+@pytest.mark.parametrize("purpose", ["backup", "atlassian_export"])
+async def test_an_import_sent_in_pieces_may_weigh_as_much_as_a_bundle(
+    client, acting_user, purpose
+):
+    from app.testing.resumable import TUS, upload_metadata
+
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+
+    async def create(length: int) -> int:
+        response = await client.post(
+            a.g("/resumable-uploads"),
+            headers={
+                **a.headers,
+                **TUS,
+                "Upload-Length": str(length),
+                "Upload-Metadata": upload_metadata(
+                    purpose=purpose,
+                    filename="import.zip",
+                    initiative_id=str(a.initiative.id),
+                ),
+            },
+        )
+        return response.status_code
+
+    assert await create(import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES + 1) == 201
+    assert await create(import_limits.IMPORT_MAX_BUNDLE_BYTES + 1) == 413
+
+
+async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
+    client, acting_user, session
+):
+
+    from app.services.tenant import attachments
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await guild_administration(session, a.guild, max_storage_bytes=0)
+
+    await send_in_pieces(
+        client,
+        a,
+        _make_backup_zip(_minimal_manifest()),
+        purpose="backup",
+        filename="backup.zip",
+    )
+
+    assert await attachments.get_guild_storage_usage(a.guild.id) == 0
+
+
+async def test_a_confluence_export_on_its_way_holds_room_in_the_communitys_storage(
+    client, acting_user
+):
+    from app.services.import_engine.confluence_export_test import export_bytes
+    from app.services.tenant import attachments
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    export = export_bytes()
+
+    await send_in_pieces(
+        client,
+        a,
+        export,
+        purpose="atlassian_export",
+        filename="export.zip",
+        initiative_id=str(a.initiative.id),
+    )
+
+    assert await attachments.get_guild_storage_usage(a.guild.id) == len(export)
 
 
 async def test_backup_staged_expiry_and_cancel(
@@ -1476,7 +1933,7 @@ async def test_backup_staged_expiry_and_cancel(
     from app.testing import route_session_to_guild
 
     await route_session_to_guild(session, a.guild.id)
-    row = await session.get(ImportJob, job_id)
+    row = await session.get(DataJob, job_id)
     row.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
     session.add(row)
     await session.commit()
@@ -1490,13 +1947,13 @@ async def test_backup_staged_expiry_and_cancel(
     assert raced.status_code == 409
     assert raced.json()["detail"] == "IMPORT_NOT_CONFIRMABLE"
     await session.refresh(row)
-    assert row.status == ImportJobStatus.expired
-    assert row.payload_ref is None
+    assert row.status == DataJobStatus.expired
+    assert row.file_ref is None
 
     # GC stays idempotent over the already-expired row.
-    await each_guild([(Scope.PROVISIONED, import_worker.expire_payloads)], name="t")
+    await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")
     await session.refresh(row)
-    assert row.status == ImportJobStatus.expired
+    assert row.status == DataJobStatus.expired
 
     late = await client.post(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
@@ -1510,19 +1967,22 @@ async def test_backup_staged_expiry_and_cancel(
         a.g(f"/imports/jobs/{second_id}"), headers=a.headers
     )
     assert cancelled.status_code == 200
-    assert cancelled.json()["status"] == ImportJobStatus.cancelled.value
+    assert cancelled.json()["status"] == DataJobStatus.cancelled.value
 
 
 async def test_backup_restores_fresh_assets_into_storage(
     client, acting_user, session, monkeypatch, role_session
 ):
     """A cross-guild restore: the storage key doesn't exist here, so the blob
-    is written into guild storage, an uploads row is registered, and the uploaded file serves from the restored key."""
+    is written into guild storage, an uploads row is registered, and the uploaded file serves from the restored key.
+    A file is restored however large, past what one sent with a request may be."""
+    import hashlib
     from pathlib import Path
 
     from sqlmodel import select
 
     from app.models.tenant.upload import Upload
+    from app.services.tenant import attachments
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1540,6 +2000,7 @@ async def test_backup_restores_fresh_assets_into_storage(
         ],
     )
     zip_bytes = _make_backup_zip(manifest, {"assets/from-elsewhere.pdf": payload})
+    monkeypatch.setattr(attachments, "MAX_FILE_SIZE", len(payload) - 1)
 
     resp = await _upload_backup(client, a, zip_bytes)
     job_id = resp.json()["id"]
@@ -1549,8 +2010,8 @@ async def test_backup_restores_fresh_assets_into_storage(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["assets_restored"] == 1
     assert job["result"]["asset_bytes"] == len(payload)
 
@@ -1567,6 +2028,7 @@ async def test_backup_restores_fresh_assets_into_storage(
     ).one()
     assert upload.size_bytes == len(payload)
     assert upload.content_type == "application/pdf"
+    assert upload.content_hash == hashlib.sha256(payload).hexdigest()
 
 
 async def test_backup_quota_uses_zip_sizes_not_manifest_claims(
@@ -1605,8 +2067,8 @@ async def test_backup_quota_uses_zip_sizes_not_manifest_claims(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_QUOTA_EXCEEDED"
     # Nothing was written despite the understated claim.
     assert get_guild_storage(a.guild.id).open_readable("liar.bin") is None
@@ -1680,7 +2142,9 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
     reported, and the entry that needed it skipped."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+
+    from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.testing import route_session_to_guild
 
@@ -1726,7 +2190,7 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     result = job["result"]
     assert result["assets_restored"] == 1
     assert "unsupported_file:typed-tool.exe" in result["warnings"]
@@ -1751,7 +2215,7 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
         entries["Table"]["detail"]["entity_id"],
         options=[undefer(File.content)],
     )
-    assert sheet.file_type == FileType.spreadsheet
+    assert sheet.file_type == FileType.sheet
     assert sheet.content["sheets"][0]["cells"]
 
 
@@ -1764,18 +2228,18 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    good_entry, good_envelope = _queue_entry()
+    good_entry, good_envelope = _counter_group_entry()
     big_entry = {
         **good_entry,
-        "path": "initiatives/1-restored/queues/2-big.initiative-queue.json",
-        "title": "Big Queue",
+        "path": "initiatives/1-restored/counter_groups/2-big.initiative-counter-group.json",
+        "title": "Big Tally",
         "entity_id": 2,
     }
     big_envelope = {
         **good_envelope,
-        "name": "Big Queue",
-        "items": [
-            {"label": f"Member {index}", "position": float(index)}
+        "name": "Big Tally",
+        "counters": [
+            {"name": f"Member {index}", "position": float(index)}
             for index in range(400)
         ],
     }
@@ -1792,10 +2256,10 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     entries = {entry["title"]: entry for entry in job["result"]["entries"]}
-    assert entries["Restored Queue"]["status"] == "created"
-    assert (entries["Big Queue"]["status"], entries["Big Queue"]["error"]) == (
+    assert entries["Restored Tally"]["status"] == "created"
+    assert (entries["Big Tally"]["status"], entries["Big Tally"]["error"]) == (
         "failed",
         "IMPORT_TOO_LARGE",
     )
@@ -1813,7 +2277,7 @@ async def test_backup_upload_past_the_cap_is_refused_by_the_handler(
     resp = await _upload_backup(client, a, _make_backup_zip(_minimal_manifest()))
     assert resp.status_code == 413
     assert resp.json()["detail"] == "IMPORT_TOO_LARGE"
-    jobs = (await client.get(a.g("/imports/jobs"), headers=a.headers)).json()
+    jobs = (await client.get(a.g("/data-jobs/"), headers=a.headers)).json()
     assert jobs == []
 
 
@@ -2060,7 +2524,7 @@ async def test_backup_attach_to_files_a_file_in_its_wiki(
 
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.wiki import Wiki
     from app.services.tenant import relationships as relationships_service
@@ -2125,8 +2589,8 @@ async def test_backup_attach_to_files_a_file_in_its_wiki(
     assert confirmed.status_code == 200
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["links_created"] == 1
 
     restored = (
@@ -2139,7 +2603,7 @@ async def test_backup_attach_to_files_a_file_in_its_wiki(
         await session.exec(
             select(File).where(
                 File.initiative_id == restored.id,
-                File.file_type == FileType.file,
+                File.current_version_id.is_not(None),
             )
         )
     ).one()
@@ -2172,8 +2636,8 @@ async def test_backup_applies_into_an_existing_initiative(
     """
     from sqlmodel import select
 
+    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.initiative import Initiative
-    from app.models.tenant.queue import Queue
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -2181,7 +2645,7 @@ async def test_backup_applies_into_an_existing_initiative(
     target = await _second_initiative(session, a)
     before = len((await session.exec(select(Initiative.id))).all())
 
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["initiatives"][0]["target_initiative_id"] = target.id
     zip_bytes = _make_backup_zip(
@@ -2196,8 +2660,8 @@ async def test_backup_applies_into_an_existing_initiative(
     )
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["initiatives"][0]["initiative_id"] == target.id
 
     assert len((await session.exec(select(Initiative.id))).all()) == before
@@ -2205,10 +2669,12 @@ async def test_backup_applies_into_an_existing_initiative(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one_or_none() is None
 
-    queue = (
-        await session.exec(select(Queue).where(Queue.initiative_id == target.id))
+    group = (
+        await session.exec(
+            select(CounterGroup).where(CounterGroup.initiative_id == target.id)
+        )
     ).one()
-    assert queue.name == "Restored Queue"
+    assert group.name == "Restored Tally"
 
 
 async def test_backup_into_an_unreachable_initiative_fails_the_job(
@@ -2220,7 +2686,7 @@ async def test_backup_into_an_unreachable_initiative_fails_the_job(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
 
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["initiatives"][0]["target_initiative_id"] = 10_000_000
     zip_bytes = _make_backup_zip(
@@ -2235,8 +2701,8 @@ async def test_backup_into_an_unreachable_initiative_fails_the_job(
     )
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_INVALID_PARAMS"
 
 
@@ -2268,13 +2734,13 @@ async def test_a_stale_fetch_is_re_claimed_not_failed(
         a.user,
         source="atlassian",
         params={"initiative_id": a.initiative.id},
-        payload_ref="imports/half-written.json",
-        status=ImportJobStatus.fetching,
+        file_ref="imports/half-written.json",
+        status=DataJobStatus.fetching,
     )
     # updated_at is stamped on write, so age it afterwards.
     await session.exec(
-        ImportJob.__table__.update()
-        .where(ImportJob.__table__.c.id == job.id)
+        DataJob.__table__.update()
+        .where(DataJob.__table__.c.id == job.id)
         .values(updated_at=long_ago)
     )
     await session.commit()
@@ -2282,17 +2748,15 @@ async def test_a_stale_fetch_is_re_claimed_not_failed(
     await _run_import_worker(monkeypatch, role_session)
 
     session.expunge_all()
-    reclaimed = (
-        await session.exec(select(ImportJob).where(ImportJob.id == job.id))
-    ).one()
+    reclaimed = (await session.exec(select(DataJob).where(DataJob.id == job.id))).one()
     # It left ``fetching`` and its half-written payload is gone, so the fetch
     # can start clean. It is NOT the apply path's fail-closed outcome, which
     # is the distinction this rule exists to make. (The same pass then picks
     # the queued row up and starts the fetch over, which fails on the spot:
     # this row was never given a credential to read the site with.)
-    assert reclaimed.status is not ImportJobStatus.fetching
+    assert reclaimed.status is not DataJobStatus.fetching
     assert reclaimed.error != "IMPORT_INTERRUPTED"
-    assert reclaimed.payload_ref != "imports/half-written.json"
+    assert reclaimed.file_ref != "imports/half-written.json"
     assert (
         get_guild_storage(a.guild.id).open_readable("imports/half-written.json") is None
     )
@@ -2542,9 +3006,7 @@ async def test_the_people_step_decides_who_an_imported_task_is_assigned_to(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
     assert done["status"] == "done", done.get("error")
     assert done["result"]["unmatched_handles"] == []
 
@@ -2562,10 +3024,10 @@ async def test_two_properties_never_share_one_definition(client, acting_user, se
     then gets a definition of its own, so a task keeps both values."""
     from sqlmodel import select
 
-    from app.models.tenant.property import (
-        PropertyDefinition,
-        PropertyType,
-        PropertyValue,
+    from app.models.tenant.metadata import (
+        MetadataDefinition,
+        MetadataType,
+        MetadataValue,
     )
     from app.models.tenant.task import Task
     from app.testing import create_property_definition
@@ -2575,13 +3037,13 @@ async def test_two_properties_never_share_one_definition(client, acting_user, se
     )
     high = [{"value": "high", "label": "High"}]
     await create_property_definition(
-        session, a.initiative, name="Priority", type=PropertyType.number
+        session, a.initiative, name="Priority", type=MetadataType.number
     )
     await create_property_definition(
         session,
         a.initiative,
         name="Priority_select",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=high,
     )
     envelope = _project_envelope_with_comment("stranger#4321", "Alice Chen")
@@ -2602,10 +3064,10 @@ async def test_two_properties_never_share_one_definition(client, acting_user, se
     task = (await session.exec(select(Task).where(Task.title == "Fit the door"))).one()
     names = (
         await session.exec(
-            select(PropertyDefinition.name)
-            .join(PropertyValue)
+            select(MetadataDefinition.name)
+            .join(MetadataValue)
             .where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -2619,7 +3081,7 @@ async def test_a_user_property_is_placed_by_the_people_step(
     does, so it is asked about the same way, and the answer is what lands."""
     from sqlmodel import select
 
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.task import Task
 
     a = await acting_user(
@@ -2651,17 +3113,15 @@ async def test_a_user_property_is_placed_by_the_people_step(
         json={"people_map": {"Robin": a.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
     assert done["status"] == "done", done.get("error")
 
     session.expunge_all()
     task = (await session.exec(select(Task).where(Task.title == "Fit the door"))).one()
     values = (
         await session.exec(
-            select(PropertyValue).where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+            select(MetadataValue).where(
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -2679,7 +3139,7 @@ async def test_a_file_naming_somebody_in_a_property_asks_first(
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Spec",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -2769,7 +3229,7 @@ async def _import_with_assignees(client, a, people_map, monkeypatch, role_sessio
     )
     assert confirm.status_code == 200, confirm.text
     await _run_import_worker(monkeypatch, role_session)
-    job = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
+    job = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     return job.json()["result"]
 
 
@@ -2927,7 +3387,7 @@ async def test_the_plan_lists_the_people_and_suggests_the_exact_matches(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["people"] = [
         {"handle": handle_of(a.user), "name": "The Importer", "comment_count": 4},
@@ -2996,8 +3456,8 @@ async def test_the_confirmed_mapping_decides_who_a_comment_belongs_to(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     comment = (
         await session.exec(
@@ -3116,8 +3576,8 @@ async def test_a_restored_mention_links_to_whoever_its_handle_is_here(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     restored = job["result"]["initiatives"][0]["initiative_id"]
 
     project = (
@@ -3215,7 +3675,7 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "native",
+        "file_type": "lexical",
         "name": "Minutes",
         "content": _editor_state(
             {**_mention_node("Bea", None), "mentionHandle": "stranger#4321"}
@@ -3248,6 +3708,76 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     assert "mentionHandle" not in mention
 
 
+async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
+    client, acting_user, session
+):
+    """A ``[[ ]]`` link in an envelope an older build wrote comes in as the
+    reference to its file it always was, as a restore reads one. A
+    spreadsheet's cells are what was typed, and come in as written."""
+    from sqlmodel import select
+
+    from app.models.tenant.file import File
+
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    target = await _second_initiative(session, a, files_enabled=True)
+    spec = await create_file(session, target, a.user, name="Spec")
+    envelope = {
+        "type": "initiative-file",
+        "schema_version": 1,
+        "file_type": "lexical",
+        "name": "Minutes",
+        "content": _editor_state(
+            {"type": "wikilink", "documentId": spec.id, "documentTitle": "Spec"}
+        ),
+    }
+
+    resp = await _import_envelope(client, a, envelope, target.id)
+    assert resp.status_code == 201, resp.text
+
+    file = (
+        await session.exec(
+            select(File)
+            .where(File.initiative_id == target.id, File.name == "Minutes")
+            .options(undefer(File.content))
+        )
+    ).one()
+    [node] = file.content["root"]["children"][0]["children"]
+    assert (node["type"], node["entityType"], node["entityId"]) == (
+        "entity-mention",
+        "file",
+        spec.id,
+    )
+
+    cells = {"0:0": "#doc[Spec](7)", "0:1": "#gallery-image[Sample](12)"}
+    resp = await _import_envelope(
+        client,
+        a,
+        {
+            "type": "initiative-file",
+            "schema_version": 1,
+            "file_type": "sheet",
+            "name": "Budget",
+            "content": {
+                "schema_version": 3,
+                "kind": "spreadsheet",
+                "sheets": [{"id": "s1", "name": "Sheet 1", "cells": cells}],
+            },
+        },
+        target.id,
+    )
+    assert resp.status_code == 201, resp.text
+    sheet = (
+        await session.exec(
+            select(File)
+            .where(File.initiative_id == target.id, File.name == "Budget")
+            .options(undefer(File.content))
+        )
+    ).one()
+    assert sheet.content["sheets"][0]["cells"] == cells
+
+
 def _reference_node(entity_type: str, entity_id: int, text: str) -> dict:
     return {
         "type": "entity-mention",
@@ -3265,16 +3795,6 @@ def _chip_node(chip_kind: str, entity_id: int, text: str) -> dict:
         "chipKind": chip_kind,
         "entityId": entity_id,
         "text": text,
-    }
-
-
-def _wikilink_node(file_id: int, title: str) -> dict:
-    return {
-        "type": "wikilink",
-        "version": 1,
-        "documentId": file_id,
-        "documentTitle": title,
-        "text": title,
     }
 
 
@@ -3324,7 +3844,7 @@ async def _referencing_initiative(session, a) -> dict:
             _reference_node("task", fix.id, "Fix the bug"),
             _chip_node("task:status", fix.id, "To do"),
             _chip_node("counter:value", counter.id, "3"),
-            _wikilink_node(spec.id, "Spec"),
+            _reference_node("file", spec.id, "Spec"),
         ),
     )
     ship = await create_task(
@@ -3332,7 +3852,7 @@ async def _referencing_initiative(session, a) -> dict:
         a.project,
         title="Ship it",
         description=(
-            f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id}) "
+            f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id}) "
             f"and #file[Elsewhere]({outside.id})"
         ),
     )
@@ -3365,7 +3885,7 @@ async def _restore_referencing_backup(
                 data = json.dumps(manifest).encode()
             rezipped.writestr(name, data)
     job = await _apply_backup(client, a, buffer.getvalue(), monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     return job["result"]["initiatives"][0]["initiative_id"]
 
 
@@ -3480,15 +4000,15 @@ async def test_a_restored_reference_points_at_the_restored_copy(
     spec, plan = r["files"]["Spec"], r["files"]["Plan"]
 
     assert ship.description == (
-        f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id}) "
+        f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id}) "
         f"and #file[Elsewhere]({outside.id})"
     )
     assert r["comment"].content == f"Written up in #wiki-page[Start]({r['page'].id})"
-    mention, status, value, wikilink = _nodes(plan.content)
+    mention, status, value, link = _nodes(plan.content)
     assert mention["entityId"] == fix.id
     assert status["entityId"] == fix.id
     assert value["entityId"] == r["counter"].id
-    assert wikilink["documentId"] == spec.id
+    assert link["entityId"] == spec.id
     [project_mention] = _nodes(r["post"].body)
     assert project_mention["entityId"] == r["project"].id
     [post_mention] = _nodes(r["page"].content)
@@ -3545,7 +4065,7 @@ async def test_a_reference_restored_elsewhere_to_something_left_behind_is_its_ti
 
     assert ship.description == (
         f"After #task[Fix the bug]({fix.id}), "
-        f"per #doc[Spec]({r['files']['Spec'].id}) and Elsewhere"
+        f"per #file[Spec]({r['files']['Spec'].id}) and Elsewhere"
     )
 
 
@@ -3556,68 +4076,9 @@ async def _import_archive(client, actor, zip_bytes, initiative_id, envelope_type
     return await client.post(
         actor.g("/imports/envelope/archive"),
         headers=actor.headers,
-        files={"file": ("gallery.zip", zip_bytes, "application/zip")},
+        files={"file": ("export.zip", zip_bytes, "application/zip")},
         data=data,
     )
-
-
-async def test_a_gallery_zip_imports_with_its_pictures_into_another_community(
-    client, acting_user, session, monkeypatch, tmp_path
-):
-    """A gallery exported on its own is a zip of its envelope and its pictures,
-    and importing that zip somewhere the pictures have never been stored brings
-    them along: each lands in the community's storage under its key, and the
-    gallery shows it."""
-    from sqlmodel import select
-
-    from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-    from app.core.config import settings
-    from app.models.tenant.gallery import Gallery, GalleryImage
-    from app.testing import route_session_to_guild
-    from app.testing.factories import create_gallery, create_gallery_image
-
-    monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _all_tools_enabled(session, a.initiative)
-    gallery = await create_gallery(session, a.initiative, a.user, name="Barovia maps")
-    picture = await create_gallery_image(session, gallery, a.user, title="Village")
-    key = picture.current_version.file_url.rsplit("/", 1)[-1]
-
-    exported = await client.get(
-        a.g("/exports/gallery"),
-        headers=a.headers,
-        params={"ids": [gallery.id], "format": "json"},
-    )
-    assert exported.status_code == 200, exported.text
-
-    b = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await _all_tools_enabled(session, b.initiative)
-    assert get_guild_storage(b.guild.id).exists(key) is False
-    resp = await _import_archive(
-        client, b, exported.content, b.initiative.id, "initiative-gallery"
-    )
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["result"]["created"]["images"] == 1
-
-    assert get_guild_storage(b.guild.id).exists(key)
-    await route_session_to_guild(session, b.guild.id)
-    restored = (
-        await session.exec(
-            select(Gallery).where(Gallery.initiative_id == b.initiative.id)
-        )
-    ).one()
-    [image] = (
-        await session.exec(
-            select(GalleryImage).where(GalleryImage.gallery_id == restored.id)
-        )
-    ).all()
-    # The picture is its version 1, typed from its bytes.
-    version = image.current_version
-    assert version is not None and version.version_number == 1
-    assert version.file_url == f"/uploads/{b.guild.id}/{key}"
-    assert version.file_content_type == "image/png"
 
 
 async def test_a_wiki_zip_imports_back_from_the_wiki_page(client, acting_user, session):
@@ -3690,7 +4151,8 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
         _all_tools_enabled,
         _wiki_with_filed_files,
     )
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.services.tenant.wikis import file_parent, linked_files
     from app.testing import route_session_to_guild
@@ -3720,9 +4182,9 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
     ).one()
     filed = {file.name: file for file in await linked_files(session, restored.id)}
     assert set(filed) == {"Session notes", "Loot", "Handout"}
-    assert filed["Loot"].file_type == FileType.spreadsheet
+    assert filed["Loot"].file_type == FileType.sheet
     handout = filed["Handout"]
-    assert handout.file_type == FileType.file
+    assert handout.file_type == FileType.pdf
     # The upload is the file's version 1, typed from its bytes.
     version = handout.current_version
     assert version is not None and version.version_number == 1
@@ -3742,38 +4204,6 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
     ).all()
 
 
-async def test_a_gallery_zip_leaves_out_what_is_not_a_picture(
-    client, acting_user, session
-):
-    """The zip says what its files are; the bytes decide. A file that is not a
-    picture a gallery can show is not stored, and the import says so."""
-    from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _all_tools_enabled(session, a.initiative)
-    envelope = {
-        "type": "initiative-gallery",
-        "schema_version": 1,
-        "name": "Handouts",
-        "images": [
-            {"storage_key": "note.png", "content_type": "image/png", "title": "Note"}
-        ],
-    }
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("handouts.initiative-gallery.json", json.dumps(envelope))
-        archive.writestr("assets/note.png", b"<svg onload='x'></svg>")
-
-    resp = await _import_archive(client, a, buffer.getvalue(), a.initiative.id)
-    assert resp.status_code == 201, resp.text
-    result = resp.json()["result"]
-    assert "not_a_picture:note.png" in result["warnings"]
-    assert result["created"]["images"] == 0
-    assert get_guild_storage(a.guild.id).exists("note.png") is False
-
-
 async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
     client, acting_user, session
 ):
@@ -3791,9 +4221,11 @@ async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
                 archive.writestr(name, content)
         return buffer.getvalue()
 
-    queue = json.dumps({"type": "initiative-queue", "schema_version": 1, "name": "Q"})
+    group = json.dumps(
+        {"type": "initiative-counter-group", "schema_version": 1, "name": "Q"}
+    )
     wrong = await _import_archive(
-        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-gallery"
+        client, a, zipped(**{"q.json": group}), a.initiative.id, "initiative-wiki"
     )
     assert wrong.status_code == 400
     assert wrong.json()["detail"] == "IMPORT_WRONG_TOOL"
@@ -3825,7 +4257,7 @@ async def test_a_lone_envelope_resolves_what_it_carries(client, acting_user, ses
         session,
         a.project,
         title="Ship it",
-        description=f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id})",
+        description=f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id})",
         # What an edit of just this task kept back is placed the same way.
         recurrence_carry={"description": f"Once #task[Fix the bug]({fix.id})"},
     )
@@ -3853,7 +4285,7 @@ async def test_a_lone_envelope_resolves_what_it_carries(client, acting_user, ses
         }
 
     (here_fix, here), (there_fix, there) = descriptions
-    assert here == f"After #task[Fix the bug]({here_fix}), per #doc[Spec]({spec.id})"
+    assert here == f"After #task[Fix the bug]({here_fix}), per #file[Spec]({spec.id})"
     assert there == f"After #task[Fix the bug]({there_fix}), per Spec"
 
 
@@ -3912,7 +4344,7 @@ async def test_confirm_refuses_a_malformed_people_map(client, acting_user, sessi
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -3989,14 +4421,14 @@ async def test_backup_restores_property_definitions_in_full(
     )
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
-    from app.models.tenant.property import PropertyDefinition
+    from app.models.tenant.metadata import MetadataDefinition
 
     await route_session_to_guild(session, a.guild.id)
     definitions = {
         d.name: d
-        for d in await session.exec(select(PropertyDefinition))
+        for d in await session.exec(select(MetadataDefinition))
         if d.name == "Region"
     }
     region = definitions["Region"]
@@ -4044,7 +4476,7 @@ async def test_backup_restores_roles_and_places_members(
     )
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     from app.models.tenant.initiative import (
         Initiative,
@@ -4112,7 +4544,7 @@ async def test_backup_structure_never_overwrites_what_is_already_there(
     )
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     from app.models.tenant.initiative import InitiativeRoleModel
 
@@ -4293,7 +4725,9 @@ def _jira_site(
         if "/attachment/content/" in url and files:
             attachment_id = url.split("/attachment/content/")[1].split("?")[0]
             if attachment_id in files:
-                return httpx.Response(200, content=files[attachment_id])
+                return await answered(
+                    method, url, httpx.Response(200, content=files[attachment_id]), kw
+                )
         if url.endswith("/rest/api/3/field") and catalog is not None:
             return httpx.Response(200, json=catalog)
         if "/rest/agile/1.0/board/" in url and boards:
@@ -4335,7 +4769,7 @@ async def _job_secret(session, guild_id, job_id):
 
     session.expunge_all()
     await set_rls_context(session, SystemGuild(guild_id))
-    job = await session.get(ImportJob, job_id)
+    job = await session.get(DataJob, job_id)
     return None if job is None else job.secret_encrypted
 
 
@@ -4369,7 +4803,7 @@ async def test_a_jira_import_fetches_then_waits_for_review_then_applies(
     resp = await _start_jira(client, a, initiative_id=a.initiative.id)
     assert resp.status_code == 202, resp.text
     job = resp.json()
-    assert job["status"] == ImportJobStatus.queued.value
+    assert job["status"] == DataJobStatus.queued.value
     assert job["source"] == "atlassian"
     assert job["params"]["jira_projects"] == ["ACME"]
     assert job["params"]["site_url"] == "https://acme.atlassian.net"
@@ -4377,9 +4811,9 @@ async def test_a_jira_import_fetches_then_waits_for_review_then_applies(
 
     await _run_import_worker(monkeypatch, role_session)
     staged = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
+        await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)
     ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     plan = staged["plan"]
     assert plan["atlassian"]["projects"] == 1
     assert plan["atlassian"]["tasks"] == 2
@@ -4399,10 +4833,8 @@ async def test_a_jira_import_fetches_then_waits_for_review_then_applies(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["initiatives"][0]["initiative_id"] == a.initiative.id
 
     session.expunge_all()
@@ -4467,10 +4899,8 @@ async def test_a_jira_import_brings_its_links_across(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     assert staged["plan"]["atlassian"]["links"] == 2
     assert staged["plan"]["atlassian"]["links_outside_selection"] == 1
 
@@ -4478,8 +4908,8 @@ async def test_a_jira_import_brings_its_links_across(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["links_created"] == 2
     assert done["result"]["links_unresolved"] == 1
 
@@ -4513,7 +4943,7 @@ async def test_a_jira_import_brings_its_fields_as_properties(
     mapped to."""
     from sqlmodel import select
 
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.task import Task
     from app.services.import_engine import atlassian as atlassian_service
 
@@ -4529,10 +4959,8 @@ async def test_a_jira_import_brings_its_fields_as_properties(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     listed = {p["name"]: p for p in staged["plan"]["atlassian"]["properties"]}
     assert listed["Priority"] == {
         "name": "Priority",
@@ -4548,20 +4976,20 @@ async def test_a_jira_import_brings_its_fields_as_properties(
         json={"people_map": {"Robin": a.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
     rows = (
         await session.exec(
-            select(PropertyValue, PropertyDefinition)
+            select(MetadataValue, MetadataDefinition)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
             .where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -4637,10 +5065,8 @@ async def test_a_jira_sprint_becomes_an_event_its_tasks_are_related_to(
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["sprints"], summary["sprint_calendars"]) == (1, 1)
     assert summary["sprints_skipped"] is None
@@ -4649,8 +5075,8 @@ async def test_a_jira_sprint_becomes_an_event_its_tasks_are_related_to(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     calendar = (
@@ -4716,9 +5142,7 @@ async def test_sprints_are_left_behind_and_said_so_when_calendars_are_off(
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     summary = staged["plan"]["atlassian"]
     assert summary["sprints"] == 1
     assert summary["sprint_calendars"] == 0
@@ -4728,8 +5152,8 @@ async def test_sprints_are_left_behind_and_said_so_when_calendars_are_off(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["links_unresolved"] == 0
 
     session.expunge_all()
@@ -4788,10 +5212,8 @@ async def test_a_jira_import_brings_its_comments_to_whoever_wrote_them(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["comments"], summary["comments_restricted"]) == (2, 1)
     people = {p["handle"]: p["comment_count"] for p in staged["plan"]["people"]}
@@ -4803,8 +5225,8 @@ async def test_a_jira_import_brings_its_comments_to_whoever_wrote_them(
         json={"people_map": {"Robin": a.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
@@ -4831,7 +5253,7 @@ async def test_a_jira_import_brings_its_images_as_uploads(
 
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.task import Task
     from app.models.tenant.upload import Upload
     from app.services.import_engine import atlassian as atlassian_service
@@ -4839,7 +5261,7 @@ async def test_a_jira_import_brings_its_images_as_uploads(
     from app.services.tenant import relationships as relationships_service
     from app.services.tenant.relationships import Endpoint
 
-    png = b"\x89PNG\r\n\x1a\nfake-image"
+    png = _PNG
     pdf = b"%PDF-spec"
     issue = _jira_issue("ACME-1", "Fit the frame")
     issue["fields"]["attachment"] = [
@@ -4867,10 +5289,8 @@ async def test_a_jira_import_brings_its_images_as_uploads(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["images"], summary["files"], summary["other_attachments"]) == (
         1,
@@ -4884,8 +5304,8 @@ async def test_a_jira_import_brings_its_images_as_uploads(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["assets_restored"] == 2
 
     session.expunge_all()
@@ -4898,7 +5318,7 @@ async def test_a_jira_import_brings_its_images_as_uploads(
     assert blob is not None
 
     file = (
-        await session.exec(select(File).where(File.file_type == FileType.file))
+        await session.exec(select(File).where(File.current_version_id.is_not(None)))
     ).one()
     assert file.current_version.original_filename == "spec.pdf"
     assert await relationships_service.related_ids(
@@ -4916,7 +5336,7 @@ async def test_a_jira_file_stays_behind_when_the_initiative_has_no_files(
     whole import down with it."""
     from app.services.import_engine import atlassian as atlassian_service
 
-    png = b"\x89PNG\r\n\x1a\nfake-image"
+    png = _PNG
     issue = _jira_issue("ACME-1", "Fit the frame")
     issue["fields"]["attachment"] = [
         {
@@ -4941,10 +5361,8 @@ async def test_a_jira_file_stays_behind_when_the_initiative_has_no_files(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["images"], summary["files"], summary["other_attachments"]) == (
         1,
@@ -4961,7 +5379,7 @@ async def test_a_property_unticked_on_the_review_is_not_created(
     value for it. The rest arrive as usual."""
     from sqlmodel import select
 
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.task import Task
     from app.services.import_engine import atlassian as atlassian_service
 
@@ -4985,16 +5403,16 @@ async def test_a_property_unticked_on_the_review_is_not_created(
     assert confirmed.status_code == 200, confirmed.text
     assert confirmed.json()["params"]["exclude_properties"] == ["Priority"]
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     names = {
         d.name
         for d in (
             await session.exec(
-                select(PropertyDefinition).where(
-                    PropertyDefinition.initiative_id == a.initiative.id
+                select(MetadataDefinition).where(
+                    MetadataDefinition.initiative_id == a.initiative.id
                 )
             )
         ).all()
@@ -5007,13 +5425,13 @@ async def test_a_property_unticked_on_the_review_is_not_created(
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
     values = (
         await session.exec(
-            select(PropertyValue, PropertyDefinition)
+            select(MetadataValue, MetadataDefinition)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
             .where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -5040,8 +5458,8 @@ async def test_confirm_refuses_a_malformed_list_of_unticked_properties(
         a.user,
         source="atlassian",
         params={},
-        status=ImportJobStatus.staged,
-        payload_ref="imports/x.zip",
+        status=DataJobStatus.staged,
+        file_ref="imports/x.zip",
     )
 
     resp = await client.post(
@@ -5114,8 +5532,8 @@ async def test_a_site_that_refuses_every_project_fails_the_job_and_drops_the_tok
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_SOURCE_UNREACHABLE"
     await drain_notices()
     failed = [
@@ -5171,8 +5589,8 @@ async def test_cancelling_a_fetch_stops_it_at_the_next_project(
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.cancelled.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.cancelled.value
     assert not any("/project/BETA" in url for url in site.requested)
     assert await _job_secret(session, a.guild.id, job["id"]) is None
 
@@ -5401,7 +5819,8 @@ def _confluence_site(
                 302, headers={"location": f"https://media.example.com/{att_id}"}
             )
         if url.startswith("https://media.example.com/"):
-            return httpx.Response(200, content=blobs[url.rsplit("/", 1)[1]])
+            blob = blobs[url.rsplit("/", 1)[1]]
+            return await answered(method, url, httpx.Response(200, content=blob), kw)
         if "/wiki/api/v2/spaces?keys=" in url:
             return httpx.Response(
                 200,
@@ -5502,9 +5921,9 @@ async def test_a_confluence_space_becomes_a_wiki_with_its_tree_and_its_people(
 
     await _run_import_worker(monkeypatch, role_session)
     staged = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
+        await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)
     ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["spaces"], summary["pages"], summary["labels"]) == (1, 2, 1)
     assert {p["handle"] for p in staged["plan"]["people"]} == {"Robin Ade", "Sam Bee"}
@@ -5517,10 +5936,8 @@ async def test_a_confluence_space_becomes_a_wiki_with_its_tree_and_its_people(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Docs"))).one()
@@ -5543,7 +5960,13 @@ async def test_a_confluence_space_becomes_a_wiki_with_its_tree_and_its_people(
     assert by_type["mention"]["mentionUserId"] == b.user.id
 
 
-_PNG, _PDF = b"\x89PNG\r\n\x1a\nchart", b"%PDF-spec"
+_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDA"
+    b"Tx\xdac\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xf7\x03AC\x00\x00\x00"
+    b"\x00IEND\xaeB`\x82"
+)
+_PDF = b"%PDF-spec"
 
 
 def _attachment_site():
@@ -5598,7 +6021,7 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
 
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.services.import_engine import atlassian as atlassian_service
     from app.services.tenant import relationships as relationships_service
@@ -5613,10 +6036,8 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
         "id"
     ]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["page_images"], summary["page_files"]) == (1, 2)
     assert summary["page_attachment_bytes"] == 2 * len(png) + len(pdf)
@@ -5625,8 +6046,8 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["assets_restored"] == 3
 
     session.expunge_all()
@@ -5640,7 +6061,7 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
             await session.exec(
                 select(File).where(
                     File.initiative_id == a.initiative.id,
-                    File.file_type == FileType.file,
+                    File.current_version_id.is_not(None),
                 )
             )
         ).all()
@@ -5690,10 +6111,8 @@ async def test_an_initiative_without_files_takes_only_the_pictures(
         "id"
     ]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["page_images"], summary["page_files"]) == (1, 0)
     assert summary["page_files_blocked"] == 2
@@ -5702,8 +6121,8 @@ async def test_an_initiative_without_files_takes_only_the_pictures(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     session.expunge_all()
     assert (await session.exec(select(File))).all() == []
 
@@ -5759,10 +6178,8 @@ async def test_a_confluence_pages_comments_arrive_on_its_wiki_page(
         "id"
     ]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     assert staged["plan"]["atlassian"]["page_comments"] == 3
 
     # Robin is placed; Sam is left as a name.
@@ -5772,8 +6189,8 @@ async def test_a_confluence_pages_comments_arrive_on_its_wiki_page(
         json={"people_map": {"Robin Ade": b.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Docs"))).one()
@@ -5816,7 +6233,7 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     token."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.services.import_engine.confluence_export_test import export_bytes
     from app.services.tenant.wikis import file_parent
@@ -5831,10 +6248,8 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     job_id = resp.json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["spaces"], summary["pages"]) == (1, 4)
     assert (summary["page_images"], summary["page_files"]) == (1, 1)
@@ -5846,8 +6261,8 @@ async def test_a_confluence_html_export_becomes_a_wiki(
         json={"people_map": {"Robin Ade": b.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Team Docs"))).one()
@@ -5862,10 +6277,41 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     assert pages["Guide"].parent_page_id == pages["Home"].id
     assert pages["Home"].created_by == b.user.id
     file = (
-        await session.exec(select(File).where(File.file_type == FileType.file))
+        await session.exec(select(File).where(File.current_version_id.is_not(None)))
     ).one()
     assert file.current_version.original_filename == "spec.pdf"
     assert file_parent(wiki, file.id) == pages["Home"].id
+
+
+async def test_a_confluence_export_can_arrive_in_pieces(
+    client, acting_user, monkeypatch, role_session
+):
+    from app.services.import_engine.confluence_export_test import export_bytes
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    upload_id = await send_in_pieces(
+        client,
+        a,
+        export_bytes(),
+        purpose="atlassian_export",
+        filename="export.zip",
+        initiative_id=str(a.initiative.id),
+    )
+
+    resp = await client.post(
+        a.g("/imports/atlassian/export"),
+        headers=a.headers,
+        data={"initiative_id": str(a.initiative.id), "upload_id": upload_id},
+    )
+
+    assert resp.status_code == 202, resp.text
+    await _run_import_worker(monkeypatch, role_session)
+    staged = (
+        await client.get(a.g(f"/data-jobs/{resp.json()['id']}"), headers=a.headers)
+    ).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
+    assert staged["plan"]["atlassian"]["pages"] == 4
 
 
 async def test_an_upload_that_is_not_an_export_is_refused_up_front(client, acting_user):
@@ -5958,8 +6404,8 @@ async def test_a_confluence_page_points_its_jira_issues_at_the_tasks_they_became
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Docs"))).one()
@@ -6088,10 +6534,8 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
     assert resp.status_code == 202, resp.text
     job_id = resp.json()["id"]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["projects"], summary["tasks"]) == (1, 1)
     assert (summary["spaces"], summary["pages"]) == (1, 1)
@@ -6105,8 +6549,8 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     task = (
@@ -6150,7 +6594,7 @@ async def test_an_apply_touches_its_row_as_it_goes(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -6158,24 +6602,24 @@ async def test_an_apply_touches_its_row_as_it_goes(
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
 
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert beats
 
 
 # --- running imports side by side -------------------------------------------
 
 
-_QUEUE_ENVELOPE = {
-    "type": "initiative-queue",
+_COUNTER_GROUP_ENVELOPE = {
+    "type": "initiative-counter-group",
     "schema_version": 1,
     "name": "Side by side",
-    "items": [{"label": "Aria", "position": 1.0}],
+    "counters": [{"name": "Aria", "position": 1.0}],
 }
 
 
 async def _queued(client, actor) -> int:
     response = await _import_envelope(
-        client, actor, _QUEUE_ENVELOPE, actor.initiative.id
+        client, actor, _COUNTER_GROUP_ENVELOPE, actor.initiative.id
     )
     assert response.status_code == 202, response.text
     return response.json()["id"]
@@ -6183,7 +6627,7 @@ async def _queued(client, actor) -> int:
 
 async def _status(client, actor, job_id) -> str:
     job = (
-        await client.get(actor.g(f"/imports/jobs/{job_id}"), headers=actor.headers)
+        await client.get(actor.g(f"/data-jobs/{job_id}"), headers=actor.headers)
     ).json()
     return job["status"]
 
@@ -6216,8 +6660,8 @@ async def test_two_communities_import_side_by_side(
 
     assert len(started) == 2
     await asyncio.gather(*started)
-    assert await _status(client, a, first) == ImportJobStatus.done.value
-    assert await _status(client, b, second) == ImportJobStatus.done.value
+    assert await _status(client, a, first) == DataJobStatus.done.value
+    assert await _status(client, b, second) == DataJobStatus.done.value
 
 
 async def test_a_community_runs_one_import_at_a_time(
@@ -6236,11 +6680,11 @@ async def test_a_community_runs_one_import_at_a_time(
 
     assert len(started) == 1
     await asyncio.gather(*started)
-    assert await _status(client, a, first) == ImportJobStatus.done.value
-    assert await _status(client, a, second) == ImportJobStatus.queued.value
+    assert await _status(client, a, first) == DataJobStatus.done.value
+    assert await _status(client, a, second) == DataJobStatus.queued.value
 
     await import_worker.process_import_jobs()
-    assert await _status(client, a, second) == ImportJobStatus.done.value
+    assert await _status(client, a, second) == DataJobStatus.done.value
 
 
 async def test_a_process_starts_no_more_than_its_slots(
@@ -6283,10 +6727,10 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
         session,
         a.guild,
         a.user,
-        source="initiative-queue",
+        source="initiative-counter-group",
         params={"initiative_id": a.initiative.id},
-        payload_ref="imports/elsewhere.json",
-        status=ImportJobStatus.running,
+        file_ref="imports/elsewhere.json",
+        status=DataJobStatus.running,
         created_at=stale_time,
         updated_at=stale_time,
     )
@@ -6301,4 +6745,4 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
         alive.cancel()
 
     await session.refresh(job)
-    assert job.status == ImportJobStatus.running
+    assert job.status == DataJobStatus.running

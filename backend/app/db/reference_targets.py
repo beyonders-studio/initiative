@@ -26,18 +26,22 @@ from sqlalchemy import Select, Table, case, func, literal, null, select, text
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlmodel import SQLModel
 
+from app.core import usernames
 from app.core.references import NOT_REFERENCEABLE
+from app.core.relationships import PERSON, EndpointKind
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
+from app.core.user_display import display_name
 from app.db.blocking import open_expr
 from app.db.initiative_rls import INITIATIVE_PATHS
 from app.db.search_index import SEARCH_SOURCES
 from app.db.authorization import standing_arg
+from app.models.platform.user_profile_view import MemberProfile
 
 
 def _table_for(entity_type: SearchEntityType) -> str:
     for table, source in SEARCH_SOURCES.items():
-        if source.entity_type is entity_type:
+        if source.entity_type == entity_type:
             return table
     raise KeyError(entity_type)
 
@@ -68,29 +72,6 @@ def id_column(entity_type: SearchEntityType):
 
 
 @dataclass(frozen=True)
-class Preview:
-    """Pictures that live on another table — a gallery's are its own images.
-
-    The chosen one stands alone; with none chosen, the newest few stand in for
-    it. That is what a gallery shows of itself everywhere else, and a gallery
-    nobody has picked a cover for is the usual kind.
-    """
-
-    #: The table the pictures are on.
-    table: str
-    #: Column there pointing back at this row.
-    parent_fk: str
-    #: Column here naming the one picture somebody chose, if any.
-    chosen_fk: str
-    #: Columns on a picture, coalesced in preference order.
-    columns: tuple[str, ...]
-    #: Column deciding which are newest.
-    newest_by: str
-    #: How many stand in when none was chosen.
-    limit: int = 4
-
-
-@dataclass(frozen=True)
 class Visual:
     """What a kind shows of itself besides its name.
 
@@ -99,17 +80,14 @@ class Visual:
     which is the honest answer for a thing with no look of its own rather than a
     blank where a picture would go.
 
-    ``image`` names columns coalesced in preference order, because a gallery
-    thumbnail is absent whenever the source was already small enough not to need
-    one — so the full picture is the fallback, decided here rather than by every
-    surface that draws one.
+    ``image`` names columns coalesced in preference order, so a fallback is
+    decided here rather than by every surface that draws one.
 
     A column named ``pointer.column`` is read from the row the foreign key
     ``pointer`` names: a file's facts live on its current version.
     """
 
     image: tuple[str, ...] = ()
-    preview: Preview | None = None
     icon: str | None = None
     color: str | None = None
     #: Columns saying what SORT of thing this is within its kind, for a kind
@@ -129,9 +107,6 @@ class Visual:
 
 #: Keyed by table, the way :data:`~app.db.search_index.SEARCH_SOURCES` is. A
 #: table with no entry has no look of its own, which is most of them.
-#: A picture's file and its thumbnail, read from the version it shows.
-_PICTURE = ("current_version_id.thumbnail_url", "current_version_id.file_url")
-
 VISUALS: dict[str, Visual] = {
     "files": Visual(
         image=("featured_image_url",),
@@ -140,20 +115,9 @@ VISUALS: dict[str, Visual] = {
         filename="current_version_id.original_filename",
         link_in_json=("content", "url"),
     ),
-    "gallery_images": Visual(image=_PICTURE),
-    "galleries": Visual(
-        preview=Preview(
-            table="gallery_images",
-            parent_fk="gallery_id",
-            chosen_fk="cover_image_id",
-            columns=_PICTURE,
-            newest_by="created_at",
-        )
-    ),
     "projects": Visual(icon="icon"),
     "calendars": Visual(color="color"),
     "counters": Visual(color="color"),
-    "queue_items": Visual(color="color"),
     "tags": Visual(color="color"),
 }
 
@@ -170,8 +134,10 @@ def visible_ids(
 
     Joins the row to the resource that governs it — its own, or its parent's —
     and asks ``resource_access``, the same function the tables' own RLS
-    policies call. A kind with no sharing of its own (the guild's tags) is
-    reachable by anyone who reached the schema, which is the whole gate for it.
+    policies call. A kind with no sharing of its own (the guild's tags, a
+    collection) is read as its own policies read it, and changed as the edge
+    policies ask: through ``entity_access``, which holds a collection to its
+    file makers.
 
     ``need_write`` asks the same question at edit level. It is the caller's to
     say, because reaching a thing and changing it are different questions and
@@ -187,7 +153,13 @@ def visible_ids(
         statement = statement.where(live)
 
     if source.dac_tool is None:
-        return statement
+        if not need_write:
+            return statement
+        return statement.where(
+            func.entity_access(
+                entity_type.value, table.c["id"], True, True, standing_arg()
+            )
+        )
 
     resource = SQLModel.metadata.tables[source.dac_tool.plural]
     if resource is table:
@@ -283,44 +255,6 @@ def _column(table: Table, name: str):
     )
 
 
-def _urls_of(picked, column: str):
-    """The URLs a subquery selected, as one array. NULL when it picked none."""
-    rows = picked.subquery()
-    return select(func.array_agg(rows.c[column])).scalar_subquery()
-
-
-def _preview_expr(table: Table, preview: Preview):
-    """The pictures a row shows of itself, as an array of URLs.
-
-    One when somebody chose it, the newest few when nobody did. Ordering and
-    limiting happen in the database rather than over a page of rows here,
-    because this runs once per kind for a whole page of edges.
-    """
-    other = SQLModel.metadata.tables[preview.table]
-    url = _coalesced([_column(other, name) for name in preview.columns]).label("url")
-    live = _live(other)
-
-    chosen = select(url).where(other.c["id"] == table.c[preview.chosen_fk])
-    newest = (
-        select(url)
-        .where(other.c[preview.parent_fk] == table.c["id"])
-        .order_by(other.c[preview.newest_by].desc())
-        .limit(preview.limit)
-    )
-    if live is not None:
-        # A picture in the trash is not one to draw.
-        chosen = chosen.where(live)
-        newest = newest.where(live)
-
-    return case(
-        (
-            table.c[preview.chosen_fk].isnot(None),
-            _urls_of(chosen, "url"),
-        ),
-        else_=_urls_of(newest, "url"),
-    )
-
-
 def _visual_exprs(table_name: str, table: Table):
     """How one kind draws, as select expressions: the picture, the emoji, the
     colour, and the four facts that pick an icon for a kind that has no fixed
@@ -335,8 +269,6 @@ def _visual_exprs(table_name: str, table: Table):
         # A row with no picture reports no pictures, not one that is null.
         one = _coalesced([_column(table, name) for name in visual.image])
         images = case((one.isnot(None), pg_array([one])), else_=null())
-    elif visual.preview is not None:
-        images = _preview_expr(table, visual.preview)
     else:
         images = null()
 
@@ -390,7 +322,7 @@ def _container_title(table_name: str, table: Table, tool: Tool | None):
 class Resolved:
     """What a reference turned out to name."""
 
-    entity_type: SearchEntityType
+    entity_type: EndpointKind
     id: int
     title: str | None
     #: The initiative the row belongs to. None means one of two different
@@ -420,8 +352,7 @@ class Resolved:
     #: a row that is a tool itself.
     tool_title: str | None = None
     #: What the row shows of itself beside its name — see :class:`Visual`. At
-    #: most one of the three is set, and most kinds set none. A picture is a
-    #: list because a gallery shows several when nobody picked one.
+    #: most one of the three is set, and most kinds set none.
     image_urls: list[str] = field(default_factory=list)
     icon: str | None = None
     color: str | None = None
@@ -431,14 +362,20 @@ class Resolved:
     mime_type: str | None = None
     original_filename: str | None = None
     smart_link_url: str | None = None
+    #: A person's handle as their profile is addressed by. Only a person
+    #: reports one.
+    handle: str | None = None
     #: Whether this row is still outstanding — still capable of holding
     #: something else up. None for a kind that never finishes, which is most of
     #: them; see :mod:`app.db.blocking`.
     is_open: bool | None = None
+    #: When it starts, for a kind that happens at a time: an event. None for
+    #: every other kind.
+    starts_at: datetime | None = None
 
 
 async def resolve_many(
-    session, entity_type: SearchEntityType, ids: Sequence[int], *, user_id: int | None
+    session, entity_type: EndpointKind, ids: Sequence[int], *, user_id: int | None
 ) -> dict[int, Resolved]:
     """The rows of one kind this reader may open, keyed by id.
 
@@ -446,10 +383,34 @@ async def resolve_many(
     ``INITIATIVE_PATHS`` entry that renders the kind's RLS, so a surface asking
     "are these two in one initiative" and the policy deciding who may read them
     are working from one declaration rather than two.
+
+    A person is read as the community shows them, by name, avatar and handle,
+    whoever they are to it now: a link outlives a membership, as a comment by
+    them does. They belong to no initiative and are never archived.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
     if not wanted:
         return {}
+
+    if entity_type == PERSON.value:
+        people = await session.exec(
+            select(MemberProfile).where(MemberProfile.id.in_(wanted))
+        )
+        return {
+            person.id: Resolved(
+                entity_type=entity_type,
+                id=person.id,
+                title=display_name(person),
+                initiative_id=None,
+                scoped_kind=False,
+                archived=False,
+                image_urls=[person.avatar_url] if person.avatar_url else [],
+                # ``/u/jordan1234``: the name and its four digits run together.
+                handle=f"{person.username}"
+                f"{person.discriminator:0{usernames.DISCRIMINATOR_DIGITS}d}",
+            )
+            for person in people.scalars().all()
+        }
 
     table_name = _table_for(entity_type)
     table = SQLModel.metadata.tables[table_name]
@@ -461,6 +422,7 @@ async def resolve_many(
         else literal(False)
     )
     updated = table.c["updated_at"] if "updated_at" in table.c else null()
+    starts = table.c["start_at"] if "start_at" in table.c else null()
     images, icon, color, doc_type, mime, filename, link_url = _visual_exprs(
         table_name, table
     )
@@ -484,6 +446,7 @@ async def resolve_many(
         link_url,
         tool_title,
         is_open,
+        starts,
     ).select_from(table)
     if container is not None:
         # Left: a container this reader cannot see leaves the name blank rather
@@ -515,13 +478,14 @@ async def resolve_many(
             smart_link_url=row[12],
             tool_title=row[13],
             is_open=None if row[14] is None else bool(row[14]),
+            starts_at=row[15],
         )
         for row in rows.all()
     }
 
 
 async def resolve_one(
-    session, entity_type: SearchEntityType, entity_id: int, *, user_id: int | None
+    session, entity_type: EndpointKind, entity_id: int, *, user_id: int | None
 ) -> Resolved | None:
     """:func:`resolve_many` for one id."""
     found = await resolve_many(session, entity_type, [entity_id], user_id=user_id)

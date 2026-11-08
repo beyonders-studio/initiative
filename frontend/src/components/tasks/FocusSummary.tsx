@@ -4,22 +4,22 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskStatusCategory } from "@/api/generated/initiativeAPI.schemas";
 import { DateCell } from "@/components/tasks/TaskDateCell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { FOCUS_HORIZON_ANY, FOCUS_PRIORITIES, type useFocusSummary } from "@/hooks/useFocusSummary";
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Progress } from "@/ui/progress";
+import { Separator } from "@/ui/separator";
+import { Slider } from "@/ui/slider";
+import { TooltipProvider } from "@/ui/tooltip";
 
 type FocusSummaryData = ReturnType<typeof useFocusSummary>;
 
@@ -89,7 +89,7 @@ const FocusRow = ({
           to={taskHref(task, activeCommunityId)}
           className={cn(
             "block truncate font-medium text-sm hover:underline",
-            done && "text-muted-foreground line-through"
+            done && "text-muted-foreground"
           )}
         >
           {task.title}

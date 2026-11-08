@@ -1,0 +1,128 @@
+{
+  "loading": "Wird geladen…",
+  "loadMore": "Mehr anzeigen",
+  "clear": "Leeren",
+  "next": "Weiter",
+  "previous": "Zurück",
+  "selectAll": "Alle auswählen",
+  "combobox": {
+    "placeholder": "Option auswählen",
+    "search": "Suchen",
+    "noResults": "Keine Ergebnisse gefunden"
+  },
+  "copy": {
+    "label": "Kopieren",
+    "copied": "Kopiert!",
+    "unavailable": "Kopieren nicht möglich — bitte manuell kopieren"
+  },
+  "dateRange": {
+    "any": "Beliebiges Datum",
+    "fromOnly": "Ab {{date}}",
+    "untilOnly": "Bis {{date}}",
+    "thisMonth": "Dieser Monat",
+    "lastMonth": "Letzter Monat",
+    "thisQuarter": "Dieses Quartal",
+    "thisYear": "Dieses Jahr",
+    "fromLabel": "Von",
+    "untilLabel": "Bis",
+    "open": "Offen",
+    "fromRemove": "Startdatum entfernen",
+    "untilRemove": "Enddatum entfernen",
+    "clear": "Daten löschen"
+  },
+  "datePicker": {
+    "pickDate": "Datum auswählen",
+    "pickDateTime": "Datum und Uhrzeit auswählen",
+    "typeDate": "Datum eingeben oder auswählen",
+    "time": "Uhrzeit",
+    "invalidDate": "Geben Sie ein gültiges Kalenderdatum ein.",
+    "invalidLocalDateTime": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein. Wählen Sie bei einer Zeitumstellung eine Uhrzeit außerhalb des übersprungenen oder wiederholten Zeitraums."
+  },
+  "emojiPicker": {
+    "pick": "Emoji auswählen",
+    "searchPlaceholder": "Emoji suchen…",
+    "empty": "Keine Emojis gefunden.",
+    "prompt": "Emoji auswählen…"
+  },
+  "fileDrop": {
+    "release": "Hier ablegen",
+    "unsupported": "Diese Art von Datei kann hier nicht hochgeladen werden."
+  },
+  "imagePicker": {
+    "chooseImage": "Bild auswählen",
+    "takePhoto": "Foto aufnehmen",
+    "chooseFromLibrary": "Aus der Galerie wählen",
+    "chooseFile": "Datei auswählen",
+    "permission": "Initiative braucht Zugriff auf Kamera und Fotos. Erlaube ihn in den Geräteeinstellungen und versuche es erneut.",
+    "unavailable": "Dieses Gerät hat keine Kamera für ein Foto.",
+    "failed": "Dieses Foto konnte nicht gelesen werden. Versuche es erneut."
+  },
+  "lightbox": {
+    "title": "Bild",
+    "description": "Mit den Pfeiltasten oder durch Wischen zwischen Bildern wechseln.",
+    "position": "{{current}} / {{total}}",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "close": "Schließen"
+  },
+  "multiSelect": {
+    "empty": "Keine Optionen verfügbar",
+    "allSelected": "Alle ausgewählt",
+    "countSelected": "{{count}} ausgewählt",
+    "clearAll": "Alle leeren"
+  },
+  "pagination": {
+    "perPage": "Pro Seite:",
+    "rangeOf": "{{start}}–{{end}} von {{total}}"
+  },
+  "pullToRefresh": {
+    "pull": "Zum Aktualisieren ziehen",
+    "release": "Zum Aktualisieren loslassen",
+    "refreshing": "Wird aktualisiert…"
+  },
+  "rowActions": {
+    "label": "Aktionen",
+    "labelFor": "Aktionen für {{subject}}"
+  },
+  "table": {
+    "select": "Auswählen",
+    "exitSelection": "Auswahl beenden",
+    "enableSelectionMode": "Auswahlmodus aktivieren",
+    "exitSelectionMode": "Auswahlmodus beenden",
+    "resetSorting": "Sortierung zurücksetzen",
+    "groupBy": "Gruppieren nach",
+    "chooseGrouping": "Gruppierung wählen",
+    "none": "Keine",
+    "columns": "Spalten",
+    "options": "Tabellenoptionen",
+    "selectRow": "Zeile auswählen",
+    "rowsSelected": "{{selected}} von {{total}} Zeile(n) ausgewählt",
+    "rowsSelectedFiltered": "{{selected}} ausgewählt ({{total}} entsprechen dem Filter)",
+    "noResults": "Keine Ergebnisse.",
+    "filter": "Filtern…"
+  },
+  "wizard": {
+    "stepOf": "Schritt {{current}} von {{total}}"
+  },
+  "cancel": "Abbrechen",
+  "close": "Schließen",
+  "breadcrumb": "Brotkrumennavigation",
+  "confirm": {
+    "continue": "Weiter",
+    "working": "Bitte warten…"
+  },
+  "carousel": {
+    "previous": "Vorherige Folie",
+    "next": "Nächste Folie"
+  },
+  "colorPicker": {
+    "pick": "Farbe auswählen",
+    "mode": "Modus"
+  },
+  "iconPicker": {
+    "search": "Nach einem Symbol suchen…",
+    "placeholder": "Symbol auswählen",
+    "empty": "Kein Symbol gefunden",
+    "other": "Sonstiges"
+  }
+}

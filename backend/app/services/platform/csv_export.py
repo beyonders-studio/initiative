@@ -26,6 +26,14 @@ def neutralize_cell(value: object) -> object:
     return value
 
 
+def restore_cell(text: str) -> str:
+    """The text a cell held before :func:`neutralize_cell` prefixed it, so a
+    phone number written ``+44 …`` reads back as it was."""
+    if text.startswith("'") and text[1:].startswith(_FORMULA_TRIGGERS):
+        return text[1:]
+    return text
+
+
 def build_csv(headers: Sequence[str], rows: Iterable[Sequence[object]]) -> bytes:
     """Serialize rows to a UTF-8 encoded CSV byte string with a BOM prefix.
 

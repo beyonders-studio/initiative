@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next";
 
 import { acceptLegalDocuments } from "@/api/generated/users/users";
 import { LegalDocumentLinks } from "@/components/auth/LegalNotice";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * The screen an account meets when it has never agreed to this deployment's
@@ -42,7 +42,7 @@ export const AcceptTerms = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t("legal:accept.title")}</CardTitle>

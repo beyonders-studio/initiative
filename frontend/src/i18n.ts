@@ -45,8 +45,10 @@ void i18n
     // toast call sites in components whose own ``useTranslation`` may
     // not list ``errors``. Without this, a lookup on a backend code
     // like ``USER_INVALID_PASSWORD`` falls back to the raw key string
-    // because the namespace bundle hasn't been fetched yet.
-    ns: ["common", "errors"],
+    // because the namespace bundle hasn't been fetched yet. ``ui`` is
+    // preloaded because the UI kit's skeletons are Suspense fallbacks, which
+    // must render without waiting on a namespace of their own.
+    ns: ["common", "errors", "ui"],
     partialBundledLanguages: true,
     interpolation: {
       escapeValue: false,

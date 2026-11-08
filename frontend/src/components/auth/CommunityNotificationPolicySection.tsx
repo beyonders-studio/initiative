@@ -16,16 +16,16 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityAuthSettingsUpdate } from "@/api/generated/initiativeAPI.schemas";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useCommunityAuthSettings,
   useUpdateCommunityAuthSettings,
 } from "@/hooks/useCommunityAuthPolicy";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 export const CommunityNotificationPolicySection = ({ communityId }: { communityId: number }) => {
   const { t } = useTranslation("settings");
@@ -35,6 +35,10 @@ export const CommunityNotificationPolicySection = ({ communityId }: { communityI
 
   const saved = query.data;
   if (!saved) return null;
+
+  // What whoever runs the server sets for this community is shown, not offered.
+  const fixed = (key: string) => saved.set_by_deployment.includes(key);
+  const fixedHelp = t("communityAuth.setByDeployment");
 
   // Each switch saves as it is flipped, sending only its own answer.
   const flip = (patch: CommunityAuthSettingsUpdate) => {
@@ -57,11 +61,13 @@ export const CommunityNotificationPolicySection = ({ communityId }: { communityI
       // the line says that rather than describing a choice nobody has.
       help: !saved.push_allowed_by_platform
         ? t("communityNotifications.push.platformHelp")
-        : saved.allow_push_notifications
-          ? t("communityNotifications.push.onHelp")
-          : t("communityNotifications.push.offHelp"),
+        : fixed("allow_push_notifications")
+          ? fixedHelp
+          : saved.allow_push_notifications
+            ? t("communityNotifications.push.onHelp")
+            : t("communityNotifications.push.offHelp"),
       checked: saved.allow_push_notifications && saved.push_allowed_by_platform,
-      settled: !saved.push_allowed_by_platform,
+      settled: !saved.push_allowed_by_platform || fixed("allow_push_notifications"),
       change: (next: boolean) => flip({ allow_push_notifications: next }),
     },
     {
@@ -69,11 +75,13 @@ export const CommunityNotificationPolicySection = ({ communityId }: { communityI
       label: t("communityNotifications.email.label"),
       help: !saved.email_allowed_by_platform
         ? t("communityNotifications.email.platformHelp")
-        : saved.allow_email_notifications
-          ? t("communityNotifications.email.onHelp")
-          : t("communityNotifications.email.offHelp"),
+        : fixed("allow_email_notifications")
+          ? fixedHelp
+          : saved.allow_email_notifications
+            ? t("communityNotifications.email.onHelp")
+            : t("communityNotifications.email.offHelp"),
       checked: saved.allow_email_notifications && saved.email_allowed_by_platform,
-      settled: !saved.email_allowed_by_platform,
+      settled: !saved.email_allowed_by_platform || fixed("allow_email_notifications"),
       change: (next: boolean) => flip({ allow_email_notifications: next }),
     },
     {
@@ -81,11 +89,13 @@ export const CommunityNotificationPolicySection = ({ communityId }: { communityI
       label: t("communityNotifications.redact.label"),
       help: saved.redacted_by_platform
         ? t("communityNotifications.redact.platformHelp")
-        : saved.redact_notification_content
-          ? t("communityNotifications.redact.onHelp")
-          : t("communityNotifications.redact.offHelp"),
+        : fixed("redact_notification_content")
+          ? fixedHelp
+          : saved.redact_notification_content
+            ? t("communityNotifications.redact.onHelp")
+            : t("communityNotifications.redact.offHelp"),
       checked: saved.redact_notification_content || saved.redacted_by_platform,
-      settled: saved.redacted_by_platform,
+      settled: saved.redacted_by_platform || fixed("redact_notification_content"),
       change: (next: boolean) => flip({ redact_notification_content: next }),
     },
   ];

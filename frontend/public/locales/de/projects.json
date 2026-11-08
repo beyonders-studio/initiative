@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Aufgabenstatus",
-    "tabTaskTypes": "Aufgabentypen"
+    "tabTaskTypes": "Aufgabentypen",
+    "tabProperties": "Eigenschaften"
   },
   "files": {
     "newFile": "Neue Datei"
@@ -252,7 +253,20 @@
     "ganttSchedule": "Ziehe über die Tage, um der Aufgabe Daten zu geben",
     "ganttFold": "Teile von {{title}} ausblenden",
     "ganttUnfold": "Teile von {{title}} einblenden",
-    "ganttLink": "Zur Aufgabe ziehen, die auf diese wartet",
+    "ganttLink": "Auf eine andere Aufgabe ziehen, um beide zu verknüpfen",
+    "ganttOutside": "Verknüpft aus anderen Projekten",
+    "ganttLinkQuestion": "Wie hängt „{{task}}“ mit „{{other}}“ zusammen?",
+    "ganttBlockedBy": "Davon blockiert",
+    "ganttBlockedByHint": "Kann erst beginnen, wenn diese Aufgabe erledigt ist",
+    "ganttPartOf": "Teil davon",
+    "ganttPartOfHint": "Wird ein Teil dieser Aufgabe",
+    "ganttRemoveLink": "Verknüpfung entfernen: {{task}} wartet auf {{other}}",
+    "ganttCriticalPath": "Kritischer Pfad",
+    "ganttChainTitle": "Auch verschieben, was darauf wartet?",
+    "ganttChain_one": "{{count}} Aufgabe wartet auf „{{title}}“. Um genauso viele Tage nach hinten verschieben?",
+    "ganttChain_other": "{{count}} Aufgaben warten auf „{{title}}“. Um genauso viele Tage nach hinten verschieben?",
+    "ganttChainMove": "Mitverschieben",
+    "ganttChainKeep": "Nur diese",
     "ganttKeys": "Pfeil hoch und runter wechseln zwischen Aufgaben, rechts und links klappen die Teile einer Aufgabe auf und zu, und Enter öffnet eine Aufgabe.",
     "ganttKeysMove": "Pfeil hoch und runter wechseln zwischen Aufgaben, rechts und links klappen die Teile einer Aufgabe auf und zu, und Enter öffnet eine Aufgabe. Alt mit links oder rechts verschiebt eine Aufgabe um einen Tag, mit zusätzlich Umschalt nur ihr Fälligkeitsdatum.",
     "archiveDoneTasks": "Erledigte Aufgaben archivieren",
@@ -282,6 +296,7 @@
     "markDone": "Aufgabe als erledigt markieren",
     "taskColumn": "Aufgabe",
     "untagged": "Ohne Tag",
+    "noParent": "Nicht Teil einer Aufgabe",
     "noValue": "Ohne {{name}}",
     "checked": "{{name}}: ja",
     "unchecked": "{{name}}: nein",
@@ -314,6 +329,8 @@
       "dueDate": "Fälligkeitsdatum",
       "recurrence": "Wiederholung",
       "checklist": "Checkliste",
+      "subtasks": "Unteraufgaben",
+      "parent": "Teil von",
       "priority": "Priorität",
       "comments": "Kommentare",
       "blockers": "Blocker",
@@ -404,5 +421,14 @@
     "unassigned": "Du bist nicht mehr bei dieser Aufgabe",
     "assignError": "Die Zuständigen dieser Aufgabe konnten nicht geändert werden.",
     "moveTo": "Verschieben nach"
+  },
+  "properties": {
+    "description": "Was die Aufgaben dieses Projekts neben den Metadaten der Initiative tragen können. Eine Aufgabe, die in ein anderes Projekt verschoben wird, behält einen Wert nur, wenn dieses Projekt eine Eigenschaft mit demselben Namen und Typ hat.",
+    "create": "Neue Eigenschaft",
+    "edit": "Eigenschaft bearbeiten",
+    "delete": "Eigenschaft löschen",
+    "deleteTitle": "Diese Eigenschaft löschen?",
+    "deleteBody": "Damit werden die Eigenschaft und die Werte aller Aufgaben dafür in diesem Projekt entfernt.",
+    "none": "Noch keine Eigenschaften"
   }
 }

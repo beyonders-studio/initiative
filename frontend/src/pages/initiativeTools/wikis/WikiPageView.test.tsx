@@ -14,8 +14,8 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
+import { TooltipProvider } from "@/ui/tooltip";
 
 vi.mock("@/hooks/useCollaboration", () => ({
   useCollaboration: () => ({
@@ -37,7 +37,7 @@ const editedBody = { root: { children: [{ type: "text", text: "just typed" }] } 
 // Stands in for Lexical, exposing the two things these tests drive: a body
 // edit, reported back the way the real editor reports one, and — as the real
 // one does — the state it was BUILT with, read once and never again.
-vi.mock("@/components/ui/editor/editor", () => ({
+vi.mock("@/components/editor/editor", () => ({
   Editor: ({
     onSerializedChange,
     editorSerializedState,

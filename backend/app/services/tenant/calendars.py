@@ -12,8 +12,6 @@ any initiative and reaching into none. Its ``initiative_id`` is NULL, so
 anything derived from an initiative has nothing to derive from and refuses.
 """
 
-from typing import Any, Sequence
-
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -24,9 +22,7 @@ from app.models.tenant.calendar_event import (
     CalendarEvent,
     CalendarEventAttendee,
 )
-from app.services import permissions as permissions_service
-from app.services.tenant import ownership as ownership_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.tool_listing import initiative_switch_clause
 
@@ -64,10 +60,10 @@ async def get_calendar(
     calendar = result.one_or_none()
     if calendar is not None:
         await tags_service.annotate_tags(session, [calendar])
-        await properties_service.annotate_properties(session, [calendar])
+        await metadata_service.annotate_properties(session, [calendar])
         if with_events:
             await tags_service.annotate_tags(session, calendar.events or [])
-            await properties_service.annotate_properties(session, calendar.events or [])
+            await metadata_service.annotate_properties(session, calendar.events or [])
     return calendar
 
 
@@ -109,34 +105,3 @@ async def list_calendar_ids_for_export(
         .order_by(Calendar.name.asc(), Calendar.id.asc())
     )
     return list(await session.exec(statement))
-
-
-async def give_to_install(
-    session: AsyncSession,
-    calendar: Calendar,
-    *,
-    install_id: int,
-    guild_id: int,
-    grants: Sequence[Any],
-    actor_user_id: int | None = None,
-) -> None:
-    """Make a guild calendar the install's, shared by ``grants``. Uninstalling
-    trashes what the install owns; the owner grant names the install row, so
-    an uninstall holding that row finishes first and this write fails. At
-    guild scope an everyone grant reads as every member of the guild."""
-    await ownership_service.set_resource_owner(
-        session,
-        tool=Tool.calendar,
-        row=calendar,
-        new_owner=ownership_service.Owner(plugin_install_id=install_id),
-    )
-    await permissions_service.replace_resource_grants(
-        session,
-        resource_type=Tool.calendar.value,
-        resource_id=calendar.id,
-        guild_id=guild_id,
-        initiative_id=None,
-        owner_id=None,
-        grants=grants,
-        actor_user_id=actor_user_id,
-    )

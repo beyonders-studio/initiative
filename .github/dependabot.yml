@@ -47,8 +47,9 @@ updates:
         patterns:
           - "@testing-library/*"
       # The browser MCP server (.mcp.json) runs the Chromium @playwright/test
-      # installs, so it must be built on the same Playwright minor; a test in
-      # frontend/src/__tests__/playwrightMcp.test.ts fails when they part.
+      # installs: an override in frontend/pnpm-workspace.yaml keeps
+      # @playwright/mcp on @playwright/test's Playwright, and
+      # frontend/src/__tests__/playwrightMcp.test.ts fails if the two part.
       playwright:
         patterns:
           - "@playwright/*"

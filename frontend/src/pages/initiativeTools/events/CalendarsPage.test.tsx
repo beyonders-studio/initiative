@@ -17,8 +17,9 @@ import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
 import { keepViewPreferences } from "@/__tests__/helpers/viewPreferences";
 import type { FilterCondition, FilterGroup } from "@/api/generated/initiativeAPI.schemas";
 import { CALENDAR_VIEW_MODE_KEY } from "@/components/calendar";
-import { dateRangeParams } from "@/components/ui/date-range-field";
+import { dateRangeParams } from "@/components/calendar/visibleRange";
 import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
+import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
 
 import { CalendarsView } from "./CalendarsPage";
 
@@ -35,16 +36,25 @@ const inFocusMonth = (dayOffset: number) => {
   return d.toISOString();
 };
 
+/** A query client holding the reader's views, as the app has them on opening
+ *  a page: the calendar `mode` an older release kept on the account, and what
+ *  community 1 keeps. */
+const withViews = (mode: string, community: Record<string, unknown> = {}) => {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
+    items: { [CALENDAR_VIEW_MODE_KEY]: mode },
+  });
+  queryClient.setQueryData(viewPreferencesQueryKey(1), { items: { ...community } });
+  return queryClient;
+};
+
 /**
  * Render the calendar in list view — the list renders a row per entry, so a
  * task either appears or it doesn't. The month grid collapses a busy day into
  * "+N more", which would hide the very thing these tests check for.
  */
 function renderCalendars() {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-    items: { [CALENDAR_VIEW_MODE_KEY]: "list" },
-  });
+  const queryClient = withViews("list");
   const Page = () => <CalendarsView fixedInitiativeId={INITIATIVE_ID} canCreate={false} />;
   return renderPage(Page, { queryClient });
 }
@@ -397,10 +407,7 @@ describe("CalendarsView on a community calendar", () => {
       communityHttp.get("/calendar-entries/", () => HttpResponse.json({ events: [], tasks: [] })),
       communityHttp.get("/calendars/:calendarId", () => HttpResponse.json(communityCalendar))
     );
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-      items: { [CALENDAR_VIEW_MODE_KEY]: "day" },
-    });
+    const queryClient = withViews("day");
     const { container } = renderPage(() => <CalendarsView soloCalendar={communityCalendar} />, {
       queryClient,
     });
@@ -433,10 +440,7 @@ describe("CalendarsView on a community calendar", () => {
       })
     );
 
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-      items: { [CALENDAR_VIEW_MODE_KEY]: "list" },
-    });
+    const queryClient = withViews("list");
     const Page = () => <CalendarsView soloCalendar={communityCalendar} />;
     renderPage(Page, { queryClient });
 
@@ -511,17 +515,15 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
   }
 
   // The community's own calendars are its admins' to add.
-  /** What the server keeps of this reader's views, as they save them. */
+  /** What the server keeps of this reader's views of the community's lists,
+   *  as they save them. */
   let kept: Record<string, unknown> = {};
   beforeEach(() => {
-    kept = keepViewPreferences();
+    kept = keepViewPreferences(1);
   });
 
   function renderCommunityScope(community = buildCommunity({ id: 1, role: "admin" })) {
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-      items: { [CALENDAR_VIEW_MODE_KEY]: "list", ...kept },
-    });
+    const queryClient = withViews("list", kept);
     return renderPage(() => <CalendarsView communityScope />, {
       queryClient,
       communities: { activeCommunityId: 1, activeCommunity: community, communities: [community] },
@@ -605,7 +607,7 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
 
     // It is kept for the reader, wherever they open it next.
     unmount();
-    await waitFor(() => expect(Object.keys(kept)).toContain("view:1:calendars"));
+    await waitFor(() => expect(Object.keys(kept)).toContain("view:calendars"));
     renderCommunityScope();
 
     // One calendar left on: the title is its name, with its settings beside it.

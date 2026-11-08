@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useMentionedPerson } from "@/hooks/useMentionedPeople";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** The chip itself — the same one comments and documents have always drawn. */
 export const MENTION_BADGE = "rounded bg-primary/10 px-1 py-0.5 font-medium text-primary text-sm";

@@ -3,6 +3,9 @@ import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { deleteCommunity } from "@/api/generated/communities/communities";
+import { useAuth } from "@/hooks/useAuth";
+import { useCommunities } from "@/hooks/useCommunities";
+import { getErrorMessage } from "@/lib/errorMessage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,14 +15,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth } from "@/hooks/useAuth";
-import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
+} from "@/ui/alert-dialog";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 export const SettingsCommunityDangerZonePage = () => {
   const { activeCommunity, communities, refreshCommunities, switchCommunity } = useCommunities();

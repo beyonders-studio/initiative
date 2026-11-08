@@ -47,6 +47,7 @@ const baseSettings = (): CommunityAuthSettingsRead => ({
   ai_offered_by_platform: true,
   guest_max_days: null,
   guest_max_days_by_platform: 90,
+  set_by_deployment: [],
 });
 /** Change what the server says, for a case that varies it. */
 const stored = (patch: Partial<CommunityAuthSettingsRead>) => {
@@ -136,6 +137,10 @@ vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
   useCreateClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useCustomRoleClaimRules: () => ({ data: [], isLoading: false }),
+  useCreateCustomRoleClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useOrderCustomRoleClaimRules: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCustomRoleClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { SettingsCommunitySecurityPage } from "./SettingsCommunitySecurityPage";
@@ -376,6 +381,15 @@ describe("SettingsCommunitySecurityPage", () => {
       expect(factorSwitch()).toBeChecked();
       expect(factorSwitch()).toBeDisabled();
       expect(screen.getByText(/already asks everybody/i)).toBeInTheDocument();
+    });
+
+    it("is shown, not offered, where whoever runs the server sets it", () => {
+      stored({ require_second_factor: true, set_by_deployment: ["require_second_factor"] });
+      render();
+
+      expect(factorSwitch()).toBeChecked();
+      expect(factorSwitch()).toBeDisabled();
+      expect(screen.getAllByText(/sets this for your community/i)).toHaveLength(1);
     });
 
     it("is not offered where the deployment permits no kind of factor", () => {

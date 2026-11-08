@@ -1,32 +1,25 @@
 /**
  * What each binding source *is* — the one description of a data view.
  *
- * Three, and they are not variations on a theme. A **query** is a statement
- * over this community's datasets. A **sheet_range** is a cell range in a
- * spreadsheet file; it answers with the same columns and rows a statement
- * does, and becomes a statement itself once files are queryable. A **plug-in**
- * is an installed listing's own endpoint, whose parameters are declared in its
- * manifest and checked at fetch time — the two slots here are the ones a
- * *definition* fills: which plug-in, and which of its sources.
+ * Two, and they are not variations on a theme. A **query** is a statement over
+ * this community's datasets, its spreadsheets' ranges and its plug-ins' read
+ * endpoints, and is what every built-in widget binds. A **plug-in** is what an
+ * installed listing's own widget binds: one of its endpoints, whose parameters
+ * are declared in its manifest and checked at fetch time — the two slots here
+ * are the ones a *definition* fills: which plug-in, and which of its sources.
  *
  * The backend deliberately does not declare binding parameters: they belong to
  * the fetcher that consumes them, and mirroring them server-side would mean
  * maintaining every parameter twice. So this is a *description*, not a second
- * validator, and it is what lets three surfaces stop restating the same
+ * validator, and it is what lets two surfaces stop restating the same
  * knowledge:
  *
  * - `unboundSlots()` — which parameters a binding still needs (from `required`)
  * - the config dialog's controls
- * - the provenance line on every tile
  */
 
 import type { WidgetBinding } from "@/hooks/useWidgetData";
 import type { WidgetSource } from "@/lib/widgets/dataShapes";
-
-/** An entity a binding can point at. The kind decides which of the canvas's
- *  already-cached list queries resolves it to a name — never a fetch of its
- *  own, so a dense canvas costs no extra requests. */
-export type EntityKind = "file";
 
 interface BaseParam {
   /** The binding key this parameter reads and writes. */
@@ -36,16 +29,9 @@ interface BaseParam {
   required?: boolean;
 }
 
-/** An id pointing at another resource in this initiative. */
-export interface EntityParam extends BaseParam {
-  kind: "entity";
-  entity: EntityKind;
-}
-
-/** Free text the source parses — a sheet name, an A1 range. */
+/** An identifier the definition names — a plug-in, one of its sources. */
 export interface TextParam extends BaseParam {
   kind: "text";
-  placeholder?: string;
 }
 
 /** A statement. Its own kind rather than free text: it is many lines, it is
@@ -55,7 +41,7 @@ export interface SqlParam extends BaseParam {
   kind: "sql";
 }
 
-export type SourceParam = EntityParam | TextParam | SqlParam;
+export type SourceParam = TextParam | SqlParam;
 
 export interface SourceDescriptor {
   /** Singular noun for one row, for counts and empty states. Rendered through
@@ -71,14 +57,6 @@ export const SOURCES: Record<WidgetSource, SourceDescriptor> = {
     // reads, what it narrows to and what it returns, so there is no project to
     // pick and no filter to build beside it.
     params: [{ kind: "sql", key: "sql", required: true }],
-  },
-  sheet_range: {
-    rowNoun: "row",
-    params: [
-      { kind: "entity", key: "file_id", entity: "file", required: true },
-      { kind: "text", key: "sheet" },
-      { kind: "text", key: "range", required: true, placeholder: "A1:B10" },
-    ],
   },
   plugin: {
     rowNoun: "row",
@@ -105,12 +83,6 @@ export const unboundSlots = (binding: WidgetBinding): string[] => {
     .filter((param) => param.required && !binding[param.key])
     .map((param) => param.key as string);
 };
-
-/** The entity parameters a source can point at, in declaration order. */
-export const entityParams = (source: WidgetSource | string): EntityParam[] =>
-  (sourceDescriptor(source)?.params ?? []).filter(
-    (param): param is EntityParam => param.kind === "entity"
-  );
 
 /** The parameters to offer for one source. Every widget bound to a statement
  *  is configured the same way, so there is nothing here that varies by widget

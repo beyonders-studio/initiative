@@ -10,25 +10,6 @@ import { ArrowLeft, ArrowRight, Copy, MoreHorizontal, Pencil, Plus, Trash2 } fro
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsBar, TabsTrigger } from "@/components/ui/tabs";
 import {
   canAddView,
   cleanViewName,
@@ -37,6 +18,19 @@ import {
   MAX_HOME_VIEWS,
   MAX_VIEW_NAME_LENGTH,
 } from "@/lib/home/views";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Tabs, TabsBar, TabsTrigger } from "@/ui/tabs";
 
 export interface HomeViewTabsProps {
   views: HomeViews;
@@ -156,7 +150,6 @@ export function HomeViewTabs({
         title={t("views.deleteTitle", { name: deleting?.name ?? "" })}
         description={t("views.deleteDescription")}
         confirmLabel={t("views.deleteConfirm")}
-        cancelLabel={t("common:cancel")}
         destructive
         onConfirm={() => {
           if (deleting) onDelete(deleting.id);

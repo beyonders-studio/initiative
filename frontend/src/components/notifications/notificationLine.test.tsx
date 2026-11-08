@@ -8,13 +8,18 @@
  * These notices belong to the person rather than to any community, so the
  * server sends no community with them.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildNotification } from "@/__tests__/factories/notification.factory";
 import { asPhoneThatMayNotSell } from "@/__tests__/helpers/storeSelling";
 import type { NotificationType } from "@/api/generated/initiativeAPI.schemas";
 
-import { notificationLink, notificationText } from "./notificationLine";
+import { notificationLink, notificationText, openNotification } from "./notificationLine";
+
+const announcements = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock("@/components/announcements/AnnouncementCenter", () => ({
+  openAnnouncement: announcements.open,
+}));
 
 // The real strings are asserted through i18n keys rather than English, so a
 // reworded translation doesn't fail this; what matters is that a key was
@@ -179,13 +184,28 @@ describe("notificationLink — a target_path without a community", () => {
 });
 
 describe("notificationText — mentions", () => {
-  it("names the task whose description mentioned you", () => {
+  it("names what a description that mentioned you describes", () => {
+    const line = notificationText(
+      notice("mention", {
+        entity_type: "collection",
+        entity_id: 7,
+        entity_name: "Ship it",
+        mentioned_by_name: "ada",
+      }),
+      t
+    );
+
+    expect(line).toContain("notifications.mentionIn");
+    expect(line).toContain("Ship it");
+  });
+
+  it("still names the task of a description mention sent by its task", () => {
     const line = notificationText(
       notice("mention", { task_id: 7, task_title: "Ship it", mentioned_by_name: "ada" }),
       t
     );
 
-    expect(line).toContain("notifications.mentionTaskDescription");
+    expect(line).toContain("notifications.mentionIn");
     expect(line).toContain("Ship it");
   });
 
@@ -207,6 +227,27 @@ describe("notificationText — mentions", () => {
 
     expect(notificationText(mention, t)).toContain("Flight plan");
     expect(notificationLink(mention)).toBe("/go/file/9");
+  });
+});
+
+describe("an announcement the reader dismissed", () => {
+  const line = notice("announcement", {
+    announcement_key: "builtin:settings-moved",
+    title: "Settings have moved",
+    target_path: "/",
+  });
+
+  it("names the announcement", () => {
+    expect(notificationText(line, t)).toBe(
+      `notifications.announcement(${JSON.stringify({ title: "Settings have moved" })})`
+    );
+  });
+
+  it("opens the announcement again rather than a page", () => {
+    const navigate = vi.fn();
+    expect(openNotification(line, { markRead: vi.fn(), navigate, t })).toBe(true);
+    expect(announcements.open).toHaveBeenCalledWith("builtin:settings-moved");
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
 
@@ -395,5 +436,62 @@ describe("notificationText — something the reader subscribed to", () => {
     });
     expect(notificationText(one, t)).toContain("notifications.subscription.reacted");
     expect(notificationLink(one)).toBe("/go/post/5");
+  });
+});
+
+describe("notificationText — access requests", () => {
+  it("names who asks, at which level, for what", () => {
+    const one = notice("share_requested", {
+      requester_name: "Ada",
+      level: "write",
+      count: 1,
+      entity_name: "Flight plan",
+    });
+    const many = notice("share_requested", {
+      requester_name: "Ada",
+      level: "read",
+      count: 5,
+      entity_name: "Photos",
+    });
+
+    expect(notificationText(one, t)).toBe(
+      'notifications.shareRequested.write({"requester":"Ada","title":"Flight plan","count":1})'
+    );
+    expect(notificationText(many, t)).toContain("notifications.shareRequested.read");
+    expect(notificationText(many, t)).toContain('"count":5');
+  });
+
+  it("says what was given, and that a request was declined", () => {
+    const granted = notice("share_granted", {
+      answerer_name: "Grace",
+      level: "read",
+      count: 1,
+      entity_name: "Flight plan",
+    });
+    const declined = notice("share_declined", { answerer_name: "Grace", count: 1 });
+
+    expect(notificationText(granted, t)).toContain("notifications.shareGranted.read");
+    expect(notificationText(declined, t)).toContain("notifications.shareDeclined");
+  });
+
+  it("opens the requests, and what was shared", () => {
+    const asked = notice("share_requested", {
+      community_id: 3,
+      target_path: "/share-requests/abc",
+    });
+    const granted = notice("share_granted", { entity_type: "file", entity_id: 8 });
+
+    expect(notificationLink(asked)).toBe("/c/3/share-requests/abc");
+    expect(notificationLink(granted)).toBe("/go/file/8");
+    expect(notificationLink(notice("share_declined", {}))).toBeNull();
+  });
+});
+
+describe("task reminders", () => {
+  it("names the task and opens it", () => {
+    const line = notice("task_reminder", { task_id: 12, task_title: "Water the plants" });
+    expect(notificationText(line, t)).toContain("notifications.taskReminder");
+    expect(notificationText(line, t)).toContain("Water the plants");
+    expect(notificationLink(line)).toContain("/go/task/12");
   });
 });

@@ -22,7 +22,7 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { ProjectTasksSection } from "@/components/projects/ProjectTasksSection";
-import { resetTimeFormat, setTimeFormat } from "@/lib/timeFormat";
+import { setClock } from "@/ui/host";
 
 const STATUSES = buildDefaultTaskStatuses(1);
 
@@ -56,7 +56,7 @@ const board = () =>
 beforeEach(() => {
   seedTask();
   localStorage.clear();
-  resetTimeFormat();
+  setClock({ timeFormat: "system" });
 });
 
 describe("a board's card", () => {
@@ -144,7 +144,7 @@ describe("a card's dates", () => {
     // These lines used to call `toLocaleString()` directly, which ignores the
     // preference — a reader on 24-hour still got AM/PM on every card.
     seedTask({ due_date: "2026-08-03T21:15:00Z" });
-    setTimeFormat("24");
+    setClock({ timeFormat: "24" });
     board();
 
     const due = await screen.findByText(/^Due:/);
@@ -153,7 +153,7 @@ describe("a card's dates", () => {
 
   it("still says AM/PM for a reader who picked 12-hour", async () => {
     seedTask({ due_date: "2026-08-03T21:15:00Z" });
-    setTimeFormat("12");
+    setClock({ timeFormat: "12" });
     board();
 
     const due = await screen.findByText(/^Due:/);

@@ -22,6 +22,7 @@ import { DeviceGoneError, RecipientHasNoDeviceError } from "@/crypto/messaging";
 import { toast } from "@/lib/mascotToast";
 import { routeTree } from "@/routeTree.gen";
 
+import { layOutVirtualList } from "./helpers/layOutVirtualList";
 import { buildRouterContext, renderPage } from "./helpers/render";
 
 const MESSAGES_ROUTE_ID = "/_serverRequired/_authenticated/messages";
@@ -150,6 +151,11 @@ beforeAll(() => {
 afterAll(() => {
   if (noWorker) Reflect.deleteProperty(globalThis, "Worker");
 });
+// The thread's log, a phone's height.
+layOutVirtualList((element) => element.classList.contains("overscroll-contain"), {
+  height: 800,
+  rowHeight: 48,
+});
 
 const grant = (userId: number, username: string) => ({
   user_id: userId,
@@ -252,7 +258,9 @@ describe("My Messages", () => {
   it("is reachable at /messages", async () => {
     await renderMessages();
 
-    expect(await screen.findByRole("heading", { name: /my messages/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /pick a conversation/i })
+    ).toBeInTheDocument();
   });
 
   it("lands on the list rather than a note about where the list is", async () => {
@@ -403,8 +411,16 @@ describe("My Messages", () => {
     mocks.messageRequests.mockReturnValue({
       data: { accepted: [grant(7, "alex")], incoming: [], outgoing: [] },
     });
+    // Far enough back that the message answered is out of the window.
+    const between = Array.from({ length: 30 }, (_, index) => ({
+      id: `between-${index}`,
+      body: `between ${index}`,
+      at: `2026-09-01T00:${String(index + 1).padStart(2, "0")}:00Z`,
+      mine: false,
+    }));
     mocks.logGet.mockResolvedValue([
       { id: "m1", body: "are you coming monday", at: "2026-09-01T00:00:00Z", mine: false },
+      ...between,
       {
         id: "m2",
         body: "yes",
@@ -415,18 +431,18 @@ describe("My Messages", () => {
     ]);
     await renderMessagesWith(7, "alex");
     await screen.findByText("yes");
+    expect(screen.queryByText("between 0")).not.toBeInTheDocument();
 
     // The quote names its speaker, so a thread reads without opening it.
     const quote = screen.getByRole("button", { name: /are you coming monday/ });
     expect(quote).toHaveTextContent("alex#1234");
 
-    // Its own scrollTop, never `scrollIntoView`: that would scroll every box
-    // the message sits in, including ones with no way back.
-    const log = document.querySelector("[class*='overscroll-contain']") as HTMLElement;
-    const scrolled = vi.spyOn(log, "scrollTop", "set");
     await userEvent.click(quote);
 
-    expect(scrolled).toHaveBeenCalled();
+    expect(await screen.findByText("between 0")).toBeInTheDocument();
+    // The answer is out of the window now, and still holds the focus, so the
+    // next Tab goes on from it.
+    expect(quote).toHaveFocus();
   });
 
   it("keeps the actions in the focus order at every width", async () => {
@@ -684,7 +700,9 @@ describe("My Messages", () => {
     mocks.ensureDevice.mockResolvedValue("device-1");
     await userEvent.click(retry);
 
-    expect(await screen.findByRole("heading", { name: /my messages/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /pick a conversation/i })
+    ).toBeInTheDocument();
     expect(screen.queryByText(/could not be set up/i)).toBeNull();
   }, 15_000);
 
@@ -741,7 +759,7 @@ describe("My Messages", () => {
   });
 
   it("opens the conversation the address names", async () => {
-    // A contacts row links straight here. Landing on the page is not enough —
+    // A person row links straight here. Landing on the page is not enough —
     // it has to land on that person's thread.
     mocks.conversations.mockResolvedValue({
       conversations: [conversation],
@@ -788,7 +806,9 @@ describe("My Messages", () => {
 
     await renderMessages();
 
-    expect(await screen.findByRole("heading", { name: /my messages/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /pick a conversation/i })
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText(/date of birth/i)).toBeNull();
   });
 
@@ -832,8 +852,8 @@ describe("My Messages", () => {
   });
 
   it("offers to ask, for somebody there is no channel with", async () => {
-    // The common case, because a contact is somebody you share a community
-    // with rather than somebody who agreed to hear from you.
+    // The common case, because a person listed is somebody you share a
+    // community with rather than somebody who agreed to hear from you.
     mocks.userProfile.mockReturnValue(profile(9, "bram"));
     mocks.dmPermission.mockReturnValue({ data: { permission: "may_request" } });
 

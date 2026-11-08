@@ -1,7 +1,7 @@
 /**
  * `/settings/layouts` — how a tool lays out what it holds: each of its
- * layouts, when it was last changed, and, for a project, which list it opens
- * on, with the way into the layout editor.
+ * layouts, when it was last changed, and, for a project, which views it shows
+ * and the one it opens on, with the way into the layout editor.
  *
  * Changing them is a step above write access (the tool's owner, the
  * initiative's managers, or a community admin). The server decides, and says
@@ -9,25 +9,20 @@
  * refuses anyone else on its own too, since the address is typeable.
  */
 
-import { Link } from "@tanstack/react-router";
-import { Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { LayoutList } from "@/components/layouts/LayoutList";
+import { LayoutsOverview } from "@/components/layouts/LayoutList";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
 import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useInstanceLayouts } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
+import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export const ToolSettingsLayoutsPage = () => {
   const { tool, entity } = useToolSettings();
   const { t } = useTranslation("layouts");
   const gp = useCommunityPath();
-  const wide = atLeast(useWidthClass(), "md");
   const set = useInstanceLayouts(tool, entity.id).data;
 
   if (!set) return null;
@@ -40,19 +35,12 @@ export const ToolSettingsLayoutsPage = () => {
         <CardTitle>{t("tab")}</CardTitle>
         <CardDescription>{t("settingsDescription")}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <LayoutList layouts={set.layouts} />
-        {/* The editor needs a tablet-sized screen; it says so itself too. */}
-        {wide ? (
-          <Button asChild variant="outline" size="sm">
-            <Link to={editor}>
-              <Pencil className="h-4 w-4" />
-              {t("open")}
-            </Link>
-          </Button>
-        ) : (
-          <p className="text-muted-foreground text-sm">{t("compact")}</p>
-        )}
+      <CardContent>
+        <LayoutsOverview
+          layouts={set.layouts}
+          target={instanceTarget(tool, entity.id)}
+          editor={editor}
+        />
       </CardContent>
     </Card>
   );

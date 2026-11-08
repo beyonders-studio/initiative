@@ -39,9 +39,6 @@ import { ContinueButton } from "@/components/start/stepParts";
 import { useSignUp } from "@/components/start/useSignUp";
 import { type YonderPose, YonderSays } from "@/components/start/YonderSays";
 import { YouStep } from "@/components/start/YouStep";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { WizardFrame } from "@/components/ui/wizard-dialog";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useBillingCatalog } from "@/hooks/useBillingCatalog";
@@ -71,6 +68,9 @@ import {
   savePendingStart,
   saveStartDraft,
 } from "@/lib/startFlow";
+import { Button } from "@/ui/button";
+import { Card } from "@/ui/card";
+import { WizardFrame } from "@/ui/wizard-dialog";
 
 type Step =
   | "choose"

@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import { PrivacyLink } from "@/components/auth/LegalNotice";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
 
 /**
  * The question, with a note under it that the answer is not shared and, where

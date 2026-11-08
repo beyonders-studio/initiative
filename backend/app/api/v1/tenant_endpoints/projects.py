@@ -39,7 +39,7 @@ from app.services.tenant import ownership as ownership_service
 from app.services import permissions as permissions_service
 from app.services import reachability
 from app.services.tenant import named_people
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import personal_items as personal_items_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import archive as archive_service
@@ -190,7 +190,7 @@ async def _project_reads(
 
     await _attach_task_summaries(session, projects)
     await tags_service.annotate_tags(session, projects)
-    await properties_service.annotate_properties(session, projects)
+    await metadata_service.annotate_properties(session, projects)
     await ownership_service.annotate_owner_plugins(session, projects)
     context = require_actor_context(session)
     return [
@@ -350,7 +350,7 @@ async def create_project(
             session, project.id, locale=locale
         )
         await attachments_service.claim_uploads(session, project)
-    await properties_service.write_on_create(session, project, project_in.properties)
+    await metadata_service.write_on_create(session, project, project_in.properties)
     settled = named_people.Governing.of(Tool.project, project)
     await session.commit()
     if project_in.template_id is not None:

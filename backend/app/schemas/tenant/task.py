@@ -20,7 +20,6 @@ from app.schemas.recurrence import OccurrenceScope, TaskRule, validate_task_recu
 from app.schemas.platform.access_grant import AccessGrantRead
 from app.schemas.platform.user import PersonShape, UserPublic
 from app.schemas.tenant.evidence import EvidenceRead
-from app.schemas.tenant.plugin_data import PluginValueSummary
 from app.schemas.tenant.initiative import InitiativeSummary
 from app.schemas.tenant.task_status import TaskStatusRead
 from app.schemas.tenant.task_type import TaskTypeRead
@@ -104,6 +103,15 @@ class ChecklistProgress(SanitizedBaseModel):
     total: int = 0
 
 
+class TaskParentSummary(SanitizedBaseModel):
+    """The task a task is part of: the target of its ``part_of`` edge."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    id: int
+    title: str
+
+
 class ChecklistItemToggle(SanitizedBaseModel):
     """The one field a tick changes."""
 
@@ -141,6 +149,8 @@ class TaskCreate(TaskBase, PropertiesOnCreate):
     task_type_id: Optional[int] = None
     tag_ids: List[int] = Field(default_factory=list, max_length=100)
     checklist: List[ChecklistItemInput] = Field(default_factory=list)
+    #: The task this one is part of, written as its ``part_of`` edge.
+    parent_task_id: Optional[int] = None
 
     @model_validator(mode="after")
     def _valid_recurrence(self) -> "TaskCreate":
@@ -186,9 +196,15 @@ class TaskUpdate(PropertiesOnUpdate):
     tz: Optional[str] = Field(default=None, max_length=64)
     recurrence_strategy: Optional[RecurrenceStrategy] = None
     recurrence_limit: Optional[int] = Field(default=None, ge=1, le=24, strict=True)
+    #: ``properties`` writes only the values it names, leaving the rest: what
+    #: a change of type (or a move) sends for the fields the new page requires.
+    merge_properties: bool = False
     # PATCH semantics: None = "leave unchanged"; a list (incl. []) = replace-all.
     tag_ids: Optional[List[int]] = Field(default=None, max_length=100)
     checklist: Optional[List[ChecklistItemInput]] = None
+    #: The task this one is part of, written as its ``part_of`` edge in place
+    #: of the one it has; null takes it out of its parent.
+    parent_task_id: Optional[int] = None
     #: Which tasks of a repeating series the edit is for (``task_series``).
     #: Omitted, it carries forward from this task ("following"). The repeat
     #: itself always changes from this task on.
@@ -210,6 +226,9 @@ class TaskUpdate(PropertiesOnUpdate):
 
 class TaskMoveRequest(SanitizedBaseModel):
     target_project_id: int = Field(gt=0)
+    #: Written to the task once it is in the destination, in the same
+    #: request: the fields its page there requires that it does not fill.
+    changes: Optional[TaskUpdate] = None
 
 
 class TaskProjectSummary(SanitizedBaseModel):
@@ -267,11 +286,14 @@ class TaskRead(TaskBase):
     project: Optional[TaskProjectSummary] = None
     checklist: List[ChecklistItem] = []
     checklist_progress: Optional[ChecklistProgress] = None
+    #: The task this one is part of, where it is part of one the reader can
+    #: open (``app.services.tenant.task_hierarchy``).
+    parent: Optional[TaskParentSummary] = None
+    #: How many of the tasks that are part of this one are done, of those
+    #: not archived; None for a task with none.
+    subtask_progress: Optional[ChecklistProgress] = None
     tags: List[TagSummary] = []
     properties: List[PropertySummary] = []
-    #: The values installed plug-ins show on the task, from the installs on
-    #: and placed in its initiative.
-    plugin_values: List[PluginValueSummary] = []
 
 
 class TaskListRead(TaskBase):
@@ -322,11 +344,14 @@ class TaskListRead(TaskBase):
     initiative_name: Optional[str] = None
     initiative_color: Optional[str] = None
     checklist_progress: Optional[ChecklistProgress] = None
+    #: The task this one is part of, where it is part of one the reader can
+    #: open (``app.services.tenant.task_hierarchy``).
+    parent: Optional[TaskParentSummary] = None
+    #: How many of the tasks that are part of this one are done, of those
+    #: not archived; None for a task with none.
+    subtask_progress: Optional[ChecklistProgress] = None
     tags: List[TagSummary] = []
     properties: List[PropertySummary] = []
-    #: The values installed plug-ins show on the task, from the installs on
-    #: and placed in its initiative.
-    plugin_values: List[PluginValueSummary] = []
 
 
 class ColumnFillRead(SanitizedBaseModel):

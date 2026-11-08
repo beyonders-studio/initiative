@@ -22,7 +22,7 @@ from sqlmodel import col, func, select
 from app.db.query import build_paginated_response, paginated_query
 from app.models.platform.user_ignore import UserIgnore
 from app.models.platform.user_profile_view import user_profiles
-from app.services.platform import contacts_stream
+from app.services.platform import connections_stream
 from app.schemas.platform.dm import IgnoredAccountRead, IgnoredAccountsResponse
 
 
@@ -87,7 +87,7 @@ async def add(session: AsyncSession, *, user_id: int, ignored_user_id: int) -> N
     )
     # The holder's own lists moved. The other account is told nothing, here or
     # anywhere: a frame would land at exactly the moment the row appeared.
-    contacts_stream.queue_contacts_signal(session, user_id)
+    connections_stream.queue_connections_signal(session, user_id)
     await session.commit()
 
 
@@ -101,7 +101,7 @@ async def remove(session: AsyncSession, *, user_id: int, ignored_user_id: int) -
     row = await session.get(UserIgnore, (user_id, ignored_user_id))
     if row is not None:
         await session.delete(row)
-        contacts_stream.queue_contacts_signal(session, user_id)
+        connections_stream.queue_connections_signal(session, user_id)
         await session.commit()
 
 

@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/LogoIcon";
 import { Markdown } from "@/components/Markdown";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLegalDocument, useLegalIndex } from "@/hooks/useLegalDocuments";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * One of the deployment's legal documents, read in the app.
@@ -25,7 +25,7 @@ export const LegalDocumentPage = () => {
   const document = useLegalDocument(enabled && !isLoading && !elsewhere ? slug : undefined);
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-muted/60 px-4 py-10">
+    <div className="flex min-h-app flex-col items-center bg-muted/60 px-4 py-10">
       <Link
         // The app packages have no front page; sign-in is where they start.
         to={__IS_CAPACITOR__ ? "/login" : "/welcome"}

@@ -9,13 +9,8 @@ import {
   ToolFilterButton,
   ToolFilterPanel,
 } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { globalTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { Label } from "@/components/ui/label";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useFocusPreferences } from "@/hooks/useFocusSummary";
 import { MY_TASKS_VIEW, useGlobalTasksTable } from "@/hooks/useGlobalTasksTable";
@@ -29,6 +24,11 @@ import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
+import { Label } from "@/ui/label";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 
 import { QuickAddTask } from "./QuickAddTask";
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
@@ -259,7 +259,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
                   table.setPage(pag.pageIndex + 1);
                 }
               }}
-              onPrefetchPage={(pageIndex) => table.prefetchPage(pageIndex + 1)}
+              onPrefetchPage={table.prefetchPage}
               manualSorting
               onSortingChange={table.handleSortingChange}
               enableResetSorting
@@ -314,7 +314,7 @@ export const TasksSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
   return (
     <div className="space-y-2">
       <Label>{t("widgets.tasks.addTo")}</Label>
-      <AsyncCombobox
+      <Combobox
         aria-label={t("widgets.tasks.addTo")}
         items={lists.map((row) => ({
           value: key(row.communityId, row.id),

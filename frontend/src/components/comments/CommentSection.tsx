@@ -8,9 +8,6 @@ import {
   ModerationAct,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateComment, useDeleteComment, useUpdateComment } from "@/hooks/useComments";
@@ -23,6 +20,9 @@ import { toast } from "@/lib/mascotToast";
 import { referenceTypeFor } from "@/lib/references";
 import { referenceRef } from "@/lib/smartChips";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
 
 import { CommentInput } from "./CommentInput";
 import { CommentReferences } from "./CommentReferences";
@@ -37,7 +37,7 @@ export interface CommentWithReplies extends CommentRead {
 /** What a comment can hang off: a tool entity, or one of the content-level
  *  extras that carries a thread of its own. Mirrors the backend's
  *  `COMMENT_TARGETS`. */
-export type CommentEntity = "task" | "wiki_page" | Tool;
+export type CommentEntity = "task" | "wiki_page" | "collection" | Tool;
 
 interface CommentSectionProps {
   entityType: CommentEntity;

@@ -30,7 +30,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.user_display import display_name
 from app.core.user_input_validators import resolve_zone
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.schemas.query import DateBucket
 from app.schemas.tenant.tool_layout import PROPERTY_FIELD_PREFIX
 from app.services.fields.derive import FK_CONTROLS
@@ -54,21 +54,21 @@ NO_GROUP = ""
 #: a bucket of the calendar.
 _GROUPING_PROPERTIES = frozenset(
     {
-        PropertyType.select,
-        PropertyType.multi_select,
-        PropertyType.user_reference,
-        PropertyType.checkbox,
+        MetadataType.select,
+        MetadataType.multi_select,
+        MetadataType.user_reference,
+        MetadataType.checkbox,
     }
 )
-_DATE_PROPERTIES = frozenset({PropertyType.date, PropertyType.datetime})
+_DATE_PROPERTIES = frozenset({MetadataType.date, MetadataType.datetime})
 
 
-def property_groups(kind: PropertyType) -> bool:
+def property_groups(kind: MetadataType) -> bool:
     """Whether a property of this type groups a list."""
     return kind in _GROUPING_PROPERTIES or kind in _DATE_PROPERTIES
 
 
-def property_needs_bucket(kind: PropertyType) -> bool:
+def property_needs_bucket(kind: MetadataType) -> bool:
     return kind in _DATE_PROPERTIES
 
 
@@ -143,6 +143,7 @@ class _How(Enum):
     reference = "reference"
     value = "value"
     relation = "relation"
+    reader = "reader"
 
 
 def _how(ds: Dataset, spec: FieldSpec) -> Optional[_How]:
@@ -152,6 +153,8 @@ def _how(ds: Dataset, spec: FieldSpec) -> Optional[_How]:
         return _How.bucket
     if not spec.offer or spec.name in HIDDEN_EVERYWHERE:
         return None
+    if spec.groups is not None:
+        return _How.reader
     if spec.kind is ControlKind.tag:
         return _How.tag
     if spec.column is not None:
@@ -224,11 +227,15 @@ async def group_rows(
     elif how is _How.value:
         held = await _by_value(session, ds, spec, ids)
         return Grouping(field, None, held, empty=spec.nullable, values=_values_of(spec))
+    elif how is _How.reader:
+        assert spec.groups is not None
+        held = await spec.groups(session, ids) if ids else {}
     else:
         held = await _by_relation(session, ds, _relation_for(ds, spec), ids)
-    # A tag or a relation is a set a row may have none of; a column is empty
-    # where it can be null, and a bucket expression always has a value.
-    empty = how in (_How.tag, _How.relation) or (
+    # A tag or a relation is a set a row may have none of, as a reader's
+    # groups are; a column is empty where it can be null, and a bucket
+    # expression always has a value.
+    empty = how in (_How.tag, _How.relation, _How.reader) or (
         how is not _How.bucket and spec.nullable
     )
     return Grouping(field, None, held, empty=empty)
@@ -441,12 +448,12 @@ async def _by_property(
     bucket: Optional[DateBucket],
     tz: Optional[str],
 ) -> Grouping:
-    from app.services.tenant import properties as properties_service
+    from app.services.tenant import metadata as metadata_service
 
     raw = field.removeprefix(PROPERTY_FIELD_PREFIX)
     property_id = int(raw) if raw.isdigit() else None
     definition = (
-        await properties_service.load_definitions_by_ids(session, [property_id])
+        await metadata_service.load_definitions_by_ids(session, [property_id])
         if property_id is not None
         else {}
     ).get(property_id)
@@ -460,8 +467,8 @@ async def _by_property(
     labels = {
         option.get("value"): option.get("label") for option in definition.options or []
     }
-    summaries = await properties_service.summaries_by_id(
-        session, properties_service.link_for(ds.model).target, ids
+    summaries = await metadata_service.summaries_by_id(
+        session, metadata_service.link_for(ds.model).target, ids
     )
 
     def held(row_id: int) -> Any:
@@ -483,21 +490,21 @@ async def _by_property(
         value = held(row_id)
         if bucket is not None:
             groups[row_id] = _date_group(value, bucket, tz)
-        elif definition.type is PropertyType.checkbox:
+        elif definition.type is MetadataType.checkbox:
             key = str(value is True).lower()
             groups[row_id] = [Group(key, None, (key != "true",))]
         elif (
-            definition.type is PropertyType.select and isinstance(value, str) and value
+            definition.type is MetadataType.select and isinstance(value, str) and value
         ):
             groups[row_id] = [option(value)]
-        elif definition.type is PropertyType.multi_select and isinstance(value, list):
+        elif definition.type is MetadataType.multi_select and isinstance(value, list):
             groups[row_id] = [option(each) for each in value if isinstance(each, str)]
-        elif definition.type is PropertyType.user_reference and isinstance(value, dict):
+        elif definition.type is MetadataType.user_reference and isinstance(value, dict):
             name = display_name(SimpleNamespace(**value))
             groups[row_id] = [Group(str(value.get("id")), name, _ranked(name))]
-    if definition.type is PropertyType.checkbox:
+    if definition.type is MetadataType.checkbox:
         values = tuple(Group(key, None, (key != "true",)) for key in ("true", "false"))
-    elif bucket is None and definition.type is not PropertyType.user_reference:
+    elif bucket is None and definition.type is not MetadataType.user_reference:
         values = tuple(option(value) for value in options)
     else:
         values = ()
@@ -506,6 +513,6 @@ async def _by_property(
         definition.name,
         groups,
         # Unchecked is a value of its own, so nothing is in no group.
-        empty=definition.type is not PropertyType.checkbox,
+        empty=definition.type is not MetadataType.checkbox,
         values=values,
     )

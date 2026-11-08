@@ -26,12 +26,6 @@ import type {
   ConnectableProviderRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useCommunityProviderConnections,
   useConnectableProviders,
@@ -40,6 +34,12 @@ import {
 } from "@/hooks/useCommunityAuthPolicy";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 export const CommunityAuthProvidersSection = ({
   communityId,
@@ -230,7 +230,6 @@ export const CommunityAuthProvidersSection = ({
         })}
         description={t("communityAuth.connections.disconnectDescription")}
         confirmLabel={t("communityAuth.connections.disconnect")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={disconnect.isPending}
         onConfirm={() => {

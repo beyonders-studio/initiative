@@ -41,7 +41,7 @@ from app.core.messages import WikiMessages
 from app.models.tenant.wiki import Wiki, WikiPage, WikiPageOrder
 from app.services.permissions import with_tool
 from app.services.tenant import comments as comments_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.names import slugify, unique_slug
 
@@ -85,7 +85,7 @@ async def get_wiki_hydrated(
     wiki = await get_wiki(session, wiki_id, populate_existing=populate_existing)
     if wiki is not None:
         await tags_service.annotate_tags(session, [wiki])
-        await properties_service.annotate_properties(session, [wiki])
+        await metadata_service.annotate_properties(session, [wiki])
         await comments_service.annotate_comment_counts(
             session, [wiki], column="wiki_id"
         )
@@ -598,5 +598,5 @@ async def _linked_file_ids(session: AsyncSession, wiki_id: int) -> list[int]:
     return [
         entity_id
         for kind, entity_id in (decode_node_id(edge.source_node) for edge in edges)
-        if kind is SearchEntityType.file
+        if kind == SearchEntityType.file
     ]

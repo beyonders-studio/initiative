@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarPlus, RefreshCcw, UserCheck, UserMinus, X } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -18,11 +18,22 @@ import {
 } from "@/components/communities/CommunityInvites";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { EntityPicker } from "@/components/entities/EntityPicker";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { useCommunities } from "@/hooks/useCommunities";
+import { useCommunityInvites } from "@/hooks/useCommunityInvites";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
+import { useCommunityInitiatives } from "@/hooks/useInitiatives";
+import { useServerTableState } from "@/hooks/useServerTableState";
+import { useExtendGuest, useMakeGuestAMember, useUsers } from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { TOOLS } from "@/lib/tools";
+import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
 import {
   Dialog,
   DialogContent,
@@ -30,31 +41,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useCommunities } from "@/hooks/useCommunities";
-import { useCommunityInvites } from "@/hooks/useCommunityInvites";
-import { useCommunityInitiatives } from "@/hooks/useInitiatives";
-import { useServerTableState } from "@/hooks/useServerTableState";
-import { useExtendGuest, useMakeGuestAMember, useUsers } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import type { AppColumnDef } from "@/lib/table";
-import { TOOLS } from "@/lib/tools";
-import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+} from "@/ui/dialog";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** One item a guest invite gives, and how far. */
 interface ChosenItem {
@@ -83,9 +78,11 @@ const ExtendGuestDialog = ({
     onError: (error) => toast.error(getErrorMessage(error, "communities:guests.extendError")),
   });
 
-  useEffect(() => {
+  const [prevGuest, setPrevGuest] = useState(guest);
+  if (prevGuest !== guest) {
+    setPrevGuest(guest);
     if (guest) setDays(7);
-  }, [guest]);
+  }
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -137,10 +134,17 @@ export const SettingsCommunityGuestsPage = () => {
   const { activeCommunity } = useCommunities();
   const { guestsEnabled } = useAppConfig();
   const communityId = activeCommunity?.id ?? null;
-  // The rung that hands out invites, where the deployment and the community
-  // both take guests.
+  // Whoever hands out invites on the admin rung, where the deployment and the
+  // community both take guests: a guest invite can open any initiative.
+  // Changing a guest's stay is running the roster.
+  const held = useHeldSurfaces();
   const managesGuests =
-    Boolean(activeCommunity?.can.configure) && guestsEnabled && activeCommunity?.max_guests !== 0;
+    held.writes &&
+    held.holds("invites") &&
+    Boolean(activeCommunity?.can.administer) &&
+    guestsEnabled &&
+    activeCommunity?.max_guests !== 0;
+  const managesMembers = held.holds("members");
 
   const table = useServerTableState();
   const guestsQuery = useUsers({ ...table.params, guests: true }, { enabled: managesGuests });
@@ -229,36 +233,42 @@ export const SettingsCommunityGuestsPage = () => {
       header: t("guests.endsColumn"),
       cell: ({ row }) => <RelativeTime date={row.original.guest_until} className="text-sm" />,
     },
-    {
-      id: "actions",
-      header: t("users.actionsColumn"),
-      cell: ({ row }) => {
-        const guest = row.original;
-        return (
-          <RowActionsMenu subject={getUserDisplayName(guest)}>
-            <DropdownMenuItem onSelect={() => setExtending(guest)}>
-              <CalendarPlus className="h-4 w-4" />
-              {t("guests.extend")}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={makeMember.isPending}
-              onSelect={() => makeMember.mutate({ communityId, userId: guest.id })}
-            >
-              <UserCheck className="h-4 w-4" />
-              {t("guests.makeMember")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onSelect={() => setRemoving({ userId: guest.id, name: getUserDisplayName(guest) })}
-            >
-              <UserMinus className="h-4 w-4" />
-              {t("users.removeFromCommunity")}
-            </DropdownMenuItem>
-          </RowActionsMenu>
-        );
-      },
-    },
+    ...(managesMembers
+      ? [
+          {
+            id: "actions",
+            header: t("users.actionsColumn"),
+            cell: ({ row }) => {
+              const guest = row.original;
+              return (
+                <RowActionsMenu subject={getUserDisplayName(guest)}>
+                  <DropdownMenuItem onSelect={() => setExtending(guest)}>
+                    <CalendarPlus className="h-4 w-4" />
+                    {t("guests.extend")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={makeMember.isPending}
+                    onSelect={() => makeMember.mutate({ communityId, userId: guest.id })}
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {t("guests.makeMember")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onSelect={() =>
+                      setRemoving({ userId: guest.id, name: getUserDisplayName(guest) })
+                    }
+                  >
+                    <UserMinus className="h-4 w-4" />
+                    {t("users.removeFromCommunity")}
+                  </DropdownMenuItem>
+                </RowActionsMenu>
+              );
+            },
+          } satisfies AppColumnDef<UserCommunityMember>,
+        ]
+      : []),
   ];
 
   return (
@@ -295,14 +305,15 @@ export const SettingsCommunityGuestsPage = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="guest-initiatives">{t("guests.initiativesLabel")}</Label>
-              <MultiSelect
+              <Combobox
+                multiple
                 id="guest-initiatives"
-                selectedValues={initiativeIds}
-                options={(initiativesQuery.data ?? []).map((row) => ({
+                value={initiativeIds}
+                items={(initiativesQuery.data ?? []).map((row) => ({
                   value: String(row.id),
                   label: row.name,
                 }))}
-                onChange={setInitiativeIds}
+                onValueChange={setInitiativeIds}
                 placeholder={t("guests.initiativesPlaceholder")}
                 className="w-full max-w-72"
               />

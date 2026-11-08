@@ -10,6 +10,7 @@ from typing import Any
 from pathlib import Path
 
 
+from app.core.file_types import FileType
 from app.core.messages import QueryMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
@@ -19,7 +20,6 @@ from app.services.fields.spec import FieldType
 from app.services.marketplace import builtin
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant.dashboard_definition import WIDGET_SPECS
-from app.models.tenant.file import FileType
 from app.testing import (
     create_file,
     create_initiative_member,
@@ -651,7 +651,6 @@ class TestAskingAboutTheReader:
             session,
             actor.initiative,
             actor.user,
-            file_type=FileType.file,
             file_url="/uploads/1/brief.pdf",
             file_size=2048,
         )
@@ -862,3 +861,187 @@ class TestEveryShippedDashboardReportsOnLiveWork:
         assert not differing, (
             f"these statements counted work that is not live: {differing}"
         )
+
+
+WORKBOOK = {
+    "schema_version": 3,
+    "kind": "spreadsheet",
+    "sheets": [
+        {
+            "id": "s1",
+            "name": "Q3 Actuals",
+            "dimensions": {"rows": 4, "cols": 3},
+            "cells": {
+                "0:0": "Region",
+                "0:1": "Amount",
+                "0:2": "Due",
+                "1:0": "North",
+                "1:1": 10,
+                "1:2": "2026-01-05",
+                "2:0": "South",
+                "2:1": "=B2*2",
+                "2:2": "2026-02-05",
+                "3:0": "North",
+                "3:1": 5,
+                "3:2": "2026-02-10",
+            },
+        }
+    ],
+}
+
+
+async def test_a_statement_reads_a_spreadsheet_range_like_a_dataset(
+    client, session, acting_user
+):
+    """The header names the columns, a formula gives its value, and the range
+    groups, joins and describes as any dataset does; a built query over it
+    answers with the range's own fields for the builder to offer."""
+    actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    sheet = await create_file(
+        session,
+        actor.initiative,
+        actor.user,
+        name="Q3 Budget",
+        file_type=FileType.sheet,
+        content=WORKBOOK,
+    )
+    project = await create_project(session, actor.initiative, actor.user, name="North")
+    await create_task(session, project)
+    scoped = {"initiative_id": actor.initiative.id}
+
+    totals = await client.post(
+        actor.g("/query"),
+        json={
+            "sql": "SELECT region, sum(amount) AS total "
+            "FROM sheet('Q3 Budget', 'Q3 Actuals!A1:C') GROUP BY region ORDER BY total DESC",
+            **scoped,
+        },
+        headers=actor.headers,
+    )
+    assert totals.status_code == 200, totals.json()
+    assert totals.json()["rows"] == [["South", 20], ["North", 15]]
+    assert totals.json()["columns"][0]["name"] == "Region"
+    assert totals.json()["relations"] == ["files"]
+
+    joined = await client.post(
+        actor.g("/query"),
+        json={
+            "sql": f"SELECT b.region, count(t.id) AS tasks FROM sheet({sheet.id}, 'A:B') AS b "
+            "JOIN projects AS p ON p.name = b.region "
+            "JOIN tasks AS t ON t.project_id = p.id GROUP BY b.region",
+            **scoped,
+        },
+        headers=actor.headers,
+    )
+    assert joined.status_code == 200, joined.json()
+    assert joined.json()["rows"] == [["North", 2]]
+
+    described = await client.post(
+        actor.g("/query/describe"),
+        json={
+            "sql": "SELECT date_trunc('month', due) AS month, sum(amount) AS total "
+            "FROM sheet('Q3 Budget') GROUP BY 1",
+            **scoped,
+        },
+        headers=actor.headers,
+    )
+    assert described.status_code == 200, described.json()
+    assert described.json()["columns"][0]["grain"] == "month"
+    [read] = described.json()["sheets"]
+    assert read["alias"] == "sheet"
+    assert read["sheets"] == ["Q3 Actuals"]
+    assert [(f["name"], f["type"]) for f in read["fields"]] == [
+        ("Region", "text"),
+        ("Amount", "number"),
+        ("Due", "date"),
+    ]
+
+    built = await client.post(
+        actor.g("/query/build"),
+        json={
+            "sheet": {"file": sheet.id, "range": "Q3 Actuals!A1:B"},
+            "columns": [
+                {"field": "Region"},
+                {"field": "Amount", "aggregate": "sum", "alias": "total"},
+            ],
+            "group_by": ["Region"],
+            **scoped,
+        },
+        headers=actor.headers,
+    )
+    assert built.status_code == 200, built.json()
+    assert [f["name"] for f in built.json()["sheets"][0]["fields"]] == [
+        "Region",
+        "Amount",
+    ]
+    ran = await client.post(
+        actor.g("/query"),
+        json={"sql": built.json()["sql"], **scoped},
+        headers=actor.headers,
+    )
+    assert ran.json()["rows"] == [["North", 15], ["South", 20]]
+
+
+async def test_a_spreadsheet_is_found_only_where_its_reader_reaches_it(
+    client, session, acting_user
+):
+    """A file outside the reader's reach reads as absent, and every other way a
+    call can miss says which."""
+    author = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    stranger = await acting_user(guild_role=CommunityRole.member, guild=author.guild)
+    for _ in range(2):
+        await create_file(
+            session,
+            author.initiative,
+            author.user,
+            name="Twice",
+            file_type=FileType.sheet,
+            content=WORKBOOK,
+        )
+    await create_file(
+        session,
+        author.initiative,
+        author.user,
+        name="Q3 Budget",
+        file_type=FileType.sheet,
+        content=WORKBOOK,
+    )
+    notes = await create_file(session, author.initiative, author.user, name="Notes")
+
+    for actor, sql, code in (
+        (
+            stranger,
+            "SELECT region FROM sheet('Q3 Budget')",
+            QueryMessages.SHEET_NOT_FOUND,
+        ),
+        (
+            author,
+            "SELECT region FROM sheet('Twice')",
+            QueryMessages.SHEET_NAME_AMBIGUOUS,
+        ),
+        (
+            author,
+            f"SELECT region FROM sheet({notes.id})",
+            QueryMessages.SHEET_NOT_A_SPREADSHEET,
+        ),
+        (
+            author,
+            "SELECT region FROM sheet('Q3 Budget', 'Q4!A1')",
+            QueryMessages.SHEET_UNKNOWN,
+        ),
+        (
+            author,
+            "SELECT region FROM sheet('Q3 Budget', 'A1:B2:C3')",
+            QueryMessages.SHEET_RANGE_INVALID,
+        ),
+        (
+            author,
+            "SELECT region FROM sheet('Q3 Budget', 'A1:ZZ99999')",
+            QueryMessages.SHEET_RANGE_TOO_LARGE,
+        ),
+    ):
+        response = await client.post(
+            actor.g("/query"), json={"sql": sql}, headers=actor.headers
+        )
+        assert response.status_code == 400, (sql, response.json())
+        assert response.json()["detail"] == code, sql

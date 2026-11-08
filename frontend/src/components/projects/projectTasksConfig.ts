@@ -2,11 +2,12 @@ import {
   Calendar,
   CalendarDays,
   ChartGantt,
+  Clock,
+  FileImage,
   FileText,
   Hash,
-  Image,
   Kanban,
-  ListOrdered,
+  LayoutGrid,
   type LucideIcon,
   Megaphone,
   Table,
@@ -17,6 +18,7 @@ import type {
   ListLayoutReadKind,
   TaskPriority,
 } from "@/api/generated/initiativeAPI.schemas";
+import { MasonryIcon } from "@/components/files/collections/MasonryIcon";
 
 export type DueFilterOption = "all" | "today" | "7_days" | "30_days" | "overdue";
 
@@ -41,26 +43,25 @@ export const priorityDotClass: Record<TaskPriority, string> = {
 
 type Look = { icon: LucideIcon; labelKey: string };
 
-/** Each list layout's icon, and its name in `projects`. */
+/** Each list layout's icon, and its name, by a key that names its
+ *  namespace: a project's lists are in `projects`, a collection's in `files`. */
 export const listLayoutLooks: Record<ListLayoutReadKind, Look> = {
-  table: { icon: Table, labelKey: "tasks.viewTable" },
-  board: { icon: Kanban, labelKey: "tasks.viewBoard" },
-  gantt: { icon: ChartGantt, labelKey: "tasks.viewGantt" },
-  calendar: { icon: Calendar, labelKey: "tasks.viewCalendar" },
+  table: { icon: Table, labelKey: "projects:tasks.viewTable" },
+  board: { icon: Kanban, labelKey: "projects:tasks.viewBoard" },
+  gantt: { icon: ChartGantt, labelKey: "projects:tasks.viewGantt" },
+  calendar: { icon: Calendar, labelKey: "projects:tasks.viewCalendar" },
+  masonry: { icon: MasonryIcon, labelKey: "files:collections.views.masonry" },
+  grid: { icon: LayoutGrid, labelKey: "common:toolbar.viewGrid" },
+  timeline: { icon: Clock, labelKey: "files:collections.views.timeline" },
 };
-
-/** The lists a project leaves out of its menu as shipped: it shows its board
- *  alone. As `app.core.tools.HIDDEN_LISTS` says. */
-export const PROJECT_HIDDEN_LISTS: readonly ListLayoutReadKind[] = ["table", "gantt", "calendar"];
 
 /** Each detail layout's icon, and its name in `layouts`. */
 export const detailLayoutLooks: Record<DetailLayoutRead["kind"], Look> = {
   task: { icon: FileText, labelKey: "layouts:taskLayout" },
   calendar_event: { icon: CalendarDays, labelKey: "layouts:eventDetail.name" },
-  queue_item: { icon: ListOrdered, labelKey: "layouts:queueItemDetail.name" },
-  gallery_image: { icon: Image, labelKey: "layouts:galleryImageDetail.name" },
   counter: { icon: Hash, labelKey: "layouts:counterDetail.name" },
   post: { icon: Megaphone, labelKey: "layouts:postDetail.name" },
+  file: { icon: FileImage, labelKey: "layouts:fileDetail.name" },
 };
 
 /** Any layout's icon and name. */

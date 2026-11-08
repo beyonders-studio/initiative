@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /**
  * A new password and its confirmation, with the length the policy asks for

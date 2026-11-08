@@ -8,14 +8,13 @@
     "projects": "Projects",
     "tasks": "Tasks",
     "files": "Files",
-    "queues": "Queues",
     "counterGroups": "Counter Groups",
     "calendars": "Calendars",
     "dashboards": "Dashboards",
     "results": "Results",
     "posts": "Posts",
-    "galleries": "Galleries",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Contacts"
   },
   "actions": {
     "addTask": "Add Task",

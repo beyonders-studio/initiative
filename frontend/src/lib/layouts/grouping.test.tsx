@@ -13,7 +13,7 @@ import {
   type GroupsResponse,
   type LayoutGrouping,
   type ListLayoutReadKind,
-  PropertyType,
+  MetadataType,
   type TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { propertyFieldId } from "@/lib/layouts/fields";
@@ -40,6 +40,7 @@ const BUILT_INS = [
   "date_group",
   "priority",
   "task_status_id",
+  "parent_task_id",
   "assignee_ids",
   "created_by",
   "tag_ids",
@@ -48,10 +49,10 @@ const BUILT_INS = [
 
 const sprint = buildPropertyDefinition({
   name: "Sprint",
-  type: PropertyType.multi_select,
+  type: MetadataType.multi_select,
   options: [buildPropertyOption({ value: "s1" }), buildPropertyOption({ value: "s2" })],
 });
-const note = buildPropertyDefinition({ name: "Note", type: PropertyType.text });
+const note = buildPropertyDefinition({ name: "Note", type: MetadataType.text });
 const sprintField = propertyFieldId(sprint.id);
 
 const all = groupables(TASK_GROUPINGS, taskFields([sprint, note]), t);
@@ -210,6 +211,11 @@ describe("a drop into another group", () => {
         options: [{ property_id: sprint.id, add: ["s2"], remove: ["s1"] }],
       },
     });
+  });
+
+  it("puts a task dropped into a task's band under that task, and out of every band under none", () => {
+    expect(moveOf("parent_task_id")?.("4", "7")).toEqual({ patch: { parent_task_id: 7 } });
+    expect(moveOf("parent_task_id")?.("4", NO_GROUP)).toEqual({ patch: { parent_task_id: null } });
   });
 
   it("writes a status drop as the status, and nothing for a date window", () => {

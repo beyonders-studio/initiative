@@ -319,7 +319,7 @@ class User(SQLModel, table=True):
     #: flag because the record of *when* is the point: it is what a deployment
     #: running a community directory keeps for the accounts that joined one.
     #: Whether it is asked for at all is the platform owner's switch
-    #: (``AppSetting.community_age_gate_enabled``).
+    #: (the rule ``community_age_gate_enabled``).
     age_confirmed_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
@@ -368,7 +368,7 @@ class User(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    last_task_assignment_digest_at: Optional[datetime] = Field(
+    last_coming_up_digest_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -400,6 +400,13 @@ class User(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
     task_completion_haptic_feedback: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default="true"),
+    )
+    #: Whether a task being added reads its due date, priority, repeat, tags
+    #: and assignees out of the words typed into its title. On until the
+    #: account turns it off; what it reads is shown before the task is added.
+    smart_task_titles: bool = Field(
         default=True,
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )

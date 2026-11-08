@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 import { CommunityExportCard } from "@/components/exports/CommunityExportCard";
 import { DataJobsTable } from "@/components/imports/DataJobsTable";
 import { ImportWizard } from "@/components/imports/ImportWizard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export const SettingsCommunityDataPage = () => {
   const { t } = useTranslation(["exports", "imports"]);

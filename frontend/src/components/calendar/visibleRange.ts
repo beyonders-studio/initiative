@@ -3,11 +3,14 @@ import {
   endOfMonth,
   endOfWeek,
   endOfYear,
+  format,
   startOfDay,
   startOfMonth,
   startOfWeek,
   startOfYear,
 } from "date-fns";
+
+import { dateRangeBounds, type LocalDateRange } from "@/ui/date-range-field";
 
 import type { CalendarViewMode } from "./CalendarView";
 
@@ -50,3 +53,17 @@ export function calendarVisibleRange(
       return { start: startOfMonth(focusDate), end: endOfMonth(focusDate) };
   }
 }
+
+const isoWithOffset = (date: Date): string => format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+
+/** The range as the calendar lists take it: `start_after` / `start_before`,
+ *  ISO with the viewer's offset. Nothing for an open end. */
+export const dateRangeParams = (
+  range: LocalDateRange
+): { start_after?: string; start_before?: string } => {
+  const { start, end } = dateRangeBounds(range);
+  return {
+    ...(start ? { start_after: isoWithOffset(start) } : {}),
+    ...(end ? { start_before: isoWithOffset(end) } : {}),
+  };
+};

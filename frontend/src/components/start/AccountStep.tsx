@@ -5,12 +5,12 @@ import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { StepField } from "@/components/start/stepParts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
-import { browserOffersPasskeys } from "@/lib/passkeys";
+import { passkeysRunHere } from "@/lib/passkeys";
 import { checkNewPassword } from "@/lib/passwordPolicy";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
 
 /**
  * The ways in this deployment offers: an address with a password and/or a
@@ -58,7 +58,7 @@ export const AccountStep = ({
   // A captcha token is spent by being checked, so every attempt gets a fresh
   // widget: bumping this remounts it.
   const [captchaKey, setCaptchaKey] = useState(0);
-  const keysOffered = passkeyLoginEnabled && browserOffersPasskeys();
+  const keysOffered = passkeyLoginEnabled && passkeysRunHere();
   const formDoor = passwordLoginEnabled || keysOffered;
   const incomplete = !email.trim() || (captcha !== null && !captchaToken) || blocked;
   // Its notice is still being read: wait, so it's there to agree to.

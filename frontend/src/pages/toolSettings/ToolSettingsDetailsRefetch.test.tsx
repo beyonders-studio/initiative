@@ -56,7 +56,7 @@ const renderSection = (arrived: ToolSettingsEntity) => {
         </button>
         <ToolSettingsProvider
           value={{
-            tool: Tool.queue,
+            tool: Tool.counter_group,
             entity,
             update: noopMutation(),
             setGrants: noopMutation(),
@@ -73,7 +73,7 @@ const renderSection = (arrived: ToolSettingsEntity) => {
 
 describe("a settings form during a background refetch", () => {
   it("keeps what has been typed when a fresh copy of the entity arrives", async () => {
-    // Somebody else moved something about this queue meanwhile — a comment
+    // Somebody else moved something about this group meanwhile — a comment
     // switch, a rename, anything the read schema carries.
     renderSection(buildEntity({ name: "Renamed by somebody else" }));
     const user = userEvent.setup();

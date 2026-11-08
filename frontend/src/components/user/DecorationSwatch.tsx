@@ -1,6 +1,6 @@
 import { TintedFrame } from "@/components/user/TintedFrame";
 import { type Decoration, decorationSrc, FRAME_APERTURE_INSET } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * One decoration, drawn the way its slot is worn.

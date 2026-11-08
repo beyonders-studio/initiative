@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildCalendarEvent, writerCan } from "@/__tests__/factories";
+import { buildCalendarEvent, buildToolLayoutSet, writerCan } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
@@ -88,6 +88,73 @@ describe("adding an event", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(close).toHaveBeenCalledWith(false);
+  });
+
+  it("counts whoever is invited and the repeat it is sent with as filled in", async () => {
+    const sent: Record<string, unknown>[] = [];
+    server.use(
+      communityHttp.get("/calendars/", () =>
+        HttpResponse.json({
+          items: [CALENDAR],
+          total_count: 1,
+          page: 1,
+          page_size: 200,
+          has_next: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            tool: "calendar",
+            layouts: [
+              {
+                kind: "calendar_event",
+                task_type_id: null,
+                task_type_name: null,
+                definition: {
+                  side: [
+                    { type: "field", props: { field: "attendees", required: true } },
+                    { type: "field", props: { field: "recurrence", required: true } },
+                  ],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      ),
+      communityHttp.post("/calendar-events/", async ({ request }) => {
+        sent.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(buildCalendarEvent({ id: 9, calendar_id: 7 }));
+      })
+    );
+    renderPage(() => (
+      <CreateEventDialog
+        open
+        onOpenChange={() => {}}
+        defaultStartDate="2026-10-20"
+        defaultStartTime="09:00"
+      />
+    ));
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByPlaceholderText("Event title"), "Dress rehearsal");
+    const add = screen.getByRole("button", { name: "Create Event" });
+    // Whoever adds it is invited, which fills in who is coming.
+    await waitFor(() =>
+      expect(document.querySelector('[data-required-missing="recurrence"]')).not.toBeNull()
+    );
+    expect(document.querySelector('[data-required-missing="attendees"]')).toBeNull();
+    expect(add).toBeDisabled();
+
+    await user.click(screen.getByRole("combobox", { name: "Repeat" }));
+    await user.click(await screen.findByRole("option", { name: "Daily" }));
+    await waitFor(() => expect(add).toBeEnabled());
+    await user.click(add);
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ recurrence: expect.stringContaining("FREQ=DAILY") });
+    expect(sent[0].attendee_ids).toHaveLength(1);
   });
 
   it.each(["09:00", "23:30"])(

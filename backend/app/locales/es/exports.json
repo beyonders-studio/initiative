@@ -5,7 +5,6 @@
   "footer": {
     "tasks": "Exportación de tareas",
     "project": "{{name}} — informe del proyecto",
-    "queue": "{{name}} — exportación de la cola",
     "counters": "{{name}} — exportación de contadores"
   },
   "summary": {
@@ -102,6 +101,23 @@
   },
   "values": {
     "yes": "Sí",
-    "no": "No"
+    "no": "No",
+    "signed": "Firmado por {{name}}, {{date}}"
+  },
+  "contacts": {
+    "name": "Nombre",
+    "type": "Tipo",
+    "person": "Persona",
+    "organization": "Organización",
+    "emails": "Correo {{n}}",
+    "emailsLabel": "Etiqueta de correo {{n}}",
+    "phones": "Teléfono {{n}}",
+    "phonesLabel": "Etiqueta de teléfono {{n}}",
+    "addresses": "Dirección {{n}}",
+    "addressesLabel": "Etiqueta de dirección {{n}}",
+    "websites": "Sitio web {{n}}",
+    "websitesLabel": "Etiqueta de sitio web {{n}}",
+    "partOf": "Organización",
+    "metadata": "Metadatos: {{name}}"
   }
 }

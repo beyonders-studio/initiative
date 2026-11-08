@@ -1,0 +1,338 @@
+{
+  "_about": "Repeats a task title says, read on Thursday 22 October 2026 at 10:00 with weeks starting Monday, and the RRULE each becomes. smartTitle.test.ts reads them in the browser's terms; app/core/recurrence_titles_test.py holds every rule to what the server takes. An UNTIL is the end of its day where the title was typed, so the frontend test compares it by `until` rather than as written.",
+  "now": "2026-10-22T10:00:00",
+  "weekStartsOn": 1,
+  "cases": [
+    {
+      "locale": "en",
+      "text": "Standup every weekday at 9am",
+      "title": "Standup",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Water plants every 3 days",
+      "title": "Water plants",
+      "rrule": "RRULE:FREQ=DAILY;INTERVAL=3",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Review every second week",
+      "title": "Review",
+      "rrule": "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Sync every third day",
+      "title": "Sync",
+      "rrule": "RRULE:FREQ=DAILY;INTERVAL=3",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Invoices every third tuesday",
+      "title": "Invoices",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=3TU",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Book club every last friday of the month",
+      "title": "Book club",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=-1FR",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Rent on the 1st of every month",
+      "title": "Rent",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Payroll every 1st and 15th",
+      "title": "Payroll",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=1,15",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Report every last day of the month",
+      "title": "Report",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=-1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Close books every last weekday of the month",
+      "title": "Close books",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Open the post every first weekday of the month",
+      "title": "Open the post",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Gym every mon, wed and fri",
+      "title": "Gym",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Brunch every weekend",
+      "title": "Brunch",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=SA,SU",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Birthday every oct 30",
+      "title": "Birthday",
+      "rrule": "RRULE:FREQ=YEARLY;BYMONTHDAY=28,29,30;BYSETPOS=-1;BYMONTH=10",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Taxes every year on april 15",
+      "title": "Taxes",
+      "rrule": "RRULE:FREQ=YEARLY;BYMONTHDAY=15;BYMONTH=4",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Meds every 4 hours",
+      "title": "Meds",
+      "rrule": "RRULE:FREQ=HOURLY;INTERVAL=4",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Stretch every hour",
+      "title": "Stretch",
+      "rrule": "RRULE:FREQ=HOURLY",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Lessons every week until dec 18",
+      "title": "Lessons",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=TH;UNTIL=20261219T075959Z",
+      "strategy": "fixed",
+      "until": "2026-12-18"
+    },
+    {
+      "locale": "en",
+      "text": "Physio every tuesday 10 times",
+      "title": "Physio",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=10",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Board every 2 months on the last thursday",
+      "title": "Board",
+      "rrule": "RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=-1TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Retro every other friday",
+      "title": "Retro",
+      "rrule": "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=FR",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Bills the 15th of each month",
+      "title": "Bills",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=15",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Check-in every third day of the month",
+      "title": "Check-in",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=3",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Cleanup every 31st",
+      "title": "Cleanup",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=28,29,30,31;BYSETPOS=-1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Water the fern every month on the 1st and 15th",
+      "title": "Water the fern",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=1,15",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Every third second of the month",
+      "title": "Every third second of the month",
+      "rrule": null,
+      "strategy": null
+    },
+    {
+      "locale": "de",
+      "text": "Sitzung jeden zweiten Dienstag im Monat",
+      "title": "Sitzung",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=2TU",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "de",
+      "text": "Gießen jede zweite Woche",
+      "title": "Gießen",
+      "rrule": "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "de",
+      "text": "Miete am 1. jedes Monats",
+      "title": "Miete",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "de",
+      "text": "Sport jeden Montag und Donnerstag",
+      "title": "Sport",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=MO,TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "es",
+      "text": "Reunión el último viernes de cada mes",
+      "title": "Reunión",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=-1FR",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "es",
+      "text": "Pagar todos los días hasta el 30 de noviembre",
+      "title": "Pagar",
+      "rrule": "RRULE:FREQ=DAILY;UNTIL=20261201T075959Z",
+      "strategy": "fixed",
+      "until": "2026-11-30"
+    },
+    {
+      "locale": "es",
+      "text": "Medicina cada 6 horas",
+      "title": "Medicina",
+      "rrule": "RRULE:FREQ=HOURLY;INTERVAL=6",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "fr",
+      "text": "Réunion le premier lundi de chaque mois",
+      "title": "Réunion",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=1MO",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "fr",
+      "text": "Courses tous les samedis",
+      "title": "Courses",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=SA",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "fr",
+      "text": "Rapport chaque 1er du mois",
+      "title": "Rapport",
+      "rrule": "RRULE:FREQ=MONTHLY;BYMONTHDAY=1",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "fr",
+      "text": "Sport toutes les 2 semaines",
+      "title": "Sport",
+      "rrule": "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Water the plants ev week",
+      "title": "Water the plants",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Mow the lawn every! 2 weeks",
+      "title": "Mow the lawn",
+      "rrule": "RRULE:FREQ=WEEKLY;INTERVAL=2",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Haircut ev! 6 weeks",
+      "title": "Haircut",
+      "rrule": "RRULE:FREQ=WEEKLY;INTERVAL=6",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Call home every! sunday at 6pm",
+      "title": "Call home",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=SU",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Review the budget ev! third tuesday",
+      "title": "Review the budget",
+      "rrule": "RRULE:FREQ=MONTHLY;BYDAY=3TU",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Descale the kettle ev! month",
+      "title": "Descale the kettle",
+      "rrule": "RRULE:FREQ=MONTHLY",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Renew the passport every! 10 years",
+      "title": "Renew the passport",
+      "rrule": "RRULE:FREQ=YEARLY;INTERVAL=10",
+      "strategy": "rolling"
+    },
+    {
+      "locale": "en",
+      "text": "Charge the EV every week",
+      "title": "Charge the EV",
+      "rrule": "RRULE:FREQ=WEEKLY;BYDAY=TH",
+      "strategy": "fixed"
+    },
+    {
+      "locale": "en",
+      "text": "Fix the EV charger",
+      "title": "Fix the EV charger",
+      "rrule": null,
+      "strategy": null
+    },
+    {
+      "locale": "fr",
+      "text": "Arroser chaque! semaine",
+      "title": "Arroser",
+      "rrule": "RRULE:FREQ=WEEKLY",
+      "strategy": "rolling"
+    }
+  ]
+}

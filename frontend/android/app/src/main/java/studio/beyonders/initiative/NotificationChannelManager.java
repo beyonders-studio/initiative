@@ -26,7 +26,9 @@ public class NotificationChannelManager {
 
     // Channel IDs - must match the backend's PUSH_CHANNELS values exactly
     public static final String CHANNEL_TASK_ASSIGNMENT = "task_assignment";
-    public static final String CHANNEL_OVERDUE_TASKS = "overdue_tasks";
+    // Both digests, Overdue tasks and Coming up. The id is the first digest's,
+    // kept so an installed app goes on receiving both.
+    public static final String CHANNEL_DIGESTS = "overdue_tasks";
     public static final String CHANNEL_INITIATIVE_ADDED = "initiative_added";
     public static final String CHANNEL_PROJECT_ADDED = "project_added";
     public static final String CHANNEL_USER_PENDING_APPROVAL = "user_pending_approval";
@@ -68,12 +70,12 @@ public class NotificationChannelManager {
             NotificationManager.IMPORTANCE_HIGH
         );
 
-        // 2. Overdue Tasks Channel
+        // 2. Digests Channel
         createChannel(
             notificationManager,
-            CHANNEL_OVERDUE_TASKS,
-            "Overdue Tasks",
-            "Your daily summary of tasks past their due date",
+            CHANNEL_DIGESTS,
+            "Digests",
+            "Your scheduled summaries",
             NotificationManager.IMPORTANCE_DEFAULT
         );
 

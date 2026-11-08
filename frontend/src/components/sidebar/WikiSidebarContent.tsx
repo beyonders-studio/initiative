@@ -11,14 +11,14 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
-import { AddWikiFileDialog } from "@/components/initiativeTools/wikis/AddWikiFileDialog";
+import { HiddenFilesRequest } from "@/components/access/RequestAccess";
+import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { WikiPageActions } from "@/components/initiativeTools/wikis/WikiPageActions";
 import {
   useWikiTreeExpansion,
   WikiPageTree,
 } from "@/components/initiativeTools/wikis/WikiPageTree";
 import { SubscribeButton } from "@/components/SubscribeButton";
-import { Button } from "@/components/ui/button";
 import {
   SidebarContent,
   SidebarGroup,
@@ -28,9 +28,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+} from "@/components/sidebar/sidebar";
 import {
+  useAddWikiFile,
   useAddWikiPage,
   useMoveWikiFile,
   useMoveWikiPage,
@@ -41,6 +41,8 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { TOOL_ICONS, toolSettingsRoute, wikiFileRoute, wikiPageRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 // Adding a file to a wiki is named by the files tool itself, so the row
 // says which tool it reaches into rather than inventing a second mark for it.
@@ -81,11 +83,22 @@ export const WikiSidebarContent = ({
   const createPage = useAddWikiPage(wikiId, initiativeId);
   // Putting a file in the wiki, and taking one back out.
   const [addingFile, setAddingFile] = useState(false);
+  const addFile = useAddWikiFile(wikiId, {
+    onSuccess: () => {
+      toast.success(t("files.added"));
+      setAddingFile(false);
+    },
+  });
   const removeFile = useRemoveWikiFile(wikiId);
   const movePage = useMoveWikiPage(wikiId);
   const moveFile = useMoveWikiFile(wikiId);
 
   const pages = pagesQuery.data?.items ?? [];
+  // A file already in the wiki is not offered again.
+  const filed = useMemo(
+    () => new Set(pages.filter((page) => page.kind === WikiPageKind.file).map((page) => page.id)),
+    [pages]
+  );
 
   // Which rows are open. Held here rather than inside the tree because the
   // button over it acts on the same set the rows do.
@@ -253,6 +266,13 @@ export const WikiSidebarContent = ({
                 }
                 accentColor={wikiQuery.data?.accent_color}
               />
+              {wikiQuery.data ? (
+                <HiddenFilesRequest
+                  hidden={wikiQuery.data.hidden_files}
+                  target={{ wiki_id: wikiId }}
+                  className="mx-2 my-2 px-3 py-2"
+                />
+              ) : null}
               {canWrite ? (
                 <SidebarMenu>
                   <SidebarMenuItem>
@@ -278,12 +298,14 @@ export const WikiSidebarContent = ({
         </SidebarGroup>
       </SidebarContent>
 
-      <AddWikiFileDialog
-        wikiId={wikiId}
+      <FileChooserDialog
         initiativeId={initiativeId}
-        pages={pages}
+        exclude={filed}
         open={addingFile}
         onOpenChange={setAddingFile}
+        onPick={(fileId) => addFile.mutate(fileId)}
+        pending={addFile.isPending}
+        text={{ title: t("files.addFile"), description: t("files.pick"), none: t("files.none") }}
       />
     </>
   );

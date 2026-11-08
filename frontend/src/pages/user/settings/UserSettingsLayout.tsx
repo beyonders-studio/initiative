@@ -3,11 +3,13 @@ import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
+import { VersionDialog } from "@/components/VersionDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
 import { usePrivacySections } from "@/hooks/usePrivacySections";
 import { matchActiveTab } from "@/lib/tabs";
+import { Button } from "@/ui/button";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 const userSettingsTabs = [
   { value: "profile", labelKey: "layout.tabs.profile", path: "/profile" },
@@ -20,9 +22,11 @@ const userSettingsTabs = [
 ] as const;
 
 export const UserSettingsLayout = () => {
-  const { t } = useTranslation("settings");
+  const { t } = useTranslation(["settings", "common"]);
   const { user } = useAuth();
-  const location = useLocation();
+  const { data: latestVersion, isLoading: isLoadingVersion } = useLatestVersion();
+  const currentVersion = __APP_VERSION__;
+  const pathname = useLocation({ select: (location) => location.pathname });
   const router = useRouter();
   // Privacy is offered while any of its sections has something to set here.
   const privacy = usePrivacySections();
@@ -45,7 +49,7 @@ export const UserSettingsLayout = () => {
       label: t(tab.labelKey),
       path: tab.path,
     }));
-  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   const activeTab = matchActiveTab(tabs, normalizedPath, "registration");
 
   return (
@@ -60,6 +64,25 @@ export const UserSettingsLayout = () => {
           <Outlet />
         </Suspense>
       </SettingsTabsNav>
+      {/* Which version this is, and what has changed lately: there for
+          whoever wants it, and nowhere anyone passes on the way to something
+          else. Updating is the Update button's, not this. */}
+      <div className="flex items-center gap-3 text-muted-foreground text-xs">
+        <span>{t("layout.version", { version: currentVersion })}</span>
+        <VersionDialog
+          currentVersion={currentVersion}
+          latestVersion={latestVersion}
+          hasUpdate={Boolean(latestVersion && compareVersions(latestVersion, currentVersion) > 0)}
+          isLoadingVersion={isLoadingVersion}
+        >
+          <button
+            type="button"
+            className="cursor-pointer underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {t("common:appUpdate.whatsNew")}
+          </button>
+        </VersionDialog>
+      </div>
     </div>
   );
 };

@@ -1,17 +1,21 @@
-"""Import endpoints: envelopes, foreign-source files, Jira, and backup restores.
+"""Import endpoints: envelopes, foreign-source files, spreadsheets of
+contacts, Jira, and backup restores.
 
 Every route here writes, so every route re-checks that the community is
 writable. The engine behind them is shared: whatever file or site the work
-arrived from, it becomes an envelope, and one apply path puts the rows in.
-
-NOTE: the job routes use literal paths plus a parametric ``/{job_id}``; every
-literal route MUST stay declared before the parametric ones.
+arrived from, it becomes an envelope, and one apply path puts the rows in. A
+spreadsheet of contacts is the one exception, made a row at a time through
+the contact's own create, on the same jobs and worker.
+Reading an import job is ``data_jobs``'s.
 """
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Optional
+from pathlib import Path
+from typing import Annotated, BinaryIO, Optional
 
 from fastapi import (
     APIRouter,
@@ -20,42 +24,46 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Response,
     UploadFile,
     status,
 )
 from fastapi.responses import JSONResponse
-from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
-    GuildContext,
     RLSSessionDep,
     get_current_active_user,
     require_seat,
+    GuildContext,
     GuildContextDep,
 )
 from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
-from app.core.messages import ImportEngineMessages
+from app.core.messages import ImportEngineMessages, ResumableMessages
 from app.core.version import get_version
 from app.models.platform.user import User
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.schemas.tenant.atlassian import (
     AtlassianConnectRequest,
     AtlassianConnectResponse,
     AtlassianImportRequest,
 )
 from app.schemas.tenant.import_job import (
+    ContactCsvImportRequest,
+    ContactCsvPreview,
     EnvelopeImportRequest,
     EnvelopeImportResponse,
     ForeignImportRequest,
     ForeignPreview,
     ForeignSourceOption,
-    ImportJobRead,
-    serialize_import_job,
 )
+from app.schemas.tenant.data_job import DataJobRead, serialize_data_job
+from app.services import data_jobs, resumable
 from app.services.import_engine import atlassian as atlassian_service
 from app.services.import_engine import atlassian_job
 from app.services.import_engine import backup as backup_service
+from app.services.import_engine import contacts_csv
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import envelope_archive
 from app.services.import_engine import foreign as foreign_service
@@ -66,13 +74,12 @@ from app.services.import_engine.engine import (
     spooled_upload,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.storage import get_guild_storage, open_seekable
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-_LIST_LIMIT = 50
 
 #: The most property names one confirm may untick.
 _MAX_EXCLUDED_PROPERTIES = 500
@@ -94,16 +101,22 @@ def _upload_bytes() -> int:
     return import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES + MULTIPART_SLACK_BYTES
 
 
-def _require_writable(guild_context: GuildContext) -> None:
-    """Imports are writes, always — no inline carve-out for read-only actors
-    (the inverse of the export engine's read-friendly inline path). A guild in
-    read_only lifecycle can't author rows, and neither can a grantee: a grant
-    reaches existing content, whatever level it carries."""
-    if guild_context.content_read_only or guild_context.is_pam:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ImportEngineMessages.IMPORT_WRITE_REQUIRED,
+def _started(outcome: InlineImport | DataJob, guild_context: GuildContext) -> Response:
+    """201 with the counts when an import applied in the request, 202 with its
+    job when it did not."""
+    if isinstance(outcome, InlineImport):
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=EnvelopeImportResponse(result=outcome.result).model_dump(
+                mode="json"
+            ),
         )
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content=serialize_data_job(outcome, guild_id=guild_context.guild_id).model_dump(
+            mode="json"
+        ),
+    )
 
 
 @router.post("/envelope", response_model=None, status_code=status.HTTP_201_CREATED)
@@ -127,7 +140,7 @@ async def import_envelope(
     # enforced by BodySizeLimitMiddleware at the ASGI seam — a handler-level
     # check would run only after FastAPI had already buffered and parsed the
     # body.
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     outcome = await import_engine.start_envelope_import(
         session,
         user=current_user,
@@ -136,19 +149,7 @@ async def import_envelope(
         envelope=payload.envelope,
     )
 
-    if isinstance(outcome, InlineImport):
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=EnvelopeImportResponse(result=outcome.result).model_dump(
-                mode="json"
-            ),
-        )
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_import_job(
-            outcome, guild_id=guild_context.guild_id
-        ).model_dump(mode="json"),
-    )
+    return _started(outcome, guild_context)
 
 
 @router.post(
@@ -167,12 +168,12 @@ async def import_envelope_archive(
         "holding another tool's export is refused",
     ),
 ) -> Response:
-    """Import an export that travels as a zip — a gallery with its pictures —
+    """Import an export that travels as a zip — a wiki with its files —
     into the chosen initiative. The zip holds one envelope at its top level and
     the files it names under ``assets/``; the files are stored first, then the
     envelope imports exactly as ``POST /imports/envelope`` imports one, with
     the same responses."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     async with spooled_upload(
         file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
     ) as payload:
@@ -185,19 +186,7 @@ async def import_envelope_archive(
             expected_type=envelope_type,
         )
 
-    if isinstance(outcome, InlineImport):
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=EnvelopeImportResponse(result=outcome.result).model_dump(
-                mode="json"
-            ),
-        )
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_import_job(
-            outcome, guild_id=guild_context.guild_id
-        ).model_dump(mode="json"),
-    )
+    return _started(outcome, guild_context)
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +213,7 @@ async def preview_foreign_import(
     somebody's file on the community's behalf, and a community nobody can
     write to has nothing to read it for.
     """
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     foreign_source = foreign_service.get_source(source)
     options = foreign_service.read_preview(foreign_source, content)
     return ForeignPreview(
@@ -260,7 +249,7 @@ async def import_foreign(
     Answers exactly as ``/imports/envelope`` does — 201 with the counts when
     it applied in the request, 202 with the job when it did not.
     """
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     foreign_source = foreign_service.get_source(source)
     mapped = foreign_service.build(
         foreign_source,
@@ -276,19 +265,56 @@ async def import_foreign(
         envelope=mapped.envelope,
     )
 
-    if isinstance(started, InlineImport):
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=EnvelopeImportResponse(result=started.result).model_dump(
-                mode="json"
-            ),
-        )
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_import_job(
-            started, guild_id=guild_context.guild_id
-        ).model_dump(mode="json"),
+    return _started(started, guild_context)
+
+
+# ---------------------------------------------------------------------------
+# Contacts from a spreadsheet
+# ---------------------------------------------------------------------------
+
+
+@router.post("/contacts/preview", response_model=ContactCsvPreview)
+@max_body(_envelope_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
+async def preview_contacts_import(
+    content: Annotated[str, Body(media_type="text/plain")],
+    session: RLSSessionDep,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    initiative_id: Optional[int] = Query(
+        default=None,
+        description="The initiative the contacts go into, whose properties a "
+        "column headed with one's name fills; none for the community's contacts",
+    ),
+) -> ContactCsvPreview:
+    """Say what a spreadsheet of contacts holds, without keeping any of it:
+    its header, how many rows it has, the first few, and what each column
+    looks like it holds. A contacts export's own columns read as what they
+    hold, so it comes back in with nothing to choose."""
+    import_engine.require_writable(guild_context)
+    return await contacts_csv.preview(session, content, initiative_id=initiative_id)
+
+
+@router.post("/contacts", response_model=None, status_code=status.HTTP_201_CREATED)
+@max_body(_envelope_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
+async def import_contacts(
+    payload: ContactCsvImportRequest,
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+) -> Response:
+    """Make a contact of each row of a spreadsheet, its columns read as
+    ``columns`` says, in an initiative or, with none, the community's
+    contacts. Each is made as ``POST /contacts/`` makes one, and needs what
+    that needs there. A row that does not read as a contact is left out and
+    named in the result's ``failed_rows``.
+
+    Answers as ``/imports/envelope`` does — 201 with the counts when it
+    applied in the request, 202 with the job when it did not."""
+    import_engine.require_writable(guild_context)
+    started = await contacts_csv.start_import(
+        session, context=guild_context, user=current_user, request=payload
     )
+    return _started(started, guild_context)
 
 
 @router.post(
@@ -319,7 +345,7 @@ async def connect_atlassian(
     here — the target and the create permission for it are resolved on the
     start, and again by the worker at apply time.
     """
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     if guild_context.grant is not None:
         # A break-glass or support grant reaches existing content; it does not
         # get to make this server talk to somebody else's on its behalf.
@@ -344,7 +370,7 @@ async def connect_atlassian(
 
 @router.post(
     "/atlassian/import",
-    response_model=ImportJobRead,
+    response_model=DataJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
 @max_body(lambda: ATLASSIAN_MAX_REQUEST_BYTES, ImportEngineMessages.IMPORT_TOO_LARGE)
@@ -353,7 +379,7 @@ async def start_atlassian_import(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> ImportJobRead:
+) -> DataJobRead:
     """Start reading Jira projects and Confluence spaces into an initiative.
 
     One job for both: projects arrive as projects, each space as a wiki, and
@@ -368,7 +394,7 @@ async def start_atlassian_import(
     The initiative needs projects switched on for projects, wikis for spaces,
     and the caller needs to be able to create them there. That is checked
     now, again before the site is read, and again when the bundle is applied."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     if guild_context.grant is not None:
         # A grant reaches existing content, not this server's outbound
         # connections.
@@ -391,12 +417,12 @@ async def start_atlassian_import(
         include_comments=payload.include_comments,
         include_attachments=payload.include_attachments,
     )
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
 @router.post(
     "/atlassian/export",
-    response_model=ImportJobRead,
+    response_model=DataJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
 @max_body(_upload_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
@@ -404,11 +430,13 @@ async def start_confluence_export_import(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    file: UploadFile = File(...),
     initiative_id: int = Form(...),
     include_attachments: bool = Form(True),
-) -> ImportJobRead:
-    """Start reading a Confluence space's HTML export into an initiative.
+    file: UploadFile | None = File(None),
+    upload_id: str | None = Form(None),
+) -> DataJobRead:
+    """Start reading a Confluence space's HTML export into an initiative,
+    sent as ``file`` or as a resumable upload named by ``upload_id``.
 
     The zip Confluence's "Export space → HTML" writes, for a site this server
     cannot reach or somebody would rather not hand a token to. It is staged
@@ -416,15 +444,15 @@ async def start_confluence_export_import(
     a site, and parks it at ``staged`` with the same plan for
     ``POST /imports/jobs/{id}/confirm``. The initiative needs wikis switched on
     and the caller able to create one there."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     if guild_context.grant is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ImportEngineMessages.IMPORT_WRITE_REQUIRED,
         )
-    async with spooled_upload(
-        file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
-    ) as payload:
+    async with _payload(
+        session, guild_context, file, upload_id, "atlassian_export", initiative_id
+    ) as (payload, payload_ref):
         job = await atlassian_job.start_export(
             session,
             user=current_user,
@@ -432,47 +460,18 @@ async def start_confluence_export_import(
             initiative_id=initiative_id,
             payload=payload,
             include_attachments=include_attachments,
+            payload_ref=payload_ref,
         )
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
-@router.get("/jobs", response_model=list[ImportJobRead])
-async def list_import_jobs(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
-) -> list[ImportJobRead]:
-    """The caller's import jobs, newest first (RLS scopes the rows: own rows,
-    or the whole guild for a guild admin)."""
-    jobs = await session.exec(
-        select(ImportJob).order_by(ImportJob.created_at.desc()).limit(_LIST_LIMIT)
-    )
-    return [serialize_import_job(job, guild_id=guild_context.guild_id) for job in jobs]
-
-
-@router.get("/jobs/{job_id}", response_model=ImportJobRead)
-async def get_import_job(
-    job_id: int,
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
-) -> ImportJobRead:
-    job = await session.get(ImportJob, job_id)
-    if job is None:  # includes rows RLS hides — 404, never 403
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ImportEngineMessages.IMPORT_JOB_NOT_FOUND,
-        )
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
-
-
-@router.delete("/jobs/{job_id}", response_model=ImportJobRead)
+@router.delete("/jobs/{job_id}", response_model=DataJobRead)
 async def cancel_import_job(
     job_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> ImportJobRead:
+) -> DataJobRead:
     """Cancel a job that hasn't started applying (staged, queued, or still
     fetching from its source); its staged payload is deleted. A fetch writes
     nothing but that payload, so stopping one mid-read is safe — the worker
@@ -480,33 +479,86 @@ async def cancel_import_job(
     terminal job is not cancellable — 409 (an interrupted apply would leave
     half-committed content). The row is locked, as the worker locks it to
     claim, so the status read here is the one the cancel replaces."""
-    job = await session.get(ImportJob, job_id, with_for_update=True)
+    job = await data_jobs.find(
+        session, job_id, DataJobDirection.import_, for_update=True
+    )
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ImportEngineMessages.IMPORT_JOB_NOT_FOUND,
         )
     if job.status not in (
-        ImportJobStatus.staged,
-        ImportJobStatus.queued,
-        ImportJobStatus.fetching,
+        DataJobStatus.staged,
+        DataJobStatus.queued,
+        DataJobStatus.fetching,
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=ImportEngineMessages.IMPORT_NOT_CANCELLABLE,
         )
     await asyncio.to_thread(
-        import_engine.delete_payload, guild_context.guild_id, job.payload_ref
+        import_engine.delete_payload, guild_context.guild_id, job.file_ref
     )
     # Everything the job was lent goes back with the payload — a cancelled
     # import has no further use for the secret it was given.
     job.secret_encrypted = None
-    job.status = ImportJobStatus.cancelled
-    job.payload_ref = None
+    job.status = DataJobStatus.cancelled
+    job.file_ref = None
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
+
+
+@asynccontextmanager
+async def _payload(
+    session: AsyncSession,
+    guild_context: GuildContext,
+    file: UploadFile | None,
+    upload_id: str | None,
+    purpose: str,
+    initiative_id: int | None,
+) -> AsyncIterator[tuple[Path | BinaryIO, str | None]]:
+    """An import's zip for the block, with its key in the community's storage
+    when it is already there: sent with the request as ``file`` and copied to
+    a local file, or taken from the resumable upload ``upload_id`` and read
+    where it is stored, a range at a time."""
+    if (file is None) == (upload_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ImportEngineMessages.IMPORT_INVALID_PARAMS,
+        )
+    if file is not None:
+        # Byte cap: BodySizeLimitMiddleware already rejected an oversized or
+        # chunked-over-cap request at the ASGI seam; the bounded copy to a
+        # temporary file is the in-process backstop.
+        async with spooled_upload(
+            file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
+        ) as payload:
+            yield payload, None
+        return
+    assert upload_id is not None
+    staged = await resumable.take(
+        session,
+        guild_context.guild_id,
+        upload_id,
+        purpose=purpose,
+        user_id=guild_context.user_id,
+        initiative_id=initiative_id,
+    )
+    source = await asyncio.to_thread(
+        open_seekable,
+        get_guild_storage(guild_context.guild_id),
+        staged.staging_key,
+        staged.length,
+    )
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ResumableMessages.NOT_FOUND,
+        )
+    with source:
+        yield source, staged.staging_key
 
 
 # ---------------------------------------------------------------------------
@@ -514,50 +566,49 @@ async def cancel_import_job(
 # ---------------------------------------------------------------------------
 
 
-@router.post(
-    "/backup", response_model=ImportJobRead, status_code=status.HTTP_201_CREATED
-)
+@router.post("/backup", response_model=DataJobRead, status_code=status.HTTP_201_CREATED)
 @max_body(_upload_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
 async def upload_backup(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    file: UploadFile = File(...),
-) -> ImportJobRead:
-    """Upload a backup zip and get its pre-flight plan. The zip is staged in
+    file: UploadFile | None = File(None),
+    upload_id: str | None = Form(None),
+) -> DataJobRead:
+    """Upload a backup zip, as ``file`` or as a resumable upload named by
+    ``upload_id``, and get its pre-flight plan. The zip is staged in
     guild storage and the job parked as ``staged`` (nothing is imported yet);
     ``POST /imports/jobs/{id}/confirm`` starts the apply. Unconfirmed staged
     backups expire after IMPORT_STAGED_TTL_HOURS. The community's seat only."""
     require_seat(guild_context, detail=ImportEngineMessages.IMPORT_SUPERADMIN_REQUIRED)
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     guild_id = guild_context.guild_id
 
-    # Byte cap: BodySizeLimitMiddleware already rejected an oversized or
-    # chunked-over-cap request at the ASGI seam; the bounded copy to a
-    # temporary file is the in-process backstop.
-    async with spooled_upload(
-        file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
-    ) as payload:
+    async with _payload(session, guild_context, file, upload_id, "backup", None) as (
+        payload,
+        payload_ref,
+    ):
         job = await backup_service.stage_backup_job(
             session,
             guild_id=guild_id,
             user=current_user,
             payload=payload,
-            status=ImportJobStatus.staged,
+            status=DataJobStatus.staged,
+            payload_ref=payload_ref,
         )
     await session.commit()
     await session.refresh(job)
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
-@router.post("/jobs/{job_id}/confirm", response_model=ImportJobRead)
+@router.post("/jobs/{job_id}/confirm", response_model=DataJobRead)
 async def confirm_import(
     job_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     body: Optional[dict] = None,
-) -> ImportJobRead:
+) -> DataJobRead:
     """Confirm a staged import: flips it to ``queued`` for the worker.
 
     Optional body ``{"include": {tool: bool}}`` narrows which tools apply
@@ -576,8 +627,8 @@ async def confirm_import(
     for when they dropped it; it is staged only to ask who the handles in it
     are, so that creator is the one who answers, and nobody else confirms on
     their behalf."""
-    _require_writable(guild_context)
-    job = await session.get(ImportJob, job_id)
+    import_engine.require_writable(guild_context)
+    job = await data_jobs.find(session, job_id, DataJobDirection.import_)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -594,7 +645,7 @@ async def confirm_import(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ImportEngineMessages.IMPORT_NOT_CONFIRMABLE,
         )
-    if job.status != ImportJobStatus.staged:
+    if job.status != DataJobStatus.staged:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=ImportEngineMessages.IMPORT_NOT_CONFIRMABLE,
@@ -605,11 +656,11 @@ async def confirm_import(
     now = datetime.now(timezone.utc)
     if job.expires_at is not None and job.expires_at <= now:
         await asyncio.to_thread(
-            import_engine.delete_payload, guild_context.guild_id, job.payload_ref
+            import_engine.delete_payload, guild_context.guild_id, job.file_ref
         )
         job.secret_encrypted = None
-        job.status = ImportJobStatus.expired
-        job.payload_ref = None
+        job.status = DataJobStatus.expired
+        job.file_ref = None
         session.add(job)
         await session.commit()
         raise HTTPException(
@@ -657,11 +708,11 @@ async def confirm_import(
                 detail=ImportEngineMessages.IMPORT_INVALID_PARAMS,
             )
         job.params = {**(job.params or {}), "exclude_properties": exclude_properties}
-    job.status = ImportJobStatus.queued
+    job.status = DataJobStatus.queued
     # Fresh TTL window: the confirmed job now waits on the worker, and a
     # nearly-elapsed staging TTL must not let GC sweep it out of the queue.
     job.expires_at = now + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS)
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)

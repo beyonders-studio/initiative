@@ -14,18 +14,6 @@ import {
 import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useRowCapacity } from "@/components/ui/overflow-toolbar";
 import {
   BULLET_LIST,
   cycleHeading,
@@ -38,7 +26,19 @@ import {
   toggleLinePrefix,
   toggleWrap,
 } from "@/lib/markdownEditing";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
+import { useRowCapacity } from "@/ui/overflow-toolbar";
 
 /**
  * The edits a keyboard shortcut reaches, by the key that reaches them.

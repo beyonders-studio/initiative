@@ -14,6 +14,8 @@ const state = vi.hoisted(() => ({
 }));
 const askMock = vi.hoisted(() => vi.fn());
 const openPortalMock = vi.hoisted(() => vi.fn());
+const openHelpMock = vi.hoisted(() => vi.fn());
+vi.mock("@/components/help/helpStore", () => ({ openHelp: openHelpMock }));
 
 vi.mock("@/hooks/useBillingPortal", () => ({
   useBillingPortal: () => ({
@@ -117,23 +119,19 @@ describe("CommunityStatusNotice", () => {
     expect(await screen.findByText("Something is wrong")).toBeInTheDocument();
   });
 
-  it("offers a support request when help is on", async () => {
+  it("asks the team about this community when help is on", async () => {
     state.support = { mode: "form", contact: null };
     renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Contact support" }));
-    expect(await screen.findByLabelText("Title")).toBeInTheDocument();
-    expect(screen.queryByText("Something is wrong")).toBeNull();
+    expect(openHelpMock).toHaveBeenCalledWith({ topic: "community", communityId: 7 });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
 
-  it("offers the address the deployment gave when it takes no requests", async () => {
+  it("opens Help, with the address the deployment gave, when it takes no requests", async () => {
     state.support = { mode: "email", contact: "help@example.org" };
     renderWithProviders(<CommunityStatusNotice community={seatCommunity()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Contact support" }));
-    expect(await screen.findByText("help@example.org")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Write an email" })).toHaveAttribute(
-      "href",
-      "mailto:help@example.org"
-    );
+    expect(openHelpMock).toHaveBeenCalledWith();
   });
 
   it("offers only OK when help is off", async () => {

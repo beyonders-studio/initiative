@@ -172,7 +172,7 @@ class TestMembership:
             manager.g(f"/initiatives/{manager.initiative.id}/members/{member.user.id}"),
             headers=manager.headers,
         )
-        assert response.status_code == 200, response.text
+        assert response.status_code == 204, response.text
 
         (row,) = emitted(capfd, AuditEventType.INITIATIVE_MEMBER_REMOVED)
         assert row["actor_user_id"] == manager.user.id

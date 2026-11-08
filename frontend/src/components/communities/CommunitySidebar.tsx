@@ -26,22 +26,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { Galaxy } from "@/components/icons/Galaxy";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useSidebar } from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebar } from "@/components/sidebar/sidebar";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
@@ -52,7 +37,22 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { getInitials } from "@/lib/initials";
 import { toast } from "@/lib/mascotToast";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import { BetaBadge } from "../BetaBadge";
 import { LogoIcon } from "../LogoIcon";
@@ -683,9 +683,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
   // shrinks to one while reordering, the mode closes itself rather than
   // leaving taps inert.
   const canReorder = memberCommunities.length > 1;
-  useEffect(() => {
-    if (!canReorder) setReorderMode(false);
-  }, [canReorder]);
+  if (!canReorder && reorderMode) setReorderMode(false);
 
   // --- Expandable "Communities" flyout state machine (mirrors MobileSidebar) ---
   // `expanded` is the desired state; `render`/`atOpen` decouple mount from the
@@ -909,7 +907,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
       // (SidebarGroup/SidebarMenuItem). Without a positive z-index here the
       // sticky rail (and its absolutely-positioned flyout) would paint beneath
       // those later-in-DOM siblings, bleeding the content through the flyout.
-      className="sticky top-0 z-30 flex max-h-dvh w-20 flex-col items-center gap-3 border-r bg-sidebar px-2 pb-4"
+      className="sticky top-0 z-30 flex max-h-app w-20 flex-col items-center gap-3 border-r bg-sidebar px-2 pb-4"
       style={{ paddingTop: "calc(var(--safe-area-inset-top) + 1rem)" }}
       onTouchStart={handleRailTouchStart}
       onTouchMove={handleRailTouchMove}
@@ -1051,7 +1049,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
             // Overlay the whole sidebar (rail + content column): stay anchored
             // at the rail's left edge and span the full sidebar width — on
             // mobile the drawer width, on desktop --sidebar-width.
-            className="absolute top-0 left-0 z-40 flex h-dvh w-[var(--sidebar-width-mobile,90vw)] flex-col border-r bg-sidebar shadow-lg md:w-[var(--sidebar-width,20rem)]"
+            className="absolute top-0 left-0 z-40 flex h-app w-[var(--sidebar-width-mobile,90vw)] flex-col border-r bg-sidebar shadow-lg md:w-[var(--sidebar-width,20rem)]"
             style={{
               transform: panelTransform,
               transition: drag ? "none" : `transform ${FLYOUT_TRANSITION_MS}ms ${FLYOUT_EASING}`,

@@ -1,4 +1,5 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import type {
   ListMyProjectsParams,
@@ -130,14 +131,15 @@ export const useTaskTypesOf = (projectIds: readonly number[]) => {
 };
 
 /** The ready-made types a project can add, grouped, in the reader's
- *  language. */
+ *  language, read again when it changes. */
 export const useTaskTypeGallery = (
   projectId: number,
   options?: QueryOpts<TaskTypeGalleryGroup[]>
 ) => {
   const communityId = useActiveCommunityId();
+  const { i18n } = useTranslation();
   return useQuery<TaskTypeGalleryGroup[]>({
-    queryKey: getListTaskTypeGalleryQueryKey(communityId, projectId),
+    queryKey: [...getListTaskTypeGalleryQueryKey(communityId, projectId), i18n.language],
     queryFn: () => listTaskTypeGallery(communityId, projectId),
     staleTime: Number.POSITIVE_INFINITY,
     ...options,

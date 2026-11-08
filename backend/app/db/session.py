@@ -605,6 +605,12 @@ def install_context(session: AsyncSession) -> InstallContext | None:
     return _standing(session, InstallContext)
 
 
+def actor_context(session: AsyncSession) -> GuildContext | InstallContext | None:
+    """The standing this session was routed with, a person's or an installed
+    plug-in's, or ``None`` for the system's own reads."""
+    return guild_context(session) or install_context(session)
+
+
 def require_actor_context(session: AsyncSession) -> GuildContext | InstallContext:
     """The standing this session was routed with, a person's or an installed
     plug-in's, for a caller on a route that serves either."""

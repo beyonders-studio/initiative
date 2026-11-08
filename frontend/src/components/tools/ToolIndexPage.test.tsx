@@ -5,17 +5,23 @@
  * its own copy of these tests. The cases come from the page's own `TOOL_INDEX`:
  * add a tool with an entry and it is covered here the moment it exists.
  *
- * What only one tool's list takes — a queue's status, a file's type — is
- * asked of that tool alone, at the bottom. So is what only one tool configures
- * today (files dropped on the list, the reader's own order): the page does it
- * for any tool whose entry asks, and files and projects are the ones that do.
+ * What only one tool's list takes — a file's type — is asked of that tool
+ * alone, at the bottom. So is what only one tool configures today (files
+ * dropped on the list, the reader's own order): the page does it for any tool
+ * whose entry asks, and files and projects are the ones that do.
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { buildNotificationPlace, buildProject, ownerCan, readerCan } from "@/__tests__/factories";
+import {
+  buildContact,
+  buildNotificationPlace,
+  buildProject,
+  ownerCan,
+  readerCan,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -32,6 +38,7 @@ import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
 import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
 import { TOOLS, toolCamelPlural, toolRouteSegment, toolViews } from "@/lib/tools";
+import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
 import type { TranslateFn } from "@/types/i18n";
 
 const INITIATIVE_ID = 1;
@@ -59,7 +66,9 @@ const shared = (key: string) => translate(key, { ns: "common" });
  */
 const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
   file: {
-    file_type: "native",
+    file_type: "lexical",
+    kind: "document",
+    file_url: null,
     featured_image_url: null,
     is_template: false,
     properties: [],
@@ -67,32 +76,33 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
     original_filename: null,
     smart_link_url: null,
   },
-  gallery: { cover: null, preview: [] },
   project: {
     icon: null,
     is_template: false,
     pinned_at: null,
     task_summary: { total: 0, completed: 0 },
   },
-  queue: { current_round: 1, is_active: true },
 };
 
-const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) => ({
-  description: null,
-  initiative_id: INITIATIVE_ID,
-  community_id: 1,
-  created_by: 1,
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z",
-  archived_at: null,
-  can: ownerCan(),
-  comments_enabled: false,
-  comment_count: 0,
-  tags: [],
-  grants: [],
-  ...CARD_FIELDS[tool],
-  ...fields,
-});
+const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) =>
+  tool === Tool.contact
+    ? buildContact({ initiative_id: INITIATIVE_ID, ...fields })
+    : {
+        description: null,
+        initiative_id: INITIATIVE_ID,
+        community_id: 1,
+        created_by: 1,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        archived_at: null,
+        can: ownerCan(),
+        comments_enabled: false,
+        comment_count: 0,
+        tags: [],
+        grants: [],
+        ...CARD_FIELDS[tool],
+        ...fields,
+      };
 
 /**
  * Serve the tool's list endpoint, honouring what every tool's page can ask
@@ -247,9 +257,7 @@ describe("the tool index page", () => {
     expect(requests.at(-1)?.get("page")).toBe("1");
     expect(requests.at(-1)?.get("page_size")).toBe("20");
     expect(
-      screen.getByText(
-        translate("pagination.rangeOf", { ns: "common", start: 1, end: 1, total: 1 })
-      )
+      screen.getByText(translate("pagination.rangeOf", { ns: "ui", start: 1, end: 1, total: 1 }))
     ).toBeInTheDocument();
   });
 
@@ -296,7 +304,7 @@ describe("the tool index page", () => {
 
 describe("the tool index page's property filter", () => {
   it("offers only the properties of the initiative the list is in", async () => {
-    stubList(Tool.queue, [row(Tool.queue, { id: 1, name: "Running" })]);
+    stubList(Tool.counter_group, [row(Tool.counter_group, { id: 1, name: "Running" })]);
     const asked: URLSearchParams[] = [];
     server.use(
       communityHttp.get("/property-definitions/", ({ request }) => {
@@ -305,77 +313,13 @@ describe("the tool index page's property filter", () => {
       })
     );
 
-    renderIndex(Tool.queue);
+    renderIndex(Tool.counter_group);
     await screen.findByText("Running");
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
 
     await waitFor(() => expect(asked.length).toBeGreaterThan(0));
     expect(asked.map((params) => params.get("initiative_id"))).toEqual(
       asked.map(() => String(INITIATIVE_ID))
-    );
-  });
-});
-
-describe("the queue index page", () => {
-  it("sends the status filter as is_active", async () => {
-    const requests = stubList(Tool.queue, [row(Tool.queue, { id: 1, name: "Running" })]);
-    const pick = async (label: string) => {
-      await userEvent.click(
-        screen.getByRole("combobox", { name: translate("filters.status", { ns: "queues" }) })
-      );
-      await userEvent.click(
-        await screen.findByRole("option", { name: translate(label, { ns: "queues" }) })
-      );
-    };
-
-    renderIndex(Tool.queue);
-    await screen.findByText("Running");
-    await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
-
-    await pick("filters.inactiveOnly");
-    await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("false"));
-    await pick("filters.activeOnly");
-    await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("true"));
-    await pick("filters.allStatuses");
-    await waitFor(() => expect(requests.at(-1)?.has("is_active")).toBe(false));
-  });
-});
-
-describe("the gallery index page", () => {
-  it("draws the newest four pictures of a gallery nobody chose a cover for", async () => {
-    const preview = [1, 2, 3, 4].map((id) => ({
-      image_id: id,
-      file_url: `/uploads/picture-${id}.png`,
-      thumbnail_url: null,
-      width: null,
-      height: null,
-    }));
-    // The list carries the pictures only when it is asked for them.
-    server.use(
-      communityHttp.get(`/${toolRouteSegment(Tool.gallery)}/`, ({ request }) => {
-        const asked = new URL(request.url).searchParams.get("include_preview") === "true";
-        return HttpResponse.json({
-          items: [
-            {
-              ...row(Tool.gallery, { id: 1, name: "Store assets" }),
-              preview: asked ? preview : [],
-            },
-          ],
-          total_count: 1,
-          page: 1,
-          page_size: 100,
-          has_next: false,
-        });
-      })
-    );
-
-    const { container } = renderIndex(Tool.gallery);
-    await screen.findByText("Store assets");
-
-    await waitFor(() =>
-      expect(
-        Array.from(container.querySelectorAll("img"), (img) => img.getAttribute("src"))
-      ).toEqual(preview.map((picture) => expect.stringContaining(picture.file_url)))
     );
   });
 });
@@ -415,25 +359,25 @@ describe("the tool index page's bulk actions", () => {
   };
 
   it("duplicates and deletes a selection through the tool's own routes", async () => {
-    stubList(Tool.queue, [
-      row(Tool.queue, { id: 4, name: "Standup" }),
-      row(Tool.queue, { id: 5, name: "Retro" }),
+    stubList(Tool.counter_group, [
+      row(Tool.counter_group, { id: 4, name: "Standup" }),
+      row(Tool.counter_group, { id: 5, name: "Retro" }),
     ]);
     const duplicated: string[] = [];
     const deleted: string[] = [];
     server.use(
-      communityHttp.post("/queues/:id/duplicate", ({ params }) => {
+      communityHttp.post("/counter-groups/:id/duplicate", ({ params }) => {
         duplicated.push(String(params.id));
         return HttpResponse.json({ id: 40, initiative_id: INITIATIVE_ID });
       }),
-      communityHttp.delete("/queues/:id", ({ params }) => {
+      communityHttp.delete("/counter-groups/:id", ({ params }) => {
         deleted.push(String(params.id));
         return new HttpResponse(null, { status: 204 });
       })
     );
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    renderIndex(Tool.queue);
+    renderIndex(Tool.counter_group);
     await screen.findByText("Standup");
 
     await select("Standup");
@@ -508,7 +452,8 @@ describe("the tool index page's bulk actions", () => {
 describe("the file index page", () => {
   const files = (key: string) => translate(key, { ns: "files" });
 
-  /** Rendered in the layout a reader left the list in. */
+  /** Rendered in the layout a reader left every files list in, as an older
+   *  release kept it on the account, with what community 1 keeps. */
   const renderIn = (
     layout: "grid" | "list" | "tags",
     canCreate = true,
@@ -516,8 +461,9 @@ describe("the file index page", () => {
   ) => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-      items: { [`${Tool.file}:view-mode`]: layout, ...kept },
+      items: { [`${Tool.file}:view-mode`]: layout },
     });
+    queryClient.setQueryData(viewPreferencesQueryKey(1), { items: { ...kept } });
     return renderPage(
       () => (
         <ToolIndexPage tool={Tool.file} fixedInitiativeId={INITIATIVE_ID} canCreate={canCreate} />
@@ -531,15 +477,15 @@ describe("the file index page", () => {
 
     renderIndex(Tool.file);
     await screen.findByText(copy(Tool.file, "emptyTitle"));
-    expect(requests.at(-1)?.get("file_type")).toBeNull();
+    expect(requests.at(-1)?.get("kind")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
     await userEvent.click(screen.getByRole("combobox", { name: files("filters.type") }));
     await userEvent.click(
-      await screen.findByRole("option", { name: files("filters.types.whiteboard") })
+      await screen.findByRole("option", { name: files("filters.kinds.whiteboard") })
     );
 
-    await waitFor(() => expect(requests.at(-1)?.get("file_type")).toBe("whiteboard"));
+    await waitFor(() => expect(requests.at(-1)?.get("kind")).toBe("whiteboard"));
     expect(requests.at(-1)?.get("is_template")).toBe("false");
   });
 
@@ -557,7 +503,7 @@ describe("the file index page", () => {
 
   it("opens its table newest first, and remembers another order for the next visit", async () => {
     const requests = stubList(Tool.file, [row(Tool.file, { id: 1, name: "Brief" })]);
-    const kept = keepViewPreferences();
+    const kept = keepViewPreferences(1);
 
     const first = renderIn("list");
     await screen.findByText("Brief");

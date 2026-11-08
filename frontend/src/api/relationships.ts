@@ -1,19 +1,18 @@
 /**
  * Links between things, as the one endpoint that serves all of them.
  *
- * The five per-tool attach routes — a project's files, a queue item's
- * files and tasks, an event's files — were the same request with
- * different kinds in it. So is everything here: what varies between attaching a
- * file to a project and a task to a queue item is which two things are
- * named, and that is an argument.
+ * The per-tool attach routes — a project's files, an event's files — were the
+ * same request with different kinds in it. So is everything here: what varies
+ * between attaching a file to a project and a task to an event is which two
+ * things are named, and that is an argument.
  */
 
 import {
+  type EndpointKind,
   type EndpointRef,
   type RelationshipCreate,
   type RelationshipRead,
   RelationshipType,
-  type SearchEntityType,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createRelationship as createRelationshipRequest,
@@ -45,7 +44,7 @@ export type Direction = "inbound" | "outbound" | "both";
 export const listRelated = (
   communityId: number,
   entity: EndpointRef,
-  otherType: SearchEntityType | null = null,
+  otherType: EndpointKind | null = null,
   relationshipType: RelationshipType | null = null,
   direction: Direction = "both"
 ): Promise<RelationshipRead[]> =>
@@ -85,7 +84,7 @@ export const createRelationship = (
 export const setRelated = (
   communityId: number,
   entity: EndpointRef,
-  otherType: SearchEntityType,
+  otherType: EndpointKind,
   otherIds: number[],
   relationshipType: RelationshipType = RelationshipType.attached
 ): Promise<RelationshipRead[]> =>

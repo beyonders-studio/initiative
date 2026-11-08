@@ -1,4 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsVendorSetupPage } from "@/pages/SettingsVendorSetupPage";
 
 export interface VendorSetupSearch {
   code?: string;
@@ -20,9 +22,5 @@ export const Route = createFileRoute(
     code: text(search.code),
     state: text(search.state),
   }),
-  component: lazyRouteComponent(() =>
-    import("@/pages/SettingsVendorSetupPage").then((m) => ({
-      default: m.SettingsVendorSetupPage,
-    }))
-  ),
+  component: SettingsVendorSetupPage,
 });

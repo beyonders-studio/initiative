@@ -20,17 +20,17 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSetPluginPlacementRoles, useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { declaredPages, hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export interface PluginPlacementPanelProps {
   plugin: CommunityPluginDetail;

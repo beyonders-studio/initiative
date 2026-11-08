@@ -19,26 +19,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { AddLinkDialog } from "@/components/entities/AddLinkDialog";
 import { EntityCard } from "@/components/entities/EntityCard";
-import { Button } from "@/components/ui/button";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DropOverlay } from "@/components/ui/file-drop";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useFileDrop } from "@/hooks/useFileDrop";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useRelatedStates } from "@/hooks/useRelatedStates";
 import {
@@ -47,7 +27,6 @@ import {
   useRelationsNeighbourhood,
   useUnrelate,
 } from "@/hooks/useRelationships";
-import { FILE_UPLOAD_ACCEPT } from "@/lib/fileUtils";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -59,7 +38,26 @@ import {
   type RelationGroupKey,
 } from "@/lib/relationships";
 import { getItem, setItem } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/ui/carousel";
+import { Collapsible, CollapsibleContent } from "@/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { DropOverlay } from "@/ui/file-drop";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * The grid every group draws into. `min(…, 100%)` keeps a card from overflowing
@@ -97,7 +95,6 @@ export type RelationsLayout = "tiles" | "rows" | "carousel" | "graph";
 const LAYOUT_ICONS: Record<RelationsLayout, LucideIcon> = {
   tiles: LayoutGrid,
   rows: Rows3,
-  // Not `GalleryHorizontalEnd`: that one is already the queue's own mark.
   carousel: GalleryHorizontal,
   graph: Waypoints,
 };
@@ -184,7 +181,6 @@ export const RelationsSection = ({
   // somebody who has files there and may make one — and only where a link
   // may be made at all. Unknown until the initiative loads, which reads as no.
   const canAdd = canEdit && assertable.length > 0;
-  const { maxUploadBytes } = useAppConfig();
   const initiativesQuery = useInitiatives({ enabled: canAdd && initiativeId != null });
   const initiative = initiativesQuery.data?.find((item) => item.id === initiativeId);
   const canUpload =
@@ -213,14 +209,10 @@ export const RelationsSection = ({
   // The whole section takes a file, not just a box inside the dialog: a file
   // dragged in from the desktop lands wherever the cursor is. Off while the
   // dialog is up — it has a drop target of its own.
-  const drop = useFileDrop(
-    canUpload && !adding,
-    (files) => {
-      const [first] = files;
-      if (first) openDialog(first);
-    },
-    { accept: FILE_UPLOAD_ACCEPT, maxBytes: maxUploadBytes }
-  );
+  const drop = useFileDrop(canUpload && !adding, (files) => {
+    const [first] = files;
+    if (first) openDialog(first);
+  });
 
   const unrelate = useUnrelate(anchorTool, {
     onSuccess: () => toast.success(t("removed")),

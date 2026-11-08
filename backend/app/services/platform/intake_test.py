@@ -9,13 +9,12 @@ from sqlmodel import select
 
 from app.core.intake import CaseField, IntakeStream
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.tenant import task_statuses as task_statuses_service
-from app.models.tenant.property import PropertyDefinition
+from app.models.tenant.metadata import MetadataDefinition
 from app.services.platform import case_activity
 from app.services.platform import intake as intake_service
 from app.services.platform.intake import CaseFiler, CaseRefs
@@ -25,19 +24,9 @@ from app.testing import (
     create_project,
     create_task,
     create_user,
+    make_operations_community,
 )
-from app.db.request_context import SystemGuild, Unattributed
-
-
-async def _point_platform_at(session, guild_id: int | None) -> None:
-    """Set (or clear) ``app_settings.operations_guild_id``."""
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
+from app.db.request_context import SystemGuild
 
 
 async def _bind(session, *, guild, project, stream, **overrides):
@@ -56,7 +45,7 @@ async def bound(session):
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
     project = await create_project(session, initiative, user)
-    await _point_platform_at(session, guild.id)
+    await make_operations_community(session, guild.id)
     binding = await _bind(
         session,
         guild=guild,
@@ -74,7 +63,7 @@ async def bound(session):
 
 async def test_unbound_deployment_files_nothing(session):
     """Every install starts here: no pointer, so the writer is a no-op."""
-    await _point_platform_at(session, None)
+    await make_operations_community(session, None)
     outcome = await intake_service.open_case(
         IntakeStream.support, title="Cannot sign in"
     )
@@ -84,7 +73,7 @@ async def test_unbound_deployment_files_nothing(session):
 async def test_pointer_without_a_binding_files_nothing(session):
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
-    await _point_platform_at(session, guild.id)
+    await make_operations_community(session, guild.id)
 
     outcome = await intake_service.open_case(
         IntakeStream.support, title="Cannot sign in"
@@ -245,8 +234,8 @@ async def test_refs_land_as_property_values(session, bound):
     definitions = {
         definition.name: definition
         for definition in await session.exec(
-            select(PropertyDefinition).where(
-                PropertyDefinition.initiative_id == bound["initiative"].id
+            select(MetadataDefinition).where(
+                MetadataDefinition.initiative_id == bound["initiative"].id
             )
         )
     }
@@ -520,7 +509,12 @@ async def test_a_case_whose_task_was_moved_away_is_not_this_projects_case(
 
 @pytest.mark.parametrize(
     ("kind", "linked"),
-    [("comment", True), ("task", True), ("queue_item", True), ("gallery_image", False)],
+    [
+        ("comment", True),
+        ("task", True),
+        ("collection", True),
+        ("tag", False),
+    ],
 )
 async def test_a_moderation_case_links_to_what_it_is_about(
     session, bound, kind, linked
@@ -528,7 +522,7 @@ async def test_a_moderation_case_links_to_what_it_is_about(
     """The link a case carries opens the thing in its community, through the
     app's resolver; a kind with no page of its own gets none."""
     from app.core.config import settings
-    from app.services.tenant.properties import summaries_by_id
+    from app.services.tenant.metadata import summaries_by_id
 
     await _bind(
         session,

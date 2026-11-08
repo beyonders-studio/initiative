@@ -1,4 +1,5 @@
-"""The plan and status triggers of migration 0364, on the real logins.
+"""The plan and status triggers of migrations 0364 and 0561, on the real
+logins.
 
 Every write here runs twice over: with ``public.billing_managed()`` answering
 false, where it must land, and answering true, where only the moves the rule
@@ -63,7 +64,11 @@ async def _as_billing(role_session, guild_id: int, sql: str, **params) -> None:
         await s.rollback()
 
 
-_CAPS = "UPDATE public.guild_administration SET max_users = :v WHERE guild_id = :g"
+#: A cap is a deployment row of the community's rules.
+_CAPS = (
+    "INSERT INTO public.community_rules (guild_id, key, set_by, amount, updated_at)"
+    " VALUES (:g, 'max_users', 'deployment', :v, now())"
+)
 _STATUS = "UPDATE public.guilds SET status = :v WHERE id = :g"
 
 
@@ -120,6 +125,24 @@ async def test_nobody_but_billing_sets_the_plan_where_billing_does(
         await session.rollback()
 
         await _as_billing(role_session, gid, _CAPS, v=25, g=gid)
+
+
+async def test_a_community_takes_its_plan_with_it_where_billing_sets_plans(
+    session, role_session
+):
+    """Its rows going with the community is not a write anybody made."""
+    gid = (await create_guild(session)).id
+    await _as_system(role_session, _CAPS, v=25, g=gid)
+    async with billing_manages_plans(session):
+        await _as_system(role_session, "DELETE FROM public.guilds WHERE id = :g", g=gid)
+
+    assert (
+        await session.exec(
+            text(
+                "SELECT count(*) FROM public.community_rules WHERE guild_id = :g"
+            ).bindparams(g=gid)
+        )
+    ).one()[0] == 0
 
 
 @pytest.mark.parametrize(

@@ -6,16 +6,26 @@
 
 import { useBlocker } from "@tanstack/react-router";
 import { Loader2, Sparkles, X } from "lucide-react";
-import { type ReactNode, type RefObject, useContext, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  ContentKind,
-  PropertyDefinitionRead,
-  PropertySummary,
-  TagSummary,
-  Tool,
+import {
+  type ContentKind,
+  MetadataType,
+  type PropertyDefinitionRead,
+  type PropertySummary,
+  type TagSummary,
+  type Tool,
+  type UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
+import { usePersonMention } from "@/components/comments/usePersonMention";
 import { MentionComposer } from "@/components/markdown/MentionComposer";
 import { AddPropertyButton } from "@/components/properties/AddPropertyButton";
 import { PropertyInput } from "@/components/properties/PropertyInput";
@@ -23,7 +33,9 @@ import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import {
   isEmptyPropertyValue,
   normalizePropertyValue,
+  ownProperties,
   propertyStubFromDefinition,
+  steppedCount,
   userReferenceValue,
 } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
@@ -31,10 +43,6 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { TagPicker } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -47,16 +55,85 @@ import {
   useItemFieldSave,
 } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
-import { useProperties } from "@/hooks/useProperties";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
+import type { MemberSearchScope } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
 import { getItem, removeItem, setItem } from "@/lib/storage";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
 
 import { FieldFrame, ReadField, sameJson, useFieldDraft } from "./editing";
 
-/** An item's title, which is its detail's heading, saved as `field` (a queue
- *  item's is its `label`). It cannot be emptied: leaving it blank puts the
+/** Without `field-sizing`, a textarea stays as many rows high as it was
+ *  given, so it is grown to what it holds, again whenever its width changes. */
+const useFittedHeight = (text: string) => {
+  const box = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const field = box.current;
+    if (!field || CSS.supports("field-sizing", "content")) return;
+    let width = -1;
+    const grow = () => {
+      if (field.clientWidth === width) return;
+      width = field.clientWidth;
+      field.style.height = "auto";
+      field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+    };
+    grow();
+    const observer = new ResizeObserver(grow);
+    observer.observe(field);
+    return () => observer.disconnect();
+  }, [text]);
+  return box;
+};
+
+/** An item's title, which is its detail's heading, saved as `field`. It cannot be emptied: leaving it blank puts the
  *  saved one back. A reader who cannot change it sees the heading alone. */
+/** How a title's text is set, which its marks are set the same way to line up
+ *  with it. */
+const TITLE_TEXT = "field-sizing-content py-1 font-semibold text-2xl tracking-tight sm:text-3xl";
+
+/**
+ * The title's text again, unseen, under the field, with its marked stretches
+ * coloured in: the field is clear, so they show through behind the words.
+ */
+const TitleMarks = ({
+  text,
+  marks,
+}: {
+  text: string;
+  marks: readonly { start: number; end: number; className: string }[];
+}) => {
+  const pieces: ReactNode[] = [];
+  let from = 0;
+  for (const mark of [...marks].sort((a, b) => a.start - b.start)) {
+    if (mark.start < from || mark.end > text.length) continue;
+    pieces.push(text.slice(from, mark.start));
+    pieces.push(
+      <mark key={mark.start} className={cn("rounded-sm text-transparent", mark.className)}>
+        {text.slice(mark.start, mark.end)}
+      </mark>
+    );
+    from = mark.end;
+  }
+  pieces.push(text.slice(from));
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        TITLE_TEXT,
+        // The field's own box: its border and padding, wrapped as it wraps.
+        "pointer-events-none absolute inset-0 w-full whitespace-pre-wrap break-words rounded-md border border-transparent px-3 text-transparent"
+      )}
+    >
+      {pieces}
+    </div>
+  );
+};
+
 export const TitleField = <I, P>({
   id,
   label,
@@ -67,6 +144,10 @@ export const TitleField = <I, P>({
   field = "title",
   optional = false,
   subscribe,
+  marks,
+  below,
+  trailing,
+  mention,
 }: {
   id: string;
   label: string;
@@ -80,12 +161,20 @@ export const TitleField = <I, P>({
   optional?: boolean;
   /** The item, for a subscribe toggle beside its title. */
   subscribe?: { kind: ContentKind; id: number };
+  /** Stretches of the title drawn marked, each with its own class. */
+  marks?: readonly { start: number; end: number; className: string }[];
+  /** Drawn under the title, inside its frame. */
+  below?: ReactNode;
+  /** Drawn at the end of the title's first line, beside the field. */
+  trailing?: ReactNode;
+  /** `@` offers these people, and writes the picked one's handle. */
+  mention?: { members: MemberSearchScope; onPick?: (member: UserSummary) => void };
 }) => {
   // One being added may be emptied while it is typed: Add waits for a title.
   const adding = useContext(ItemDraftContext) !== null;
   const besides = (title: ReactNode) =>
     subscribe && !adding ? (
-      <div className="flex min-w-0 flex-1 items-start gap-1">
+      <div className="flex min-w-0 grow basis-72 items-start gap-1">
         {title}
         <SubscribeButton kind={subscribe.kind} entityId={subscribe.id} className="mt-0.5" />
       </div>
@@ -98,9 +187,18 @@ export const TitleField = <I, P>({
       ? false
       : save.save({ patch: { [field]: title } as P, shows: { [field]: title } as Partial<I> });
   });
+  const box = useFittedHeight(draft.value);
+  const people = usePersonMention({
+    field: box,
+    text: draft.value,
+    onChange: draft.change,
+    members: mention?.members ?? { type: "community" },
+    enabled: mention !== undefined && !readOnly,
+    onPick: mention?.onPick,
+  });
   if (readOnly) {
     return besides(
-      <h1 className="min-w-0 flex-1 break-words font-semibold text-3xl tracking-tight">
+      <h1 className="min-w-0 grow basis-72 break-words font-semibold text-2xl tracking-tight sm:text-3xl">
         {value || placeholder}
       </h1>
     );
@@ -114,16 +212,40 @@ export const TitleField = <I, P>({
       save={save}
       changed={draft.changed}
       keys={draft.keys}
-      className="flex-1"
+      // Too narrow a row for this beside its actions puts them above it.
+      className="grow basis-72"
     >
       <h1 className="sr-only">{value}</h1>
-      <Input
-        id={id}
-        value={draft.value}
-        onChange={(event) => draft.change(event.target.value)}
-        placeholder={placeholder}
-        className="h-auto font-semibold text-3xl tracking-tight shadow-none focus-visible:ring-0 sm:text-3xl"
-      />
+      <div className="flex items-start gap-1">
+        <div className="relative min-w-0 grow">
+          {marks?.length ? <TitleMarks text={draft.value} marks={marks} /> : null}
+          {/* One line of text that wraps, so a long title shows whole on a phone. */}
+          <Textarea
+            ref={box}
+            id={id}
+            rows={1}
+            aria-multiline="false"
+            value={draft.value}
+            onChange={(event) => {
+              const text = event.target.value.replace(/\s*[\r\n]+\s*/g, " ");
+              draft.change(text);
+              people.sync(event.target, text);
+            }}
+            {...people.handlers}
+            // A list open under the field takes Escape for itself.
+            data-picking={people.open || undefined}
+            placeholder={placeholder}
+            className={cn(
+              TITLE_TEXT,
+              "relative min-h-0 resize-none shadow-none focus-visible:ring-0"
+            )}
+          />
+          {people.popover}
+        </div>
+        {/* Centred on the first line of the title, as tall as it is set. */}
+        {trailing ? <div className="mt-1.5 shrink-0 sm:mt-2">{trailing}</div> : null}
+      </div>
+      {below}
     </FieldFrame>
   );
 };
@@ -180,8 +302,15 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   properties: PropertySummary[];
   readOnly: boolean;
   initiativeId: number | null;
-  /** Whose people a person-valued property may name: who can open this tool. */
-  canOpen: { tool: Tool; id: number | null | undefined };
+  /** Whose people a person-valued property may name: who can open this tool.
+   *  Left out (a collection, which has no sharing of its own), the
+   *  initiative's members. */
+  canOpen?: { tool: Tool; id: number | null | undefined };
+  /** The project whose metadata the item holds beside the initiative's
+   *  properties: a task's. */
+  owner?: MetadataOwner;
+  /** When the item last changed, which a signature made before it says. */
+  updatedAt?: string | null;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -211,6 +340,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   readOnly,
   initiativeId,
   canOpen,
+  updatedAt,
   property,
   placed = false,
 }: PropertiesProps<I, P> & {
@@ -222,26 +352,43 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
 }) => {
   const { t } = useTranslation(["properties", "common"]);
   const save = useItemFieldSave(kind, id, property.name);
+  const adding = useContext(ItemDraftContext) !== null;
   const saved = normalizePropertyValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
     properties: { values: [{ property_id: property.property_id, value }] },
     shows: { properties: withValue(properties, property, value) } as Partial<I>,
   });
+  // A signature cleared can't be put back: writing it again signs it anew,
+  // as whoever writes it.
+  const restorable = property.type !== MetadataType.signature;
   const draft = useFieldDraft(
     saved,
     (value) =>
       save.save(
         edit(value),
-        isEmptyPropertyValue(value) && !isEmptyPropertyValue(saved) ? edit(saved) : undefined
+        restorable && isEmptyPropertyValue(value) && !isEmptyPropertyValue(saved)
+          ? edit(saved)
+          : undefined
       ),
     sameJson
   );
+  // A step is taken from what the counter holds when it lands, and shows at
+  // once as it reads from here.
+  const step = (up: boolean) => {
+    draft.restore();
+    void save.save({
+      properties: { values: [], steps: [{ property_id: property.property_id, up }] },
+      shows: {
+        properties: withValue(properties, property, steppedCount(property.counter, saved, up)),
+      } as Partial<I>,
+    });
+  };
   // The property stays until it is gone, so a failed removal says so here.
   const remove = () => {
     draft.restore();
     void save.save(
       { properties: { values: [], removed: [property.property_id] }, shows: {} },
-      { ...edit(saved), shows: { properties } as Partial<I> }
+      restorable ? { ...edit(saved), shows: { properties } as Partial<I> } : undefined
     );
   };
   return (
@@ -270,10 +417,13 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         definition={property}
         value={draft.value}
         onChange={draft.edit}
+        // An item being added has no counter to step yet.
+        onStep={adding ? undefined : step}
         disabled={readOnly}
         initiativeId={initiativeId}
         canOpen={canOpen}
         selectedUser={userReferenceValue(property)}
+        updatedAt={updatedAt}
       />
     </FieldFrame>
   );
@@ -318,7 +468,18 @@ export const ColorField = <
   );
 };
 
-/** An item's custom properties, each saved on its own, and adding one. */
+/** One holder per read of a row's properties, so a copy passed again is the
+ *  same copy ({@link useHeldItem}). */
+const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
+const holderOf = (properties: PropertySummary[]) => {
+  let holder = holders.get(properties);
+  if (!holder) {
+    holder = { properties };
+    holders.set(properties, holder);
+  }
+  return holder;
+};
+
 /**
  * One property placed on the layout on its own: drawn whether or not the item
  * has a value for it yet, and saved on its own. A reader sees it only where it
@@ -326,15 +487,27 @@ export const ColorField = <
  */
 export const PlacedPropertyField = <I extends { properties: PropertySummary[] }, P>({
   propertyId,
+  definitions: given,
   ...props
-}: PropertiesProps<I, P> & { propertyId: number }) => {
+}: PropertiesProps<I, P> & {
+  propertyId: number;
+  /** Where its definition is, where not among the initiative's properties
+   *  and the owner's metadata: a collection's metadata. */
+  definitions?: PropertyDefinitionRead[];
+}) => {
   const { t } = useTranslation(["properties", "common"]);
-  const definitions = useProperties({
+  const definitions = useOwnedDefinitions({
     initiativeId: props.initiativeId ?? undefined,
-    enabled: props.initiativeId !== null,
+    owner: props.owner,
+    enabled: props.initiativeId !== null && given === undefined,
   });
-  const definition = definitions.data?.find((each) => each.id === propertyId);
-  const held = props.properties.find((each) => each.property_id === propertyId);
+  const { properties } = useHeldItem(
+    props.kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
+    props.id,
+    holderOf(props.properties)
+  );
+  const definition = (given ?? definitions.data)?.find((each) => each.id === propertyId);
+  const held = properties.find((each) => each.property_id === propertyId);
   const property = held ?? (definition ? propertyStubFromDefinition(definition) : undefined);
   // Not loaded is not deleted: an editor is told, and can ask again.
   if (!property && definitions.isError && !props.readOnly) {
@@ -352,25 +525,14 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
     if (isEmptyPropertyValue(property.value)) return null;
     return (
       <ReadField label={property.name}>
-        <PropertyValueCell summary={property} variant="cell" />
+        <PropertyValueCell summary={property} variant="cell" updatedAt={props.updatedAt} />
       </ReadField>
     );
   }
-  return <PropertyField {...props} property={property} placed />;
+  return <PropertyField {...props} properties={properties} property={property} placed />;
 };
 
-/** One holder per read of a row's properties, so a copy passed again is the
- *  same copy ({@link useHeldItem}). */
-const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
-const holderOf = (properties: PropertySummary[]) => {
-  let holder = holders.get(properties);
-  if (!holder) {
-    holder = { properties };
-    holders.set(properties, holder);
-  }
-  return holder;
-};
-
+/** An item's custom properties, each saved on its own, and adding one. */
 export const PropertiesField = <I extends { properties: PropertySummary[] }, P>({
   except,
   hideLabel = false,
@@ -388,8 +550,12 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
     id,
     holderOf(props.properties)
   );
-  const listed = except ? properties.filter((each) => !except.has(each.property_id)) : properties;
-  const label = t("title");
+  // Its own values: a collection's metadata is the collection's, and a
+  // plug-in's values are drawn as its fields.
+  const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
+  // Where the item also holds its project's metadata, the panel says so.
+  const label = t(props.owner ? "titleWithMetadata" : "title");
+  const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = useItemFieldSave(kind, id, label);
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
@@ -407,7 +573,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       <div className="space-y-2">
         {hideLabel ? null : <p className="font-medium text-sm">{label}</p>}
         {sorted.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+          <p className="text-muted-foreground text-sm">{none}</p>
         ) : (
           <ul className="space-y-2">
             {sorted.map((property) => {
@@ -421,7 +587,11 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
                     <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <span className="truncate">{property.name}</span>
                   </span>
-                  <PropertyValueCell summary={property} variant="cell" />
+                  <PropertyValueCell
+                    summary={property}
+                    variant="cell"
+                    updatedAt={props.updatedAt}
+                  />
                 </li>
               );
             })}
@@ -433,7 +603,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   return (
     <FieldFrame label={label} save={save} hideLabel={hideLabel}>
       {sorted.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+        <p className="text-muted-foreground text-sm">{none}</p>
       ) : (
         sorted.map((property) => (
           // Keyed by the row too: a host that moves to another row starts
@@ -448,6 +618,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       )}
       <AddPropertyButton
         initiativeId={initiativeId ?? 0}
+        owner={props.owner}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
         disabled={readOnly || !initiativeId}
@@ -472,7 +643,9 @@ const readDescriptionDraft = (key: string): DescriptionDraft | null => {
 };
 
 /** The preview of a description being edited reads the way the saved one will. */
-const renderDescription = (draft: string) => <TaskDescription content={draft} />;
+const renderDescription = (draft: string, onChange?: (draft: string) => void) => (
+  <TaskDescription content={draft} onChange={onChange} />
+);
 
 /**
  * An item's description, in a composer that opens on its preview, saved only
@@ -498,7 +671,7 @@ export const DescriptionField = <I, P>({
   suggest,
   maxLength,
 }: {
-  /** What the item calls it (a queue item's `notes`). A save names the text
+  /** What the item calls it. A save names the text
    *  it was written over as `<field>_base`, which the server refuses once
    *  that has changed. */
   field?: string;
@@ -545,6 +718,11 @@ export const DescriptionField = <I, P>({
   const [draft, setDraftState] = useState(() => readDescriptionDraft(key));
   const [discarding, setDiscarding] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  // The written description, and the draft it replaced, for Undo suggestion.
+  const [suggested, setSuggested] = useState<{
+    text: string;
+    before: DescriptionDraft | null;
+  } | null>(null);
   // Read by the description written for the reader, which lands later.
   const latest = useRef(draft);
 
@@ -558,10 +736,13 @@ export const DescriptionField = <I, P>({
 
   const current = value ?? "";
   // One being added is written straight into it: nothing is saved until Add.
+  // It names what it held when it was opened, so a change of an item that
+  // exists is refused where somebody wrote over it meanwhile.
   const adding = useContext(ItemDraftContext) !== null;
+  const openedOn = useRef(value ?? null);
   const write = (text: string) =>
     void save.save({
-      patch: { [field]: text || null } as P,
+      patch: { [field]: text || null, [`${field}_base`]: openedOn.current } as P,
       shows: { [field]: text || null } as Partial<I>,
     });
   // A reader who can no longer edit keeps the draft on the device, but sees
@@ -589,6 +770,7 @@ export const DescriptionField = <I, P>({
     setSuggesting(true);
     try {
       const text = await suggest.run();
+      setSuggested({ text, before: latest.current });
       setDraft({ text, base: latest.current?.base ?? value });
     } catch {
       // The request says what went wrong.
@@ -704,6 +886,19 @@ export const DescriptionField = <I, P>({
               <Button type="button" size="sm" variant="outline" onClick={cancel}>
                 {t("cancel")}
               </Button>
+              {suggested !== null && open.text === suggested.text ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setDraft(suggested.before);
+                    setSuggested(null);
+                  }}
+                >
+                  {t("descriptionField.undoSuggestion")}
+                </Button>
+              ) : null}
             </div>
           )}
         </div>

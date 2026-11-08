@@ -2,9 +2,9 @@ import { Pin, PinOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
 import { useSetPostPin } from "@/hooks/usePosts";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 /**
  * Pins a notice to the top of its board, or takes it down. An icon on the

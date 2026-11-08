@@ -3,15 +3,15 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DecorationPack, OwnedDecoration } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
 import { DecorationSwatch } from "@/components/user/DecorationSwatch";
 import { PackContentsDialog, packPieces } from "@/components/user/PackContents";
 import { useDecorationPacks, useRemoveDecorationPack } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type Decoration, resolveDecoration } from "@/lib/profileDecorations";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
 
 /** Above this many, finding one by eye stops working and the filter appears. */
 const FILTER_THRESHOLD = 8;
@@ -38,7 +38,7 @@ const PackRow = ({
   return (
     <li className="flex items-center gap-3 px-3 py-2">
       {/* The pieces at a glance. Small on purpose: this is a list you scan for
-          one name, not a gallery — the gallery is the marketplace. */}
+          one name, not a catalog — the catalog is the marketplace. */}
       <ul className="flex shrink-0 items-center gap-2">
         {pieces(entry.contents).map((decoration) => (
           <li key={decoration.id} className="flex size-8 items-center justify-center">
@@ -175,7 +175,6 @@ export const MyDecorationPacks = () => {
         title={t("profiles:myPacks.confirmTitle", { name: pending?.name ?? "" })}
         description={t("profiles:myPacks.confirmBody")}
         confirmLabel={t("profiles:myPacks.remove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("profiles:myPacks.removing")}
         isLoading={remove.isPending}
         onConfirm={() => {

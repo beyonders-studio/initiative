@@ -7,7 +7,10 @@ import type {
   CommunityRead,
   LeaveCommunityEligibilityResponse,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useCommunities } from "@/hooks/useCommunities";
+import { toast } from "@/lib/mascotToast";
+import type { DialogProps } from "@/types/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,10 +20,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useCommunities } from "@/hooks/useCommunities";
-import { toast } from "@/lib/mascotToast";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/alert-dialog";
 
 interface LeaveCommunityDialogProps extends DialogProps {
   community: CommunityRead;

@@ -1,9 +1,9 @@
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS frontend-deps
+FROM node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS frontend-deps
 WORKDIR /frontend
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN apk add --no-cache zip
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN npm install --global corepack@0.36.0 && corepack enable && pnpm install --frozen-lockfile
 
 FROM frontend-deps AS frontend-build
 COPY frontend .
@@ -58,12 +58,31 @@ WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
 RUN uv sync --frozen --no-dev
 
-# The stages that depend on the lockfiles alone, which is all the CI build cache
-# keeps (docker-image.yml): every other layer differs from one build to the
-# next. Nothing ships from here, and an image build never builds it.
+# Zensical, at the version that publishes the help center
+# (.github/workflows/docs.yml installs the same one; change the two together).
+FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS help-deps
+RUN pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore \
+        --only-binary=:all: zensical==0.1.0
+
+# The help center's search index, which the app's Help panel searches: the
+# pages built as the published site is, then trimmed to what the panel shows.
+# The script stops the build when the search index is not the shape it reads.
+FROM help-deps AS help-index
+WORKDIR /help
+COPY zensical.toml ./
+COPY docs ./docs
+RUN zensical build --clean
+COPY backend/scripts/build_help_index.py ./
+RUN python build_help_index.py site/search.json /help-index.json
+
+# The stages that depend on the lockfiles and pinned tools alone, which is all
+# the CI build cache keeps (docker-image.yml): every other layer differs from
+# one build to the next. Nothing ships from here, and an image build never
+# builds it.
 FROM scratch AS dependencies
 COPY --from=frontend-deps /frontend/package.json /frontend/
 COPY --from=backend-deps /app/pyproject.toml /backend/
+COPY --from=help-deps /usr/local/bin/zensical /help/
 
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS backend-runtime
 ARG VERSION=0.1.0
@@ -88,7 +107,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 ARG APT_REFRESH=
 RUN apt-get update \
     && apt-get dist-upgrade -y \
-    && apt-get install -y --no-install-recommends gosu \
+    && apt-get install -y --no-install-recommends gosu libmagic1t64 \
     && remaining="$(apt-get --simulate dist-upgrade | grep '^Inst ' || true)" \
     && if [ -n "$remaining" ]; then \
          echo "packages still upgradable after dist-upgrade:" >&2; \
@@ -107,6 +126,9 @@ RUN apt-get update \
 # every build. Anything that wrote to /app before it would give /app a new
 # time, and the 340 MB layer a new digest, on every build.
 COPY --from=backend-deps /app /app
+# An upload's type is read from its bytes by libmagic (python-magic). Without
+# the library every upload is refused, so a build that loses it fails here.
+RUN /app/.venv/bin/python -c "import magic; assert magic.from_buffer(b'%PDF-1.4', mime=True) == 'application/pdf'"
 WORKDIR /app
 COPY backend/ .
 # Put the synced venv on PATH so uvicorn/alembic/python resolve to it
@@ -119,6 +141,7 @@ COPY MIN_DESKTOP_VERSION ./MIN_DESKTOP_VERSION
 ARG IMAGE_CHANNEL=release
 RUN echo "$IMAGE_CHANNEL" > ./IMAGE_CHANNEL
 COPY CHANGELOG.md ./CHANGELOG.md
+COPY --from=help-index /help-index.json ./help-index.json
 COPY --from=frontend-build /frontend/dist ./static
 COPY --from=frontend-build /frontend/dist-editor/editor.js ./editor/editor.js
 COPY --from=frontend-build /ota/ ./ota/

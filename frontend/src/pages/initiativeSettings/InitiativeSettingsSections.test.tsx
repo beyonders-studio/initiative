@@ -14,6 +14,8 @@ import {
   buildInitiative,
   buildInitiativeJoinRequest,
   buildInitiativeRole,
+  buildPropertyDefinition,
+  buildPropertyGroup,
   buildToolLayoutSet,
   buildUserSummary,
   initiativeCan,
@@ -229,6 +231,39 @@ describe("initiative settings sections", () => {
     });
   });
 
+  it("holds a switch whose partner the community set", async () => {
+    stubInitiative();
+    server.use(
+      communityHttp.get("/initiatives/:id/roles", () =>
+        HttpResponse.json([
+          buildInitiativeRole({
+            id: 2,
+            name: "member",
+            display_name: "Member",
+            is_builtin: true,
+            permissions: { projects_enabled: true, create_projects: true },
+          }),
+        ])
+      ),
+      communityHttp.get("/initiatives/defaults", () =>
+        HttpResponse.json({
+          tools: {},
+          member_permissions: { create_projects: true },
+          custom_roles: true,
+        })
+      )
+    );
+
+    renderSection(InitiativeSettingsRolesPage, "roles");
+
+    // Turning view off would take create with it, and create is the
+    // community's.
+    const create = await screen.findByRole("switch", { name: "Create Projects" });
+    await waitFor(() => expect(create).toBeDisabled());
+    expect(screen.getByRole("switch", { name: "View Projects" })).toBeDisabled();
+    expect(screen.getByText(/sets this for every initiative/)).toBeInTheDocument();
+  });
+
   /**
    * A permission for a tool the initiative has switched off grants nothing —
    * the mirror of the details screen never mentioning roles. The roles screen
@@ -250,15 +285,122 @@ describe("initiative settings sections", () => {
     expect(screen.getAllByText(/grant nothing until the tool is turned back on/)).toHaveLength(1);
   });
 
-  it("serves custom properties at /settings/properties", async () => {
+  it("serves the initiative's metadata, then each tool's properties, at /settings/properties", async () => {
     stubInitiative();
-    server.use(communityHttp.get("/property-definitions/", () => HttpResponse.json([])));
+    server.use(
+      communityHttp.get("/property-definitions/by-owner", () =>
+        HttpResponse.json({
+          groups: [
+            buildPropertyGroup({
+              definitions: [buildPropertyDefinition({ id: 1, name: "Budget" })],
+            }),
+            buildPropertyGroup({
+              owner: "project",
+              owner_id: 3,
+              name: "Launch",
+              definitions: [buildPropertyDefinition({ id: 2, name: "Sprint", project_id: 3 })],
+            }),
+            buildPropertyGroup({
+              owner: "collection",
+              owner_id: 5,
+              name: "Moodboard",
+              definitions: [buildPropertyDefinition({ id: 3, name: "Caption", collection_id: 5 })],
+            }),
+          ],
+        })
+      )
+    );
 
     renderSection(InitiativeSettingsPropertiesPage, "properties");
 
     expect(
-      await screen.findByText("Define reusable metadata for anything in this initiative.")
+      await screen.findByText(
+        "Metadata holds values on anything in this initiative: its tasks, files, events and the rest."
+      )
     ).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "Budget" })).toBeInTheDocument();
+    const launch = screen.getByRole("region", { name: "Launch" });
+    expect(within(launch).getByText("Project")).toBeInTheDocument();
+    expect(within(launch).getByRole("cell", { name: "Sprint" })).toBeInTheDocument();
+    const moodboard = screen.getByRole("region", { name: "Moodboard" });
+    expect(within(moodboard).getByText("Collection")).toBeInTheDocument();
+    expect(within(moodboard).getByRole("cell", { name: "Caption" })).toBeInTheDocument();
+  });
+
+  it("deletes the fields selected, and promotes properties of one type to metadata", async () => {
+    stubInitiative();
+    const deleted: unknown[] = [];
+    const promoted: unknown[] = [];
+    server.use(
+      communityHttp.get("/property-definitions/by-owner", () =>
+        HttpResponse.json({
+          groups: [
+            buildPropertyGroup({
+              definitions: [buildPropertyDefinition({ id: 1, name: "Points", type: "number" })],
+            }),
+            buildPropertyGroup({
+              owner: "project",
+              owner_id: 3,
+              name: "Launch",
+              definitions: [
+                buildPropertyDefinition({ id: 2, name: "Effort", type: "number", project_id: 3 }),
+                buildPropertyDefinition({ id: 4, name: "Notes", project_id: 3 }),
+              ],
+            }),
+            buildPropertyGroup({
+              owner: "collection",
+              owner_id: 5,
+              name: "Moodboard",
+              definitions: [
+                buildPropertyDefinition({
+                  id: 3,
+                  name: "Score",
+                  type: "number",
+                  collection_id: 5,
+                }),
+              ],
+            }),
+          ],
+        })
+      ),
+      communityHttp.post("/property-definitions/bulk-delete", async ({ request }) => {
+        deleted.push(await request.json());
+        return new HttpResponse(null, { status: 204 });
+      }),
+      communityHttp.post("/property-definitions/promote", async ({ request }) => {
+        promoted.push(await request.json());
+        return HttpResponse.json(buildPropertyDefinition({ id: 1, name: "Points" }));
+      })
+    );
+    const user = userEvent.setup();
+
+    renderSection(InitiativeSettingsPropertiesPage, "properties");
+
+    await user.click(await screen.findByRole("checkbox", { name: "Select Effort" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Notes" }));
+    const toolbar = screen.getByRole("toolbar", { name: "2 selected" });
+    // Of two types, they can't be one field.
+    expect(within(toolbar).getByRole("button", { name: "Promote to metadata" })).toBeDisabled();
+    await user.click(within(toolbar).getByRole("button", { name: "Delete" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" })
+    );
+    await waitFor(() => expect(deleted).toEqual([{ initiative_id: INITIATIVE_ID, ids: [2, 4] }]));
+
+    await user.click(screen.getByRole("checkbox", { name: "Select Effort" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Score" }));
+    await user.click(screen.getByRole("button", { name: "Promote to metadata" }));
+    const dialog = await screen.findByRole("dialog", { name: "Promote to metadata" });
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    expect(name).toHaveValue("Effort");
+    await user.clear(name);
+    await user.type(name, "points");
+    // One of the initiative's metadata already has the name, and the type.
+    expect(within(dialog).getByText(/Merges into the metadata “Points”/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Promote to metadata" }));
+    await waitFor(() =>
+      expect(promoted).toEqual([{ initiative_id: INITIATIVE_ID, ids: [2, 3], name: "points" }])
+    );
   });
 
   it("serves the export wizard at /settings/export", async () => {

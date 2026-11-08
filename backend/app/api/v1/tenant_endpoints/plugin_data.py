@@ -3,20 +3,22 @@
 Three reads, all guild-scoped, all under the caller's own session.
 
 ``/plugins/widget-catalog`` is the palette: which installed plug-ins contribute
-widgets, what each widget draws, and the module the browser will run in its
-sandbox. It comes from each install's **pinned** definition, so a canvas is
+widgets or read endpoints, what each widget draws, and the module the browser
+will run in its sandbox. It comes from each install's **pinned** definition, so a canvas is
 authored against the version the guild chose.
 
-``/plugins/{plugin_id}/endpoints/{endpoint_id}`` is the proxy. A widget never names
-an address — it names a read endpoint on an installed plug-in, and this route turns
-that into one bounded call to the plug-in's own service. The request carries the dashboard the
-widget sits on, and that is what makes the gates run **before** anything else:
+``/plugins/{plugin_id}/endpoints/{endpoint_id}`` is the preview an editor sees
+while configuring a plug-in widget, with the parameters on the form; a placed
+widget is read with the canvas (``/dashboards/{id}/data``), with the parameters
+it stores. A widget never names an address — it names a read endpoint on an
+installed plug-in, and this route turns that into one bounded call to the
+plug-in's own service. The request carries the dashboard the widget sits on,
+and that is what makes the gates run **before** anything else:
 
 * the URL is ``/c/{community_id}/…`` under a session that assumes the guild's own
   Postgres role, so the install row is reachable only from inside the guild;
-* the dashboard is loaded through the ordinary resource path, so a member of the
-  guild who is not in the dashboard's initiative gets the same answer they would
-  get for the dashboard itself — nothing;
+* the dashboard is loaded through the ordinary resource path for writing, so
+  only somebody who may change its widgets previews one;
 * the dashboard has to actually bind this endpoint, so holding one dashboard is
   not a key to every endpoint a plug-in offers;
 * an endpoint marked ``admin_only`` is then read by the guild's admins alone.
@@ -44,7 +46,7 @@ declaration, and it is fetched on the caller's own credentials.
 
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import select
 
 from app.core.errors import CodedError
@@ -54,20 +56,19 @@ from app.api.deps import (
     RLSSessionDep,
     GuildContextDep,
     CurrentUser,
-    SettingsAdminContextDep,
+    GuildContext,
     SettingsRLSSessionDep,
+    require_surface,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import GuildPluginMessages, PluginDataMessages
 from app.core.rate_limit import PLUGIN_ACTIONS_PER_MEMBER, take_allowance
 from app.core.tools import Tool
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.schemas.sql_query import QueryColumnDescription
-from app.services.query import rows as rows_query
 from app.schemas.tenant.plugin_data import (
     PluginActionResult,
     PluginActionRun,
-    PluginDataTable,
     PluginDataResponse,
     PluginEndpointRead,
     PluginParamOption,
@@ -80,8 +81,9 @@ from app.schemas.tenant.plugin_data import (
 from app.services import audit as audit_service
 from app.services.marketplace import plugin_actions
 from app.services.marketplace import plugin_data as plugin_data_service
+from app.services.marketplace.registration_lookup import registration_for_definition
 from app.services.marketplace.service_plugins import plugin_widget_type, is_admin_only
-from app.services.tenant import plugin_age
+from app.services.tenant import plugin_age, view_as
 
 
 def _projected_sample(raw: Any, endpoints: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -103,6 +105,12 @@ def _projected_sample(raw: Any, endpoints: dict[str, dict[str, Any]]) -> dict[st
         projected[endpoint_id] = {"rows": rows, "values": values}
     return projected
 
+
+#: The community's usage page, where its admins read what each plug-in
+#: reports.
+UsageContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.usage, settings=True))
+]
 
 router = APIRouter()
 
@@ -151,7 +159,8 @@ async def read_plugin_widget_catalog(
     current_user: CurrentUser,
     guild_context: GuildContextDep,
 ) -> PluginWidgetCatalogResponse:
-    """Which widgets this guild's installed plug-ins contribute.
+    """Which widgets and read endpoints this guild's installed plug-ins
+    contribute.
 
     Every member may read it: a plug-in's existence is guild-wide knowledge and the
     palette carries no guild data — declarations, module source, and sample
@@ -173,15 +182,11 @@ async def read_plugin_widget_catalog(
         if not plugin.enabled or definition.get("plugin_kind") != "service":
             continue
         declared = definition.get("widgets")
-        if not isinstance(declared, list):
-            continue
         widgets = [
             entry
-            for entry in declared
+            for entry in (declared if isinstance(declared, list) else [])
             if isinstance(entry, dict) and isinstance(entry.get("id"), str)
         ]
-        if not widgets:
-            continue
 
         # Reads only. A picker offering a write would offer a tile that makes
         # the plug-in act every time somebody looks at a dashboard.
@@ -202,10 +207,16 @@ async def read_plugin_widget_catalog(
             )
             for endpoint in readable.values()
         ]
+        if not widgets and not endpoints:
+            continue
+        registration = await registration_for_definition(
+            definition, listing_uid=plugin.listing_uid
+        )
         items.append(
             PluginWidgetCatalogEntry(
                 plugin_id=plugin.id,
                 plugin_uid=plugin.listing_uid,
+                public_id=registration.public_id if registration else None,
                 name=plugin.name,
                 enabled=plugin.enabled,
                 widgets=[
@@ -239,38 +250,31 @@ async def read_plugin_data(
         int,
         Query(
             description=(
-                "The dashboard the widget sits on. Its own gates decide whether "
-                "this caller may see anything here at all."
+                "The dashboard the widget sits on. Previewing a widget takes "
+                "write access to it."
             )
         ),
     ],
     params: Annotated[
         Optional[str],
-        Query(description="The binding's parameters, as a JSON object."),
-    ] = None,
-    widget_id: Annotated[
-        Optional[str],
-        Query(
-            description=(
-                "Which widget on that dashboard is asking. Only needed where "
-                "its binding carries a statement: what runs is the one stored "
-                "on the widget, never one the request supplies."
-            )
-        ),
+        Query(description="The parameters on the form, as a JSON object."),
     ] = None,
 ) -> PluginDataResponse:
-    """One of a plug-in's read endpoints, resolved for this viewer.
+    """One of a plug-in's read endpoints, as a widget being configured would
+    show it, made as the dashboard's view mode says.
 
     Returns the plug-in's rows verbatim with the time they were obtained. A plug-in
     that is unreachable, slow, oversized, or answering in a shape this build
-    does not accept comes back as a named message code, so the canvas draws one
+    does not accept comes back as a named message code, so the preview draws one
     error tile instead of the request becoming a server fault.
     """
-    # Gates 1–4 for the surface the data is being drawn on: RLS scopes the row
-    # to this guild, initiative membership decides whether it exists for this
-    # caller, and the resource's own grants decide whether they may read it.
     dashboard = await resource_access.load_authorized(
-        session, Tool.dashboard, dashboard_id, current_user, guild_context
+        session,
+        Tool.dashboard,
+        dashboard_id,
+        current_user,
+        guild_context,
+        access="write",
     )
 
     plugin = (
@@ -287,13 +291,12 @@ async def read_plugin_data(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildPluginMessages.AGE_RESTRICTED,
         )
-    bound = _bound_bindings(
+    if not _bound_bindings(
         dashboard.definition,
         dashboard.config,
         plugin_uid=plugin.listing_uid,
         endpoint_id=endpoint_id,
-    )
-    if not bound:
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=PluginDataMessages.ENDPOINT_NOT_FOUND,
@@ -306,60 +309,20 @@ async def read_plugin_data(
         raw_params=params,
         user_id=current_user.id,
         is_guild_admin=guild_context.is_admin,
+        as_installation=view_as.runs_as_initiative(dashboard),
     )
-
-    # After the fetch, so a statement is a transformation of a shared answer:
-    # twenty viewers of the same binding are still one upstream call, whatever
-    # each of their widgets asks of the rows.
-    table = _transformed(plugin, endpoint_id, bound.get(widget_id or ""), result)
     return PluginDataResponse(
         rows=result.rows,
-        table=table,
         values=result.values,
         fetched_at=result.fetched_at,
         cached=result.cached,
     )
 
 
-def _transformed(
-    plugin: GuildPlugin,
-    endpoint_id: str,
-    binding: dict[str, Any] | None,
-    result: "plugin_data_service.PluginDataResult",
-) -> PluginDataTable | None:
-    """What this widget's statement made of the rows, or nothing.
-
-    A binding with no statement draws the plug-in's own rows, as it always has —
-    the plug-in's widget module reads them by the names its manifest declared. A
-    binding with one gets a table beside them: described, and positional, so a
-    built-in widget can be pointed at a plug-in.
-    """
-    statement = (binding or {}).get("sql")
-    if not isinstance(statement, str) or not statement.strip():
-        return None
-
-    endpoint = plugin_data_service.find_read_endpoint(plugin.definition, endpoint_id)
-    if endpoint is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=PluginDataMessages.ENDPOINT_NOT_FOUND,
-        )
-    planned = rows_query.plan(statement, plugin_data_service.row_columns(endpoint))
-    answered = rows_query.evaluate(planned, result.rows)
-
-    return PluginDataTable(
-        columns=[
-            QueryColumnDescription(name=column.name, type=column.type)
-            for column in planned.columns
-        ],
-        rows=[list(row) for row in answered],
-    )
-
-
 @router.get("/summaries", response_model=PluginSummaryListResponse)
 async def list_plugin_summaries(
     session: SettingsRLSSessionDep,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: UsageContext,
 ) -> PluginSummaryListResponse:
     """The installs whose pinned definition names a community summary, with
     what each declares it returns."""
@@ -371,7 +334,7 @@ async def read_plugin_summary(
     plugin_id: int,
     session: SettingsRLSSessionDep,
     current_user: CurrentUser,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: UsageContext,
 ) -> PluginDataResponse:
     """Where the community stands with one installed plug-in.
 

@@ -28,27 +28,6 @@ import {
   NotApplyingBadge,
   placementRoleLabel,
 } from "@/components/auth/ProviderPlacementRuleSummary";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   useCommunityClaimRules,
   useCommunityProviderConnections,
@@ -59,6 +38,21 @@ import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useInitiativesForCommunity } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Sentinel for "the community itself", which has no initiative id. */
 const COMMUNITY_ONLY = "community";
@@ -359,7 +353,6 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
           group: removing?.claim_value ?? "",
         })}
         confirmLabel={t("communityAuth.rules.remove")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteRule.isPending}
         onConfirm={() => {

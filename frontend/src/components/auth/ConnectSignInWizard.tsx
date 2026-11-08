@@ -19,7 +19,7 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -27,19 +27,6 @@ import type {
   ConnectableProviderRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import {
   useCommunityProviderConnections,
   useConnectableProviders,
@@ -50,6 +37,13 @@ import {
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** Which claim narrows which provider. Each one spells "our tenant"
  *  differently, and only the provider knows which word it uses. */
@@ -100,9 +94,11 @@ export const ConnectSignInWizard = ({
   const [providerId, setProviderId] = useState<number | null>(startOn);
   // The wizard stays mounted between openings, so a provider chosen for it
   // has to land each time it opens rather than only on the first mount.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, startOn });
+  if (prev.open !== open || prev.startOn !== startOn) {
+    setPrev({ open, startOn });
     if (open && startOn !== null) setProviderId(startOn);
-  }, [open, startOn]);
+  }
   const [claim, setClaim] = useState("");
   // Whether the claim is being typed rather than picked from the shortcuts.
   const [customClaim, setCustomClaim] = useState(false);

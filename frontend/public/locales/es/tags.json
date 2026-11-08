@@ -17,9 +17,8 @@
     "children": {
       "task": "Tareas",
       "calendar_event": "Eventos",
-      "gallery_image": "Imágenes",
-      "queue_item": "Elementos de la cola",
-      "wiki_page": "Páginas"
+      "wiki_page": "Páginas",
+      "collection": "Colecciones"
     },
     "columns": {
       "in": "En"
@@ -50,11 +49,7 @@
     "creating": "Creando…",
     "create": "Crear",
     "searchPlaceholder": "Buscar o crear etiquetas...",
-    "loading": "Cargando…",
-    "existingTags": "Etiquetas existentes",
-    "noTagsFound": "No se encontraron etiquetas.",
     "createTag": "Crear \"{{name}}\"",
-    "selected": "{{count}} seleccionadas",
     "filterLabel": "Etiquetas",
     "anyTag": "Cualquier etiqueta"
   },

@@ -188,6 +188,13 @@ class SortExpression(Protocol):
     def __call__(self, ctx: SortContext) -> Any: ...
 
 
+class GroupReader(Protocol):
+    """A field whose groups no column or relation says: given a session and
+    the rows' ids, the groups each row is in (``fields.grouping.Group``s)."""
+
+    def __call__(self, session: Any, ids: list[int]) -> Any: ...
+
+
 @dataclass(frozen=True)
 class FieldSpec:
     """One field, described once."""
@@ -228,6 +235,9 @@ class FieldSpec:
     #: Whether what it orders by is a set of groups: a sort expression whose
     #: values a list is grouped into (a task's date window).
     buckets: bool = False
+    #: How a list is grouped by it, for a field that is neither a column nor
+    #: a declared relation (the task a task is part of).
+    groups: Optional[GroupReader] = None
 
     @property
     def type(self) -> FieldType:
@@ -253,7 +263,12 @@ class FieldSpec:
         return FilterOp.in_ in self.offered_ops
 
     def __post_init__(self) -> None:
-        if self.column is None and self.resolve is None and self.sort is None:
+        if (
+            self.column is None
+            and self.resolve is None
+            and self.sort is None
+            and self.groups is None
+        ):
             raise ValueError(f"field {self.name!r} declares no way to be used")
         if self.column is not None and self.resolve is not None:
             raise ValueError(f"field {self.name!r} is both a column and a computation")

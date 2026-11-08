@@ -129,6 +129,10 @@
   "tagTasks": {
     "loadError": "Unable to load tasks."
   },
+  "ai": {
+    "fromComments_one": "Written without the task's comment, which did not fit.",
+    "fromComments_other": "Written from the {{read}} most recent of {{count}} comments."
+  },
   "checklist": {
     "title": "Checklist",
     "progressLabel": "Checklist progress",
@@ -153,7 +157,20 @@
     "progress_one": "{{completed}}/{{total}} item",
     "progress_other": "{{completed}}/{{total}} items",
     "expandItem": "Show the whole item",
-    "collapseItem": "Show less"
+    "collapseItem": "Show less",
+    "promote": "Make it a task",
+    "promoteLabel": "Make this checklist item a task",
+    "promoted": "Made a task part of this one",
+    "openPromoted": "Open",
+    "promoteError": "Unable to make that item a task. Please try again."
+  },
+  "subtasks": {
+    "progressLabel": "Subtask progress",
+    "progress_one": "{{completed}}/{{total}} subtask",
+    "progress_other": "{{completed}}/{{total}} subtasks",
+    "partOf": "Part of {{title}}",
+    "fold": "Hide the subtasks of {{title}}",
+    "unfold": "Show the subtasks of {{title}}"
   },
   "prioritySelector": {
     "ariaLabel": "Priority: {{priority}}. Click to change.",
@@ -182,8 +199,7 @@
     "noInitiatives": "No initiatives found in this community.",
     "noProjects": "No projects found in this initiative.",
     "back": "Back",
-    "searchProjects": "Search projects…",
-    "loadMore": "Load more"
+    "searchProjects": "Search projects…"
   },
   "bulkEdit": {
     "title": "Edit tasks",
@@ -200,6 +216,11 @@
     "detailsSection": "Details",
     "statusLabel": "Status",
     "selectStatus": "Select status",
+    "typeLabel": "Type",
+    "selectType": "Select type",
+    "keepType": "Leave unchanged",
+    "typeLeavesEmpty_one": "{{name}} requires fields {{count}} task leaves empty",
+    "typeLeavesEmpty_other": "{{name}} requires fields {{count}} tasks leave empty",
     "priorityLabel": "Priority",
     "selectPriority": "Select priority",
     "recurrenceSection": "Recurrence",
@@ -220,5 +241,94 @@
     "sections": {
       "schedule": "Schedule"
     }
+  },
+  "smartTitle": {
+    "read": "Read from the title",
+    "due": "Due {{when}}",
+    "priority": "{{priority}} priority",
+    "keep": "Keep “{{text}}” in the title",
+    "hints": {
+      "button": "What a title can say",
+      "title": "Type the details into the title",
+      "dates": {
+        "label": "Dates",
+        "examples": "friday|next week|in 3 days|on oct 30"
+      },
+      "times": {
+        "label": "Times",
+        "examples": "at 5pm|tomorrow at 9:30"
+      },
+      "repeats": {
+        "label": "Repeats",
+        "examples": "every week|every monday|every! 2 days",
+        "note": "With “every!”, the next one is counted from when the last is done."
+      },
+      "priority": {
+        "label": "Priority",
+        "examples": "!high|!1",
+        "note": "!1 is urgent, down to !4 for low."
+      },
+      "tags": {
+        "label": "Tags",
+        "examples": "#billing"
+      },
+      "people": {
+        "label": "People",
+        "examples": "@sam|@me"
+      },
+      "type": {
+        "label": "Task type",
+        "examples": "bug:|milestone:",
+        "note": "At the very start, one of the project's types."
+      },
+      "footer": "Each is taken out of the title and set on the task. Take its chip off to keep the words as typed."
+    },
+    "words": {
+      "today": "today",
+      "tomorrow": "tomorrow|tmrw|tmr",
+      "next": "next",
+      "nextAfter": "",
+      "in": "in",
+      "every": "every|each|ev",
+      "other": "other",
+      "lead": "due|by|on|due on|due by",
+      "at": "at",
+      "one": "a|an|one",
+      "of": "of",
+      "ordinal": "st|nd|rd|th",
+      "day": "day|days",
+      "week": "week|weeks|wk|wks",
+      "month": "month|months",
+      "year": "year|years|yr|yrs",
+      "weekday": "weekday|weekdays|workday|workdays",
+      "noon": "noon|midday",
+      "midnight": "midnight",
+      "am": "am|a.m.",
+      "pm": "pm|p.m.",
+      "oclock": "o'clock|oclock",
+      "me": "me",
+      "weekend": "weekend|weekends",
+      "hour": "hour|hours|hr|hrs",
+      "first": "first",
+      "second": "second",
+      "third": "third",
+      "fourth": "fourth",
+      "fifth": "fifth",
+      "last": "last|final",
+      "ofTheMonth": "of the month|in the month|of each month|of every month|each month|every month|a month",
+      "ofEveryMonth": "of every month|of each month|each month|every month|monthly",
+      "and": "and|&",
+      "the": "the",
+      "until": "until|till|through",
+      "times": "times"
+    }
+  },
+  "reminder": {
+    "label": "Remind me",
+    "placeholder": "No reminder",
+    "clear": "No reminder",
+    "private": "Only you are reminded.",
+    "repeats": "Each time it repeats, the reminder moves with its due date.",
+    "sent": "Reminder sent."
   }
 }

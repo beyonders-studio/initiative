@@ -6,17 +6,9 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PostPinButton } from "@/components/initiativeTools/posts/PostPinButton";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
-import { DetailHeaderSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
@@ -30,6 +22,10 @@ import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
 import { toast } from "@/lib/mascotToast";
 import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdown-menu";
+import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * One notice, on its own page — where its comments and reactions live, laid
@@ -69,6 +65,7 @@ export function PostDetailPage() {
         keys="posts:"
         backTo={gp(toolListRoute(Tool.post, initiativeId))}
         backLabel={t("backToPosts")}
+        entity={{ kind: "post", id: parsedId }}
       />
     );
   }

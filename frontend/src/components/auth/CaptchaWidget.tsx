@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { CaptchaConfig } from "@/api/generated/initiativeAPI.schemas";
 import { useServer } from "@/hooks/useServer";
 import { captchaProvider } from "@/lib/captchaProviders";
+import { useFrameMessages } from "@/ui/lib/useFrameMessages";
 
 /**
  * Single captcha widget that swaps between hCaptcha, Cloudflare
@@ -173,6 +174,9 @@ const InlineCaptcha = ({ config, onToken }: CaptchaWidgetProps) => {
 /** How long the server's captcha page has to draw its widget. */
 const FRAME_TIMEOUT_MS = 10_000;
 
+/** The tallest the captcha frame grows to fit what its page reports. */
+const MAX_FRAME_HEIGHT = 800;
+
 interface CaptchaFrameProps {
   src: string;
   /** The server's origin, the only one whose messages are read. */
@@ -186,17 +190,12 @@ const CaptchaFrame = ({ src, origin, onToken }: CaptchaFrameProps) => {
   const [height, setHeight] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
 
-  useEffect(() => {
-    const receive = (event: MessageEvent) => {
-      if (event.origin !== origin || event.source !== frameRef.current?.contentWindow) return;
-      const data = event.data as { type?: unknown; height?: unknown; token?: unknown } | null;
-      if (data?.type !== "initiative-captcha") return;
-      if (typeof data.height === "number") setHeight(data.height);
-      if (typeof data.token === "string") onToken(data.token);
-    };
-    window.addEventListener("message", receive);
-    return () => window.removeEventListener("message", receive);
-  }, [origin, onToken]);
+  useFrameMessages(frameRef, origin, (data) => {
+    const message = data as { type?: unknown; height?: unknown; token?: unknown } | null;
+    if (message?.type !== "initiative-captcha") return;
+    if (typeof message.height === "number") setHeight(Math.min(message.height, MAX_FRAME_HEIGHT));
+    if (typeof message.token === "string") onToken(message.token);
+  });
 
   useEffect(() => {
     if (height !== null) return;

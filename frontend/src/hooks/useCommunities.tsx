@@ -163,11 +163,7 @@ const grantEntry = (grant: AccessGrantRead, settingsGrant?: AccessGrantRead): Co
   contact_email: null,
   // Admin-only entitlements; a grantee acts as a member here, so they're absent.
   auth_options: null,
-  // Likewise: these settings are not inferred into a synthetic entry. An
-  // authorized settings grantee reads their real values from the dedicated
-  // settings endpoint when opening Authentication.
-  enforce_compliance_session: null,
-  require_second_factor: null,
+  closed_surfaces: null,
   // A grant reaches one named community directly; the directory is not how the
   // grantee got here, and this synthetic entry is never listed in it.
   is_community: false,
@@ -675,21 +671,38 @@ export const CommunityProvider = ({ children }: { children: ReactNode }) => {
       activeCommunity?.grantAccessLevel !== "read_write") ||
     Boolean(activeCommunity?.content_read_only);
 
-  const value: CommunityContextValue = {
-    communities,
-    activeCommunityId,
-    activeCommunity,
-    activeCommunityReadOnly,
-    loading,
-    error,
-    refreshCommunities,
-    switchCommunity,
-    syncCommunityFromUrl,
-    createCommunity,
-    updateCommunityInState,
-    reorderCommunities,
-    canCreateCommunities,
-  };
+  const value = useMemo<CommunityContextValue>(
+    () => ({
+      communities,
+      activeCommunityId,
+      activeCommunity,
+      activeCommunityReadOnly,
+      loading,
+      error,
+      refreshCommunities,
+      switchCommunity,
+      syncCommunityFromUrl,
+      createCommunity,
+      updateCommunityInState,
+      reorderCommunities,
+      canCreateCommunities,
+    }),
+    [
+      communities,
+      activeCommunityId,
+      activeCommunity,
+      activeCommunityReadOnly,
+      loading,
+      error,
+      refreshCommunities,
+      switchCommunity,
+      syncCommunityFromUrl,
+      createCommunity,
+      updateCommunityInState,
+      reorderCommunities,
+      canCreateCommunities,
+    ]
+  );
 
   return <CommunityContext.Provider value={value}>{children}</CommunityContext.Provider>;
 };

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { BetaBadge } from "@/components/BetaBadge";
 import { LogoIcon } from "@/components/LogoIcon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * The ground every signed-out card sits on: the hex backdrop and the
@@ -33,7 +33,7 @@ export const SignInFrame = ({
     >
       <div
         className={cn(
-          "flex min-h-screen flex-col items-center justify-center gap-3 bg-muted/60 px-4 py-12",
+          "flex min-h-app flex-col items-center justify-center gap-3 bg-muted/60 px-4 py-12",
           fillPhone && "max-sm:justify-start max-sm:p-0"
         )}
       >

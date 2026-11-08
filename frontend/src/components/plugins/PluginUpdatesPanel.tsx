@@ -11,12 +11,16 @@
  * "Up to date" rather than a button whose only outcome is being told there was
  * nothing to do.
  *
+ * A newer version this server cannot run (`update_refused`) is named with the
+ * reason, rather than reading as "Up to date".
+ *
  * A version that asks for more than the install holds — a new scope, or a new
  * surface inside initiatives — is not applied on its own. The server says what
- * it asks for in `pending_update`, and the panel shows that as "Version X wants
- * to: …" with accept and decline. Accepting grants the new scopes with the
- * version; declining keeps the current version and stops the asking until a
- * newer one is published.
+ * it asks for in `pending_update`, and {@link PluginPendingUpdate} shows that
+ * as "Version X wants to: …" with accept and decline. Accepting grants the new
+ * scopes with the version; declining keeps the current version and stops the
+ * asking until a newer one is published. The settings page draws it first in
+ * the plug-in's settings, since it is what the seat came to answer.
  *
  * Community admins only — the caller decides that, since this renders inside a
  * section that has already made the call.
@@ -30,14 +34,14 @@ import type {
   CommunityPluginDetail,
   CommunityPluginUpgradeAsks,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { useDeclinePluginUpgrade, useUpgradePlugin } from "@/hooks/useCommunityPluginDetail";
 import { useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
-import { getErrorMessage } from "@/lib/errorMessage";
+import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type PluginNames, scopeSentence } from "@/lib/pluginScopes";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { Switch } from "@/ui/switch";
 
 export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }) {
   const { t } = useTranslation(["plugins", "common"]);
@@ -45,6 +49,7 @@ export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }
   const upgrade = useUpgradePlugin(plugin.id);
   const pending = plugin.update_version ?? null;
   const asks = plugin.pending_update ?? null;
+  const refused = plugin.update_refused ?? null;
 
   return (
     <section className="space-y-3">
@@ -92,18 +97,21 @@ export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }
             {upgrade.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {t("plugins:manage.upgradeTo", { version: pending })}
           </Button>
+        ) : refused ? (
+          <span className="text-muted-foreground text-xs">
+            {t("plugins:updates.refused", { version: refused.version })}{" "}
+            {messageForCode(refused.reason, "plugins:error")}
+          </span>
         ) : (
           <span className="text-muted-foreground text-xs">{t("plugins:manage.upToDate")}</span>
         )}
       </div>
-
-      {asks && <PendingUpdate pluginId={plugin.id} asks={asks} pluginNames={plugin.plugin_names} />}
     </section>
   );
 }
 
 /** "Version X wants to: …", with the seat's accept and decline. */
-function PendingUpdate({
+export function PluginPendingUpdate({
   pluginId,
   asks,
   pluginNames,

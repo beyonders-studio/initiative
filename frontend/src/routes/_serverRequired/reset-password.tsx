@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 
 export const Route = createFileRoute("/_serverRequired/reset-password")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage }))
-  ),
+  component: ResetPasswordPage,
 });

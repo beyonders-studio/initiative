@@ -1,0 +1,128 @@
+{
+  "loading": "Cargando…",
+  "loadMore": "Mostrar más",
+  "clear": "Limpiar",
+  "next": "Siguiente",
+  "previous": "Anterior",
+  "selectAll": "Seleccionar todo",
+  "combobox": {
+    "placeholder": "Selecciona una opción",
+    "search": "Buscar",
+    "noResults": "No se encontraron resultados"
+  },
+  "copy": {
+    "label": "Copiar",
+    "copied": "¡Copiado!",
+    "unavailable": "No se pudo copiar: cópialo a mano"
+  },
+  "dateRange": {
+    "any": "Cualquier fecha",
+    "fromOnly": "Desde el {{date}}",
+    "untilOnly": "Hasta el {{date}}",
+    "thisMonth": "Este mes",
+    "lastMonth": "El mes pasado",
+    "thisQuarter": "Este trimestre",
+    "thisYear": "Este año",
+    "fromLabel": "Desde",
+    "untilLabel": "Hasta",
+    "open": "Abierto",
+    "fromRemove": "Quitar la fecha de inicio",
+    "untilRemove": "Quitar la fecha de fin",
+    "clear": "Borrar fechas"
+  },
+  "datePicker": {
+    "pickDate": "Elegir una fecha",
+    "pickDateTime": "Elegir fecha y hora",
+    "typeDate": "Escribe o elige una fecha",
+    "time": "Hora",
+    "invalidDate": "Introduce una fecha válida.",
+    "invalidLocalDateTime": "Introduce una fecha y una hora válidas. Durante un cambio de hora, elige una hora fuera del intervalo omitido o repetido."
+  },
+  "emojiPicker": {
+    "pick": "Elegir un emoji",
+    "searchPlaceholder": "Buscar emoji…",
+    "empty": "No se encontraron emojis.",
+    "prompt": "Selecciona un emoji…"
+  },
+  "fileDrop": {
+    "release": "Suéltalo aquí",
+    "unsupported": "Ese tipo de archivo no se puede subir aquí."
+  },
+  "imagePicker": {
+    "chooseImage": "Elegir una imagen",
+    "takePhoto": "Hacer una foto",
+    "chooseFromLibrary": "Elegir de la galería",
+    "chooseFile": "Elegir un archivo",
+    "permission": "Initiative necesita permiso para usar la cámara y las fotos. Actívalo en los ajustes del dispositivo e inténtalo de nuevo.",
+    "unavailable": "Este dispositivo no tiene cámara para hacer una foto.",
+    "failed": "No se pudo leer esa foto. Inténtalo de nuevo."
+  },
+  "lightbox": {
+    "title": "Imagen",
+    "description": "Usa las flechas o desliza para pasar de una imagen a otra.",
+    "position": "{{current}} / {{total}}",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "close": "Cerrar"
+  },
+  "multiSelect": {
+    "empty": "No hay opciones disponibles",
+    "allSelected": "Todos seleccionados",
+    "countSelected": "{{count}} seleccionados",
+    "clearAll": "Limpiar todo"
+  },
+  "pagination": {
+    "perPage": "Por página:",
+    "rangeOf": "{{start}}–{{end}} de {{total}}"
+  },
+  "pullToRefresh": {
+    "pull": "Desliza para actualizar",
+    "release": "Suelta para actualizar",
+    "refreshing": "Actualizando…"
+  },
+  "rowActions": {
+    "label": "Acciones",
+    "labelFor": "Acciones para {{subject}}"
+  },
+  "table": {
+    "select": "Seleccionar",
+    "exitSelection": "Salir de selección",
+    "enableSelectionMode": "Activar modo de selección",
+    "exitSelectionMode": "Salir del modo de selección",
+    "resetSorting": "Restablecer orden",
+    "groupBy": "Agrupar por",
+    "chooseGrouping": "Elegir agrupación",
+    "none": "Ninguno",
+    "columns": "Columnas",
+    "options": "Opciones de tabla",
+    "selectRow": "Seleccionar fila",
+    "rowsSelected": "{{selected}} de {{total}} fila(s) seleccionada(s)",
+    "rowsSelectedFiltered": "{{selected}} seleccionada(s) ({{total}} coinciden con el filtro)",
+    "noResults": "Sin resultados.",
+    "filter": "Filtrar…"
+  },
+  "wizard": {
+    "stepOf": "Paso {{current}} de {{total}}"
+  },
+  "cancel": "Cancelar",
+  "close": "Cerrar",
+  "breadcrumb": "Ruta de navegación",
+  "confirm": {
+    "continue": "Continuar",
+    "working": "Espera…"
+  },
+  "carousel": {
+    "previous": "Diapositiva anterior",
+    "next": "Diapositiva siguiente"
+  },
+  "colorPicker": {
+    "pick": "Elegir un color",
+    "mode": "Modo"
+  },
+  "iconPicker": {
+    "search": "Buscar un icono…",
+    "placeholder": "Selecciona un icono",
+    "empty": "No se encontró ningún icono",
+    "other": "Otro"
+  }
+}

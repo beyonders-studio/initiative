@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildCalendarEvent,
+  buildCollection,
+  buildCollectionFile,
   buildDefaultTaskStatuses,
   buildPropertyDefinition,
   buildPropertyOption,
@@ -20,12 +22,14 @@ import {
   TASK_GROUPINGS,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { definitionsHandler } from "@/__tests__/helpers/handlers/property.handlers";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
+  type CollectionRead,
   type DetailLayoutWrite,
   type ListLayoutWrite,
-  PropertyType,
+  MetadataType,
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -33,6 +37,7 @@ import { instanceTarget, sharedTarget, useToolLayouts } from "@/hooks/useToolLay
 import { MAX_PRESETS } from "@/lib/layouts/presets";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { CollectionLayoutEditorPage } from "@/pages/initiativeTools/files/CollectionLayoutEditorPage";
 
 import { calendarPresets, eventDetail, taskDetails, taskPresets } from "./details";
 import { LayoutEditor } from "./LayoutEditor";
@@ -84,6 +89,7 @@ const editor = (kind: string, onClose = vi.fn(), set = buildToolLayoutSet(), cal
         presets={calendar ? CALENDAR_PRESETS : PROJECT_PRESETS}
         set={read}
         initialKind={kind}
+        ownPropertiesEditable={!calendar}
         onClose={onClose}
       />
     ) : null;
@@ -104,6 +110,26 @@ const firePointer = (
 };
 
 const outline = () => screen.findByRole("navigation", { name: /outline/i });
+
+/** A plug-in placed on the initiative's tasks, with a field of its own. */
+const ciPlugin = communityHttp.get("/plugins/", () =>
+  HttpResponse.json({
+    items: [
+      {
+        id: 3,
+        name: "CI",
+        enabled: true,
+        definition: {
+          fields: [{ key: "ci.state", name: { en: "Build" }, kind: "badge", on: ["task"] }],
+        },
+        item_initiatives: [1],
+        item_fields: ["ci.state"],
+        item_parts: [],
+        item_actions: [],
+      },
+    ],
+  })
+);
 const canvas = () => screen.findByRole("region", { name: /preview/i });
 
 beforeEach(() => {
@@ -135,9 +161,7 @@ beforeEach(() => {
         ])
       )
     ),
-    communityHttp.get("/property-definitions/", () =>
-      HttpResponse.json([buildPropertyDefinition({ id: 12, name: "Effort" })])
-    ),
+    definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })]),
     communityHttp.put("/layouts/", async ({ request }) => {
       const body = (await request.json()) as Write;
       sent.push({ save: body });
@@ -160,6 +184,8 @@ describe("LayoutEditor", () => {
   it("takes a field off the card at once, and stores it only on Save", async () => {
     const { user } = editor("board");
     expect(await within(await canvas()).findByText(/priority: medium/i)).toBeInTheDocument();
+    // A card requires nothing: only an item's page does.
+    expect(within(await outline()).queryByRole("button", { name: /required/i })).toBeNull();
 
     await user.click(within(await outline()).getByRole("button", { name: /hide priority/i }));
 
@@ -214,6 +240,149 @@ describe("LayoutEditor", () => {
     ]);
   });
 
+  it("offers the project's properties and the initiative's metadata under whose they are", async () => {
+    server.use(
+      definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    const { user } = editor("table");
+
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    const picker = await screen.findByRole("dialog", { name: "Add" });
+    const sprint = await within(picker).findByRole("button", { name: "Sprint" });
+    expect(sprint.parentElement).toHaveTextContent("This project's properties");
+    const effort = within(picker).getByRole("button", { name: "Effort" });
+    expect(effort.parentElement).toHaveTextContent("Initiative metadata");
+    expect(effort.parentElement).not.toHaveTextContent("Sprint");
+    await user.click(sprint);
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(saved("table")?.columns).toContain("property:14");
+  });
+
+  it("manages the project's properties only where the server says it may", async () => {
+    server.use(
+      definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    const { user } = editor("table");
+
+    // With the layout selected, the panel lists them, to change.
+    const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
+      "section"
+    ) as HTMLElement;
+    expect(await within(panel).findByText("Sprint")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Edit property" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "New property" })).toBeInTheDocument();
+
+    // The initiative's metadata is placed here and edited in its settings.
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: "Effort" }));
+    expect(
+      await screen.findByRole("link", { name: "Open initiative settings" })
+    ).toBeInTheDocument();
+  });
+
+  it("lists the project's properties and changes nothing without the right to", async () => {
+    server.use(
+      definitionsHandler([], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    server.use(communityHttp.get("/layouts/", () => HttpResponse.json(buildToolLayoutSet())));
+    const target = instanceTarget(Tool.project, 1);
+    const Page = () => {
+      const read = useToolLayouts(target).data;
+      return read ? (
+        <LayoutEditor
+          target={target}
+          initiativeId={1}
+          project={PROJECT}
+          details={PROJECT_DETAILS}
+          presets={PROJECT_PRESETS}
+          set={read}
+          initialKind="table"
+          onClose={vi.fn()}
+        />
+      ) : null;
+    };
+    renderPage(Page);
+
+    const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
+      "section"
+    ) as HTMLElement;
+    expect(await within(panel).findByText("Sprint")).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Edit property" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "New property" })).not.toBeInTheDocument();
+  });
+
+  it("makes a new field the project's property, or the initiative's metadata if asked", async () => {
+    const made: Record<string, unknown>[] = [];
+    server.use(
+      communityHttp.post("/property-definitions/", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        made.push(body);
+        return HttpResponse.json(
+          buildPropertyDefinition({ id: 40 + made.length, name: String(body.name) })
+        );
+      })
+    );
+    const { user } = editor("table");
+
+    const add = async (name: string, initiatives: boolean) => {
+      await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+      const picker = await screen.findByRole("dialog", { name: "Add" });
+      await user.type(within(picker).getByRole("textbox", { name: /search/i }), name);
+      await user.click(within(picker).getByRole("button", { name: /^text$/i }));
+      expect(within(picker).getByRole("combobox", { name: "Belongs to" })).toHaveTextContent(
+        "This project's properties"
+      );
+      if (initiatives) {
+        await user.click(within(picker).getByRole("combobox", { name: "Belongs to" }));
+        await user.click(await screen.findByRole("option", { name: "The initiative's metadata" }));
+      }
+      await user.click(within(picker).getByRole("button", { name: /^create$/i }));
+    };
+    await add("Sprint", false);
+    await add("Budget", true);
+
+    await waitFor(() => expect(made).toHaveLength(2));
+    expect(made[0]).toMatchObject({ name: "Sprint", initiative_id: 1, project_id: 1 });
+    expect(made[1]).toMatchObject({ name: "Budget", initiative_id: 1 });
+    expect(made[1]).not.toHaveProperty("project_id");
+  });
+
+  it("names the part showing every value for the project's properties too", async () => {
+    editor("board");
+
+    // The shipped card holds it.
+    expect(
+      await within(await outline()).findByRole("button", { name: "All properties and metadata" })
+    ).toBeInTheDocument();
+  });
+
+  it("draws a scale column as the layout picks", async () => {
+    server.use(
+      definitionsHandler([
+        buildPropertyDefinition({ id: 13, name: "Score", type: MetadataType.scale }),
+      ])
+    );
+    const { user } = editor("table");
+
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: /^score/i }));
+    // What was added is selected, and its settings say how it is drawn.
+    await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
+    await user.click(await screen.findByRole("option", { name: "Stars" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(saved("table")?.displays).toEqual({ "property:13": "stars" });
+  });
+
   it("changes nothing while a save is under way, and still asks before leaving", async () => {
     let answer = () => {};
     server.use(
@@ -246,30 +415,12 @@ describe("LayoutEditor", () => {
   });
 
   it("shows a placed plug-in's field on a table as shipped, and takes it off", async () => {
-    server.use(
-      communityHttp.get("/plugins/", () =>
-        HttpResponse.json({
-          items: [
-            {
-              id: 3,
-              name: "CI",
-              enabled: true,
-              definition: {
-                fields: [{ key: "ci.state", name: { en: "Build" }, kind: "badge", on: ["task"] }],
-              },
-              item_initiatives: [1],
-              item_fields: ["ci.state"],
-              item_parts: [],
-              item_actions: [],
-            },
-          ],
-        })
-      )
-    );
+    server.use(ciPlugin);
     const { user } = editor("table");
 
     // It shows as it arrives, after the shipped columns; taken off, it stays off.
     await user.click(await within(await outline()).findByRole("button", { name: /^hide build/i }));
+    expect(within(await outline()).queryByRole("button", { name: /required/i })).toBeNull();
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -277,7 +428,7 @@ describe("LayoutEditor", () => {
   });
 
   it("shows a list, and opens the project on it, as changes of their own", async () => {
-    const { user } = editor("gantt");
+    const { user } = editor("gantt", vi.fn(), buildToolLayoutSet({ hidden: ["gantt"] }));
     await outline();
 
     // A hidden list is not one to open on, and the last one shown stays shown.
@@ -295,7 +446,7 @@ describe("LayoutEditor", () => {
   });
 
   it("keeps the last list a project shows", async () => {
-    editor("board");
+    editor("board", vi.fn(), buildToolLayoutSet({ hidden: ["table", "gantt", "calendar"] }));
     await outline();
 
     expect(screen.getByRole("switch", { name: /shown in the layout menu/i })).toBeDisabled();
@@ -368,16 +519,14 @@ describe("LayoutEditor", () => {
 
   it("offers a property's grouping once it is ticked, and starts the table on it", async () => {
     server.use(
-      communityHttp.get("/property-definitions/", () =>
-        HttpResponse.json([
-          buildPropertyDefinition({
-            id: 12,
-            name: "Sprint",
-            type: PropertyType.select,
-            options: [buildPropertyOption({ value: "s1", label: "Sprint 1" })],
-          }),
-        ])
-      )
+      definitionsHandler([
+        buildPropertyDefinition({
+          id: 12,
+          name: "Sprint",
+          type: MetadataType.select,
+          options: [buildPropertyOption({ value: "s1", label: "Sprint 1" })],
+        }),
+      ])
     );
     const { user } = editor("table");
     await outline();
@@ -634,7 +783,10 @@ describe("LayoutEditor", () => {
       const card = saved("board")?.card;
       // Into the row the title shares with its type's icon.
       const first = (card as LayoutNode | undefined)?.children?.[0] as LayoutNode | undefined;
-      expect((first?.children?.[0] as LayoutNode | undefined)?.children).toEqual([
+      const row = first?.children?.find((node) =>
+        (node as LayoutNode).children?.some((child) => child.props?.field === "title")
+      ) as LayoutNode | undefined;
+      expect(row?.children).toEqual([
         { type: "field", props: { field: "type" } },
         { type: "field", props: { field: "priority" } },
         { type: "field", props: { field: "title" } },
@@ -677,7 +829,7 @@ describe("LayoutEditor", () => {
       // A search no kind matches keeps every kind, and names the field.
       await user.type(within(picker).getByRole("textbox", { name: /search/i }), "Budget");
       await user.click(within(picker).getByRole("button", { name: /^number$/i }));
-      expect(within(picker).getByLabelText(/property name/i)).toHaveValue("Budget");
+      expect(within(picker).getByLabelText(/^Name$/)).toHaveValue("Budget");
       await user.click(within(picker).getByRole("button", { name: /^create$/i }));
       await user.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -743,6 +895,84 @@ describe("LayoutEditor", () => {
       });
     });
 
+    it("requires a field from its row in the outline, and shows a title as always", async () => {
+      server.use(ciPlugin);
+      const { user } = editor("task:1");
+      const required = async (name: string) =>
+        within(await outline()).queryByRole("button", { name: new RegExp(`^${name}: `) });
+
+      const tags = await required("Tags");
+      expect(tags).toHaveAccessibleName("Tags: not required. Press to require it.");
+      expect(tags).toHaveAttribute("aria-pressed", "false");
+      await user.click(tags as HTMLElement);
+      expect(await required("Tags")).toHaveAttribute("aria-pressed", "true");
+      // A part of the page's own that edits a field can be too.
+      await user.click((await required("When")) as HTMLElement);
+      // Pressed twice, it is not required again.
+      await user.click((await required("When")) as HTMLElement);
+
+      const title = await required("Task");
+      expect(title).toHaveAccessibleName("Task: required. A title is always required.");
+      expect(title).toHaveAttribute("aria-pressed", "true");
+      expect(title).toHaveAttribute("aria-disabled", "true");
+      // It still takes focus, so its explanation opens from the keyboard, and
+      // pressing it changes nothing.
+      (title as HTMLElement).focus();
+      expect(title).toHaveFocus();
+      await user.click(title as HTMLElement);
+      expect(await required("Task")).toHaveAttribute("aria-pressed", "true");
+      // What nobody fills in, what is never empty, and what a plug-in fills
+      // cannot be.
+      expect(await within(await outline()).findByRole("button", { name: "Build" })).toBeVisible();
+      for (const part of ["Created by", "Status", "Build"]) {
+        expect(await required(part)).not.toBeInTheDocument();
+      }
+      // The part's settings hold no second control.
+      await user.click(within(await outline()).getByRole("button", { name: "Tags" }));
+      expect(screen.queryByRole("switch", { name: /required/i })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+      await waitFor(() => expect(sent).toHaveLength(1));
+      expect(JSON.stringify(saved("task"))).toContain('{"field":"tags","required":true}');
+      expect(JSON.stringify(saved("task"))).not.toContain('{"field":"title","required"');
+      expect(JSON.stringify(saved("task"))).not.toContain('"type":"dates","props":{"required"');
+    });
+
+    it("explains a requirement in its tooltip", async () => {
+      const { user } = editor("task:1");
+
+      await user.hover(
+        within(await outline()).getByRole("button", { name: /^Tags: not required/ })
+      );
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        /Not required\. Press to require it\.Whoever adds one has to fill this in/
+      );
+    });
+
+    it("takes the flag off with the field it hides", async () => {
+      const { user } = editor(
+        "task:1",
+        vi.fn(),
+        buildToolLayoutSet({
+          layouts: [
+            {
+              kind: "task",
+              task_type_id: 1,
+              task_type_name: "Task",
+              definition: { side: [{ type: "field", props: { field: "tags", required: true } }] },
+              updated_at: "2026-10-01T12:00:00.000Z",
+            },
+          ],
+        })
+      );
+
+      await user.click(within(await outline()).getByRole("button", { name: /^hide tags$/i }));
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(sent).toHaveLength(1));
+      expect(JSON.stringify(saved("task"))).not.toContain("required");
+    });
+
     it("goes back to the shipped layout", async () => {
       const { user } = editor(
         "task:1",
@@ -784,6 +1014,105 @@ describe("LayoutEditor", () => {
 
       await waitFor(() => expect(sent).toHaveLength(1));
       expect(JSON.stringify(saved("calendar_event"))).not.toContain('"location"');
+    });
+  });
+
+  describe("a collection's layouts", () => {
+    /** The collection's layouts page, for `collection` (id 5) holding one file. */
+    const collectionEditor = (collection: CollectionRead) => {
+      server.use(
+        communityHttp.get("/collections/:id", () => HttpResponse.json(collection)),
+        communityHttp.get("/collections/:id/files", () =>
+          HttpResponse.json({
+            items: [buildCollectionFile({ id: 4, name: "Harbour" })],
+            total_count: 1,
+            page: 1,
+            page_size: 60,
+            has_next: false,
+            has_prev: false,
+          })
+        ),
+        communityHttp.get("/layouts/", () =>
+          HttpResponse.json(
+            buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "timeline"] })
+          )
+        )
+      );
+      renderPage(CollectionLayoutEditorPage, {
+        initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId/layouts",
+        routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+      });
+      return userEvent.setup();
+    };
+
+    it("puts the collection's property on a wall's card, drawn as stars", async () => {
+      const rating = buildPropertyDefinition({
+        id: 31,
+        name: "Stars given",
+        type: MetadataType.scale,
+        collection_id: 5,
+      });
+      server.use(definitionsHandler([], { collection: [rating] }));
+      const user = collectionEditor(buildCollection({ id: 5, metadata: [rating] }));
+
+      // Beside the layout, the collection's properties, each saying where it
+      // shows: the file's page shows every one.
+      expect(await screen.findByText("Shown on File page")).toBeInTheDocument();
+
+      await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+      const picker = await screen.findByRole("dialog", { name: "Add" });
+      // Listed under whose it is.
+      const field = await within(picker).findByRole("button", { name: "Stars given" });
+      expect(field.parentElement).toHaveTextContent("This collection's properties");
+      await user.click(field);
+      await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
+      await user.click(await screen.findByRole("option", { name: "Stars" }));
+      await user.click(within(await outline()).getByRole("button", { name: "Grid" }));
+      expect(await screen.findByText("Shown on Grid and File page")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(saved("grid")).toBeDefined());
+      expect(saved("grid")).toMatchObject({
+        card: { type: "card", children: [{ type: "field", props: { field: "property:31" } }] },
+        displays: { "property:31": "stars" },
+      });
+    });
+
+    it("makes a property of the collection's on a file's page and places it", async () => {
+      const made: Record<string, unknown>[] = [];
+      server.use(
+        communityHttp.post("/property-definitions/", async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          made.push(body);
+          return HttpResponse.json(
+            buildPropertyDefinition({ id: 32, name: String(body.name), collection_id: 5 }),
+            { status: 201 }
+          );
+        })
+      );
+      const user = collectionEditor(buildCollection({ id: 5, initiative_id: 1 }));
+
+      await user.click(await screen.findByRole("combobox", { name: "Layout being edited" }));
+      await user.click(await screen.findByRole("option", { name: "File page" }));
+      // Drawn with the collection's first file.
+      expect(
+        await within(await canvas()).findByRole("heading", { name: "Harbour" })
+      ).toBeInTheDocument();
+      await user.click(within(await outline()).getByRole("button", { name: /^add$/i }));
+      const picker = await screen.findByRole("dialog", { name: "Add" });
+      await user.type(within(picker).getByRole("textbox", { name: /search/i }), "Credit");
+      await user.click(within(picker).getByRole("button", { name: /^text$/i }));
+      await user.click(within(picker).getByRole("button", { name: /^create$/i }));
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(saved("file")).toBeDefined());
+      expect(made).toEqual([
+        expect.objectContaining({ name: "Credit", initiative_id: 1, collection_id: 5 }),
+      ]);
+      expect((saved("file")?.main as LayoutNode[] | undefined)?.at(-1)).toEqual({
+        type: "field",
+        props: { field: "property:32" },
+      });
     });
   });
 });

@@ -12,8 +12,10 @@ import httpx
 import pytest
 
 from app.core.messages import AIMessages
+from app.schemas.ai_generation import AIWriteAction, AIWriteRequest
 from app.schemas.ai_settings import AIProvider, ConnectionScope, ResolvedAISettings
 from app.services import ai_generation, ai_provider, safe_http
+from app.services.ai_context import TaskContext
 from app.services.ai_provider import AIRequestError
 
 
@@ -87,17 +89,26 @@ async def test_a_checklist_is_asked_for_as_json_and_tidied(monkeypatch):
         ),
     )
     health = _resolving_to(monkeypatch)
+    context = TaskContext('{"task":{"title":"Ship it"}}', 2, 5)
+
+    async def read_task(*args, **kwargs):
+        return context
+
+    monkeypatch.setattr(ai_generation, "task_context", read_task)
 
     with patch(
         "app.services.webhook_target_url.socket.getaddrinfo",
         return_value=[(2, 0, 0, "", ("93.184.216.34", 0))],
     ):
-        steps = await ai_generation.generate_checklist(None, _User(), 1, _Task())
+        steps, told = await ai_generation.generate_checklist(None, _User(), 1, _Task())
 
     assert steps[0] == "Book the hall"
     assert len(steps) == 2 and steps[1].endswith("...")
-    system = sent[0]["messages"][0]["content"]
+    assert told is context
+    system, data = (m["content"] for m in sent[0]["messages"])
     assert '{"items":' in system
+    # The instructions come first and stay the same; the task follows them.
+    assert data == f"<context>{context.data}</context>"
     # The connection answered, so it is well.
     assert health == [(ConnectionScope.community, 3, 1, None)]
 
@@ -116,8 +127,115 @@ async def test_a_connection_that_cannot_answer_says_why(monkeypatch, overrides, 
     assert refused.value.code == code
 
 
-async def test_an_empty_file_is_not_sent(monkeypatch):
+def _streaming(monkeypatch, *pieces: str, then: str | None = None) -> list[tuple]:
+    """Answer with ``pieces`` as they are written, then fail with ``then``;
+    keep the prompts asked."""
+    asked: list[tuple] = []
+
+    async def stream_text(target, job, prompt, *, guild_id):
+        asked.append(prompt)
+        for piece in pieces:
+            yield piece
+        if then:
+            raise AIRequestError(then)
+
+    monkeypatch.setattr(ai_provider, "stream_text", stream_text)
+    return asked
+
+
+async def _summary(monkeypatch, markdown: str) -> list[dict]:
+    monkeypatch.setattr(ai_generation, "editor_markdown", lambda *a, **k: markdown)
+    lines = await ai_generation.summarize(
+        None, _User(), 1, title="Notes", content={"root": {}}
+    )
+    return [json.loads(line) async for line in lines]
+
+
+async def test_a_summary_streams_as_it_is_written(monkeypatch):
+    health = _resolving_to(monkeypatch)
+    asked = _streaming(monkeypatch, "A ", "summary")
+
+    assert await _summary(monkeypatch, "The rota") == [
+        {"text": "A "},
+        {"text": "summary"},
+    ]
+    assert "The rota" in asked[0][1]
+    assert health == [(ConnectionScope.community, 3, 1, None)]
+
+
+async def test_a_long_document_is_summarized_as_far_as_it_fits(monkeypatch):
+    _resolving_to(monkeypatch)
+    asked = _streaming(monkeypatch, "Short")
+    monkeypatch.setattr(ai_generation, "_SUMMARY_BUDGET", 10)
+
+    lines = await _summary(monkeypatch, "a" * 30 + "\n\n" + "b" * 50)
+
+    # It ends where the first paragraph does, a third of the way in.
+    assert lines == [{"cut": {"percent": 36}}, {"text": "Short"}]
+    system, data = asked[0]
+    assert "Only the beginning" in system
+    assert "b" not in data.split("<content>")[1]
+
+
+async def test_a_failure_says_why_before_or_part_way(monkeypatch):
+    health = _resolving_to(monkeypatch)
+
+    _streaming(monkeypatch, then=AIMessages.RATE_LIMITED)
+    with pytest.raises(AIRequestError) as refused:
+        await _summary(monkeypatch, "The rota")
+    assert refused.value.code == AIMessages.RATE_LIMITED
+
+    # Once text has gone out, the lines end with the code instead.
+    _streaming(monkeypatch, "A ", then=AIMessages.RATE_LIMITED)
+    assert await _summary(monkeypatch, "The rota") == [
+        {"text": "A "},
+        {"error": AIMessages.RATE_LIMITED},
+    ]
+    assert [code for *_, code in health] == [AIMessages.RATE_LIMITED] * 2
+
+
+async def test_an_empty_document_is_not_sent(monkeypatch):
     _resolving_to(monkeypatch)
     with pytest.raises(AIRequestError) as refused:
-        await ai_generation.generate_file_summary(None, _User(), 1, None, "Notes")
+        await _summary(monkeypatch, "  ")
     assert refused.value.code == AIMessages.DOCUMENT_EMPTY
+
+
+async def test_writing_help_sends_the_selection_whole_and_trims_around_it(
+    monkeypatch,
+):
+    _resolving_to(monkeypatch)
+    asked = _streaming(monkeypatch, "Shorter.")
+    recorded: list[dict] = []
+
+    async def record_request(session, **kwargs):
+        recorded.append(kwargs)
+
+    monkeypatch.setattr(ai_generation, "record_request", record_request)
+    monkeypatch.setattr(ai_generation, "_WRITING_BUDGET", 5)
+
+    def write(text: str):
+        request = AIWriteRequest(
+            action=AIWriteAction.shorten,
+            text=text,
+            before="a" * 20 + "<end of before>",
+            after="<start of after>" + "b" * 20,
+        )
+        return ai_generation.write(None, _User(), 1, request)
+
+    lines = await write("The rota")
+    assert [json.loads(line) async for line in lines] == [{"text": "Shorter."}]
+    # Twenty characters, less the selection's eight, shared from either side
+    # of it: the six nearest it on each.
+    data = asked[0][1]
+    assert "\nThe rota\n" in data
+    assert "\nefore&gt;\n</before>" in data and "<after>\n&lt;start\n" in data
+    assert recorded == [
+        {"user": recorded[0]["user"], "guild_id": 1, "purpose": "writing"}
+    ]
+
+    # A selection that does not fit is refused before anything is recorded.
+    with pytest.raises(AIRequestError) as refused:
+        await write("x" * 21)
+    assert refused.value.code == AIMessages.SELECTION_TOO_LONG
+    assert len(recorded) == 1

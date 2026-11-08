@@ -2,9 +2,9 @@
 
 The columns are not here. They are read off ``Task`` itself, because a foreign
 key already names the picker that fills it and a SQL type already says whether
-it orders. What is left is the part no table carries: the five fields that are a
-subquery rather than a column, and the two columns that exist for a feature's
-own bookkeeping.
+it orders. What is left is the part no table carries: the fields that are a
+subquery rather than a column, the parent a list groups by, and the columns that
+exist for a feature's own bookkeeping.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from app.services.fields.spec import (
     SortContext,
     computed,
 )
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 
 #: Columns that are the recurrence feature's own state — the rule, its end, the
 #: strategy that applies it, the counter that tracks it and the series a task
@@ -122,7 +122,7 @@ def _property_values(op: FilterOp, value: Any, ctx: FieldContext) -> Any:
         # Unknown or cross-guild property — silently skip (defense in depth,
         # consistent with the rest of apply_filters).
         return None
-    return properties_service.build_single_property_clause(
+    return metadata_service.build_single_property_clause(
         "task", pid, op, value.get("value"), defn
     )
 
@@ -135,15 +135,12 @@ def _plugin_values(op: FilterOp, value: Any, ctx: FieldContext) -> Any:
     by the key a value names for it. A field the person is not drawn, or a
     facet it does not declare, contributes nothing, as an unknown property
     does."""
-    # Local: the plug-in values service reads schemas that read this registry.
-    from app.services.tenant import plugin_metadata  # noqa: WPS433
-
     if not isinstance(value, dict):
         return None
     field = ctx.plugin_fields.get(str(value.get("field")))
     if field is None:
         return None
-    return plugin_metadata.filter_clause(
+    return metadata_service.filter_clause(
         field, op, value.get("value"), value.get("facet")
     )
 
@@ -219,6 +216,12 @@ def _tag_name(ctx: SortContext) -> Any:
     return first_tag_name(TAG_LINKS["task"], Task.id)
 
 
+async def _parent_groups(session: Any, ids: list[int]) -> Any:
+    from app.services.tenant import task_hierarchy
+
+    return await task_hierarchy.groups(session, ids)
+
+
 def _computed() -> tuple[FieldSpec, ...]:
     return (
         FieldSpec(
@@ -239,6 +242,15 @@ def _computed() -> tuple[FieldSpec, ...]:
             sort=_status_position,
             filterable=False,
             sortable=True,
+        ),
+        # The task a task is part of. A grouping only: the tree is stored as
+        # ``part_of`` edges, which no column or declared relation reaches.
+        FieldSpec(
+            name="parent_task_id",
+            kind=ControlKind.task,
+            ops=frozenset(),
+            filterable=False,
+            groups=_parent_groups,
         ),
         FieldSpec(
             name="tag_name",

@@ -2,10 +2,11 @@
 and leaving a tenant whose rules no longer grant a membership."""
 
 import pytest
-from sqlmodel import select
+from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db import post_commit
+from app.core.rules import SetBy
+from app.db import cohorts, post_commit
 from app.db.session import set_rls_context
 from app.models.platform.guild import GuildMembership, CommunityRole
 from app.models.platform.platform_provider_default import PlatformProviderDefault
@@ -15,11 +16,22 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCMappingTargetType,
 )
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.custom_role import (
+    CustomRole,
+    CustomRoleClaimRule,
+    CustomRoleMember,
+)
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.initiative import Initiative, InitiativeMember
+from app.services import oidc_sync
 from app.services.oidc_sync import sync_oidc_assignments
+from app.services.platform import provider_placement, rules
+from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
+    create_claim_rule,
+    create_guild_membership,
     NARROWED_CLAIM,
     NARROWED_VALUE,
     create_guild_provider_connection,
@@ -31,6 +43,7 @@ from app.testing.factories import (
     create_user,
 )
 from app.db.request_context import SystemGuild, Unattributed
+from app.testing.schema_harness import route_session_to_guild
 
 
 #: What an arrival from the tenant the factory's connections narrow to carries.
@@ -72,18 +85,14 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     await create_guild_provider_connection(session, guild=guild, provider=provider)
 
     newcomer = await create_user(session)
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider.id,
-            claim_value="engineering",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=guild.id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=initiative.id,
-            initiative_role_id=pm_role.id,
-        )
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        claim_value="engineering",
+        initiative=initiative,
+        initiative_role_id=pm_role.id,
     )
-    await session.commit()
 
     await set_rls_context(session, Unattributed())
     await sync_oidc_assignments(
@@ -285,18 +294,14 @@ async def test_auto_join_still_covers_what_the_claims_do_not(session: AsyncSessi
     await create_guild_provider_connection(session, guild=guild, provider=provider)
 
     newcomer = await create_user(session)
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider.id,
-            claim_value="engineering",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=guild.id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=mapped.id,
-            initiative_role_id=mapped_pm.id,
-        )
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        claim_value="engineering",
+        initiative=mapped,
+        initiative_role_id=mapped_pm.id,
     )
-    await session.commit()
 
     await set_rls_context(session, Unattributed())
     await sync_oidc_assignments(
@@ -566,11 +571,11 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     """
     from datetime import datetime, timezone
 
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True, community_age_gate_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await rules.put(session, "community_age_gate_enabled", True)
+    await session.commit()
     provider = await create_auth_provider(session)
     owner = await create_user(session)
     guild = await create_guild(session, creator=owner)
@@ -660,11 +665,9 @@ async def test_a_provider_rule_places_where_the_community_accepts_it(
 async def test_a_provider_rule_places_everywhere_when_the_deployment_says_so(
     session: AsyncSession,
 ):
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    settings_row = await app_settings_service.get_app_settings(session)
-    settings_row.provider_placement_everywhere = True
-    session.add(settings_row)
+    await rules.put(session, "provider_placement_everywhere", True)
     owner = await create_user(session)
     unconnected = await create_guild(session, creator=owner)
     provider = await create_auth_provider(session, slug="org")
@@ -751,3 +754,248 @@ async def test_a_provider_rule_places_whatever_the_communitys_own_narrowing_says
     )
 
     assert await _joined(session, out_of_tenant.id) == {accepting.id}
+
+
+async def test_the_first_role_rule_a_sign_in_matches_gives_its_role(
+    session: AsyncSession,
+):
+    """A community's custom-role rules, in its own schema, are read in order:
+    the first whose group the sign-in carries decides. A role somebody gave
+    by hand is the claims' to leave alone."""
+    owner = await create_user(session)
+    home = await create_guild(session, creator=owner)
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=home, provider=provider)
+    await _guild_rule(session, provider_id=provider.id, guild_id=home.id)
+    newcomer = await create_user(session)
+    await route_session_to_guild(session, home.id)
+    doors = CustomRole(name="Doors", base_rung="member", surfaces=["invites"])
+    roll = CustomRole(name="Roll", base_rung="member", surfaces=["members"])
+    session.add_all([doors, roll])
+    await session.flush()
+    session.add_all(
+        [
+            CustomRoleClaimRule(
+                provider_id=provider.id, claim_value="crew", role_id=roll.id, position=1
+            ),
+            CustomRoleClaimRule(
+                provider_id=provider.id,
+                claim_value="staff",
+                role_id=doors.id,
+                position=2,
+            ),
+        ]
+    )
+    await session.commit()
+    home_id, provider_id, user_id = home.id, provider.id, newcomer.id
+
+    async def sync(groups: set[str]) -> tuple[int, int | None]:
+        await set_rls_context(session, Unattributed())
+        await sync_oidc_assignments(
+            session,
+            user_id=user_id,
+            provider_id=provider_id,
+            claim_values=groups,
+            claims=_ADMITTED,
+        )
+        await session.commit()
+        session.expunge_all()
+        await set_rls_context(session, SystemGuild(home_id))
+        held = await session.get(CustomRoleMember, user_id)
+        assert held is not None
+        return held.role_id, held.oidc_provider_id
+
+    assert await sync({"staff", "crew"}) == (roll.id, provider_id)
+    assert await sync({"staff"}) == (doors.id, provider_id)
+
+    await custom_roles_service.assign(session, user_id=user_id, role_id=roll.id)
+    await session.commit()
+    assert await sync({"staff"}) == (roll.id, None)
+
+
+async def test_a_role_stays_until_a_sign_in_says_the_claim(session: AsyncSession):
+    """A refresh can come back without the claim a community narrows by. Its
+    custom-role rules live in its schema, out of the refresh guard's sight, so
+    there the role is left as it is; a sign-in that carries the claim but not
+    the group takes it back."""
+    owner = await create_user(session)
+    home = await create_guild(session, creator=owner)
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=home, provider=provider)
+    member = await create_user(session)
+    await create_guild_membership(session, user=member, guild=home)
+    await route_session_to_guild(session, home.id)
+    doors = CustomRole(name="Doors", base_rung="member", surfaces=["invites"])
+    session.add(doors)
+    await session.flush()
+    session.add(
+        CustomRoleClaimRule(
+            provider_id=provider.id, claim_value="staff", role_id=doors.id, position=1
+        )
+    )
+    await session.commit()
+    home_id, provider_id, user_id, doors_id = home.id, provider.id, member.id, doors.id
+
+    async def sync(groups: set[str], claims: dict) -> int | None:
+        await set_rls_context(session, Unattributed())
+        await sync_oidc_assignments(
+            session,
+            user_id=user_id,
+            provider_id=provider_id,
+            claim_values=groups,
+            claims=claims,
+        )
+        await session.commit()
+        session.expunge_all()
+        await set_rls_context(session, SystemGuild(home_id))
+        held = await session.get(CustomRoleMember, user_id)
+        return held.role_id if held is not None else None
+
+    assert await sync({"staff"}, _ADMITTED) == doors_id
+    assert await sync(set(), {}) == doors_id
+    assert await sync(set(), _ADMITTED) is None
+
+
+async def test_a_full_community_takes_nobody_new_from_its_rules(
+    session: AsyncSession,
+):
+    """A seat is a seat however somebody arrives: at its cap, a community's
+    rules place nobody new in it, nor in its initiatives, and the rest of the
+    sign-in goes on."""
+    owner = await create_user(session)
+    full = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, full, owner)
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=full, provider=provider)
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=full,
+        initiative=initiative,
+        initiative_role_id=member_role.id,
+    )
+    await rules.put(session, "max_users", 1, guild_id=full.id, set_by=SetBy.deployment)
+    newcomer = await create_user(session)
+    await session.commit()
+    full_id, initiative_id, user_id = full.id, initiative.id, newcomer.id
+
+    result = await _sync(
+        session, user_id=user_id, provider_id=provider.id, claims=_ADMITTED
+    )
+
+    assert result.guilds_added == []
+    assert result.initiatives_added == []
+    assert await _joined(session, user_id) == set()
+    assert (
+        await _membership(
+            session, guild_id=full_id, initiative_id=initiative_id, user_id=user_id
+        )
+        is None
+    )
+
+
+async def test_a_rule_whose_initiative_is_deleted_places_in_the_community_alone(
+    session: AsyncSession,
+):
+    """A rule's initiative is kept beside the initiative, in the community's
+    schema, and goes when the initiative does: the rule then places people in
+    the community and in no initiative."""
+    provider = await create_auth_provider(session)
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, guild, owner, name="Gone")
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    rule = await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        initiative=initiative,
+        initiative_role_id=member_role.id,
+    )
+    newcomer = await create_user(session)
+    guild_id, initiative_id = guild.id, initiative.id
+    rule_id, user_id = rule.id, newcomer.id
+
+    await route_session_to_guild(session, guild_id)
+    await session.exec(delete(Initiative).where(Initiative.id == initiative_id))
+    await session.commit()
+    assert await session.get(ClaimRuleInitiative, (rule_id, 0)) is None
+
+    result = await _sync(
+        session, user_id=user_id, provider_id=provider.id, claims=_ADMITTED
+    )
+
+    assert result.guilds_added == [guild_id]
+    assert result.initiatives_added == []
+    assert await _joined(session, user_id) == {guild_id}
+
+
+async def test_a_rule_moved_during_a_sign_in_takes_nothing_away(
+    session: AsyncSession, monkeypatch
+):
+    """A sign-in reads its rules, then each community's half reads where they
+    place people. A rule moved twice in between has no row at the version the
+    sign-in read: the person keeps their place, and the next sign-in decides."""
+    provider = await create_auth_provider(session)
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, guild, owner)
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    manager_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="project_manager"
+    )
+    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    rule = await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        initiative=initiative,
+        initiative_role_id=member_role.id,
+    )
+    newcomer = await create_user(session)
+    guild_id, initiative_id, manager_role_id = guild.id, initiative.id, manager_role.id
+    rule_id, user_id, provider_id = rule.id, newcomer.id, provider.id
+    await _sync(session, user_id=user_id, provider_id=provider_id, claims=_ADMITTED)
+    assert await _membership(
+        session, guild_id=guild_id, initiative_id=initiative_id, user_id=user_id
+    )
+
+    each_guild = oidc_sync.each_guild
+
+    async def moved_meanwhile(visits, **kwargs):
+        if kwargs["name"] == "oidc-sync":
+            await provider_placement.set_rule_initiative(
+                guild_id,
+                rule_id,
+                version=2,
+                initiative_id=initiative_id,
+                initiative_role_id=manager_role_id,
+                alike=[],
+            )
+            async with cohorts.system_session(None) as system:
+                await system.exec(
+                    update(OIDCClaimMapping)
+                    .where(OIDCClaimMapping.id == rule_id)
+                    .values(placement_version=2)
+                )
+                await system.commit()
+            await provider_placement.drop_rule_initiative(guild_id, rule_id, before=1)
+        return await each_guild(visits, **kwargs)
+
+    monkeypatch.setattr(oidc_sync, "each_guild", moved_meanwhile)
+    result = await _sync(
+        session, user_id=user_id, provider_id=provider_id, claims=_ADMITTED
+    )
+
+    assert result.initiatives_removed == []
+    assert await _membership(
+        session, guild_id=guild_id, initiative_id=initiative_id, user_id=user_id
+    )

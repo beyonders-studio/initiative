@@ -120,6 +120,7 @@
   "imageDialog": {
     "urlTab": "URL",
     "fileTab": "Archivo",
+    "filesTab": "Archivos",
     "imageUrl": "URL de la imagen",
     "imageUrlPlaceholder": "https://example.com/imagen.png",
     "altText": "Texto alternativo",
@@ -153,9 +154,6 @@
       "total_one": "{{count}} tarea",
       "total_other": "{{count}} tareas",
       "none": "Ninguna tarea coincide.",
-      "previous": "Anterior",
-      "next": "Siguiente",
-      "page": "Página {{page}} de {{pages}}",
       "label": "Etiqueta",
       "labelPlaceholder": "Tareas abiertas del lanzamiento",
       "from": "De",
@@ -182,12 +180,17 @@
       "assignee": "Persona asignada",
       "checklist": "Hecha",
       "due": "Fecha de vencimiento",
+      "email": "Correo",
+      "phone": "Teléfono",
       "priority": "Prioridad",
       "progress": "Progreso",
       "status": "Estado",
       "value": "Valor",
       "when": "Fecha"
     },
+    "callHint": "Haz clic para llamar",
+    "contactEmail": "Correo del contacto",
+    "contactPhone": "Teléfono del contacto",
     "counterValue": "Valor del contador",
     "eventWhen": "Fecha del evento",
     "insert": "Chip inteligente",
@@ -206,6 +209,35 @@
     "taskDue": "Fecha de vencimiento",
     "taskPriority": "Prioridad",
     "taskStatus": "Estado de la tarea",
-    "whichFact": "¿Qué dato debe mostrar el chip?"
+    "whichFact": "¿Qué dato debe mostrar el chip?",
+    "writeHint": "Haz clic para escribir"
+  },
+  "summary": {
+    "title": "Resumen",
+    "aiNotEnabled": "Las funciones de IA no están habilitadas. Configura los ajustes de IA para generar resúmenes.",
+    "generateDescription": "Genera un resumen de este documento con inteligencia artificial.",
+    "generateButton": "Generar resumen",
+    "generateError": "No se pudo generar el resumen. Por favor intenta de nuevo.",
+    "generating": "Generando resumen…",
+    "copy": "Copiar resumen",
+    "regenerate": "Regenerar resumen",
+    "cut": "Escrito a partir del primer {{percent}} %. El resto no cabía."
+  },
+  "writing": {
+    "menu": "Ayuda para escribir",
+    "rewrite": "Reescribir",
+    "shorten": "Acortar",
+    "fix": "Corregir ortografía y gramática",
+    "translate": "Traducir…",
+    "continue": "Seguir escribiendo",
+    "preview": "Texto sugerido",
+    "writing": "Escribiendo…",
+    "discard": "Descartar",
+    "insert": "Insertar",
+    "insertBelow": "Insertar debajo",
+    "replace": "Reemplazar",
+    "changed": "El texto cambió mientras se escribía. Insértalo debajo o descártalo.",
+    "cannotKeep": "La ayuda de escritura no puede devolver esta selección entera: abarca elementos de una lista o un título, o contiene algo como una imagen. Selecciona texto dentro de uno de ellos.",
+    "error": "No se pudo escribir. Por favor intenta de nuevo."
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -7,8 +7,8 @@ import {
   CreateToolDialog,
   type CreateToolDialogProps,
 } from "@/components/initiativeTools/shared/CreateToolDialog";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Label } from "@/components/ui/label";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Label } from "@/ui/label";
 
 /**
  * The shared create dialog with the one thing a calendar asks for beside it:
@@ -20,9 +20,11 @@ export const CreateCalendarDialog = (
   const { t } = useTranslation("calendars");
   const [color, setColor] = useState(DEFAULT_CALENDAR_COLOR);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(props.open);
+  if (wasOpen !== props.open) {
+    setWasOpen(props.open);
     if (!props.open) setColor(DEFAULT_CALENDAR_COLOR);
-  }, [props.open]);
+  }
 
   return (
     <CreateToolDialog

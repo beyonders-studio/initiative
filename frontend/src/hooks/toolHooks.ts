@@ -40,6 +40,17 @@ import {
   updateCalendar,
 } from "@/api/generated/calendars/calendars";
 import {
+  createContact,
+  deleteContact,
+  duplicateContact,
+  getListContactsQueryKey,
+  getReadContactQueryKey,
+  listContacts,
+  readContact,
+  setContactGrants,
+  updateContact,
+} from "@/api/generated/contacts/contacts";
+import {
   createCounterGroup,
   deleteCounterGroup,
   duplicateCounterGroup,
@@ -72,17 +83,6 @@ import {
   setFileGrants,
   updateFile,
 } from "@/api/generated/files/files";
-import {
-  createGallery,
-  deleteGallery,
-  duplicateGallery,
-  getListGalleriesQueryKey,
-  getReadGalleryQueryKey,
-  listGalleries,
-  readGallery,
-  setGalleryGrants,
-  updateGallery,
-} from "@/api/generated/galleries/galleries";
 import type {
   ListFilesParams,
   ResourceGrantSchema,
@@ -91,22 +91,20 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   getListMyCalendarsQueryKey,
+  getListMyContactsQueryKey,
   getListMyCounterGroupsQueryKey,
   getListMyDashboardsQueryKey,
   getListMyFilesQueryKey,
-  getListMyGalleriesQueryKey,
   getListMyPostsQueryKey,
   getListMyProjectsQueryKey,
-  getListMyQueuesQueryKey,
   getListMyWikisQueryKey,
   listMyCalendars,
+  listMyContacts,
   listMyCounterGroups,
   listMyDashboards,
   listMyFiles,
-  listMyGalleries,
   listMyPosts,
   listMyProjects,
-  listMyQueues,
   listMyWikis,
 } from "@/api/generated/my-tools/my-tools";
 import {
@@ -131,17 +129,6 @@ import {
   setProjectGrants,
   updateProject,
 } from "@/api/generated/projects/projects";
-import {
-  createQueue,
-  deleteQueue,
-  duplicateQueue,
-  getListQueuesQueryKey,
-  getReadQueueQueryKey,
-  listQueues,
-  readQueue,
-  setQueueGrants,
-  updateQueue,
-} from "@/api/generated/queues/queues";
 import {
   createWiki,
   deleteWiki,
@@ -275,6 +262,22 @@ const listHook = <TList, TParams>(endpoints: {
 };
 
 /**
+ * One row, as query options: for a caller that holds the tool as a value
+ * rather than calling that tool's own hook — the page title reads whichever
+ * tool the route is in. The same key and fetch `useDetail` uses, so the two
+ * share one cache entry.
+ */
+const detailQueryOf =
+  <TRead>(endpoints: {
+    detailKey: (communityId: number, id: number) => CacheKey;
+    detail: (communityId: number, id: number) => Promise<TRead>;
+  }) =>
+  (communityId: number, id: number) => ({
+    queryKey: endpoints.detailKey(communityId, id),
+    queryFn: () => endpoints.detail(communityId, id),
+  });
+
+/**
  * One row. `null` for an id the route has not resolved yet, which holds the
  * request rather than firing it at nothing; a caller's own `enabled` narrows
  * further and never widens.
@@ -287,12 +290,12 @@ const detailHook = <TRead>(endpoints: {
   detailKey: (communityId: number, id: number) => CacheKey;
   detail: (communityId: number, id: number) => Promise<TRead>;
 }) => {
+  const detailQuery = detailQueryOf(endpoints);
   return (id: number | null, options?: QueryOpts<TRead>) => {
     const communityId = useActiveCommunityId();
     const { enabled: userEnabled = true, ...rest } = options ?? {};
     return useQuery<TRead>({
-      queryKey: endpoints.detailKey(communityId, id!),
-      queryFn: () => endpoints.detail(communityId, id!),
+      ...detailQuery(communityId, id!),
       enabled: id !== null && Number.isFinite(id) && userEnabled,
       placeholderData: undefined,
       ...rest,
@@ -432,6 +435,7 @@ const makeToolHooks = <TRead, TList, TMyList, TCreate, TUpdate, TParams>(
   const errorKey = `${toolCamelPlural(endpoints.tool)}:error`;
   return {
     ...listQueries(endpoints),
+    detailQuery: detailQueryOf(endpoints),
     create: endpoints.create,
     duplicate: endpoints.duplicate,
     remove: endpoints.remove,
@@ -459,6 +463,21 @@ const calendarEndpoints = {
   setGrants: setCalendarGrants,
   duplicate: duplicateCalendar,
   tool: Tool.calendar,
+};
+
+const contactEndpoints = {
+  listKey: getListContactsQueryKey,
+  list: listContacts,
+  myListKey: getListMyContactsQueryKey,
+  myList: listMyContacts,
+  detailKey: getReadContactQueryKey,
+  detail: readContact,
+  create: createContact,
+  update: updateContact,
+  remove: deleteContact,
+  setGrants: setContactGrants,
+  duplicate: duplicateContact,
+  tool: Tool.contact,
 };
 
 const counterGroupEndpoints = {
@@ -511,6 +530,7 @@ const fileEndpoints = {
 
 const fileHooks = {
   ...listQueries(fileEndpoints),
+  detailQuery: detailQueryOf(fileEndpoints),
   create: createFile,
   duplicate: duplicateFile,
   remove: fileEndpoints.remove,
@@ -522,21 +542,6 @@ const fileHooks = {
   }),
   useDelete: deleteHook(fileEndpoints, "files:error"),
   useSetGrants: grantsHook(fileEndpoints, "files:settings.updateAccessError"),
-};
-
-const galleryEndpoints = {
-  listKey: getListGalleriesQueryKey,
-  list: listGalleries,
-  myListKey: getListMyGalleriesQueryKey,
-  myList: listMyGalleries,
-  detailKey: getReadGalleryQueryKey,
-  detail: readGallery,
-  create: createGallery,
-  update: updateGallery,
-  remove: deleteGallery,
-  setGrants: setGalleryGrants,
-  duplicate: duplicateGallery,
-  tool: Tool.gallery,
 };
 
 const postEndpoints = {
@@ -567,21 +572,6 @@ const projectEndpoints = {
   setGrants: setProjectGrants,
   duplicate: duplicateProject,
   tool: Tool.project,
-};
-
-const queueEndpoints = {
-  listKey: getListQueuesQueryKey,
-  list: listQueues,
-  myListKey: getListMyQueuesQueryKey,
-  myList: listMyQueues,
-  detailKey: getReadQueueQueryKey,
-  detail: readQueue,
-  create: createQueue,
-  update: updateQueue,
-  remove: deleteQueue,
-  setGrants: setQueueGrants,
-  duplicate: duplicateQueue,
-  tool: Tool.queue,
 };
 
 const wikiEndpoints = {
@@ -618,6 +608,11 @@ interface ToolQueries {
     queryKey: CacheKey;
     queryFn: () => Promise<ToolListPage>;
   };
+  /** Reads one — what the page title asks of whichever tool the route is in. */
+  detailQuery: (
+    communityId: number,
+    id: number
+  ) => { queryKey: CacheKey; queryFn: () => Promise<{ name: string }> };
   /** Makes one from a name and its initiative — what `useCreateTool` sends every tool. */
   create: (
     communityId: number,
@@ -639,7 +634,6 @@ interface ToolQueries {
 export const TOOL_HOOKS = {
   [Tool.project]: makeToolHooks(projectEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.file]: fileHooks,
-  [Tool.queue]: makeToolHooks(queueEndpoints),
   [Tool.counter_group]: makeToolHooks(counterGroupEndpoints),
   [Tool.calendar]: makeToolHooks(calendarEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.dashboard]: makeToolHooks(dashboardEndpoints, { seedsDetailOnUpdate: true }),
@@ -647,8 +641,8 @@ export const TOOL_HOOKS = {
     seedsDetailOnUpdate: true,
     refreshesRelationships: true,
   }),
-  [Tool.gallery]: makeToolHooks(galleryEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.wiki]: makeToolHooks(wikiEndpoints),
+  [Tool.contact]: makeToolHooks(contactEndpoints, { seedsDetailOnUpdate: true }),
 } satisfies Record<Tool, ToolQueries>;
 
 /**
@@ -658,6 +652,13 @@ export const TOOL_HOOKS = {
 export const toolListQuery = (tool: Tool, communityId: number, params?: ToolListParams) => {
   const listQuery: ToolQueries["listQuery"] = TOOL_HOOKS[tool].listQuery;
   return listQuery(communityId, params);
+};
+
+/** One row of a tool, typed as any tool's: for a caller that holds the tool
+ *  as a value and only needs what every row carries. */
+export const toolDetailQuery = (tool: Tool, communityId: number, id: number) => {
+  const detailQuery: ToolQueries["detailQuery"] = TOOL_HOOKS[tool].detailQuery;
+  return detailQuery(communityId, id);
 };
 
 /**

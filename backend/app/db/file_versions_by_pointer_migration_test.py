@@ -1,7 +1,7 @@
 """Migration 20261005_0459 points file documents and pictures at the version
 they show. Loaded by path and run on a guild the test builds, the way
 ``upload_initiative_backfill_test`` runs its revision: down to the old shape
-(20261006_0464's rename first), rows written as an older release wrote them,
+(20261027_0546's conversion and 20261006_0464's rename first), rows written as an older release wrote them,
 and up again."""
 
 from __future__ import annotations
@@ -14,11 +14,9 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.models.tenant.file import FileType
+from app.testing.later_revisions import later_revisions
 from app.testing import (
     create_file,
-    create_gallery,
-    create_gallery_image,
     create_guild,
     create_initiative,
     create_user,
@@ -27,6 +25,8 @@ from app.testing import (
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
+_COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
+_METADATA = _VERSIONS / "20261027_0550_metadata_is_one_store.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:
@@ -35,6 +35,42 @@ def _load(path: Path = _MIGRATION) -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+async def _picture(session, schema: str, initiative_id: int, user_id: int) -> int:
+    """A picture in a gallery, as 0.68 stored one."""
+    connection = await session.connection()
+
+    async def one(sql: str, **params) -> int:
+        return (await connection.execute(text(sql), params)).scalar_one()
+
+    gallery = await one(
+        f"INSERT INTO {schema}.galleries (initiative_id, name, created_by, "
+        "created_at, updated_at) VALUES (:i, 'Wall', :u, now(), now()) RETURNING id",
+        i=initiative_id,
+        u=user_id,
+    )
+    picture = await one(
+        f"INSERT INTO {schema}.gallery_images (gallery_id, created_by, created_at, "
+        "updated_at) VALUES (:g, :u, now(), now()) RETURNING id",
+        g=gallery,
+        u=user_id,
+    )
+    version = await one(
+        f"INSERT INTO {schema}.gallery_image_versions (gallery_image_id, "
+        "version_number, file_url, file_content_type, original_filename, "
+        "created_by, created_at) VALUES (:p, 1, '/uploads/1/wall.png', "
+        "'image/png', 'wall.png', :u, now()) RETURNING id",
+        p=picture,
+        u=user_id,
+    )
+    await connection.execute(
+        text(
+            f"UPDATE {schema}.gallery_images SET current_version_id = :v WHERE id = :p"
+        ),
+        {"v": version, "p": picture},
+    )
+    return picture
 
 
 async def test_old_files_get_versions_types_and_pointers(
@@ -55,17 +91,14 @@ async def test_old_files_get_versions_types_and_pointers(
         session,
         initiative,
         user,
-        file_type=FileType.file,
         file_url="/uploads/1/brief.pdf",
         original_filename="brief.pdf",
     )
     named = await create_file(session, initiative, user)
     nameless = await create_file(session, initiative, user)
-    picture = await create_gallery_image(
-        session, await create_gallery(session, initiative, user), user
-    )
     migration = _load()
     files = _load(_FILES)
+    collections = _load(_COLLECTIONS)
 
     def run(step):
         def apply(sync_session) -> None:
@@ -79,6 +112,10 @@ async def test_old_files_get_versions_types_and_pointers(
 
         return apply
 
+    await session.run_sync(later_revisions(schema, forward=False))
+    await session.run_sync(run(lambda: _load(_METADATA)._apply(False)))
+    await session.run_sync(run(lambda: collections._apply(False)))
+    picture = await _picture(session, schema, initiative.id, user.id)
     await session.run_sync(run(lambda: files._apply(False)))
     await session.run_sync(run(migration._apply_downgrade))
     # Written as an import used to write them: a file and no version.
@@ -101,7 +138,7 @@ async def test_old_files_get_versions_types_and_pointers(
             " original_filename = 'foo.bin', file_url = '/uploads/1/foo.bin'"
             " WHERE gallery_image_id = :id"
         ),
-        {"id": picture.id},
+        {"id": picture},
     )
     copied = (
         await (await session.connection()).execute(
@@ -133,7 +170,7 @@ async def test_old_files_get_versions_types_and_pointers(
                 f" JOIN {schema}.gallery_image_versions v ON v.id = i.current_version_id"
                 " WHERE i.id = :id"
             ),
-            {"id": picture.id},
+            {"id": picture},
         )
     ).scalar()
     assert shown == "image/png"
@@ -150,3 +187,6 @@ async def test_old_files_get_versions_types_and_pointers(
     ).scalar()
     assert leftover == 0
     await session.run_sync(run(lambda: files._apply(True)))
+    await session.run_sync(run(lambda: collections._apply(True)))
+    await session.run_sync(run(lambda: _load(_METADATA)._apply(True)))
+    await session.run_sync(later_revisions(schema, forward=True))

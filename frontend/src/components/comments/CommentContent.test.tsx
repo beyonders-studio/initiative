@@ -168,7 +168,7 @@ describe("CommentContent", () => {
   });
 
   it("links task, doc, and project mentions", async () => {
-    renderLinkedContent("#task[Fix login](3) #doc[Runbook](4) #project[Apollo](5)");
+    renderLinkedContent("#task[Fix login](3) #file[Runbook](4) #project[Apollo](5)");
 
     expect(await screen.findByRole("link", { name: /Fix login/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Runbook/ })).toBeInTheDocument();

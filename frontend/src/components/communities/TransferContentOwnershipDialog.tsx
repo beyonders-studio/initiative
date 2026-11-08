@@ -17,18 +17,6 @@ import {
 } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
 import type { MemberLike } from "@/components/members/MemberSearchSelect";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import type { SearchableComboboxItem } from "@/components/ui/searchable-combobox";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { USER_ID_LOOKUP_MAX, useUserSearch } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -36,6 +24,17 @@ import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
 import { toolCamelPlural } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Combobox, type ComboboxItem } from "@/ui/combobox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
 
 /**
  * Counts keyed by tool, rendered as "3 projects · 1 calendar". The label comes
@@ -150,7 +149,7 @@ export const TransferContentOwnershipDialog = ({
     pageSize: USER_ID_LOOKUP_MAX,
     enabled: open && pickerOpen,
   });
-  const recipients = useMemo<SearchableComboboxItem[]>(() => {
+  const recipients = useMemo<ComboboxItem[]>(() => {
     const term = search.trim().toLowerCase();
     return [
       ...(adminSearch.data?.items ?? [])
@@ -235,7 +234,7 @@ export const TransferContentOwnershipDialog = ({
 
             <div className="space-y-2">
               <Label>{t("transferOwnership.recipientLabel")}</Label>
-              <AsyncCombobox
+              <Combobox
                 items={recipients}
                 value={recipientId}
                 onValueChange={(value) => {

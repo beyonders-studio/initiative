@@ -29,7 +29,7 @@ class GalleryField:
 
     #: Its name's key (``taskTypes.gallery.fields.<key>``).
     key: str
-    #: A ``PropertyType`` value.
+    #: A ``MetadataType`` value.
     type: str
 
 
@@ -58,6 +58,7 @@ class GalleryType:
 
 _LOCATION = GalleryField("location", "text")
 _LINK = GalleryField("link", "url")
+_DESIGN_FILES = GalleryField("design_files", "file")
 
 #: Every ready-made type, in the order the gallery lists them within a group.
 GALLERY: tuple[GalleryType, ...] = (
@@ -112,8 +113,12 @@ GALLERY: tuple[GalleryType, ...] = (
         "bug",
         start=GalleryStart(outline="bug"),
     ),
-    GalleryType("feature", "making", "plain", "#60A5FA", "sparkles"),
-    GalleryType("art", "making", "plain", "#F472B6", "palette"),
+    GalleryType(
+        "feature", "making", "plain", "#60A5FA", "sparkles", fields=(_DESIGN_FILES,)
+    ),
+    GalleryType(
+        "art", "making", "plain", "#F472B6", "palette", fields=(_DESIGN_FILES,)
+    ),
     GalleryType(
         "playtest",
         "making",

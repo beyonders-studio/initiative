@@ -14,12 +14,12 @@ import { MapPin } from "lucide-react";
 import { type KeyboardEvent, useDeferredValue, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Input } from "@/components/ui/input";
 import { usePlaceIndex } from "@/hooks/usePlaceIndex";
 import { countryName } from "@/lib/communityLocation";
 import { EMPTY_PLACE, PLACE_TEXT_MAX, type Place } from "@/lib/directoryNear";
 import { browserOrigin, type PlaceSuggestion, suggestPlaces } from "@/lib/placeSearch";
-import { cn } from "@/lib/utils";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
 
 /** Suggestions listed at once; a few more letters narrow the rest. */
 const SUGGESTION_LIMIT = 8;

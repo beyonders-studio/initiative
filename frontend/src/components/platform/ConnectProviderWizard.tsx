@@ -30,13 +30,6 @@ import type {
   AuthProviderProbeResult,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SuggestCombobox } from "@/components/ui/suggest-combobox";
-import { Switch } from "@/components/ui/switch";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useWizard } from "@/hooks/useWizard";
 import {
   buildIssuer,
@@ -52,6 +45,13 @@ import {
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isValidProviderSlug } from "@/lib/providerSlug";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { CopyButton } from "@/ui/copy-button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 type Step = "choose" | "address" | "credentials" | "options";
 
@@ -409,16 +409,16 @@ export const ConnectProviderWizard = ({
 
           <div className="space-y-1">
             <Label>{t("authProviders.claimPathLabel")}</Label>
-            <SuggestCombobox
-              suggestions={[
+            <Combobox
+              items={[
                 ...new Set([...(shown?.claims_supported ?? []), ...GROUPS_CLAIM_SUGGESTIONS]),
-              ]}
+              ].map((claim) => ({ value: claim, label: claim }))}
               value={groupsClaim}
+              selectedLabel={groupsClaim}
               onValueChange={setGroupsClaim}
               placeholder={t("authProviders.claimPathPlaceholder")}
               searchPlaceholder={t("authProviders.claimPathSearch")}
-              loadingLabel={t("authProviders.claimPathSearch")}
-              emptyLabel={t("authProviders.claimPathEmpty")}
+              emptyMessage={t("authProviders.claimPathEmpty")}
               typedLabel={(value) => t("authProviders.claimPathUseTyped", { value })}
               aria-label={t("authProviders.claimPathLabel")}
             />

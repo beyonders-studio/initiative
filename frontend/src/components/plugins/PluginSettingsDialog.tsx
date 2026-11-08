@@ -30,17 +30,11 @@ import { PluginConsentRequests } from "@/components/plugins/PluginConsentRequest
 import { PluginMembersPanel } from "@/components/plugins/PluginMembersPanel";
 import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPluginDetail } from "@/hooks/useCommunityPluginDetail";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Separator } from "@/ui/separator";
 
 export interface PluginSettingsDialogProps {
   pluginId: number;

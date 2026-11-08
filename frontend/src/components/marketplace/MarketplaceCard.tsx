@@ -11,11 +11,11 @@ import { useTranslation } from "react-i18next";
 
 import type { MarketplaceListingSummary } from "@/api/generated/initiativeAPI.schemas";
 import { ListingProvenance } from "@/components/marketplace/ListingProvenance";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Card, CardContent } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
 
 export interface MarketplaceCardProps {
   listing: MarketplaceListingSummary;

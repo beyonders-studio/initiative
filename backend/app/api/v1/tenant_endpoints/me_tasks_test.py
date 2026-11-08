@@ -613,7 +613,7 @@ async def test_list_my_tasks_property_value_is_null_filter(
     ``UndefinedTableError: relation "property_definitions" does not exist`` and
     the endpoint 500'd; definitions must be loaded per-guild.
     """
-    from app.models.tenant.property import PropertyType
+    from app.models.tenant.metadata import MetadataType
     from app.testing.factories import (
         create_property_definition,
         create_property_value,
@@ -623,7 +623,7 @@ async def test_list_my_tasks_property_value_is_null_filter(
     guild, initiative, project = await _setup_guild_with_project(session, user)
 
     definition = await create_property_definition(
-        session, initiative, name="Owner note", type=PropertyType.text
+        session, initiative, name="Owner note", type=MetadataType.text
     )
 
     with_value = await _create_task(session, project, "Has value", created_by=user.id)
@@ -663,7 +663,7 @@ async def test_list_my_tasks_property_filter_spans_guilds(
     typically both assign the same id to their first definition; the loader
     merges first-id-wins and the filter must still resolve correctly in both.
     """
-    from app.models.tenant.property import PropertyType
+    from app.models.tenant.metadata import MetadataType
     from app.testing.factories import (
         create_property_definition,
         create_property_value,
@@ -678,10 +678,10 @@ async def test_list_my_tasks_property_filter_spans_guilds(
     )
 
     def1 = await create_property_definition(
-        session, initiative1, name="Note", type=PropertyType.text
+        session, initiative1, name="Note", type=MetadataType.text
     )
     def2 = await create_property_definition(
-        session, initiative2, name="Note", type=PropertyType.text
+        session, initiative2, name="Note", type=MetadataType.text
     )
     # Per-schema sequences: the first definition in each guild shares an id. The
     # filter carries one property_id, so this collision is what makes a single

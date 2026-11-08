@@ -22,23 +22,15 @@ import { useTranslation } from "react-i18next";
 
 import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
+import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { useSecurityReporting } from "@/components/tickets/ReportSecurityProblem";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { MentionText } from "@/components/user/MentionText";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useGlobalCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useRecents } from "@/hooks/usePersonalItems";
@@ -48,7 +40,6 @@ import { useHasFiledTickets } from "@/hooks/useTickets";
 import { useUserSearch } from "@/hooks/useUsers";
 import { USER_MENTION_PATTERN } from "@/lib/commentReferences";
 import { communityPath, useCommunityPath } from "@/lib/communityUrl";
-import { commandFilter } from "@/lib/fuzzyMatch";
 import { canAccessOperatorDashboard, canManagePlatformConfig } from "@/lib/permissions";
 import { renderRecentIcon } from "@/lib/recentIcon";
 import { recentRoute } from "@/lib/recentRoute";
@@ -57,6 +48,7 @@ import {
   DEFAULT_SEARCH_CATEGORY,
   FROM_SEARCH,
   hitIcon,
+  isSearchCategory,
   SEARCH_CATEGORIES,
   type SearchCategory,
   searchHitPath,
@@ -69,7 +61,18 @@ import {
   getUrlHandle,
   getUserDisplayName,
 } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/ui/command";
+import { commandFilter } from "@/ui/lib/fuzzyMatch";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Tabs } from "@/ui/tabs";
 
 // Module-level callback so other components can open the command center
 let openCommandCenter: (() => void) | null = null;
@@ -106,12 +109,14 @@ export function CommandCenter() {
   const isSearching = effectiveSearch.length >= 2;
 
   // Reset the input whenever the dialog closes so reopening starts fresh.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setSearchQuery("");
       setScope(DEFAULT_SEARCH_CATEGORY);
     }
-  }, [open]);
+  }
 
   // Tab moves between the slices while there is something to search for, so the
   // hands stay on the query.
@@ -169,7 +174,7 @@ export function CommandCenter() {
   // Data hooks — all use existing cached data except tasks which fetches when dialog opens
   const recentQuery = useRecents({ staleTime: 30_000 });
   // Searching asks the community index one question and gets every kind of thing
-  // back — tasks, files, queue items, events, tags — ranked together.
+  // back — tasks, files, events, tags — ranked together.
   // `null` for Members, who are not in the index: identity is shared across
   // communities while the index is per-community, so they are read from the
   // roster — the same split the results page makes.
@@ -250,7 +255,9 @@ export function CommandCenter() {
     scopeQuery.isSuccess &&
     !scopeQuery.isPlaceholderData;
 
-  const isCommunityAdmin = Boolean(activeCommunity?.can.administer);
+  // Anybody who runs any part of the community, a custom role included.
+  const heldSurfaces = useHeldSurfaces();
+  const showsCommunitySettings = Boolean(activeCommunity?.can.administer) || heldSurfaces.holdsAny;
   const dmEnabled = useDirectMessagesEnabled();
   const hasTickets = useHasFiledTickets();
   const securityReporting = useSecurityReporting();
@@ -279,7 +286,7 @@ export function CommandCenter() {
       },
     ];
 
-    if (isCommunityAdmin) {
+    if (showsCommunitySettings) {
       items.push({
         label: t("pages.communitySettings"),
         path: getCommunityPath("/settings"),
@@ -309,7 +316,7 @@ export function CommandCenter() {
     getCommunityPath,
     dmEnabled,
     hasTickets,
-    isCommunityAdmin,
+    showsCommunitySettings,
     showOperatorDashboard,
     showPlatformSettings,
   ]);
@@ -329,32 +336,18 @@ export function CommandCenter() {
         })}
       />
       {isSearching && (
-        <div
-          className="flex items-center gap-1 border-b px-2 py-1.5"
-          role="tablist"
-          aria-label={t("search:title")}
+        <Tabs
+          value={scope}
+          onValueChange={(next) => {
+            if (isSearchCategory(next)) setScope(next);
+          }}
         >
-          {SEARCH_CATEGORIES.map((category) => (
-            <button
-              key={category}
-              type="button"
-              role="tab"
-              aria-selected={scope === category}
-              onClick={() => setScope(category)}
-              className={cn(
-                "rounded-md px-2 py-1 text-sm transition-colors",
-                scope === category
-                  ? "bg-accent font-medium text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t(`search:tabs.${category}`)}
-            </button>
-          ))}
-          <span className="ml-auto pr-1 text-muted-foreground text-xs">
-            {t("search:switchHint")}
-          </span>
-        </div>
+          <SearchCategoryTabs variant="strip">
+            <span className="ml-auto pr-1 text-muted-foreground text-xs">
+              {t("search:switchHint")}
+            </span>
+          </SearchCategoryTabs>
+        </Tabs>
       )}
 
       <CommandList>
@@ -479,8 +472,8 @@ export function CommandCenter() {
           )}
         </CommandGroup>
 
-        {/* Suggested — mixed recents across projects/files/queues/counter
-            groups. Browsing only: once there is a query, the index answers. */}
+        {/* Suggested — mixed recents across projects/files/counter groups.
+            Browsing only: once there is a query, the index answers. */}
         {!isSearching && recentItems.length > 0 && (
           <CommandGroup heading={t("groups.suggested")}>
             {recentItems.slice(0, 5).map((item) => (

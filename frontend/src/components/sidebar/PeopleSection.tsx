@@ -8,16 +8,13 @@ import {
   type CommunityRosterMember,
   type Presence,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@/components/sidebar/sidebar";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -26,7 +23,11 @@ import { useCommunityRoster } from "@/hooks/useUsers";
 import { isAdminRole } from "@/lib/permissions";
 import { PRESENCE_ORDER, presenceLabelKey } from "@/lib/presence";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { LoadMore } from "@/ui/load-more";
+import { Skeleton } from "@/ui/skeleton";
 
 const RosterRow = ({ member }: { member: CommunityRosterMember }) => {
   const { t } = useTranslation("communities");
@@ -156,17 +157,11 @@ export const PeopleSection = () => {
             </section>
           ))
         )}
-        {roster.hasNextPage && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-xs"
-            disabled={roster.isFetchingNextPage}
-            onClick={() => void roster.fetchNextPage()}
-          >
-            {t("peopleMore")}
-          </Button>
-        )}
+        <LoadMore
+          hasMore={roster.hasNextPage}
+          loading={roster.isFetchingNextPage}
+          onLoadMore={roster.fetchNextPage}
+        />
         {readerHidden && (
           <p className="px-2 text-muted-foreground text-xs">
             {t("peopleReaderHidden")}{" "}

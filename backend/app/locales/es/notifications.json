@@ -9,7 +9,16 @@
       "title": "Tareas vencidas",
       "body_one": "{{count}} tarea está vencida: {{title}}",
       "body_other": "{{count}} tareas están vencidas, incluida {{title}}"
+    },
+    "reminder": {
+      "title": "Recordatorio",
+      "body": "{{task}}"
     }
+  },
+  "comingUp": {
+    "title": "Próximamente",
+    "body_one": "{{count}} cosa próxima: {{title}}",
+    "body_other": "{{count}} cosas próximas, empezando por {{title}}"
   },
   "initiative": {
     "added": {
@@ -48,9 +57,9 @@
       "title": "Tu tarea fue mencionada",
       "body": "{{actor}} mencionó {{task}} en {{context}}"
     },
-    "taskDescription": {
+    "description": {
       "title": "Te mencionaron",
-      "body": "{{actor}} te mencionó en la descripción de {{task}}"
+      "body": "{{actor}} te mencionó en la descripción de {{title}}"
     }
   },
   "comment": {
@@ -212,6 +221,14 @@
     "account": {
       "title": "Un aviso sobre tu cuenta",
       "body": "Abre Initiative para leerlo."
+    },
+    "overdue": {
+      "title": "Tienes tareas vencidas",
+      "body": "Abre Initiative para verlas."
+    },
+    "coming_up": {
+      "title": "Tienes cosas próximas",
+      "body": "Abre Initiative para verlas."
     }
   },
   "quietHours": {
@@ -263,6 +280,37 @@
     "replied": {
       "title": "Una respuesta en un caso que nadie ha tomado",
       "body": "Abre Initiative para leerla."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Solicitud para ver",
+        "body_one": "{{requester}} pide ver {{title}}",
+        "body_other": "{{requester}} pide ver {{count}} archivos"
+      },
+      "write": {
+        "title": "Solicitud para editar",
+        "body_one": "{{requester}} pide editar {{title}}",
+        "body_other": "{{requester}} pide editar {{count}} archivos"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "Ya puedes verlo",
+        "body_one": "{{answerer}} te dejó ver {{title}}",
+        "body_other": "{{answerer}} te dejó ver {{count}} archivos"
+      },
+      "write": {
+        "title": "Ya puedes editarlo",
+        "body_one": "{{answerer}} te dejó editar {{title}}",
+        "body_other": "{{answerer}} te dejó editar {{count}} archivos"
+      }
+    },
+    "declined": {
+      "title": "Solicitud rechazada",
+      "body_one": "{{answerer}} rechazó tu solicitud",
+      "body_other": "{{answerer}} rechazó tu solicitud de {{count}} archivos"
     }
   }
 }

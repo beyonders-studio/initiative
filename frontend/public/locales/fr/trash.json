@@ -1,5 +1,4 @@
 {
-  "title": "Corbeille",
   "description": "Les éléments ici seront supprimés définitivement après la période de rétention de la communauté. Restaurez-les à tout moment avant cela.",
   "empty": "La corbeille est vide.",
   "columnType": "Type",
@@ -25,17 +24,15 @@
     "comment": "Commentaire",
     "initiative": "Initiative",
     "tag": "Étiquette",
-    "queue": "File d'attente",
-    "queue_item": "Élément de file",
     "calendar": "Calendrier",
     "calendar_event": "Événement de calendrier",
     "counter_group": "Groupe de compteurs",
     "counter": "Compteur",
     "dashboard": "Tableau de bord",
     "post": "Publication",
-    "gallery": "Galerie",
-    "gallery_image": "Image",
     "wiki": "Wiki",
-    "wiki_page": "Page"
+    "wiki_page": "Page",
+    "contact": "Contact",
+    "collection": "Collection"
   }
 }

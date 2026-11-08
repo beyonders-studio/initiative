@@ -1,5 +1,6 @@
 {
   "open": "Edit layouts",
+  "editLayout": "Edit {{name}}",
   "title": "Edit layouts",
   "close": "Close the editor",
   "previewWidth": "Preview width",
@@ -23,7 +24,8 @@
   "card": "Card",
   "row": "Row",
   "group": "Group",
-  "allProperties": "All properties",
+  "allMetadata": "All metadata",
+  "allPropertiesAndMetadata": "All properties and metadata",
   "missingPart": "A part that's no longer available",
   "missingField": "A field that's no longer available",
   "columns": "Columns",
@@ -38,11 +40,14 @@
   "emptyGroup": "Empty. Drop a part here, or add one.",
   "builtIn": "Built-in",
   "properties": "Properties",
+  "propertiesShownOn": "Shown on {{layouts}}",
+  "propertiesNowhere": "Not shown on any layout yet. Place it with Add.",
+  "propertiesPlacementHelp": "A page that shows all properties shows a new one straight away. Cards and tables show only what you add to them.",
   "layoutParts": "Layout",
   "hidePart": "Hide",
   "settings": "Settings",
-  "cardHelp": "What each task shows on the board. Select a part to change it, or add one below the outline.",
-  "propertiesHelp": "Shows every property a task has a value for.",
+  "cardHelp": "What each item shows on its card. Select a part to change it, or add one below the outline.",
+  "propertiesHelp": "Shows every property and metadata value a task holds.",
   "pluginPartHelp": "Drawn by the plug-in from its own values and actions.",
   "fieldHelp": "Shows this field when a task has a value for it.",
   "layout": "Layout being edited",
@@ -95,11 +100,17 @@
   "typedTaskLayout": "{{name}} page",
   "detailHelp": "How every task's detail in this project is laid out. What it leaves out is hidden.",
   "useShipped": "Use the shipped layout",
-  "shipped": "This is the layout as shipped. Changing it makes it the project's own.",
+  "shipped": "This is the layout as shipped. A change is kept for everyone who sees it.",
   "detailTitleHelp": "Every task's detail shows its title.",
   "opensFirst": "Opens first",
   "shownInMenu": "Shown in the layout menu",
   "hiddenList": "{{name}} (hidden)",
+  "views": "Views",
+  "taskPages": "Task pages",
+  "pages": "Pages",
+  "hidden": "Hidden",
+  "showView": "Show {{name}} in the layout menu",
+  "deleteTaskType": "Delete the {{name}} task type",
   "asShipped": "As shipped",
   "saveError": "Couldn't save the layouts",
   "listHelp": {
@@ -160,6 +171,7 @@
       "priority": "Priority",
       "task_status_id": "Status",
       "task_type_id": "Type",
+      "parent_task_id": "Parent task",
       "assignee_ids": "Assignees",
       "created_by": "Created by",
       "tag_ids": "Tags",
@@ -196,53 +208,17 @@
     "rowHelp": "Puts what it holds side by side."
   },
   "boxWith": "Box with {{name}}",
-  "newField": "New field",
-  "fieldsGroup": "Fields",
+  "newProperty": "New property",
+  "newMetadata": "New metadata",
+  "projectProperties": "This project's properties",
+  "collectionProperties": "This collection's properties",
+  "initiativeMetadata": "Initiative metadata",
   "panels": "Panels",
-  "fromProperty": "Property",
   "search": "Search",
   "noMatches": "Nothing matches.",
   "sectionHelp": "With a title it opens and closes; without one it's a box.",
-  "queueItemDetail": {
-    "name": "Queue item detail",
-    "help": "How every item in this queue is shown when it's opened. What it leaves out is hidden.",
-    "shipped": "This is the layout as shipped. Changing it makes it the queue's own.",
-    "titleHelp": "Every item shows its label.",
-    "hiddenHelp": "Every item can show this. Taken off, it is hidden, and Add puts it back.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations"
-    },
-    "partHelp": {
-      "actions": "What else can be done with the item: report, duplicate and remove.",
-      "relations": "What the item is linked to."
-    },
-    "noItems": "Add an item to the queue to see its layout here."
-  },
   "tab": "Layouts",
   "settingsDescription": "How it lays out what it holds: each layout, when it was last changed, and the way into the editor. Everyone who can open it sees them; what each person filters and sorts by is their own.",
-  "galleryImageDetail": {
-    "name": "Picture detail",
-    "help": "How every picture in this gallery is shown when it's opened. What it leaves out is hidden.",
-    "shipped": "This is the layout as shipped. Changing it makes it the gallery's own.",
-    "titleHelp": "Every picture shows its title.",
-    "hiddenHelp": "Every picture can show this. Taken off, it is hidden, and Add puts it back.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations",
-      "picture": "Picture",
-      "about": "Where it came from",
-      "versions": "Versions"
-    },
-    "partHelp": {
-      "actions": "What else can be done with the picture: report, download, use as cover and remove.",
-      "relations": "What the picture is linked to.",
-      "picture": "The picture itself.",
-      "about": "Who added it and when, and its file.",
-      "versions": "Every version uploaded, and uploading a new one."
-    },
-    "noItems": "Add a picture to the gallery to see its layout here."
-  },
   "counterDetail": {
     "name": "Counter detail",
     "help": "How every counter in this group is shown when it's opened to edit. What it leaves out is hidden.",
@@ -260,6 +236,14 @@
       "count": "Its count, stepped or set."
     },
     "noItems": "Add a counter to the group to see its layout here."
+  },
+  "fileDetail": {
+    "name": "File page",
+    "help": "How a file opened from this collection is shown, beside its picture or beside the collection, once the collection has properties of its own. What it leaves out is hidden.",
+    "shipped": "This is the layout as shipped. Changing it makes it the collection's own.",
+    "titleHelp": "Every file shows its name.",
+    "hiddenHelp": "Every file can show this. Taken off, it is hidden, and Add puts it back.",
+    "noItems": "Add a file to the collection to see its layout here."
   },
   "postDetail": {
     "name": "Notice detail",
@@ -287,5 +271,39 @@
     },
     "noItems": "Write a notice in this initiative to see its layout here."
   },
-  "calendarNote": "A calendar has no card or columns to lay out. Whether it shows, and whether the project opens on it, is set on the right."
+  "calendarNote": "A calendar has no card or columns to lay out. Whether it shows, and whether the project opens on it, is set on the right.",
+  "makeOpensFirst": "Open on {{name}} first",
+  "scaleDisplay": {
+    "label": "Show the scale as",
+    "number": "A number",
+    "stars": "Stars",
+    "bar": "A bar"
+  },
+  "counterDisplay": {
+    "label": "Show the counter as",
+    "number": "A number",
+    "bar": "A bar",
+    "clock": "A clock"
+  },
+  "fieldProperty": {
+    "metadata": "Metadata",
+    "metadataHelp": "This is the initiative's metadata, which is edited in its settings.",
+    "openSettings": "Open initiative settings"
+  },
+  "required": {
+    "label": "Required",
+    "help": "Whoever adds one has to fill this in, and cannot empty it later. Hiding it lifts the requirement.",
+    "always": "A title is always required.",
+    "on": "Required. Press to make it optional.",
+    "off": "Not required. Press to require it.",
+    "onFor": "{{name}}: required. Press to make it optional.",
+    "offFor": "{{name}}: not required. Press to require it.",
+    "alwaysFor": "{{name}}: required. A title is always required.",
+    "missing": "Required, and not filled in yet.",
+    "toAdd": "Fill in what is required to add it.",
+    "ask": "Its new page requires these, and it doesn't have them yet. Fill them in and the change goes through with them.",
+    "confirm": "Continue",
+    "retypeTitle": "What the {{type}} page asks for",
+    "moveTitle": "What {{project}} asks for"
+  }
 }

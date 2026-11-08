@@ -9,6 +9,7 @@
 import type { NavigateFn } from "@tanstack/react-router";
 
 import { type NotificationRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { openAnnouncement } from "@/components/announcements/AnnouncementCenter";
 import { communityPath } from "@/lib/communityUrl";
 import {
   entityRefTypeFor,
@@ -96,6 +97,7 @@ export const notificationLink = (notification: NotificationRead): string | null 
     // These hold ids and nothing else, so they address the `/go` resolver,
     // which reads the entity and works out where it lives.
     case "task_assignment":
+    case "task_reminder":
     case "case_opened":
     case "case_replied": {
       const taskId = Number(data.task_id);
@@ -129,18 +131,22 @@ export const notificationLink = (notification: NotificationRead): string | null 
       // device's own store, so there is nothing for a route param to fetch.
       return "/messages";
     // Each lands where it is answered: a message request in the inbox that
-    // would carry the conversation, a connection on the contacts page.
+    // would carry the conversation, a connection in privacy settings.
     case "message_request_received":
     case "message_request_accepted":
       return "/messages";
     case "connection_requested":
     case "connection_accepted":
-      return "/contacts";
+      return "/profile/privacy";
     case "mention":
     case "comment_reply":
     case "comment_on_resource":
     case "subscription_activity":
     case "assigned_activity":
+      return entityRefFromData(data);
+    // A granted request opens what was shared; one asking opens the requests
+    // through its `target_path`.
+    case "share_granted":
       return entityRefFromData(data);
     case "post_published":
       if (typeof data.post_id === "number") {
@@ -176,6 +182,15 @@ const accessLevelLabel = (
   if (level === "read_write") return t("notifications.accessLevelReadWrite");
   if (level === "read") return t("notifications.accessLevelRead");
   return null;
+};
+
+/** The level a share line is about: edit for `write`, view for anything else. */
+const shareLevel = (level: unknown): "read" | "write" => (level === "write" ? "write" : "read");
+
+/** How many things a share line covers; one where the row does not say. */
+const shareCount = (count: unknown): number => {
+  const parsed = Number(count);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 };
 
 // How many distinct emoji a rolled-up reaction line shows before it stops —
@@ -284,22 +299,17 @@ export const notificationText = (
         initiativeName: data.initiative_name ?? t("notifications.plain.initiativeIn"),
       });
     case "mention":
-      // A comment, a task's description, or a file.
       if (data.comment_id) {
         return t("notifications.mentionComment", {
           mentionedBy: data.mentioned_by_name ?? t("notifications.someone"),
           contextTitle: data.context_title ?? t("notifications.plain.item"),
         });
       }
-      if (data.task_id) {
-        return t("notifications.mentionTaskDescription", {
-          mentionedBy: data.mentioned_by_name ?? t("notifications.someone"),
-          taskTitle: data.task_title ?? t("notifications.plain.item"),
-        });
-      }
-      return t("notifications.mentionFile", {
+      // A description or a file, named by kind and id. A task's description
+      // named its task by `task_id` before that.
+      return t("notifications.mentionIn", {
         mentionedBy: data.mentioned_by_name ?? t("notifications.someone"),
-        fileTitle: data.entity_name ?? t("notifications.plain.file"),
+        title: data.entity_name ?? data.task_title ?? t("notifications.plain.item"),
       });
     case "comment_on_task": {
       const { name, others, count } = commentSummary(data);
@@ -432,6 +442,30 @@ export const notificationText = (
       return t("notifications.eventReminder", {
         eventTitle: data.event_title ?? t("notifications.plain.event"),
       });
+    case "task_reminder":
+      return t("notifications.taskReminder", {
+        taskTitle: data.task_title ?? t("notifications.plain.task"),
+      });
+    // A request names what it is for — the thing, or for several files the
+    // collection or wiki they are in — and a yes names what was shared.
+    // Declined names nothing: its reader cannot open it.
+    case "share_requested":
+      return t(`notifications.shareRequested.${shareLevel(data.level)}`, {
+        requester: data.requester_name ?? t("notifications.someone"),
+        title: data.entity_name ?? t("notifications.plain.item"),
+        count: shareCount(data.count),
+      });
+    case "share_granted":
+      return t(`notifications.shareGranted.${shareLevel(data.level)}`, {
+        answerer: data.answerer_name ?? t("notifications.someone"),
+        title: data.entity_name ?? t("notifications.plain.item"),
+        count: shareCount(data.count),
+      });
+    case "share_declined":
+      return t("notifications.shareDeclined", {
+        answerer: data.answerer_name ?? t("notifications.someone"),
+        count: shareCount(data.count),
+      });
     case "initiative_join_requested":
       return t("notifications.initiativeJoinRequested", {
         requester: data.requester_name ?? t("notifications.someone"),
@@ -475,6 +509,10 @@ export const notificationText = (
         : t("notifications.accountSuspended");
     case "account_unsuspended":
       return t("notifications.accountUnsuspended");
+    case "announcement":
+      return t("notifications.announcement", {
+        title: typeof data.title === "string" ? data.title : "",
+      });
     case "plugin_consent_requested":
       // The label is the plug-in's own words, quoted as such by the string.
       return t("notifications.pluginConsentRequested", {
@@ -607,8 +645,9 @@ const exportDownloadTarget = (
 };
 
 /**
- * Open a notification: mark it read, then fetch a finished export or go to
- * the line's destination. Returns whether it led anywhere.
+ * Open a notification: mark it read, then show an announcement again, fetch a
+ * finished export or go to the line's destination. Returns whether it led
+ * anywhere.
  *
  * The bell, the inbox and the desktop app's system notifications all open a
  * line through this. `t` must have the `exports` namespace loaded, for the
@@ -628,6 +667,15 @@ export const openNotification = (
 ): boolean => {
   if (!notification.read_at) {
     markRead(notification.id);
+  }
+  // An announcement opens again in its own dialog.
+  if (notification.type === "announcement") {
+    const key = notification.data?.announcement_key;
+    if (typeof key !== "string") {
+      return false;
+    }
+    openAnnouncement(key);
+    return true;
   }
   // A finished export is fetched, not navigated to: the artifact lives behind
   // the job-gated download endpoint, so opening it IS the download.

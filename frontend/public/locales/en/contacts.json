@@ -1,30 +1,120 @@
 {
-  "unreachable": {
-    "age": {
-      "title": "Direct messages are off for this account"
-    },
-    "private": {
-      "body": "You're set to Private. You can still connect with anyone by their exact handle, and a connection lets you message each other whatever your setting is. To be reachable here, let your communities message you.",
-      "open": "Let my communities message me",
-      "settings": "Privacy settings"
-    }
+  "title": "Contacts",
+  "newContact": "New contact",
+  "importCsv": "Import contacts from CSV",
+  "createDescription": "A person or an organization, and how to reach them.",
+  "addPersonDescription": "Someone at {{name}}, and how to reach them.",
+  "creating": "Creating...",
+  "name": "Name",
+  "namePlaceholder": "Lakeside Lodge, Priya Shah...",
+  "kind": "Person or organization",
+  "person": "Person",
+  "organization": "Organization",
+  "partOf": "Organization",
+  "noOrganization": "None",
+  "searchOrganizations": "Search organizations...",
+  "noOrganizations": "No organization matches.",
+  "communityHint": "Community",
+  "fields": {
+    "phones": "Phone",
+    "emails": "Email",
+    "addresses": "Address",
+    "websites": "Website"
   },
-  "actions": {
-    "label": "Actions for {{handle}}",
-    "connect": "Connect",
-    "acceptConnection": "Accept connection",
-    "connectPending": "Request sent",
-    "ask": "Ask to message",
-    "asked": "Request sent",
-    "askSent": "Request sent.",
-    "ignore": "Ignore",
-    "stopIgnoring": "Stop ignoring",
-    "removeConnection": "Remove connection",
-    "removeConnectionTitle": "Remove this connection?",
-    "removeConnectionBody": "You will no longer be connected. If nothing else lets the two of you message each other — a community you both belong to, or both of you being open to messages — that ends with it.",
-    "message": "Message",
-    "viewProfile": "View profile",
-    "copyHandle": "Copy handle",
-    "handleCopied": "Handle copied."
+  "add": {
+    "phones": "Add phone",
+    "emails": "Add email",
+    "addresses": "Add address",
+    "websites": "Add website"
+  },
+  "placeholders": {
+    "phones": "+1 555 0100",
+    "emails": "name@example.com",
+    "addresses": "12 Harbour Road\nPort Ellen",
+    "websites": "example.com"
+  },
+  "label": "Label",
+  "labelOf": "{{field}} label",
+  "removeOf": "Remove this {{field}}",
+  "labels": {
+    "mobile": "Mobile",
+    "work": "Work",
+    "home": "Home",
+    "office": "Office",
+    "main": "Main",
+    "billing": "Billing",
+    "venue": "Venue",
+    "booking": "Booking",
+    "other": "Other"
+  },
+  "noContacts": "No contacts yet",
+  "noContactsDescription": "Keep the people and businesses this work is for or with: the client, the venue, the supplier. Link them to the tasks, events and files they're part of.",
+  "createFirst": "Add the First Contact",
+  "loading": "Loading contacts...",
+  "loadError": "Failed to load contacts.",
+  "error": "Something went wrong",
+  "notFound": "Contact not found",
+  "notFoundDescription": "The contact you're looking for does not exist or has been removed.",
+  "noAccess": "Access Denied",
+  "noAccessDescription": "You do not have permission to view this contact.",
+  "backToContacts": "Back to Contacts",
+  "filters": {
+    "searchLabel": "Name",
+    "searchContacts": "Search contacts...",
+    "kind": "People or organizations",
+    "allKinds": "Everyone",
+    "people": "People",
+    "organizations": "Organizations",
+    "noMatchingContacts": "No contacts match your filters."
+  },
+  "columns": {
+    "phone": "Phone",
+    "email": "Email",
+    "organization": "Organization"
+  },
+  "reach": {
+    "copy": "Copy",
+    "copied": "Address copied"
+  },
+  "details": {
+    "title": "How to reach them",
+    "edit": "Edit",
+    "saved": "Contact saved",
+    "empty": "No phone, email, address or website yet."
+  },
+  "standing": {
+    "title": "Where things stand",
+    "openTasks": "Open tasks",
+    "upcoming": "Coming up",
+    "files": "Files",
+    "empty": "Nothing open, coming up or filed with them yet."
+  },
+  "newTask": "New task",
+  "newEvent": "New event",
+  "linked": "Linked to {{name}}",
+  "task": {
+    "description": "Added to a project here and linked to {{name}}.",
+    "project": "Project",
+    "change": "Change",
+    "title": "Title",
+    "titlePlaceholder": "Send the deposit, Confirm the menu...",
+    "create": "Add task"
+  },
+  "people": {
+    "title": "People",
+    "add": "Add person",
+    "empty": "Nobody here yet."
+  },
+  "move": {
+    "action": "Move to community contacts",
+    "title": "Move {{name}} to the community's contacts?",
+    "description": "Everyone in the community will be able to look them up, and their links stay. Properties from this initiative are dropped.",
+    "confirm": "Move",
+    "moving": "Moving...",
+    "moved": "Moved to the community's contacts"
+  },
+  "community": {
+    "title": "Community contacts",
+    "description": "The community's own address book. Link to these from the work in any initiative."
   }
 }

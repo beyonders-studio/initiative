@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Task statuses",
-    "tabTaskTypes": "Task types"
+    "tabTaskTypes": "Task types",
+    "tabProperties": "Properties"
   },
   "files": {
     "newFile": "New file"
@@ -252,7 +253,20 @@
     "ganttSchedule": "Drag across the days to give this task dates",
     "ganttFold": "Hide the parts of {{title}}",
     "ganttUnfold": "Show the parts of {{title}}",
-    "ganttLink": "Drag to the task that waits on this one",
+    "ganttLink": "Drag onto another task to link the two",
+    "ganttOutside": "Linked from other projects",
+    "ganttLinkQuestion": "How is “{{task}}” linked to “{{other}}”?",
+    "ganttBlockedBy": "Blocked by it",
+    "ganttBlockedByHint": "Can't start until that task is done",
+    "ganttPartOf": "Part of it",
+    "ganttPartOfHint": "Becomes one of that task's parts",
+    "ganttRemoveLink": "Remove the link: {{task}} waits on {{other}}",
+    "ganttCriticalPath": "Critical path",
+    "ganttChainTitle": "Move what waits on it too?",
+    "ganttChain_one": "{{count}} task waits on “{{title}}”. Move it later by as many days?",
+    "ganttChain_other": "{{count}} tasks wait on “{{title}}”. Move them later by as many days?",
+    "ganttChainMove": "Move as well",
+    "ganttChainKeep": "Just this one",
     "ganttKeys": "Up and down move between tasks, right and left open and fold a task's parts, and Enter opens a task.",
     "ganttKeysMove": "Up and down move between tasks, right and left open and fold a task's parts, and Enter opens a task. Alt with left or right moves a task a day; with Shift as well, just its due date.",
     "archiveDoneTasks": "Archive done tasks",
@@ -282,6 +296,7 @@
     "markDone": "Mark task as done",
     "taskColumn": "Task",
     "untagged": "Untagged",
+    "noParent": "Not part of a task",
     "noValue": "No {{name}}",
     "checked": "{{name}}: yes",
     "unchecked": "{{name}}: no",
@@ -314,6 +329,8 @@
       "dueDate": "Due date",
       "recurrence": "Repeats",
       "checklist": "Checklist",
+      "subtasks": "Subtasks",
+      "parent": "Part of",
       "priority": "Priority",
       "comments": "Comments",
       "blockers": "Blockers",
@@ -404,5 +421,14 @@
     "unassigned": "You're off this task",
     "assignError": "Couldn't change who's on this task.",
     "moveTo": "Move to"
+  },
+  "properties": {
+    "description": "What this project's tasks can hold beside the initiative's metadata. A task moved to another project keeps a value only where that project has a property of the same name and type.",
+    "create": "New property",
+    "edit": "Edit property",
+    "delete": "Delete property",
+    "deleteTitle": "Delete this property?",
+    "deleteBody": "This removes the property and every task's value of it in this project.",
+    "none": "No properties yet"
   }
 }

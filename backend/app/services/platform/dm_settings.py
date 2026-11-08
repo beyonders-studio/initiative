@@ -42,9 +42,9 @@ async def seed_for_new_account(session: AsyncSession, *, user_id: int) -> None:
     so a retried registration does not overwrite a policy its owner has since
     changed.
     """
-    from app.services.platform.app_settings import get_app_settings
+    from app.services.platform import rules
 
-    policy = (await get_app_settings(session)).default_dm_policy
+    policy = (await rules.platform_values(session))["default_dm_policy"]
     # A core insert, so the model's default factories do not run: the
     # timestamps are named here.
     now = datetime.now(timezone.utc)
@@ -79,7 +79,7 @@ async def _rail_ordered_communities(
 ) -> list[tuple[int, str]]:
     """The reader's communities in the order they dragged the rail into.
 
-    Same rule My Contacts uses, so the toggle list and the contacts page name
+    Same rule the people roster uses, so the toggle list and the roster name
     the same communities in the same order. A suspended community is left out:
     it does not count towards ``can_ask`` either.
     """

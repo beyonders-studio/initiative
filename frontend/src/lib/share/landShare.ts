@@ -1,15 +1,16 @@
 import { Capacitor } from "@capacitor/core";
 
 import { createFile, uploadFile } from "@/api/generated/files/files";
-import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { createPost } from "@/api/generated/posts/posts";
 import { createTask } from "@/api/generated/tasks/tasks";
 import { uploadAttachment, uploadPastedImage } from "@/lib/attachmentUtils";
 import { communityPath } from "@/lib/communityUrl";
-import { nameWithoutExtension } from "@/lib/fileUtils";
+import { uploadInPieces } from "@/lib/resumableUpload";
 import type { SharedFile } from "@/lib/share/pendingShare";
 import { shareBody, shareMarkdown } from "@/lib/share/shareContent";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
+import { nameWithoutExtension } from "@/ui/lib/fileUtils";
 
 /**
  * What a share can become: a task, a document written around it, a post, or
@@ -94,11 +95,14 @@ async function landUploads(
   let last: number | null = null;
   for (const upload of uploads) {
     const file = await readSharedFile(upload.file);
-    const created = await uploadFile(communityId, {
-      name: upload.name,
-      initiative_id: initiativeId,
+    const created = await uploadInPieces(
+      communityId,
       file,
-    });
+      file.name,
+      { purpose: "file", initiativeId },
+      (upload_id) =>
+        uploadFile(communityId, { name: upload.name, initiative_id: initiativeId, upload_id })
+    );
     last = created.id;
     onUploaded?.(upload);
   }
@@ -151,7 +155,7 @@ export async function landShare(input: LandShareInput): Promise<string> {
     const file = await createFile(communityId, {
       name: title,
       initiative_id: initiativeId,
-      file_type: "native",
+      file_type: FileType.lexical,
       content: { ...body },
     });
     return communityPath(communityId, toolDetailRoute(Tool.file, initiativeId, file.id));

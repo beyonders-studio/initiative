@@ -1,7 +1,6 @@
 import {
   Archive,
   ArchiveRestore,
-  Check,
   ChevronsUpDown,
   CircleAlert,
   Loader2,
@@ -11,26 +10,12 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
+import { CommunityInitiativeDefaultsCard } from "@/components/initiatives/CommunityInitiativeDefaultsCard";
 import { DeleteInitiativeDialog } from "@/components/initiatives/DeleteInitiativeDialog";
 import { type MemberLike, useSeenMembers } from "@/components/members/MemberSearchSelect";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { DataTable } from "@/components/ui/data-table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import {
   useAddInitiativeMember,
@@ -44,9 +29,15 @@ import { type MemberSearchScope, useUserSearch } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { Skeleton } from "@/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 const COMMUNITY_SCOPE: MemberSearchScope = { type: "community" };
 const NONE: never[] = [];
@@ -65,13 +56,12 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
   const { t } = useTranslation(["initiatives", "common"]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const debouncedQuery = useDebouncedValue(query, 250);
   const rolesQuery = useInitiativeRoles(initiative.id);
   const managersQuery = useInitiativeManagers(initiative.id);
 
   // Candidates are the community's members matching what was typed, asked of the
   // server once the picker is open.
-  const searchQuery = useUserSearch({ search: debouncedQuery, enabled: open });
+  const searchQuery = useUserSearch({ search: query, enabled: open });
   const results = useMemo(
     () => (searchQuery.data?.items ?? []).filter((candidate) => candidate.status !== "anonymized"),
     [searchQuery.data]
@@ -177,19 +167,33 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
         : t("manage.managerCount", { count: managerCount });
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setQuery("");
+    <Combobox
+      multiple
+      items={candidates.map((candidate) => ({
+        value: String(candidate.id),
+        label: getUserDisplayName(candidate),
+        // Unticking waits until the community has said whether this manager is
+        // one of its admins.
+        disabled: pending || (managerIds.has(candidate.id) && !knownManagers.has(candidate.id)),
+      }))}
+      value={managerIdList.map(String)}
+      // One row is ticked or unticked at a time: the one in only one list.
+      onValueChange={(next) => {
+        const changed = [...next, ...managerIdList.map(String)].find(
+          (value) => next.includes(value) !== managerIds.has(Number(value))
+        );
+        if (changed) toggle(Number(changed));
       }}
-    >
-      <PopoverTrigger asChild>
+      onSearchChange={setQuery}
+      onOpenChange={setOpen}
+      loading={searchQuery.isFetching && candidates.length === 0}
+      searchPlaceholder={t("common:search")}
+      emptyMessage={t("manage.noCandidates")}
+      trigger={
         <Button
           variant="outline"
           size="sm"
           role="combobox"
-          aria-expanded={open}
           aria-label={t("manage.managersColumn")}
           className="w-48 justify-between font-normal"
         >
@@ -202,52 +206,22 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           )}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder={t("common:search")} value={query} onValueChange={setQuery} />
-          <CommandList>
-            {searchQuery.isFetching && candidates.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("common:loading")}
-              </div>
-            ) : (
-              <CommandEmpty>{t("manage.noCandidates")}</CommandEmpty>
-            )}
-            <CommandGroup className="max-h-64 overflow-y-auto">
-              {candidates.map((candidate) => {
-                const isManager = managerIds.has(candidate.id);
-                return (
-                  <CommandItem
-                    key={candidate.id}
-                    value={String(candidate.id)}
-                    // Unticking waits until the community has said whether this
-                    // manager is one of its admins.
-                    disabled={pending || (isManager && !knownManagers.has(candidate.id))}
-                    onSelect={() => toggle(candidate.id)}
-                  >
-                    <Check className={cn("h-4 w-4", isManager ? "opacity-100" : "opacity-0")} />
-                    {getUserDisplayName(candidate)}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+      }
+    />
   );
 };
 
 export const SettingsInitiativesPage = () => {
   const { t } = useTranslation(["initiatives", "common"]);
   const { activeCommunity } = useCommunities();
+  // Whoever holds the community's initiatives, not only its admins.
+  const managesInitiatives = useHeldSurfaces().holds("initiatives");
+  // What every initiative uses is the admin rung's own to set.
   const isCommunityAdmin = Boolean(activeCommunity?.can.administer);
 
   // The community-wide listing, not the admin's own memberships — this table is
   // where they manage initiatives they have not joined.
-  const initiativesQuery = useCommunityInitiatives({ enabled: isCommunityAdmin });
+  const initiativesQuery = useCommunityInitiatives({ enabled: managesInitiatives });
   const deleteInitiative = useDeleteInitiative();
   const archiveInitiative = useArchiveEntity();
   const unarchiveInitiative = useUnarchiveEntity();
@@ -375,7 +349,7 @@ export const SettingsInitiativesPage = () => {
     },
   ];
 
-  if (!isCommunityAdmin) {
+  if (!managesInitiatives) {
     return <p className="text-muted-foreground text-sm">{t("manage.adminRequired")}</p>;
   }
 
@@ -405,6 +379,8 @@ export const SettingsInitiativesPage = () => {
           />
         </CardContent>
       </Card>
+
+      {isCommunityAdmin && <CommunityInitiativeDefaultsCard />}
 
       <DeleteInitiativeDialog
         open={deleteTarget !== null}

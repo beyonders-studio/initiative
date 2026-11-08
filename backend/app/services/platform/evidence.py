@@ -15,8 +15,8 @@ Every path that handles an attached file goes through here:
 - :func:`transfer` carries a report's files into the operations case it was
   escalated to: the stored bytes are copied as they are and only the key is
   wrapped again.
-- :func:`purge_due` and :func:`rewrap_guild` are the retention sweep's and the
-  key rotation's halves.
+- :func:`purge_cases_due`, :func:`purge_reports_due` and :func:`rewrap_guild`
+  are the retention sweeps' and the key rotation's halves.
 
 Files are never written to ``uploads``: a community's uploads are readable
 community-wide, and evidence is readable only through its own row.
@@ -52,6 +52,7 @@ from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.evidence import DISPLAY_NAME_LENGTH, Evidence, EvidenceKind
 from app.services import storage as storage_service
+from app.services import upload_scanning
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +256,7 @@ def _without_location(data: bytes, content_type: str) -> bytes:
         return data
     from PIL import Image, UnidentifiedImageError
 
-    from app.services.tenant.galleries import MAX_IMAGE_PIXELS
+    from app.core.image_headers import MAX_IMAGE_PIXELS
 
     try:
         with warnings.catch_warnings():
@@ -319,6 +320,9 @@ def prepare(
         content_type = _sniff(incoming.data)
         if content_type not in policy.types:
             raise EvidenceRefused(EvidenceMessages.TYPE_NOT_ALLOWED)
+        # Staff open evidence: it is scanned like any upload, where the
+        # deployment scans, and refused (or held back) the same way.
+        upload_scanning.scan_bytes(incoming.data)
         data = _without_location(incoming.data, content_type)
         prepared.append(
             PreparedEvidence(
@@ -345,7 +349,7 @@ def store(
     prepared: Iterable[PreparedEvidence],
     created_by: Optional[int],
     written: list[str],
-    case_id: Optional[int] = None,
+    case_task_id: Optional[int] = None,
     report_id: Optional[int] = None,
     comment_id: Optional[int] = None,
 ) -> list[Evidence]:
@@ -355,6 +359,7 @@ def store(
     :class:`Sealing`, which removes the objects if the rows never land.
     """
     storage = storage_service.get_guild_storage(guild_id)
+    version = blob_crypto.current_kek_version()
     rows: list[Evidence] = []
     for item in prepared:
         origin_id = uuid.uuid4()
@@ -370,7 +375,7 @@ def store(
         )
         row = Evidence(
             report_id=report_id,
-            case_id=case_id,
+            case_task_id=case_task_id,
             comment_id=comment_id,
             kind=EvidenceKind.attachment,
             origin_guild_id=guild_id,
@@ -381,9 +386,9 @@ def store(
             display_name=item.display_name,
             sha256=item.sha256,
             wrapped_dek=blob_crypto.wrap(
-                dek, holding_guild_id=guild_id, origin_id=origin_id
+                dek, holding_guild_id=guild_id, origin_id=origin_id, version=version
             ),
-            kek_version=blob_crypto.KEK_VERSION,
+            kek_version=version,
             created_by=created_by,
         )
         session.add(row)
@@ -409,7 +414,7 @@ class Sealing:
     wherever. Call :meth:`keep` straight after the commit that holds the rows::
 
         with Sealing(guild_id) as sealing:
-            sealing.store(session, prepared=files, created_by=user_id, case_id=1)
+            sealing.store(session, prepared=files, created_by=user_id, case_task_id=1)
             ...
             await session.commit()
             sealing.keep()
@@ -433,7 +438,7 @@ class Sealing:
         *,
         prepared: Iterable[PreparedEvidence],
         created_by: Optional[int],
-        case_id: Optional[int] = None,
+        case_task_id: Optional[int] = None,
         report_id: Optional[int] = None,
         comment_id: Optional[int] = None,
     ) -> list[Evidence]:
@@ -443,7 +448,7 @@ class Sealing:
             prepared=prepared,
             created_by=created_by,
             written=self.written,
-            case_id=case_id,
+            case_task_id=case_task_id,
             report_id=report_id,
             comment_id=comment_id,
         )
@@ -460,18 +465,18 @@ async def listed(
     session: AsyncSession,
     *,
     report_ids: Sequence[int] = (),
-    case_ids: Sequence[int] = (),
+    case_task_ids: Sequence[int] = (),
 ) -> dict[tuple[str, int], list[Evidence]]:
     """The files attached to these reports and cases, read on ``session`` and
-    keyed ``("report", id)`` or ``("case", id)``, oldest first. One statement,
+    keyed ``("report", id)`` or ``("case", task id)``, oldest first. One statement,
     whatever the page holds."""
-    if not report_ids and not case_ids:
+    if not report_ids and not case_task_ids:
         return {}
     conditions = []
     if report_ids:
         conditions.append(Evidence.report_id.in_(tuple(report_ids)))  # type: ignore[union-attr]
-    if case_ids:
-        conditions.append(Evidence.case_id.in_(tuple(case_ids)))  # type: ignore[union-attr]
+    if case_task_ids:
+        conditions.append(Evidence.case_task_id.in_(tuple(case_task_ids)))  # type: ignore[union-attr]
     rows = (
         await session.exec(
             select(Evidence)
@@ -481,7 +486,7 @@ async def listed(
     ).all()
     found: dict[tuple[str, int], list[Evidence]] = {}
     for row in rows:
-        key = ("report", row.report_id) if row.report_id else ("case", row.case_id)
+        key = ("report", row.report_id) if row.report_id else ("case", row.case_task_id)
         found.setdefault(key, []).append(row)  # type: ignore[arg-type]
     return found
 
@@ -591,11 +596,11 @@ async def transfer(
     rows: Sequence[Evidence],
     destination: AsyncSession,
     destination_guild_id: int,
-    case_id: int,
+    case_task_id: int,
     written: list[str],
 ) -> list[Evidence]:
     """Carry ``rows`` — read in ``source_guild_id`` — into the operations case
-    ``case_id``, on ``destination``, a system session routed into
+    whose task is ``case_task_id``, on ``destination``, a system session routed into
     ``destination_guild_id``.
 
     Each object is copied as it is stored; it is never opened. Its key is
@@ -607,11 +612,12 @@ async def transfer(
     already = set(
         (
             await destination.exec(
-                select(Evidence.origin_id).where(Evidence.case_id == case_id)
+                select(Evidence.origin_id).where(Evidence.case_task_id == case_task_id)
             )
         ).all()
     )
     same_community = int(source_guild_id) == int(destination_guild_id)
+    version = blob_crypto.current_kek_version()
     carried: list[Evidence] = []
     for row in rows:
         if row.origin_id in already:
@@ -637,7 +643,7 @@ async def transfer(
             version=row.kek_version,
         )
         copy = Evidence(
-            case_id=case_id,
+            case_task_id=case_task_id,
             kind=row.kind,
             origin_guild_id=row.origin_guild_id,
             origin_id=row.origin_id,
@@ -647,9 +653,12 @@ async def transfer(
             display_name=row.display_name,
             sha256=row.sha256,
             wrapped_dek=blob_crypto.wrap(
-                dek, holding_guild_id=destination_guild_id, origin_id=row.origin_id
+                dek,
+                holding_guild_id=destination_guild_id,
+                origin_id=row.origin_id,
+                version=version,
             ),
-            kek_version=blob_crypto.KEK_VERSION,
+            kek_version=version,
             created_by=row.created_by,
         )
         destination.add(copy)
@@ -662,11 +671,11 @@ async def carry_report(
     *,
     source_guild_id: int,
     report_id: int,
-    case_id: int,
+    case_task_id: int,
 ) -> int:
     """Carry what was attached to community report ``report_id`` — read on
-    ``session``, routed into ``source_guild_id`` — into operations case
-    ``case_id``. Returns how many files were carried.
+    ``session``, routed into ``source_guild_id`` — into the operations case
+    whose task is ``case_task_id``. Returns how many files were carried.
 
     Its own transaction in the operations community, committed before the
     report closes: a report closed as escalated has handed its files over.
@@ -689,7 +698,7 @@ async def carry_report(
                 rows=rows,
                 destination=destination,
                 destination_guild_id=operations,
-                case_id=case_id,
+                case_task_id=case_task_id,
                 written=sealing.written,
             )
             await destination.commit()
@@ -700,21 +709,20 @@ async def carry_report(
 # -- Retention ----------------------------------------------------------------
 
 
-async def purge_due(session: AsyncSession, guild_id: int) -> int:
-    """One community's retention: delete the evidence of what closed long
-    enough ago — the rows, then the objects. Returns how many went.
+async def purge_cases_due(session: AsyncSession, guild_id: int) -> int:
+    """The operations community's retention for its cases: delete the evidence
+    of those that closed long enough ago — the rows, then the objects. Returns
+    how many went.
 
     A case closes when its task is done or in the trash, and its evidence is
-    kept for its stream's ``retention_days`` from then. A report closes when it
-    is settled, and its evidence is kept for the moderation stream's. Each is
-    read from the parent as it stands when the rows are deleted, so a reopened
-    case keeps its files, and one closed again counts from the new close. The
-    tasks are locked while that is decided, so a reopen at the same moment
-    either lands first and keeps the files, or waits for them to go. A case
-    a hold still names keeps its files until the hold is released.
+    kept for its stream's ``retention_days`` from then, read from the task as
+    it stands when the rows are deleted, so a reopened case keeps its files,
+    and one closed again counts from the new close. The tasks are locked while
+    that is decided, so a reopen at the same moment either lands first and
+    keeps the files, or waits for them to go. A case a hold still names keeps
+    its files until the hold is released.
     """
     from app.models.tenant.intake import IntakeCase
-    from app.models.tenant.moderation import ModerationReport
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 
     now = datetime.now(timezone.utc)
@@ -724,11 +732,11 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
         due = (
             await session.exec(
                 # A case in the trash is closed too.
-                select_including_deleted(IntakeCase.id, IntakeCase.task_id)
+                select_including_deleted(IntakeCase.task_id)
                 .join(Task, Task.id == IntakeCase.task_id)
                 .join(TaskStatus, TaskStatus.id == Task.task_status_id)
                 .where(IntakeCase.stream == stream.value)
-                .where(IntakeCase.id.in_(select(Evidence.case_id)))  # type: ignore[union-attr]
+                .where(IntakeCase.task_id.in_(select(Evidence.case_task_id)))  # type: ignore[union-attr]
                 .where(
                     or_(
                         Task.deleted_at < cutoff,  # type: ignore[operator]
@@ -745,23 +753,34 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
             continue
         # A case a hold still names keeps its files for as long as the hold
         # stands, however long ago it closed.
-        held = await held_cases(session, [int(task_id) for _id, task_id in due])
-        kept = [int(case_id) for case_id, task_id in due if task_id not in held]
+        held = await held_cases(session, [int(task_id) for task_id in due])
+        kept = [int(task_id) for task_id in due if task_id not in held]
         if not kept:
             continue
         gone += (
             (
                 await session.exec(
                     delete(Evidence)
-                    .where(Evidence.case_id.in_(kept))  # type: ignore[union-attr]
+                    .where(Evidence.case_task_id.in_(kept))  # type: ignore[union-attr]
                     .returning(Evidence.storage_key)
                 )
             )
             .scalars()
             .all()
         )
-    report_cutoff = now - timedelta(days=meta(IntakeStream.moderation).retention_days)
-    gone += (
+    return await _purged(session, guild_id, gone)
+
+
+async def purge_reports_due(session: AsyncSession, guild_id: int) -> int:
+    """One community's retention for its reports: delete the evidence of those
+    settled long enough ago, kept for the moderation stream's
+    ``retention_days`` — the rows, then the objects. Returns how many went."""
+    from app.models.tenant.moderation import ModerationReport
+
+    report_cutoff = datetime.now(timezone.utc) - timedelta(
+        days=meta(IntakeStream.moderation).retention_days
+    )
+    gone = (
         (
             await session.exec(
                 delete(Evidence)
@@ -778,6 +797,12 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
         .scalars()
         .all()
     )
+    return await _purged(session, guild_id, gone)
+
+
+async def _purged(session: AsyncSession, guild_id: int, gone: Sequence[str]) -> int:
+    """Commit a purge, then remove the objects its rows named that no row still
+    does."""
     await session.commit()
     if gone:
         await _remove_unnamed(session, guild_id, gone)
@@ -797,7 +822,7 @@ async def held_cases(session: AsyncSession, task_ids: Sequence[int]) -> set[int]
     from app.db.session import SystemSessionLocal
     from app.models.platform.guild import Guild
     from app.models.tenant.content_hold import ContentHold
-    from app.services.tenant.properties import summaries_by_id
+    from app.services.tenant.metadata import summaries_by_id
 
     by_subject: dict[int, list[int]] = {}
     for task_id, summaries in (
@@ -880,18 +905,11 @@ async def released_by_purge(
     Read before the parents are deleted, on the purging session; the caller
     removes what this returns once its commit has landed.
     """
-    from app.models.tenant.intake import IntakeCase
     from app.models.tenant.moderation import ModerationReport
 
     conditions = []
     if task_ids:
-        conditions.append(
-            Evidence.case_id.in_(  # type: ignore[union-attr]
-                select(IntakeCase.id).where(
-                    IntakeCase.task_id.in_(tuple(task_ids))  # type: ignore[union-attr]
-                )
-            )
-        )
+        conditions.append(Evidence.case_task_id.in_(tuple(task_ids)))  # type: ignore[union-attr]
     if initiative_ids:
         conditions.append(
             Evidence.report_id.in_(  # type: ignore[union-attr]
@@ -933,13 +951,17 @@ async def rewrap_guild(
     new_secret_key: str,
     dry_run: bool = False,
 ) -> tuple[int, int, int]:
-    """Wrap every evidence key in ``guild_id`` under ``new_secret_key``.
-    Objects are not touched. Returns ``(rotated, skipped, failed)``: a key
-    that already unwraps under the new secret is skipped, one that unwraps
-    under neither is counted and left."""
+    """Wrap every evidence key in ``guild_id`` that ``SECRET_KEY`` wraps
+    (version 1) under ``new_secret_key``. Objects are not touched, nor are
+    keys under the community's storage key (version 2), which a rotation of
+    ``SECRET_KEY`` does not reach. Returns ``(rotated, skipped, failed)``: a
+    key that already unwraps under the new secret is skipped, one that
+    unwraps under neither is counted and left."""
     rows = (
         await session.exec(
-            select(Evidence.id, Evidence.origin_id, Evidence.wrapped_dek)
+            select(Evidence.id, Evidence.origin_id, Evidence.wrapped_dek).where(
+                Evidence.kek_version == blob_crypto.KEK_VERSION
+            )
         )
     ).all()
     rotated = skipped = failed = 0
@@ -974,3 +996,36 @@ async def rewrap_guild(
                 .values(wrapped_dek=new, kek_version=blob_crypto.KEK_VERSION)
             )
     return rotated, skipped, failed
+
+
+async def adopt_community_key(session: AsyncSession, guild_id: int) -> int:
+    """Re-wrap every evidence key in ``guild_id`` that ``SECRET_KEY`` wraps
+    under the community's storage key instead, so the evidence goes with that
+    key when the community does. Objects are not touched. ``session`` is
+    routed into the community; the caller commits. Returns how many it
+    re-wrapped."""
+    rows = (
+        await session.exec(
+            select(Evidence.id, Evidence.origin_id, Evidence.wrapped_dek).where(
+                Evidence.kek_version == blob_crypto.KEK_VERSION
+            )
+        )
+    ).all()
+    for evidence_id, origin_id, wrapped in rows:
+        dek = blob_crypto.unwrap(
+            wrapped, holding_guild_id=guild_id, origin_id=origin_id
+        )
+        await session.exec(
+            update(Evidence)
+            .where(Evidence.id == evidence_id)
+            .values(
+                wrapped_dek=blob_crypto.wrap(
+                    dek,
+                    holding_guild_id=guild_id,
+                    origin_id=origin_id,
+                    version=blob_crypto.COMMUNITY_KEK_VERSION,
+                ),
+                kek_version=blob_crypto.COMMUNITY_KEK_VERSION,
+            )
+        )
+    return len(rows)

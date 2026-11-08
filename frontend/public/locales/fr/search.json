@@ -24,8 +24,6 @@
     "project": "Projet",
     "task": "Tâche",
     "file": "Fichier",
-    "queue": "File",
-    "queue_item": "Élément de file",
     "counter_group": "Groupe de compteurs",
     "counter": "Compteur",
     "calendar": "Calendrier",
@@ -33,11 +31,11 @@
     "dashboard": "Tableau de bord",
     "wiki": "Wiki",
     "wiki_page": "Page de wiki",
+    "contact": "Contact",
     "tag": "Étiquette",
     "comment": "Commentaire",
     "post": "Publication",
-    "gallery": "Galerie",
-    "gallery_image": "Image"
+    "collection": "Collection"
   },
   "switchHint": "Tab pour changer",
   "closeMatches": "Rien ne correspond exactement à « {{query}} ». Voici ce qui s’en rapproche le plus.",

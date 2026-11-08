@@ -1,8 +1,8 @@
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { cn } from "@/ui/lib/utils";
 
 /** A bordered group of parts. A title lets the reader fold it, and
  *  `collapsed` starts it folded. */

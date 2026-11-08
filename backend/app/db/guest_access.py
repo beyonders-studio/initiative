@@ -61,16 +61,20 @@ _NAMED: dict[str, GuestAccess] = {
     # and bookmarking it.
     "comments": GuestAccess.write,
     "reactions": GuestAccess.write,
-    "reaction_digest_items": GuestAccess.write,
+    "batched_notices": GuestAccess.write,
     # The sweep timers a guest's writes arm (public.arm_timer reads the mark
     # before it writes one).
     "timer_marks": GuestAccess.write,
     "personal_items": GuestAccess.write,
+    # How they show the lists they reach.
+    "view_preferences": GuestAccess.write,
+    # Asking to edit what was shared with them, and reading their own asks.
+    "share_requests": GuestAccess.write,
     # How widely what they reach was engaged with, read beside it.
     "engagement_levels": GuestAccess.read,
     "relationships": GuestAccess.write,
-    "property_values": GuestAccess.write,
-    "property_definitions": GuestAccess.read,
+    "metadata_values": GuestAccess.write,
+    "metadata_definitions": GuestAccess.read,
     # Read beside a task, and refused to a guest row by row (GUEST_ROWS).
     "intake_cases": GuestAccess.read,
     # The files content shows, stored and claimed as a step of saving it.
@@ -79,12 +83,19 @@ _NAMED: dict[str, GuestAccess] = {
     "search_entries": GuestAccess.write,
     # The change log, written by the capture trigger on what they write.
     "event_outbox": GuestAccess.insert,
+    # The collections the files given to them are in, seen through those files.
+    "collections": GuestAccess.read,
+    "collection_files": GuestAccess.read,
     # What they are in, and the vocabulary items are labelled with.
     "initiatives": GuestAccess.read,
     "initiative_members": GuestAccess.read,
     "initiative_roles": GuestAccess.read,
-    "initiative_role_permissions": GuestAccess.read,
+    "initiative_rules": GuestAccess.read,
     "tags": GuestAccess.read,
+    # Their own custom role, which the standing reads (and never applies on
+    # the guest rung).
+    "custom_role_members": GuestAccess.read,
+    "custom_roles": GuestAccess.read,
 }
 
 
@@ -140,10 +151,17 @@ GUEST_ROWS: dict[str, str] = {
         f" OR initiative_members.initiative_id = ANY ({_MEMBER_OF}))"
     ),
     "initiative_roles": f"(initiative_roles.initiative_id IN {_IN_INITIATIVES})",
-    "initiative_role_permissions": (
-        "EXISTS (SELECT 1 FROM initiative_roles r"
-        " WHERE r.id = initiative_role_permissions.initiative_role_id"
-        f" AND r.initiative_id IN {_IN_INITIATIVES})"
+    # The community's own rows say what every initiative is held to, which a
+    # guest's standing reads too.
+    "initiative_rules": (
+        f"(initiative_rules.initiative_id IN {_IN_INITIATIVES}"
+        " OR initiative_rules.initiative_id IS NULL)"
+    ),
+    # Their own custom role, if one was given: not who else holds what.
+    "custom_role_members": f"custom_role_members.user_id = {_UID}",
+    "custom_roles": (
+        "custom_roles.id IN (SELECT cm.role_id FROM custom_role_members cm"
+        f" WHERE cm.user_id = {_UID})"
     ),
     # Only the sharing rows that reach them: not who else something is
     # shared with.

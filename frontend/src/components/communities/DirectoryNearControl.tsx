@@ -13,8 +13,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PlacePicker } from "@/components/communities/PlacePicker";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/useAuth";
 import { countryName } from "@/lib/communityLocation";
 import {
@@ -25,6 +23,8 @@ import {
   type Place,
   saveNear,
 } from "@/lib/directoryNear";
+import { Button } from "@/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 export const DirectoryNearControl = ({ near }: { near: Place | null }) => {
   const { t, i18n } = useTranslation("communities");

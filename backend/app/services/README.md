@@ -9,7 +9,7 @@ content or shared/platform data.
 |---|---|---|---|
 | `tenant/` | per-guild content (`guild_<id>` schemas) | `RLSSessionDep` under `/c/{community_id}/…` | files, tasks (statuses), queues, counters, calendar_events, comments, initiatives, properties, project import/export, soft_delete, trash_purge, webhook dispatch/subscriptions |
 | `platform/` | shared/public-schema tables | `UserSessionDep` / `SystemSessionDep` (no guild) | users, guilds, access_grants, api_keys, app_settings, push/user tokens, user_notifications, ws_auth |
-| *root* (here) | **both sides** — cross-cutting infra | varies / called by both | `rls`, `membership`, `permissions`, `content_sockets`, `email`, `notifications`, `cross_guild`, `ai_settings`, `ai_generation`, `background_tasks`, `soft-delete filters`, `captcha`, `hibp`, … |
+| *root* (here) | **both sides** — cross-cutting infra | varies / called by both | `rls`, `membership`, `permissions`, `content_sockets`, `email`, `notifications`, `cross_guild`, `ai_settings`, `ai_generation`, `ai_context`, `compact`, `background_tasks`, `soft-delete filters`, `captcha`, `hibp`, … |
 
 ## The rule for the root
 
@@ -19,7 +19,7 @@ deliberate home for code that legitimately bridges the boundary:
 - `cross_guild.py` powers the `/me/*` aggregates — the **one** sanctioned way to
   read a user's tenant data across guilds (still per-guild-routed under the hood).
 - `notifications.py` reads guild content but writes the **public** `Notification`
-  inbox; `ai_settings.py` resolves the platform→guild→user config cascade.
+  inbox; `ai_settings.py` resolves which AI connection a community uses.
 - `rls` / `membership` / `permissions` are the shared enforcement layer both sides
   call.
 

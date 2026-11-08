@@ -1,10 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
-import {
-  type ProjectRead,
-  Tool,
-  type UserViewPreferencesMap,
-} from "@/api/generated/initiativeAPI.schemas";
+import { type ProjectRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
 import {
   getListTaskStatusesQueryKey,
@@ -14,9 +10,10 @@ import { keptView } from "@/hooks/useListView";
 import { projectViewSpec, resolveProjectView } from "@/hooks/useProjectTaskView";
 import { tasksQuery } from "@/hooks/useTasks";
 import { instanceTarget, listLayouts, toolLayoutsQuery } from "@/hooks/useToolLayouts";
-import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
 import { parseListLayout, parsePreset } from "@/lib/filters/layoutSearch";
 import { buildTaskListParams } from "@/lib/filters/taskFilters";
+import { viewPreferencesQuery } from "@/lib/viewPreferences";
+import { ProjectDetailPage } from "@/pages/initiativeTools/projects/ProjectDetailPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/"
@@ -40,7 +37,7 @@ export const Route = createFileRoute(
     // is swallowed here; the page fetches for itself and reports the error.
     void (async () => {
       try {
-        const [, set] = await Promise.all([
+        const [, set, views] = await Promise.all([
           queryClient.ensureQueryData<ProjectRead>({
             queryKey: getReadProjectQueryKey(communityId, projectId),
             queryFn: () => readProject(communityId, projectId),
@@ -50,6 +47,7 @@ export const Route = createFileRoute(
             ...toolLayoutsQuery(communityId, instanceTarget(Tool.project, projectId)),
             staleTime: 60_000,
           }),
+          queryClient.ensureQueryData(viewPreferencesQuery(communityId)),
           queryClient.ensureQueryData({
             queryKey: getListTaskStatusesQueryKey(communityId, projectId),
             queryFn: () => listTaskStatuses(communityId, projectId),
@@ -64,10 +62,7 @@ export const Route = createFileRoute(
         const { spec } = resolveProjectView(
           deps,
           listLayouts(set),
-          keptView(
-            queryClient.getQueryData<UserViewPreferencesMap>(VIEW_PREFERENCES_QUERY_KEY)?.items,
-            projectViewSpec(communityId, projectId)
-          ).view
+          keptView(views.items, projectViewSpec(communityId, projectId)).view
         );
         const taskParams = buildTaskListParams(spec, { projectId });
 
@@ -82,9 +77,5 @@ export const Route = createFileRoute(
       }
     })();
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/projects/ProjectDetailPage").then((m) => ({
-      default: m.ProjectDetailPage,
-    }))
-  ),
+  component: ProjectDetailPage,
 });

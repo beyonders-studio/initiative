@@ -9,6 +9,7 @@ import type comments from "../../public/locales/en/comments.json";
 import type common from "../../public/locales/en/common.json";
 import type communities from "../../public/locales/en/communities.json";
 import type communityHome from "../../public/locales/en/communityHome.json";
+import type connections from "../../public/locales/en/connections.json";
 import type contacts from "../../public/locales/en/contacts.json";
 import type counterGroups from "../../public/locales/en/counterGroups.json";
 import type dashboards from "../../public/locales/en/dashboards.json";
@@ -17,7 +18,6 @@ import type editor from "../../public/locales/en/editor.json";
 import type errors from "../../public/locales/en/errors.json";
 import type exports_ from "../../public/locales/en/exports.json";
 import type files from "../../public/locales/en/files.json";
-import type galleries from "../../public/locales/en/galleries.json";
 import type home from "../../public/locales/en/home.json";
 import type importsNs from "../../public/locales/en/imports.json";
 import type initiatives from "../../public/locales/en/initiatives.json";
@@ -35,7 +35,6 @@ import type posts from "../../public/locales/en/posts.json";
 import type profiles from "../../public/locales/en/profiles.json";
 import type projects from "../../public/locales/en/projects.json";
 import type properties from "../../public/locales/en/properties.json";
-import type queues from "../../public/locales/en/queues.json";
 import type relations from "../../public/locales/en/relations.json";
 import type search from "../../public/locales/en/search.json";
 import type settings from "../../public/locales/en/settings.json";
@@ -44,6 +43,7 @@ import type stats from "../../public/locales/en/stats.json";
 import type tags from "../../public/locales/en/tags.json";
 import type tasks from "../../public/locales/en/tasks.json";
 import type trash from "../../public/locales/en/trash.json";
+import type ui from "../../public/locales/en/ui.json";
 import type wikis from "../../public/locales/en/wikis.json";
 
 declare module "i18next" {
@@ -67,6 +67,7 @@ declare module "i18next" {
       messages: typeof messages;
       myTools: typeof myTools;
       home: typeof home;
+      connections: typeof connections;
       contacts: typeof contacts;
       files: typeof files;
       editor: typeof editor;
@@ -87,9 +88,7 @@ declare module "i18next" {
       projects: typeof projects;
       properties: typeof properties;
       posts: typeof posts;
-      galleries: typeof galleries;
       wikis: typeof wikis;
-      queues: typeof queues;
       relations: typeof relations;
       search: typeof search;
       settings: typeof settings;
@@ -98,6 +97,7 @@ declare module "i18next" {
       tags: typeof tags;
       tasks: typeof tasks;
       trash: typeof trash;
+      ui: typeof ui;
     };
   }
 }

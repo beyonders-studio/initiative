@@ -23,6 +23,7 @@ from app.api.v1.tenant_endpoints import (
     query,
     smart_chips,
     search as guild_search,
+    ai,
     ai_settings,
     plugin_data,
     attachments,
@@ -31,29 +32,32 @@ from app.api.v1.tenant_endpoints import (
     calendar_events,
     calendars,
     dashboards,
+    data_jobs,
     guild_plugins,
     collaboration,
     comments,
+    contacts,
     counters,
     files,
     events,
     exports,
     imports,
+    resumable_uploads,
     initiatives,
     marketplace as guild_marketplace,
     me_tools,
-    galleries,
+    collections,
     me_trash,
     posts,
     projects,
     property_definitions,
     property_values,
-    queues,
     reactions,
     personal_items,
     relationships,
     resource_grants,
     storage,
+    custom_roles,
     tags,
     task_statuses,
     task_types,
@@ -64,6 +68,8 @@ from app.api.v1.tenant_endpoints import (
     tool_lists,
     tools,
     trash,
+    share_requests,
+    view_preferences,
     wikis,
 )
 from app.api.v1.platform_endpoints import (
@@ -88,11 +94,11 @@ from app.api.v1.platform_endpoints import (
     provider_placement,
     billing,
     config,
-    contacts,
     demo,
     guild_provider_connections,
     guilds,
     health,
+    help_center,
     legal,
     marketplace,
     native,
@@ -102,6 +108,7 @@ from app.api.v1.platform_endpoints import (
     push,
     intake,
     passkeys,
+    people,
     email_otp,
     passwordless,
     second_factor,
@@ -130,6 +137,8 @@ api_router.include_router(config.router, tags=["config"])
 # This deployment's terms and privacy policy, if it has any.
 # Unauthenticated: the signup form links to them.
 api_router.include_router(legal.router, tags=["legal"])
+# The help center's search index. Unauthenticated, like the help center.
+api_router.include_router(help_center.router, prefix="/help", tags=["help"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # The demo deployment's routes; 404 unless the deployment runs as the demo.
 api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
@@ -300,30 +309,40 @@ guild_router.include_router(reactions.router, prefix="/reactions", tags=["reacti
 guild_router.include_router(
     ai_settings.router, prefix="/settings", tags=["ai-settings"]
 )
+guild_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 guild_router.include_router(
     initiatives.router, prefix="/initiatives", tags=["initiatives"]
 )
 guild_router.include_router(files.router, **_tool_mount(Tool.file))
+# A collection is part of Files, and answers under its tag.
+guild_router.include_router(
+    collections.router, prefix="/collections", tags=_tool_mount(Tool.file)["tags"]
+)
 guild_router.include_router(
     attachments.router, prefix="/attachments", tags=["attachments"]
 )
+# Asking for something you can't open or edit, and the answer. Every tool's
+# resources, so mounted once at the community's root rather than per tool.
+guild_router.include_router(
+    share_requests.router, prefix="/share-requests", tags=["sharing"]
+)
+guild_router.include_router(data_jobs.router, prefix="/data-jobs", tags=["data-jobs"])
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
-guild_router.include_router(queues.router, **_tool_mount(Tool.queue))
-# Flat read-back routes, at the guild root: an event envelope names a
-# resource by its own id, so every evented resource must resolve from one.
-guild_router.include_router(queues.items_router, tags=_tool_mount(Tool.queue)["tags"])
+guild_router.include_router(resumable_uploads.router, prefix="/resumable-uploads")
 
 guild_router.include_router(counters.router, **_tool_mount(Tool.counter_group))
+# Flat read-back routes, at the guild root: an event envelope names a
+# resource by its own id, so every evented resource must resolve from one.
 guild_router.include_router(counters.counters_router, tags=["counters"])
 guild_router.include_router(calendars.router, **_tool_mount(Tool.calendar))
 guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))
 guild_router.include_router(posts.router, **_tool_mount(Tool.post))
-guild_router.include_router(galleries.router, **_tool_mount(Tool.gallery))
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])
+guild_router.include_router(contacts.router, **_tool_mount(Tool.contact))
 # Plug-ins installed at guild scope. Every member reads them (the sidebar needs to
 # know what is there); installing and removing are guild-admin actions.
 #
@@ -353,6 +372,9 @@ guild_router.include_router(
     resource_grants.router, prefix="/resource-grants", tags=["resource-grants"]
 )
 guild_router.include_router(storage.router, prefix="/storage", tags=["storage"])
+guild_router.include_router(
+    custom_roles.router, prefix="/custom-roles", tags=["custom-roles"]
+)
 guild_router.include_router(
     relationships.router, prefix="/relationships", tags=["relationships"]
 )
@@ -388,6 +410,13 @@ guild_router.include_router(users.members_router, prefix="/members", tags=["user
 guild_router.include_router(
     personal_items.guild_router, prefix="/personal-items", tags=["personal-items"]
 )
+# A person's views of this community's lists. The account's own views are the
+# top-level /user-view-preferences; both answer under one tag.
+guild_router.include_router(
+    view_preferences.router,
+    prefix="/view-preferences",
+    tags=["user-view-preferences"],
+)
 # WebSockets (guild-scoped). Mounting under /c fixes the URL shape now; the
 # handlers are rewired to read the path guild in a follow-up step.
 guild_router.include_router(events.router, prefix="/events", tags=["events"])
@@ -413,7 +442,7 @@ me_router.include_router(personal_items.me_router, tags=["personal-items"])
 me_router.include_router(calendar_entries.me_router, tags=["calendar-entries"])
 me_router.include_router(me_trash.me_router, tags=["trash"])
 me_router.include_router(notification_prefs.me_router, tags=["notifications"])
-me_router.include_router(contacts.me_router, tags=["contacts"])
+me_router.include_router(people.me_router, tags=["people"])
 me_router.include_router(
     dm.me_router, tags=["direct-messages"], dependencies=[DirectMessagesEnabledDep]
 )

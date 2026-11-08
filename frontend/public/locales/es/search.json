@@ -24,8 +24,6 @@
     "project": "Proyecto",
     "task": "Tarea",
     "file": "Archivo",
-    "queue": "Cola",
-    "queue_item": "Elemento de cola",
     "counter_group": "Grupo de contadores",
     "counter": "Contador",
     "calendar": "Calendario",
@@ -33,11 +31,11 @@
     "dashboard": "Panel",
     "wiki": "Wiki",
     "wiki_page": "Página del wiki",
+    "contact": "Contacto",
     "tag": "Etiqueta",
     "comment": "Comentario",
     "post": "Publicación",
-    "gallery": "Galería",
-    "gallery_image": "Imagen"
+    "collection": "Colección"
   },
   "switchHint": "Tab para cambiar",
   "closeMatches": "Nada coincide exactamente con «{{query}}». Esto es lo más parecido.",

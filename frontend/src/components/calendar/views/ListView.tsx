@@ -7,13 +7,14 @@ import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/initials";
-import { formatCompactTime as formatTime } from "@/lib/timeFormat";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Checkbox } from "@/ui/checkbox";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { formatCompactTime as formatTime } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import type { CalendarEntry } from "../CalendarView";
 import { type CalendarViewBaseProps, dateKey, EntryType, kindLabelKey, parseEntry } from "./shared";
@@ -35,7 +36,9 @@ export function ListView({
   isEntrySelectable?: (entry: CalendarEntry) => boolean;
   onToggleEntrySelection?: (entry: CalendarEntry) => void;
 }) {
-  const { t } = useTranslation(["common"]);
+  const { t, i18n } = useTranslation(["common"]);
+  const monthName = dateTimeFormat(i18n.language, { month: "short" });
+  const weekdayName = dateTimeFormat(i18n.language, { weekday: "long" });
 
   const rows = useMemo<ListRow[]>(() => {
     const monthStart = startOfMonth(focusDate);
@@ -124,13 +127,13 @@ export function ListView({
               <div className="flex w-14 shrink-0 flex-col items-center pt-0.5 leading-tight">
                 <span className="font-bold text-lg">{format(displayDate, "d")}</span>
                 <span className="text-2xs text-muted-foreground uppercase">
-                  {format(displayDate, "MMM")}
+                  {monthName.format(displayDate)}
                 </span>
               </div>
 
               {/* Weekday name */}
               <span className="w-24 shrink-0 pt-1 text-muted-foreground text-xs">
-                {format(displayDate, "EEEE")}
+                {weekdayName.format(displayDate)}
               </span>
 
               {/* Color dot */}

@@ -5,11 +5,11 @@
   "name": "Content calendar",
   "publisher": "Initiative",
   "description": "What you are publishing, where, and when. Mostly when.",
-  "long_description": "Every post, newsletter, video or episode is a card that moves from Ideas through Drafting, Editing and Scheduled to Published. Each one says which channels it goes out on and the day it goes out, and that day is its due date, so the initiative's calendar is the content calendar.\n\nThe Ideas column has no due dates on purpose. Ideas are free. Deadlines are for the ones you picked.",
+  "long_description": "Every post, newsletter, video or episode is a card that moves from Ideas through Drafting, Editing and Scheduled to Published. Each one says which channels it goes out on and the day it goes out, and that day is its due date, so the initiative's calendar is the content calendar.\n\nThe Ideas column has no due dates on purpose. Ideas are free. Deadlines are for the ones you picked.\n\nPosts, newsletters, videos and episodes are each their own type. The ones with more steps start with a checklist of them, at the top of the page.",
   "avatar_url": "/marketplace/core-content-calendar.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Opens on the board. Each card shows its channels and publish date, and a piece's page keeps its details together.",
+  "version": "1.2.0",
+  "release_notes": "Posts, newsletters, videos and episodes are each their own type, with a page of their own. A new newsletter, video or episode starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata. The due date is the publish date, so the separate Publish date field is gone.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -67,6 +67,65 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Post",
+        "is_default": true,
+        "color": "#60A5FA",
+        "icon": "pen-line",
+        "layout_preset": "plain",
+        "position": 0
+      },
+      {
+        "name": "Newsletter",
+        "is_default": false,
+        "color": "#34D399",
+        "icon": "mail",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Subject line",
+            "Links checked",
+            "Test send",
+            "Scheduled"
+          ]
+        },
+        "position": 1
+      },
+      {
+        "name": "Video",
+        "is_default": false,
+        "color": "#F472B6",
+        "icon": "video",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Script",
+            "Record",
+            "Edit",
+            "Captions",
+            "Thumbnail"
+          ]
+        },
+        "position": 2
+      },
+      {
+        "name": "Episode",
+        "is_default": false,
+        "color": "#A78BFA",
+        "icon": "mic",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Record",
+            "Edit",
+            "Show notes",
+            "Transcript"
+          ]
+        },
+        "position": 3
+      }
+    ],
     "property_definitions": [
       {
         "name": "Channels",
@@ -99,21 +158,16 @@
             "label": "Podcast",
             "color": "#8B5CF6"
           }
-        ]
-      },
-      {
-        "name": "Publish date",
-        "type": "date",
-        "position": 1.0,
-        "color": null,
-        "options": null
+        ],
+        "project": true
       },
       {
         "name": "Link",
         "type": "url",
-        "position": 2.0,
+        "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [],
@@ -131,10 +185,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -152,12 +222,6 @@
                         "type": "field",
                         "props": {
                           "field": "property:1"
-                        }
-                      },
-                      {
-                        "type": "field",
-                        "props": {
-                          "field": "property:2"
                         }
                       },
                       {
@@ -239,7 +303,6 @@
             "title",
             "property:1",
             "property:2",
-            "property:3",
             "assignees",
             "dueDate",
             "priority",
@@ -249,14 +312,21 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
               "type": "section",
               "props": {
-                "title": "Piece"
+                "title": "Post"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -270,12 +340,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -302,6 +366,225 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Newsletter"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Video"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 4,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Episode"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {
@@ -386,6 +669,65 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Post",
+        "is_default": true,
+        "color": "#60A5FA",
+        "icon": "pen-line",
+        "layout_preset": "plain",
+        "position": 0
+      },
+      {
+        "name": "Newsletter",
+        "is_default": false,
+        "color": "#34D399",
+        "icon": "mail",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Subject line",
+            "Links checked",
+            "Test send",
+            "Scheduled"
+          ]
+        },
+        "position": 1
+      },
+      {
+        "name": "Video",
+        "is_default": false,
+        "color": "#F472B6",
+        "icon": "video",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Script",
+            "Record",
+            "Edit",
+            "Captions",
+            "Thumbnail"
+          ]
+        },
+        "position": 2
+      },
+      {
+        "name": "Episode",
+        "is_default": false,
+        "color": "#A78BFA",
+        "icon": "mic",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Record",
+            "Edit",
+            "Show notes",
+            "Transcript"
+          ]
+        },
+        "position": 3
+      }
+    ],
     "property_definitions": [
       {
         "name": "Channels",
@@ -418,21 +760,16 @@
             "label": "Podcast",
             "color": "#8B5CF6"
           }
-        ]
-      },
-      {
-        "name": "Publish date",
-        "type": "date",
-        "position": 1.0,
-        "color": null,
-        "options": null
+        ],
+        "project": true
       },
       {
         "name": "Link",
         "type": "url",
-        "position": 2.0,
+        "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [
@@ -454,9 +791,11 @@
             "property_type": "multi_select",
             "value_json": [
               "blog"
-            ]
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Post"
       },
       {
         "title": "Behind the scenes: how we pack an order",
@@ -477,9 +816,11 @@
             "value_json": [
               "video",
               "social"
-            ]
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Video"
       },
       {
         "title": "Spring product roundup",
@@ -517,14 +858,11 @@
             "value_json": [
               "blog",
               "newsletter"
-            ]
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-13"
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Post"
       },
       {
         "title": "Interview with our longest customer",
@@ -562,14 +900,11 @@
             "value_json": [
               "podcast",
               "blog"
-            ]
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-10"
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Episode"
       },
       {
         "title": "Monthly newsletter",
@@ -606,14 +941,11 @@
             "property_type": "multi_select",
             "value_json": [
               "newsletter"
-            ]
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-06"
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Newsletter"
       },
       {
         "title": "Holiday opening hours",
@@ -633,14 +965,11 @@
             "property_type": "multi_select",
             "value_json": [
               "social"
-            ]
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-05"
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Post"
       },
       {
         "title": "We moved to a new workshop",
@@ -661,14 +990,11 @@
             "value_json": [
               "blog",
               "social"
-            ]
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-03"
+            ],
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Post"
       }
     ],
     "layouts": [
@@ -685,10 +1011,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -706,12 +1048,6 @@
                         "type": "field",
                         "props": {
                           "field": "property:1"
-                        }
-                      },
-                      {
-                        "type": "field",
-                        "props": {
-                          "field": "property:2"
                         }
                       },
                       {
@@ -793,7 +1129,6 @@
             "title",
             "property:1",
             "property:2",
-            "property:3",
             "assignees",
             "dueDate",
             "priority",
@@ -803,14 +1138,21 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
               "type": "section",
               "props": {
-                "title": "Piece"
+                "title": "Post"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -824,12 +1166,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -856,6 +1192,225 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Newsletter"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Video"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 4,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Episode"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {

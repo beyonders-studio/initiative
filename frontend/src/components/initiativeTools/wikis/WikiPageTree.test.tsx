@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { buildWikiPage } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import { WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 
 import { dropIntents, useWikiTreeExpansion, WikiPageTree } from "./WikiPageTree";
 
@@ -158,7 +158,7 @@ describe("files filed under pages", () => {
       kind: WikiPageKind.file,
       parent_page_id: 11,
       title: "Rulebook.pdf",
-      file_type: "file",
+      file_type: "pdf",
       file_content_type: "application/pdf",
       original_filename: "Rulebook.pdf",
     });

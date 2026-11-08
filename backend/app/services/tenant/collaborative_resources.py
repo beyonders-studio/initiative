@@ -19,7 +19,7 @@ persistence sweep all read it rather than each knowing about files:
     collaborative table, so they are not restated.
 ``body_kind``
     Which editor a row's body is for, as a SQL expression: a file's type,
-    or ``"native"`` for a page, which is always prose. The server makes the
+    or ``lexical`` for a page, which is always prose. The server makes the
     body's Yjs state and renders its content with that editor's mapping
     (:mod:`app.services.tenant.body_states`).
 ``load``
@@ -38,6 +38,7 @@ from sqlalchemy import literal
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
 
+from app.core.file_types import FileType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, plural_of
 
@@ -165,7 +166,7 @@ def _wiki_page_resource() -> CollaborativeResource:
         model=WikiPage,
         content_column="content",
         load=_load_wiki_page,
-        body_kind=lambda: literal("native"),
+        body_kind=lambda: literal(FileType.lexical.value),
         # Every wiki page route names its row ``page_id``.
         id_param="page_id",
     )

@@ -41,8 +41,10 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from app.core import recurrence
+from app.core.file_types import FileType
 from app.core.references import REFERENCE_NODES, reference_as_text, text_node
 from app.core.tools import Tool, tool_export_source
+from app.models.tenant.metadata import PERSON_TYPES
 
 __all__ = [
     "DATE_ANCHOR",
@@ -58,18 +60,13 @@ DATE_ANCHOR = date(2000, 1, 3)
 
 #: Property types whose value is a person, and whose value therefore stays
 #: behind.
-_PERSON_PROPERTY_TYPES = frozenset({"user_reference"})
+_PERSON_PROPERTY_TYPES = frozenset(kind.value for kind in PERSON_TYPES)
 
 #: Property types whose value is a date the item plans with.
 _DATE_PROPERTY_TYPES = frozenset({"date", "datetime"})
 
 #: Editor nodes that name a person.
 _MENTION_NODES = frozenset({"mention", "custom-mention"})
-
-#: Editor nodes that name something else in the community by id. A wikilink is
-#: not among them: it names a page by title, and a link between two pages of
-#: the same wiki is part of the wiki.
-_REFERENCE_NODES = REFERENCE_NODES.keys() - {"wikilink"}
 
 #: Editor nodes that carry a picture.
 _IMAGE_NODES = frozenset({"image"})
@@ -102,7 +99,7 @@ def _clean_editor_state(content: Any) -> Any:
         kind = node.get("type")
         if kind in _MENTION_NODES:
             return text_node(_mention_text(node), node.get("format") or 0)
-        if kind in _REFERENCE_NODES:
+        if kind in REFERENCE_NODES:
             return reference_as_text(node)
         children = node.get("children")
         if isinstance(children, list):
@@ -208,7 +205,7 @@ def _strip_project(env: dict[str, Any]) -> None:
 def _strip_file(env: dict[str, Any]) -> None:
     env["mention_handles"] = []
     content = env.get("content")
-    if env.get("file_type") == "native":
+    if env.get("file_type") == FileType.lexical:
         env["content"] = _clean_editor_state(content)
 
 
@@ -238,38 +235,21 @@ def _strip_calendar(env: dict[str, Any]) -> None:
         event["created_at"] = None
 
 
-def _strip_queue(env: dict[str, Any]) -> None:
-    for item in env.get("items") or []:
-        if isinstance(item, dict):
-            item["member"] = None
-
-
-def _strip_gallery(env: dict[str, Any]) -> None:
-    env["images"] = [
-        image
-        for image in env.get("images") or []
-        if isinstance(image, dict) and _in_marketplace(image.get("storage_key"))
-    ]
-    if not _in_marketplace(env.get("cover")):
-        env["cover"] = None
-
-
 def _strip_nothing(env: dict[str, Any]) -> None:
-    """A counter group and a dashboard name nobody and point at nothing a
-    listing could carry. (A dashboard's configuration, which does, is dropped
-    by the dashboard's own canonical form.)"""
+    """A counter group, a dashboard and a contact name nobody in the community
+    and point at nothing a listing could carry. (A dashboard's configuration,
+    which does, is dropped by the dashboard's own canonical form.)"""
 
 
 _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
     Tool.project: _strip_project,
     Tool.file: _strip_file,
-    Tool.queue: _strip_queue,
     Tool.counter_group: _strip_nothing,
     Tool.calendar: _strip_calendar,
     Tool.dashboard: _strip_nothing,
     Tool.post: _strip_post,
-    Tool.gallery: _strip_gallery,
     Tool.wiki: _strip_wiki,
+    Tool.contact: _strip_nothing,
 }
 
 

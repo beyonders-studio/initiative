@@ -12,8 +12,8 @@ import {
 } from "recharts";
 
 import type { VelocityWeekData } from "@/api/generated/initiativeAPI.schemas";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ChartContainer, ChartTooltipContent } from "@/ui/chart";
 
 interface VelocityChartProps {
   data: VelocityWeekData[];

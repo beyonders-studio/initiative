@@ -25,8 +25,7 @@ from app.models.platform.guild import (
     GuildMembership,
 )
 from app.models.platform.user import User
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.models.tenant.initiative import (
     Initiative,
     InitiativeMember,
@@ -35,11 +34,13 @@ from app.models.tenant.initiative import (
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.task import Task
 from app.schemas.platform.demo import PitchSeat
+from app.services import data_jobs
 from app.services.export import worker as export_worker
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import worker as import_worker
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import users as users_service
 from app.services.platform.app_settings import get_app_settings
 from app.testing import (
@@ -66,8 +67,9 @@ async def demo(session, monkeypatch):
     """The demo deployment, as boot records it."""
     monkeypatch.setattr(settings, "DEMO_MODE", True)
     row = await app_settings_service.ensure_settings_row(session)
-    row.demo_mode = row.guests_enabled = True
+    row.demo_mode = True
     session.add(row)
+    await rules.put(session, "guests_enabled", True)
     await session.commit()
 
 
@@ -179,8 +181,8 @@ async def test_a_link_seats_the_visitor_in_its_role(pitch, client, session, role
         assert roster[host.id] is CommunityRole.superadmin
 
     await route_session_to_guild(session, copy_id)
-    job = await session.get(ImportJob, opened["import_job_id"])
-    assert job is not None and job.status == ImportJobStatus.done, job
+    job = await session.get(DataJob, opened["import_job_id"])
+    assert job is not None and job.status == DataJobStatus.done, job
     assert (await session.exec(select(Task.title))).all() == ["Proof the dough"]
     initiatives = set((await session.exec(select(Initiative.id))).all())
     joined = set(
@@ -243,7 +245,6 @@ async def test_a_failed_opening_spends_nothing(pitch, session, monkeypatch):
     session.expire_all()
     sandbox = await session.get(DemoSandbox, copy_id)
     assert sandbox is not None and sandbox.state == DemoSandboxState.pooled
-    assert sandbox.import_job_id is None
     assert (await session.exec(select(GuildInvite.uses))).one() == 0
     assert (
         await session.exec(
@@ -281,7 +282,7 @@ async def test_the_export_gc_keeps_what_a_pitch_publishes(pitch, client, session
         "source": "community",
         "format": "zip",
         "params": {"mode": "backup"},
-        "status": ExportJobStatus.done,
+        "status": DataJobStatus.done,
         "expires_at": past,
     }
     other_guild = await create_guild(session)
@@ -291,26 +292,26 @@ async def test_the_export_gc_keeps_what_a_pitch_publishes(pitch, client, session
             session,
             await session.get(Guild, source),
             host,
-            artifact_ref="exports/superseded.zip",
+            file_ref="exports/superseded.zip",
             created_at=past - timedelta(days=8),
             **backup,
         )
     ).id
     other = (
         await create_export_job(
-            session, other_guild, host, artifact_ref="exports/other.zip", **backup
+            session, other_guild, host, file_ref="exports/other.zip", **backup
         )
     ).id
     await route_session_to_guild(session, source)
     published = (
-        await session.exec(select(ExportJob).where(ExportJob.id != superseded))
+        await session.exec(select(DataJob).where(DataJob.id != superseded))
     ).one()
     published.expires_at = past
     session.add(published)
     await session.commit()
     published_id = published.id
 
-    await each_guild([(Scope.PROVISIONED, export_worker.expire_artifacts)], name="t")
+    await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")
 
     statuses = {}
     for guild_id, job_id in (
@@ -320,13 +321,13 @@ async def test_the_export_gc_keeps_what_a_pitch_publishes(pitch, client, session
     ):
         session.expunge_all()
         await route_session_to_guild(session, guild_id)
-        job = await session.get(ExportJob, job_id)
+        job = await session.get(DataJob, job_id)
         assert job is not None
         statuses[job_id] = job.status
     assert statuses == {
-        published_id: ExportJobStatus.done,
-        superseded: ExportJobStatus.expired,
-        other: ExportJobStatus.expired,
+        published_id: DataJobStatus.done,
+        superseded: DataJobStatus.expired,
+        other: DataJobStatus.expired,
     }
     await copies.build_copy()
     await _open(client, token)
@@ -790,7 +791,7 @@ async def test_a_listed_pitch_from_the_api_and_its_deletion(
     created_at = listed.created_at
     assert listed.is_community and listed.categories == ["education"]
     assert listed.has_adult_content is False
-    assert (await get_app_settings(session)).community_directory_enabled
+    assert (await rules.platform_values(session))["community_directory_enabled"]
     await route_session_to_guild(session, pitch_id)
     assert set((await session.exec(select(Initiative.join_policy))).all()) == {
         "request"
@@ -886,7 +887,7 @@ async def test_a_link_from_the_api_reports_its_opening_and_its_leads(
         session,
         await session.get(Guild, opened["community_id"]),
         await accounts.demo_host(session),
-        status=ImportJobStatus.cancelled,
+        status=DataJobStatus.cancelled,
     )
     copy = await client.get("/api/v1/demo/copy", headers=visitor)
     assert copy.json()["ready"] is True
@@ -985,9 +986,9 @@ async def test_a_copy_whose_import_failed_says_so(pitch, client, session):
     copy_id = await copies.build_copy()
     opened, visitor, _me = await _open(client, await link())
     await route_session_to_guild(session, copy_id)
-    job = await session.get(ImportJob, opened["import_job_id"])
+    job = await session.get(DataJob, opened["import_job_id"])
     assert job is not None
-    job.status = ImportJobStatus.failed
+    job.status = DataJobStatus.failed
     session.add(job)
     await session.commit()
 

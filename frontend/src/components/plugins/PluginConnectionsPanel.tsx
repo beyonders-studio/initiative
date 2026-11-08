@@ -31,18 +31,6 @@ import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginConnectionRead } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   useConnectPlugin,
   useDisconnectPlugin,
@@ -50,7 +38,14 @@ import {
 } from "@/hooks/useCommunityPluginDetail";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { openExternal } from "@/lib/openExternal";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** One typed input in a connection's form, as the pinned definition declares
  *  it. The read carries fields and the access hint untyped, because their shape
@@ -73,12 +68,16 @@ export interface PluginConnectionsPanelProps {
   connections: CommunityPluginConnectionRead[];
   /** Holds the seat, which sets the community-wide connections. */
   canManage: boolean;
+  /** Plug-ins are managed by whoever runs the server: the community-wide
+   * connections are read-only. A member's own account still connects. */
+  closed?: boolean;
 }
 
 export function PluginConnectionsPanel({
   pluginId,
   connections,
   canManage,
+  closed = false,
 }: PluginConnectionsPanelProps) {
   const { t } = useTranslation(["plugins"]);
 
@@ -94,7 +93,7 @@ export function PluginConnectionsPanel({
             key={connection.id}
             pluginId={pluginId}
             connection={connection}
-            canManage={canManage}
+            canManage={canManage && !closed}
           />
         ) : (
           <PersonalConnection key={connection.id} pluginId={pluginId} connection={connection} />
@@ -192,11 +191,10 @@ function CommunityConnection({
     connect.mutate(connection.id, {
       onSuccess: (started) => {
         // A new tab rather than a redirect, so the admin comes back to where
-        // they were; `noopener` keeps the vendor's page from reaching into
-        // this one. The address is the server's to build — see
+        // they were. The address is the server's to build — see
         // PersonalConnection.
         if (started.connect_url) {
-          window.open(started.connect_url, "_blank", "noopener,noreferrer");
+          openExternal(started.connect_url);
           toast.success(t("plugins:connections.connectOpened"));
           return;
         }
@@ -407,10 +405,9 @@ function PersonalConnection({
       onSuccess: (started) => {
         // The server builds the vendor's address; the client never does. A
         // new tab rather than a redirect, so the member comes back to where
-        // they were, and `noopener` keeps the vendor's page from reaching into
-        // this one.
+        // they were.
         if (started.connect_url) {
-          window.open(started.connect_url, "_blank", "noopener,noreferrer");
+          openExternal(started.connect_url);
           toast.success(t("plugins:connections.connectOpened"));
           return;
         }

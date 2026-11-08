@@ -17,9 +17,8 @@
     "children": {
       "task": "Aufgaben",
       "calendar_event": "Termine",
-      "gallery_image": "Bilder",
-      "queue_item": "Warteschlangeneinträge",
-      "wiki_page": "Seiten"
+      "wiki_page": "Seiten",
+      "collection": "Sammlungen"
     },
     "columns": {
       "in": "In"
@@ -50,11 +49,7 @@
     "creating": "Wird erstellt…",
     "create": "Erstellen",
     "searchPlaceholder": "Tags suchen oder erstellen...",
-    "loading": "Wird geladen…",
-    "existingTags": "Vorhandene Tags",
-    "noTagsFound": "Keine Tags gefunden.",
     "createTag": "\"{{name}}\" erstellen",
-    "selected": "{{count}} ausgewählt",
     "filterLabel": "Tags",
     "anyTag": "Beliebiges Tag"
   },

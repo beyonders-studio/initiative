@@ -4,10 +4,10 @@
  * What is typed here is sent to them as it is. It never says who reported
  * the thing, or how many people did.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,9 +15,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
 const MESSAGE_MAX = 2000;
@@ -33,9 +33,11 @@ export const WarnDialog = ({ open, onOpenChange, pending = false, onConfirm }: W
   const { t } = useTranslation(["moderation", "common"]);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) setMessage("");
-  }, [open]);
+  }
 
   const said = message.trim();
 

@@ -1,7 +1,8 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadFileQueryKey, readFile } from "@/api/generated/files/files";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
+import { FileDetailPage } from "@/pages/initiativeTools/files/FileDetailPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/files/$fileId/"
@@ -26,9 +27,5 @@ export const Route = createFileRoute(
       }),
     ]).catch(() => {});
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/files/FileDetailPage").then((m) => ({
-      default: m.FileDetailPage,
-    }))
-  ),
+  component: FileDetailPage,
 });

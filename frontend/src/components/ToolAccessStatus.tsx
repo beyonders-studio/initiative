@@ -1,20 +1,22 @@
 import { AlertCircle, SearchX, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { StatusMessage } from "@/components/StatusMessage";
+import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { NeedAccessOr } from "@/components/access/RequestAccess";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import { StatusMessage } from "@/ui/status-message";
 
 /** Where a detail page keeps its `noAccess` and `notFound` strings, each with
  *  a `…Description` beside it. */
 type AccessKeys =
   | "calendars:"
+  | "contacts:"
   | "counterGroups:"
   | "dashboards:"
+  | "files:collections."
   | "files:detail."
-  | "galleries:"
   | "posts:"
   | "projects:detail."
-  | "queues:"
   | "tasks:edit."
   | "wikis:";
 
@@ -24,14 +26,34 @@ interface ToolAccessStatusProps {
   keys: AccessKeys;
   backTo: string;
   backLabel: string;
+  /** What the page was reading. Given, a reader who knows it is there and
+   *  cannot open it is offered a way to ask for access. */
+  entity?: { kind: SearchEntityType; id: number };
 }
 
 /**
  * What a detail page shows in place of the thing it could not read: no access
  * on a 403, not found on a 404 or when there was nothing to ask for, and the
  * error itself for anything else — a failed request is not a missing item.
+ *
+ * Either refusal may be something the reader can ask for: when the standing
+ * read says they cannot open it, the way to ask takes the message's place.
+ * When that read finds nothing, the page says what it always said.
  */
-export function ToolAccessStatus({ error, keys, backTo, backLabel }: ToolAccessStatusProps) {
+export function ToolAccessStatus({ entity, ...props }: ToolAccessStatusProps) {
+  return (
+    <NeedAccessOr
+      error={props.error}
+      entity={entity}
+      backTo={props.backTo}
+      backLabel={props.backLabel}
+    >
+      <Refusal {...props} />
+    </NeedAccessOr>
+  );
+}
+
+function Refusal({ error, keys, backTo, backLabel }: Omit<ToolAccessStatusProps, "entity">) {
   const { t } = useTranslation();
   const status = getHttpStatus(error);
 

@@ -3,7 +3,6 @@ import { Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Capability,
@@ -12,6 +11,7 @@ import {
   hasCapability,
 } from "@/lib/permissions";
 import { matchActiveTab } from "@/lib/tabs";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 /**
  * App-wide *configuration* area: authentication, security, branding, email,
@@ -22,7 +22,7 @@ import { matchActiveTab } from "@/lib/tabs";
 export const PlatformSettingsLayout = () => {
   const { t } = useTranslation("settings");
   const { user } = useAuth();
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const router = useRouter();
 
   const tabs = useMemo(() => {
@@ -98,7 +98,7 @@ export const PlatformSettingsLayout = () => {
     return <Navigate to={canAccessOperatorDashboard(user) ? "/settings/operator" : "/"} replace />;
   }
 
-  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   // Fall back to whichever tab this user actually has, not always `auth`.
   const activeTab = matchActiveTab(tabs, normalizedPath, tabs[0]?.value ?? "auth");
 

@@ -6,8 +6,14 @@ import { FilerState } from "@/api/generated/initiativeAPI.schemas";
 import { getReadMyTimeOutQueryKey } from "@/api/generated/users/users";
 import { TicketConversation } from "@/components/tickets/TicketConversation";
 import { TicketStateBadge } from "@/components/tickets/TicketStateBadge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAccountTimeOut } from "@/hooks/useAccountTimeOut";
+import { useAuth } from "@/hooks/useAuth";
+import { useFiledTicket, useFileTicket } from "@/hooks/useTickets";
+import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -15,15 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useAccountTimeOut } from "@/hooks/useAccountTimeOut";
-import { useAuth } from "@/hooks/useAuth";
-import { useFiledTicket, useFileTicket } from "@/hooks/useTickets";
-import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { queryClient } from "@/lib/queryClient";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it, so the field stops where the server would. */
 const BODY_MAX = 5000;
@@ -140,7 +140,7 @@ export const AccountTimeOut = () => {
   const canAppeal = Boolean(data?.can_appeal) && !nowhere && !appealOpen;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">

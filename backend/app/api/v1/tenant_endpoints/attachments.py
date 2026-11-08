@@ -13,6 +13,8 @@ from app.core.messages import ImageMessages, AttachmentMessages
 from app.models.platform.user import User
 from app.schemas.tenant.attachment import AttachmentUploadResponse
 from app.services.tenant.attachments import (
+    IMAGE_SUFFIXES,
+    MAX_IMAGE_BYTES,
     detect_document_image_type,
     FileTooLargeError,
     PASTED_IMAGE_PREFIX,
@@ -26,22 +28,6 @@ from app.services.tenant import attachments as attachments_service
 from app.services.storage import get_guild_storage
 
 router = APIRouter()
-
-MAX_IMAGE_BYTES = 10 * 1024 * 1024
-
-#: What a document image may be, and the suffix its stored copy takes. The four
-#: raster formats ``read_image_header`` identifies, plus the three this endpoint
-#: allows on top of them: TIFF and ICO, which it does not read, and SVG, which
-#: is markup rather than a raster and so is served as a download.
-_SUFFIXES = {
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/gif": ".gif",
-    "image/webp": ".webp",
-    "image/tiff": ".tiff",
-    "image/x-icon": ".ico",
-    "image/svg+xml": ".svg",
-}
 
 ImageUploadUser = Annotated[User, Depends(get_current_active_user)]
 
@@ -88,7 +74,7 @@ async def _store_image(
 
     # The stored name carries the detected format, so the suffix the serve path
     # reads and the type recorded on the row describe the same bytes.
-    filename = new_upload_filename(_SUFFIXES[content_type], prefix=prefix)
+    filename = new_upload_filename(IMAGE_SUFFIXES[content_type], prefix=prefix)
 
     await enforce_storage_quota(
         session, guild_id=guild_id, incoming_bytes=len(contents)

@@ -61,19 +61,6 @@ describe("CommentSection", () => {
     await waitFor(() => expect(deleted).toBe(String(mine.id)));
   });
 
-  it("posts a queue comment under queue_id", async () => {
-    const created = captureCreate();
-
-    renderPage(() => (
-      <CommentSection entityType={Tool.queue} entityId={42} comments={[]} initiativeId={7} />
-    ));
-
-    await postComment("Whose turn is it?");
-
-    await waitFor(() => expect(created.body()).not.toBeNull());
-    expect(created.body()).toEqual({ content: "Whose turn is it?", queue_id: 42 });
-  });
-
   it("posts a counter-group comment under counter_group_id", async () => {
     const created = captureCreate();
 
@@ -205,7 +192,7 @@ describe("CommentSection", () => {
 
     renderPage(() => (
       <CommentSection
-        entityType={Tool.queue}
+        entityType={Tool.counter_group}
         entityId={42}
         comments={[older, firstReply, newer, secondReply]}
         initiativeId={7}
@@ -427,7 +414,6 @@ describe("CommentSection", () => {
   it.each([
     ["task", 3],
     ["wiki_page", 4],
-    [Tool.queue, 42],
     [Tool.counter_group, 9],
     [Tool.file, 11],
   ] as const)(

@@ -4,7 +4,7 @@ The one read of each setting, and the one write. Everything that gates a
 sign-in route asks here, so the rules live in exactly one place. (A fresh
 deployment's first value is the env's, ``AUTH_LOGIN_METHODS`` — seeded once
 into the settings row when it is created, see
-``app_settings._seeded_login_methods`` — and every change after that goes
+``app_settings._seeded_login_methods``, as the rule ``login_methods`` — and every change after that goes
 through :func:`change`.)
 
 **Writing a rule.** Every rule about how somebody reaches the deployment or a
@@ -25,7 +25,7 @@ community, and what leaves a community on its behalf, is a :class:`Rule` in
 5. Follow up and commit: switching push off drops the tokens it was sent to.
 
 A community's rule applies only while it holds the option the rule needs
-(``guild_administration.auth_options``), and every point that enforces
+(its paid key, ``app.core.rules.OPTION_RULES``), and every point that enforces
 one asks. Taking an option away stops the rule applying and
 leaves it set, so it applies again when the option comes back.
 """
@@ -37,18 +37,18 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_
 from sqlalchemy import select as sa_select
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core import rules as rule_catalog
+from app.core.rules import SignInRequirement
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import (
     FACTOR_METHODS,
     PRIMARY_LOGIN_METHODS,
     LoginMethod,
     SecondFactorRequirement,
-    methods_from_values,
 )
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import AuthMessages, GuildMessages, SettingsMessages
@@ -56,7 +56,7 @@ from app.core.security import AUTH_POLICY_UNMET_HEADER, has_usable_password
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.guild import Guild
-from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
+from app.models.platform.rule import CommunityRule
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
 from app.models.platform.user_totp import UserTotp
@@ -65,32 +65,20 @@ from app.services import email as email_service
 from app.services.auth import guild_provider_connections as guild_connections
 from app.services.auth import identity as identity_service
 from app.services.auth.platform_provider import is_login_ready
+from app.services.platform import account_stream
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import guild_entitlements
 from app.services.platform import guilds as guilds_service
 from app.services.platform import push_tokens
+from app.services.platform import rules as rules_service
 from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 
 logger = logging.getLogger(__name__)
 
 
-def methods_from_row(row: AppSetting) -> frozenset[LoginMethod]:
-    """The sign-in methods one ``app_settings`` row permits.
-
-    Never empty. The column is constrained non-empty and the write path refuses
-    to empty it; should this read one anyway, it resolves to the default set.
-    Conservative for a *gate* and conservative for an *account* point opposite
-    ways here, and this resolves in the account's favour.
-
-    Pure, so a caller that already holds the settings row does not fetch it
-    twice; :func:`resolve_login_methods` is the form for callers that do not.
-    """
-    return methods_from_values(row.login_methods)
-
-
 async def resolve_login_methods(session: AsyncSession) -> frozenset[LoginMethod]:
-    """The sign-in methods this deployment permits. See :func:`methods_from_row`."""
-    return methods_from_row(await app_settings_service.get_app_settings(session))
+    """The sign-in methods this deployment permits (the rule ``login_methods``)."""
+    return (await rules_service.platform_values(session))["login_methods"]
 
 
 async def login_method_allowed(session: AsyncSession, method: LoginMethod) -> bool:
@@ -111,23 +99,10 @@ async def password_confirms(session: AsyncSession, user: User) -> bool:
     )
 
 
-def requirement_from_row(row: AppSetting) -> SecondFactorRequirement:
-    """What this ``app_settings`` row asks of an account.
-
-    Pure, so a caller holding the row does not fetch it twice. A value this
-    version does not recognise reads as ``nobody``: the column is a database
-    enum, so that can only be a row written by a later version, and asking for
-    something this one cannot describe is worse than asking for nothing.
-    """
-    try:
-        return SecondFactorRequirement(row.second_factor_requirement)
-    except ValueError:
-        return SecondFactorRequirement.nobody
-
-
 async def second_factor_requirement(session: AsyncSession) -> SecondFactorRequirement:
-    """What this deployment asks of an account. See :func:`requirement_from_row`."""
-    return requirement_from_row(await app_settings_service.get_app_settings(session))
+    """What this deployment asks of an account (the rule
+    ``second_factor_requirement``)."""
+    return (await rules_service.platform_values(session))["second_factor_requirement"]
 
 
 def rule_covers(level: SecondFactorRequirement, role: UserRole) -> bool:
@@ -223,28 +198,28 @@ async def account_figures(
     return stranding, dict(zip(_FACTOR_LEVELS, row[len(withdrawable) :]))
 
 
+#: The rule keys that hold a community's sign-in requirements.
+_REQUIREMENTS = ("auth_policy", "guest_auth_policy")
+
+
 async def guilds_requiring_sign_in(session: AsyncSession) -> int:
     """How many guilds require a sign-in of their own.
 
-    A requirement is enforced from the policy row alone — the gate in
-    ``deps.py`` and ``public.guild_auth_satisfied()`` read nothing else — so it
-    stands whatever happens to the route that satisfies it. Counted before
-    single sign-on is withdrawn for that reason.
+    A requirement is enforced from its rule alone — the gate in ``deps.py``
+    and ``public.guild_auth_satisfied()`` read nothing else — so it stands
+    whatever happens to the route that satisfies it. Counted before single
+    sign-on is withdrawn for that reason.
 
-    Any row with a half that is not ``open`` counts, its members' or its
-    guests'. A requirement names a provider, or a way in, or both, and a table
-    constraint is what makes that list complete — so this stays right when a
-    third thing becomes requirable, rather than quietly skipping it.
+    A requirement of its members or of its guests counts. It names a provider,
+    or a way in, or both, and a table constraint is what makes that list
+    complete — so this stays right when a third thing becomes requirable,
+    rather than quietly skipping it.
     """
     return (
         await session.exec(
-            select(func.count())
-            .select_from(GuildAuthPolicy)
-            .where(
-                or_(
-                    GuildAuthPolicy.policy != "open",
-                    GuildAuthPolicy.guest_policy != "open",
-                )
+            select(func.count(func.distinct(CommunityRule.guild_id))).where(
+                CommunityRule.key.in_(_REQUIREMENTS),  # type: ignore[attr-defined]
+                CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
             )
         )
     ).one()
@@ -260,19 +235,10 @@ async def guilds_requiring_method(session: AsyncSession, method: LoginMethod) ->
     """
     return (
         await session.exec(
-            select(func.count())
-            .select_from(GuildAuthPolicy)
-            .where(
-                or_(
-                    and_(
-                        GuildAuthPolicy.policy != "open",
-                        GuildAuthPolicy.require_methods.contains([method.value]),
-                    ),
-                    and_(
-                        GuildAuthPolicy.guest_policy != "open",
-                        GuildAuthPolicy.guest_require_methods.contains([method.value]),
-                    ),
-                )
+            select(func.count(func.distinct(CommunityRule.guild_id))).where(
+                CommunityRule.key.in_(_REQUIREMENTS),  # type: ignore[attr-defined]
+                CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+                CommunityRule.methods.contains([method.value]),  # type: ignore[union-attr]
             )
         )
     ).one()
@@ -386,9 +352,9 @@ class RuleContext:
     guild_id: int | None = None
     #: The stranded-account count the writer was shown (``login_methods``).
     acknowledge_stranded: int | None = None
-    settings: AppSetting = field(init=False)
     guild: Guild = field(init=False)
-    policy: GuildAuthPolicy | None = field(default=None, init=False)
+    #: The layer's stored rules as written, whether or not each applies.
+    rules: dict[str, Any] = field(default_factory=dict, init=False)
     stranded: int = field(default=0, init=False)
 
     @classmethod
@@ -411,11 +377,6 @@ class RuleContext:
     ) -> RuleContext:
         return cls(session, system, actor, guild_id=guild_id)
 
-    @property
-    def target(self) -> AppSetting | Guild:
-        """The row a column rule reads and writes."""
-        return self.settings if self.guild_id is None else self.guild
-
 
 FollowUp = Callable[[RuleContext, Any, Any], Awaitable[None]]
 
@@ -424,10 +385,10 @@ FollowUp = Callable[[RuleContext, Any, Any], Awaitable[None]]
 class Rule:
     """One rule, as :func:`change` writes it.
 
-    The base is a column of the settings row (a deployment's rule) or of the
-    community's row: ``loose`` is its most permissive value, ``None`` for a
-    limit where no limit is the loosest. Rules that are more than a column
-    override the hooks.
+    The base is a stored rule (``app.core.rules``) of the deployment or of
+    the community: ``loose`` is its most permissive value, which is also its
+    default, ``None`` for a limit where no limit is the loosest. Rules stored
+    anywhere else override the hooks.
     """
 
     key: str
@@ -437,7 +398,7 @@ class Rule:
     follow_up: FollowUp | None = None
 
     async def read(self, ctx: RuleContext) -> Any:
-        return getattr(ctx.target, self.key)
+        return ctx.rules[self.key]
 
     def tightens(self, before: Any, after: Any) -> bool:
         if self.loose is None:
@@ -454,8 +415,8 @@ class Rule:
         """Refusals of this rule's own, asked of every change to it."""
 
     async def write(self, ctx: RuleContext, after: Any) -> None:
-        setattr(ctx.target, self.key, after)
-        ctx.session.add(ctx.target)
+        await rules_service.put(ctx.session, self.key, after, guild_id=ctx.guild_id)
+        ctx.rules[self.key] = after
 
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         """Record this rule's area: every column rule in it that moved, once."""
@@ -470,6 +431,32 @@ class Rule:
             before={k: moved[k][0] for k in names if k in moved},
             after={k: moved[k][1] for k in names if k in moved},
         )
+
+
+async def _everyone_rereads_their_account(
+    ctx: RuleContext, before: Any, after: Any
+) -> None:
+    # Whether an account may create a community is part of what ``/me``
+    # answers, so every open tab reads it again.
+    account_stream.queue_signal_to_everyone(ctx.system)
+
+
+async def _ai_mode_moved(ctx: RuleContext, before: Any, after: Any) -> None:
+    # Every worker reads the version beside the mode and reloads the
+    # operator's connections when it moves.
+    from app.services import ai_settings
+
+    await ai_settings.bump_ai_config_version(ctx.system)
+    ai_settings.invalidate_platform_ai_cache()
+
+
+async def _community_connections_off(ctx: RuleContext, before: Any, after: Any) -> None:
+    # Its own connections go off with it, so turning AI back on starts from
+    # none in use until each is turned on again.
+    from app.services import ai_settings
+
+    if before and not after and ctx.guild_id is not None:
+        await ai_settings.turn_off_guild_connections(ctx.guild_id)
 
 
 async def _drop_push_tokens(ctx: RuleContext, before: Any, after: Any) -> None:
@@ -494,9 +481,6 @@ class _LoginMethods(Rule):
     number; the writer's own account is refused outright, and adds another way
     in first. Withdrawing a method signs nobody out.
     """
-
-    async def read(self, ctx: RuleContext) -> frozenset[LoginMethod]:
-        return methods_from_row(ctx.settings)
 
     def tightens(self, before: Any, after: Any) -> bool:
         return bool(before - after)
@@ -541,7 +525,8 @@ class _LoginMethods(Rule):
         if (
             withdrawn.intersection(FACTOR_METHODS)
             and not after.intersection(FACTOR_METHODS)
-            and requirement_from_row(ctx.settings) is not SecondFactorRequirement.nobody
+            and ctx.rules["second_factor_requirement"]
+            is not SecondFactorRequirement.nobody
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -565,10 +550,6 @@ class _LoginMethods(Rule):
                 ),
                 headers={"X-Affected-Count": str(ctx.stranded)},
             )
-
-    async def write(self, ctx: RuleContext, after: Any) -> None:
-        ctx.settings.login_methods = sorted(m.value for m in after)
-        ctx.session.add(ctx.settings)
 
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         before, after = moved[self.key]
@@ -601,14 +582,11 @@ class _FactorRequirement(Rule):
     """Who the deployment asks to hold a second factor. Nobody is signed out:
     an account the rule covers is asked at its next request."""
 
-    async def read(self, ctx: RuleContext) -> SecondFactorRequirement:
-        return requirement_from_row(ctx.settings)
-
     def tightens(self, before: Any, after: Any) -> bool:
         return _FACTOR_ORDER[after] > _FACTOR_ORDER[before]
 
     async def offered(self, ctx: RuleContext, after: Any) -> None:
-        if not methods_from_row(ctx.settings).intersection(FACTOR_METHODS):
+        if not ctx.rules["login_methods"].intersection(FACTOR_METHODS):
             raise not_offered()
 
     async def writer_meets(self, ctx: RuleContext, after: Any) -> None:
@@ -619,10 +597,6 @@ class _FactorRequirement(Rule):
         ):
             raise self_unsatisfied(LoginMethod.totp.value)
 
-    async def write(self, ctx: RuleContext, after: Any) -> None:
-        ctx.settings.second_factor_requirement = after
-        ctx.session.add(ctx.settings)
-
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         before, after = moved[self.key]
         await audit_service.record(
@@ -631,16 +605,6 @@ class _FactorRequirement(Rule):
             actor_user_id=ctx.actor.id if ctx.actor else None,
             detail={"from": before.value, "to": after.value},
         )
-
-
-@dataclass(frozen=True)
-class SignInRequirement:
-    """A community's sign-in requirement: ``open``, or ``required`` naming a
-    provider its members arrive through, methods they must use, or both."""
-
-    policy: str = "open"
-    provider_id: int | None = None
-    methods: frozenset[LoginMethod] = frozenset()
 
 
 _OPEN = SignInRequirement()
@@ -661,18 +625,6 @@ class _SignInRequirement(Rule):
     """
 
     guest: bool = False
-
-    async def read(self, ctx: RuleContext) -> SignInRequirement:
-        if ctx.policy is None:
-            return _OPEN
-        half = ctx.policy.half(self.guest)
-        if half.policy == "open":
-            return _OPEN
-        return SignInRequirement(
-            "required",
-            half.provider_id,
-            frozenset(LoginMethod(m) for m in half.require_methods),
-        )
 
     def tightens(self, before: Any, after: Any) -> bool:
         return after.policy == "required" and (
@@ -755,32 +707,6 @@ class _SignInRequirement(Rule):
         if LoginMethod.passkey in after.methods and not carries_passkey(amr):
             raise self_unsatisfied(LoginMethod.passkey.value)
 
-    async def write(self, ctx: RuleContext, after: Any) -> None:
-        provider = (
-            await ctx.system.get(AuthProvider, after.provider_id)
-            if after.provider_id is not None
-            else None
-        )
-        half = SignInHalf(
-            after.policy,
-            after.provider_id,
-            provider.slug if provider else None,
-            tuple(sorted(m.value for m in after.methods)),
-        )
-        row = ctx.policy or GuildAuthPolicy(guild_id=ctx.guild_id, policy="open")
-        row.set_half(self.guest, half)
-        # No row is open, for members and guests alike.
-        if row.policy == "open" and row.guest_policy == "open":
-            if ctx.policy is not None:
-                await ctx.session.delete(ctx.policy)
-                # Flushed now, so the other half writing in the same change
-                # inserts its row after this one is gone.
-                await ctx.session.flush()
-                ctx.policy = None
-            return
-        ctx.policy = row
-        ctx.session.add(row)
-
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         before, after = moved[self.key]
         await audit_service.record(
@@ -817,7 +743,25 @@ class _CommunityFactor(Rule):
             raise self_unsatisfied(LoginMethod.totp.value)
 
 
-_RESTRICTIONS = CommunityAuthOption.restrictions
+def _platform(key: str, area: str, follow_up: FollowUp | None = None) -> Rule:
+    """A stored rule of the deployment, its loosest value its default."""
+    stored = rule_catalog.PLATFORM_RULES[key]
+    return Rule(key, area=area, loose=stored.default, follow_up=follow_up)
+
+
+def _community(
+    key: str, area: str, cls: type[Rule] = Rule, follow_up: FollowUp | None = None
+) -> Rule:
+    """A stored rule of a community, with the option it needs."""
+    stored = rule_catalog.COMMUNITY_RULES[key]
+    return cls(
+        key,
+        area=area,
+        loose=stored.default,
+        entitlement=stored.entitlement,
+        follow_up=follow_up,
+    )
+
 
 #: The deployment's rules, by the field that names each.
 PLATFORM_RULES: dict[str, Rule] = {
@@ -825,16 +769,46 @@ PLATFORM_RULES: dict[str, Rule] = {
     for rule in (
         _LoginMethods("login_methods", area="login_methods"),
         _FactorRequirement("second_factor_requirement", area="second_factor"),
-        Rule("session_max_hours", area="session_lifetime"),
-        Rule("session_idle_minutes", area="session_lifetime"),
-        Rule(
+        _platform("session_max_hours", "session_lifetime"),
+        _platform("session_idle_minutes", "session_lifetime"),
+        _platform(
             "push_notifications_enabled",
-            area="notifications",
-            loose=True,
+            "notifications",
             follow_up=_drop_push_tokens,
         ),
-        Rule("email_notifications_enabled", area="notifications", loose=True),
-        Rule("redact_notification_content", area="notifications", loose=False),
+        _platform("email_notifications_enabled", "notifications"),
+        _platform("redact_notification_content", "notifications"),
+        _platform("engagement_ranking_enabled", "engagement_ranking"),
+        _platform("cookie_consent_enabled", "cookie_consent"),
+        # Read once, when an account is made, so changing it moves nobody.
+        _platform("default_dm_policy", "community"),
+        _platform("ai_config_mode", "ai_mode", follow_up=_ai_mode_moved),
+        _platform("community_directory_enabled", "community"),
+        _platform("community_age_gate_enabled", "community"),
+        _platform("direct_messages_enabled", "community"),
+        # Guests made or extended after the ceiling changes are held to it.
+        _platform("guests_enabled", "community"),
+        _platform("max_guest_days", "community"),
+        # Each window is counted from each deletion or hold, so changing one
+        # moves the date for every row already waiting.
+        *(
+            _platform(key, "community")
+            for window in rule_catalog.RETENTION_WINDOWS.items()
+            for key in window
+        ),
+        _platform("marketplace_members_publish_directly", "marketplace"),
+        _platform("marketplace_registry_enabled", "marketplace_registry"),
+        _platform("public_registration_enabled", "community"),
+        _platform(
+            "community_creation_enabled",
+            "community",
+            follow_up=_everyone_rereads_their_account,
+        ),
+        _platform("community_creation_daily_limit", "community"),
+        # Counted from each community's last export, so changing it moves the
+        # date for one already waiting.
+        _platform("community_export_cooldown_hours", "community"),
+        _platform("breached_password_check_enabled", "passwords"),
     )
 }
 
@@ -851,46 +825,16 @@ COMMUNITY_RULES: dict[str, Rule] = {
             entitlement=CommunityAuthOption.providers,
             guest=True,
         ),
-        _CommunityFactor(
-            "require_second_factor",
-            area="second_factor",
-            loose=False,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "enforce_compliance_session",
-            area="session_limit",
-            loose=False,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "allow_push_notifications",
-            area="notifications",
-            loose=True,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "allow_email_notifications",
-            area="notifications",
-            loose=True,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "redact_notification_content",
-            area="notifications",
-            loose=False,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "allow_engagement_ranking",
-            area="engagement_ranking",
-            loose=True,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule("allow_ai", area="ai", loose=True, entitlement=_RESTRICTIONS),
+        _community("require_second_factor", "second_factor", _CommunityFactor),
+        _community("enforce_compliance_session", "session_limit"),
+        _community("allow_push_notifications", "notifications"),
+        _community("allow_email_notifications", "notifications"),
+        _community("redact_notification_content", "notifications"),
+        _community("allow_engagement_ranking", "engagement_ranking"),
+        _community("allow_ai", "ai", follow_up=_community_connections_off),
         # The longest a guest may stay. It bounds the guests made or extended
         # after it changes, and no others.
-        Rule("guest_max_days", area="guests", entitlement=_RESTRICTIONS),
+        _community("guest_max_days", "guests"),
     )
 }
 
@@ -900,10 +844,12 @@ def _rules(ctx: RuleContext) -> dict[str, Rule]:
 
 
 async def _load(ctx: RuleContext) -> None:
-    """Take the rows the rules read: the settings row, held, for the
-    deployment's; the community's row and its requirement for a community's."""
+    """Take the rows the rules read: the deployment's stored rules, with the
+    settings row held so its changes take turns; the community's row and its
+    stored rules for a community's."""
     if ctx.guild_id is None:
-        ctx.settings = await app_settings_service.locked_settings(ctx.session)
+        await app_settings_service.locked_settings(ctx.session)
+        ctx.rules = await rules_service.platform_values(ctx.session)
         return
     guild = await ctx.session.get(Guild, ctx.guild_id)
     if guild is None:
@@ -912,7 +858,9 @@ async def _load(ctx: RuleContext) -> None:
             detail=GuildMessages.COMMUNITY_NOT_FOUND,
         )
     ctx.guild = guild
-    ctx.policy = await ctx.session.get(GuildAuthPolicy, ctx.guild_id)
+    ctx.rules = (
+        await rules_service.community_values(ctx.session, [ctx.guild_id], applied=False)
+    )[ctx.guild_id]
 
 
 async def change(ctx: RuleContext, changes: dict[str, Any]) -> None:
@@ -929,6 +877,15 @@ async def change(ctx: RuleContext, changes: dict[str, Any]) -> None:
         before = await rules[key].read(ctx)
         if value != before:
             moved[key] = (before, value)
+    if (
+        ctx.guild_id is not None
+        and moved.keys()
+        & await rules_service.set_by_deployment(ctx.session, ctx.guild_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=GuildMessages.COMMUNITY_RULE_SET_BY_DEPLOYMENT,
+        )
     tightening = {k for k, (b, a) in moved.items() if rules[k].tightens(b, a)}
 
     if ctx.guild_id is not None and tightening:

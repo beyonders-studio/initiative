@@ -1,0 +1,178 @@
+"""A community's custom roles: named sets of admin surfaces, on a rung.
+
+A custom role holds some of the parts of administering the community
+(``app.models.platform.guild.AdminSurface``) and is anchored to a rung: on the
+admin rung it narrows what an admin holds, on the member rung it gives a member
+a few surfaces. It applies only while its holder's rung, which
+``public.guild_memberships`` keeps, is the role's ``base_rung``, and only to an
+assignment made during the membership the holder has now. Otherwise the holder
+stands on their plain rung. Both tables are the community's own: nothing outside
+it reads them.
+
+A role is the community's own or the deployment's (``set_by``). The deployment
+defines its roles once for every community, through billing's sync; a community
+gives them as it gives its own, and only the system engine changes or deletes
+one.
+"""
+
+from collections.abc import Iterable
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Optional
+
+from sqlalchemy import (
+    ARRAY,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Index,
+    Text,
+    text,
+)
+from sqlmodel import Field, SQLModel
+
+from app.core.rules import SetBy
+from app.db.registry_checks import FROM_REGISTRY
+from app.models.platform.guild import MEMBER_ROLE_SURFACES, AdminSurface, CommunityRole
+from app.models.tenant._mixins import CreatedByMixin
+
+#: The rungs a custom role may be anchored to.
+CUSTOM_ROLE_RUNGS: tuple[CommunityRole, ...] = (
+    CommunityRole.member,
+    CommunityRole.admin,
+)
+
+#: The longest name a custom role may have.
+CUSTOM_ROLE_NAME_MAX_LENGTH = 64
+
+
+def _listed(values: Iterable[Enum]) -> str:
+    return ", ".join(f"'{value.value}'" for value in values)
+
+
+def _surfaces(values: Iterable[AdminSurface]) -> str:
+    return f"ARRAY[{_listed(values)}]::text[]"
+
+
+class CustomRole(CreatedByMixin, table=True):
+    """A named set of admin surfaces, on the rung it applies to."""
+
+    __tablename__ = "custom_roles"
+    __table_args__ = (
+        CheckConstraint(
+            f"base_rung IN ({_listed(CUSTOM_ROLE_RUNGS)})",
+            name="ck_custom_roles_base_rung",
+            info={FROM_REGISTRY: True},
+        ),
+        CheckConstraint(
+            f"surfaces <@ {_surfaces(AdminSurface)}"
+            f" AND (base_rung <> '{CommunityRole.member.value}'"
+            f" OR surfaces <@ {_surfaces(sorted(MEMBER_ROLE_SURFACES))})",
+            name="ck_custom_roles_surfaces",
+            info={FROM_REGISTRY: True},
+        ),
+        CheckConstraint(
+            f"set_by IN ({_listed(SetBy)})",
+            name="ck_custom_roles_set_by",
+            info={FROM_REGISTRY: True},
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(
+        sa_column=Column(
+            String(length=CUSTOM_ROLE_NAME_MAX_LENGTH), nullable=False, unique=True
+        )
+    )
+    base_rung: str = Field(sa_column=Column(String(length=16), nullable=False))
+    surfaces: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(
+            ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+        ),
+    )
+    #: Who defined the role: the community, or the deployment for every
+    #: community (``SetBy``).
+    set_by: str = Field(
+        default=SetBy.community.value,
+        sa_column=Column(
+            String(length=16),
+            nullable=False,
+            server_default=SetBy.community.value,
+        ),
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class CustomRoleMember(SQLModel, table=True):
+    """Who holds a custom role: one per person, from ``assigned_at``."""
+
+    __tablename__ = "custom_role_members"
+
+    user_id: int = Field(foreign_key="users.id", primary_key=True)
+    role_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("custom_roles.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    #: When the role was given, by the database. The standing applies it only
+    #: from the holder's ``guild_memberships.joined_at`` on, so leaving and
+    #: coming back does not bring an old role back.
+    assigned_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True), nullable=False, server_default=text("now()")
+        ),
+    )
+    #: The sign-in provider whose claims gave the role
+    #: (:class:`CustomRoleClaimRule`), which a later sign-in through it may
+    #: change or take back. ``None`` for a role somebody gave by hand, which the
+    #: claims leave alone. A ``public.auth_providers`` id.
+    oidc_provider_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True)
+    )
+
+
+class CustomRoleClaimRule(CreatedByMixin, table=True):
+    """A custom role the community gives whoever signs in through one of its
+    providers carrying a group. The seat writes them, in order: the first rule
+    whose group a sign-in carries decides the person's role."""
+
+    __tablename__ = "custom_role_claim_rules"
+    __table_args__ = (
+        # One rule per group as a sign-in matches it: capitals aside.
+        Index(
+            "uq_custom_role_claim_rules_claim",
+            "provider_id",
+            text("lower(claim_value)"),
+            unique=True,
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    #: A ``public.auth_providers`` id the community connects to.
+    provider_id: int = Field(sa_column=Column(Integer, nullable=False))
+    claim_value: str = Field(sa_column=Column(String(length=500), nullable=False))
+    role_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("custom_roles.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    #: Earlier first; the first matching rule wins.
+    position: int = Field(default=0, sa_column=Column(Integer, nullable=False))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

@@ -4,6 +4,7 @@ Everything here is about the signed-in account and nobody else, so both routes
 resolve their subject from the credential rather than a path parameter.
 """
 
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Annotated, Any
 
@@ -17,13 +18,13 @@ from app.db.session import get_system_session
 from app.core.notification_categories import (
     CATEGORY_SPECS,
     ALL_CHANNELS,
+    DIGEST_CATEGORIES,
     NotificationCategory,
 )
 from app.models.platform.guild import Guild, GuildMembership
 from app.models.platform.user import User
-from app.models.tenant.reaction_digest import ReactionDigestItem
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.schemas.platform.notification_prefs import (
+    DigestSchedule,
     EmailSchedule,
     CommunityNotificationSettings,
     NotificationCategoryRead,
@@ -39,14 +40,6 @@ from app.services.platform import case_notices, email_outbox
 from app.services.platform import notification_prefs as prefs_service
 
 me_router = APIRouter()
-
-
-#: The digest queues an opt-out can leave nobody wanting, with the categories
-#: that fill each. A queue is emptied once none of them is wanted.
-_DIGEST_QUEUES: tuple[tuple[type, tuple[NotificationCategory, ...]], ...] = (
-    (TaskAssignmentDigestItem, (NotificationCategory.assignments,)),
-    (ReactionDigestItem, (NotificationCategory.mentions,)),
-)
 
 
 def _registry(
@@ -163,6 +156,12 @@ async def read_my_notification_preferences(
             weekday=schedule.weekday,
             personal_instant=schedule.personal_instant,
         ),
+        digests={
+            category: DigestSchedule(
+                **asdict(prefs_service.digest_schedule(doc, category))
+            )
+            for category in DIGEST_CATEGORIES
+        },
         # A lapsed pause reads as no pause. The sweep that summarises a lift
         # clears the key, but a deployment with nothing to summarise should not
         # show somebody a stand-down that ended last week either.
@@ -252,6 +251,15 @@ async def update_my_notification_preferences(
             "personal_instant": payload.email.personal_instant,
         }
 
+    for category, digest in payload.digests.items():
+        if category not in DIGEST_CATEGORIES:
+            continue
+        doc.setdefault("digests", {})[category.value] = {
+            "cadence": digest.cadence.value,
+            "at": digest.at,
+            "weekday": digest.weekday,
+        }
+
     if payload.clear_pause:
         doc.pop("pause", None)
     elif payload.pause_until is not None:
@@ -284,27 +292,24 @@ async def update_my_notification_preferences(
     # discarded for a choice that stuck.
     await session.commit()
 
-    if payload.email is not None or any(
-        change.category is NotificationCategory.assignments
-        for change in (*payload.channels, *payload.rows)
-    ):
-        # The overdue digest goes out on their schedule, to those who want it.
-        await sweep_timers.arm_in(
-            "overdue", await member_guild_ids(session, current_user.id)
-        )
+    # Each digest goes out on its own schedule, to those who want it.
+    moved = {*payload.digests, *(change.category for change in payload.channels)}
+    armed = [category.value for category in DIGEST_CATEGORIES if category in moved]
+    if armed:
+        communities = await member_guild_ids(session, current_user.id)
+        for kind in armed:
+            await sweep_timers.arm_in(kind, communities)
 
-    # A queue nobody will ever be sent is discarded, not kept: it is guild
+    # A batch nobody will ever be sent is discarded, not kept: it is guild
     # scoped, so this reaches into each of the account's guild schemas.
     emptied = [
-        model
-        for model, categories in _DIGEST_QUEUES
-        if not any(
-            notifications_service.wants_digest(doc, category) for category in categories
-        )
+        batch.kind
+        for batch in notifications_service.BATCHES
+        if not notifications_service.wants_digest(doc, batch.category)
     ]
     if emptied:
         user_id = current_user.id
-        await notifications_service.clear_digest_queue_across_guilds(
+        await notifications_service.clear_batches_across_guilds(
             session, user_id, emptied
         )
 

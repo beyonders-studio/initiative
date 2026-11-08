@@ -5,10 +5,12 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
+import { useCreateRole, useDeleteRole, useUpdateRole } from "@/hooks/useInitiativeRoles";
+import { toast } from "@/lib/mascotToast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,8 +20,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+} from "@/ui/alert-dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -27,11 +29,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useCreateRole, useDeleteRole, useUpdateRole } from "@/hooks/useInitiativeRoles";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 export interface InitiativeRoleDialogsProps {
   initiativeId: number;
@@ -60,14 +60,16 @@ export const InitiativeRoleDialogs = ({
   const roleNameTouchedRef = useRef(false);
 
   // Rename role dialog state
-  const [renameDisplayName, setRenameDisplayName] = useState("");
+  const [renameDisplayName, setRenameDisplayName] = useState(roleToRename?.display_name ?? "");
 
   // Sync renameDisplayName when roleToRename changes
-  useEffect(() => {
+  const [prevRoleToRename, setPrevRoleToRename] = useState(roleToRename);
+  if (prevRoleToRename !== roleToRename) {
+    setPrevRoleToRename(roleToRename);
     if (roleToRename) {
       setRenameDisplayName(roleToRename.display_name);
     }
-  }, [roleToRename]);
+  }
 
   const createRoleMutation = useCreateRole(initiativeId);
   const updateRoleMutation = useUpdateRole(initiativeId);

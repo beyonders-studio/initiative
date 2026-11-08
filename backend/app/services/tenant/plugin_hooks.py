@@ -80,7 +80,7 @@ from app.services.marketplace.vendor_values import (
 )
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_connection_flows as flows
-from app.services.tenant import plugin_metadata
+from app.services.tenant import metadata
 from app.services.tenant.plugin_channels import (
     PluginChannelError,
     keep_event,
@@ -487,7 +487,7 @@ async def _map(
 ) -> bool:
     """A declarative plug-in's install: its pinned ``webhooks`` map the delivery
     to changes to the plug-in's values, made as the install
-    (:func:`plugin_metadata.apply_changes`), to an event, emitted as a
+    (:func:`metadata.apply_changes`), to an event, emitted as a
     container's is, and to a connection's state. Whether it is done: a
     mapping that may answer if asked again is not, and waits; one that
     cannot, and changes that are refused, are logged and done."""
@@ -522,7 +522,7 @@ async def _map(
             failure,
         )
     try:
-        await plugin_metadata.apply_changes(
+        await metadata.apply_changes(
             plugin, registration, delivered.writes, guild_id=install.guild_id
         )
     except PluginChannelError as exc:

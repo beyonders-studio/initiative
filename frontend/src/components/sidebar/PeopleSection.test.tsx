@@ -13,7 +13,7 @@ import type {
   CommunityRosterMember,
   CommunityRosterResponse,
 } from "@/api/generated/initiativeAPI.schemas";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 
 import { PeopleSection } from "./PeopleSection";
 

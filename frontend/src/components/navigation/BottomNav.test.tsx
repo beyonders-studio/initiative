@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 
 const mocks = vi.hoisted(() => ({
   waiting: vi.fn(),
@@ -24,8 +24,8 @@ vi.mock("@/hooks/useMyMessages", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useMessagesWaiting: () => mocks.waiting(),
 }));
-vi.mock("@/hooks/useWidthClass", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/useWidthClass")>()),
+vi.mock("@/ui/lib/useWidthClass", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/ui/lib/useWidthClass")>()),
   useWidthClass: () => (mocks.mobile() ? "base" : "lg"),
 }));
 vi.mock("@/hooks/useNotifications", () => ({ useNotifications: () => mocks.notifications() }));

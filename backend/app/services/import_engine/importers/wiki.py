@@ -495,7 +495,8 @@ async def _upload_file(
     whose file is not stored here — left out of the zip, or refused on the way
     in — or is not a type an uploaded file holds is not created."""
     from app.db.session import routed_guild_id
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import type_of_media
+    from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.services.tenant import file_versions
 
@@ -507,17 +508,15 @@ async def _upload_file(
         return None, (0, 0)
     filename = upload.original_filename or key
     content_type = await file_versions.stored_file_type(
-        File,
         routed_guild_id(session),
         key,
         filename=filename,
-        hint=stored.content_type,
     )
     if content_type is None:
         return None, (0, 0)
     file = File(
         name=upload.name,
-        file_type=FileType.file,
+        file_type=type_of_media(content_type),
         content={},
         initiative_id=target_initiative.id,
         created_by=importer.id,
@@ -659,30 +658,30 @@ async def _tasks_by_jira_key(session: AsyncSession, keys: set[str]) -> dict[str,
         return {}
     from sqlalchemy import or_
 
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.task import Task
     from app.services.import_engine.jira_fields import JIRA_KEY_PROPERTY
 
     rows = (
         await session.exec(
-            select(PropertyValue.value_text, Task.id)
+            select(MetadataValue.value_text, Task.id)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
             .join(
                 Task,
-                (PropertyValue.entity_type == "task")
-                & (Task.id == PropertyValue.entity_id),
+                (MetadataValue.entity_type == "task")
+                & (Task.id == MetadataValue.entity_id),
             )
             .where(
                 # The name the import gave it, or the one it was renamed to
                 # when that name was already taken by a different kind.
                 or_(
-                    PropertyDefinition.name == JIRA_KEY_PROPERTY,
-                    PropertyDefinition.name.like(f"{JIRA_KEY_PROPERTY} (%"),
+                    MetadataDefinition.name == JIRA_KEY_PROPERTY,
+                    MetadataDefinition.name.like(f"{JIRA_KEY_PROPERTY} (%"),
                 ),
-                PropertyValue.value_text.in_(sorted(keys)),
+                MetadataValue.value_text.in_(sorted(keys)),
                 Task.deleted_at.is_(None),
             )
             .order_by(Task.id)

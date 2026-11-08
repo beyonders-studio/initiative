@@ -18,11 +18,11 @@ import {
   type HoldRelease as HoldReleaseValue,
 } from "@/api/generated/initiativeAPI.schemas";
 import { HoldDialog } from "@/components/moderation/HoldDialog";
-import { Button } from "@/components/ui/button";
-import { CardContent } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCaseHolds, useReleaseHold } from "@/hooks/useHolds";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
+import { Button } from "@/ui/button";
+import { CardContent } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 
 interface CaseHoldsProps {
   taskId: number;

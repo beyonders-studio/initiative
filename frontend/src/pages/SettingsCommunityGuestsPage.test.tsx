@@ -79,9 +79,13 @@ vi.mock(import("@/hooks/useSearch"), async (importOriginal) => ({
 
 import { SettingsCommunityGuestsPage } from "./SettingsCommunityGuestsPage";
 
+// The page's last render, whose reads are waited on before clicking into a
+// table row: each read that lands redraws the rows.
+let rendered: ReturnType<typeof renderPage>;
+
 const setup = () => {
   const community = buildCommunity({ role: "admin" }) as CommunityRead;
-  renderPage(() => <SettingsCommunityGuestsPage />, {
+  rendered = renderPage(() => <SettingsCommunityGuestsPage />, {
     communities: {
       communities: [community],
       activeCommunityId: community.id,
@@ -124,7 +128,7 @@ describe("SettingsCommunityGuestsPage", () => {
     await user.type(days, "5");
 
     await user.click(screen.getByLabelText("Initiatives they join"));
-    await user.click(await screen.findByRole("button", { name: "Select all" }));
+    await user.click(await screen.findByRole("option", { name: "Select all" }));
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByRole("combobox", { name: "Thing" }));
@@ -158,7 +162,9 @@ describe("SettingsCommunityGuestsPage", () => {
     const community = setup();
     extendGuest.mockResolvedValue(undefined);
 
-    await user.click(await screen.findByRole("button", { name: /actions for/i }));
+    await screen.findByRole("button", { name: /actions for/i });
+    await waitFor(() => expect(rendered.queryClient.isFetching()).toBe(0));
+    await user.click(screen.getByRole("button", { name: /actions for/i }));
     await user.click(await screen.findByRole("menuitem", { name: "Extend" }));
     const days = await screen.findByLabelText("Days from now");
     await user.clear(days);

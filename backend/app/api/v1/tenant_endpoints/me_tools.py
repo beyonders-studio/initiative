@@ -155,11 +155,6 @@ MY_TOOL_LISTS: dict[Tool, MyToolList] = {
             "``created_by_me`` to the ones the caller wrote."
         ),
     ),
-    Tool.queue: MyToolList(
-        default_key=lambda model: model.updated_at,
-        page_size=page_size_param(20, ge=0, le=100),
-        list_doc="Queues that reach the caller across every guild they belong to.",
-    ),
     Tool.counter_group: MyToolList(
         default_key=lambda model: model.updated_at,
         page_size=page_size_param(20, ge=0, le=100),
@@ -210,15 +205,17 @@ MY_TOOL_LISTS: dict[Tool, MyToolList] = {
             "an editor the client mounts."
         ),
     ),
-    Tool.gallery: MyToolList(
-        default_key=lambda model: model.updated_at,
-        page_size=page_size_param(20, ge=0, le=100),
-        list_doc=("Galleries that reach the caller across every guild they belong to."),
-    ),
     Tool.wiki: MyToolList(
         default_key=lambda model: model.updated_at,
         page_size=page_size_param(20, ge=0, le=100),
         list_doc=("Wikis that reach the caller across every guild they belong to."),
+    ),
+    Tool.contact: MyToolList(
+        # By name, as an address book is read.
+        default_key=my_tools_service.name_key,
+        default_desc=False,
+        page_size=page_size_param(20, ge=0, le=100),
+        list_doc="Contacts that reach the caller across every guild they belong to.",
     ),
 }
 
@@ -344,8 +341,8 @@ async def list_across_guilds(
         )
         rows = list((await guild_session.exec(statement)).unique().all())
         # Serialized by the tool's own list, inside the routed session:
-        # relationships and the per-guild annotations (a gallery's cover, a
-        # wiki's page count) resolve in this guild's schema, and the next guild
+        # relationships and the per-guild annotations (a dashboard's preview,
+        # a wiki's page count) resolve in this guild's schema, and the next guild
         # expunges these rows.
         items = await tool_list.serialize(tool_list, request, rows)
         return [(placement[(guild_id, item.id)], item) for item in items]

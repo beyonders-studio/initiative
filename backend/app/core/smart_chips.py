@@ -34,6 +34,10 @@ class SmartChipAspect(str, Enum):
     progress = "progress"
     #: Whether a task is finished, as a box to tick.
     checklist = "checklist"
+    #: How to call somebody: a contact's first phone number.
+    phone = "phone"
+    #: How to write to somebody: a contact's first email address.
+    email = "email"
 
 
 class SmartChipTone(str, Enum):
@@ -61,6 +65,8 @@ class SmartChipTone(str, Enum):
 #: ``smart_chips_test`` fails until a pair added here has one.
 SMART_CHIP_KINDS: tuple[tuple[SearchEntityType, SmartChipAspect], ...] = (
     (SearchEntityType.calendar_event, SmartChipAspect.when),
+    (SearchEntityType.contact, SmartChipAspect.email),
+    (SearchEntityType.contact, SmartChipAspect.phone),
     (SearchEntityType.counter, SmartChipAspect.value),
     (SearchEntityType.project, SmartChipAspect.progress),
     (SearchEntityType.task, SmartChipAspect.assignee),

@@ -1,11 +1,19 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { buildCommunity } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 
-import { AppLayout } from "./_authenticated";
+import { Route } from "./_authenticated";
+
+// The route's own component, loaded the way the route loads it.
+const AuthenticatedLayout = Route.options.component as React.ComponentType & {
+  preload?: () => Promise<unknown>;
+};
+beforeAll(async () => {
+  await AuthenticatedLayout.preload?.();
+});
 
 // The layout is mounted directly, as `$communityId.test.tsx` mounts its own:
 // what is under test is which screen it picks for a given community list, so
@@ -20,7 +28,10 @@ vi.mock("@/hooks/useVersionCheck", () => ({
 }));
 vi.mock("@/hooks/useRealtimeUpdates", () => ({ useRealtimeUpdates: () => undefined }));
 vi.mock("@/hooks/useNotificationStream", () => ({ useNotificationStream: () => undefined }));
-vi.mock("@/hooks/usePushNotifications", () => ({ usePushNotifications: () => undefined }));
+vi.mock("@/hooks/usePushNotifications", () => ({
+  usePushNotifications: () => undefined,
+  usePushTray: () => undefined,
+}));
 vi.mock("@/hooks/useDesktopApp", () => ({ useDesktopApp: () => undefined }));
 vi.mock("@/hooks/useBackButton", () => ({ useBackButton: () => undefined }));
 vi.mock("@/hooks/useShareTarget", () => ({ useResumePendingShare: () => undefined }));
@@ -46,7 +57,7 @@ const show = ({
   communities = [] as ReturnType<typeof buildCommunity>[],
   refreshCommunities = vi.fn().mockResolvedValue([]),
 } = {}) => {
-  renderPage(AppLayout, {
+  renderPage(AuthenticatedLayout, {
     communities: {
       communities,
       activeCommunityId: null,

@@ -30,7 +30,7 @@ configuration and event work runs on the system engine, routed into the
 community one install at a time (:mod:`app.services.tenant.plugin_channels`).
 The metadata routes run as the install itself, on the session the seam routed,
 so the table's policies decide which rows it reaches
-(:mod:`app.services.tenant.plugin_metadata`).
+(:mod:`app.services.tenant.metadata`).
 """
 
 from __future__ import annotations
@@ -47,6 +47,7 @@ from app.api.deps import (
     SessionDep,
     VerifiedInstall,
     establish_install_access,
+    named_refs,
     oauth2_scheme,
     SystemSessionDep,
 )
@@ -83,7 +84,7 @@ from app.schemas.tenant.plugin_channel import (
 from app.services.marketplace import plugin_entitlements, registration_lookup
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.tenant import plugin_channels as channels_service
-from app.services.tenant import plugin_metadata as metadata_service
+from app.services.tenant import metadata as metadata_service
 
 # Not part of the OpenAPI document: only plug-in containers call these, never the
 # SPA, so the generated frontend client carries none of them.
@@ -147,6 +148,9 @@ async def _admit(
                 scopes=token.scopes,
                 initiative_id=token.initiative_id,
             ),
+            # A routed route may name people, by the install's references
+            # for them, which its standing resolves.
+            await named_refs(request) if routed else (),
         )
     except InstallAccessError as exc:
         raise _refuse() from exc

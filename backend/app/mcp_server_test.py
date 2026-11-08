@@ -26,7 +26,6 @@ from app.mcp_server import (
     ArgumentDefaultsMiddleware,
     TrimResultMiddleware,
     _free_form_keys,
-    _trim,
     build_mcp_server,
 )
 
@@ -58,7 +57,6 @@ _WRITE_PREFIXES = (
     "start_",
     "stop_",
     "sort_",
-    "advance_",
     "hold_",
     "release_",
     "upgrade_",
@@ -71,8 +69,6 @@ _SAFE_WRITES = {
     "update_project",
     "create_file",
     "update_file",
-    "create_queue",
-    "update_queue",
     "create_counter_group",
     "update_counter_group",
     "create_calendar",
@@ -81,24 +77,18 @@ _SAFE_WRITES = {
     "update_dashboard",
     "create_post",
     "update_post",
-    # A gallery is authored and renamed here, and filled elsewhere: putting a
-    # picture in one is a multipart upload, which no RouteMap matches, so the
-    # write surface stops at the wall itself.
-    "create_gallery",
-    "update_gallery",
     "create_wiki",
     "update_wiki",
-    # And what those tools hold: a project's tasks, a queue's items, a counter
-    # group's counters, a calendar's events, a wiki's pages, and the comments on
-    # any of them.
+    "create_contact",
+    "update_contact",
+    # And what those tools hold: a project's tasks, a counter group's counters,
+    # a calendar's events, a wiki's pages, and the comments on any of them.
     "create_task",
     "update_task",
     "move_task",
     # One checklist tick. The task update rewrites the list's lines but never
     # its done flags, so this is the only way to mark a piece of a task done.
     "toggle_checklist_item",
-    "add_queue_item",
-    "update_queue_item",
     "add_counter",
     "update_counter",
     "create_calendar_event",
@@ -140,6 +130,8 @@ async def test_mcp_tools_are_curated():
         # full one is refused.
         "column_limits",
         "counter",
+        # A collection in Files, read through the files tag.
+        "collection",
         "backlink",
         # The edges between them, which belong to no one tool.
         "relationship",
@@ -165,7 +157,7 @@ async def test_mcp_tools_are_curated():
             f"no MCP tool reads {tool.value}"
         )
     # And what those tools hold reads back by its own id.
-    assert {"read_queue_item", "read_counter", "read_wiki_page"} <= set(names)
+    assert {"read_counter", "read_wiki_page"} <= set(names)
 
     # Join requests sit on the initiatives router and would otherwise ride in on
     # its tag, but they name who asked to be let in and quote their note — a
@@ -270,8 +262,8 @@ async def test_the_tool_writes_stop_short_of_these():
     names = [t.name.lower() for t in await build_mcp_server(app).list_tools()]
     writes = {n for n in names if n.startswith(_WRITE_PREFIXES)}
 
-    # Nothing that removes or empties: delete, trash, archive, reset a counter
-    # or a queue, discard the done column.
+    # Nothing that removes or empties: delete, trash, archive, reset a counter,
+    # discard the done column.
     assert not [w for w in writes if w.startswith(("delete_", "archive_", "reset_"))]
     # Nothing that acts on a whole collection at once.
     assert not [
@@ -296,92 +288,6 @@ async def test_the_tool_writes_stop_short_of_these():
     # So are its task types; a task is given one by reading them.
     assert "list_task_types" in names
     assert not [w for w in writes if "task_type" in w]
-
-
-def test_trim_leaves_out_what_a_caller_never_acts_on():
-    payload = {
-        "title": "t",
-        "due_date": None,
-        "tags": [],
-        "can": {},
-        "archived": False,
-        "comment_count": 0,
-        "guild": {"id": 3, "name": "g", "avatar_base64": "AAAA"},
-        "assignees": [
-            {"id": 1, "avatar_url": "https://example.com/a.png", "avatar_base64": None},
-        ],
-        "count_base64_ish": "kept",  # only an exact suffix match is left out
-        "color": "#2563eb",
-        "icon": "circle",
-        "position": 2.5,
-    }
-    trimmed = _trim(payload)
-
-    assert trimmed == {
-        "title": "t",
-        # A false and a zero are answers, not absences.
-        "archived": False,
-        "comment_count": 0,
-        "guild": {"id": 3, "name": "g"},
-        "assignees": [{"id": 1}],
-        "count_base64_ish": "kept",
-        # The write tools set these, so they are kept.
-        "color": "#2563eb",
-        "icon": "circle",
-        "position": 2.5,
-    }
-    # Input is not mutated.
-    assert payload["guild"]["avatar_base64"] == "AAAA"
-    assert payload["due_date"] is None
-
-
-def test_trim_shows_a_property_s_options_once_per_result():
-    options = [{"value": "bug", "label": "Bug", "color": "#DB0000"}]
-    row = {"property_id": 2, "type": "multi_select", "options": options}
-    other = {"property_id": 5, "type": "select", "options": options}
-    payload = {
-        "items": [
-            {"id": 1, "properties": [{**row, "value": ["bug"]}]},
-            {"id": 2, "properties": [{**row, "value": []}, {**other, "value": "bug"}]},
-        ]
-    }
-    first, second = _trim(payload, frozenset({"value"}))["items"]
-
-    assert first["properties"][0]["options"] == options
-    # Seen already: the second row carries the value without the definition.
-    assert "options" not in second["properties"][0]
-    # A different property's options are its own, shown the first time.
-    assert second["properties"][1]["options"] == options
-
-
-def test_trim_keeps_another_community_s_options_under_the_same_id():
-    # Property ids are numbered per community, and ``list_my_tasks`` lists
-    # tasks from all of them: the same id can be two different properties.
-    ours = [{"value": "bug", "label": "Bug"}]
-    theirs = [{"value": "low", "label": "Low"}]
-    payload = {
-        "items": [
-            {"community_id": 1, "properties": [{"property_id": 1, "options": ours}]},
-            {"community_id": 2, "properties": [{"property_id": 1, "options": theirs}]},
-            {"community_id": 2, "properties": [{"property_id": 1, "options": theirs}]},
-        ]
-    }
-    first, second, third = _trim(payload)["items"]
-
-    assert first["properties"][0]["options"] == ours
-    assert second["properties"][0]["options"] == theirs
-    # Once both have been shown, a repeat of either carries the value alone.
-    assert "options" not in third["properties"][0]
-
-
-def test_trim_passes_free_form_fields_through_verbatim():
-    content = {"type": "doc", "attrs": {"level": None}, "content": []}
-    payload = {"id": 1, "content": content, "description": None}
-
-    trimmed = _trim(payload, frozenset({"content"}))
-
-    # Inside a document a null can mean something, so it is left alone.
-    assert trimmed == {"id": 1, "content": content}
 
 
 def test_free_form_keys_are_read_off_the_response_schema():

@@ -5,11 +5,11 @@
   "name": "Facility maintenance",
   "publisher": "Initiative",
   "description": "The upkeep nobody remembers until the alarm goes off.",
-  "long_description": "A year of building upkeep, already on repeat: filters, alarms, extinguishers, gutters, the water heater and the roof. Each task comes back on its own schedule when you finish it, so the list never runs out and never needs rewriting.\n\nPick the day to start from when you install. Tasks record the area, the vendor you called and what it cost, which is the information you will want next year and will not have written down otherwise.",
+  "long_description": "A year of building upkeep, already on repeat: filters, alarms, extinguishers, gutters, the water heater and the roof. Each task comes back on its own schedule when you finish it, so the list never runs out and never needs rewriting.\n\nPick the day to start from when you install. Tasks record the area, the vendor you called and what it cost, which is the information you will want next year and will not have written down otherwise.\n\nThe jobs you do yourself are routines, the ones somebody comes in for are service visits, and anything that breaks in between is a repair, which is what a new task is unless you say otherwise.",
   "avatar_url": "/marketplace/core-facility-maintenance.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Each card shows its area and vendor, the table its cost, and a job's page keeps its details together.",
+  "version": "1.2.0",
+  "release_notes": "Routines, service visits and repairs are each their own type, with a page of their own. A new task is a repair, and asks what is wrong and who has been called. The project's fields are its own properties rather than the initiative's metadata. Cost is money, in US dollars.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -59,6 +59,45 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Repair",
+        "is_default": true,
+        "color": "#F87171",
+        "icon": "hammer",
+        "layout_preset": "fix",
+        "starting_values": {
+          "description": "**What is wrong, and where**\n\n\n**Who has been called**\n\n"
+        },
+        "position": 0
+      },
+      {
+        "name": "Routine",
+        "is_default": false,
+        "color": "#34D399",
+        "icon": "repeat",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=MONTHLY"
+        },
+        "position": 1
+      },
+      {
+        "name": "Service visit",
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "truck",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "checklist": [
+            "Book the visit",
+            "Clear access",
+            "File the report"
+          ]
+        },
+        "position": 2
+      }
+    ],
     "property_definitions": [
       {
         "name": "Area",
@@ -96,21 +135,25 @@
             "label": "Grounds",
             "color": "#10B981"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Vendor",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Cost",
-        "type": "number",
+        "type": "currency",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "currency": "USD",
+        "project": true
       }
     ],
     "tasks": [
@@ -130,9 +173,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Check fire extinguishers",
@@ -150,9 +195,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Test emergency lighting",
@@ -170,9 +217,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Restock first aid kits",
@@ -190,9 +239,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Replace heating and cooling filters",
@@ -210,9 +261,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "hvac"
+            "value_text": "hvac",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Pest control visit",
@@ -230,9 +283,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "building"
+            "value_text": "building",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Service visit"
       },
       {
         "title": "Service the heating and cooling system",
@@ -263,9 +318,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "hvac"
+            "value_text": "hvac",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Service visit"
       },
       {
         "title": "Clear the gutters and drains",
@@ -283,9 +340,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "grounds"
+            "value_text": "grounds",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Flush the water heater",
@@ -303,9 +362,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "plumbing"
+            "value_text": "plumbing",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Annual extinguisher service",
@@ -336,9 +397,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Service visit"
       },
       {
         "title": "Inspect the roof",
@@ -356,9 +419,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "building"
+            "value_text": "building",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       },
       {
         "title": "Test the electrical safety switches",
@@ -376,9 +441,11 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "electrical"
+            "value_text": "electrical",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Routine"
       }
     ],
     "layouts": [
@@ -395,10 +462,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -502,6 +585,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -537,6 +623,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -562,14 +651,27 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
               "type": "section",
               "props": {
-                "title": "Job"
+                "title": "Repair"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -599,12 +701,6 @@
                 {
                   "type": "field",
                   "props": {
-                    "field": "priority"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
                     "field": "assignees"
                   }
                 },
@@ -614,7 +710,151 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Routine"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Visit"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {

@@ -1,5 +1,4 @@
 {
-  "title": "Papelera",
   "description": "Los elementos aquí se eliminarán permanentemente después del período de retención de la comunidad. Puedes restaurarlos en cualquier momento antes de eso.",
   "empty": "La papelera está vacía.",
   "columnType": "Tipo",
@@ -25,17 +24,15 @@
     "comment": "Comentario",
     "initiative": "Iniciativa",
     "tag": "Etiqueta",
-    "queue": "Cola",
-    "queue_item": "Elemento de cola",
     "calendar": "Calendario",
     "calendar_event": "Evento de calendario",
     "counter_group": "Grupo de contadores",
     "counter": "Contador",
     "dashboard": "Panel",
     "post": "Publicación",
-    "gallery": "Galería",
-    "gallery_image": "Imagen",
     "wiki": "Wiki",
-    "wiki_page": "Página"
+    "wiki_page": "Página",
+    "contact": "Contacto",
+    "collection": "Colección"
   }
 }

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Presence } from "@/api/generated/initiativeAPI.schemas";
 import { PRESENCE_COLOR, presenceLabelKey } from "@/lib/presence";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface PresenceDotProps {
   presence: Presence;

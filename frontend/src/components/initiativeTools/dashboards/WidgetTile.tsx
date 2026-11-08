@@ -11,12 +11,12 @@ import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import type { WidgetConfig, WidgetData } from "@/lib/widgets/dataShapes";
 import { WidgetErrorCode } from "@/lib/widgets/errors";
 import { builtinWidgetSource } from "@/lib/widgets/registry";
 import { renderWidget, type WidgetRenderOutcome } from "@/lib/widgets/runtime/host";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 import { SceneRenderer } from "./scene/SceneRenderer";
 import { SceneTableView } from "./scene/SceneTableView";

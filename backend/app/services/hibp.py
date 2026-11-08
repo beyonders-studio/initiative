@@ -20,7 +20,6 @@ import logging
 
 import httpx
 
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +38,11 @@ _TIMEOUT = httpx.Timeout(2.0)
 async def is_password_breached(password: str) -> bool:
     """Return ``True`` iff the password's SHA-1 appears in the HIBP corpus.
 
-    Returns ``False`` when the HIBP check is disabled, on any network
-    or parse error, or when the hash isn't found. The empty string is
-    treated as not breached (caller already enforces a length floor).
+    Returns ``False`` on any network or parse error, or when the hash isn't
+    found. The empty string is treated as not breached (caller already
+    enforces a length floor). Whether to ask at all is the deployment's rule
+    ``breached_password_check_enabled``, which ``password_policy`` reads.
     """
-    if not settings.HIBP_CHECK_ENABLED:
-        return False
     if not password:
         return False
 

@@ -1,5 +1,6 @@
-"""Migration 20261021_0534 keeps every existing project showing what it showed
-once a project ships showing its board alone, and leaves My Tasks a table.
+"""Migration 20261021_0534 leaves every existing project's layouts as they were,
+as a project ships showing every list, takes the Gantt away on the way down,
+and leaves My Tasks a table.
 
 Loaded by path and run on a guild the test builds, as
 ``groupings_migration_test`` runs its revision: rows as the last release wrote
@@ -17,11 +18,10 @@ from app.db.tool_layouts_migration_test import _load
 from app.testing import create_guild, create_initiative, create_project, create_user
 
 _PRESETS = {"presets": [{"slug": "mine", "filters": {"assignees": ["me"]}}]}
-_SHOWN = {"hidden": False}
 _MY_TASKS = {"layout": "calendar", "mode": "month", "parts": {"list": {"grouping": []}}}
 
 
-async def test_existing_projects_keep_what_they_show_and_come_back(session) -> None:
+async def test_existing_projects_keep_their_layouts_and_come_back(session) -> None:
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     schema = f"guild_{guild.id}"
@@ -84,22 +84,11 @@ async def test_existing_projects_keep_what_they_show_and_come_back(session) -> N
         return found
 
     await session.run_sync(run(True))
-    table = {"kind": "table"}
-    assert await stored() == {
-        saved: {
-            "calendar": {**_PRESETS, **_SHOWN},
-            "table": _SHOWN,
-            "gantt": _SHOWN,
-            "default": table,
-        },
-        opens: {
-            "calendar": _SHOWN,
-            "table": _SHOWN,
-            "gantt": _SHOWN,
-            "default": {"kind": "calendar"},
-        },
-        plain: {"table": _SHOWN, "gantt": _SHOWN, "default": table},
+    before = {
+        saved: {"calendar": _PRESETS},
+        opens: {"default": {"kind": "calendar"}},
     }
+    assert await stored() == before
     my_tasks = (
         await sql(
             "SELECT value FROM public.user_view_preferences WHERE user_id = :u",
@@ -108,9 +97,20 @@ async def test_existing_projects_keep_what_they_show_and_come_back(session) -> N
     ).scalar()
     assert my_tasks == {"parts": {"list": {"grouping": []}}}
 
+    # Down again, a Gantt, what opens on one and what a list hid go.
+    for kind, definition in (
+        ("gantt", {}),
+        ("default", {"kind": "gantt"}),
+        ("table", {"hidden": True}),
+    ):
+        await sql(
+            f"INSERT INTO {schema}.tool_layouts (initiative_id, tool, tool_id, kind,"
+            " definition, created_at, updated_at) VALUES (:i, 'project', :p, :k,"
+            " CAST(:d AS jsonb), now(), now())",
+            i=initiative.id,
+            p=plain,
+            k=kind,
+            d=json.dumps(definition),
+        )
     await session.run_sync(run(False))
-    assert await stored() == {
-        saved: {"calendar": _PRESETS, "table": {}, "default": table},
-        opens: {"calendar": {}, "table": {}, "default": {"kind": "calendar"}},
-        plain: {"table": {}, "default": table},
-    }
+    assert await stored() == {**before, plain: {"table": {}}}

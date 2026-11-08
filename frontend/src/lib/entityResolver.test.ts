@@ -78,6 +78,15 @@ describe("resolveEntityPath", () => {
     );
   });
 
+  it("opens a collection in its initiative's Files", async () => {
+    server.use(
+      communityHttp.get("/collections/:id", () => HttpResponse.json({ id: 12, initiative_id: 1 }))
+    );
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "collection", 12)).resolves.toBe(
+      "/i/1/files/collections/12"
+    );
+  });
+
   // Deleted, or invisible to this reader — the caller lands on the community home
   // rather than a URL that 404s.
   it.each([
@@ -104,16 +113,6 @@ describe("resolveEntityPath", () => {
       communityHttp.get("/posts/:id", () => HttpResponse.json({ id: 6, initiative_id: 3 }))
     );
     await expect(resolveEntityPath(queryClient, COMMUNITY, "comment", 21)).resolves.toBe(expected);
-  });
-
-  it("opens a queue item's queue", async () => {
-    server.use(
-      communityHttp.get("/queue-items/:id", () => HttpResponse.json({ id: 5, queue_id: 2 })),
-      communityHttp.get("/queues/:id", () => HttpResponse.json({ id: 2, initiative_id: 7 }))
-    );
-    await expect(resolveEntityPath(queryClient, COMMUNITY, "queue-item", 5)).resolves.toBe(
-      "/i/7/queues/2"
-    );
   });
 
   it("returns null for a comment the reader can't read", async () => {
@@ -144,8 +143,7 @@ describe("resolveEntityPath", () => {
     expect(isEntityRefType("calendar-event")).toBe(true);
     expect(isEntityRefType("counter_group")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
-    // A picture has no read by its own id, so nothing links to one.
-    expect(isEntityRefType("gallery-image")).toBe(false);
+    expect(isEntityRefType("collection")).toBe(true);
   });
 });
 

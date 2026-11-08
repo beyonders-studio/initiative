@@ -29,19 +29,6 @@ import { toDateKey, toTimeSlot } from "@/components/initiativeTools/events/event
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   type EventPatch,
@@ -54,7 +41,6 @@ import {
 import { ItemDraftContext } from "@/hooks/useFieldSave";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import {
   allDayReference,
@@ -64,12 +50,21 @@ import {
   summarizeStored,
 } from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
-import { hour12Option } from "@/lib/timeFormat";
 import { eventRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { hour12Option } from "@/ui/lib/timeFormat";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
@@ -632,6 +627,16 @@ export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, Eve
     rsvp: (_node, event) => <MyAnswer event={event} />,
   },
   addingParts: ["dates"],
+  filled: filledBy<CalendarEventRead, EventPatch>(
+    {
+      description: (event, sent) => hasText(sentOr(sent, "description", event.description)),
+      location: (event, sent) => hasText(sentOr(sent, "location", event.location)),
+      recurrence: (event, sent) => sentOr(sent, "recurrence", event.recurrence) != null,
+      attendees: (event, sent) => hasAny(sentOr(sent, "attendee_ids", event.attendees)),
+      tags: (event, sent) => hasAny(sentOr(sent, "tag_ids", event.tags)),
+    },
+    (event) => event.properties
+  ),
   home: (event, context) => ({
     saves: eventSaves(context.occurrence),
     readOnly: context.readOnly,
@@ -679,5 +684,4 @@ export const blankEvent = (
   overridden_fields: [],
   skipped_starts: [],
   extra_starts: [],
-  plugin_values: [],
 });

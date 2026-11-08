@@ -10,18 +10,12 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CounterView } from "@/components/initiativeTools/counters/views/CounterView";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
 import { type ItemFieldSave, useItemFieldSave } from "@/hooks/useFieldSave";
 import { isAtMax, isAtMin } from "@/lib/counter-math";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { type COUNTER_FIELDS, COUNTER_LAYOUT, counterFields } from "./counters";
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
@@ -269,7 +263,6 @@ export const blankCounter = (groupId: number, color: string): CounterRead => ({
   view_mode: CounterViewMode.number,
   position: "0",
   properties: [],
-  plugin_values: [],
   created_at: "",
   updated_at: "",
 });

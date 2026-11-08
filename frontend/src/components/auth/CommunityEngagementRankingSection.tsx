@@ -9,16 +9,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useCommunityAuthSettings,
   useUpdateCommunityAuthSettings,
 } from "@/hooks/useCommunityAuthPolicy";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 export const CommunityEngagementRankingSection = ({ communityId }: { communityId: number }) => {
   const { t } = useTranslation("settings");
@@ -30,6 +30,8 @@ export const CommunityEngagementRankingSection = ({ communityId }: { communityId
   if (!saved) return null;
 
   const allowed = saved.engagement_ranking_allowed_by_platform;
+  // Set for this community by whoever runs the server.
+  const fixed = saved.set_by_deployment.includes("allow_engagement_ranking");
   const change = (next: boolean) => {
     setError(null);
     update.mutate(
@@ -54,16 +56,18 @@ export const CommunityEngagementRankingSection = ({ communityId }: { communityId
               {t("communityEngagementRanking.label")}
             </Label>
             <p className="text-muted-foreground text-sm">
-              {allowed
-                ? t("communityEngagementRanking.help")
-                : t("communityEngagementRanking.platformHelp")}
+              {!allowed
+                ? t("communityEngagementRanking.platformHelp")
+                : fixed
+                  ? t("communityAuth.setByDeployment")
+                  : t("communityEngagementRanking.help")}
             </p>
           </div>
           <Switch
             id="community-engagement-ranking"
             checked={saved.allow_engagement_ranking && allowed}
             onCheckedChange={change}
-            disabled={update.isPending || !allowed}
+            disabled={update.isPending || !allowed || fixed}
           />
         </div>
         {error && (

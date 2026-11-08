@@ -120,6 +120,10 @@ How the app reads to you. Each choice saves as you make it — no Save button.
 - **Week starts on** — which day calendars and date pickers lead with.
 - **Time format** — whether a clock reads `1:30 PM` or `13:30`, everywhere one appears: calendars and their hour gutters, event times, due dates, message timestamps. **Browser default** takes its cue from your browser's language. Your phone or laptop keeps its own 12/24-hour setting to itself, so when the app and the clock on your wall disagree, this is the place to settle it.
 
+**When you add a task**
+
+- **Read details from the title** — write "friday at 3pm", "every week", "!high", "#tag" or "@name" into a new task's title to fill in its due date, repeat, priority, tags and assignees. On unless you switch it off. See [Typing the details into the title](../guides/projects-and-tasks.md#typing-the-details-into-the-title).
+
 **When you finish a task**
 
 - **Task completion feedback** — a bit of fun when you finish something: **Confetti**, **+1 Heart**, **Natural 20**, **Gold coins**, **Random**, or **None**.

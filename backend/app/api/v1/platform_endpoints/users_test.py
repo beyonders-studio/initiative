@@ -22,11 +22,11 @@ from app.models.platform.user import Presence, User, UserStatus
 from app.models.platform.user_decoration import UserDecoration
 from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_passkey import UserPasskey
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.schemas.platform.user import STATUS_TEXT_MAX_LENGTH
 from app.services.marketplace import catalog as marketplace_catalog
 from app.services.marketplace.builtin import load_builtin_manifests
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import profile_decorations as profile_decorations_service
 from app.services.content_sockets import sockets as content_sockets
 from app.testing.sockets import (
@@ -155,6 +155,7 @@ async def test_every_mutable_channel_can_be_switched_off(client, acting_user):
         for channel in row["mutable_channels"]
     ]
     assert changes
+    defaults = {row["category"]: row["defaults"] for row in registry}
 
     response = await client.put(
         "/api/v1/me/notification-preferences",
@@ -167,7 +168,12 @@ async def test_every_mutable_channel_can_be_switched_off(client, acting_user):
     missing = [
         (change["category"], change["channel"])
         for change in changes
-        if settings.get(change["category"], {}).get(change["channel"]) is not False
+        # What the account now has: what it stored, or the default where it
+        # stored nothing, as a channel that starts off does.
+        if settings.get(change["category"], {}).get(
+            change["channel"], defaults[change["category"]][change["channel"]]
+        )
+        is not False
     ]
     assert missing == []
 
@@ -273,19 +279,22 @@ async def test_quiet_hours_round_trip(client, acting_user):
 
 
 async def _queue_assignment_item(session: AsyncSession, user, guild) -> None:
-    """Put one pending digest item in ``guild``'s schema for ``user``."""
+    """Put one pending batched line in ``guild``'s schema for ``user``."""
     initiative = await create_initiative(session, guild, user, name="Queue")
     project = await create_project(session, initiative, user, name="Queue Project")
     task = await create_task(session, project, title="Queued")
     await route_as(session, user_id=user.id, guild_id=guild.id)
     session.add(
-        TaskAssignmentDigestItem(
+        BatchedNotice(
             user_id=user.id,
-            task_id=task.id,
+            kind=BatchedNoticeKind.task_assignment,
+            actor_name="Assigner",
+            target_type="task",
+            target_id=task.id,
+            target_path=f"/go/task/{task.id}",
+            title="Queued",
             project_id=project.id,
-            task_title="Queued",
             project_name=project.name,
-            assigned_by_name="Assigner",
         )
     )
     await session.commit()
@@ -296,9 +305,7 @@ async def _pending_assignment_items(session: AsyncSession, user, guild) -> int:
     await route_as(session, user_id=user.id, guild_id=guild.id)
     rows = (
         await session.exec(
-            select(TaskAssignmentDigestItem).where(
-                TaskAssignmentDigestItem.processed_at.is_(None)
-            )
+            select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
         )
     ).all()
     return len(rows)
@@ -532,9 +539,9 @@ async def test_roster_lists_everyone_where_direct_messages_are_off(
     """With no direct messages on the deployment there is no policy to keep."""
     reader = await acting_user(guild_role=CommunityRole.member)
     other = await acting_user(guild=reader.guild)
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False, direct_messages_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "direct_messages_enabled", False)
+    await session.commit()
 
     response = await client.get(reader.g("/users/roster"), headers=reader.headers)
 
@@ -733,9 +740,9 @@ async def test_delete_user_as_admin(client, session, acting_user, monkeypatch):
         assert response.status_code == 204
         session.expire_all()
         assert await session.get(GuildMembership, (guild_id, member_id)) is None
-        # Billing reads the community's new count from its change log.
+        # Billing is told the count changed; it is counted when served.
         assert await change_rows(session, guild_id, kinds=("community.members",)) == [
-            ("community.members", {"members": 1, "guests": 0})
+            ("community.members", {})
         ]
     assert signalled == [(member_id, "membership")]
     assert swept == [member_id]
@@ -930,6 +937,31 @@ async def test_task_completion_audio_and_haptic_round_trip(client, acting_user):
         result = response.json()
         assert result["task_completion_audio_feedback"] is value
         assert result["task_completion_haptic_feedback"] is value
+
+
+async def test_smart_task_titles_round_trip(client, acting_user):
+    """Reading a new task's title is on until the account turns it off."""
+    a = await acting_user()
+
+    me = await client.get("/api/v1/me", headers=a.headers)
+    assert me.status_code == 200
+    assert me.json()["smart_task_titles"] is True
+
+    for value in (False, True):
+        response = await client.patch(
+            "/api/v1/me", headers=a.headers, json={"smart_task_titles": value}
+        )
+        assert response.status_code == 200, value
+        assert response.json()["smart_task_titles"] is value
+
+    # Left out of a write, it stays as it was.
+    await client.patch(
+        "/api/v1/me", headers=a.headers, json={"smart_task_titles": False}
+    )
+    response = await client.patch(
+        "/api/v1/me", headers=a.headers, json={"locale": "en"}
+    )
+    assert response.json()["smart_task_titles"] is False
 
 
 def _parse_csv(body: bytes) -> tuple[list[str], list[list[str]]]:

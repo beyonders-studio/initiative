@@ -5,24 +5,13 @@ import { useTranslation } from "react-i18next";
 import type {
   AccessGrantRead,
   BreakGlassCreate,
+  CommunityNotice,
   GrantCaseRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusBadge";
 import { CasePicker } from "@/components/platform/CasePicker";
 import { CommunityPicker, type PickedCommunity } from "@/components/platform/CommunityPicker";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   flattenGrants,
   useAccessGrantLimits,
@@ -43,10 +32,17 @@ import type { AccessGrantsForm, AccessGrantsSearch } from "@/lib/accessGrantsSea
 import { getErrorMessage } from "@/lib/errorMessage";
 import { minutesLeft } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
-import { assertForBreakGlass, describePasskeyPromptError } from "@/lib/passkeys";
+import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { LoadMore } from "@/ui/load-more";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 // Always surface the community id alongside the name so approvers can
 // disambiguate similarly-named communities (and fall back cleanly when the name
@@ -112,6 +108,17 @@ const useCaseChoice = (form: AccessGrantsForm) => {
     setChosenId(taskId);
     setFound(picked);
   };
+  const listed =
+    caseTaskId == null
+      ? undefined
+      : (items.find((item) => item.task_id === caseTaskId) ??
+        (found?.task_id === caseTaskId ? found : undefined));
+  // A case the page was opened for that is past the first page is looked up
+  // by its number, so the form knows what it allows.
+  const lookedUp = useGrantCases({
+    enabled: caseTaskId != null && cases.isSuccess && listed === undefined,
+    search: `#${caseTaskId}`,
+  });
   return {
     items,
     loading: cases.isLoading,
@@ -119,11 +126,7 @@ const useCaseChoice = (form: AccessGrantsForm) => {
     required: cases.data?.required ?? false,
     caseTaskId,
     setCaseTaskId,
-    chosen:
-      caseTaskId == null
-        ? undefined
-        : (items.find((item) => item.task_id === caseTaskId) ??
-          (found?.task_id === caseTaskId ? found : undefined)),
+    chosen: listed ?? lookedUp.data?.items.find((item) => item.task_id === caseTaskId),
   };
 };
 
@@ -185,7 +188,57 @@ const CaseField = ({
   );
 };
 
-/** The case a grant was asked for, by its number. */
+/**
+ * Whether the community is told of the access, as the chosen case allows: a
+ * support case always tells it when access starts, and a security or
+ * moderation case leaves it to the asker. The server settles it; this only
+ * offers what it will take.
+ */
+const CommunityNoticeField = ({
+  id,
+  chosen,
+  value,
+  onChange,
+}: {
+  id: string;
+  chosen: GrantCaseRead | undefined;
+  value: CommunityNotice;
+  onChange: (value: CommunityNotice) => void;
+}) => {
+  const { t } = useTranslation("settings");
+  if (chosen?.community_notice === "always") {
+    return (
+      <p className="col-span-full text-muted-foreground text-xs">
+        {t("accessGrants.notice.always")}
+      </p>
+    );
+  }
+  if (chosen?.community_notice !== "optional") return null;
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={id}>{t("accessGrants.notice.label")}</Label>
+      <Select value={value} onValueChange={(next) => onChange(next as CommunityNotice)}>
+        <SelectTrigger id={id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">{t("accessGrants.notice.none")}</SelectItem>
+          <SelectItem value="when_granted">{t("accessGrants.notice.when_granted")}</SelectItem>
+          <SelectItem value="when_ended">{t("accessGrants.notice.when_ended")}</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-muted-foreground text-xs">{t("accessGrants.notice.help")}</p>
+    </div>
+  );
+};
+
+/** What a form sends for the community's notice: a choice only where the
+ *  chosen case offers one. */
+const noticeChoice = (chosen: GrantCaseRead | undefined, notice: CommunityNotice) =>
+  chosen?.community_notice === "optional" && notice !== "none" ? { community_notice: notice } : {};
+
+/** The case a grant was asked for, by its number, and when its community is
+ *  told of it. */
 const GrantCaseMark = ({ grant }: { grant: AccessGrantRead }) => {
   const { t } = useTranslation("settings");
   if (grant.case_task_id == null) return null;
@@ -194,6 +247,9 @@ const GrantCaseMark = ({ grant }: { grant: AccessGrantRead }) => {
   return (
     <span className="shrink-0 text-muted-foreground text-xs">
       {t("accessGrants.caseMark", { id: grant.case_task_id })}
+      {grant.community_notice !== "none"
+        ? ` · ${t(`accessGrants.notice.mark.${grant.community_notice}`)}`
+        : null}
     </span>
   );
 };
@@ -211,32 +267,6 @@ export const SettingsAccessGrantsPage = () => {
       {canApprove && <ApprovalQueue />}
       {canBreakGlass && <BreakGlassSection />}
       {canRequest && <RequestSection />}
-    </div>
-  );
-};
-
-const LoadMore = ({
-  hasNextPage,
-  isFetchingNextPage,
-  onLoadMore,
-}: {
-  hasNextPage: boolean;
-  isFetchingNextPage: boolean;
-  onLoadMore: () => void;
-}) => {
-  const { t } = useTranslation(["settings", "common"]);
-  if (!hasNextPage) return null;
-  return (
-    <div className="flex justify-center pt-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onLoadMore}
-        disabled={isFetchingNextPage}
-      >
-        {isFetchingNextPage ? t("common:loading") : t("accessGrants.loadMore")}
-      </Button>
     </div>
   );
 };
@@ -271,6 +301,7 @@ const BreakGlassSection = () => {
   // Null until chosen: the offered windows arrive with the requirements below.
   const [chosenDuration, setDuration] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [notice, setNotice] = useState<CommunityNotice>("none");
   const [code, setCode] = useState("");
 
   // What this request will be asked for. Breaking glass carries the account's
@@ -303,6 +334,7 @@ const BreakGlassSection = () => {
       setCommunity(null);
       caseChoice.setCaseTaskId(null);
       setReason("");
+      setNotice("none");
       setCode("");
       setFactorRefused(false);
       setPresenting(false);
@@ -332,6 +364,7 @@ const BreakGlassSection = () => {
       reason: reason.trim(),
       requested_duration_minutes: Number.parseInt(duration, 10),
       ...(caseChoice.caseTaskId == null ? {} : { case_task_id: caseChoice.caseTaskId }),
+      ...noticeChoice(caseChoice.chosen, notice),
       ...answer,
     });
   };
@@ -375,6 +408,12 @@ const BreakGlassSection = () => {
             />
           </div>
           <CaseField choice={caseChoice} community={community} optional />
+          <CommunityNoticeField
+            id="bg-notice"
+            chosen={caseChoice.chosen}
+            value={notice}
+            onChange={setNotice}
+          />
           <div className="space-y-1">
             <Label htmlFor="bg-duration">{t("accessGrants.durationLabel")}</Label>
             <Select value={duration} onValueChange={setDuration}>
@@ -429,7 +468,7 @@ const BreakGlassSection = () => {
             >
               {breakGlass.isPending ? t("common:submitting") : t("accessGrants.breakGlass.submit")}
             </Button>
-            {needsCode && hasKey && (
+            {needsCode && hasKey && passkeysRunHere() && (
               <Button
                 type="button"
                 variant="outline"
@@ -495,6 +534,7 @@ const RequestSection = () => {
   const [chosenDuration, setDuration] = useState<string | null>(null);
   const duration = chosenDuration ?? defaultDuration;
   const [reason, setReason] = useState("");
+  const [notice, setNotice] = useState<CommunityNotice>("none");
 
   const createRequest = useCreateAccessRequest({
     onSuccess: () => {
@@ -502,6 +542,7 @@ const RequestSection = () => {
       setCommunity(null);
       caseChoice.setCaseTaskId(null);
       setReason("");
+      setNotice("none");
       setDuration(null);
     },
     onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.requestError")),
@@ -527,6 +568,7 @@ const RequestSection = () => {
       reason: reason.trim(),
       requested_duration_minutes: Number.parseInt(duration, 10),
       ...(caseChoice.caseTaskId == null ? {} : { case_task_id: caseChoice.caseTaskId }),
+      ...noticeChoice(caseChoice.chosen, notice),
     });
   };
 
@@ -547,6 +589,12 @@ const RequestSection = () => {
             />
           </div>
           <CaseField choice={caseChoice} community={community} optional={false} />
+          <CommunityNoticeField
+            id="ag-notice"
+            chosen={caseChoice.chosen}
+            value={notice}
+            onChange={setNotice}
+          />
           <div className="space-y-1">
             <Label htmlFor="ag-level">{t("accessGrants.purposeContent")}</Label>
             <Select value={level} onValueChange={setLevel}>
@@ -668,9 +716,10 @@ const RequestSection = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={myGrants.hasNextPage}
-            isFetchingNextPage={myGrants.isFetchingNextPage}
-            onLoadMore={() => myGrants.fetchNextPage()}
+            className="pt-1"
+            hasMore={myGrants.hasNextPage}
+            loading={myGrants.isFetchingNextPage}
+            onLoadMore={myGrants.fetchNextPage}
           />
         </div>
       </CardContent>
@@ -749,9 +798,10 @@ const ApprovalQueue = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={pending.hasNextPage}
-            isFetchingNextPage={pending.isFetchingNextPage}
-            onLoadMore={() => pending.fetchNextPage()}
+            className="pt-1"
+            hasMore={pending.hasNextPage}
+            loading={pending.isFetchingNextPage}
+            onLoadMore={pending.fetchNextPage}
           />
         </div>
 
@@ -795,9 +845,10 @@ const ApprovalQueue = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={active.hasNextPage}
-            isFetchingNextPage={active.isFetchingNextPage}
-            onLoadMore={() => active.fetchNextPage()}
+            className="pt-1"
+            hasMore={active.hasNextPage}
+            loading={active.isFetchingNextPage}
+            onLoadMore={active.fetchNextPage}
           />
         </div>
       </CardContent>

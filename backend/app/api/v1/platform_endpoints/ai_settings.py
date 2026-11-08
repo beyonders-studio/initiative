@@ -21,6 +21,7 @@ from app.schemas.ai_settings import (
     PlatformAIModeUpdate,
 )
 from app.services import ai_settings as ai_settings_service
+from app.services.platform import auth_posture
 
 platform_router = APIRouter()
 
@@ -42,9 +43,11 @@ async def update_platform_ai_mode(
     owner: ConfigManageDep,
 ) -> PlatformAIModeResponse:
     """Set the global AI config mode (``config.manage`` — owner only)."""
-    return await ai_settings_service.update_platform_ai_mode(
-        session, payload, actor_user_id=owner.id
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner),
+        {"ai_config_mode": payload.mode},
     )
+    return await ai_settings_service.get_platform_ai_mode(session)
 
 
 # --- Operator connections (platform mode) ------------------------------------

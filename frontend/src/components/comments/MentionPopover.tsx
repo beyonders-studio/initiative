@@ -4,24 +4,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SearchSuggestion, UserSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
-import { useInitiativeMemberSearch } from "@/hooks/useUsers";
+import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
 import { getInitials } from "@/lib/initials";
 import type { ActiveMention } from "@/lib/mentions";
 import { MENTIONABLE_TYPES } from "@/lib/mentions";
 import { linkableToolTypes } from "@/lib/references";
 import { hitIcon } from "@/lib/searchResults";
 import { getAvatarSrc, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { cn } from "@/ui/lib/utils";
 
 /** How many rows a mention picker offers. */
 const MENTION_LIMIT = 8;
 
 /** What choosing a row means: a person, or one of the things in this community. */
 export type MentionChoice =
-  | { user: true; id: number; label: string }
+  | { user: true; id: number; label: string; member: UserSummary }
   | { user: false; suggestion: SearchSuggestion }
   /** Nothing matched and `[[ ]]` offered to make it. */
   | { user: false; create: string };
@@ -33,6 +33,8 @@ interface MentionPopoverProps {
   /** The thing this comment is on, as a reference (`file:12`). Never
    *  offered: a remark about something does not point back at it. */
   subject?: string | null;
+  /** Who `@` offers: the initiative's members unless this says otherwise. */
+  members?: MemberSearchScope;
   /** Pixel anchor (relative to the field) so the popover sits under the word
    *  being typed. Falls back to below the whole field when absent. */
   anchor?: { top: number; left: number } | null;
@@ -65,7 +67,7 @@ const memberRow = (member: UserSummary): Row => {
         <AvatarFallback userId={member.id}>{getInitials(label)}</AvatarFallback>
       </Avatar>
     ),
-    choose: { user: true, id: member.id, label },
+    choose: { user: true, id: member.id, label, member },
   };
 };
 
@@ -99,6 +101,7 @@ export const MentionPopover = ({
   active,
   initiativeId,
   subject,
+  members: memberScope,
   anchor,
   onSelect,
   onClose,
@@ -113,16 +116,19 @@ export const MentionPopover = ({
   // A community-level surface — a community calendar, say — belongs to no
   // initiative, so there is nothing initiative-scoped to offer.
   const inInitiative = initiativeId > 0;
-  const members = useInitiativeMemberSearch(initiativeId, {
+  const members = useMemberSearch(memberScope ?? { type: "initiative", initiativeId }, {
     search: active.query,
     pageSize: MENTION_LIMIT,
-    enabled: active.user && inInitiative,
+    enabled: active.user && (memberScope !== undefined || inInitiative),
   });
   // `[[ ]]` reaches the tools this initiative has; `#` reaches everything.
+  // Held across renders, so the rows below are rebuilt only when what they
+  // come from changes, and moving through them doesn't start them over.
   const { data: initiative } = useInitiative(inInitiative ? initiativeId : null);
-  const types = active.canCreate
-    ? linkableToolTypes(initiative)
-    : (active.types ?? MENTIONABLE_TYPES);
+  const types = useMemo(
+    () => (active.canCreate ? linkableToolTypes(initiative) : (active.types ?? MENTIONABLE_TYPES)),
+    [active.canCreate, active.types, initiative]
+  );
   // A bare trigger names nothing yet, so the list opens on what was most
   // recently worked on instead of on nothing at all.
   const suggestions = useCommunityPickerSuggestions(active.query, {
@@ -153,11 +159,16 @@ export const MentionPopover = ({
     return [...found, createRow(active.query.trim(), t)];
   }, [active.user, active.canCreate, active.query, wanted, members.data, suggestions.items, t]);
 
-  const isLoading = inInitiative && (active.user ? members.isLoading : suggestions.isLoading);
+  const isLoading = active.user
+    ? (memberScope !== undefined || inInitiative) && members.isLoading
+    : inInitiative && suggestions.isLoading;
 
-  useEffect(() => {
+  // A new list starts at its top.
+  const [prevRows, setPrevRows] = useState(rows);
+  if (prevRows !== rows) {
+    setPrevRows(rows);
     setSelectedIndex(0);
-  }, [rows]);
+  }
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

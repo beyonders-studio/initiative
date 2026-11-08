@@ -1,8 +1,15 @@
 import { useNavigate } from "@tanstack/react-router";
+import { lazy, Suspense, useState } from "react";
 
 import { type AgeChallengeDetail, AUTH_AGE_REQUIRED_EVENT } from "@/api/client";
-import { AgeConfirmationDialog } from "@/components/communities/AgeConfirmationDialog";
 import { useAuthChallenge } from "@/hooks/useAuthChallenge";
+
+// Loaded the first time the question is put, not with every page.
+const AgeConfirmationDialog = lazy(() =>
+  import("@/components/communities/AgeConfirmationDialog").then((m) => ({
+    default: m.AgeConfirmationDialog,
+  }))
+);
 
 /**
  * The age question, put by a listed community at its own door.
@@ -35,16 +42,23 @@ export const AgeGateDialog = () => {
     void navigate({ to: "/" });
   };
 
+  // Mounted from the first time it opens, so it closes as it opened.
+  const [asked, setAsked] = useState(false);
+  if (open && !asked) setAsked(true);
+  if (!asked) return null;
+
   return (
-    <AgeConfirmationDialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          leave();
-        }
-      }}
-      onConfirmed={leave}
-      answerStands={challenge?.answerStands}
-    />
+    <Suspense fallback={null}>
+      <AgeConfirmationDialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) {
+            leave();
+          }
+        }}
+        onConfirmed={leave}
+        answerStands={challenge?.answerStands}
+      />
+    </Suspense>
   );
 };

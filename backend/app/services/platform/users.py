@@ -12,7 +12,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.errors import CodedError
 from app.core.messages import AuthMessages, GuildMessages, UserMessages
 from app.core.audit_events import AuditEventType
-from app.core.capabilities import Capability, roles_with_capability
+from app.core.capabilities import (
+    Capability,
+    roles_with_capability,
+    standing_capabilities,
+)
 from app.core.config import settings
 from app.core import usernames
 from app.core.security import has_usable_password
@@ -30,7 +34,6 @@ from app.models.platform.user import (
     UserRole,
     UserStatus,
 )
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.user_birthdate import UserBirthdate
 from app.models.platform.user_notification_prefs import UserNotificationPrefs
 from app.models.platform.user_profile_view import MemberProfile
@@ -44,14 +47,15 @@ from app.services.auth import sessions as session_service
 from app.services.auth import challenges as challenge_service
 from app.services.auth import totp as totp_service
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import identity_refs
+from app.services.platform import identity_refs, rules
+from app.services.platform.rules import Values
 from app.services.platform.retention import ACCOUNT_DELETION
 from app.services.platform import user_avatars as user_avatars_service
 from app.models.tenant.resource_grant import ResourceGrant
+from app.models.tenant.share_request import ShareRequest
 from app.models.tenant.task import TaskAssignee
 from app.models.platform.notification import Notification
 from app.models.tenant.personal_item import PersonalItem
-from app.models.tenant.reaction_digest import ReactionDigestItem
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.models.platform.sign_in_lock import SignInLock
@@ -59,8 +63,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 from app.models.platform.api_key import UserApiKey
 from app.models.platform.account_change_hold import AccountChangeHold
 from app.models.platform.user_token import UserToken
+from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.db.request_context import SystemGuild, SystemMaintenance
 
 _S = TypeVar("_S", bound=Select)
@@ -218,9 +222,14 @@ async def _erase_in_guild(
 
     ``guild_session`` is a system session routed into ``guild_id``.
     """
+    from app.core.relationships import PERSON, EndpointKind
+    from app.models.platform.identity_ref import IdentityEntity
     from app.models.tenant.calendar_event import CalendarEventAttendee
-    from app.models.tenant.property import PropertyValue
-    from app.models.tenant.queue import QueueItem
+    from app.models.tenant.custom_role import CustomRoleMember
+    from app.models.tenant.metadata import MetadataValue
+    from app.models.tenant.view_preference import ViewPreference
+    from app.models.tenant.webhook_ref import WebhookRef
+    from app.services.tenant import relationships as relationships_service
     from app.services.tenant.mention_parser import anonymize_user_mentions
 
     # Releases their owner grants (content is left unowned) and drops their
@@ -238,41 +247,50 @@ async def _erase_in_guild(
     await guild_session.exec(
         delete(PersonalItem).where(col(PersonalItem.user_id) == user_id)
     )
+    await guild_session.exec(
+        delete(ViewPreference).where(col(ViewPreference.user_id) == user_id)
+    )
+    await guild_session.exec(
+        delete(CustomRoleMember).where(col(CustomRoleMember.user_id) == user_id)
+    )
     # The ledger that stops an event reminder being sent twice: one row per
     # (event, person), of no use to anyone once the person is gone.
     await guild_session.exec(
         delete(EventReminderDispatch).where(EventReminderDispatch.user_id == user_id)
     )
+    # What each webhook subscription's receiver calls them, as
+    # identity_refs.forget_user drops every other party's name for them.
     await guild_session.exec(
-        delete(TaskAssignmentDigestItem).where(
-            TaskAssignmentDigestItem.user_id == user_id
+        delete(WebhookRef).where(
+            col(WebhookRef.entity_type) == IdentityEntity.user,
+            col(WebhookRef.entity_id) == user_id,
         )
     )
     await guild_session.exec(
-        update(TaskAssignmentDigestItem)
-        .where(TaskAssignmentDigestItem.assigned_by_id == user_id)
-        .values(assigned_by_id=None)
+        delete(BatchedNotice).where(col(BatchedNotice.user_id) == user_id)
     )
     await guild_session.exec(
-        delete(ReactionDigestItem).where(ReactionDigestItem.user_id == user_id)
+        update(BatchedNotice)
+        .where(col(BatchedNotice.actor_id) == user_id)
+        .values(actor_id=None)
     )
-    await guild_session.exec(
-        update(ReactionDigestItem)
-        .where(ReactionDigestItem.reactor_id == user_id)
-        .values(reactor_id=None)
-    )
-    # All per-user DAC grants (project, file, queue, counter group, calendar
-    # event) live in the polymorphic resource_grants table; one delete clears
+    # All per-user DAC grants (project, file, counter group, calendar event)
+    # live in the polymorphic resource_grants table; one delete clears
     # every resource type for this user in the schema.
     await guild_session.exec(
         delete(ResourceGrant).where(ResourceGrant.user_id == user_id)
     )
+    # What they asked for, and their name on what they answered.
+    await guild_session.exec(
+        delete(ShareRequest).where(col(ShareRequest.user_id) == user_id)
+    )
+    await guild_session.exec(
+        update(ShareRequest)
+        .where(col(ShareRequest.resolved_by) == user_id)
+        .values(resolved_by=None)
+    )
     await guild_session.exec(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id)
-    )
-    # Queue items: assigned-to is nullable, so just clear the pointer.
-    await guild_session.exec(
-        update(QueueItem).where(QueueItem.user_id == user_id).values(user_id=None)
     )
     await guild_session.exec(
         delete(CalendarEventAttendee).where(CalendarEventAttendee.user_id == user_id)
@@ -280,9 +298,13 @@ async def _erase_in_guild(
     # Person-valued properties: NULL the reference (a value belongs to the
     # initiative, not to the person it names).
     await guild_session.exec(
-        update(PropertyValue)
-        .where(PropertyValue.value_user_id == user_id)
+        update(MetadataValue)
+        .where(MetadataValue.value_user_id == user_id)
         .values(value_user_id=None)
+    )
+    # Every link with them on an end, from either side, tombstones included.
+    await relationships_service.purge_for_entities(
+        guild_session, EndpointKind(PERSON.value), [user_id]
     )
 
 
@@ -572,7 +594,7 @@ async def _erase_personal_rows(session: AsyncSession, *, user_id: int) -> None:
     A hard delete gets all of these from the ``users`` foreign key. Anonymizing
     keeps the row, so the cascade never fires and each one is deleted here.
     Rows that pair this account with somebody else go from both sides: a husk
-    on another person's contacts, ignore list or conversation is a trace of
+    on another person's connections, ignore list or conversation is a trace of
     the account just the same.
     """
     from app.models.platform.announcement import AnnouncementReadReceipt
@@ -1169,6 +1191,15 @@ async def to_self_read(session: AsyncSession, user: User) -> "UserRead":
         if copy is not None:
             payload.demo_community_id = copy.guild_id
             payload.demo_expires_at = copy.expires_at
+    payload.can_create_communities = (
+        user.status != UserStatus.suspended
+        and payload.demo_expires_at is None
+        and (
+            (await rules.platform_values(session))["community_creation_enabled"]
+            or Capability.COMMUNITIES_MANAGE
+            in standing_capabilities(user.role, user.status)
+        )
+    )
     return payload
 
 
@@ -1210,7 +1241,7 @@ async def to_operator_read(users: List[User]) -> List["OperatorUserRead"]:
     # Only asked when somebody on this page is actually waiting out a window,
     # which on an ordinary roster is nobody.
     deployment = (
-        await _app_settings()
+        await _deployment_rules()
         if any(u.status == UserStatus.deleted for u in users)
         else None
     )
@@ -1232,17 +1263,16 @@ async def to_operator_read(users: List[User]) -> List["OperatorUserRead"]:
     return out
 
 
-async def _app_settings() -> AppSetting:
-    """The deployment's settings, on its own session.
+async def _deployment_rules() -> Values:
+    """The deployment's rules, on their own session.
 
     Same reason as :func:`_reach`: this shape is built outside any particular
-    request's session, and the setting is one row read once for the whole page.
+    request's session, and the rules are read once for the whole page.
     """
     from app.db.session import SystemSessionLocal
-    from app.services.platform import app_settings as app_settings_service
 
     async with SystemSessionLocal() as system_session:
-        return await app_settings_service.get_app_settings(system_session)
+        return await rules.platform_values(system_session)
 
 
 async def to_operator_read_one(user: User) -> "OperatorUserRead":

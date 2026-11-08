@@ -21,13 +21,18 @@ See [Installation](installation.md#the-database-connection) for what it's used f
 
 ## Who can sign up
 
-| Variable | What it does | Default |
-|---|---|---|
-| `ENABLE_PUBLIC_REGISTRATION` | Allow people to register without an invite link. Set `false` for invite-only. | `true` |
-| `DISABLE_GUILD_CREATION` | Stop regular users from creating new communities (they must be invited to one). | `false` |
-| `GUILD_CREATION_DAILY_LIMIT` | How many communities one person can create in a day. Operators and owners have no limit. `0` turns the limit off. | `5` |
+Under **Settings → Platform → Community**, in **Who may join and create**:
 
-Between them, you can run anything from a wide-open public server to a locked-down, invite-only, one-organization deployment.
+| Setting | What it does | Starts as |
+|---|---|---|
+| **Let anyone sign up** | People make an account without an invite. Off, only invited people can. | On |
+| **Let anyone create a community** | Off, only the people who manage communities on this server can make one — and sign-up closes to invited people too. | On |
+| **Communities one account may create per day** | `0` means no limit. People who manage communities aren't counted. | 5 |
+
+Between them, you can run anything from a wide-open public server to a locked-down, invite-only, one-organization deployment. Nothing needs a restart.
+
+??? techspec "Pre-filling from environment variables"
+    The first time a server starts with these settings, `ENABLE_PUBLIC_REGISTRATION`, `DISABLE_GUILD_CREATION`, `GUILD_CREATION_DAILY_LIMIT`, `HIBP_CHECK_ENABLED` and `EXPORT_GUILD_COOLDOWN_HOURS` fill them in. After that the settings pages own them and the variables are ignored.
 
 ### The community directory
 
@@ -140,6 +145,10 @@ When a community's window ends, its plug-ins are asked to erase what they hold a
 
 A restored community reconnects its installed plug-ins itself. It authorised those connections in the first place, so it authorises them again.
 
+## How often a community can export everything
+
+A whole-community export reads every last thing the community holds, so each community waits 48 hours between them. Change it with **Hours between community exports**, under **Settings → Platform → Community**. `0` means no wait. The wait is counted from the community's last export, so changing it moves the next date for everyone already waiting.
+
 ## Running behind a reverse proxy
 
 For any real deployment you'll put Initiative behind a reverse proxy that handles HTTPS.
@@ -156,6 +165,8 @@ For any real deployment you'll put Initiative behind a reverse proxy that handle
 
     The one setup that needs more is a proxy on another machine that reaches Initiative over a public address. List it in `FORWARDED_ALLOW_IPS`; the log names the address to add when it sees one.
 
+**Let 50 MB through per request.** A file of any size arrives in pieces of up to 50 MB, and a picture put in a page arrives in one go. nginx stops at 1 MB unless told otherwise, so add `client_max_body_size 50m;` to the server block. Caddy and Traefik pass it as they are. Behind a tighter limit, files make do with smaller pieces and take a little longer; a picture over the limit doesn't arrive at all.
+
 ## The app association files
 
 A phone lets an app use a site's passkeys only when the site says, in a file at a fixed address, which apps may. Initiative serves both, built from the project's own app identities (they are the project's to vouch for, not something you configure):
@@ -167,7 +178,7 @@ A phone lets an app use a site's passkeys only when the site says, in a file at 
 
 They're served as JSON, at exactly those paths, with no redirect, and only when your address can carry a passkey at all (`https`, a host name rather than an IP address). Anything else under `/.well-known/` answers 404, never the app's page, because Apple and Google read an HTML page there as a broken file.
 
-**If you self-host**, there's nothing to set. Android checks the file on whatever server the app points at, so the Android app signs in with passkeys on yours by itself. An iPhone only reads the file for addresses built into the app (the hosted service's `initiativetasks.com` and `demo.initiativetasks.com`), so on your server the iPhone app sends people to the browser for passkeys, which works for every server.
+**If you self-host**, there's nothing to set. Android checks the file on whatever server the app points at, so the Android app signs in with passkeys on yours by itself. An iPhone only reads the file for addresses built into the app (the hosted service's `initiativetasks.com` and `demo.initiativetasks.com`), so on your server the iPhone app sends people to the browser for passkeys, which works for every server. The Windows app reads neither file and signs in with passkeys on any `https` address.
 
 If your proxy answers anything under `/.well-known/` itself, as some do for certificates, pass `/.well-known/assetlinks.json` through to Initiative. Without it the Android app sends people to the browser for passkeys instead.
 
@@ -210,6 +221,10 @@ The captcha switches on once all three are saved, and the section's badge says w
 
 ??? techspec "Pre-filling from environment variables"
     On a fresh install's **first boot**, `CAPTCHA_PROVIDER`, `CAPTCHA_SITE_KEY` and `CAPTCHA_SECRET_KEY` fill these settings in. After that the settings page owns them and the variables are ignored.
+
+## Checking passwords against known breaches
+
+A new password that has already turned up in a data breach is turned away. Only the first five characters of the password's hash leave the server; the password never does. The switch is **Check new passwords against known breaches**, under **Settings → Platform → Security**, and it's on to begin with. Turn it off on a server that can't reach the internet.
 
 ## AI assistant access (MCP)
 
@@ -304,7 +319,7 @@ Point `targets` at the app's own port, or at your proxy with `scheme: https` add
 | `initiative_http_requests_total` | Requests answered, by `method`, `route` and `status`. `route` is the pattern (`/api/v1/c/{community_id}/initiatives/`), so every community shares one line. |
 | `initiative_http_request_duration_seconds` | How long those took, as a histogram. |
 | `initiative_http_requests_in_progress` | Requests being answered right now. |
-| `initiative_websocket_connections` | Live connections: notifications, live editing, queues and counters. One open tab holds several. |
+| `initiative_websocket_connections` | Live connections: notifications, live editing and counters. One open tab holds several. |
 | `initiative_db_statement_duration_seconds` | How long database statements took, by `engine`. |
 | `initiative_db_slow_statements_total` | Statements that took longer than half a second. |
 | `initiative_db_pool_connections` | Database connections each engine holds, by `state`: `checked_out`, `idle`, `overflow`. |

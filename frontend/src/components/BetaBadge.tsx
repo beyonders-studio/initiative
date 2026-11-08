@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
-import { badgeVariants } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { badgeVariants } from "@/ui/badge";
+import { cn } from "@/ui/lib/utils";
 
 /** Whether a version is from before 1.0.0, which is what the app calls beta. */
 export const isBetaVersion = (version: string): boolean =>

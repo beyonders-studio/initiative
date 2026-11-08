@@ -36,6 +36,7 @@ from app.api.deps import (
     RLSSessionDep,
     plugin_scope,
     get_current_active_user,
+    GuildContext,
     GuildContextDep,
 )
 from app.core.messages import CommonMessages, WikiMessages
@@ -45,6 +46,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import KINDS, Tool
 from app.models.platform.user import User
 from app.models.tenant.wiki import Wiki, WikiPage
+from app.schemas.ai_generation import AIStreamEvent
 from app.schemas.tenant.wiki import (
     WikiCreate,
     WikiPageCreate,
@@ -58,25 +60,29 @@ from app.schemas.tenant.wiki import (
     serialize_file_as_page,
     serialize_wiki_page_summary,
 )
+from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.tool import serialize_tool
+from app.services import ai_generation
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import body_states
 from app.services.tenant.collaboration import (
     collaboration_manager,
     content_version,
+    current_content,
     versioned,
     written_into,
 )
 from app.services.tenant import content_references
 from app.services.tenant import relationships as relationships_service
+from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import soft_delete as soft_delete_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import wikis as wikis_service
 
 router = APIRouter(route_class=ActorRoute)
-#: A page addressed by its own id, mounted at the guild root the way a queue
-#: item is. Only adding one names its wiki.
+#: A page addressed by its own id, mounted at the guild root the way a counter
+#: is. Only adding one names its wiki.
 pages_router = APIRouter(route_class=ActorRoute)
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
@@ -96,7 +102,7 @@ async def _serialized_page(
     """A page as every page route answers with it: its tags and properties,
     and the body it reads as now with that body's version."""
     await tags_service.annotate_tags(session, [page])
-    await properties_service.annotate_properties(session, [page])
+    await metadata_service.annotate_properties(session, [page])
     return await versioned(
         serialize_wiki_page(page, context=guild_context),
         guild_context.guild_id,
@@ -119,9 +125,18 @@ async def read_wiki(
     wiki = await resource_access.load_authorized(
         session, Tool.wiki, wiki_id, current_user, guild_context, hydrated=True
     )
-    return serialize_tool(
+    read = serialize_tool(
         WikiRead, wiki, user_id=guild_context.user_id, context=guild_context
     )
+    # A plug-in knows of nothing it can't read, so it is asked nothing.
+    if isinstance(guild_context, GuildContext):
+        hidden, requested = (
+            await share_requests_service.hidden_file_counts(
+                session, user_id=guild_context.user_id, wiki_ids=[wiki_id]
+            )
+        ).get(wiki_id, (0, 0))
+        read.hidden_files = HiddenFiles(count=hidden, requested=requested)
+    return read
 
 
 @router.post("/", response_model=WikiRead, status_code=status.HTTP_201_CREATED)
@@ -166,7 +181,7 @@ async def create_wiki(
             tag_ids=wiki_in.tag_ids,
         )
     await attachments_service.claim_uploads(session, wiki)
-    await properties_service.write_on_create(session, wiki, wiki_in.properties)
+    await metadata_service.write_on_create(session, wiki, wiki_in.properties)
     await session.commit()
     return await read_after_write(session, wiki.id, current_user, guild_context)
 
@@ -271,7 +286,7 @@ async def list_wiki_pages(
     rows = await wikis_service.load_list(session, wiki)
     pages = [row for row, _ in rows if isinstance(row, WikiPage)]
     await tags_service.annotate_tags(session, pages)
-    await properties_service.annotate_properties(session, pages)
+    await metadata_service.annotate_properties(session, pages)
     # The position each row is SERVED with is its place in the list as drawn —
     # a file's is kept on the wiki and a page's in its own column, and
     # neither is what a client counts with.
@@ -471,7 +486,7 @@ async def create_wiki_page(
         author_id=guild_context.user_id,
     )
     await attachments_service.claim_uploads(session, page)
-    await properties_service.write_on_create(session, page, page_in.properties)
+    await metadata_service.write_on_create(session, page, page_in.properties)
     await session.commit()
     hydrated = await resource_access.reload_child(session, WikiPage, page.id)
     return await _serialized_page(session, hydrated, guild_context)
@@ -488,6 +503,43 @@ async def read_wiki_page(
     stored notification names."""
     page = await resource_access.load_child(session, WikiPage, page_id)
     return await _serialized_page(session, page, guild_context)
+
+
+@pages_router.post(
+    "/wiki-pages/{page_id}/ai/summary",
+    response_class=ai_generation.AIStreamResponse,
+    responses={200: {"model": AIStreamEvent}},
+)
+async def summarize_wiki_page(
+    page_id: int,
+    session: RLSSessionDep,
+    current_user: CurrentUserDep,
+    guild_context: GuildContextDep,
+) -> ai_generation.AIStreamResponse:
+    """A summary of a page, streamed as it is written. Requires read access
+    to the page."""
+    page = await resource_access.load_child(session, WikiPage, page_id)
+    content = await current_content(
+        guild_context.guild_id, SearchEntityType.wiki_page.value, page.id, page.content
+    )
+    await ai_generation.record_request(
+        session,
+        user=current_user,
+        guild_id=guild_context.guild_id,
+        purpose="summary",
+        target_type="wiki_page",
+        target_id=page.id,
+        initiative_id=page.wiki.initiative_id,
+    )
+    return ai_generation.AIStreamResponse(
+        await ai_generation.summarize(
+            session,
+            current_user,
+            guild_context.guild_id,
+            title=page.title,
+            content=content,
+        )
+    )
 
 
 @pages_router.post(
@@ -603,7 +655,7 @@ async def update_wiki_page(
             entity_id=page.id,
             tag_ids=data["tag_ids"],
         )
-    await properties_service.write_on_update(session, page, page_in.properties)
+    await metadata_service.write_on_update(session, page, page_in.properties)
     if "content" in data:
         await content_references.sync_for_entity(
             session,

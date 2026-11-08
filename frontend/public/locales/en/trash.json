@@ -1,5 +1,4 @@
 {
-  "title": "Trash",
   "description": "Items here will be permanently deleted after the community's retention period. Restore at any time before then.",
   "empty": "Trash is empty.",
   "columnType": "Type",
@@ -25,17 +24,15 @@
     "comment": "Comment",
     "initiative": "Initiative",
     "tag": "Tag",
-    "queue": "Queue",
-    "queue_item": "Queue item",
     "calendar": "Calendar",
     "calendar_event": "Calendar event",
     "counter_group": "Counter group",
     "counter": "Counter",
     "dashboard": "Dashboard",
     "post": "Post",
-    "gallery": "Gallery",
-    "gallery_image": "Picture",
     "wiki": "Wiki",
-    "wiki_page": "Page"
+    "wiki_page": "Page",
+    "contact": "Contact",
+    "collection": "Collection"
   }
 }

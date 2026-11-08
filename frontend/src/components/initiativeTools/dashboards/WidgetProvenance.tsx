@@ -6,30 +6,26 @@
  * is what a reader trusts when the numbers look wrong — a widget that could
  * write its own provenance could describe data it is not drawing.
  *
- * What it may say is bounded by `provenance.ts`: names come from the viewer's
- * own resolved lookups, and an id that will not resolve renders as restricted
- * rather than as the name the author saw. So two people looking at the same
- * shared dashboard can legitimately read two different lines, and each one is
- * true for the person reading it.
+ * What it may say is bounded by `provenance.ts`: the datasets the statement
+ * read, as the server resolved them for the person reading it.
  */
 
-import { AlertTriangle, EyeOff, Info, RefreshCw } from "lucide-react";
+import { AlertTriangle, Info, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WidgetBinding } from "@/hooks/useWidgetData";
-import { dateTimeFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
 import type { DataMeta } from "@/lib/widgets/dataShapes";
-import { bindingScope, type EntityLabels, queryScope } from "@/lib/widgets/provenance";
+import { queryScope } from "@/lib/widgets/provenance";
 import { sourceDescriptor } from "@/lib/widgets/sources";
 import { localized, type WidgetMeta } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 export interface WidgetProvenanceProps {
   binding: WidgetBinding;
-  labels: EntityLabels;
   meta?: DataMeta;
   /** The datasets the statement read, as the server resolved them. */
   relations?: string[];
@@ -45,7 +41,6 @@ export interface WidgetProvenanceProps {
 export function WidgetProvenance({
   binding,
   relations,
-  labels,
   meta,
   options,
   widgetMeta,
@@ -62,10 +57,7 @@ export function WidgetProvenance({
   // What a statement read, answered by the server rather than parsed here: what
   // a statement resolves to is the validator's answer, and a second reading of
   // the same SQL could only disagree with it.
-  const scope = useMemo(
-    () => [...bindingScope(binding, labels), ...queryScope(relations ?? [])],
-    [binding, labels, relations]
-  );
+  const scope = useMemo(() => queryScope(relations ?? []), [relations]);
 
   const descriptor = sourceDescriptor(binding.source);
   const sourceLabel = t(`dashboards:bindingSource.${binding.source}` as const);
@@ -74,7 +66,7 @@ export function WidgetProvenance({
   // how much came back. Everything else waits in the popover.
   const parts: string[] = [sourceLabel];
   for (const chip of scope) {
-    parts.push(chip.label ?? (chip.restricted ? t("dashboards:provenance.restricted") : "…"));
+    parts.push(chip.label);
   }
   if (typeof meta?.total === "number" && descriptor) {
     parts.push(
@@ -101,9 +93,6 @@ export function WidgetProvenance({
               aria-hidden
             />
           )}
-          {scope.some((chip) => chip.restricted) && (
-            <EyeOff className="h-3 w-3 shrink-0" aria-hidden />
-          )}
           <span className="truncate">{parts.join(" · ")}</span>
           <Info className="h-3 w-3 shrink-0 opacity-0 group-hover/widget:opacity-60" aria-hidden />
         </button>
@@ -118,14 +107,7 @@ export function WidgetProvenance({
           <Row label={t("dashboards:provenance.scope")}>
             <ul className="space-y-0.5">
               {scope.map((chip) => (
-                <li key={chip.key}>
-                  {chip.label ?? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground italic">
-                      <EyeOff className="h-3 w-3" aria-hidden />
-                      {t("dashboards:provenance.restricted")}
-                    </span>
-                  )}
-                </li>
+                <li key={chip.key}>{chip.label}</li>
               ))}
             </ul>
           </Row>

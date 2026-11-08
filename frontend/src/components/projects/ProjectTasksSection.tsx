@@ -49,16 +49,11 @@ import {
   shouldInsertAfter,
 } from "@/components/projects/taskOrdering";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import { StatusMessage } from "@/components/StatusMessage";
 import { BulkEditTaskTagsDialog } from "@/components/tasks/BulkEditTaskTagsDialog";
 import { ExportTasksButton } from "@/components/tasks/ExportTasksButton";
 import { TaskBulkEditDialog } from "@/components/tasks/TaskBulkEditDialog";
 import { TaskBulkEditPanel } from "@/components/tasks/TaskBulkEditPanel";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useColumnLimits } from "@/hooks/useColumnLimits";
@@ -99,6 +94,12 @@ import { getProjectColor } from "@/lib/projectColor";
 import { getItem, setItem } from "@/lib/storage";
 import { taskReadToListRow } from "@/lib/taskUtils";
 import { browserTimezone } from "@/lib/timezones";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog } from "@/ui/dialog";
+import { useWeekStart } from "@/ui/host";
+import { StatusMessage } from "@/ui/status-message";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** A status change on screen whose request has not answered yet. */
 type PendingStatus = { vars: UpdateTaskVariables; status: TaskStatusRead };
@@ -225,11 +226,13 @@ export const ProjectTasksSection = ({
   const [isComposerOpen, setIsComposerOpen] = useState(initialComposerOpen ?? false);
   // An archived project takes no new tasks until it is unarchived.
   const canAddTasks = canEditTaskDetails && !projectIsArchived;
-  useEffect(() => {
+  const [prevInitialComposerOpen, setPrevInitialComposerOpen] = useState(initialComposerOpen);
+  if (prevInitialComposerOpen !== initialComposerOpen) {
+    setPrevInitialComposerOpen(initialComposerOpen);
     if (initialComposerOpen) {
       setIsComposerOpen(true);
     }
-  }, [initialComposerOpen]);
+  }
   useEffect(() => {
     onComposerOpenChange?.(isComposerOpen);
   }, [isComposerOpen, onComposerOpenChange]);
@@ -285,7 +288,7 @@ export const ProjectTasksSection = ({
   const lastKanbanOverRef = useRef<DragOverEvent["over"] | null>(null);
 
   const { user } = useAuth();
-  const weekStartsOn = (user?.week_starts_on ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const weekStartsOn = useWeekStart();
   // How much of the calendar the Gantt or the calendar shows is one choice in
   // this person's view of the project.
   const ganttScale = isGanttScale(mode) ? mode : "week";
@@ -327,9 +330,13 @@ export const ProjectTasksSection = ({
     return explicit?.id ?? sortedTaskStatuses[0]?.id ?? null;
   }, [sortedTaskStatuses]);
 
-  useEffect(() => {
+  // Rows changed here stand in for the server's until its next answer, which
+  // replaces them.
+  const [prevProjectTasks, setPrevProjectTasks] = useState(projectTasks);
+  if (prevProjectTasks !== projectTasks) {
+    setPrevProjectTasks(projectTasks);
     setLocalOverride(null);
-  }, [projectTasks]);
+  }
 
   useEffect(() => {
     if (!collapsedStorageKey) {
@@ -591,17 +598,21 @@ export const ProjectTasksSection = ({
   const scopePrompt = useScopePrompt();
   const { mutateAsync: writeTaskDates } = rescheduleTaskDates;
   const rescheduleTask = useCallback(
-    async (task: TaskListRead, dates: Pick<TaskUpdate, "start_date" | "due_date">) => {
+    async (
+      task: Pick<TaskListRead, "id" | "recurrence">,
+      dates: Pick<TaskUpdate, "start_date" | "due_date">
+    ) => {
       const scope = task.recurrence
         ? await scopePrompt.ask("edit", { tool: "tasks", scopes: ["this", "following"] })
         : undefined;
-      if (scope === null) return;
-      await writeTaskDates({
+      if (scope === null) return false;
+      return writeTaskDates({
         taskId: task.id,
         data: { ...dates, ...(scope ? { scope } : {}) },
-      }).catch(
+      }).then(
+        () => true,
         // The mutation says what went wrong; the bar goes back.
-        () => undefined
+        () => false
       );
     },
     [writeTaskDates, scopePrompt.ask]
@@ -983,6 +994,7 @@ export const ProjectTasksSection = ({
               memberScope: { type: "canOpen", tool: Tool.project, id: projectId },
               statuses: sortedTaskStatuses,
               types: taskTypes,
+              projectId,
             }}
             value={appliedSpec}
             onChange={setFilters}
@@ -1018,6 +1030,7 @@ export const ProjectTasksSection = ({
             }
             isArchivingDoneTasks={archiveDoneTasks.isPending}
             card={layout?.definition.card as LayoutNode | null | undefined}
+            displays={layout?.definition.displays}
             columnLimits={columnLimits}
             grouping={grouping}
             onGroupingChange={setGrouping}
@@ -1078,6 +1091,7 @@ export const ProjectTasksSection = ({
                 onExitSelection={() => setSelectedTasks([])}
                 tableState={tableState}
                 viewColumns={layout?.definition.columns}
+                displays={layout?.definition.displays}
                 viewGroupings={layout?.definition.groupings}
                 columnLimits={columnLimits}
               />
@@ -1177,6 +1191,7 @@ export const ProjectTasksSection = ({
             <TaskBulkEditDialog
               selectedTasks={selectedTasks}
               taskStatuses={sortedTaskStatuses}
+              taskTypes={taskTypes ?? []}
               isFull={(statusId) =>
                 columnLimits.isFull(
                   statusId,
@@ -1184,6 +1199,7 @@ export const ProjectTasksSection = ({
                 )
               }
               projectId={projectId}
+              initiativeId={initiativeId}
               isSubmitting={bulkUpdateTasks.isPending}
               onApply={(changes) => {
                 bulkUpdateTasks.mutate({

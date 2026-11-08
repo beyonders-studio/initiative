@@ -6,14 +6,14 @@
  * thing's own moderation menu and from a report card, which pre-fills the
  * reason it was reported for.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
   RemovalReason,
   type RemovalReason as RemovalReasonValue,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -21,16 +21,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
 const NOTE_MAX = 2000;
@@ -82,12 +76,18 @@ export const RemovalDialog = ({
   const [note, setNote] = useState(initialNote);
 
   // Each opening starts from what the caller knows, not from last time.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, initialReason, initialNote });
+  if (
+    prev.open !== open ||
+    prev.initialReason !== initialReason ||
+    prev.initialNote !== initialNote
+  ) {
+    setPrev({ open, initialReason, initialNote });
     if (open) {
       setReason(initialReason ?? "");
       setNote(initialNote);
     }
-  }, [open, initialReason, initialNote]);
+  }
 
   const comment = targetType === "comment";
 

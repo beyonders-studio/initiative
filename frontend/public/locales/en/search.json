@@ -24,8 +24,6 @@
     "project": "Project",
     "task": "Task",
     "file": "File",
-    "queue": "Queue",
-    "queue_item": "Queue item",
     "counter_group": "Counter group",
     "counter": "Counter",
     "calendar": "Calendar",
@@ -33,11 +31,11 @@
     "dashboard": "Dashboard",
     "wiki": "Wiki",
     "wiki_page": "Wiki page",
+    "contact": "Contact",
     "tag": "Tag",
     "comment": "Comment",
     "post": "Post",
-    "gallery": "Gallery",
-    "gallery_image": "Picture"
+    "collection": "Collection"
   },
   "switchHint": "Tab to switch",
   "closeMatches": "Nothing matches “{{query}}” exactly. These are the closest.",

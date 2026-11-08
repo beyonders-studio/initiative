@@ -5,6 +5,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.models.platform.user import UserRole
 from app.models.tenant.initiative import Initiative
 from app.services import membership as membership_service
 from app.testing.factories import (
@@ -49,7 +50,6 @@ async def test_initiative_scope_clause_legs(session: AsyncSession, reading_as):
     that reader, the way a request does.
     """
     from app.api.deps import GuildAccessError
-    from app.models.platform.user import UserRole
 
     admin, member, outsider, guild, initiative = await _setup(session)
     platform_operator = await create_user(
@@ -96,6 +96,9 @@ async def test_initiative_scope_clause_pam_leg(session: AsyncSession, reading_as
     with pytest.raises(GuildAccessError):
         await reading_as(outsider.id, guild.id)
 
+    # A grant counts only for a rung that may hold it.
+    outsider.role = UserRole.support
+    session.add(outsider)
     await create_access_grant(session, user=outsider, guild=guild)
     reader = await reading_as(outsider.id, guild.id)
     assert list((await reader.exec(stmt())).all()) == [initiative.id]

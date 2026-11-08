@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.models.platform.user import UserRole
 from app.models.tenant.file import File
 from app.services.tenant.comments import (
     _ensure_parent_access,
@@ -31,7 +32,9 @@ from app.testing import (
 
 async def test_task_comment_access_honors_grant(session: AsyncSession, reading_as):
     owner = await create_user(session, email="owner-cmt@example.com")
-    grantee = await create_user(session, email="grantee-cmt@example.com")
+    grantee = await create_user(
+        session, email="grantee-cmt@example.com", role=UserRole.support
+    )
     guild = await create_guild(session, creator=owner)
     init = await create_initiative(session, guild, owner)
     project = await create_project(session, init, owner, name="P")
@@ -67,7 +70,9 @@ async def test_file_comment_access_honors_grant(session: AsyncSession, reading_a
     """The other branch of the parent check: a tool entity answers for itself,
     where a task answers through its project."""
     owner = await create_user(session, email="owner-cmt2@example.com")
-    grantee = await create_user(session, email="grantee-cmt2@example.com")
+    grantee = await create_user(
+        session, email="grantee-cmt2@example.com", role=UserRole.support
+    )
     guild = await create_guild(session, creator=owner)
     init = await create_initiative(session, guild, owner)
     file = File(
@@ -120,7 +125,9 @@ async def test_a_read_only_grant_cannot_post(session: AsyncSession, reading_as):
     day the grant layer changes without the rule changing.
     """
     owner = await create_user(session, email="owner-cmt-ro@example.com")
-    support = await create_user(session, email="support-cmt-ro@example.com")
+    support = await create_user(
+        session, email="support-cmt-ro@example.com", role=UserRole.support
+    )
     guild = await create_guild(session, creator=owner)
     init = await create_initiative(session, guild, owner)
     project = await create_project(session, init, owner, name="P")

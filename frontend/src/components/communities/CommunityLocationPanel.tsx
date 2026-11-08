@@ -6,21 +6,21 @@
  * the people browsing for one.
  */
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { PlacePicker } from "@/components/communities/PlacePicker";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { CommunityLocation } from "@/lib/communityLocation";
 import { type Place, placeFrom } from "@/lib/directoryNear";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /** The server's limit on the community's own name for the place. */
 const LABEL_MAX = 60;
@@ -48,11 +48,12 @@ export const CommunityLocationPanel = () => {
   // Compared by value: the community list is refetched on focus, and a fresh copy
   // of the same location must not throw away what is being typed.
   const storedKey = JSON.stringify(stored ?? null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: storedKey is stored, by value
-  useEffect(() => {
+  const [prevStoredKey, setPrevStoredKey] = useState(storedKey);
+  if (prevStoredKey !== storedKey) {
+    setPrevStoredKey(storedKey);
     setDraft(placeFrom(stored));
     setLabel(stored?.label ?? "");
-  }, [storedKey]);
+  }
 
   if (!activeCommunity) return null;
 

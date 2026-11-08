@@ -10,13 +10,16 @@ real Postgres rather than against the rendering code.
 from __future__ import annotations
 
 import pytest
-from sqlmodel import select
+from sqlmodel import delete, select
 
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.collection import CollectionFile
 from app.models.tenant.event_outbox import EventOutbox
 from app.testing import (
+    create_collection,
     create_comment,
+    create_file,
     create_resource_grant,
     create_tag,
     create_task,
@@ -146,6 +149,48 @@ async def test_tagging_a_task_is_reported_against_the_task(session, acting_user)
     assert junction[-1].changed == ["tags"]
 
 
+async def test_a_file_going_into_a_collection_and_out_names_both_and_which_way(
+    session, acting_user
+):
+    """The collection hears its list changed; the file is reported as added to
+    or removed from it, the collection in its chain, read where the file is."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    kept = await create_file(session, a.initiative, a.user)
+    moved = await create_file(session, a.initiative, a.user)
+    collection = await create_collection(session, a.initiative, a.user, files=[kept])
+
+    before = len(await _outbox(session, a.guild.id))
+    session.add(
+        CollectionFile(
+            collection_id=collection.id,
+            file_id=moved.id,
+            initiative_id=a.initiative.id,
+        )
+    )
+    await session.commit()
+    await session.exec(
+        delete(CollectionFile).where(
+            CollectionFile.collection_id == collection.id,
+            CollectionFile.file_id == moved.id,
+        )
+    )
+    await session.commit()
+
+    new_rows = (await _outbox(session, a.guild.id))[before:]
+    chain = [{"type": "collections", "id": collection.id}]
+    assert [
+        (r.resource_type, r.resource_id, r.action, r.changed, r.parents, r.dac_id)
+        for r in new_rows
+        if r.resource_type == "files"
+    ] == [
+        ("files", moved.id, "updated", ["added_to_collection"], chain, moved.id),
+        ("files", moved.id, "updated", ["removed_from_collection"], chain, moved.id),
+    ]
+    assert [
+        (r.resource_id, r.changed) for r in new_rows if r.resource_type == "collections"
+    ] == [(collection.id, ["files"])] * 2
+
+
 async def test_a_task_status_is_reported_against_its_project(session, acting_user):
     """A sub-resource with an id of its own is still a facet of its parent.
 
@@ -180,7 +225,7 @@ async def test_a_grant_is_reported_against_the_resource_it_shares(session, actin
     """Sharing is polymorphic: the event lands on whichever tool was shared.
 
     ``resource_grants`` rows have their own ids and no route, so a grant reports
-    against the project (or file, queue, …) named in the row — which the
+    against the project (or file, calendar, …) named in the row — which the
     subscriber can fetch, and which is the thing that actually changed.
     """
 
@@ -659,7 +704,8 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
     person: the plug-in acts as its community. A person's write names the person
     and no install."""
     from app.db.install_standing_test import _install, _route
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
 
     install = await _install(
         session, acting_user, role_session, granted=["files:write"]
@@ -669,7 +715,7 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
     made = File(
         initiative_id=install.a.id,
         name="Made by the plug-in",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     s.add(made)
     await s.commit()
@@ -699,13 +745,14 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
 
 async def _create_file_as(session, install) -> int:
     """A file the install's seat creates through the request path."""
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
 
     await route_as(session, user_id=install.seat.user.id, guild_id=install.guild.id)
     made = File(
         initiative_id=install.a.id,
         name="Made by a person",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     session.add(made)
     await session.commit()

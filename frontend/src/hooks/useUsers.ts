@@ -122,7 +122,7 @@ export interface UserSearchOptions {
   /** Bounded page size (server caps at 100). */
   pageSize?: number;
   /** Only the people who can open this row: who may be named on what it
-   *  holds (assignees, attendees, person properties, queue items). */
+   *  holds (assignees, attendees, person properties). */
   canOpen?: { tool: Tool; id: number | null | undefined };
   /** Gate the request — pass the picker's `open` state so we don't fetch until
    *  the dropdown is shown. */
@@ -310,12 +310,12 @@ export const useInitiativeMemberSearch = (
  * - `initiative`: one initiative's members (mentions, linked members).
  * - `canOpen`: the people who can open one row, who are the ones that may be
  *   named on what it holds (task assignees, event attendees, person
- *   properties, queue items).
+ *   properties).
  */
 export type MemberSearchScope =
   | { type: "community"; communityIdOverride?: number }
   | { type: "initiative"; initiativeId: number | null | undefined }
-  | { type: "canOpen"; tool: Tool; id: number | null | undefined };
+  | { type: "canOpen"; tool: Tool; id: number | null | undefined; communityIdOverride?: number };
 
 /**
  * One entry point for the member typeaheads, selected by `scope`. Both
@@ -336,7 +336,7 @@ export const useMemberSearch = (
     userIds,
     pageSize,
     enabled: enabled && scope.type !== "initiative",
-    communityIdOverride: scope.type === "community" ? scope.communityIdOverride : undefined,
+    communityIdOverride: scope.type === "initiative" ? undefined : scope.communityIdOverride,
     canOpen: scope.type === "canOpen" ? { tool: scope.tool, id: scope.id } : undefined,
   });
   const initiativeQuery = useInitiativeMemberSearch(
@@ -456,7 +456,7 @@ type SetDisplayNameVars = { communityId: number; userId?: number; displayName: s
 /**
  * What somebody is called in one community — their own, without `userId`, or
  * a member's, by an administrator. The name is drawn wherever the community
- * draws people, so its content, its rosters and the contacts lists refresh
+ * draws people, so its content, its rosters and the people lists refresh
  * along with the community list.
  */
 export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayNameVars>) =>
@@ -469,7 +469,7 @@ export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayN
           : setMemberDisplayName(communityId, userId, body));
       },
       invalidate: () =>
-        invalidate(q.communityContent(), q.communityMembers(), q.contacts(), q.allCommunities()),
+        invalidate(q.communityContent(), q.communityMembers(), q.people(), q.allCommunities()),
     },
     options
   );

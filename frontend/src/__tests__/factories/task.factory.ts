@@ -91,10 +91,11 @@ export function buildTask(overrides: Partial<TaskListRead> = {}): TaskListRead {
     initiative_name: null,
     initiative_color: null,
     checklist_progress: null,
+    parent: null,
+    subtask_progress: null,
     completed_at: null,
     tags: [],
     properties: [],
-    plugin_values: [],
     ...overrides,
   };
 }
@@ -131,6 +132,7 @@ export const TASK_GROUPINGS: GroupingDescription[] = [
   { name: "date_group", kind: "number", bucket: false },
   { name: "priority", kind: "select", bucket: false },
   { name: "task_status_id", kind: "task_status", bucket: false },
+  { name: "parent_task_id", kind: "task", bucket: false },
   { name: "assignee_ids", kind: "member", bucket: false },
   { name: "created_by", kind: "member", bucket: false },
   { name: "tag_ids", kind: "tag", bucket: false },

@@ -19,6 +19,7 @@ from app.core import recurrence
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import overwrites
 from app.services.tenant import personal_items
+from app.services.tenant import required_fields
 from sqlmodel import select
 
 from app.api.actor_route import ActorRoute
@@ -66,9 +67,8 @@ from app.services.permissions import Action
 from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant import ical_service
-from app.services.tenant import plugin_metadata
 from app.services import notifications as notifications_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 router = APIRouter(route_class=ActorRoute)
@@ -298,9 +298,6 @@ async def _serialized_event(
     occurrence: datetime | None = None,
 ) -> CalendarEventRead:
     """``occurrence`` shows that one's answers in place of the series'."""
-    values = await plugin_metadata.values_on(
-        session, "calendar_event", {event.id: event.calendar.initiative_id}
-    )
     return serialize_calendar_event(
         event,
         context=context,
@@ -310,7 +307,6 @@ async def _serialized_event(
             if occurrence is not None
             else await occurrences_service.answers_on(session, event)
         ),
-        plugin_values=values.get(event.id, []),
     )
 
 
@@ -413,7 +409,8 @@ async def create_calendar_event(
     )
 
     await attachments_service.claim_uploads(session, event)
-    await properties_service.write_on_create(session, event, event_in.properties)
+    await metadata_service.write_on_create(session, event, event_in.properties)
+    await required_fields.refuse_missing(session, guild_context, event)
     return await _event_committed(session, event.id, context=guild_context)
 
 
@@ -552,6 +549,7 @@ async def _apply_update(
 ) -> CalendarEventRead:
     """Write ``update_data`` to one event row, and to a series' overrides
     what they follow of it."""
+    required = await required_fields.required_of(session, guild_context, event)
     # Snapshot fields that drive the "updated"/"rescheduled" notification before
     # the in-place mutation below.
     old_title = event.title
@@ -589,8 +587,11 @@ async def _apply_update(
         # move, while the values still resolve.
         if destination.initiative_id != event.calendar.initiative_id:
             overrides = await occurrences_service.overrides(session, event)
-            await properties_service.drop_values(
-                session, "calendar_event", [e.id for e in (event, *overrides)]
+            await metadata_service.drop_values(
+                session,
+                "calendar_event",
+                [e.id for e in (event, *overrides)],
+                moved=True,
             )
             # With their own values gone, the overrides follow the series'.
             for override in overrides:
@@ -647,7 +648,7 @@ async def _apply_update(
         await _followed(session, event, "tags")
         updated = True
     if event_in.properties is not None:
-        await properties_service.write_on_update(session, event, event_in.properties)
+        await metadata_service.write_on_update(session, event, event_in.properties)
         await session.flush()
         # The same for its properties.
         await _followed(session, event, "properties")
@@ -708,6 +709,7 @@ async def _apply_update(
             and not attachments_service.shows_files(CalendarEvent, update_data),
         )
     session.add(event)
+    await required_fields.refuse_emptied(session, required)
     return await _event_committed(session, event.id, context=guild_context)
 
 
@@ -954,6 +956,7 @@ async def set_attendees(
         session, CalendarEvent, event_id, action=Action.contribute
     )
     event = await _scoped_list_target(session, event, "attendees", scope, occurrence)
+    required = await required_fields.required_of(session, guild_context, event)
     old_ids = {a.user_id for a in event.attendees}
     await events_service.set_event_attendees(
         session, event, attendee_ids, calendar=event.calendar
@@ -964,6 +967,7 @@ async def set_attendees(
     )
     await session.flush()
     await _followed(session, event, "attendees")
+    await required_fields.refuse_emptied(session, required)
     return await _event_committed(session, event.id, context=guild_context)
 
 

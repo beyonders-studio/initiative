@@ -102,8 +102,10 @@ export const useUpdatePlatformConnection = (
     ...rest,
     mutationFn: ({ connectionId, data }: { connectionId: number; data: AIConnectionUpdate }) =>
       updatePlatformConnection(connectionId, data),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("platform");
+    // Pending until the list has reloaded, so a row's switch holds the
+    // value it asked for rather than showing the old one in between.
+    onSuccess: async (...args) => {
+      await invalidateConnectionSurfaces("platform");
       onSuccess?.(...args);
     },
   });
@@ -176,8 +178,10 @@ export const useUpdateCommunityConnection = (
     ...rest,
     mutationFn: ({ connectionId, data }: { connectionId: number; data: AIConnectionUpdate }) =>
       updateCommunityConnection(communityId, connectionId, data),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("community");
+    // Pending until the list has reloaded, so a row's switch holds the
+    // value it asked for rather than showing the old one in between.
+    onSuccess: async (...args) => {
+      await invalidateConnectionSurfaces("community");
       onSuccess?.(...args);
     },
   });

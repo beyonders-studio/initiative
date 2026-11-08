@@ -14,6 +14,7 @@ from app.api.deps import establish_guild_access
 from app.api.v1.tenant_endpoints.events import _rooms_for
 from app.models.platform.access_grant import AccessGrant, AccessGrantStatus, AccessLevel
 from app.models.platform.guild import CommunityRole
+from app.models.platform.user import UserRole
 from app.services.content_sockets import guild_room, initiative_room
 from app.testing import (
     create_guild,
@@ -79,7 +80,9 @@ async def test_rooms_pam_grantee_sees_all(
     one = await create_initiative(session, guild, owner)
     two = await create_initiative(session, guild, owner)
 
-    grantee = await create_user(session, email="grantee@example.com")  # not a member
+    grantee = await create_user(  # not a member
+        session, email="grantee@example.com", role=UserRole.support
+    )
     now = datetime.now(timezone.utc)
     session.add(
         AccessGrant(

@@ -6,6 +6,7 @@ export {
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
+export { buildCollection, buildCollectionFile } from "./collection.factory";
 export {
   buildComment,
   buildReactionGroup,
@@ -19,13 +20,14 @@ export {
   communityCan,
   resetCounter as resetCommunityCounter,
 } from "./community.factory";
+export { buildContact } from "./contact.factory";
+export { buildDataJob, resetCounter as resetDataJobCounter } from "./dataJob.factory";
 export {
   buildContactGrant,
   buildIgnoredAccount,
   resetCounter as resetDmCounter,
 } from "./dm.factory";
 export { buildFileSummary, resetCounter as resetFileCounter } from "./file.factory";
-export { buildGallery, buildGalleryImage } from "./gallery.factory";
 export {
   buildInitiative,
   buildInitiativeDirectoryEntry,
@@ -39,6 +41,7 @@ export {
   buildMarketplaceListing,
   buildMarketplaceListingDetail,
   buildMarketplaceVersion,
+  buildPluginCatalogEntry,
   buildProjectListingEnvelope,
   resetCounter as resetMarketplaceCounter,
 } from "./marketplace.factory";
@@ -57,23 +60,16 @@ export {
 } from "./project.factory";
 export {
   buildPropertyDefinition,
+  buildPropertyGroup,
   buildPropertyOption,
   buildPropertySummary,
   resetCounter as resetPropertyCounter,
 } from "./properties";
 export {
-  buildQueue,
-  buildQueueItem,
-  buildQueueListResponse,
-  buildQueueSummary,
-  resetCounter as resetQueueCounter,
-} from "./queue.factory";
-export {
   buildRecentCounterGroupItem,
   buildRecentFileItem,
   buildRecentItem,
   buildRecentProjectItem,
-  buildRecentQueueItem,
   resetRecentCounter,
 } from "./recent.factory";
 export {
@@ -83,6 +79,11 @@ export {
   buildTaggedEntity,
   resetCounter as resetSearchCounter,
 } from "./search.factory";
+export {
+  buildShareRequest,
+  buildShareStanding,
+  resetCounter as resetShareRequestCounter,
+} from "./shareRequest.factory";
 export { buildTag, buildTagSummary, resetCounter as resetTagCounter } from "./tag.factory";
 export {
   buildTask,
@@ -110,20 +111,22 @@ export {
 export { buildWiki, buildWikiPage } from "./wiki.factory";
 
 import { resetCounter as resetCalendarEventCounter } from "./calendarEvent.factory";
+import { resetCounter as resetCollectionCounter } from "./collection.factory";
 import { resetCounter as resetCommentCounter } from "./comment.factory";
 import { resetCounter as resetCommunityCounter } from "./community.factory";
+import { resetCounter as resetContactCounter } from "./contact.factory";
+import { resetCounter as resetDataJobCounter } from "./dataJob.factory";
 import { resetCounter as resetDmCounter } from "./dm.factory";
 import { resetCounter as resetFileCounter } from "./file.factory";
-import { resetCounter as resetGalleryCounter } from "./gallery.factory";
 import { resetCounter as resetInitiativeCounter } from "./initiative.factory";
 import { resetCounter as resetMarketplaceCounter } from "./marketplace.factory";
 import { resetCounter as resetNotificationCounter } from "./notification.factory";
 import { resetCounter as resetPostCounter } from "./post.factory";
 import { resetCounter as resetProjectCounter } from "./project.factory";
 import { resetCounter as resetPropertyCounter } from "./properties";
-import { resetCounter as resetQueueCounter } from "./queue.factory";
 import { resetRecentCounter } from "./recent.factory";
 import { resetCounter as resetSearchCounter } from "./search.factory";
+import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory";
 import { resetCounter as resetTagCounter } from "./tag.factory";
 import { resetCounter as resetTaskCounter } from "./task.factory";
 import { resetCounter as resetTaskTypeCounter } from "./taskType.factory";
@@ -143,16 +146,18 @@ export function resetFactories(): void {
   resetTaskTypeCounter();
   resetTagCounter();
   resetFileCounter();
+  resetDataJobCounter();
   resetCommentCounter();
   resetNotificationCounter();
-  resetQueueCounter();
   resetPropertyCounter();
   resetRecentCounter();
   resetMarketplaceCounter();
   resetSearchCounter();
   resetDmCounter();
   resetPostCounter();
-  resetGalleryCounter();
+  resetCollectionCounter();
   resetWikiCounter();
+  resetContactCounter();
   resetCalendarEventCounter();
+  resetShareRequestCounter();
 }

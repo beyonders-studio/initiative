@@ -8,11 +8,10 @@ means a new tool is exercised here the moment it exists.
 
 What survives here from the per-tool copies these replace:
 
-- *the owner shares it* — ``queues_test.test_set_queue_grants`` and
+- *the owner shares it* —
   ``dashboards_test.test_set_grants_replaces_sharing`` (the grantee can then
   write, and the owner's own grant is kept);
-- *a role can be named instead of a person* —
-  ``queues_test.test_set_queue_role_grants``;
+- *a role can be named instead of a person*;
 - *a reader cannot re-share* — the first half of
   ``calendars_test.test_set_calendar_grants_owner_only``. Its second half —
   that revoking every non-owner grant hides the row again — is already proved
@@ -20,12 +19,12 @@ What survives here from the per-tool copies these replace:
   ``dashboards_test`` both strip grants and read back).
 
 A grant change also lets go of the people named inside the tool whom the new
-sharing no longer reaches — a task's assignee, an event's attendee, a queue
-item's person.
+sharing no longer reaches — a task's assignee, an event's attendee, a person
+field's person.
 
-What stays where it is: sharing that runs into the initiative-role gate
-(``queues_test.test_sharing_does_not_reach_past_the_role_gate``), and every
-test that merely *uses* the route to set up something else.
+Sharing that runs into the initiative-role gate is proved for one tool. What
+stays where it is: every test that merely *uses* the route to set up something
+else.
 """
 
 import pytest
@@ -34,16 +33,17 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.db import post_commit
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import named_people
 from app.testing import (
     create_calendar_event,
+    create_collection,
     create_property_definition,
     create_property_value,
-    create_queue_item,
     create_resource_grant,
     create_task,
     create_tool_entity,
@@ -140,6 +140,42 @@ async def test_a_reader_cannot_reshare_it(
     assert response.status_code == 403, response.text
 
 
+async def test_sharing_does_not_reach_past_the_role_gate(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """The picker lists only people whose role lets them use the tool, and the
+    endpoint behind it says so rather than accepting a grant that would do
+    nothing — which is what a caller not going through the picker needs to
+    hear."""
+    tool = Tool.counter_group
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    entity = await _entity(session, a, tool)
+    b = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    await grant_role_permission(
+        session, a.initiative, tool.view_permission, enabled=False
+    )
+
+    response = await client.put(
+        a.g(f"/{tool.route_segment}/{entity.id}/grants"),
+        headers=a.headers,
+        json=[{"user_id": b.user.id, "level": "read"}],
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json() == tool.grantee_lacks_access().body
+
+    # Nothing was written, and the counter group is still not theirs to open.
+    seen = await client.get(
+        b.g(f"/{tool.route_segment}/{entity.id}"), headers=b.headers
+    )
+    assert seen.status_code in (403, 404)
+
+
 @TOOLS
 async def test_someone_outside_the_initiative_gets_the_tools_not_found(
     client: AsyncClient, session: AsyncSession, acting_user, tool: Tool
@@ -208,13 +244,9 @@ async def _invite(session: AsyncSession, actor, calendar, person) -> None:
     await create_calendar_event(session, calendar, actor.user, attendees=[person])
 
 
-async def _queue_up(session: AsyncSession, actor, queue, person) -> None:
-    await create_queue_item(session, queue, user_id=person.id)
-
-
 async def _person_field(session: AsyncSession, actor, entity, person) -> None:
     definition = await create_property_definition(
-        session, actor.initiative, type=PropertyType.user_reference
+        session, actor.initiative, type=MetadataType.user_reference
     )
     await create_property_value(session, entity, definition, value_user_id=person.id)
 
@@ -224,7 +256,6 @@ async def _person_field(session: AsyncSession, actor, entity, person) -> None:
 NAMES = {
     "task_assignee": (Tool.project, _assign),
     "event_attendee": (Tool.calendar, _invite),
-    "queue_item": (Tool.queue, _queue_up),
     "person_field": (Tool.file, _person_field),
 }
 
@@ -273,3 +304,46 @@ async def test_a_grant_change_lets_go_only_of_who_can_no_longer_open_it(
     r = await client.put(url, headers=a.headers, json=[])
     assert r.status_code == 200, r.text
     assert b.user.id not in await named()
+
+
+async def test_a_collection_names_whoever_can_open_a_file_in_it(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A collection has no sharing of its own: a file's sharing changing lets
+    nobody go from a collection that only has the same id, and lets go of who
+    can no longer open any file in a collection that holds it."""
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    file = await _entity(session, a, Tool.file)
+    held = await create_tool_entity(session, Tool.file, a.initiative, a.user)
+    collection = await create_collection(session, a.initiative, a.user, files=[held])
+    assert collection.id == file.id
+    b = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    await grant_role_permission(session, a.initiative, Tool.file.view_permission)
+    await create_resource_grant(session, held, user=b.user)
+    await _person_field(session, a, collection, b.user)
+
+    async def named() -> list[int | None]:
+        await post_commit.settle_all()
+        await route_session_to_guild(session, a.guild.id)
+        return list(
+            (
+                await session.exec(
+                    select(MetadataValue.value_user_id).where(
+                        MetadataValue.entity_type == "collection",
+                        MetadataValue.entity_id == collection.id,
+                    )
+                )
+            ).all()
+        )
+
+    for shared, still in ((file, [b.user.id]), (held, [None])):
+        r = await client.put(
+            a.g(f"/files/{shared.id}/grants"), headers=a.headers, json=[]
+        )
+        assert r.status_code == 200, r.text
+        assert await named() == still

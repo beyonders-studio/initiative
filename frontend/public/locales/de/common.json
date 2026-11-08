@@ -1,4 +1,7 @@
 {
+  "appName": "Initiative",
+  "help": "Hilfe",
+  "helpDraft": "Entwurf der Hilfeanfrage",
   "deletedUserName": "Gelöschter Benutzer #{{id}}",
   "user": "Benutzer",
   "userWithId": "Benutzer #{{id}}",
@@ -19,32 +22,12 @@
   "submit": "Absenden",
   "reset": "Zurücksetzen",
   "done": "Fertig",
-  "pullToRefresh": {
-    "pull": "Zum Aktualisieren ziehen",
-    "release": "Zum Aktualisieren loslassen",
-    "refreshing": "Wird aktualisiert…"
-  },
   "toolViewFilter": {
     "label": "Anzeigen",
     "all": "Alle",
     "active": "Aktiv",
     "templates": "Vorlagen",
     "archived": "Archiviert"
-  },
-  "dateRange": {
-    "any": "Beliebiges Datum",
-    "fromOnly": "Ab {{date}}",
-    "untilOnly": "Bis {{date}}",
-    "thisMonth": "Dieser Monat",
-    "lastMonth": "Letzter Monat",
-    "thisQuarter": "Dieses Quartal",
-    "thisYear": "Dieses Jahr",
-    "fromLabel": "Von",
-    "untilLabel": "Bis",
-    "open": "Offen",
-    "fromRemove": "Startdatum entfernen",
-    "untilRemove": "Enddatum entfernen",
-    "clear": "Daten löschen"
   },
   "yes": "Ja",
   "no": "Nein",
@@ -53,7 +36,6 @@
   "success": "Erfolg",
   "warning": "Warnung",
   "info": "Info",
-  "none": "Keine",
   "all": "Alle",
   "name": "Name",
   "description": "Beschreibung",
@@ -63,46 +45,26 @@
   "optional": "Optional",
   "actions": "Aktionen",
   "adding": "Wird hinzugefügt…",
-  "rowActionsFor": "Aktionen für {{subject}}",
   "more": "Mehr",
+  "moreOptions": "Weitere Optionen",
   "less": "Weniger",
   "noResults": "Keine Ergebnisse gefunden",
   "tryAgain": "Erneut versuchen",
   "learnMore": "Mehr erfahren",
   "viewAll": "Alle anzeigen",
   "copyToClipboard": "In die Zwischenablage kopieren",
-  "copied": "Kopiert!",
   "copy": "Kopieren",
-  "copyUnavailable": "Kopieren nicht möglich — bitte manuell kopieren",
   "untitled": "Ohne Titel",
   "appName": "initiative",
   "beta": "Beta",
+  "pageTitle": "{{name}} - Initiative",
   "send": "Senden",
   "submitting": "Wird gesendet…",
   "clear": "Leeren",
-  "pickEmoji": "Emoji auswählen",
   "previous": "Zurück",
-  "rowsPerPage": "Zeilen pro Seite:",
-  "pageOf": "Seite {{current}} von {{total}}",
-  "stepOf": "Schritt {{current}} von {{total}}",
-  "select": "Auswählen",
-  "exitSelection": "Auswahl beenden",
-  "enableSelectionMode": "Auswahlmodus aktivieren",
-  "exitSelectionMode": "Auswahlmodus beenden",
-  "resetSorting": "Sortierung zurücksetzen",
-  "groupBy": "Gruppieren nach",
-  "chooseGrouping": "Gruppierung wählen",
-  "columns": "Spalten",
-  "tableOptions": "Tabellenoptionen",
-  "rowsSelected": "{{selected}} von {{total}} Zeile(n) ausgewählt",
-  "rowsSelectedFiltered": "{{selected}} ausgewählt ({{total}} entsprechen dem Filter)",
   "selectAll": "Alle auswählen",
   "selectRow": "Zeile auswählen",
   "noResultsDot": "Keine Ergebnisse.",
-  "allSelected": "Alle ausgewählt",
-  "countSelected": "{{count}} ausgewählt",
-  "selectEllipsis": "Auswählen…",
-  "noOptionsAvailable": "Keine Optionen verfügbar",
   "clearAll": "Alle leeren",
   "calendar": {
     "today": "Heute",
@@ -169,7 +131,7 @@
     "tags": "Tags",
     "tagsDescription": "Füge Tags hinzu, um zu organisieren und zu filtern.",
     "tagsNoAccess": "Du benötigst Schreibzugriff, um Tags zu verwalten.",
-    "propertiesDescription": "Werte für die benutzerdefinierten Eigenschaften, die diese Initiative festlegt.",
+    "propertiesDescription": "Werte für die Metadaten, die diese Initiative festlegt.",
     "comments": "Kommentare",
     "commentsDescription": "Lass andere dies kommentieren. Wenn du Kommentare deaktivierst, bleibt alles bereits Verfasste erhalten und erscheint wieder, sobald du sie erneut aktivierst.",
     "commentsToggle": "Kommentare aktivieren",
@@ -242,11 +204,6 @@
     "viewTags": "Tags",
     "details": "Details"
   },
-  "emojiPicker": {
-    "searchPlaceholder": "Emoji suchen…",
-    "empty": "Keine Emojis gefunden.",
-    "prompt": "Emoji auswählen…"
-  },
   "reactions": {
     "add": "Reaktion hinzufügen",
     "quick": "Mit {{emoji}} reagieren",
@@ -258,16 +215,7 @@
     "namesAndMore_other": "{{names}} und {{count}} weitere Personen",
     "error": "Deine Reaktion konnte nicht gespeichert werden."
   },
-  "pagination": {
-    "perPage": "Pro Seite:",
-    "rangeOf": "{{start}}–{{end}} von {{total}}"
-  },
   "lightbox": {
-    "title": "Bild",
-    "description": "Mit den Pfeiltasten oder durch Wischen zwischen Bildern wechseln.",
-    "position": "{{current}} / {{total}}",
-    "zoomIn": "Vergrößern",
-    "zoomOut": "Verkleinern",
     "open": "Dieses Bild in voller Größe ansehen",
     "openNamed": "{{name}} in voller Größe ansehen"
   },
@@ -281,18 +229,8 @@
     "lastUpdated": "Zuletzt aktualisiert {{when}}"
   },
   "imagePicker": {
-    "chooseImage": "Bild auswählen",
     "takePhoto": "Foto aufnehmen",
-    "chooseFromLibrary": "Aus der Galerie wählen",
-    "chooseFile": "Datei auswählen",
-    "permission": "Initiative braucht Zugriff auf Kamera und Fotos. Erlaube ihn in den Geräteeinstellungen und versuche es erneut.",
-    "unavailable": "Dieses Gerät hat keine Kamera für ein Foto.",
-    "failed": "Dieses Foto konnte nicht gelesen werden. Versuche es erneut."
-  },
-  "fileDrop": {
-    "release": "Hier ablegen",
-    "unsupported": "Diese Art von Datei kann hier nicht hochgeladen werden.",
-    "tooLarge": "Diese Datei ist größer, als dieser Server annimmt."
+    "chooseFromLibrary": "Aus der Galerie wählen"
   },
   "archiveError": "Das konnte nicht archiviert werden. Bitte versuche es erneut.",
   "unarchiveError": "Das konnte nicht aus dem Archiv geholt werden. Bitte versuche es erneut.",
@@ -313,6 +251,8 @@
     "taskList": "Aufgabenliste",
     "more": "Weitere Formatierung",
     "image": "Bild",
+    "uploadImage": "Bild hochladen",
+    "imageFromFiles": "Aus Dateien",
     "uploadingImage": "{{name}} wird hochgeladen…",
     "imageUploadFailed": "Das Bild konnte nicht hinzugefügt werden."
   },
@@ -334,7 +274,13 @@
     "ready": "Version {{version}} ist bereit. Lade neu, um sie zu verwenden.",
     "reload": "Neu laden",
     "updated": "Auf Version {{version}} aktualisiert.",
-    "whatsNew": "Was ist neu"
+    "whatsNew": "Was ist neu",
+    "update": "Aktualisieren",
+    "action": {
+      "reload": "Lade neu, um die neue Version zu verwenden",
+      "restart": "Starte neu, um das Update der App abzuschließen",
+      "install": "Hol dir die neuere App, die diese Version braucht"
+    }
   },
   "nativeUpdate": {
     "unsigned": "Das Update dieses Servers wurde nicht von Initiative veröffentlicht, deshalb bleibt die App auf Version {{version}}.",
@@ -382,7 +328,8 @@
     "unsavedTitle": "Nicht gespeicherte Änderungen verwerfen?",
     "unsavedBody": "Du hast eine nicht gespeicherte Beschreibung. Wenn du jetzt gehst, geht sie verloren.",
     "leave": "Verlassen",
-    "stay": "Bleiben"
+    "stay": "Bleiben",
+    "undoSuggestion": "Vorschlag rückgängig machen"
   },
   "kinds": {
     "project": {
@@ -394,11 +341,6 @@
       "name": "Datei",
       "this": "diese Datei",
       "plural": "Dateien"
-    },
-    "queue": {
-      "name": "Warteschlange",
-      "this": "diese Warteschlange",
-      "plural": "Warteschlangen"
     },
     "counter_group": {
       "name": "Zählergruppe",
@@ -420,25 +362,20 @@
       "this": "diesen Beitrag",
       "plural": "Beiträge"
     },
-    "gallery": {
-      "name": "Galerie",
-      "this": "diese Galerie",
-      "plural": "Galerien"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "dieses Wiki",
       "plural": "Wikis"
     },
+    "contact": {
+      "name": "Kontakt",
+      "this": "diesen Kontakt",
+      "plural": "Kontakte"
+    },
     "task": {
       "name": "Aufgabe",
       "this": "diese Aufgabe",
       "plural": "Aufgaben"
-    },
-    "queue_item": {
-      "name": "Warteschlangenelement",
-      "this": "dieses Warteschlangenelement",
-      "plural": "Warteschlangenelemente"
     },
     "calendar_event": {
       "name": "Termin",
@@ -450,11 +387,6 @@
       "this": "diesen Zähler",
       "plural": "Zähler"
     },
-    "gallery_image": {
-      "name": "Bild",
-      "this": "dieses Bild",
-      "plural": "Bilder"
-    },
     "wiki_page": {
       "name": "Seite",
       "this": "diese Seite",
@@ -464,6 +396,11 @@
       "name": "Tag",
       "this": "diesen Tag",
       "plural": "Tags"
+    },
+    "collection": {
+      "name": "Sammlung",
+      "this": "diese Sammlung",
+      "plural": "Sammlungen"
     }
   }
 }

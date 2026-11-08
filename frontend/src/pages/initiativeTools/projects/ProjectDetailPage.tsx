@@ -1,15 +1,13 @@
 import { useParams, useRouter, useSearch } from "@tanstack/react-router";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectRelationships } from "@/components/projects/ProjectRelationships";
 import { ProjectTasksSection } from "@/components/projects/ProjectTasksSection";
-import { ProjectDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { clearLastUsedProject } from "@/components/tasks/CreateTaskWizard";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
@@ -20,6 +18,8 @@ import { useProject, useProjectTaskStatuses } from "@/hooks/useProjects";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { taskRoute, toolListRoute } from "@/lib/tools";
+import { ProjectDetailSkeleton } from "@/ui/page-skeletons";
+import { PullToRefresh } from "@/ui/pull-to-refresh";
 
 export const ProjectDetailPage = () => {
   const { t } = useTranslation("projects");
@@ -74,18 +74,6 @@ export const ProjectDetailPage = () => {
   // authority once it arrives — a URL naming a different one is corrected
   // rather than left to build links into an initiative it isn't in.
   const initiativeId = useCanonicalInitiativeId(project?.initiative_id);
-  const projectName = project?.name;
-  useEffect(() => {
-    if (typeof document === "undefined" || !projectName) {
-      return;
-    }
-    const previousTitle = document.title || "Initiative";
-    document.title = `${projectName} - Initiative`;
-    return () => {
-      document.title = previousTitle;
-    };
-  }, [projectName]);
-
   // Stable identity: the task table's column definitions and its memoized
   // cells both key off this. Declared with the other hooks, above the early
   // returns below.
@@ -110,6 +98,7 @@ export const ProjectDetailPage = () => {
         keys="projects:detail."
         backTo={gp(toolListRoute(Tool.project, initiativeId))}
         backLabel={t("detail.backToProjects")}
+        entity={{ kind: "project", id: parsedProjectId }}
       />
     );
   }

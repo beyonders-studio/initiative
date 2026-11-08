@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import builtin_announcements as builtins_module
@@ -20,6 +21,7 @@ from app.models.platform.announcement import (
     AnnouncementReadReceipt,
 )
 from app.models.platform.guild import CommunityRole
+from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import UserRole
 from app.schemas.platform.announcement import (
     AnnouncementSection,
@@ -29,6 +31,7 @@ from app.schemas.platform.announcement import (
 from app.services.platform import announcements as service
 from app.services.platform import app_settings as app_settings_service
 from app.testing.factories import create_guild, create_guild_membership, create_user
+from app.testing.notices import drain_notices
 
 
 @pytest.fixture(autouse=True)
@@ -346,6 +349,32 @@ async def test_dismissals_stop_counting_at_what_was_asked_for(session):
 
     receipt = await session.get(AnnouncementReadReceipt, (reader.id, key))
     assert receipt.dismiss_count == 2
+
+
+async def test_the_first_dismissal_leaves_one_read_line_in_the_bell(session):
+    """The bell is where a dismissed notice is found again: one line, read."""
+    author = await create_user(session, role=UserRole.owner)
+    reader = await create_user(session)
+    announcement = await _publish(session, author, dismissals_required=2)
+    key = f"db:{announcement.id}"
+
+    await service.record_receipt(session, user_id=reader.id, key=key, dismissed=False)
+    for _ in range(3):
+        await service.record_receipt(
+            session, user_id=reader.id, key=key, dismissed=True
+        )
+        await session.commit()
+        await drain_notices()
+
+    lines = (
+        await session.exec(
+            select(Notification).where(Notification.user_id == reader.id)
+        )
+    ).all()
+    assert [
+        (line.type, line.data["announcement_key"], line.data["title"]) for line in lines
+    ] == [(NotificationType.announcement, key, "Board view is new")]
+    assert lines[0].read_at is not None
 
 
 async def test_a_route_triggered_notice_is_returned_with_its_pattern(session):

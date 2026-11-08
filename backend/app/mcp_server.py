@@ -7,19 +7,19 @@ authentication and the six RLS gates apply by reuse — never re-implemented.
 The surface is curated and default-deny, so a newly added route can't silently
 become a tool:
   * **Reads** — every ``GET`` route for initiatives and for the tools they hold
-    (projects and tasks, files, queues, counters, calendars and their
-    events, wikis and their pages, notices, dashboards), plus the two comment
-    reads that pair with the comment write (a parent's thread and a single
-    comment by id), plus the one relationships read, which answers what a thing
-    is linked to, plus the guild's general search, which finds a thing by name,
+    (projects and tasks, files, counters, calendars and their events, wikis
+    and their pages, notices, dashboards), plus the two comment reads that
+    pair with the comment write (a parent's thread and a single comment by
+    id), plus the one relationships read, which answers what a thing is
+    linked to, plus the guild's general search, which finds a thing by name,
     plus the caller's list of communities, which says what ``community_id``
     every other tool takes. A handful are carved back out: file downloads, who
     voted and who has read, and the dashboard editor's own palette.
   * **Writes** — an explicit allow-list, matched by path shape: create and edit
-    every tool (projects, files, queues, counters, calendars, wikis,
-    notices, dashboards) and the things they hold (tasks, queue items, counters,
-    calendar events, wiki pages, comments), plus the two writes that shape alone
-    doesn't reach — moving a task, and moving a counter's count — plus drawing
+    every tool (projects, files, counters, calendars, wikis, notices,
+    dashboards) and the things they hold (tasks, counters, calendar events,
+    wiki pages, comments), plus the two writes that shape alone doesn't
+    reach — moving a task, and moving a counter's count — plus drawing
     one relationship between two of them. Each is gated client-side by Claude Code's
     per-write permission prompt. Destructive (delete, archive, reset), bulk
     (reorder, batch, archive-all, replacing a thing's links wholesale),
@@ -48,6 +48,7 @@ from app.mcp_descriptions import describe as describe_tool
 from app.models.tenant.task import TaskStatusCategory
 from app.core.tools import Tool
 from app.services import fields as fields_registry
+from app.services.compact import trim
 
 if TYPE_CHECKING:
     import mcp.types as mt
@@ -62,9 +63,9 @@ if TYPE_CHECKING:
 # Every tool an initiative holds is readable, not only the two it starts with.
 # An agent asked "how is this going" was previously answering from tasks alone,
 # which is the shape of the question rather than the shape of the work: the
-# rota is a queue, the write-up is a file, the numbers are counters, and
-# what somebody would actually look at first is a dashboard. The write surface
-# in ``_WRITE_ROUTE_MAPS`` covers the same set, so what an agent can read it can
+# write-up is a file, the numbers are counters, and what somebody would
+# actually look at first is a dashboard. The write surface in
+# ``_WRITE_ROUTE_MAPS`` covers the same set, so what an agent can read it can
 # also author and edit.
 READ_TAGS = (
     # Every tool's own tag, as its list is published under.
@@ -123,13 +124,12 @@ _WRITABLE_SEGMENTS = (
     # Every tool an initiative holds, addressed by its own path segment.
     *((tool.route_segment, tool.route_segment) for tool in Tool),
     # And what those tools hold in turn: a project's tasks, a calendar's
-    # events, a queue's items, a counter group's counters, a wiki's pages. Not
-    # derivable from the enum — each names its parent differently — so each is
-    # spelled out. Tasks and events name their parent in the body; the other
-    # three are added under it, and edited at their own id like the rest.
+    # events, a counter group's counters, a wiki's pages. Not derivable from
+    # the enum — each names its parent differently — so each is spelled out.
+    # Tasks and events name their parent in the body; the other two are added
+    # under it, and edited at their own id like the rest.
     ("tasks", "tasks"),
     ("calendar-events", "calendar-events"),
-    ("queues/" + _ID + "/items", "queue-items"),
     ("counter-groups/" + _ID + "/counters", "counters"),
     ("wikis/" + _ID + "/pages", "wiki-pages"),
     # The comment surface every tool shares.
@@ -184,7 +184,7 @@ _WRITE_ROUTE_MAPS = [
 # The other two stay behind the default-deny catch-all. ``GET /comments/recent``
 # is a guild-wide activity feed rather than a working surface — the same reason
 # ``join-requests`` is carved out of the ``initiatives`` tag — and it reaches
-# comments on parents (files, queues, counters, calendars, dashboards) that
+# comments on parents (files, counters, calendars, dashboards) that
 # the tool surface otherwise doesn't cover, undirected by any task at hand.
 # ``GET /comments/mentions/search`` backs the editor's @-mention picker; the
 # member and task lookups an agent needs are already tools of their own.
@@ -215,10 +215,10 @@ _SEARCH_READ_ROUTE_MAPS = [
 #
 # ``GET /relationships/`` answers what no tool read can: a task's payload
 # carries its status, its people and its tags, but nothing about the task it
-# blocks, the file it was written from, or the queue item it came out of —
-# and that wiring is most of what "what is the state of this" means once a piece
-# of work touches more than one tool. It answers for one thing at a time
-# (``entity=task:12``), from that thing's side.
+# blocks or the file it was written from — and that wiring is most of what
+# "what is the state of this" means once a piece of work touches more than one
+# tool. It answers for one thing at a time (``entity=task:12``), from that
+# thing's side.
 #
 # ``POST /relationships/`` is the same create-and-edit reasoning the tool writes
 # follow: what an agent can read it can also author, and an agent that files a
@@ -273,6 +273,16 @@ _TOOL_READ_EXCLUSIONS = [
 ]
 
 _ROUTE_MAPS = [
+    # A collection's own writes are not on the write surface, and adding files
+    # to one would otherwise read as creating a file.
+    RouteMap(
+        methods=["POST", "PATCH", "DELETE"],
+        pattern=r".*/collections/.*",
+        mcp_type=MCPType.EXCLUDE,
+    ),
+    # Nor are imports, and importing contacts would otherwise read as creating
+    # one.
+    RouteMap(methods=["POST"], pattern=r".*/imports/.*", mcp_type=MCPType.EXCLUDE),
     *_WRITE_ROUTE_MAPS,
     *_COMMENT_READ_ROUTE_MAPS,
     *_SEARCH_READ_ROUTE_MAPS,
@@ -294,87 +304,19 @@ _ROUTE_MAPS = [
 ]
 
 
-# A tool result is read by a model, and every field it carries is context the
-# caller pays for. The route JSON is shaped for the app, so before it reaches
-# the caller the result is trimmed of what a model never acts on:
-#
-#   * an absent value — a ``null``, an empty list, an empty object. Most of a
-#     task row's fields are unset most of the time; leaving the key out says
-#     the same thing.
-#   * pictures — any ``*_base64`` data URI (a single avatar is often larger
-#     than the rest of a task read combined) and any ``avatar_url``. Neither is
-#     anything a caller can open or act on.
-#   * a property's option list after the first row that carried it. A task list
-#     repeats each property's whole definition — every option, label and colour
-#     — on every row, which was nearly a quarter of a page of tasks. The first
-#     row keeps it, so the caller still learns what the property accepts. A
-#     repeat is the same id *and* the same options: ids are numbered per
-#     community, and a cross-community list can hold two properties that share
-#     one.
-#
-# Colours, icons and positions stay: the write tools set them, so a caller can
-# be asked about them.
-#
-# A free-form field — a file's content, a dashboard's config, a property's
-# value — passes through verbatim: what is inside it is the document's own,
-# and a ``null`` there can mean something. Which fields are free-form is read
-# off each tool's response schema when the server is built (see
-# ``_free_form_keys``), so a new one is left alone by construction.
-#
-# Removing keys is possible because the tools publish no output schema (see
-# ``_drop_output_schema``); against one, a missing key fails the client's
-# validation.
-_BASE64_SUFFIX = "_base64"
-_UNREAD_KEYS = frozenset({"avatar_url"})
-
-
-def _is_absent(value: Any) -> bool:
-    return value is None or value == [] or value == {}
-
-
-def _trim(
-    value: Any,
-    free_form: frozenset[str] = frozenset(),
-    seen_properties: set[Any] | None = None,
-) -> Any:
-    """Return ``value`` without the fields a caller never acts on.
-
-    Returns a new structure; the input is left untouched. ``free_form`` names
-    the keys whose values pass through as they are; ``seen_properties`` carries
-    the (property id, options) pairs a row earlier in the same result has
-    already shown.
-    """
-    if seen_properties is None:
-        seen_properties = set()
-    if isinstance(value, list):
-        return [_trim(v, free_form, seen_properties) for v in value]
-    if not isinstance(value, dict):
-        return value
-
-    trimmed: dict[str, Any] = {}
-    repeats_options = False
-    if "options" in value and value.get("property_id") is not None:
-        shown = (value["property_id"], json.dumps(value["options"], sort_keys=True))
-        repeats_options = shown in seen_properties
-        seen_properties.add(shown)
-    for key, v in value.items():
-        if key in _UNREAD_KEYS or key.endswith(_BASE64_SUFFIX):
-            continue
-        if key == "options" and repeats_options:
-            continue
-        if key not in free_form:
-            v = _trim(v, free_form, seen_properties)
-        if not _is_absent(v):
-            trimmed[key] = v
-    return trimmed
-
-
 class TrimResultMiddleware(Middleware):
-    """Trim every tool result to what a caller acts on (see ``_trim``).
+    """Trim every tool result to what a caller acts on (see
+    :func:`app.services.compact.trim`).
 
     Route-backed tools return the raw route JSON. Trimming here — after the
     route (and its RLS gates) have run — only removes fields from the payload;
-    it never adds, changes or reorders anything.
+    it never adds, changes or reorders anything. Which fields are free-form is
+    read off each tool's response schema when the server is built (see
+    ``_free_form_keys``), so a new one is left alone by construction.
+
+    Removing keys is possible because the tools publish no output schema (see
+    ``_drop_output_schema``); against one, a missing key fails the client's
+    validation.
     """
 
     def __init__(self, free_form_keys: dict[str, frozenset[str]] | None = None):
@@ -395,7 +337,7 @@ class TrimResultMiddleware(Middleware):
         # The text block is serialized from the trimmed structure, so the two
         # always say the same thing.
         return ToolResult(
-            structured_content=_trim(result.structured_content, free_form),
+            structured_content=trim(result.structured_content, free_form),
             meta=result.meta,
             is_error=result.is_error,
         )
@@ -467,7 +409,7 @@ def _conditions_description(dataset_name: str | None) -> str:
         return _CONDITIONS_SHAPE
     lines = [
         _field_line(field["name"], field["ops"], field["options"])
-        for field in fields_registry.describe(dataset_name)
+        for field in fields_registry.describe(fields_registry.dataset(dataset_name))
     ]
     spec = fields_registry.dataset(dataset_name)
     for name in _EXTRA_FILTER_FIELDS.get(dataset_name, ()):
@@ -477,7 +419,7 @@ def _conditions_description(dataset_name: str | None) -> str:
     text = f"{_CONDITIONS_SHAPE} Fields: {'; '.join(lines)}."
     if "property_values" in spec.by_name:
         text += (
-            " A custom property: "
+            " A property or metadata: "
             '{"field": "property_values", "op": "eq", "value": '
             '{"property_id": <id>, "value": <value>}}.'
         )
@@ -490,7 +432,11 @@ def _sorting_description(dataset_name: str | None) -> str:
     # The fields a client offers that also sort, and the ones declared only to
     # be sorted on (a date window, a board column, a tag), which the offered
     # set — a set of filters — never holds.
-    names = [f["name"] for f in fields_registry.describe(dataset_name) if f["sortable"]]
+    names = [
+        f["name"]
+        for f in fields_registry.describe(fields_registry.dataset(dataset_name))
+        if f["sortable"]
+    ]
     names += [
         spec.name
         for spec in fields_registry.dataset(dataset_name).fields
@@ -614,7 +560,7 @@ def _free_form_keys(schema: dict[str, Any] | None) -> frozenset[str]:
 
     A free-form value is one the schema gives no shape to — no type, or an
     object with no properties: a document's content, a dashboard's config, a
-    property's value. ``_trim`` passes these through verbatim.
+    property's value. ``trim`` passes these through verbatim.
     """
     if not schema:
         return frozenset()
@@ -670,7 +616,7 @@ def _drop_output_schema(component: object) -> None:
     A route's response schema is most of what ``tools/list`` sends — four
     fifths of it, in one measurement — and is there for a client to validate
     the structured result against, not for a model to read. Without it the
-    result is still structured, and ``_trim`` may leave out keys the schema
+    result is still structured, and ``trim`` may leave out keys the schema
     would have required.
     """
     if getattr(component, "output_schema", None) is not None:

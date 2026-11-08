@@ -84,7 +84,7 @@
     "people": {
       "prompt": "Wer sind diese Personen hier?",
       "note": "Wähle, wer jede Person hier ist. Genaue Handle-Treffer sind schon eingetragen; leer gelassen bleibt nur der Name.",
-      "access": "Wer zugewiesen, eingeladen oder in einer Eigenschaft genannt wird, wird der Initiative hinzugefügt, wenn du sie verwaltest, und erhält Zugriff auf das Importierte.",
+      "access": "Wer zugewiesen, eingeladen oder in Metadaten genannt wird, wird der Initiative hinzugefügt, wenn du sie verwaltest, und erhält Zugriff auf das Importierte.",
       "comments_one": "{{count}} Kommentar",
       "comments_other": "{{count}} Kommentare",
       "unmapped": "Niemand hier",
@@ -103,7 +103,10 @@
       "assets": "{{restored}} Dateien wiederhergestellt, {{deduped}} bereits vorhanden",
       "unmatchedHandles": "Einige Personen wurden nicht zugeordnet. Niemand hier passt zu ihnen, oder du kannst sie dieser Initiative nicht hinzufügen: {{handles}}",
       "failedEntries": "Nicht importierte Elemente:",
-      "nothing": "Es wurde nichts importiert."
+      "nothing": "Es wurde nichts importiert.",
+      "failedRows_one": "{{count}} Zeile wurde ausgelassen:",
+      "failedRows_other": "{{count}} Zeilen wurden ausgelassen:",
+      "failedRow": "Zeile {{row}} · {{field}}"
     },
     "atlassian": {
       "connect": {
@@ -172,7 +175,7 @@
         "files_other": "{{count}} angehängte Dateien, jeweils an ihrer Aufgabe ({{size}})",
         "sprints_one": "{{count}} Sprint in {{calendars}} Kalender(n)",
         "sprints_other": "{{count}} Sprints in {{calendars}} Kalender(n)",
-        "propertiesTitle": "Felder, die zu Eigenschaften werden",
+        "propertiesTitle": "Felder, die zu Metadaten werden",
         "propertiesHint": "Entferne das Häkchen bei allem, was dieser Initiative nicht hinzugefügt werden soll.",
         "propertyCount_one": "{{count}} Aufgabe",
         "propertyCount_other": "{{count}} Aufgaben",
@@ -224,11 +227,37 @@
         "filesBlocked_other": "{{count}} Dateien, weil in dieser Initiative Dateien ausgeschaltet sind",
         "dropped": "Ausgelassen: {{items}}"
       }
+    },
+    "contacts": {
+      "title": "Kontakte importieren",
+      "fileHint": "Eine CSV-Datei: ein Kontakte-Export oder eine als CSV gespeicherte Tabelle.",
+      "filePrompt": "CSV-Datei auswählen",
+      "where": "In einer Tabellenkalkulation: Datei → Herunterladen oder Speichern unter → CSV",
+      "columnsPrompt": "Was steht in jeder Spalte?",
+      "rows_one": "{{count}} Zeile zu importieren",
+      "rows_other": "{{count}} Zeilen zu importieren",
+      "note": "Jede Zeile wird zu einem neuen Kontakt. Eine Zeile, die nicht gelesen werden kann, wird ausgelassen, und der Bericht nennt sie.",
+      "untitled": "Spalte {{n}}",
+      "labelOf": "Bezeichnung für {{column}}",
+      "labelFrom": "Bezeichnung aus {{column}}",
+      "noLabel": "Keine Bezeichnung",
+      "targets": {
+        "ignore": "Auslassen",
+        "name": "Name",
+        "type": "Person oder Organisation",
+        "emails": "E-Mail",
+        "phones": "Telefon",
+        "addresses": "Adresse",
+        "websites": "Website",
+        "organization": "Organisation",
+        "tags": "Tags",
+        "properties": "Eigenschaften"
+      }
     }
   },
   "envelope": {
     "title": "Aus Datei importieren",
-    "description": "Importiere eine aus Initiative exportierte Datei: eine JSON-Datei oder eine ZIP-Datei, wenn der Export seine Dateien mitbringt, etwa die Bilder einer Galerie. Der Inhalt wird in der gewählten Initiative erstellt.",
+    "description": "Importiere eine aus Initiative exportierte Datei: eine JSON-Datei oder eine ZIP-Datei, wenn der Export seine Dateien mitbringt, etwa die eines Wikis. Der Inhalt wird in der gewählten Initiative erstellt.",
     "selectFile": "Exportdatei",
     "parseError": "Diese Datei ist kein bekannter Initiative-Export.",
     "wrongTool": "Diese Datei ist ein {{type}}-Export — importiere sie über die Seite dieses Werkzeugs.",
@@ -270,13 +299,13 @@
       "backup": "Backup",
       "initiative-project": "Projekt",
       "initiative-file": "Datei",
-      "initiative-queue": "Warteschlange",
       "initiative-calendar": "Kalender",
       "initiative-post": "Beitrag",
       "initiative-wiki": "Wiki",
-      "initiative-gallery": "Galerie",
+      "initiative-contact": "Kontakt",
       "initiative-counter-group": "Zählergruppe",
-      "initiative-dashboard": "Dashboard"
+      "initiative-dashboard": "Dashboard",
+      "contacts-csv": "Kontakte aus einer Tabelle"
     },
     "cancel": "Abbrechen",
     "viewReport": "Bericht anzeigen",

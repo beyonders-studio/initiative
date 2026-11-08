@@ -89,6 +89,9 @@ export interface FilterFieldSpec {
    *  Sent by the server, read off the column that stores them — so a value
    *  added by a migration is offered here without a frontend release. */
   options?: readonly string[];
+  /** What it is called, for a field that is not one of the registry's own:
+   *  a range's column, named by its header as written. */
+  label?: string;
 }
 
 /** Where a closed vocabulary's labels live, by the field that holds it.

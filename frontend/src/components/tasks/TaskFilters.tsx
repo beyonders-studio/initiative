@@ -15,16 +15,6 @@ import {
   type PropertyFilterCondition,
 } from "@/components/properties/PropertyFilter";
 import { TagPicker } from "@/components/tags/TagPicker";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useTags } from "@/hooks/useTags";
 import type { MemberSearchScope } from "@/hooks/useUsers";
 import {
@@ -36,6 +26,10 @@ import {
 } from "@/lib/filters/taskFilters";
 import { pluginFilterFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Combobox } from "@/ui/combobox";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /**
  * Task statuses are per-project rows, so filtering by a status *id* only means
@@ -62,6 +56,8 @@ export type TaskFiltersScope =
       types?: TaskTypeRead[];
       /** Scopes the property filter's definitions. */
       initiativeId?: number;
+      /** The one project listed, whose metadata the filter offers too. */
+      projectId?: number;
     }
   | {
       kind: "mine";
@@ -200,13 +196,14 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
           >
             {t("filters.filterByStatus")}
           </Label>
-          <MultiSelect
+          <Combobox
+            multiple
             id="status-filter"
-            selectedValues={[
+            value={[
               ...value.status_ids.map(String),
               ...value.status_categories.map((category) => `${CATEGORY_PREFIX}${category}`),
             ]}
-            options={[
+            items={[
               ...taskStatuses.map((status) => ({
                 value: String(status.id),
                 label: status.name,
@@ -217,7 +214,7 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
                 group: t("filters.statusCategory"),
               })),
             ]}
-            onChange={(values) =>
+            onValueChange={(values) =>
               patch({
                 status_ids: values
                   .filter((entry) => !entry.startsWith(CATEGORY_PREFIX))
@@ -240,14 +237,17 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
             >
               {t("filters.filterByType")}
             </Label>
-            <MultiSelect
+            <Combobox
+              multiple
               id="type-filter"
-              selectedValues={value.type_ids.map(String)}
-              options={(project.types ?? []).map((type) => ({
+              value={value.type_ids.map(String)}
+              items={(project.types ?? []).map((type) => ({
                 value: String(type.id),
                 label: type.name,
               }))}
-              onChange={(values) => patch({ type_ids: values.map(Number).filter(Number.isFinite) })}
+              onValueChange={(values) =>
+                patch({ type_ids: values.map(Number).filter(Number.isFinite) })
+              }
               placeholder={t("filters.allTypes")}
               emptyMessage={t("filters.allTypes")}
             />
@@ -260,14 +260,15 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
           >
             {t("tasks:filters.filterByPriority")}
           </Label>
-          <MultiSelect
+          <Combobox
+            multiple
             id="priority-filter"
-            selectedValues={value.priorities}
-            options={PRIORITY_ORDER.map((priority) => ({
+            value={value.priorities}
+            items={PRIORITY_ORDER.map((priority) => ({
               value: priority,
               label: t(`tasks:priority.${priority}` as never),
             }))}
-            onChange={(values) => patch({ priorities: values as TaskPriority[] })}
+            onValueChange={(values) => patch({ priorities: values as TaskPriority[] })}
             placeholder={t("tasks:filters.allPriorities")}
             emptyMessage={t("tasks:filters.noPriorities")}
           />
@@ -280,14 +281,15 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
             >
               {t("tasks:filters.filterByCommunity")}
             </Label>
-            <MultiSelect
+            <Combobox
+              multiple
               id="community-filter"
-              selectedValues={value.community_ids.map(String)}
-              options={scope.communities.map((community) => ({
+              value={value.community_ids.map(String)}
+              items={scope.communities.map((community) => ({
                 value: String(community.id),
                 label: community.name,
               }))}
-              onChange={(values) =>
+              onValueChange={(values) =>
                 patch({ community_ids: values.map(Number).filter(Number.isFinite) })
               }
               placeholder={t("tasks:filters.allCommunities")}
@@ -335,6 +337,7 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
       </div>
       <PropertyFilter
         initiativeId={project?.initiativeId}
+        owner={project?.projectId ? { kind: "project", id: project.projectId } : undefined}
         value={value.properties}
         plugins={{ fields: pluginFields, value: value.plugins }}
         onChange={(properties: PropertyFilterCondition[], plugins) =>

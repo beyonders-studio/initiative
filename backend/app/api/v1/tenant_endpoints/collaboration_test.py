@@ -24,8 +24,8 @@ from app.api.v1.tenant_endpoints.collaboration import MSG_AWARENESS
 from app.core.security import create_upload_token
 from app.core.user_display import handle_of
 from app.models.platform.access_grant import AccessGrant
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.wiki import WikiPage
 from app.testing import (
     create_file,
@@ -49,6 +49,9 @@ from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.services import permissions as permissions_service
 from app.testing import route_as
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.services.platform import rules
 
 WHITEBOARD = {"elements": [], "appState": {}, "files": {}}
 
@@ -140,7 +143,7 @@ async def test_a_handover_merges_into_the_room_and_saves_both_views(
         session,
         owner.initiative,
         owner.user,
-        file_type=FileType.whiteboard,
+        file_type=FileType.excalidraw,
         content=WHITEBOARD,
         yjs_state=stored,
     )
@@ -255,7 +258,7 @@ async def test_two_processes_saving_one_body_keep_each_others_edits(
     up holding both processes' edits, not the last writer's."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     doc = await create_file(
-        session, owner.initiative, owner.user, file_type=FileType.spreadsheet
+        session, owner.initiative, owner.user, file_type=FileType.sheet
     )
     one, room_one = await _a_process_editing(owner, doc.id, role_session)
     two, room_two = await _a_process_editing(owner, doc.id, role_session)
@@ -284,7 +287,7 @@ async def test_a_room_takes_what_another_process_saved_on_the_next_sweep(
     the room has nothing of its own to write back for it."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     doc = await create_file(
-        session, owner.initiative, owner.user, file_type=FileType.spreadsheet
+        session, owner.initiative, owner.user, file_type=FileType.sheet
     )
     here, watching = await _a_process_editing(owner, doc.id, role_session)
     elsewhere, editing = await _a_process_editing(owner, doc.id, role_session)
@@ -414,10 +417,11 @@ async def test_a_handover_answers_a_community_that_asks_for_a_passkey(
     opened with a password is refused."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     doc = await create_file(session, owner.initiative, owner.user)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=owner.guild.id, policy="required", require_methods=["passkey"]
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.passkey})),
+        guild_id=owner.guild.id,
     )
     await session.commit()
 
@@ -502,7 +506,7 @@ async def test_a_read_grant_cannot_hand_over(
     needs."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     doc = await create_file(session, owner.initiative, owner.user)
-    grantee = await create_user(session)
+    grantee = await create_user(session, role=UserRole.support)
     await _approved_grant(
         session, user=grantee, guild=owner.guild, owner=owner.user, level="read"
     )

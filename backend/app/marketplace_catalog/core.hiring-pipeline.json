@@ -5,11 +5,11 @@
   "name": "Hiring pipeline",
   "publisher": "Initiative",
   "description": "Candidates on a board, so nobody waits three weeks to hear back.",
-  "long_description": "Each candidate is a card that moves from Applied through Screening, Interviewing and Offer to Hired, or to Not moving forward, which is kinder than a column called Rejected.\n\nCards record the role, where the candidate came from, how they would work and when the interview is. Give each card a checklist of your steps, such as phone screen, interviews, references, offer letter and start date, so every candidate gets the same process.\n\nAssign each card to whoever owes the candidate an answer next. That is usually the whole problem.",
+  "long_description": "Each candidate is a card that moves from Applied through Screening, Interviewing and Offer to Hired, or to Not moving forward, which is kinder than a column called Rejected.\n\nCards record the role, where the candidate came from, how they would work and when the interview is. Give each card a checklist of your steps, such as phone screen, interviews, references, offer letter and start date, so every candidate gets the same process.\n\nAssign each card to whoever owes the candidate an answer next. That is usually the whole problem.\n\nVolunteers go through the same columns with a shorter checklist: an intro chat, a background check, an induction and a first shift.",
   "avatar_url": "/marketplace/core-hiring-pipeline.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Opens on the board. Each card shows the role and interview date, and a candidate's page keeps their details together.",
+  "version": "1.2.0",
+  "release_notes": "Candidates and volunteers are each their own type, with a page of their own, and each starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -75,13 +75,49 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Candidate",
+        "is_default": true,
+        "color": "#60A5FA",
+        "icon": "user-round",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Phone screen",
+            "Interviews",
+            "References",
+            "Offer letter",
+            "Start date set"
+          ]
+        },
+        "position": 0
+      },
+      {
+        "name": "Volunteer",
+        "is_default": false,
+        "color": "#F59E0B",
+        "icon": "hand-helping",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Intro chat",
+            "Background check",
+            "Induction",
+            "First shift booked"
+          ]
+        },
+        "position": 1
+      }
+    ],
     "property_definitions": [
       {
         "name": "Role",
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Source",
@@ -109,7 +145,8 @@
             "label": "Recruiter",
             "color": "#F59E0B"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Work location",
@@ -132,21 +169,24 @@
             "label": "Remote",
             "color": null
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Interview date",
         "type": "date",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Portfolio",
         "type": "url",
         "position": 4.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [],
@@ -164,10 +204,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -271,6 +327,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -311,6 +370,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -339,6 +401,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -347,6 +410,12 @@
                 "title": "Candidate"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -388,9 +457,84 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "priority"
                   }
                 },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Volunteer"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
                 {
                   "type": "field",
                   "props": {
@@ -404,6 +548,12 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {
@@ -496,13 +646,49 @@
         "is_default": false
       }
     ],
+    "task_types": [
+      {
+        "name": "Candidate",
+        "is_default": true,
+        "color": "#60A5FA",
+        "icon": "user-round",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Phone screen",
+            "Interviews",
+            "References",
+            "Offer letter",
+            "Start date set"
+          ]
+        },
+        "position": 0
+      },
+      {
+        "name": "Volunteer",
+        "is_default": false,
+        "color": "#F59E0B",
+        "icon": "hand-helping",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Intro chat",
+            "Background check",
+            "Induction",
+            "First shift booked"
+          ]
+        },
+        "position": 1
+      }
+    ],
     "property_definitions": [
       {
         "name": "Role",
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Source",
@@ -530,7 +716,8 @@
             "label": "Recruiter",
             "color": "#F59E0B"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Work location",
@@ -553,21 +740,24 @@
             "label": "Remote",
             "color": null
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Interview date",
         "type": "date",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Portfolio",
         "type": "url",
         "position": 4.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [
@@ -608,19 +798,23 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Support specialist"
+            "value_text": "Support specialist",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "careers-page"
+            "value_text": "careers-page",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "remote"
+            "value_text": "remote",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Ben W.",
@@ -659,19 +853,23 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Office manager"
+            "value_text": "Office manager",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "job-board"
+            "value_text": "job-board",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "on-site"
+            "value_text": "on-site",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Chloe D.",
@@ -710,24 +908,29 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Frontend engineer"
+            "value_text": "Frontend engineer",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "hybrid"
+            "value_text": "hybrid",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-05"
+            "value_text": "2000-01-05",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Diego M.",
@@ -766,24 +969,29 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Support specialist"
+            "value_text": "Support specialist",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "job-board"
+            "value_text": "job-board",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "remote"
+            "value_text": "remote",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-07"
+            "value_text": "2000-01-07",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Elena V.",
@@ -822,24 +1030,29 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Frontend engineer"
+            "value_text": "Frontend engineer",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "recruiter"
+            "value_text": "recruiter",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "remote"
+            "value_text": "remote",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-04"
+            "value_text": "2000-01-04",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Farid H.",
@@ -878,24 +1091,29 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Office manager"
+            "value_text": "Office manager",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "on-site"
+            "value_text": "on-site",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-03"
+            "value_text": "2000-01-03",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Grace L.",
@@ -934,24 +1152,81 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Frontend engineer"
+            "value_text": "Frontend engineer",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "careers-page"
+            "value_text": "careers-page",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "hybrid"
+            "value_text": "hybrid",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-03"
+            "value_text": "2000-01-03",
+            "project": true
           }
-        ]
+        ],
+        "type_name": "Candidate"
+      },
+      {
+        "title": "Hamish P.",
+        "description": "Wants Saturday mornings. Has a van, which is more than most of us can say.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-07T12:00:00+00:00",
+        "recurrence": null,
+        "status_name": "Screening",
+        "position": 3.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Intro chat",
+            "done": true
+          },
+          {
+            "text": "Background check",
+            "done": false
+          },
+          {
+            "text": "Induction",
+            "done": false
+          },
+          {
+            "text": "First shift booked",
+            "done": false
+          }
+        ],
+        "properties": [
+          {
+            "property_name": "Role",
+            "property_type": "text",
+            "value_text": "Weekend driver",
+            "project": true
+          },
+          {
+            "property_name": "Source",
+            "property_type": "select",
+            "value_text": "referral",
+            "project": true
+          },
+          {
+            "property_name": "Interview date",
+            "property_type": "date",
+            "value_text": "2000-01-07",
+            "project": true
+          }
+        ],
+        "type_name": "Volunteer",
+        "completed_at": null
       }
     ],
     "layouts": [
@@ -968,10 +1243,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -1075,6 +1366,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -1115,6 +1409,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -1143,6 +1440,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -1151,6 +1449,12 @@
                 "title": "Candidate"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -1192,9 +1496,84 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "priority"
                   }
                 },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Volunteer"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
                 {
                   "type": "field",
                   "props": {
@@ -1208,6 +1587,12 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {

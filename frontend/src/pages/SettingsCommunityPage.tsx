@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
@@ -6,32 +6,29 @@ import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityArtworkPanel } from "@/components/communities/CommunityArtworkPanel";
 import { CommunityDiscoveryPanel } from "@/components/communities/CommunityDiscoveryPanel";
 import { CommunityLocationPanel } from "@/components/communities/CommunityLocationPanel";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 
 export const SettingsCommunityPage = () => {
   const { activeCommunity, refreshCommunities, updateCommunityInState } = useCommunities();
   const { t } = useTranslation(["communities", "common"]);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState(activeCommunity?.name ?? "");
+  const [description, setDescription] = useState(activeCommunity?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!activeCommunity) {
-      setName("");
-      setDescription("");
-      return;
-    }
-    setName(activeCommunity.name);
-    setDescription(activeCommunity.description ?? "");
-  }, [activeCommunity]);
+  const [prevCommunity, setPrevCommunity] = useState(activeCommunity);
+  if (prevCommunity !== activeCommunity) {
+    setPrevCommunity(activeCommunity);
+    setName(activeCommunity?.name ?? "");
+    setDescription(activeCommunity?.description ?? "");
+  }
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

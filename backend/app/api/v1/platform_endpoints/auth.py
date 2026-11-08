@@ -262,7 +262,7 @@ async def register_user(
     await require_login_method(session, LoginMethod.password)
     # Enforce password policy (NIST 800-63B: length + HIBP breach check) before
     # we hash. Raises 422 PASSWORD_TOO_SHORT / PASSWORD_BREACHED on failure.
-    await validate_new_password(user_in.password)
+    await validate_new_password(session, user_in.password)
     registered = await _register_account(
         request,
         session,
@@ -330,7 +330,11 @@ async def _registration_gate(
     # Registration is closed without an invite when public registration or
     # guild creation is off. The very first account bootstraps the deployment
     # and is always allowed.
-    if not settings.registration_open and not invite and not is_first_user:
+    if (
+        not invite
+        and not is_first_user
+        and not await app_settings_service.registration_open(session)
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=AuthMessages.REGISTRATION_REQUIRES_INVITE,
@@ -649,11 +653,14 @@ async def begin_passkey_sign_up(
         account_name=normalize_email(payload.email),
         display_name=payload.username.strip(),
     )
+    # An app's registration is bound to the app's challenge, so only the app
+    # can finish it.
     await challenge_service.create(
         session,
         user_id=None,
         purpose=challenge_service.ChallengePurpose.passkey_sign_up,
         value=bytes_to_base64url(ceremony.challenge),
+        answer=payload.code_challenge or None,
     )
     await session.commit()
     return PasskeyRegistrationOptions(options=ceremony.options)
@@ -690,6 +697,7 @@ async def finish_passkey_sign_up(
         user_id=None,
         credential=payload.credential,
         purposes=_SIGN_UP_PURPOSES,
+        code_verifier=payload.code_verifier,
     )
     if isinstance(registered, passkey_service.PresentationRefused):
         await registered.settle(session)
@@ -727,14 +735,20 @@ async def finish_passkey_sign_up(
         amr=passkey_amr(backed_up=registered.backed_up),
         audit_detail={"method": "passkey", "during": "registration"},
     )
-    return PasskeySignUpResult(access_token=token.access_token, codes=account.codes)
+    return PasskeySignUpResult(
+        access_token=token.access_token,
+        refresh_token=token.refresh_token,
+        codes=account.codes,
+    )
 
 
 @router.get("/bootstrap")
 async def bootstrap_status(session: SessionDep) -> dict[str, bool]:
     return {
         "has_users": await any_account_exists(session),
-        "public_registration_enabled": settings.registration_open,
+        "public_registration_enabled": await app_settings_service.registration_open(
+            session
+        ),
         "demo": settings.DEMO_MODE,
     }
 
@@ -2039,7 +2053,7 @@ async def reset_password(
     await require_login_method(session, LoginMethod.password)
     # Run the policy first so an invalid candidate doesn't burn the
     # reset token; ``consume_token`` is one-shot.
-    await validate_new_password(payload.password)
+    await validate_new_password(session, payload.password)
     record = await user_tokens.consume_token(
         system_session,
         token=payload.token,

@@ -5,7 +5,9 @@ import type {
   AIProvider,
   ConnectionScope,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -13,19 +15,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { SuggestCombobox } from "@/components/ui/suggest-combobox";
-import { Switch } from "@/components/ui/switch";
-import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 import { AIConnectionCommunitiesField } from "./AIConnectionCommunitiesField";
 import type { ConnectionMutations } from "./aiConnection.types";
@@ -162,17 +156,21 @@ export const AIConnectionDialog = ({
           {form.provider && (
             <div className="space-y-2">
               <Label>{t("ai.modelLabel")}</Label>
-              <SuggestCombobox
-                suggestions={modelOptions}
+              <Combobox
+                items={modelOptions.map((model) => ({ value: model, label: model }))}
                 value={form.model}
+                selectedLabel={form.model}
                 onValueChange={(value) => setField("model", value)}
                 placeholder={t("aiConnections.modelPlaceholder")}
                 searchPlaceholder={t("aiConnections.modelSearchPlaceholder")}
                 loadingLabel={t("aiConnections.modelsLoading")}
-                emptyLabel={t("aiConnections.modelsEmpty")}
+                emptyMessage={t("aiConnections.modelsEmpty")}
                 typedLabel={(value) => t("aiConnections.modelUseTyped", { value })}
-                onOpen={fetchModels}
-                isLoading={isFetchingModels}
+                onOpenChange={(open) => {
+                  if (open) fetchModels();
+                }}
+                // The models already listed stay listed while they are looked up again.
+                loading={isFetchingModels && modelOptions.length === 0}
               />
               {!form.model && (
                 <p className="text-muted-foreground text-xs">
@@ -188,19 +186,6 @@ export const AIConnectionDialog = ({
               onChange={(communities) => setField("communities", communities)}
             />
           )}
-
-          <div className="flex items-center justify-between rounded-md border px-4 py-3">
-            <div>
-              <p className="font-medium">{t("aiConnections.enabledLabel")}</p>
-              <p className="text-muted-foreground text-sm">
-                {t("aiConnections.enabledDescription")}
-              </p>
-            </div>
-            <Switch
-              checked={form.enabled}
-              onCheckedChange={(checked) => setField("enabled", Boolean(checked))}
-            />
-          </div>
 
           <div className="flex items-center justify-between rounded-md border px-4 py-3">
             <div>

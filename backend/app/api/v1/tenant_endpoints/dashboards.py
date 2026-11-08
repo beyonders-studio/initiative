@@ -13,9 +13,10 @@ Sharing a dashboard therefore shares the *view*, never the underlying data:
 a viewer who cannot read a bound counter simply sees an empty widget.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Awaitable, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -35,6 +36,7 @@ from app.core.audit_events import AuditEventType
 from app.core.messages import (
     DashboardMessages,
     MarketplaceMessages,
+    PluginDataMessages,
 )
 from app.core.tools import Tool
 from app.models.platform.marketplace import (
@@ -42,6 +44,7 @@ from app.models.platform.marketplace import (
 )
 from app.models.platform.user import User
 from app.models.tenant.dashboard import Dashboard, DashboardViewMode
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.schemas.tenant.dashboard import (
     DashboardDataResponse,
     DashboardWidgetData,
@@ -56,10 +59,13 @@ from app.schemas.tenant.dashboard import (
 from app.schemas.tenant.tool import serialize_tool
 from app.db.session import routed_context
 from app.schemas.sql_query import QueryColumnDescription, QueryResponse
-from app.services.tenant import properties as properties_service
+from app.schemas.tenant.plugin_data import PluginDataResponse
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services import audit as audit_service
 from app.services import query as query_service
+from app.services.marketplace import plugin_data
+from app.services.query import plugins as query_plugins
 from app.services.marketplace.installs import (
     count_install,
     resolve_listing_install,
@@ -67,8 +73,6 @@ from app.services.marketplace.installs import (
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import view_as
 from app.services.tenant import tags as tags_service
-from app.models.tenant.guild_plugin import GuildPlugin
-from app.services.marketplace.plugin_data import row_columns
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_config,
     normalize_dashboard_definition,
@@ -84,37 +88,10 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-async def _endpoint_columns(session: AsyncSession):
-    """What each installed plug-in says its read endpoints hand back.
-
-    Read once per save rather than per widget: a canvas of plug-in tiles is a
-    handful of installs, and this is what lets a statement over an endpoint's
-    rows be refused while its author is looking at it.
-    """
-    installed = (await session.exec(select(GuildPlugin))).all()
-    declared: dict[tuple[str, str], tuple] = {}
-    for plugin in installed:
-        for endpoint in (plugin.definition or {}).get("endpoints") or []:
-            if not isinstance(endpoint, dict) or endpoint.get("direction") != "read":
-                continue
-            endpoint_id = endpoint.get("id")
-            if isinstance(endpoint_id, str):
-                declared[(plugin.listing_uid, endpoint_id)] = row_columns(endpoint)
-
-    def columns(plugin_uid: str, endpoint_id: str):
-        return declared.get((plugin_uid, endpoint_id))
-
-    return columns
-
-
-def _normalize_body(
-    definition: dict, config: dict, endpoint_columns=None
-) -> tuple[dict, dict]:
+def _normalize_body(definition: dict, config: dict) -> tuple[dict, dict]:
     """Validate a definition + its config together. Raises 422 with the
     validator's machine code so the client can localize it."""
-    clean_definition = normalize_dashboard_definition(
-        definition or {}, endpoint_columns=endpoint_columns
-    )
+    clean_definition = normalize_dashboard_definition(definition or {})
     clean_config = normalize_dashboard_config(config or {}, clean_definition)
     return clean_definition, clean_config
 
@@ -225,15 +202,11 @@ async def create_dashboard(
         # Validated again on the way in: the catalog validated it at publish
         # time, but this build decides what it can render *now*.
         definition, config = _normalize_body(
-            _listing_canvas(version),
-            dashboard_in.config,
-            await _endpoint_columns(session),
+            _listing_canvas(version), dashboard_in.config
         )
     else:
         definition, config = _normalize_body(
-            dashboard_in.definition,
-            dashboard_in.config,
-            await _endpoint_columns(session),
+            dashboard_in.definition, dashboard_in.config
         )
 
     dashboard = Dashboard(
@@ -269,9 +242,7 @@ async def create_dashboard(
         )
 
     await attachments_service.claim_uploads(session, dashboard)
-    await properties_service.write_on_create(
-        session, dashboard, dashboard_in.properties
-    )
+    await metadata_service.write_on_create(session, dashboard, dashboard_in.properties)
     await session.commit()
     if listing_id is not None:
         await count_install(guild_context.guild_id, listing_id)
@@ -312,9 +283,7 @@ async def update_dashboard(
     if "definition" in update_data or "config" in update_data:
         definition = update_data.get("definition", dashboard.definition)
         config = update_data.get("config", dashboard.config)
-        normalized, normalized_config = _normalize_body(
-            definition, config, await _endpoint_columns(session)
-        )
+        normalized, normalized_config = _normalize_body(definition, config)
         if (normalized, normalized_config) != (dashboard.definition, dashboard.config):
             _check_view_mode_allows(dashboard, guild_context)
         dashboard.definition, dashboard.config = normalized, normalized_config
@@ -371,9 +340,7 @@ async def upgrade_dashboard(
             detail=MarketplaceMessages.ALREADY_LATEST_VERSION,
         )
 
-    definition, config = _normalize_body(
-        _listing_canvas(version), dashboard.config, await _endpoint_columns(session)
-    )
+    definition, config = _normalize_body(_listing_canvas(version), dashboard.config)
     # A new version replaces what this dashboard asks, which is the same act as
     # editing it.
     _check_view_mode_allows(dashboard, guild_context)
@@ -428,21 +395,6 @@ def _stored_binding(
         override = overrides.get(widget_id)
         return {**binding, **(override if isinstance(override, dict) else {})}
     return None
-
-
-def _stored_sql(
-    definition: dict[str, Any] | None,
-    config: dict[str, Any] | None,
-    widget_id: str,
-) -> Optional[str]:
-    """The statement one widget runs, or ``None`` when it runs none."""
-    binding = _stored_binding(definition, config, widget_id)
-    if not isinstance(binding, dict) or binding.get("source") != "query":
-        return None
-    sql = binding.get("sql")
-    if not isinstance(sql, str) or not sql.strip():
-        return None
-    return sql
 
 
 def _widget_ids(definition: dict[str, Any] | None) -> list[str]:
@@ -507,21 +459,88 @@ async def load_dashboard_data(
 async def canvas_widget_data(
     session: AsyncSession, dashboard: Dashboard, guild_id: int
 ) -> dict[str, DashboardWidgetData]:
-    """Every query widget on a dashboard the reader may already read, answered
-    together: the canvas route's work.
+    """Every widget on a dashboard the reader may already read that reads
+    data, answered together: the canvas route's work.
+
+    A statement and a plug-in widget each read with what the widget stores,
+    as the dashboard's view mode says: a dashboard that runs as its initiative
+    calls a plug-in as the installation.
 
     Raises :class:`query_service.QueryError` when the canvas as a whole is
     refused; a single widget's refusal is its own entry."""
     context = _answered_as(session, dashboard)
+    as_installation = view_as.runs_as_initiative(dashboard)
 
+    # Everything each widget needs from the session is read first, one widget
+    # after another; then every plug-in is called together.
     widgets: dict[str, DashboardWidgetData] = {}
-    statements: dict[str, query_service.ResolvedQuery] = {}
+    sources: dict[str, tuple[str, query_service.ResolvedQuery]] = {}
+    calls: dict[str, Callable[[], Awaitable[plugin_data.PluginDataResult]]] = {}
+    installs: dict[str, GuildPlugin] | None = None
     for widget_id in _widget_ids(dashboard.definition):
-        sql = _stored_sql(dashboard.definition, dashboard.config, widget_id)
-        if sql is None:
-            continue
+        binding = _stored_binding(dashboard.definition, dashboard.config, widget_id)
+        source = (binding or {}).get("source")
+        sql = (binding or {}).get("sql")
         try:
-            statements[widget_id] = query_service.resolve(sql)
+            if source == "query" and isinstance(sql, str) and sql.strip():
+                sources[widget_id] = (sql, query_service.resolve(sql))
+            elif source == "plugin" and binding is not None:
+                if installs is None:
+                    installs = {
+                        install.listing_uid: install
+                        for install in (
+                            await session.exec(
+                                select(GuildPlugin).where(GuildPlugin.enabled.is_(True))
+                            )
+                        ).all()
+                    }
+                install = installs.get(str(binding.get("plugin_uid")))
+                if install is None:
+                    raise plugin_data.PluginDataError(
+                        PluginDataMessages.ENDPOINT_NOT_FOUND, 404
+                    )
+                calls[widget_id] = await plugin_data.prepare_for_session(
+                    session,
+                    plugin=install,
+                    endpoint_id=str(binding.get("endpoint_id")),
+                    params=binding.get("params") or {},
+                    as_installation=as_installation,
+                )
+        except (query_service.QueryError, plugin_data.PluginDataError) as refused:
+            widgets[widget_id] = DashboardWidgetData(error=refused.code)
+    prepared = await query_plugins.prepare(
+        session,
+        [call for _, statement in sources.values() for call in statement.unread],
+        as_installation=as_installation,
+    )
+
+    read_rows, *answers = await asyncio.gather(
+        query_plugins.answered(prepared),
+        *(call() for call in calls.values()),
+        return_exceptions=True,
+    )
+    if isinstance(read_rows, BaseException):
+        raise read_rows
+    for widget_id, answer in zip(calls, answers):
+        if isinstance(answer, plugin_data.PluginDataError):
+            widgets[widget_id] = DashboardWidgetData(error=answer.code)
+        elif isinstance(answer, BaseException):
+            raise answer
+        else:
+            widgets[widget_id] = DashboardWidgetData(
+                plugin=PluginDataResponse(
+                    rows=answer.rows,
+                    values=answer.values,
+                    fetched_at=answer.fetched_at,
+                    cached=answer.cached,
+                )
+            )
+    statements: dict[str, query_service.ResolvedQuery] = {}
+    for widget_id, (sql, statement) in sources.items():
+        try:
+            statements[widget_id] = query_plugins.resolved_with(
+                sql, statement, read_rows
+            )
         except query_service.QueryError as refused:
             widgets[widget_id] = DashboardWidgetData(error=refused.code)
 

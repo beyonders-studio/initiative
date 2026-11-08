@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.testing import community_plan
 from app.db import post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.guild import GuildInvite, CommunityRole
@@ -45,10 +46,10 @@ async def test_get_primary_guild_creates_if_missing(session: AsyncSession):
     # same companion row: without it the operator dashboard has no caps to show
     # and get_administration raises for the one guild a fresh install has.
     administration = await guild_service.get_administration(session, guild_id=guild.id)
-    assert administration.max_storage_bytes is None
-    assert administration.max_users is None
     assert administration.tier_name is None
-    assert administration.auth_options == []
+    plan = await community_plan(session, guild.id)
+    assert (plan["max_storage_bytes"], plan["max_users"]) == (None, None)
+    assert not (plan["community_sign_in"] or plan["security_standards"])
 
 
 async def test_get_primary_guild_seed_warns_when_users_exist(

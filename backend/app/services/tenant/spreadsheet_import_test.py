@@ -13,7 +13,7 @@ from app.services.tenant.files_spreadsheet import (
     FileContentError,
     normalize_spreadsheet_content,
 )
-from app.services.tenant.spreadsheet_import import parse_spreadsheet_file
+from app.services.tenant.spreadsheet_import import decode_text, parse_spreadsheet_file
 
 
 def workbook(**sheet) -> dict:
@@ -348,3 +348,142 @@ def test_a_sparse_sheet_with_a_distant_corner_is_refused() -> None:
         parse_spreadsheet_file("sparse.xlsx", buffer.getvalue())
 
     assert excinfo.value.code == FileMessages.SPREADSHEET_FILE_TOO_LARGE
+
+
+def _ods(rows: list[list[str]], *, name: str = "Budget", repeat_last: int = 1) -> bytes:
+    """An OpenDocument spreadsheet holding ``rows`` of text, numbers and
+    formulas, its last row repeated ``repeat_last`` times."""
+    import io
+    import zipfile
+
+    def cell(value: str) -> str:
+        if value.startswith("of:="):
+            return (
+                f'<table:table-cell table:formula="{value}" office:value-type="float" '
+                'office:value="0"><text:p>0</text:p></table:table-cell>'
+            )
+        if value == "":
+            return '<table:table-cell table:number-columns-repeated="2"/>'
+        if value.replace(".", "", 1).isdigit():
+            return (
+                f'<table:table-cell office:value-type="float" '
+                f'office:value="{value}"><text:p>{value}</text:p></table:table-cell>'
+            )
+        return (
+            '<table:table-cell office:value-type="string">'
+            f"<text:p>{value}</text:p></table:table-cell>"
+        )
+
+    body = "".join(
+        (
+            f'<table:table-row table:number-rows-repeated="{repeat_last}">'
+            if index == len(rows) - 1
+            else "<table:table-row>"
+        )
+        + "".join(cell(v) for v in row)
+        + "</table:table-row>"
+        for index, row in enumerate(rows)
+    )
+    content = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+        'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+        'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2">'
+        f'<office:body><office:spreadsheet><table:table table:name="{name}">'
+        f"{body}</table:table></office:spreadsheet></office:body>"
+        "</office:document-content>"
+    )
+    manifest = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">'
+        '<manifest:file-entry manifest:full-path="/" '
+        'manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/>'
+        '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>'
+        "</manifest:manifest>"
+    )
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as package:
+        package.writestr(
+            "mimetype",
+            "application/vnd.oasis.opendocument.spreadsheet",
+            compress_type=zipfile.ZIP_STORED,
+        )
+        package.writestr("content.xml", content)
+        package.writestr("META-INF/manifest.xml", manifest)
+    return out.getvalue()
+
+
+def test_an_ods_is_read_in_a_worker_as_its_values() -> None:
+    (sheet,) = parse_spreadsheet_file(
+        "budget.ods", _ods([["Item", "Cost"], ["Tea", "3"]])
+    )
+
+    assert sheet["name"] == "Budget"
+    assert sheet["cells"] == {"0:0": "Item", "0:1": "Cost", "1:0": "Tea", "1:1": 3}
+
+
+def test_an_ods_keeps_its_formulas_where_they_were() -> None:
+    # Two empty cells, written as one repeated, put the formula in column C.
+    rows = [["2", "3"], ["", "of:=SUM([.A1:.B1])"]]
+
+    (sheet,) = parse_spreadsheet_file("budget.ods", _ods(rows))
+
+    assert sheet["cells"]["1:2"] == "=SUM(A1:B1)"
+
+
+def test_a_repeated_row_keeps_its_formula_moved_to_each_row() -> None:
+    rows = [["1", "of:=[.A1]*2"]]
+
+    (sheet,) = parse_spreadsheet_file("budget.ods", _ods(rows, repeat_last=3))
+
+    assert [sheet["cells"][f"{r}:1"] for r in range(3)] == [
+        "=A1*2",
+        "=A2*2",
+        "=A3*2",
+    ]
+
+
+def test_repeated_formulas_past_the_cell_budget_are_refused(monkeypatch) -> None:
+    from app.services.tenant import spreadsheet_import
+
+    monkeypatch.setattr(spreadsheet_import, "MAX_IMPORT_CELLS", 2)
+    spreadsheet_import.shutdown()
+    rows = [["1", "of:=[.A1]*2"]]
+
+    try:
+        with pytest.raises(FileContentError) as refused:
+            parse_spreadsheet_file("budget.ods", _ods(rows, repeat_last=5))
+    finally:
+        # The next test's worker starts with the real budget.
+        spreadsheet_import.shutdown()
+
+    assert refused.value.code == FileMessages.SPREADSHEET_FILE_TOO_LARGE
+
+
+def test_a_file_calamine_cannot_read_is_refused() -> None:
+    with pytest.raises(FileContentError) as refused:
+        parse_spreadsheet_file("broken.xls", b"not a workbook")
+
+    assert refused.value.code == FileMessages.SPREADSHEET_UNREADABLE_FILE
+
+
+@pytest.mark.parametrize(
+    ("data", "text"),
+    [
+        ("café".encode(), "café"),
+        ("café".encode("cp1252"), "café"),
+        ("café".encode("utf-16"), "café"),
+        (b"caf\x81", None),
+        (b"a\x00b", None),
+    ],
+    ids=["utf-8", "cp1252", "utf-16", "no-encoding", "binary"],
+)
+def test_text_is_read_whole_or_not_at_all(data, text) -> None:
+    assert decode_text(data) == text
+
+
+def test_a_strict_read_refuses_a_table_it_cannot_read_whole() -> None:
+    with pytest.raises(FileContentError) as refused:
+        parse_spreadsheet_file("broken.csv", b"a,b\nc\x00,d\n", strict=True)
+
+    assert refused.value.code == FileMessages.SPREADSHEET_UNREADABLE_FILE

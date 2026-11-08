@@ -6,13 +6,6 @@ import {
   PluginServiceFormDialog,
   type PluginServiceFormValues,
 } from "@/components/platform/PluginServiceFormDialog";
-import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useCreatePluginService,
@@ -23,6 +16,13 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Label } from "@/ui/label";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Switch } from "@/ui/switch";
 
 /** Whether a registration carries a key set, pasted or by address. */
 const hasKeys = (registration: PluginServiceRegistrationRead): boolean =>
@@ -374,7 +374,6 @@ export const SettingsPluginServicesPage = () => {
         title={t("pluginServices.disableTitle", { name: disabling?.public_id ?? "" })}
         description={t("pluginServices.disableDescription")}
         confirmLabel={t("pluginServices.disableConfirm")}
-        cancelLabel={t("pluginServices.cancel")}
         destructive
         isLoading={updateService.isPending}
         onConfirm={() => {
@@ -390,7 +389,6 @@ export const SettingsPluginServicesPage = () => {
         title={t("pluginServices.deleteTitle", { name: deleting?.public_id ?? "" })}
         description={t("pluginServices.deleteDescription")}
         confirmLabel={t("pluginServices.delete")}
-        cancelLabel={t("pluginServices.cancel")}
         destructive
         confirmationText={deleting?.public_id}
         confirmationLabel={t("pluginServices.deleteConfirmLabel")}

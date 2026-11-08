@@ -3,8 +3,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DecorationPack, UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { firstOfSlot, PackContentsDialog, packPieces } from "@/components/user/PackContents";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import {
@@ -15,6 +13,8 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 /**
  * One pack, shown as the profile it would make.
@@ -213,7 +213,6 @@ export const DecorationStore = ({ user }: { user: UserRead }) => {
         title={t("profiles:myPacks.confirmTitle", { name: pending?.name ?? "" })}
         description={t("profiles:myPacks.confirmBody")}
         confirmLabel={t("profiles:myPacks.remove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("profiles:myPacks.removing")}
         isLoading={remove.isPending}
         onConfirm={() => {

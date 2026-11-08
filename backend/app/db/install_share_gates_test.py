@@ -16,7 +16,8 @@ from sqlmodel import select
 
 from app.core.tools import Tool
 from app.db.install_standing_test import _install, _route
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_file,
@@ -33,7 +34,7 @@ async def _made_by_the_install(s, install) -> File:
     made = File(
         initiative_id=install.a.id,
         name="Made by the plug-in",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     s.add(made)
     await s.flush()

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { GroupingState } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -14,26 +15,29 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useListCalendarEntries } from "@/api/generated/calendar-entries/calendar-entries";
 import {
   type LayoutGrouping,
+  type LinkedTaskRead,
   type ListTasksParams,
   RelationshipType,
   SearchEntityType,
+  type TaskEdgeRead,
   type TaskListRead,
   type TaskStatusRead,
   type TaskUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useListTaskEdges } from "@/api/generated/relationships/relationships";
+import { readTask } from "@/api/generated/tasks/tasks";
 import { TaskTypeMark } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
-import { GroupBySelect } from "@/components/ui/data-table";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
-import { useProperties } from "@/hooks/useProperties";
-import { useRelate } from "@/hooks/useRelationships";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { useRelate, useUnrelate } from "@/hooks/useRelationships";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
+import { useCommunityPath } from "@/lib/communityUrl";
 import {
+  criticalPath,
   DAY,
   type DragHold,
   draggedAcross,
@@ -48,13 +52,14 @@ import {
   scheduledDates,
   spanOf,
   taskRows,
+  waitingOn,
   wholesOf,
 } from "@/lib/gantt";
-import { dateTimeFormat } from "@/lib/intl";
 import { LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { taskFields } from "@/lib/layouts/tasks";
-import { cn } from "@/lib/utils";
+import { browserTimezone } from "@/lib/timezones";
+import { taskRoute } from "@/lib/tools";
 import {
   type AxisTick,
   addUnits,
@@ -64,6 +69,20 @@ import {
   weekendBands,
 } from "@/lib/widgets/timelineAxis";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { GroupBySelect } from "@/ui/data-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Toggle } from "@/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 const LABEL_WIDTH = 260;
 const ROW_HEIGHT = 32;
@@ -73,6 +92,9 @@ const INDENT = 14;
 const DRAG_SLOP = 4;
 /** Where the arrow from a blocker turns before it reaches what waits on it. */
 const ELBOW = 8;
+/** How far past today a repeating task's coming occurrences are drawn: the
+ *  most a calendar's window asks for. */
+const OCCURRENCE_DAYS = 399;
 /** Rows drawn past each edge of the view, so a quick scroll shows no gap. */
 const OVERSCAN = 10;
 /** How long a run of arrow-key moves waits before it is saved, as one write. */
@@ -104,6 +126,16 @@ type Linking = {
   y2: number;
 };
 
+/** What is being asked of a link: which way to make one dropped on a row, or
+ *  whether to take back one an arrow was clicked on, at the point on the
+ *  chart it was done. */
+type LinkMenu =
+  | { kind: "drop"; from: TaskListRead; to: TaskListRead; x: number; y: number }
+  | { kind: "arrow"; edge: TaskEdgeRead; x: number; y: number };
+
+/** A move that left tasks waiting on the moved one: whether to move them too. */
+type Chain = { title: string; ids: number[]; days: number };
+
 type ProjectTasksGanttViewProps = {
   initiativeId: number;
   projectId: number;
@@ -118,7 +150,7 @@ type ProjectTasksGanttViewProps = {
   viewGroupings?: LayoutGrouping[] | null;
   taskHref: (taskId: number) => string;
   /** Writes a task's new dates; left out, the bars stay where they are. */
-  onReschedule?: (task: TaskListRead, dates: Dates) => Promise<unknown>;
+  onReschedule?: (task: Pick<TaskListRead, "id" | "recurrence">, dates: Dates) => Promise<boolean>;
   /** Drawn in the layout editor: nothing opens or moves. */
   editing?: boolean;
 };
@@ -136,6 +168,11 @@ type ProjectTasksGanttViewProps = {
  * The rows are a tree grid: the arrow keys move between them and fold them,
  * Enter opens a task, and Alt with an arrow moves it a day (with Shift, its
  * due date). Only the rows in view are drawn.
+ *
+ * Moving a task later offers to move what waits on it by as many days, and the
+ * critical path picks out the chain that decides when the work ends. A
+ * repeating task's coming occurrences are faded bars on its row, and another
+ * project's tasks the project's are linked to are a band of their own.
  */
 export const ProjectTasksGanttView = ({
   initiativeId,
@@ -158,7 +195,10 @@ export const ProjectTasksGanttView = ({
   const navigate = useNavigate();
   const communityId = useActiveCommunityId();
 
-  const { data: definitions } = useProperties({ initiativeId });
+  const { data: definitions } = useOwnedDefinitions({
+    initiativeId,
+    owner: { kind: "project", id: projectId },
+  });
   const fields = useMemo(() => taskFields(definitions ?? []), [definitions]);
   const { offered, active } = useTaskGroupings({
     fields,
@@ -172,7 +212,9 @@ export const ProjectTasksGanttView = ({
   });
   // A project with one type shows none: it tells no task apart.
   const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;
-  const edges = useListTaskEdges(communityId, { project_id: projectId }).data;
+  const links = useListTaskEdges(communityId, { project_id: projectId }).data;
+  const edges = links?.edges;
+  const gp = useCommunityPath();
 
   // Dates written but not yet answered for, drawn where they were dropped.
   const [pending, setPending] = useState<ReadonlyMap<number, Dates>>(new Map());
@@ -188,29 +230,39 @@ export const ProjectTasksGanttView = ({
   );
 
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
+  const outsideLabel = t("tasks.ganttOutside");
   const rows = useMemo<GanttRow[]>(() => {
     const wholes = wholesOf(shown, edges ?? []);
-    if (!active) return taskRows(shown, wholes, folded);
     const byId = new Map(shown.map((task) => [task.id, task]));
-    return boardBands(active, tasks).flatMap((band): GanttRow[] => {
-      const held = band.tasks.map((task) => byId.get(task.id) ?? task);
-      return [
-        { type: "group", key: band.key, count: held.length },
-        ...taskRows(held, wholes, folded, `${band.key}:`),
-      ];
-    });
-  }, [shown, tasks, edges, folded, active]);
+    const own = active
+      ? boardBands(active, tasks).flatMap((band): GanttRow[] => {
+          const held = band.tasks.map((task) => byId.get(task.id) ?? task);
+          return [
+            { type: "group", key: band.key, count: held.length },
+            ...taskRows(held, wholes, folded, `${band.key}:`),
+          ];
+        })
+      : taskRows(shown, wholes, folded);
+    const others = links?.others ?? [];
+    if (others.length === 0) return own;
+    return [
+      ...own,
+      { type: "group", key: "outside", count: others.length, label: outsideLabel },
+      ...others.map((task): GanttRow => ({ type: "outside", key: `outside:${task.id}`, task })),
+    ];
+  }, [shown, tasks, edges, links, folded, active, outsideLabel]);
 
   const now = useMemo(() => Date.now(), []);
   const pxPerDay = PX_PER_DAY[scale];
   const range = useMemo(
     () =>
       ganttWindow(
-        shown.flatMap((task) => spanOf(task) ?? []),
+        // Other projects' linked tasks are drawn on the same axis.
+        [...shown, ...(links?.others ?? [])].flatMap((task) => spanOf(task) ?? []),
         scale,
         now
       ),
-    [shown, scale, now]
+    [shown, links, scale, now]
   );
   const width = Math.round(((range.end - range.start) / DAY) * pxPerDay);
   const x = useCallback(
@@ -220,6 +272,33 @@ export const ProjectTasksGanttView = ({
   const ticks = useMemo(() => axisTicks(range, scale, 0, Number.POSITIVE_INFINITY), [range, scale]);
   const major = useMemo(() => majorSegments(range, scale), [range, scale]);
   const weekends = useMemo(() => (scale === "month" ? [] : weekendBands(range)), [range, scale]);
+
+  // A repeating task's coming occurrences, as the calendars draw them.
+  const repeating = tasks.some((task) => task.recurrence && task.due_date);
+  const upcoming = useMemo(() => {
+    const from = Math.max(range.start, floorToUnit(now, "day"));
+    const to = Math.min(range.end, addUnits(from, "day", OCCURRENCE_DAYS));
+    return { start_after: new Date(from).toISOString(), start_before: new Date(to).toISOString() };
+  }, [range, now]);
+  const occurrences = useListCalendarEntries(
+    communityId,
+    {
+      initiative_id: initiativeId,
+      include_events: false,
+      conditions: listParams?.conditions,
+      tz: browserTimezone(),
+      ...upcoming,
+    },
+    { query: { enabled: repeating && !editing } }
+  ).data?.task_occurrences;
+  const nextOf = useMemo(() => {
+    const found = new Map<number, GanttSpan[]>();
+    for (const occurrence of occurrences ?? []) {
+      const span = spanOf(occurrence);
+      if (span) found.set(occurrence.id, [...(found.get(occurrence.id) ?? []), span]);
+    }
+    return found;
+  }, [occurrences]);
 
   // Opens on today, a third of the way in, and again on another scale. When
   // the window widens (tasks load, a filter changes) the dates in view stay.
@@ -248,17 +327,47 @@ export const ProjectTasksGanttView = ({
   };
   const canMove = Boolean(onReschedule) && !editing;
 
-  const write = async (task: TaskListRead, dates: Dates) => {
-    if (!onReschedule) return;
+  /** Save `dates`, drawn where they were dropped until it answers: whether
+   *  they were saved. */
+  const write = async (task: Pick<TaskListRead, "id" | "recurrence">, dates: Dates) => {
+    if (!onReschedule) return false;
     setPending((all) => new Map(all).set(task.id, dates));
     try {
-      await onReschedule(task, dates);
+      return await onReschedule(task, dates);
     } finally {
       setPending((all) => {
         const next = new Map(all);
         next.delete(task.id);
         return next;
       });
+    }
+  };
+
+  // Moving a task later offers to move what waits on it, through the chain,
+  // by as many days.
+  const [chain, setChain] = useState<Chain | null>(null);
+  const commit = async (task: TaskListRead, dates: Dates, later: number) => {
+    // Only once its own move is saved: one asked about and kept back, or
+    // refused, leaves what waits on it where it is.
+    if (!(await write(task, dates)) || later <= 0 || !edges) return;
+    // Through every task of the project, the ones a filter hides among them.
+    const others = new Set((links?.others ?? []).map((each) => each.id));
+    const project = new Set(
+      [...tasks.map((each) => each.id), ...edges.flatMap((e) => [e.source_id, e.target_id])].filter(
+        (id) => !others.has(id)
+      )
+    );
+    const ids = waitingOn(task.id, edges, project);
+    if (ids.length > 0) setChain({ title: task.title, ids, days: later });
+  };
+  const moveChain = async ({ ids, days }: Chain) => {
+    setChain(null);
+    const byId = new Map(tasks.map((each) => [each.id, each]));
+    // One after another, so a repeating one's question is asked on its own; a
+    // task the filters hide is read first.
+    for (const id of ids) {
+      const each = byId.get(id) ?? (await readTask(communityId, id).catch(() => null));
+      if (each && spanOf(each)) await write(each, draggedDates(each, "move", days));
     }
   };
 
@@ -310,7 +419,10 @@ export const ProjectTasksGanttView = ({
     }
     const span = spanOf(current.task);
     const days = span ? heldDays(span, current.hold, current.days) : 0;
-    if (days !== 0) void write(current.task, draggedDates(current.task, current.hold, days));
+    if (days !== 0) {
+      const dates = draggedDates(current.task, current.hold, days);
+      void commit(current.task, dates, current.hold === "start" ? 0 : days);
+    }
   };
 
   /** Where a row's bar is drawn, the drag on it included. */
@@ -335,22 +447,18 @@ export const ProjectTasksGanttView = ({
     });
 
   // Which rows are in view, from where the chart is scrolled to: only those,
-  // and the one in the tab order, are drawn.
-  const [view, setView] = useState({ top: 0, height: 0 });
-  const measure = useCallback(() => {
-    const element = scroller.current;
-    if (element) setView({ top: element.scrollTop, height: element.clientHeight });
-  }, []);
-  useLayoutEffect(() => {
-    measure();
-    const element = scroller.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [measure]);
-  const first = Math.max(0, Math.floor((view.top - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
-  const last = Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_HEIGHT) + OVERSCAN);
+  // and the one in the tab order, are drawn. The axis sits above them in the
+  // same scroller, so the rows start that far down it.
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scroller.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
+    scrollMargin: HEADER_HEIGHT,
+  });
+  const inView = virtualizer.getVirtualItems();
+  const first = inView[0]?.index ?? 0;
+  const last = (inView.at(-1)?.index ?? -1) + 1;
 
   // One row is in the tab order, and the arrow keys move it.
   const body = useRef<HTMLDivElement>(null);
@@ -451,9 +559,9 @@ export const ProjectTasksGanttView = ({
         break;
       }
       case "Enter":
-        if (row.type !== "task" || editing) return;
+        if (row.type === "group" || editing) return;
         if (settle.current !== undefined) release();
-        void navigate({ to: taskHref(row.task.id) });
+        void navigate({ to: hrefOf(row) });
         break;
       default:
         return;
@@ -461,9 +569,17 @@ export const ProjectTasksGanttView = ({
     event.preventDefault();
   };
 
+  /** Where a row's task opens: this project's own, or another project's. */
+  const hrefOf = (row: Extract<GanttRow, { type: "task" | "outside" }>) =>
+    row.type === "task"
+      ? taskHref(row.task.id)
+      : gp(taskRoute(row.task.initiative_id, row.task.project_id, row.task.id));
+
   // A link drawn from the dot at a task's end to another task's row: the task
-  // dropped on waits on the one it was drawn from.
+  // dropped on waits on the one it was drawn from, or is part of it.
   const relate = useRelate();
+  const unrelate = useUnrelate();
+  const [menu, setMenu] = useState<LinkMenu | null>(null);
   const [linking, setLinking] = useState<Linking | null>(null);
   const onChart = (event: ReactPointerEvent<HTMLElement>) => {
     const rect = body.current?.getBoundingClientRect();
@@ -489,22 +605,42 @@ export const ProjectTasksGanttView = ({
     const from = linking;
     setLinking(null);
     if (!from) return;
-    const target = rows[Math.floor(onChart(event).y / ROW_HEIGHT)];
+    const point = onChart(event);
+    const target = rows[Math.floor(point.y / ROW_HEIGHT)];
     if (target?.type !== "task" || target.task.id === from.task.id) return;
-    relate.mutate({
-      source: { type: SearchEntityType.task, id: target.task.id },
-      relationship_type: RelationshipType.depends_on,
-      target: { type: SearchEntityType.task, id: from.task.id },
-    });
+    setMenu({ kind: "drop", from: from.task, to: target.task, x: point.x, y: point.y });
   };
+  const link = (to: TaskListRead, kind: RelationshipType, from: TaskListRead) =>
+    relate.mutate({
+      source: { type: SearchEntityType.task, id: to.id },
+      relationship_type: kind,
+      target: { type: SearchEntityType.task, id: from.id },
+    });
+  const titleOf = (id: number) =>
+    tasks.find((each) => each.id === id)?.title ??
+    links?.others.find((each) => each.id === id)?.title ??
+    "";
   const linkingOver = linking ? Math.floor(linking.y2 / ROW_HEIGHT) : -1;
+
+  // The critical path: the chain of the project's tasks that ends last.
+  const [critical, setCritical] = useState(false);
+  const onPath = useMemo(() => {
+    if (!critical) return new Set<number>();
+    const spans = new Map(
+      shown.flatMap((task) => {
+        const span = spanOf(task);
+        return span ? [[task.id, span] as const] : [];
+      })
+    );
+    return criticalPath(spans, edges ?? []);
+  }, [critical, shown, edges]);
 
   // A dependency's arrow runs from the end of what blocks to the start of
   // what waits, between the first rows each is drawn in.
   const arrows = useMemo(() => {
     const at = new Map<number, { index: number; span: GanttSpan }>();
     rows.forEach((row, index) => {
-      if (row.type !== "task" || at.has(row.task.id)) return;
+      if (row.type === "group" || at.has(row.task.id)) return;
       const span = spanOf(row.task);
       if (span) at.set(row.task.id, { index, span });
     });
@@ -525,13 +661,14 @@ export const ProjectTasksGanttView = ({
           : `M${x1},${y1} H${x1 + ELBOW} V${(y1 + y2) / 2} H${x2 - ELBOW} V${y2} H${x2}`;
       return [
         {
-          key: `${edge.source_id}:${edge.target_id}`,
+          edge,
           path,
           late: waits.span.start < blocks.span.end,
+          faded: critical && !(onPath.has(edge.source_id) && onPath.has(edge.target_id)),
         },
       ];
     });
-  }, [rows, edges, x, first, last]);
+  }, [rows, edges, x, first, last, critical, onPath]);
 
   const tickLabel = (tick: AxisTick) =>
     dateTimeFormat(locale, scale === "month" ? { month: "short" } : { day: "numeric" }).format(
@@ -558,6 +695,11 @@ export const ProjectTasksGanttView = ({
             onChange={(id) => onGroupingChange(id === null ? [] : [id])}
           />
         ) : null}
+        {(edges ?? []).some((edge) => edge.relationship_type === "depends_on") ? (
+          <Toggle variant="outline" size="sm" pressed={critical} onPressedChange={setCritical}>
+            {t("tasks.ganttCriticalPath")}
+          </Toggle>
+        ) : null}
         <Button type="button" variant="outline" size="sm" onClick={scrollToToday}>
           {t("common:calendar.today")}
         </Button>
@@ -581,7 +723,6 @@ export const ProjectTasksGanttView = ({
 
       <div
         ref={scroller}
-        onScroll={measure}
         className="scrollbar-thin max-h-[75vh] overflow-auto rounded-md border text-sm"
         data-testid="gantt"
       >
@@ -676,14 +817,15 @@ export const ProjectTasksGanttView = ({
                   ))}
                 </defs>
                 {arrows.map((arrow) => (
-                  <path
-                    key={arrow.key}
-                    d={arrow.path}
-                    fill="none"
-                    strokeWidth={1.5}
-                    markerEnd={`url(#${markerId}-${arrow.late})`}
-                    className={arrow.late ? "stroke-destructive" : "stroke-muted-foreground"}
-                  />
+                  <g key={arrow.edge.id} className={cn(arrow.faded && "opacity-25")}>
+                    <path
+                      d={arrow.path}
+                      fill="none"
+                      strokeWidth={1.5}
+                      markerEnd={`url(#${markerId}-${arrow.late})`}
+                      className={arrow.late ? "stroke-destructive" : "stroke-muted-foreground"}
+                    />
+                  </g>
                 ))}
                 {linking ? (
                   <path
@@ -697,6 +839,61 @@ export const ProjectTasksGanttView = ({
                 ) : null}
               </svg>
             </div>
+
+            <DropdownMenu
+              open={menu !== null}
+              onOpenChange={(open) => {
+                if (!open) setMenu(null);
+              }}
+            >
+              <DropdownMenuTrigger asChild>
+                <span
+                  className="pointer-events-none absolute h-0 w-0"
+                  style={{ left: LABEL_WIDTH + (menu?.x ?? 0), top: menu?.y ?? 0 }}
+                  aria-hidden
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {menu?.kind === "drop" ? (
+                  <>
+                    <DropdownMenuLabel className="max-w-xs font-normal text-muted-foreground">
+                      {t("tasks.ganttLinkQuestion", {
+                        task: menu.to.title,
+                        other: menu.from.title,
+                      })}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onSelect={() => link(menu.to, RelationshipType.depends_on, menu.from)}
+                    >
+                      <span className="flex flex-col">
+                        <span>{t("tasks.ganttBlockedBy")}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {t("tasks.ganttBlockedByHint")}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => link(menu.to, RelationshipType.part_of, menu.from)}
+                    >
+                      <span className="flex flex-col">
+                        <span>{t("tasks.ganttPartOf")}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {t("tasks.ganttPartOfHint")}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+                {menu?.kind === "arrow" ? (
+                  <DropdownMenuItem onSelect={() => unrelate.mutate({ id: menu.edge.id })}>
+                    {t("tasks.ganttRemoveLink", {
+                      task: titleOf(menu.edge.source_id),
+                      other: titleOf(menu.edge.target_id),
+                    })}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {rows.length === 0 ? (
               <p
@@ -741,12 +938,30 @@ export const ProjectTasksGanttView = ({
                       className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-muted px-3"
                       style={{ width: LABEL_WIDTH }}
                     >
-                      <span className="min-w-0 truncate">{active?.grouping.header(row.key)}</span>
+                      <span className="min-w-0 truncate">
+                        {row.label ?? active?.grouping.header(row.key)}
+                      </span>
                       <span className="text-muted-foreground text-xs tabular-nums">
                         {row.count}
                       </span>
                     </div>
                   </div>
+                );
+              }
+              if (row.type === "outside") {
+                return (
+                  <OutsideRow
+                    key={row.key}
+                    row={row}
+                    index={index}
+                    tabIndex={index === focused ? 0 : -1}
+                    rowProps={rowProps}
+                    href={hrefOf(row)}
+                    editing={editing}
+                    width={width}
+                    x={x}
+                    dayLabel={dayLabel}
+                  />
                 );
               }
               const span = spanOf(row.task);
@@ -805,8 +1020,7 @@ export const ProjectTasksGanttView = ({
                         tabIndex={-1}
                         className={cn(
                           "min-w-0 truncate hover:underline",
-                          row.task.task_status.category === "done" &&
-                            "text-muted-foreground line-through"
+                          row.task.task_status.category === "done" && "text-muted-foreground"
                         )}
                       >
                         {row.task.title}
@@ -822,6 +1036,8 @@ export const ProjectTasksGanttView = ({
                     dragging={drag?.key === row.key}
                     scheduleHint={t("tasks.ganttSchedule")}
                     linkHint={t("tasks.ganttLink")}
+                    next={nextOf.get(row.task.id)}
+                    faded={critical && !onPath.has(row.task.id)}
                     dayLabel={dayLabel}
                     onPress={(event, hold) => press(event, row.key, row.task, hold)}
                     onSchedule={(event) => press(event, row.key, row.task, "move", dayAt(event))}
@@ -836,9 +1052,64 @@ export const ProjectTasksGanttView = ({
                 </div>
               );
             })}
+            {canMove && arrows.length > 0 ? (
+              // Over the rows, so a click on an arrow reaches it: an unseen,
+              // wider line on each, which takes its link back. The keyboard
+              // does so from the task's Connections.
+              <svg
+                className="pointer-events-none absolute inset-y-0 z-[5] overflow-visible"
+                style={{ left: LABEL_WIDTH }}
+                width={width}
+                height={rows.length * ROW_HEIGHT}
+                aria-hidden
+              >
+                {arrows.map((arrow) => (
+                  // biome-ignore lint/a11y/noStaticElementInteractions: a pointer shortcut beside the task page's own control
+                  <path
+                    key={arrow.edge.id}
+                    d={arrow.path}
+                    fill="none"
+                    strokeWidth={8}
+                    className="cursor-pointer stroke-transparent"
+                    style={{ pointerEvents: "stroke" }}
+                    data-testid="gantt-arrow"
+                    onClick={(event) => {
+                      const rect = body.current?.getBoundingClientRect();
+                      setMenu({
+                        kind: "arrow",
+                        edge: arrow.edge,
+                        x: event.clientX - (rect?.left ?? 0) - LABEL_WIDTH,
+                        y: event.clientY - (rect?.top ?? 0),
+                      });
+                    }}
+                  />
+                ))}
+              </svg>
+            ) : null}
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={chain !== null}
+        onOpenChange={(open) => {
+          if (!open) setChain(null);
+        }}
+        title={t("tasks.ganttChainTitle")}
+        description={
+          chain
+            ? t("tasks.ganttChain", {
+                count: chain.ids.length,
+                title: chain.title,
+                days: chain.days,
+              })
+            : undefined
+        }
+        confirmLabel={t("tasks.ganttChainMove")}
+        cancelLabel={t("tasks.ganttChainKeep")}
+        onConfirm={() => {
+          if (chain) void moveChain(chain);
+        }}
+      />
     </div>
   );
 };
@@ -863,6 +1134,10 @@ type TrackProps = {
   dragging: boolean;
   scheduleHint: string;
   linkHint: string;
+  /** The coming occurrences of a repeating task. */
+  next?: GanttSpan[];
+  /** Off the critical path, while it is shown. */
+  faded: boolean;
   dayLabel: (at: number) => string;
   onPress: (event: ReactPointerEvent<HTMLElement>, hold: DragHold) => void;
   onSchedule: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -886,6 +1161,8 @@ const TaskTrack = ({
   dragging,
   scheduleHint,
   linkHint,
+  next,
+  faded,
   dayLabel,
   onPress,
   onSchedule,
@@ -915,12 +1192,28 @@ const TaskTrack = ({
     <div
       role="gridcell"
       tabIndex={-1}
-      className={cn("relative", undated && canMove && "cursor-crosshair touch-pan-y")}
+      className={cn(
+        "relative",
+        undated && canMove && "cursor-crosshair touch-pan-y",
+        faded && "opacity-30"
+      )}
       style={{ width }}
       title={undated && canMove && !dragging ? scheduleHint : undefined}
       onPointerDown={undated && canMove ? onSchedule : undefined}
       {...(undated ? pointer : {})}
     >
+      {(next ?? []).map((occurrence) => (
+        <div
+          key={occurrence.start}
+          className="pointer-events-none absolute top-1/2 h-4 -translate-y-1/2 rounded border border-primary/50 border-dashed"
+          data-testid="gantt-next"
+          style={{
+            left: x(occurrence.start),
+            width: Math.max(4, x(occurrence.end) - x(occurrence.start)),
+          }}
+          aria-hidden
+        />
+      ))}
       {row.parts ? (
         // What its parts cover, as a bracket over the row.
         <div
@@ -975,9 +1268,11 @@ const TaskTrack = ({
         </div>
       ) : null}
       {span && canMove && !dragging ? (
-        // Drawn from here to another task's row, that task waits on this one.
+        // Drawn from here to another task's row, it asks how the two are linked.
+        // Above the arrows' hit lines, which leave the bar's end right here,
+        // so a task with links can still start another.
         <span
-          className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair touch-none rounded-full border-2 border-primary bg-background opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100"
+          className="absolute top-1/2 z-[6] h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair touch-none rounded-full border-2 border-primary bg-background opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100"
           style={{ left: x(span.end) + 3 }}
           title={linkHint}
           data-testid="gantt-link"
@@ -987,6 +1282,88 @@ const TaskTrack = ({
           onPointerCancel={onLinkCancel}
         />
       ) : null}
+    </div>
+  );
+};
+
+/** Another project's task a task here is linked to: drawn, and opened, but
+ *  not moved from here. */
+const OutsideRow = ({
+  row,
+  index,
+  tabIndex,
+  rowProps,
+  href,
+  editing,
+  width,
+  x,
+  dayLabel,
+}: {
+  row: Extract<GanttRow, { type: "outside" }>;
+  index: number;
+  tabIndex: number;
+  rowProps: Record<string, unknown>;
+  href: string;
+  editing: boolean;
+  width: number;
+  x: (at: number) => number;
+  dayLabel: (at: number) => string;
+}) => {
+  const span = spanOf(row.task);
+  const task: LinkedTaskRead = row.task;
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: virtualized absolute layout doesn't fit a <table>; ARIA grid roles convey semantics
+    <div
+      role="row"
+      tabIndex={tabIndex}
+      {...rowProps}
+      data-row={index}
+      aria-level={2}
+      aria-label={
+        span
+          ? `${task.title}, ${task.project_name}, ${dayLabel(span.start)} – ${dayLabel(addUnits(span.end, "day", -1))}`
+          : `${task.title}, ${task.project_name}`
+      }
+    >
+      {/* biome-ignore lint/a11y/useSemanticElements: virtualized absolute layout doesn't fit a <table>; ARIA grid roles convey semantics */}
+      <div
+        role="gridcell"
+        tabIndex={-1}
+        className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r bg-background pr-2 pl-[30px] group-hover/row:bg-muted"
+        style={{ width: LABEL_WIDTH }}
+      >
+        {editing ? (
+          <span className="min-w-0 truncate">{task.title}</span>
+        ) : (
+          <Link
+            to={href}
+            tabIndex={-1}
+            className={cn("min-w-0 truncate hover:underline", task.done && "text-muted-foreground")}
+          >
+            {task.title}
+          </Link>
+        )}
+        <span className="shrink-0 truncate text-muted-foreground text-xs">{task.project_name}</span>
+      </div>
+      {/* biome-ignore lint/a11y/useSemanticElements: virtualized absolute layout doesn't fit a <table>; ARIA grid roles convey semantics */}
+      <div role="gridcell" tabIndex={-1} className="relative" style={{ width }}>
+        {span ? (
+          <div
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2",
+              span.kind === "bar"
+                ? "h-4 rounded border border-muted-foreground/60 bg-muted"
+                : "h-3 w-3 -translate-x-1/2 rotate-45 rounded-[2px] bg-muted-foreground/60"
+            )}
+            style={
+              span.kind === "bar"
+                ? { left: x(span.start), width: Math.max(4, x(span.end) - x(span.start)) }
+                : { left: x(span.start) + (x(span.end) - x(span.start)) / 2 }
+            }
+            title={`${task.title} · ${task.project_name}`}
+          />
+        ) : null}
+      </div>
     </div>
   );
 };

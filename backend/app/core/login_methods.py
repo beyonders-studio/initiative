@@ -56,8 +56,8 @@ PRIMARY_LOGIN_METHODS: tuple[LoginMethod, ...] = (
 )
 
 #: What a deployment that has never chosen permits: everything that costs an
-#: account nothing until it opts in. Also the column's server default, so an
-#: upgrade changes nobody's behaviour.
+#: account nothing until it opts in. The ``login_methods`` rule's default
+#: (``app.core.rules``), so an upgrade changes nobody's behaviour.
 #:
 #: The rule used to read "everything it could", which was the same list while
 #: every method waited on the account to do something — register a key, enrol

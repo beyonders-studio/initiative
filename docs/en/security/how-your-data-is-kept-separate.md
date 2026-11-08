@@ -14,7 +14,7 @@ Initiative is **multi-tenant**: many separate groups (communities) share one ser
 
 ## Each community gets its own space in the database
 
-A community is not just a label attached to shared rows. Each community's content — its initiatives, projects, tasks, files, calendar, queues, counters, posts, tags, and comments — lives in its **own dedicated area of the database** (a separate schema), provisioned when the community is created and removed when the community is deleted.
+A community is not just a label attached to shared rows. Each community's content — its initiatives, projects, tasks, files, calendar, counters, posts, tags, and comments — lives in its **own dedicated area of the database** (a separate schema), provisioned when the community is created and removed when the community is deleted.
 
 Shared identity and configuration (the list of users, community memberships, invitations, server settings) lives in a common area. Everything that *belongs to a community* lives in that community's own space.
 

@@ -42,6 +42,7 @@ def detect(
     head_ref: str = "feature",
     same_repo: bool = True,
     tested: str = "",
+    fork: bool = False,
 ) -> dict[str, str]:
     """Commit ``changed`` on top of ``origin/<base_ref>`` and return the
     step's outputs."""
@@ -93,6 +94,7 @@ def detect(
                     "BASE_REF": base_ref,
                     "HEAD_REF": head_ref,
                     "SAME_REPO": str(same_repo).lower(),
+                    "FORK": str(fork).lower(),
                     "BEFORE": base,
                     "TESTED": tested,
                     "GITHUB_OUTPUT": str(output),
@@ -214,7 +216,6 @@ class TreeIdTest(unittest.TestCase):
         "backend/app/main.py": "app\n",
         "VERSION": "1.2.2\n",
         "CHANGELOG.md": "## [Unreleased]\n",
-        "RELEASED_MIGRATION": "0001\n",
         "frontend/src/api/generated/version/version.ts": "1.2.2\n",
     }
 
@@ -223,7 +224,6 @@ class TreeIdTest(unittest.TestCase):
             **self.BASE,
             "VERSION": "1.2.3\n",
             "CHANGELOG.md": "## [1.2.3]\n",
-            "RELEASED_MIGRATION": "0002\n",
             "MIN_DESKTOP_VERSION": "1.2.3\n",
             "frontend/src/api/generated/version/version.ts": "1.2.3\n",
         }
@@ -270,6 +270,22 @@ class UpgradeTest(unittest.TestCase):
     def test_another_pull_request_into_main_walks(self) -> None:
         outputs = detect(["VERSION"], base_ref="main", head_ref="hotfix/login")
         self.assertEqual(outputs.get("upgrade"), "walk")
+
+
+class ForkTest(unittest.TestCase):
+    AREAS = ["backend", "seam", "upgrade", "frontend", "codegen", "tooling"]
+
+    def test_a_push_to_a_fork_checks_nothing(self) -> None:
+        outputs = detect(["backend/app/db/session.py"], "push", fork=True)
+        self.assertEqual(
+            {area: outputs.get(area) for area in self.AREAS},
+            dict.fromkeys(self.AREAS, "false"),
+        )
+
+    def test_a_pull_request_in_a_fork_checks_as_usual(self) -> None:
+        outputs = detect(["backend/app/db/session.py"], fork=True)
+        self.assertEqual(outputs.get("backend_mode"), "full")
+        self.assertEqual(outputs.get("seam"), "true")
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ const renderLayout = ({
   renderPage(
     () => (
       <ToolSettingsLayout
-        tool={Tool.queue}
+        tool={Tool.counter_group}
         entity={entity}
         isLoading={false}
         isError={false}
@@ -46,8 +46,8 @@ const renderLayout = ({
       />
     ),
     {
-      initialRoute: `/c/$communityId/i/$initiativeId/queues/$queueId/settings${path}`,
-      routeParams: { communityId: "1", initiativeId: "3", queueId: "7" },
+      initialRoute: `/c/$communityId/i/$initiativeId/counter-groups/$counterGroupId/settings${path}`,
+      routeParams: { communityId: "1", initiativeId: "3", counterGroupId: "7" },
     }
   );
 
@@ -66,7 +66,7 @@ describe("ToolSettingsLayout", () => {
     await userEvent.click(await screen.findByRole("tab", { name: "Access" }));
 
     // The section is an address, not a piece of component state.
-    expect(router.state.location.pathname).toBe("/c/1/i/3/queues/7/settings/access");
+    expect(router.state.location.pathname).toBe("/c/1/i/3/counter-groups/7/settings/access");
   });
 
   it("lights the tab the address names", async () => {
@@ -110,7 +110,7 @@ describe("ToolSettingsLayout", () => {
 
     await userEvent.click(await screen.findByRole("tab", { name: "Task statuses" }));
 
-    expect(router.state.location.pathname).toBe("/c/1/i/3/queues/7/settings/task-statuses");
+    expect(router.state.location.pathname).toBe("/c/1/i/3/counter-groups/7/settings/task-statuses");
   });
 
   it("addresses a community-level entity at its community route", async () => {

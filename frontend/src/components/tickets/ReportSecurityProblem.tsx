@@ -13,8 +13,8 @@ import { useTranslation } from "react-i18next";
 
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
-import { Button } from "@/components/ui/button";
 import { useTicketAvailability } from "@/hooks/useTickets";
+import { Button } from "@/ui/button";
 
 /** Whether this server offers anything to report a security problem to. */
 export const useSecurityReporting = () => {

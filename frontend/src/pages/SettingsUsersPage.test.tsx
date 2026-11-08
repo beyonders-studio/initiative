@@ -9,9 +9,12 @@
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity, buildUserCommunityMember } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type {
   CommunityAuthOption,
@@ -74,7 +77,13 @@ import { SettingsUsersPage } from "./SettingsUsersPage";
 
 beforeEach(() => {
   state.invites = [];
+  state.members = [];
 });
+
+// The page's last render, whose reads are waited on before clicking into a
+// table row: each read that lands redraws the rows.
+let rendered: ReturnType<typeof renderPage>;
+const settled = () => waitFor(() => expect(rendered.queryClient.isFetching()).toBe(0));
 
 const setup = (overrides: Partial<CommunityRead>) => {
   const community = buildCommunity({
@@ -82,7 +91,7 @@ const setup = (overrides: Partial<CommunityRead>) => {
     name: "Alpha",
     ...overrides,
   }) as CommunityRead;
-  renderPage(() => <SettingsUsersPage />, {
+  rendered = renderPage(() => <SettingsUsersPage />, {
     communities: {
       communities: [community],
       activeCommunityId: community.id,
@@ -166,6 +175,19 @@ describe("SettingsUsersPage roles", () => {
     expect(await screen.findByText("Admin")).toBeInTheDocument();
     expect(screen.queryByText("Superadmin")).not.toBeInTheDocument();
   });
+
+  it("names a superadmin's rung to an admin, and leaves changing it to the seat", async () => {
+    state.members = [buildUserCommunityMember({ community_role: "superadmin" })];
+    setup({ role: "admin" });
+
+    const picker = await screen.findByRole("combobox", { name: /community role for/i });
+    expect(picker).toHaveTextContent("Superadmin");
+    expect(picker).toBeDisabled();
+
+    cleanup();
+    setup({});
+    expect(await screen.findByRole("combobox", { name: /community role for/i })).toBeEnabled();
+  });
 });
 
 describe("SettingsUsersPage invites", () => {
@@ -244,8 +266,9 @@ describe("SettingsUsersPage API access", () => {
     const community = setup({});
     const member = state.members[0];
 
-    // The invites load and redraw the page; click the switch that stays.
+    // The page's reads land and redraw it; click the switch that stays.
     await screen.findByRole("button", { name: "Generate invite" });
+    await settled();
     await userEvent.click(screen.getByRole("switch", { name: /personal api keys for/i }));
 
     expect(setApiAccess).toHaveBeenCalledWith({
@@ -268,5 +291,37 @@ describe("SettingsUsersPage API access", () => {
 
     await screen.findByText("Superadmin");
     expect(apiSwitch()).not.toBeInTheDocument();
+  });
+});
+
+describe("SettingsUsersPage custom roles", () => {
+  beforeEach(() => {
+    state.billing = null;
+    state.authOptions = [];
+  });
+
+  it("gives a member one of the community's custom roles", async () => {
+    state.members = [buildUserCommunityMember({ display_name: "Ada" })];
+    const member = state.members[0];
+    const assigned: { userId: string; body: unknown }[] = [];
+    server.use(
+      communityHttp.get("/custom-roles/", () =>
+        HttpResponse.json([{ id: 3, name: "Greeter", base_rung: "member", surfaces: ["invites"] }])
+      ),
+      communityHttp.put("/custom-roles/holders/:userId", async ({ request, params }) => {
+        assigned.push({ userId: String(params.userId), body: await request.json() });
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    setup({ role: "admin" });
+
+    await screen.findByRole("combobox", { name: /custom role for/i });
+    await settled();
+    await userEvent.click(screen.getByRole("combobox", { name: /custom role for/i }));
+    await userEvent.click(await screen.findByRole("option", { name: "Greeter" }));
+
+    await waitFor(() =>
+      expect(assigned).toEqual([{ userId: String(member.id), body: { role_id: 3 } }])
+    );
   });
 });

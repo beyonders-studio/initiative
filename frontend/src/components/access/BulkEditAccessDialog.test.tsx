@@ -253,14 +253,14 @@ describe("BulkEditAccessDialog grant rebuild", () => {
         onOpenChange={vi.fn()}
         onSuccess={vi.fn()}
         items={[{ id: 1, initiative_id: INITIATIVE_ID, grants: [], can: ownerCan() }]}
-        resourceType={Tool.queue}
+        resourceType={Tool.counter_group}
         invalidate={vi.fn()}
       />,
       { auth: { user: buildUser({ id: 1 }) } }
     );
 
-    // Default People tab, grant mode → the description uses the queue noun.
-    expect(await screen.findByText("Grant people access on 1 queue.")).toBeInTheDocument();
+    // Default People tab, grant mode → the description uses the counter group noun.
+    expect(await screen.findByText("Grant people access on 1 counter group.")).toBeInTheDocument();
   });
 
   it("all-members remove makes no request when nothing is shared with all members", async () => {

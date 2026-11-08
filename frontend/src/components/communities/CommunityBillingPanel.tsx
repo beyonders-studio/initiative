@@ -5,16 +5,16 @@ import type {
   CommunityBillingChargeRead,
   CommunityBillingSummaryRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge, type BadgeProps } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
 import { holdsBillingSeat, trialDaysLeft } from "@/lib/billingSummary";
 import { parseDateValue } from "@/lib/formatDate";
-import { dateTimeFormat, numberFormat } from "@/lib/intl";
+import { Badge, type BadgeProps } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
+import { Separator } from "@/ui/separator";
 
 /** A charge in minor units as the currency writes it, or null when the
  *  browser does not know the currency. */
@@ -128,6 +128,10 @@ export const CommunityBillingPanel = () => {
 
   const unavailable = isError || (summary != null && !summary.available);
   const status = summary?.available ? planStatus(summary, t, lang, canSell) : null;
+  // Billing says whether there is a plan above this one, and a subscription
+  // the portal can cancel: neither on the top plan, nor cancel on a free one.
+  const canUpgrade = Boolean(summary?.available && summary.can_upgrade);
+  const canCancel = Boolean(summary?.available && summary.can_cancel);
   const tierLabel =
     (summary?.available ? summary.tier_name : null) ??
     activeCommunity.tier_name ??
@@ -162,12 +166,17 @@ export const CommunityBillingPanel = () => {
                 </Button>
               ) : (
                 <>
-                  <Button size="sm" onClick={() => void openPortal(activeCommunity.id, "upgrade")}>
-                    {t("usagePanel.upgrade")}
-                  </Button>
+                  {canUpgrade && (
+                    <Button
+                      size="sm"
+                      onClick={() => void openPortal(activeCommunity.id, "upgrade")}
+                    >
+                      {t("usagePanel.upgrade")}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant={canUpgrade ? "outline" : "default"}
                     onClick={() => void openPortal(activeCommunity.id, "manage")}
                   >
                     {t("usagePanel.manageBilling")}
@@ -177,8 +186,12 @@ export const CommunityBillingPanel = () => {
             </div>
             <p className="text-muted-foreground text-sm">{t("billingPanel.changeInPortal")}</p>
 
-            <Separator />
-            <p className="text-muted-foreground text-sm">{t("billingPanel.cancelAnytime")}</p>
+            {canCancel && (
+              <>
+                <Separator />
+                <p className="text-muted-foreground text-sm">{t("billingPanel.cancelAnytime")}</p>
+              </>
+            )}
           </>
         ) : (
           <p className="text-muted-foreground text-sm">{t("billingPanel.notInApp")}</p>

@@ -1,0 +1,246 @@
+.EditorTheme__code {
+  background-color: transparent;
+  font-family: Menlo, Consolas, Monaco, monospace;
+  display: block;
+  padding: 8px 8px 8px 52px;
+  line-height: 1.53;
+  font-size: 13px;
+  margin: 0;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  border: 1px solid #ccc;
+  position: relative;
+  border-radius: 8px;
+  tab-size: 2;
+}
+.EditorTheme__code:before {
+  content: attr(data-gutter);
+  position: absolute;
+  background-color: transparent;
+  border-right: 1px solid #ccc;
+  left: 0;
+  top: 0;
+  padding: 8px;
+  color: #777;
+  white-space: pre-wrap;
+  text-align: right;
+  min-width: 25px;
+}
+.EditorTheme__table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  overflow-y: scroll;
+  overflow-x: scroll;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0px 0px 30px 0px;
+}
+.EditorTheme__tokenComment {
+  color: slategray;
+}
+.EditorTheme__tokenPunctuation {
+  color: #999;
+}
+.EditorTheme__tokenProperty {
+  color: #905;
+}
+.EditorTheme__tokenSelector {
+  color: #690;
+}
+.EditorTheme__tokenOperator {
+  color: #9a6e3a;
+}
+.EditorTheme__tokenAttr {
+  color: #07a;
+}
+.EditorTheme__tokenVariable {
+  color: #e90;
+}
+.EditorTheme__tokenFunction {
+  color: #dd4a68;
+}
+
+.Collapsible__container {
+  background-color: var(--background);
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.Collapsible__title {
+  padding: 0.25rem;
+  padding-left: 1rem;
+  position: relative;
+  font-weight: bold;
+  outline: none;
+  cursor: pointer;
+  list-style-type: disclosure-closed;
+  list-style-position: inside;
+}
+
+.Collapsible__title p {
+  display: inline-flex;
+}
+.Collapsible__title::marker {
+  color: lightgray;
+}
+.Collapsible__container[open] > .Collapsible__title {
+  list-style-type: disclosure-open;
+}
+
+/* Collaboration cursors container */
+.collaboration-cursors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Callouts: a panel in its kind's colour, the icon drawn as a mask so it
+ * takes that colour too. */
+.EditorTheme__callout {
+  --callout-color: #2563eb;
+  position: relative;
+  margin-top: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--callout-color) 35%, transparent);
+  background-color: color-mix(in srgb, var(--callout-color) 10%, transparent);
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+}
+.EditorTheme__callout > .callout-icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  background-color: var(--callout-color);
+  mask: var(--callout-icon) center / contain no-repeat;
+  -webkit-mask: var(--callout-icon) center / contain no-repeat;
+  user-select: none;
+}
+.EditorTheme__callout > .callout-body > :first-child {
+  margin-top: 0;
+}
+/* Where the page can be edited, a callout's icon opens its menu. An embed
+ * draws the same panel and has none. */
+[contenteditable="true"] .EditorTheme__callout:not([data-lexical-decorator]) > .callout-icon {
+  cursor: pointer;
+}
+/* Folding: a callout folds to its first line. The button shows only when
+ * there is something below that line to fold away. */
+.EditorTheme__callout:has(> .callout-toggle) {
+  padding-right: 2.5rem;
+}
+.EditorTheme__callout > .callout-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.7rem;
+  display: flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  color: var(--callout-color);
+  cursor: pointer;
+  user-select: none;
+}
+.EditorTheme__callout > .callout-toggle:hover {
+  background-color: color-mix(in srgb, var(--callout-color) 15%, transparent);
+}
+.EditorTheme__callout > .callout-toggle::before {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  background-color: currentColor;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform 150ms;
+}
+.EditorTheme__callout[data-collapsed] > .callout-toggle::before {
+  transform: rotate(-90deg);
+}
+.EditorTheme__callout:not(:has(> .callout-body > :nth-child(2))) > .callout-toggle {
+  display: none;
+}
+.EditorTheme__callout[data-collapsed] > .callout-body > :not(:first-child) {
+  display: none;
+}
+.EditorTheme__callout[data-callout="info"] {
+  --callout-color: #2563eb;
+  --callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22/%3E%3Cpath d=%22M12 16v-4%22/%3E%3Cpath d=%22M12 8h.01%22/%3E%3C/svg%3E");
+}
+.dark .EditorTheme__callout[data-callout="info"] {
+  --callout-color: #60a5fa;
+}
+.EditorTheme__callout[data-callout="note"] {
+  --callout-color: #64748b;
+  --callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d=%22M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z%22/%3E%3Cpath d=%22m15 5 4 4%22/%3E%3C/svg%3E");
+}
+.dark .EditorTheme__callout[data-callout="note"] {
+  --callout-color: #94a3b8;
+}
+.EditorTheme__callout[data-callout="tip"] {
+  --callout-color: #0d9488;
+  --callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d=%22M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5%22/%3E%3Cpath d=%22M9 18h6%22/%3E%3Cpath d=%22M10 22h4%22/%3E%3C/svg%3E");
+}
+.dark .EditorTheme__callout[data-callout="tip"] {
+  --callout-color: #2dd4bf;
+}
+.EditorTheme__callout[data-callout="success"] {
+  --callout-color: #16a34a;
+  --callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22/%3E%3Cpath d=%22m9 12 2 2 4-4%22/%3E%3C/svg%3E");
+}
+.dark .EditorTheme__callout[data-callout="success"] {
+  --callout-color: #4ade80;
+}
+.EditorTheme__callout[data-callout="warning"] {
+  --callout-color: #d97706;
+  --callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d=%22m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3%22/%3E%3Cpath d=%22M12 9v4%22/%3E%3Cpath d=%22M12 17h.01%22/%3E%3C/svg%3E");
+}
+.dark .EditorTheme__callout[data-callout="warning"] {
+  --callout-color: #fbbf24;
+}
+.EditorTheme__callout[data-callout="error"] {
+  --callout-color: #dc2626;
+  --callout-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d=%22m15 9-6 6%22/%3E%3Cpath d=%22M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z%22/%3E%3Cpath d=%22m9 9 6 6%22/%3E%3C/svg%3E");
+}
+.dark .EditorTheme__callout[data-callout="error"] {
+  --callout-color: #f87171;
+}
+
+/* A Mermaid code block's diagram, drawn under it by the preview plugin. */
+.mermaid-preview {
+  margin: 0.5rem 0 1rem;
+  display: flex;
+  justify-content: center;
+  user-select: none;
+}
+.mermaid-preview-image {
+  max-width: 100%;
+  height: auto;
+}
+.mermaid-preview-error {
+  font-size: 0.8125rem;
+  color: var(--destructive);
+}
+/* Being read, a drawn diagram is the block: its code steps aside. */
+.ContentEditable__root[contenteditable="false"] .EditorTheme__code[data-mermaid-drawn="true"] {
+  display: none;
+}
+
+/* The right-click menu opens inside a full-window overlay that is fixed in
+   place, which makes the overlay its own stacking context with no z-index of
+   its own: whatever the menu sets, the editor's sticky bars (z-10) still draw
+   over it. Lifting the overlay to the popover layer puts the menu above them. */
+:has(> .EditorContextMenu) {
+  z-index: 50;
+}

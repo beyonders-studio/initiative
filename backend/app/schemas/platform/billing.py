@@ -24,17 +24,31 @@ import jwt
 from pydantic import (
     ConfigDict,
     Field,
+    StrictBool,
+    StrictInt,
     StringConstraints,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
 from app.core.messages import BillingMessages
+from app.core.rules import COMMUNITY_RULES, SYNCED_RULES, Slot
 from app.core.security import PUBLIC_KEY_JWT_ALGORITHM
 from app.models.platform.identity_ref import REF_MAX_LENGTH
 from app.models.platform.marketplace import UID_LENGTH
-from app.models.platform.guild import BILLING_SETTABLE_STATUSES, CommunityStatus
-from app.schemas.base import SanitizedBaseModel
+from app.models.platform.guild import (
+    BILLING_SETTABLE_STATUSES,
+    MEMBER_ROLE_SURFACES,
+    AdminSurface,
+    CommunityRole,
+    CommunityStatus,
+)
+from app.models.tenant.custom_role import (
+    CUSTOM_ROLE_NAME_MAX_LENGTH,
+    CUSTOM_ROLE_RUNGS,
+)
+from app.schemas.base import SanitizedBaseModel, TitleStr
 
 #: The most items one call carries.
 BATCH_MAX = 500
@@ -61,6 +75,55 @@ class CommunitySyncRequest(BillingBatch):
     communities: list[Any] = Field(min_length=1, max_length=BATCH_MAX)
 
 
+class SyncedRule(SanitizedBaseModel):
+    """One of the deployment's rules for a community, beside its plan. A key
+    this build does not know is ignored, as a capability name is."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(min_length=1, max_length=64)
+    value: StrictBool | StrictInt
+
+    @model_validator(mode="after")
+    def _fits_its_rule(self) -> SyncedRule:
+        rule = COMMUNITY_RULES.get(self.key)
+        if rule is None:
+            return self
+        on_off = rule.slot is Slot.enabled
+        if (
+            self.key not in SYNCED_RULES
+            or on_off != isinstance(self.value, bool)
+            or not 0 <= self.value <= MAX_VERSION
+        ):
+            raise ValueError(BillingMessages.RULE_NOT_SYNCED)
+        return self
+
+
+#: The most custom roles a deployment defines.
+MAX_DEPLOYMENT_CUSTOM_ROLES = 16
+
+
+class SyncedCustomRole(SanitizedBaseModel):
+    """A custom role the deployment defines for every community: a name the
+    communities may not use for their own, and the surfaces it holds on its
+    rung."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: TitleStr = Field(min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH)
+    base_rung: CommunityRole
+    surfaces: list[AdminSurface] = Field(max_length=len(AdminSurface))
+
+    @model_validator(mode="after")
+    def _on_its_rung(self) -> "SyncedCustomRole":
+        if self.base_rung not in CUSTOM_ROLE_RUNGS or (
+            self.base_rung is CommunityRole.member
+            and not set(self.surfaces) <= MEMBER_ROLE_SURFACES
+        ):
+            raise ValueError(BillingMessages.CUSTOM_ROLES_NOT_SYNCED)
+        return self
+
+
 class CommunityFields(SanitizedBaseModel):
     """What billing holds a community to, whole, at one version. Every field
     is sent every time: billing sends its desired state, never a patch, so a
@@ -76,6 +139,30 @@ class CommunityFields(SanitizedBaseModel):
     max_guests: Optional[int] = Field(ge=0)
     feature_keys: list[str] = Field(max_length=64)
     status: CommunityStatus
+    #: The deployment's other rules for the community, whole: a rule left out
+    #: falls back to the community's own. A sender that predates the field
+    #: sets none.
+    rules: list[SyncedRule] = Field(default_factory=list, max_length=64)
+    #: The deployment's custom roles, whole: a role left out is deleted from
+    #: the community, and its holders stand on their rung. A sender that
+    #: predates the field, or has none to send, leaves it out.
+    custom_roles: list[SyncedCustomRole] = Field(
+        default_factory=list, max_length=MAX_DEPLOYMENT_CUSTOM_ROLES
+    )
+
+    @field_validator("custom_roles")
+    @classmethod
+    def _named_once(cls, value: list[SyncedCustomRole]) -> list[SyncedCustomRole]:
+        if len({role.name.casefold() for role in value}) != len(value):
+            raise ValueError(BillingMessages.CUSTOM_ROLES_NOT_SYNCED)
+        return value
+
+    @field_validator("rules")
+    @classmethod
+    def _once_each(cls, value: list[SyncedRule]) -> list[SyncedRule]:
+        if len({rule.key for rule in value}) != len(value):
+            raise ValueError(BillingMessages.RULE_NOT_SYNCED)
+        return value
 
     @field_validator("status")
     @classmethod

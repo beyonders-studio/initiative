@@ -10,8 +10,10 @@ import { useTranslation } from "react-i18next";
 
 import { type TaskTypeRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useProjects, useProjectTaskTypes } from "@/hooks/useProjects";
+import { toolViewParams } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -19,17 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useProjects, useProjectTaskTypes } from "@/hooks/useProjects";
-import { toolViewParams } from "@/lib/tools";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 interface TaskTypeCopyDialogProps {
   open: boolean;
@@ -60,12 +54,14 @@ export const TaskTypeCopyDialog = ({
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const sourceTypes = useProjectTaskTypes(sourceId, { enabled: open && sourceId !== null });
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) {
       setSourceId(null);
       setChosen(new Set());
     }
-  }, [open]);
+  }
 
   const others = (projects.data?.items ?? []).filter((project) => project.id !== projectId);
   const here = useMemo(() => new Set(types.map((type) => type.name.toLocaleLowerCase())), [types]);

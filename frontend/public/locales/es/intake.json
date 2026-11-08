@@ -86,18 +86,38 @@
   },
   "help": {
     "action": "Pedir ayuda",
-    "title": "Pedir ayuda",
-    "description": "Cuéntanos qué ocurre y alguien se encargará.",
+    "panel": {
+      "search": "Buscar en la guía de uso",
+      "guide": "Guía de uso",
+      "guideBody": "Cómo usar cada parte de Initiative, desde tu primer proyecto.",
+      "back": "Volver a la búsqueda",
+      "forThisPage": "Para esta página",
+      "noMatch": "Nada en la guía de uso coincide con «{{query}}».",
+      "noMatchAsk": "Prueba con otras palabras o pregunta al equipo abajo. Tu búsqueda pasa a la solicitud.",
+      "noMatchWrite": "Prueba con otras palabras o escribe a la dirección de abajo.",
+      "noMatchBrowse": "Prueba con otras palabras o recorre la guía de uso.",
+      "unavailable": "La búsqueda no está configurada en este servidor. El enlace a la guía de uso de arriba lo tiene todo.",
+      "noAnswer": "¿No está la respuesta?",
+      "openRequests_one": "{{count}} solicitud abierta",
+      "openRequests_other": "{{count}} solicitudes abiertas",
+      "askTeam": "Preguntar al equipo",
+      "writeTo": "¿No está la respuesta? Escribe a quienes administran este servidor:",
+      "needsText": "Cuenta qué pasa para enviar.",
+      "needsTopic": "Elige de qué trata para enviar.",
+      "sendShortcut": "Ctrl+Intro envía",
+      "discard": "Descartar",
+      "sent": "Enviado al equipo",
+      "sentBody": "Quienes administran este servidor se encargarán. Su respuesta llega a tus notificaciones y la solicitud queda en Mis tickets.",
+      "openTickets": "Abrir Mis tickets"
+    },
     "subjectLabel": "Título",
     "subjectPlaceholder": "Una línea, para poder encontrarlo después",
     "bodyLabel": "¿Qué ha pasado?",
     "bodyPlaceholder": "Qué estabas haciendo, qué esperabas y qué ocurrió en su lugar.",
-    "browseFaq": "Consultar las preguntas frecuentes",
     "submit": "Enviar",
     "thanks": "Enviado. Alguien se encargará.",
     "error": "No se ha podido enviar. Inténtalo de nuevo en un momento.",
     "topicLabel": "¿De qué se trata?",
-    "topicPlaceholder": "Elige una opción",
     "topics": {
       "account": "Mi cuenta",
       "community": "Esta comunidad",
@@ -133,13 +153,13 @@
     "replyError": "No se pudo enviar tu respuesta. Inténtalo de nuevo en un momento.",
     "closedNote": "Este ticket está cerrado. Si surge otra cosa, vuelve a pedir ayuda.",
     "noConversation": "Gracias por el reporte. El equipo revisa cada uno, pero no responde a los reportes aquí.",
-    "staffFirst": "Gracias por contárnoslo. Podrás responder aquí cuando el equipo te haya escrito.",
     "empty": "Aún no has enviado ningún ticket. Cuando pidas ayuda, aparecerá aquí para que puedas seguirla.",
     "loadError": "No se pudieron cargar tus tickets."
   },
   "case": {
     "filedBy": "Enviado por",
     "noFiler": "Abierto automáticamente",
+    "noContact": "Prefiere que no le contacten",
     "theyCalledIt": "Su asunto:",
     "noConversation": "Este tipo de caso no abre una conversación con quien lo envió.",
     "staffFirst": "Podrá responder cuando el equipo le haya escrito.",
@@ -211,6 +231,7 @@
   },
   "evidence": {
     "attach": "Adjuntar archivos",
+    "dropHere": "Suelta para adjuntar",
     "limits_one": "Hasta {{count}} archivo, de {{size}} como máximo.",
     "limits_other": "Hasta {{count}} archivos, de {{size}} como máximo cada uno.",
     "remove": "Quitar {{name}}",
@@ -221,9 +242,7 @@
     "heading": "Adjuntos",
     "reveal": "Mostrar {{name}}",
     "view": "Ver {{name}}",
-    "open": "Abrir {{name}}",
-    "dropped_one": "Se quitó {{names}}: aquí no se acepta.",
-    "dropped_other": "Se quitaron {{names}}: aquí no se aceptan."
+    "open": "Abrir {{name}}"
   },
   "security": {
     "action": "Informar de un problema de seguridad",
@@ -246,28 +265,34 @@
     "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
   },
   "feedback": {
-    "action": "Enviar comentarios",
-    "title": "Enviar comentarios",
-    "description": "Cuéntales a quienes gestionan este servidor lo que piensas. Puedes seguirlo en Mis tickets.",
-    "typeLabel": "¿Qué tipo de comentario es?",
-    "typePlaceholder": "Elige una opción",
-    "topics": {
-      "idea": "Una idea",
-      "problem": "Un problema",
-      "praise": "Un elogio",
-      "other": "Otra cosa"
+    "title": "Cuéntanos qué piensas",
+    "kindLabel": "Tipo de comentario",
+    "kinds": {
+      "idea": {
+        "label": "Sugerir una idea",
+        "question": "¿Qué te gustaría que hiciera Initiative?",
+        "placeholder": "La idea, y en qué te ayudaría."
+      },
+      "problem": {
+        "label": "Algo no va bien",
+        "question": "¿Qué te ha estorbado?",
+        "placeholder": "Qué estabas haciendo y qué pasó."
+      },
+      "praise": {
+        "label": "Hacer un cumplido",
+        "question": "¿Qué es lo que te encanta?",
+        "placeholder": "Lo que le contarías a un amigo."
+      }
     },
-    "bodyLabel": "¿Qué quieres decirles?",
-    "bodyPlaceholder": "Lo que te gustaría, lo que te estorbó o lo que te gustó.",
-    "needsAnswer": "Necesito una respuesta",
-    "needsAnswerHelp": "Lo envía como solicitud de ayuda, para que alguien te responda.",
-    "submit": "Enviar comentarios",
-    "thanks": "¡Gracias! Quienes gestionan este servidor lo leerán.",
-    "error": "No se pudo enviar. Inténtalo de nuevo en un momento.",
+    "addPicture": "Añadir una imagen",
+    "contactable": "Pueden contactarme si tienen preguntas sobre esto",
+    "stuck": "¿Necesitas que alguien lo resuelva por ti? Pedir ayuda",
     "context": {
-      "title": "Se envía con él",
-      "help": "Dónde estaba la aplicación, para que vean lo que viste. Nada de esto te nombra ni nombra nada de lo que abriste.",
-      "remove": "Quitar",
+      "on": "Incluye la versión de la app y la página en la que estás.",
+      "off": "Sin la versión de la app ni la página.",
+      "switch": "Incluir la versión de la app y la página",
+      "show": "Ver qué",
+      "hide": "Ocultar",
       "fields": {
         "app_version": "Versión",
         "platform": "Plataforma",
@@ -276,7 +301,14 @@
         "route": "Página",
         "viewport": "Ventana"
       }
-    }
+    },
+    "discard": "Descartar",
+    "writeSomething": "Escribe algo para enviarlo.",
+    "submit": "Enviar comentarios",
+    "thanks": "¡Gracias por tu opinión!",
+    "thanksBody": "El equipo lee cada una.",
+    "done": "Listo",
+    "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
   },
   "moderationTopics": {
     "appeal": "Apelación contra tu suspensión"

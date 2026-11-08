@@ -27,7 +27,7 @@ import pytest
 
 from app.services.marketplace import contract, service_plugins
 from app.services.marketplace.definitions import normalize_listing_definition
-from app.services.tenant import plugin_metadata
+from app.services.tenant import metadata as metadata_service
 
 pytestmark = pytest.mark.always
 
@@ -266,7 +266,7 @@ def maximal_manifest() -> dict:
                 "name": {"en": "Demo"},
                 "kind": "badge",
                 "list": True,
-                "on": ["task", "queue_item"],
+                "on": ["task", "counter"],
                 "description": {"en": "The item's demo"},
                 "tone": "accent",
                 "states": {
@@ -278,7 +278,23 @@ def maximal_manifest() -> dict:
                     }
                 },
                 "requires": {"all_of": ["vendor"]},
-            }
+            },
+            {
+                "key": "demo.stage",
+                "name": {"en": "Stage"},
+                "kind": "select",
+                "on": ["task"],
+                "options": [
+                    {"value": "won", "label": {"en": "Won"}, "color": "#22aa55"}
+                ],
+            },
+            {
+                "key": "demo.price",
+                "name": {"en": "Price"},
+                "kind": "currency",
+                "on": ["task"],
+                "currency": "EUR",
+            },
         ],
         "actions": [
             {
@@ -357,7 +373,7 @@ def maximal_declarative_manifest() -> dict:
 
     A request sends a body or a GraphQL query, a cursor goes in a parameter or
     a variable, and a route reads a body path or a header, so those are spread
-    over several requests. Only a write's request names a connection per actor.
+    over several requests.
     """
     api = '"https://api.tracker.example/issues"'
     paged = {
@@ -732,7 +748,17 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("webhookEvent", hooks["events"][0]),
         ("webhookStatus", hooks["status"][0]),
         # Only a declarative plug-in's list field offers its elements actions.
-        ("field", {**published["fields"][0], **declarative["fields"][0]}),
+        # A select's options and money's currency are terms of those kinds.
+        (
+            "field",
+            {
+                **published["fields"][0],
+                **declarative["fields"][0],
+                **published["fields"][1],
+                **published["fields"][2],
+            },
+        ),
+        ("fieldOption", published["fields"][1]["options"][0]),
         ("stateFacet", published["fields"][0]["states"]["status"]),
         ("stateValue", published["fields"][0]["states"]["status"]["values"]["open"]),
         ("setting", published["settings"][0]),
@@ -803,11 +829,11 @@ def test_the_maximal_manifests_really_are_maximal(nodes):
     contract defines with fields is one these manifests reach. A change, and
     a list's element, is what a ``write`` answers rather than a term a
     manifest stores, and the changes engine holds an answer to it
-    (``plugin_metadata.apply_changes``), an element's every term."""
+    (``metadata.apply_changes``), an element's every term."""
     reached = {owner for owner, _ in nodes} - {"other"}
     with_fields = {name for name in contract.objects() if contract.fields(name)}
     assert with_fields - reached == {"change", "targetedChange", "listElement"}
-    assert set(plugin_metadata._ELEMENT_TERMS) == set(contract.fields("listElement"))
+    assert set(metadata_service._ELEMENT_TERMS) == set(contract.fields("listElement"))
 
 
 def test_an_emitting_endpoint_keeps_what_describes_it(published):
@@ -847,8 +873,8 @@ def test_the_uid_shape_matches_the_contract():
 
 
 def test_the_metadata_columns_match_the_contract():
-    """A plug-in's metadata key and look-up text are column widths, and the
-    items it keeps values on are the table's CHECK, so each is checked against
+    """A plug-in's metadata key and an element's ref are column widths, and
+    the items it keeps values on are the table's CHECK, so each is checked against
     the contract rather than read from it, as the uid is. So are a setting's
     key and a unique setting's value, which an install claims."""
     from app.core.tools import ITEM_KINDS
@@ -856,12 +882,12 @@ def test_the_metadata_columns_match_the_contract():
         SETTING_KEY_LENGTH,
         SETTING_VALUE_LENGTH,
     )
-    from app.models.tenant.plugin_metadata import LOOKUP_LENGTH, PluginMetadata
+    from app.models.tenant.metadata import REF_LENGTH, MetadataDefinition
 
-    assert PluginMetadata.__table__.c.key.type.length == contract.cap(
+    assert MetadataDefinition.__table__.c.key.type.length == contract.cap(
         "metadataKeyLength"
     )
-    assert LOOKUP_LENGTH == contract.cap("metadataLookupLength")
+    assert REF_LENGTH == contract.cap("metadataLookupLength")
     assert frozenset(ITEM_KINDS) == contract.enum("itemKind")
     assert SETTING_KEY_LENGTH == contract.cap("identifierLength")
     assert SETTING_VALUE_LENGTH == contract.cap("uniqueSettingValueLength")
@@ -1150,7 +1176,7 @@ def _labelled_on(connection) -> dict:
         _with(
             maximal_declarative_manifest,
             lambda b: b["endpoints"][0]["request"].update(
-                connection={"installation": "workspace"}
+                connection={"member": "profile", "installation": "workspace"}
             ),
         ),
         _labelled_on({"member": "profile"}),
@@ -1233,7 +1259,7 @@ def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
     plug-in's list field offers actions on its elements, each declared and
     offered wherever the field is, and an action asks for the params of an
     endpoint it names. A request on a member's connection is one its endpoint
-    requires and the installation does not make; a write's request naming a
+    requires and the installation does not make; a request naming a
     connection per actor names one for each of its actors, the member's own
     for the member and the community's for the installation. An endpoint is
     closed: a misspelt term is refused, not dropped."""
@@ -1241,6 +1267,17 @@ def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
 
     with pytest.raises(ListingDefinitionError):
         normalize_listing_definition("plugin", body, public_id=DECLARATIVE_ID)
+
+
+def test_a_reads_request_names_a_connection_per_actor():
+    """A read made as the member carries the member's own credential, and one
+    made as the installation the community's, as a write's does."""
+    body = maximal_declarative_manifest()
+    body["endpoints"][0]["actors"] = ["member", "installation"]
+    per_actor = {"member": "profile", "installation": "workspace"}
+    body["endpoints"][0]["request"]["connection"] = per_actor
+    normalized = normalize_listing_definition("plugin", body, public_id=DECLARATIVE_ID)
+    assert normalized["endpoints"][0]["request"]["connection"] == per_actor
 
 
 def test_a_declarative_manifest_is_named_by_its_listing():

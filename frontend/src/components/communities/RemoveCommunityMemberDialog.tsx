@@ -4,6 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import { removeMember } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunities } from "@/hooks/useCommunities";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,11 +17,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/alert-dialog";
 
 interface RemoveCommunityMemberDialogProps {
   open: boolean;

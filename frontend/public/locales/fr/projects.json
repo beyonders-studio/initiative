@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Statuts de tâche",
-    "tabTaskTypes": "Types de tâche"
+    "tabTaskTypes": "Types de tâche",
+    "tabProperties": "Propriétés"
   },
   "files": {
     "newFile": "Nouveau fichier"
@@ -252,7 +253,20 @@
     "ganttSchedule": "Faites glisser sur les jours pour donner des dates à cette tâche",
     "ganttFold": "Masquer les parties de {{title}}",
     "ganttUnfold": "Afficher les parties de {{title}}",
-    "ganttLink": "Faites glisser vers la tâche qui attend celle-ci",
+    "ganttLink": "Faites glisser sur une autre tâche pour les lier",
+    "ganttOutside": "Liées depuis d’autres projets",
+    "ganttLinkQuestion": "Quel est le lien entre « {{task}} » et « {{other}} » ?",
+    "ganttBlockedBy": "Bloquée par elle",
+    "ganttBlockedByHint": "Ne peut pas commencer avant que cette tâche soit terminée",
+    "ganttPartOf": "En fait partie",
+    "ganttPartOfHint": "Devient l'une des parties de cette tâche",
+    "ganttRemoveLink": "Retirer le lien : {{task}} attend {{other}}",
+    "ganttCriticalPath": "Chemin critique",
+    "ganttChainTitle": "Déplacer aussi ce qui en dépend ?",
+    "ganttChain_one": "{{count}} tâche attend « {{title}} ». La décaler d’autant de jours ?",
+    "ganttChain_other": "{{count}} tâches attendent « {{title}} ». Les décaler d’autant de jours ?",
+    "ganttChainMove": "Décaler aussi",
+    "ganttChainKeep": "Seulement celle-ci",
     "ganttKeys": "Haut et bas passent d’une tâche à l’autre, droite et gauche déplient et replient les parties d’une tâche, et Entrée ouvre une tâche.",
     "ganttKeysMove": "Haut et bas passent d’une tâche à l’autre, droite et gauche déplient et replient les parties d’une tâche, et Entrée ouvre une tâche. Alt avec gauche ou droite déplace une tâche d’un jour ; avec Maj en plus, seulement sa date d’échéance.",
     "archiveDoneTasks": "Archiver les tâches terminées",
@@ -282,6 +296,7 @@
     "markDone": "Marquer la tâche comme terminée",
     "taskColumn": "Tâche",
     "untagged": "Sans étiquette",
+    "noParent": "Ne fait partie d’aucune tâche",
     "noValue": "Sans {{name}}",
     "checked": "{{name}} : oui",
     "unchecked": "{{name}} : non",
@@ -314,6 +329,8 @@
       "dueDate": "Date d'échéance",
       "recurrence": "Récurrence",
       "checklist": "Liste de contrôle",
+      "subtasks": "Sous-tâches",
+      "parent": "Fait partie de",
       "priority": "Priorité",
       "comments": "Commentaires",
       "blockers": "Bloqueurs",
@@ -404,5 +421,14 @@
     "unassigned": "Vous n'êtes plus sur cette tâche",
     "assignError": "Impossible de modifier les personnes assignées à cette tâche.",
     "moveTo": "Déplacer vers"
+  },
+  "properties": {
+    "description": "Ce que les tâches de ce projet peuvent porter en plus des métadonnées de l'initiative. Une tâche déplacée vers un autre projet ne garde une valeur que si ce projet a une propriété du même nom et du même type.",
+    "create": "Nouvelle propriété",
+    "edit": "Modifier la propriété",
+    "delete": "Supprimer la propriété",
+    "deleteTitle": "Supprimer cette propriété ?",
+    "deleteBody": "La propriété et la valeur de chaque tâche dans ce projet seront supprimées.",
+    "none": "Aucune propriété pour l'instant"
   }
 }

@@ -22,12 +22,27 @@
  *
  * That is also where a plug-in's update cadence lives. An install takes new
  * versions on its own unless a community admin turns that off here, after which the
- * Update button beside it is how they land.
+ * Update button beside it is how they land. A version that asks for more access
+ * waits for the seat: its row says so, and its settings open on the question.
+ * The notice about it links here with `?plugin=`, which opens that row.
+ *
+ * Whoever runs the server can take plug-ins over for a community. The installed
+ * ones keep running and stay listed, members still answer for themselves and the
+ * seat can still revoke and block, but nothing here installs, changes or removes
+ * one.
  */
 
-import { Link } from "@tanstack/react-router";
-import { Blocks, ChevronDown, Loader2, ShieldCheck, Store, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { Link, useSearch } from "@tanstack/react-router";
+import {
+  ArrowUpCircle,
+  Blocks,
+  ChevronDown,
+  Loader2,
+  ShieldCheck,
+  Store,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
@@ -36,16 +51,7 @@ import { PluginMembersPanel } from "@/components/plugins/PluginMembersPanel";
 import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel";
 import { PluginScopesPanel } from "@/components/plugins/PluginScopesPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
-import { PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PluginPendingUpdate, PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPluginDetail } from "@/hooks/useCommunityPluginDetail";
@@ -60,7 +66,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
-import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 export function SettingsCommunityPluginsPage() {
   const { t } = useTranslation(["plugins", "common"]);
@@ -73,6 +89,8 @@ export function SettingsCommunityPluginsPage() {
   const holdsTheSeat = Boolean(activeCommunity?.can.seat);
   // Erasing a plug-in's data with it is for the community's own admins.
   const administers = Boolean(activeCommunity?.can.administer_content);
+  const closed = Boolean(activeCommunity?.closed_surfaces?.includes("plugins"));
+  const { plugin: openId } = useSearch({ strict: false }) as { plugin?: number };
 
   const plugins = pluginsQuery.data?.items ?? [];
 
@@ -83,6 +101,11 @@ export function SettingsCommunityPluginsPage() {
         <CardDescription>{t("plugins:manage.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {closed && (
+          <Alert>
+            <AlertDescription>{t("plugins:manage.closed")}</AlertDescription>
+          </Alert>
+        )}
         {pluginsQuery.isLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : plugins.length ? (
@@ -92,12 +115,14 @@ export function SettingsCommunityPluginsPage() {
               plugin={plugin}
               canManage={Boolean(holdsTheSeat)}
               canErase={holdsTheSeat && administers}
+              closed={closed}
+              initiallyOpen={plugin.id === openId}
             />
           ))
         ) : (
           <div className="space-y-3 rounded-lg border border-dashed p-6 text-center">
             <p className="text-muted-foreground text-sm">{t("plugins:manage.empty")}</p>
-            {holdsTheSeat && (
+            {holdsTheSeat && !closed && (
               <Button variant="outline" asChild>
                 <Link to={gp("/marketplace")} search={{ kind: ListingKind.plugin }}>
                   <Store className="h-4 w-4" />
@@ -131,24 +156,40 @@ export interface PluginListItem {
   mandatory?: boolean;
   /** False when the plug-in's service is not set up on this server. */
   available?: boolean;
+  /** A version asking for more access, waiting for the seat's answer. */
+  pending_version?: string | null;
 }
 
 function PluginRow({
   plugin,
   canManage,
   canErase,
+  closed,
+  initiallyOpen,
 }: {
   plugin: PluginListItem;
   canManage: boolean;
   canErase: boolean;
+  /** Plug-ins are managed by whoever runs the server, not here. */
+  closed: boolean;
+  /** Opened and scrolled to: the row a link named. */
+  initiallyOpen: boolean;
 }) {
   const { t, i18n } = useTranslation(["plugins", "common"]);
   const [name, setName] = useState(plugin.name);
   const [confirming, setConfirming] = useState(false);
   const [erase, setErase] = useState(false);
   const [open, setOpen] = useState(false);
+  const row = useRef<HTMLDivElement>(null);
+  // On arrival, and when a link names this row while the page is open.
+  useEffect(() => {
+    if (!initiallyOpen) return;
+    setOpen(true);
+    row.current?.scrollIntoView?.({ block: "start" });
+  }, [initiallyOpen]);
   const update = useUpdateCommunityPlugin(plugin.id);
   const uninstall = useUninstallCommunityPlugin();
+  const canChange = canManage && !closed;
 
   const save = (patch: { name?: string; enabled?: boolean }) =>
     update.mutate(patch, {
@@ -174,11 +215,11 @@ function PluginRow({
   };
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border">
+    <Collapsible ref={row} open={open} onOpenChange={setOpen} className="rounded-lg border">
       <div className="flex flex-wrap items-center gap-3 p-3">
         <Blocks className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1 space-y-1">
-          {canManage ? (
+          {canChange ? (
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -196,8 +237,15 @@ function PluginRow({
           </p>
         </div>
 
-        {/* Unfinished configuration is the one thing worth surfacing on the
-            collapsed row: it is why a plug-in looks installed and does nothing. */}
+        {/* What the collapsed row surfaces: a version waiting for the seat's
+            answer, and unfinished configuration, which is why a plug-in looks
+            installed and does nothing. */}
+        {canChange && plugin.pending_version && (
+          <Badge className="gap-1">
+            <ArrowUpCircle className="h-3 w-3" aria-hidden />
+            {t("plugins:manage.updateWaiting")}
+          </Badge>
+        )}
         {plugin.needs_config && (
           <Badge variant="outline" className="gap-1">
             <TriangleAlert className="h-3 w-3" aria-hidden />
@@ -224,7 +272,7 @@ function PluginRow({
         <div className="flex shrink-0 items-center gap-2">
           {/* A plug-in the platform provides has no switch and no remove button:
               the affordances are absent rather than present-and-refusing. */}
-          {canManage && !plugin.mandatory && (
+          {canChange && !plugin.mandatory && (
             <>
               <Button
                 size="sm"
@@ -254,7 +302,7 @@ function PluginRow({
       <CollapsibleContent>
         {/* Fetched only once opened: the detail read carries every connection's
             whole pinned form, which the collapsed list has no use for. */}
-        {open && <PluginDetailPanels pluginId={plugin.id} canManage={canManage} />}
+        {open && <PluginDetailPanels pluginId={plugin.id} canManage={canManage} closed={closed} />}
       </CollapsibleContent>
 
       <ConfirmDialog
@@ -329,26 +377,45 @@ function RemovalNotice({ pluginId, locale }: { pluginId: number; locale: string 
 }
 
 /**
- * The plug-in's connections, and — for the seat — its settings, where it appears
- * and who opens it there, what it can reach, who has connected to it and how it
- * takes new versions.
+ * The plug-in's connections, and — for the seat — a version waiting for its
+ * answer first, then its settings, where it appears and who opens it there,
+ * what it can reach, who has connected to it and how it takes new versions.
  */
-function PluginDetailPanels({ pluginId, canManage }: { pluginId: number; canManage: boolean }) {
+function PluginDetailPanels({
+  pluginId,
+  canManage,
+  closed,
+}: {
+  pluginId: number;
+  canManage: boolean;
+  closed: boolean;
+}) {
   const { t } = useTranslation(["plugins", "common"]);
   const detail = useCommunityPluginDetail(pluginId);
 
   if (detail.isLoading) return <Skeleton className="m-3 h-24" />;
   if (!detail.data) return null;
 
+  const asks = detail.data.pending_update;
+
   return (
     <div className="space-y-6 border-t p-4">
+      {canManage && !closed && asks && (
+        <PluginPendingUpdate
+          pluginId={pluginId}
+          asks={asks}
+          pluginNames={detail.data.plugin_names}
+        />
+      )}
+
       <PluginConnectionsPanel
         pluginId={pluginId}
         connections={detail.data.connections}
         canManage={canManage}
+        closed={closed}
       />
 
-      {canManage && (
+      {canManage && !closed && (
         <>
           <PluginSettingsPanel pluginId={pluginId} settings={detail.data.settings ?? []} />
 
@@ -360,15 +427,18 @@ function PluginDetailPanels({ pluginId, canManage }: { pluginId: number; canMana
           {(detail.data.requested_scopes ?? []).length > 0 && (
             <PluginScopesPanel plugin={detail.data} />
           )}
-
-          <section className="space-y-2">
-            <h3 className="font-medium text-sm">{t("plugins:members.title")}</h3>
-            <PluginMembersPanel pluginId={pluginId} enabled={canManage} />
-          </section>
-
-          <PluginUpdatesPanel plugin={detail.data} />
         </>
       )}
+
+      {/* Revoking and blocking stay the seat's while the rest is closed. */}
+      {canManage && (
+        <section className="space-y-2">
+          <h3 className="font-medium text-sm">{t("plugins:members.title")}</h3>
+          <PluginMembersPanel pluginId={pluginId} enabled={canManage} />
+        </section>
+      )}
+
+      {canManage && !closed && <PluginUpdatesPanel plugin={detail.data} />}
     </div>
   );
 }

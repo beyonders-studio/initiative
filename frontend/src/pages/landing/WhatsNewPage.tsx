@@ -14,11 +14,11 @@ import { useTranslation } from "react-i18next";
 
 import type { ChangelogEntry } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Button } from "@/components/ui/button";
 import { useChangelog } from "@/hooks/useSettings";
-import { dateTimeFormat } from "@/lib/intl";
 import { DOCS_URL, REPO_URL } from "@/lib/links";
 import { RELEASE_IMAGE_DIR } from "@/lib/releaseImages";
+import { Button } from "@/ui/button";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 import { DarkBand } from "./DarkBand";
 import { LandingShell } from "./LandingShell";

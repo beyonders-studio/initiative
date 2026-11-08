@@ -19,26 +19,6 @@ import type {
   PlacementProviderRead,
   ProviderPlacementRuleRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   useCreatePlacementRule,
   usePlacementCommunities,
@@ -47,6 +27,20 @@ import {
 } from "@/hooks/useProviderPlacement";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** Sentinel for "the community itself", which has no initiative id. */
 const COMMUNITY_ONLY = "community";
@@ -257,7 +251,7 @@ export const ProviderPlacementRuleDialog = ({
               <p className="font-medium text-sm">{community?.name}</p>
             ) : (
               <>
-                <AsyncCombobox
+                <Combobox
                   aria-label={t("providerPlacement.communityLabel")}
                   items={communityItems}
                   value={community ? String(community.id) : null}

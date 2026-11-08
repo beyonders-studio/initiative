@@ -1,11 +1,10 @@
 import {
   Download,
   ExternalLink,
-  FileSpreadsheet,
   FileText,
   History,
   Loader2,
-  Presentation,
+  Pencil,
   Trash2,
   Upload,
   ZoomIn,
@@ -16,25 +15,28 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Document, Page, pdfjs } from "react-pdf";
 
-import type { FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
+import { FileKind, FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useDeleteFileVersion, useFileVersions, useUploadFileVersion } from "@/hooks/useFiles";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import {
-  FILE_UPLOAD_ACCEPT,
-  formatBytes,
-  getFileExtension,
-  getFileTypeLabel,
-} from "@/lib/fileUtils";
-import { toast } from "@/lib/mascotToast";
+  useConvertFile,
+  useDeleteFileVersion,
+  useFileVersions,
+  usePutVideoThumbnail,
+  useUploadFileVersion,
+} from "@/hooks/useFiles";
+import { fileIcon } from "@/lib/fileIcon";
+import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { drawVideoFrame } from "@/lib/videoFrame";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { formatBytes, getFileExtension, getFileTypeLabel } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Lightbox } from "@/ui/lightbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -66,7 +68,27 @@ interface UploadedFileViewerProps {
   canEdit?: boolean;
   /** Whether the current user owns the file (can delete versions). */
   canDeleteVersions?: boolean;
+  /** The current version's thumbnail. A video without one is given a frame
+   *  of itself when somebody who can edit it opens it. */
+  thumbnailUrl?: string | null;
+  /** The file's type, and the type it becomes when converted to edit it
+   *  (`null` for one that does not convert). */
+  fileType: FileType;
+  convertsTo?: FileType | null;
 }
+
+/** What converting a file of each type keeps, said before it is converted. */
+const CONVERT_NOTES = {
+  [FileType.xlsx]: "convert.toSheet.xlsx",
+  [FileType.xls]: "convert.toSheet.values",
+  [FileType.ods]: "convert.toSheet.ods",
+  [FileType.csv]: "convert.toSheet.table",
+  [FileType.tsv]: "convert.toSheet.table",
+  [FileType.docx]: "convert.toDocument.word",
+  [FileType.odt]: "convert.toDocument.word",
+  [FileType.md]: "convert.toDocument.markdown",
+  [FileType.txt]: "convert.toDocument.text",
+} as const;
 
 /**
  * Live "Version N · M ago" label for one version row. A component (not an inline
@@ -87,15 +109,32 @@ export const UploadedFileViewer = ({
   fileSize,
   canEdit = false,
   canDeleteVersions = false,
+  thumbnailUrl = null,
+  fileType,
+  convertsTo = null,
 }: UploadedFileViewerProps) => {
-  const { t } = useTranslation(["files", "common"]);
-  const { maxUploadBytes } = useAppConfig();
+  const { t, i18n } = useTranslation(["files", "common"]);
+  const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 
   // ── Version history ─────────────────────────────────────────────────────
   const { data: versions } = useFileVersions(fileId);
   const uploadVersion = useUploadFileVersion();
   const deleteVersion = useDeleteFileVersion();
+  const { mutate: putVideoThumbnail } = usePutVideoThumbnail();
+  const convert = useConvertFile({ onSuccess: () => setConvertOpen(false) });
+  const [convertOpen, setConvertOpen] = useState(false);
+  const convertNote =
+    fileType && fileType in CONVERT_NOTES
+      ? CONVERT_NOTES[fileType as keyof typeof CONVERT_NOTES]
+      : undefined;
   const versionInputRef = useRef<HTMLInputElement>(null);
+  // How much of a new version has arrived, and how to stop it on leaving.
+  const [versionSent, setVersionSent] = useState(0);
+  const sendingVersion = useRef<AbortController | null>(null);
+  useEffect(() => () => sendingVersion.current?.abort(), []);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versionPendingDelete, setVersionPendingDelete] = useState<FileVersionRead | null>(null);
@@ -150,15 +189,18 @@ export const UploadedFileViewer = ({
   const [markdownContent, setMarkdownContent] = useState<string | null>(null);
   const [showRendered, setShowRendered] = useState(true);
 
-  // Determine file type for rendering strategy
-  const isPdf = extension === "pdf" || contentType === "application/pdf";
+  // How the file is shown follows from its kind. An Illustrator file is
+  // usually a PDF inside, so it is shown as one until it turns out not to be.
+  const kind = FILE_TYPE_KINDS[fileType];
+  const isPdf = kind === FileKind.pdf || (fileType === FileType.ai && !pdfError);
   const isText = extension === "txt" || contentType === "text/plain";
   const isHtml = extension === "html" || extension === "htm" || contentType === "text/html";
-  const isImage =
-    contentType?.startsWith("image/") ||
-    ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension);
+  const isImage = kind === FileKind.image;
   const isMarkdown =
     extension === "md" || extension === "markdown" || contentType === "text/markdown";
+  // Played by the browser's own player; one it cannot play offers the download.
+  const isVideo = kind === FileKind.video;
+  const isAudio = kind === FileKind.audio;
 
   // Measure toolbar width once on mount for PDF sizing
   useEffect(() => {
@@ -172,6 +214,18 @@ export const UploadedFileViewer = ({
     const timeoutId = setTimeout(measureWidth, 50);
     return () => clearTimeout(timeoutId);
   }, []);
+
+  // A video with no thumbnail gets a frame of itself from the first editor to
+  // open it. Where the browser keeps the frame from the page, it gets none.
+  const frameVersionId = selectedVersion?.is_current ? selectedVersion.id : null;
+  useEffect(() => {
+    if (!isVideo || !canEdit || thumbnailUrl || frameVersionId == null || !inlineUrl) return;
+    const leaving = new AbortController();
+    drawVideoFrame(inlineUrl, leaving.signal)
+      .then((frame) => putVideoThumbnail({ fileId, versionId: frameVersionId, frame }))
+      .catch(() => {});
+    return () => leaving.abort();
+  }, [isVideo, canEdit, thumbnailUrl, frameVersionId, inlineUrl, fileId, putVideoThumbnail]);
 
   // Fetch markdown content for rendering
   useEffect(() => {
@@ -217,12 +271,15 @@ export const UploadedFileViewer = ({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (maxUploadBytes !== null && file.size > maxUploadBytes) {
-      toast.error(t("create.fileTooLarge"));
-      return;
-    }
+    sendingVersion.current = new AbortController();
+    setVersionSent(0);
     uploadVersion.mutate(
-      { fileId, file },
+      {
+        fileId,
+        file,
+        signal: sendingVersion.current.signal,
+        onProgress: (arrived, total) => setVersionSent(total ? arrived / total : 1),
+      },
       {
         // Show the newly uploaded (now current) version.
         onSuccess: () => {
@@ -306,9 +363,8 @@ export const UploadedFileViewer = ({
     );
   }
 
-  // Get the appropriate icon for Office files
-  const OfficeIcon = isExcel ? FileSpreadsheet : isPowerPoint ? Presentation : FileText;
-  const iconColor = isExcel ? "text-green-600" : isPowerPoint ? "text-orange-500" : "text-blue-600";
+  // A file shown only as a card is drawn by its kind's mark.
+  const { Icon: KindIcon, colorClass: kindColor } = fileIcon({ file_type: fileType });
 
   return (
     <div className="space-y-4">
@@ -331,7 +387,11 @@ export const UploadedFileViewer = ({
                   size="sm"
                   aria-label={t("versions.label")}
                 >
-                  <History className="h-4 w-4" />
+                  {uploadVersion.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <History className="h-4 w-4" />
+                  )}
                   {t("versions.label")}
                   {versions.length > 1 && (
                     <Badge variant="secondary" className="px-1.5">
@@ -356,7 +416,9 @@ export const UploadedFileViewer = ({
                       ) : (
                         <Upload className="h-3.5 w-3.5" />
                       )}
-                      {t("versions.uploadNew")}
+                      {uploadVersion.isPending
+                        ? t("create.uploadingProgress", { percent: percent.format(versionSent) })
+                        : t("versions.uploadNew")}
                     </Button>
                   )}
                 </div>
@@ -404,6 +466,12 @@ export const UploadedFileViewer = ({
               </PopoverContent>
             </Popover>
           )}
+          {canEdit && convertsTo && isViewingCurrent && (
+            <Button size="sm" onClick={() => setConvertOpen(true)}>
+              <Pencil className="h-4 w-4" />
+              {t("convert.edit")}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
             <ExternalLink className="h-4 w-4" />
             {t("viewer.openNewTab")}
@@ -414,6 +482,18 @@ export const UploadedFileViewer = ({
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        title={t("convert.title")}
+        description={convertNote ? t(convertNote) : undefined}
+        confirmLabel={t("convert.confirm")}
+        loadingLabel={t("convert.converting")}
+        onConfirm={() => convert.mutate(fileId)}
+        isLoading={convert.isPending}
+      >
+        <p className="text-muted-foreground text-sm">{t("convert.replaces")}</p>
+      </ConfirmDialog>
       {!isViewingCurrent && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-700 text-sm dark:text-amber-400">
           {t(canEdit ? "versions.viewingOldCanEdit" : "versions.viewingOld")}
@@ -422,7 +502,6 @@ export const UploadedFileViewer = ({
       <input
         ref={versionInputRef}
         type="file"
-        accept={FILE_UPLOAD_ACCEPT}
         className="hidden"
         onChange={handleVersionFileSelected}
       />
@@ -438,7 +517,6 @@ export const UploadedFileViewer = ({
             : undefined
         }
         confirmLabel={t("versions.deleteVersion")}
-        cancelLabel={t("common:cancel")}
         onConfirm={handleConfirmDeleteVersion}
         isLoading={deleteVersion.isPending}
         destructive
@@ -536,6 +614,7 @@ export const UploadedFileViewer = ({
             className="w-full bg-muted"
             style={{ height: "70vh", minHeight: 500 }}
             title={originalFilename || t("viewer.textDocument")}
+            sandbox=""
             referrerPolicy="no-referrer"
           />
         ) : isHtml ? (
@@ -571,6 +650,34 @@ export const UploadedFileViewer = ({
               onIndexChange={() => {}}
             />
           </>
+        ) : isVideo ? (
+          <div
+            className="flex w-full items-center justify-center bg-black"
+            style={{ height: "70vh", minHeight: 500 }}
+          >
+            {/* biome-ignore lint/a11y/useMediaCaption: an uploaded video brings no caption track. */}
+            <video
+              src={inlineUrl}
+              controls
+              preload="metadata"
+              className="max-h-full max-w-full"
+              title={displayFilename || t("viewer.video")}
+            />
+          </div>
+        ) : isAudio ? (
+          <div className="flex flex-col items-center justify-center gap-6 bg-muted/50 px-6 py-16">
+            <h3 className="w-full min-w-0 break-words text-center font-semibold text-xl tracking-tight">
+              {displayFilename || t("viewer.audio")}
+            </h3>
+            {/* biome-ignore lint/a11y/useMediaCaption: an uploaded recording brings no caption track. */}
+            <audio
+              src={inlineUrl}
+              controls
+              preload="metadata"
+              className="w-full max-w-xl"
+              title={displayFilename || t("viewer.audio")}
+            />
+          </div>
         ) : isMarkdown ? (
           <div className="flex flex-col">
             <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
@@ -599,7 +706,7 @@ export const UploadedFileViewer = ({
             className="flex flex-col items-center justify-center bg-muted/50"
             style={{ height: "70vh", minHeight: 500 }}
           >
-            <OfficeIcon className={`h-24 w-24 ${iconColor} mb-6`} />
+            <KindIcon className={cn("mb-6 h-24 w-24", kindColor)} />
             <h3 className="mb-2 font-semibold text-xl tracking-tight">
               {originalFilename || t("viewer.file")}
             </h3>
@@ -631,7 +738,7 @@ export const UploadedFileViewer = ({
             className="flex flex-col items-center justify-center bg-muted/50"
             style={{ height: "70vh", minHeight: 500 }}
           >
-            <FileText className="mb-6 h-24 w-24 text-muted-foreground" />
+            <KindIcon className={cn("mb-6 h-24 w-24", kindColor)} />
             <h3 className="mb-2 font-semibold text-xl tracking-tight">
               {originalFilename || t("viewer.file")}
             </h3>

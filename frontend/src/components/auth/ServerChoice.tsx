@@ -3,22 +3,6 @@ import { Check, ChevronDown } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsDemoServer } from "@/hooks/useDemoCopy";
 import { normalizeServerUrl, useServer } from "@/hooks/useServer";
@@ -29,8 +13,18 @@ import {
   setSelfHostedAddress,
 } from "@/lib/serverStorage";
 import { clearStart } from "@/lib/startFlow";
-import { cn } from "@/lib/utils";
 import AppEnvironment from "@/plugins/appEnvironment";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Whether the server a sign-in goes to is Initiative Cloud. */
 const useIsCloudServer = (): boolean => useServer().getServerOrigin() === CLOUD_ORIGIN;

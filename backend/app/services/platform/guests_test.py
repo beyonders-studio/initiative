@@ -22,7 +22,8 @@ from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services import cross_guild
 from app.services import permissions as permissions_service
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import contacts as contacts_service
+from app.services.platform import rules
+from app.services.platform import people as people_service
 from app.services.platform import guests
 from app.services.platform import guilds as guilds_service
 from app.services.platform import users as users_service
@@ -48,9 +49,9 @@ HOUR = timedelta(hours=1)
 
 async def _platform(session, *, guests_enabled: bool = True, demo_mode: bool = False):
     row = await app_settings_service.ensure_settings_row(session)
-    row.guests_enabled = guests_enabled
     row.demo_mode = demo_mode
     session.add(row)
+    await rules.put(session, "guests_enabled", guests_enabled)
     await session.commit()
 
 
@@ -273,11 +274,11 @@ async def test_a_guests_community_is_left_out_where_members_are_offered_more(
 
     shared = await cross_guild.member_guild_ids(session, guest_id)
     offered = await cross_guild.member_guild_ids(session, guest_id, guests=False)
-    contacts = await contacts_service.ordered_member_guilds(session, user_id=guest_id)
+    people = await people_service.ordered_member_guilds(session, user_id=guest_id)
 
     assert shared == sorted([guild_id, elsewhere_id])
     assert offered == [elsewhere_id]
-    assert [row[0] for row in contacts] == [elsewhere_id]
+    assert [row[0] for row in people] == [elsewhere_id]
 
 
 @pytest.mark.parametrize(

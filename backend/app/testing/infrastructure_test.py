@@ -173,6 +173,36 @@ async def test_a_pooled_guild_schema_comes_back_as_built(session: AsyncSession, 
     assert schema in await guild_pool.take_changed(engine)
 
 
+async def test_a_parked_schema_whose_roles_went_does_not_outlive_the_session(
+    session: AsyncSession, engine
+):
+    """A session that starts with a parked schema whose roles are gone drops
+    it, rather than taking the missing roles as what the slot should hold."""
+    from sqlalchemy import text
+
+    from app.db.schema_provisioning import drop_guild_schema
+    from app.testing import create_guild, guild_pool
+
+    if not guild_pool.ENABLED:
+        pytest.skip("PYTEST_GUILD_POOL=0")
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    gid = guild.id
+    await session.commit()
+
+    assert await guild_pool.park(engine, gid)
+    async with engine.begin() as conn:
+        await drop_guild_schema(conn, gid)
+
+    await guild_pool.install(engine)
+    async with engine.connect() as conn:
+        parked = await conn.scalar(
+            text("SELECT to_regnamespace(:p) IS NOT NULL"),
+            {"p": guild_pool.parked_name(gid)},
+        )
+    assert not parked
+
+
 async def test_unrouted_tenant_write_fails_closed(session: AsyncSession, acting_user):
     """A tenant write that carries no guild_id on an unrouted session must
     raise the harness's explicit error, not fall through toward public."""

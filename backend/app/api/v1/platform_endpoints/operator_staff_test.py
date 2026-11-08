@@ -15,6 +15,7 @@ from app.testing import (
     create_guild_membership,
     create_user,
     get_auth_headers,
+    make_operations_community,
 )
 
 USERS = "/api/v1/operator/users"
@@ -226,19 +227,13 @@ async def test_cases_an_account_has_are_counted_and_listed(
     from app.core.intake import IntakeStream
     from app.db.request_context import SystemGuild, Unattributed
     from app.db.session import set_rls_context
-    from app.models.platform.app_setting import AppSetting
     from app.models.tenant.intake import IntakeBinding
     from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
     staff = await acting_user(
         guild_role=CommunityRole.admin, initiative=True, project=True
     )
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    row = row or AppSetting(id=1)
-    row.operations_guild_id = staff.guild.id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, staff.guild.id)
     await set_rls_context(session, SystemGuild(staff.guild.id))
     for stream in (IntakeStream.support, IntakeStream.moderation):
         session.add(IntakeBinding(stream=stream, project_id=staff.project.id))

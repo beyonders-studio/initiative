@@ -26,6 +26,8 @@ permissions:
 jobs:
   branch-contract:
     name: Release Branch Contract
+    # A fork's main and dev follow this repository's; its pull requests run it.
+    if: ${{ github.event_name != 'push' || github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

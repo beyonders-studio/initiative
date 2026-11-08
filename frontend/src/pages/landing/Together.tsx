@@ -17,7 +17,7 @@ import { AtSign, Check, MessageSquareText, Share2, ThumbsUp, Users } from "lucid
 import type { ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 import { reveal, Typed, useRevealOnScroll } from "./effects";
 
@@ -136,7 +136,7 @@ const Drawing = ({ playing }: { playing: boolean }) => {
               <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-[5px] bg-primary text-primary-foreground">
                 <Check className="h-3 w-3" aria-hidden="true" />
               </span>
-              <span className="text-muted-foreground line-through">{t("together.doc.task1")}</span>
+              <span className="text-muted-foreground">{t("together.doc.task1")}</span>
             </li>
             <li className="flex items-center gap-2.5">
               <span className="h-4.5 w-4.5 shrink-0 rounded-[5px] border-2 border-muted-foreground/50" />

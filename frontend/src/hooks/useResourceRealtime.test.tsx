@@ -1,5 +1,5 @@
 /**
- * A queue's or counter group's change signal, on the shared live socket.
+ * A counter group's change signal, on the shared live socket.
  */
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,7 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useToolRealtime } from "@/hooks/useResourceRealtime";
 
 const COMMUNITY = 5;
-const QUEUE = 7;
+const GROUP = 7;
 
 const invalidate = vi.hoisted(() => vi.fn());
 
@@ -39,20 +39,20 @@ describe("useToolRealtime", () => {
   });
 
   it("authenticates in its first frame and refetches on a change", () => {
-    renderHook(() => useToolRealtime(Tool.queue, QUEUE));
+    renderHook(() => useToolRealtime(Tool.counter_group, GROUP));
     const socket = latestSocket();
     socket.open();
 
-    expect(socket.url).toContain(`/${COMMUNITY}/queues/${QUEUE}/ws`);
+    expect(socket.url).toContain(`/${COMMUNITY}/counter-groups/${GROUP}/ws`);
     expect(socket.url).not.toContain("token");
     expect(socket.authPayload()).toEqual({ token: "test-token" });
 
-    socket.receive({ type: "turn_advance", id: QUEUE, timestamp: "now" });
+    socket.receive({ type: "updated", id: GROUP, timestamp: "now" });
     expect(invalidate).toHaveBeenCalledTimes(1);
   });
 
   it("takes a beat as proof of life and nothing more", () => {
-    renderHook(() => useToolRealtime(Tool.queue, QUEUE));
+    renderHook(() => useToolRealtime(Tool.counter_group, GROUP));
     const socket = latestSocket();
     socket.open();
 
@@ -62,7 +62,7 @@ describe("useToolRealtime", () => {
   });
 
   it("reconnects after a drop and refetches what it may have missed", async () => {
-    renderHook(() => useToolRealtime(Tool.queue, QUEUE));
+    renderHook(() => useToolRealtime(Tool.counter_group, GROUP));
     const first = latestSocket();
     first.open();
     first.serverClose(1006);
@@ -76,7 +76,7 @@ describe("useToolRealtime", () => {
   });
 
   it("closes its socket on unmount and does not come back", async () => {
-    const { unmount } = renderHook(() => useToolRealtime(Tool.queue, QUEUE));
+    const { unmount } = renderHook(() => useToolRealtime(Tool.counter_group, GROUP));
     const socket = latestSocket();
     socket.open();
 

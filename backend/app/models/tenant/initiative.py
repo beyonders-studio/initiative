@@ -7,8 +7,8 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -37,7 +37,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.models.tenant.project import Project
     from app.models.platform.user_profile_view import MemberProfile
     from app.models.tenant.file import File
-    from app.models.tenant.queue import Queue
     from app.models.tenant.calendar import Calendar
     from app.models.tenant.counter import CounterGroup
 
@@ -77,7 +76,7 @@ class JoinRequestStatus(str, Enum):
 # one `{plural}_enabled` + `create_{plural}` pair per tool (projects_enabled,
 # create_projects, …), plus the few EXTRA_PERMISSION_KEYS that are not a tool of
 # their own. A new Tool member gets its keys automatically, and the CHECK on
-# initiative_role_permissions is rendered from them at boot
+# initiative_rules is rendered from them at boot
 # (``app.db.registry_checks``).
 #: Role keys that are not a tool's pair. Each is a capability inside a tool
 #: rather than the tool itself, defaults to off for an ordinary role, and is
@@ -129,6 +128,10 @@ class BuiltinRole(NamedTuple):
     permissions: dict["PermissionKey", bool]
 
 
+#: The built-in role an ordinary member holds, whose permissions a community
+#: may set for all its initiatives (``app.core.rules``).
+BUILTIN_MEMBER_ROLE = "member"
+
 # The built-in roles, ordered. Moderator and project manager get every tool
 # permission; members get view-only on the core (always-on) tools.
 BUILTIN_ROLES: tuple[BuiltinRole, ...] = (
@@ -147,7 +150,7 @@ BUILTIN_ROLES: tuple[BuiltinRole, ...] = (
         permissions={key: True for key in PermissionKey},
     ),
     BuiltinRole(
-        name="member",
+        name=BUILTIN_MEMBER_ROLE,
         display_name="Member",
         is_manager=False,
         override_share_restrictions=False,
@@ -171,6 +174,9 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
     __tablename__ = "initiative_roles"
     __table_args__ = (
         UniqueConstraint("initiative_id", "name", name="uq_initiative_role_name"),
+        # What an initiative's rule names a role by: the role and the
+        # initiative it belongs to, so a rule never reaches another's role.
+        UniqueConstraint("id", "initiative_id", name="uq_initiative_roles_initiative"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -197,47 +203,85 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
     position: int = Field(default=0)  # for ordering in UI
 
     initiative: Optional["Initiative"] = Relationship(back_populates="roles")
-    permissions: List["InitiativeRolePermission"] = Relationship(
+    permissions: List["InitiativeRule"] = Relationship(
         back_populates="role",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     members: List["InitiativeMember"] = Relationship(back_populates="role_ref")
 
 
-class InitiativeRolePermission(SQLModel, table=True):
-    """Permission toggles per role."""
+#: What a community may set for every initiative in it, kept as its
+#: ``initiative_rules`` rows with no initiative: each tool's switch, each
+#: permission of the built-in member role, and whether managers may add roles
+#: of their own. Its value stands over each initiative's own; a key with no row
+#: is each initiative's to set.
+INITIATIVE_TOOL_PREFIX = "initiative_tool."
+INITIATIVE_TOOL_KEYS: dict[Tool, str] = {
+    tool: f"{INITIATIVE_TOOL_PREFIX}{tool.value}" for tool in Tool
+}
+INITIATIVE_MEMBER_PREFIX = f"initiative_role.{BUILTIN_MEMBER_ROLE}."
+INITIATIVE_CUSTOM_ROLES = "initiative_custom_roles"
+COMMUNITY_DEFAULT_KEYS: tuple[str, ...] = (
+    *INITIATIVE_TOOL_KEYS.values(),
+    *(f"{INITIATIVE_MEMBER_PREFIX}{key.value}" for key in PermissionKey),
+    INITIATIVE_CUSTOM_ROLES,
+)
 
-    __tablename__ = "initiative_role_permissions"
+
+def _quoted(keys) -> str:
+    return ", ".join(f"'{key}'" for key in keys)
+
+
+class InitiativeRule(SQLModel, table=True):
+    """One of an initiative's rules: what one of its roles may do with a tool
+    (``PermissionKey``). Kept in the community's own schema beside the
+    initiative, and gone with it; a role's rules go with the role. A row with
+    no initiative is the community's, for every initiative
+    (``COMMUNITY_DEFAULT_KEYS``)."""
+
+    __tablename__ = "initiative_rules"
     __table_args__ = (
         CheckConstraint(
-            "permission_key IN ("
-            + ", ".join(f"'{key.value}'" for key in PermissionKey)
-            + ")",
-            name="ck_initiative_role_permissions_permission_key",
+            "(initiative_id IS NOT NULL AND key IN ("
+            + _quoted(key.value for key in PermissionKey)
+            + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
+            + " AND key IN ("
+            + _quoted(COMMUNITY_DEFAULT_KEYS)
+            + "))",
+            name="ck_initiative_rules_key",
             info={FROM_REGISTRY: True},
+        ),
+        ForeignKeyConstraint(
+            ["initiative_role_id", "initiative_id"],
+            ["initiative_roles.id", "initiative_roles.initiative_id"],
+            ondelete="CASCADE",
+            name="fk_initiative_rules_role",
+        ),
+        UniqueConstraint(
+            "initiative_id",
+            "key",
+            "initiative_role_id",
+            name="uq_initiative_rules_subject",
+            postgresql_nulls_not_distinct=True,
         ),
     )
 
-    initiative_role_id: int = Field(
+    id: Optional[int] = Field(default=None, primary_key=True)
+    #: The initiative, or ``None`` for the community's own.
+    initiative_id: Optional[int] = Field(
+        default=None,
         sa_column=Column(
             Integer,
-            ForeignKey("initiative_roles.id", ondelete="CASCADE"),
-            primary_key=True,
-        )
+            ForeignKey("initiatives.id", ondelete="CASCADE"),
+            nullable=True,
+        ),
     )
-    permission_key: PermissionKey = Field(
-        sa_column=Column(
-            SAEnum(
-                PermissionKey,
-                name="permissionkey",
-                create_constraint=False,
-                native_enum=False,
-                length=50,
-            ),
-            primary_key=True,
-        )
+    #: The role the rule is about.
+    initiative_role_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
-    enabled: bool = Field(default=True)
+    key: str = Field(sa_column=Column(String(64), nullable=False))
+    enabled: bool = Field(sa_column=Column(Boolean, nullable=False))
 
     role: Optional["InitiativeRoleModel"] = Relationship(back_populates="permissions")
 
@@ -453,10 +497,6 @@ class Initiative(
     )
     projects: List["Project"] = Relationship(back_populates="initiative")
     files: List["File"] = Relationship(
-        back_populates="initiative",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    queues: List["Queue"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

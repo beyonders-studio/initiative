@@ -2,8 +2,8 @@ import { useTranslation } from "react-i18next";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import type { CommunityTaskBreakdown } from "@/api/generated/initiativeAPI.schemas";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ChartContainer, ChartTooltipContent } from "@/ui/chart";
 
 interface CommunityBreakdownChartProps {
   data: CommunityTaskBreakdown[];

@@ -22,6 +22,7 @@ from app.core.config import settings  # noqa: E402
 from app.db import base  # noqa: F401,E402  # ensure models are imported
 from app.db.migration_filters import (  # noqa: E402
     make_include_object,
+    reaches_operations_only,
     strip_cross_schema_foreign_keys,
 )
 
@@ -67,6 +68,8 @@ def _process_revision_directives(context, revision, directives):
         # where a key out of the guild schema can be caught — see
         # app.db.migration_filters.
         strip_cross_schema_foreign_keys(directives)
+        # A change to the operations tables runs where they are.
+        config.attributes["operations_only"] = reaches_operations_only(directives)
     now = datetime.now(timezone.utc)
     date_prefix = now.strftime("%Y%m%d")
 

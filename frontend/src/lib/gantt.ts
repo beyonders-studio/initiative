@@ -7,7 +7,12 @@
  * them: a task due on the 3rd fills the 3rd.
  */
 
-import type { TaskEdgeRead, TaskListRead, TaskUpdate } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  LinkedTaskRead,
+  TaskEdgeRead,
+  TaskListRead,
+  TaskUpdate,
+} from "@/api/generated/initiativeAPI.schemas";
 import { addUnits, floorToUnit, type TimelineRange } from "@/lib/widgets/timelineAxis";
 
 export const DAY = 86_400_000;
@@ -71,9 +76,11 @@ export const ganttWindow = (
   return { start, end: Math.max(end, addUnits(start, "day", least)) };
 };
 
-/** One row of the Gantt: a group's heading, or a task. */
+/** One row of the Gantt: a group's heading, a task, or another project's
+ *  task one of them is linked to. */
 export type GanttRow =
-  | { type: "group"; key: string; count: number }
+  | { type: "group"; key: string; count: number; label?: string }
+  | { type: "outside"; key: string; task: LinkedTaskRead }
   | {
       type: "task";
       /** Unique across the rows: a task in two groups has a row in each. */
@@ -203,4 +210,55 @@ export const scheduledDates = (from: number, days: number) => {
     start_date: new Date(start).toISOString(),
     due_date: new Date(addUnits(end, "day", -1)).toISOString(),
   };
+};
+
+/** The tasks waiting on `taskId`, directly or through others, of `ids`:
+ *  each that depends on it, and each that depends on one of those. */
+export const waitingOn = (
+  taskId: number,
+  edges: readonly TaskEdgeRead[],
+  ids: ReadonlySet<number>
+): number[] => {
+  const waits = new Map<number, number[]>();
+  for (const edge of edges) {
+    if (edge.relationship_type !== "depends_on" || !ids.has(edge.source_id)) continue;
+    waits.set(edge.target_id, [...(waits.get(edge.target_id) ?? []), edge.source_id]);
+  }
+  const found = new Set<number>();
+  const visit = (id: number) => {
+    for (const next of waits.get(id) ?? []) {
+      if (next === taskId || found.has(next)) continue;
+      found.add(next);
+      visit(next);
+    }
+  };
+  visit(taskId);
+  return [...found];
+};
+
+/** The chain that decides when the work ends: the task that ends last, the
+ *  blocker of it that ends last, and so on back, of those drawn with dates. */
+export const criticalPath = (
+  spans: ReadonlyMap<number, Pick<GanttSpan, "end">>,
+  edges: readonly TaskEdgeRead[]
+): Set<number> => {
+  const blockers = new Map<number, number[]>();
+  for (const edge of edges) {
+    if (edge.relationship_type !== "depends_on") continue;
+    if (!spans.has(edge.source_id) || !spans.has(edge.target_id)) continue;
+    blockers.set(edge.source_id, [...(blockers.get(edge.source_id) ?? []), edge.target_id]);
+  }
+  const endOf = (id: number) => spans.get(id)?.end ?? Number.NEGATIVE_INFINITY;
+  const latest = (ids: Iterable<number>) =>
+    [...ids].reduce<number | undefined>(
+      (best, id) => (best === undefined || endOf(id) > endOf(best) ? id : best),
+      undefined
+    );
+  const path = new Set<number>();
+  let at = latest(spans.keys());
+  while (at !== undefined && !path.has(at)) {
+    path.add(at);
+    at = latest(blockers.get(at) ?? []);
+  }
+  return path;
 };

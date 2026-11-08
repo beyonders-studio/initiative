@@ -4,7 +4,8 @@ import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useAuth } from "@/hooks/useAuth";
+} from "@/ui/dialog";
 
 /**
  * The age question, asked once, before a directory Join goes through.
@@ -81,7 +81,12 @@ export const AgeConfirmationDialog = ({
             <p className="text-muted-foreground text-sm">{t("auth:confirmAge.blockedHelp")}</p>
             <DialogFooter>
               {/* Their own answer, so a question about their account. */}
-              <HelpLink topic={SupportTopic.account} communityId={null} variant="ghost" />
+              <HelpLink
+                topic={SupportTopic.account}
+                communityId={null}
+                variant="ghost"
+                onAsk={() => setOpen(false)}
+              />
               <Button variant="outline" onClick={() => setOpen(false)}>
                 {t("common:close")}
               </Button>

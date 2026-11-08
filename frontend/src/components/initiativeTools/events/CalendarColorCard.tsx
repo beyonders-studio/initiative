@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
 import { useUpdateCalendar } from "@/hooks/useCalendars";
 import { toast } from "@/lib/mascotToast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
 
 type CalendarColorCardProps = {
   calendarId: number;

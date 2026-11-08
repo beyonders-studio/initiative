@@ -6,20 +6,13 @@ import { recoverWithCode, requestPasswordReset } from "@/api/generated/auth/auth
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { checkNewPassword } from "@/lib/passwordPolicy";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /**
  * Two ways back in, on one card.

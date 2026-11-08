@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"
-     role="presentation">
-  <title>Taoist</title>
-  <circle cx="24" cy="24" r="23" fill="#1B2036"/>
-  <circle cx="24" cy="24" r="21" fill="none" stroke="#C8A45C" stroke-width="2"/>
-  <circle cx="24" cy="24" r="14.6" fill="#F2EFE6"/>
-  <g transform="translate(24 24) scale(0.36667) translate(-0.00 -0.00)" fill="#1B2036"><circle r="39"/> <path fill="#F2EFE6" d="M0,38a38,38 0 0 1 0,-76a19,19 0 0 1 0,38a19,19 0 0 0 0,38"/> <circle r="5" cy="19" fill="#F2EFE6"/> <circle r="5" cy="-19"/></g>
-</svg>

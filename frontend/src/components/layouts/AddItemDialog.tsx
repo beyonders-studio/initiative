@@ -7,7 +7,16 @@ import type {
   PropertySummary,
   PropertyValueInput,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { type ItemDraft, ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { useSetItemLinks } from "@/hooks/useRelationships";
+import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
+import { AddingLinks, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
+import { missingRequired, requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
+import type { PluginItem } from "@/lib/layouts/plugins";
+import type { LinkedRef } from "@/lib/relationships";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,15 +24,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { type ItemDraft, ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
-import { useSetItemLinks } from "@/hooks/useRelationships";
-import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
-import { AddingLinks, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
-import type { PluginItem } from "@/lib/layouts/plugins";
-import type { LinkedRef } from "@/lib/relationships";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { cn } from "@/ui/lib/utils";
 
 type Item = PluginItem & { properties: PropertySummary[] };
 
@@ -34,6 +36,84 @@ export interface Written<I, P> {
   fields: Partial<P>;
   properties: PropertyValueInput[];
 }
+
+/** What a draft holds as its last change left it: read by a handler that can
+ *  run in the same event as the change it follows (leaving a field, or Enter
+ *  in it), before the render that shows it. */
+interface Held<I, P> {
+  item: I;
+  fields: Partial<P>;
+  values: Map<number, unknown>;
+  holding: Set<string>;
+}
+
+/**
+ * An item changed field by field with nothing saved: an item being added, or
+ * the fields a change of one asks for. Its fields' saves write into `draft`
+ * (as `ItemDraftContext`); `written()` is what it holds, as it is sent.
+ */
+export const useItemDraft = <I extends Item, P>(
+  blank: I,
+  { onEdit, onSubmit }: { onEdit?: () => void; onSubmit: () => void }
+) => {
+  const [item, setItem] = useState(blank);
+  // The fields showing a value they cannot take, which sending waits for.
+  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
+  const latest = useRef<Held<I, P>>({
+    item,
+    fields: {},
+    values: new Map(),
+    holding: new Set(),
+  });
+  const handlers = useRef({ onEdit, onSubmit });
+  handlers.current = { onEdit, onSubmit };
+  const draft = useMemo<ItemDraft>(
+    () => ({
+      edit: (edit: ItemEdit<unknown, unknown>) => {
+        handlers.current.onEdit?.();
+        const held = latest.current;
+        held.item = { ...held.item, ...(edit.shows as Partial<I>) };
+        if ("patch" in edit) {
+          held.fields = { ...held.fields, ...(edit.patch as Partial<P>) };
+        } else {
+          for (const { property_id, value } of edit.properties.values) {
+            held.values.set(property_id, value);
+          }
+          // A property taken off shows as gone: nothing reads it back.
+          const removed = edit.properties.removed ?? [];
+          for (const id of removed) held.values.delete(id);
+          held.item = {
+            ...held.item,
+            properties: held.item.properties.filter((each) => !removed.includes(each.property_id)),
+          };
+        }
+        setItem(held.item);
+      },
+      submit: () => handlers.current.onSubmit(),
+      hold: (id: string, holds: boolean) => {
+        const held = latest.current.holding;
+        if (held.has(id) === holds) return;
+        if (holds) held.add(id);
+        else held.delete(id);
+        setHolding(new Set(held));
+      },
+      sent: () => latest.current.fields as Record<string, unknown>,
+    }),
+    []
+  );
+  /** What it holds now, as it is sent. A description is named with what it
+   *  was written over, so a change of an item that exists is refused where
+   *  somebody else wrote it meanwhile. */
+  const written = (): Written<I, P> => {
+    const { item: now, fields, values } = latest.current;
+    return {
+      item: now,
+      fields,
+      properties: [...values].map(([property_id, value]) => ({ property_id, value })),
+    };
+  };
+  return { item, holding, latest, draft, written };
+};
 
 type AddItemProps<I extends Item, C, P, R extends { id: number }> = {
   detail: DetailKind<I, C, P>;
@@ -48,7 +128,8 @@ type AddItemProps<I extends Item, C, P, R extends { id: number }> = {
   before?: (item: I) => ReactNode;
   /** The dialog's title, and what its button says. */
   title: string;
-  /** Whether it can be added as it stands: it has a name. */
+  /** Whether it can be added as it stands: it has a name. What its layout
+   *  requires is asked here as well. */
   ready: (item: I) => boolean;
   /** Makes it from what was changed, answering it. */
   create: (written: Written<I, P>) => Promise<R>;
@@ -75,9 +156,19 @@ export const AddItemDialog = <I extends Item, C, P, R extends { id: number }>({
           width rather than the screen's, as they follow the page area's on
           the item's own page. */}
       <DialogContent
-        className="@container w-full rounded-2xl border bg-card shadow-2xl sm:max-w-5xl"
+        className={cn(
+          "@container w-full rounded-2xl border bg-card shadow-2xl",
+          // One column needs no room for a second.
+          props.detail.addingUpFront ? "sm:max-w-2xl" : "sm:max-w-5xl"
+        )}
         onInteractOutside={(event) => {
           if (changed.current) event.preventDefault();
+        }}
+        // Escape in a field with a list open under it closes the list.
+        onEscapeKeyDown={(event) => {
+          if ((event.target as Element | null)?.closest?.("[data-picking]")) {
+            event.preventDefault();
+          }
         }}
       >
         <Adding {...props} changed={changed} />
@@ -99,26 +190,31 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   onAdded,
   changed,
 }: AddItemProps<I, C, P, R> & { changed: RefObject<boolean> }) => {
-  const { t } = useTranslation("common");
-  const [item, setItem] = useState(blank);
+  const { t } = useTranslation(["common", "layouts"]);
   const [links, setLinks] = useState<LinkedRef[]>([]);
   const [adding, setAdding] = useState(false);
-  // The fields showing a value they cannot take, which Add waits for.
-  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
-  // Read by Add, which can run in the same event as the change it follows
-  // (leaving a field, or Enter in it), before the render that shows it.
-  const latest = useRef({
-    item,
-    fields: {} as Partial<P>,
-    values: new Map<number, unknown>(),
-    holding: new Set<string>(),
+  const { item, holding, latest, draft, written } = useItemDraft<I, P>(blank, {
+    onEdit: () => {
+      changed.current = true;
+    },
+    onSubmit: () => void submit.current(),
   });
-  const layout = detailLayoutOf(
-    useToolLayouts(layouts(item)).data,
-    detail.spec.kind,
-    detail.typed?.typeOf(item)
-  );
+  const laidOut = useToolLayouts(layouts(item));
+  const layout = detailLayoutOf(laidOut.data, detail.spec.kind, detail.typed?.typeOf(item));
   const home = detail.home(item, context);
+  const definitions = useOwnedDefinitions({
+    initiativeId: home.initiativeId ?? undefined,
+    owner: home.owner,
+    enabled: home.initiativeId !== null,
+  }).data;
+  // What its layout requires that it leaves empty, which Add waits for.
+  const missingOf = (it: I) =>
+    missingRequired(
+      requiredKeys(layout as StoredRegions | null),
+      (key) => detail.filled?.(it, key, latest.current.fields) ?? true,
+      home.initiativeId === null ? [] : definitions
+    );
+  const missing = missingOf(item);
   const target = home.links.target;
   const setLinksOn = useSetItemLinks(home.canOpen.tool, home.canOpen.id);
   // The item this sitting made, whose links did not all land: Add again
@@ -142,17 +238,20 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   };
 
   const add = async () => {
-    const { item: now, fields, values, holding: held } = latest.current;
-    if (adding || held.size > 0 || !ready(now)) return;
+    const { item: now, holding: held } = latest.current;
+    if (adding || held.size > 0 || !ready(now) || laidOut.isLoading || missingOf(now).length > 0)
+      return;
     setAdding(true);
     try {
       if (made.current === null) {
-        // A description written over is named with its base; a new one has none.
-        const sent = Object.fromEntries(
-          Object.entries(fields).filter(([key]) => !key.endsWith("_base"))
-        ) as Partial<P>;
-        const properties = [...values].map(([property_id, value]) => ({ property_id, value }));
-        made.current = await create({ item: now, fields: sent, properties });
+        // A new item was written over nothing, so it names no base.
+        const { fields, ...rest } = written();
+        made.current = await create({
+          ...rest,
+          fields: Object.fromEntries(
+            Object.entries(fields).filter(([key]) => !key.endsWith("_base"))
+          ) as Partial<P>,
+        });
       }
       await finish(made.current);
     } catch {
@@ -167,39 +266,6 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   useEffect(() => {
     changed.current = false;
   }, [changed]);
-  const draft = useMemo<ItemDraft>(
-    () => ({
-      edit: (edit: ItemEdit<unknown, unknown>) => {
-        changed.current = true;
-        const held = latest.current;
-        held.item = { ...held.item, ...(edit.shows as Partial<I>) };
-        if ("patch" in edit) {
-          held.fields = { ...held.fields, ...(edit.patch as Partial<P>) };
-        } else {
-          for (const { property_id, value } of edit.properties.values) {
-            held.values.set(property_id, value);
-          }
-          // A property taken off shows as gone: nothing reads it back.
-          const removed = edit.properties.removed ?? [];
-          for (const id of removed) held.values.delete(id);
-          held.item = {
-            ...held.item,
-            properties: held.item.properties.filter((each) => !removed.includes(each.property_id)),
-          };
-        }
-        setItem(held.item);
-      },
-      submit: () => void submit.current(),
-      hold: (id: string, holds: boolean) => {
-        const held = latest.current.holding;
-        if (held.has(id) === holds) return;
-        if (holds) held.add(id);
-        else held.delete(id);
-        setHolding(new Set(held));
-      },
-    }),
-    [changed]
-  );
   const picking = useMemo(
     () => ({
       value: links,
@@ -228,11 +294,21 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
           />
         </AddingLinks.Provider>
       </ItemDraftContext.Provider>
-      <DialogFooter>
+      <DialogFooter className="items-center">
+        {missing.length > 0 ? (
+          <p className="text-muted-foreground text-xs">{t("layouts:required.toAdd")}</p>
+        ) : null}
         <Button
           type="button"
           onClick={() => void add()}
-          disabled={adding || holding.size > 0 || !ready(item)}
+          disabled={
+            adding ||
+            holding.size > 0 ||
+            !ready(item) ||
+            // Until its layout is read, what it requires is not known.
+            laidOut.isLoading ||
+            missing.length > 0
+          }
         >
           {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {adding ? t("adding") : title}

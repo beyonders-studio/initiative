@@ -29,7 +29,7 @@ import {
   Trash2,
   UserCheck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -40,20 +40,6 @@ import {
 import { CasePicker } from "@/components/platform/CasePicker";
 import { OperatorDeleteUserDialog } from "@/components/platform/OperatorDeleteUserDialog";
 import { Section, SettingRow } from "@/components/platform/SettingRow";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useGrantCases } from "@/hooks/useAccessGrants";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +67,14 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasAnyCapability } from "@/lib/permissions";
 import { getUserHandle } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 /** Platform roles ordered least → most privileged. */
 export const PLATFORM_ROLE_ORDER: UserRole[] = [
@@ -209,9 +203,11 @@ export const UserOperatorSettingsSheet = ({
   const grantCases = useGrantCases({ enabled: open && mayNameCase });
   const [caseTaskId, setCaseTaskId] = useState<number | null>(null);
   // A new account starts with no case.
-  useEffect(() => {
+  const [prevUserId, setPrevUserId] = useState(user?.id);
+  if (prevUserId !== user?.id) {
+    setPrevUserId(user?.id);
     setCaseTaskId(null);
-  }, [user?.id]);
+  }
 
   const setUsername = useOperatorSetUsername(
     {
@@ -789,7 +785,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.suspendTitle", { handle: getUserHandle(user) })}
         description={t("platformUsers.suspendBody")}
         confirmLabel={t("platformUsers.suspend")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={setSuspension.isPending}
@@ -821,7 +816,6 @@ export const UserOperatorSettingsSheet = ({
           role: roleConfirm ? platformRoleLabel(roleConfirm, t as TranslateFn) : "",
         })}
         confirmLabel={t("common:confirm")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         isLoading={updateRole.isPending}
         onConfirm={() => roleConfirm && updateRole.mutate({ userId: user.id, role: roleConfirm })}
@@ -835,7 +829,6 @@ export const UserOperatorSettingsSheet = ({
           handle: getUserHandle(user),
         })}
         confirmLabel={t("platformUsers.sheet.avatarRemove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={removeAvatar.isPending}
@@ -851,7 +844,6 @@ export const UserOperatorSettingsSheet = ({
           count: user.api_key_count,
         })}
         confirmLabel={t("platformUsers.sheet.apiKeysRevoke")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={revokeApiKeys.isPending}
@@ -866,7 +858,6 @@ export const UserOperatorSettingsSheet = ({
           handle: getUserHandle(user),
         })}
         confirmLabel={t("platformUsers.sheet.signOut")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={signOut.isPending}
@@ -879,7 +870,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.resetPassword")}
         description={t("platformUsers.resetDescription", { handle })}
         confirmLabel={t("common:send")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         isLoading={resetPassword.isPending}
         onConfirm={() => resetPassword.mutate(user.id)}
@@ -891,7 +881,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.clearSecondFactor")}
         description={t("platformUsers.clearSecondFactorDescription", { handle })}
         confirmLabel={t("platformUsers.clearSecondFactorConfirm")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={clearSecondFactor.isPending}
@@ -922,7 +911,6 @@ export const UserOperatorSettingsSheet = ({
             : ""
         }
         confirmLabel={t("platformUsers.sheet.clear.button")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={clearField.isPending}

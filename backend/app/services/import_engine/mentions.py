@@ -9,7 +9,7 @@ person's **handle** and lists it beside the text, and the restore links the
 handles the people step placed, the way it already does for a Jira mention:
 
 * markdown: ``@[Sam Bee](42)`` becomes ``@sam#0042`` and the handle joins the
-  row's ``mention_handles``; ``project_import._link_mentions`` turns a placed
+  row's ``mention_handles``; :func:`place_markdown_mentions` turns a placed
   one back into ``@[…](<id here>)``.
 * editor state: the node keeps its name, loses its ``mentionUserId`` and
   carries ``mentionHandle`` instead; :func:`place_editor_mentions` gives a
@@ -38,12 +38,14 @@ from app.core.identity_boundary import (
     MentionForm,
     without_mention_names,
 )
+from app.core.file_types import FileType
 from app.core.user_display import handle_of
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import UserStatus
 from app.models.platform.user_profile_view import GuildMember, MemberProfile
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.services.import_engine.context import ImportContext
     from app.services.import_engine.people import PeopleMap
 
 #: The node types a person's mention is written as (``mention_parser``).
@@ -197,6 +199,47 @@ def place_mentions(
     return place_editor_mentions(content, lambda handle: accounts.get(handle))
 
 
+def place_markdown_mentions(
+    text: str | None,
+    handles: list[str],
+    *,
+    context: "ImportContext | None",
+    initiative_member_handles: dict[str, int],
+) -> str | None:
+    """``text`` with each ``@<handle>`` it mentions linked to an account here.
+
+    Placed the way a project comment's author is: the account the people
+    step mapped the handle to, else a member of the target
+    initiative with that exact handle, and is stored by id alone, as every
+    mention is. A mention nobody places stays the name it arrived as. Handles
+    are tried longest first, so ``@Ann Lee`` is never read as ``@Ann``
+    followed by a surname.
+    """
+    from app.services.import_engine.people import PeopleMap, quoted_account
+
+    if not text or not handles:
+        return text
+    people = context.people if context is not None else PeopleMap()
+    targets: dict[str, int] = {}
+    for handle in handles:
+        mapped = quoted_account(
+            handle, people=people, member_handles=initiative_member_handles
+        )
+        if mapped is not None:
+            targets[handle] = mapped
+    if not targets:
+        return text
+    ordered = sorted(set(handles), key=len, reverse=True)
+    pattern = re.compile("@(" + "|".join(re.escape(h) for h in ordered) + r")(?![\w])")
+
+    def link(match: re.Match[str]) -> str:
+        handle = match.group(1)
+        user_id = targets.get(handle)
+        return match.group(0) if user_id is None else f"@[]({user_id})"
+
+    return pattern.sub(link, text)
+
+
 def mention_handles_in(payload: Any) -> list[str]:
     """Every handle an envelope, as plain data, lists under
     ``mention_handles`` at any depth — a task's, a comment's, a page's, a
@@ -222,18 +265,22 @@ def mention_handles_in(payload: Any) -> list[str]:
 
 
 async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
-    """Rewrite the editor-state mentions in one tool envelope, in place on
-    ``data`` (a freshly built envelope dict — the content inside it is never
-    edited, only replaced).
+    """Rewrite the mentions in one tool envelope, in place on ``data`` (a
+    freshly built envelope dict — the content inside it is never edited, only
+    replaced).
 
-    Files, posts and wiki pages carry their bodies as editor states. A
-    project envelope's mentions are markdown and are written by
+    Files, posts and wiki pages carry their bodies as editor states. A project
+    envelope's mentions are markdown, and are written by
     ``build_project_export`` itself, which is where the text is read.
     """
     if not isinstance(data, dict):
         return
     kind = data.get("type")
-    if kind == tool_envelope_type(Tool.file) and data.get("file_type") == "native":
+    holders: list[tuple[dict[str, Any], str]] = []
+    if (
+        kind == tool_envelope_type(Tool.file)
+        and data.get("file_type") == FileType.lexical
+    ):
         holders = [(data, "content")]
     elif kind == tool_envelope_type(Tool.post):
         holders = [(data, "body")]
@@ -248,7 +295,7 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
             for filed in data.get("files") or []
             if isinstance(filed, dict)
             and isinstance(filed.get("envelope"), dict)
-            and filed["envelope"].get("file_type") == "native"
+            and filed["envelope"].get("file_type") == FileType.lexical
         ]
     else:
         return

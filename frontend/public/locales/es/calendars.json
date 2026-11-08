@@ -42,7 +42,7 @@
   "selectInitiative": "Seleccionar iniciativa",
   "deleteEventConfirm": "El evento se enviará a la papelera. Puedes restaurarlo desde Configuración → Papelera antes de que finalice el período de retención.",
   "dangerZoneDescription": "Acciones destructivas. Los eventos eliminados van a la papelera y pueden restaurarse antes de que finalice el período de retención.",
-  "properties": "Propiedades",
+  "properties": "Metadatos",
   "import": {
     "title": "Importar eventos del calendario",
     "importIcs": "Importar .ics",
@@ -134,6 +134,8 @@
     "replaces": "Ya tienes un enlace para este calendario. Si pides uno nuevo, el anterior deja de funcionar.",
     "getLink": "Obtener enlace",
     "getNewLink": "Obtener un enlace nuevo",
+    "newLinkTitle": "Un enlace nuevo para {{name}}",
+    "newLinkDescription": "Tu enlace actual dejará de funcionar. Vuelve a suscribirte con el enlace nuevo dondequiera que usaras el anterior.",
     "copy": "Copiar enlace",
     "copied": "Enlace copiado.",
     "open": "Abrir en la aplicación de calendario",

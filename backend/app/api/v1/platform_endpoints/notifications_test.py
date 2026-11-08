@@ -21,11 +21,13 @@ from app.testing.factories import (
     create_task,
     create_tool_entity,
     create_user,
+    create_collection,
     create_wiki_page,
     enable_all_tools,
     get_auth_headers,
     set_notification_prefs,
 )
+from app.services.platform import rules
 
 
 async def _seed_notification(session: AsyncSession, user_id: int) -> int:
@@ -309,8 +311,7 @@ async def test_the_desktop_alert_is_the_line_unless_its_community_redacts(
     assert body["notification"]["id"] == line.id
     assert body["redacted"] is None
 
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     body = (await client.get(url, headers=get_auth_headers(user))).json()
     title, text = notification_policy.redacted_line(
@@ -368,6 +369,9 @@ async def test_the_bell_reads_the_title_back_from_the_community(
     subjects["task"] = task
     subjects["wiki_page"] = await create_wiki_page(
         session, subjects[Tool.wiki.value], actor.user
+    )
+    subjects["collection"] = await create_collection(
+        session, actor.initiative, actor.user, files=[subjects[Tool.file.value]]
     )
     assert set(subjects) == set(COMMENT_TARGETS)
     for kind, entity in subjects.items():

@@ -4,10 +4,10 @@ import { AuthProvidersSection } from "@/components/platform/AuthProvidersSection
 import { PlatformAuthSection } from "@/components/platform/PlatformAuthSection";
 import { ProviderDefaultsSection } from "@/components/platform/ProviderDefaultsSection";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { useAuth } from "@/hooks/useAuth";
 import { useOidcSettings } from "@/hooks/useSettings";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**
  * Platform → Authentication.

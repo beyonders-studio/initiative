@@ -40,6 +40,8 @@ Guest links are listed on the Guests tab, under the form, with what each one giv
 
 Comments, reactions, bookmarks, mentions and notifications all work on those things. Anything a guest makes stays with the community after they've gone.
 
+A guest in an initiative can [ask for access](sharing-projects-and-files.md#asking-for-access) to what's in it, as any member can. A guest given one item can only ask to edit that item: nothing else in its initiative turns up for them to ask about.
+
 Everything else isn't there for them: other initiatives, the community's member list, its initiative directory, plug-ins and settings. Like anything else they can't reach, it comes back "not found". See [Sharing & access](index.md#why-a-missing-thing-says-not-found-rather-than-denied).
 
 ## Seats
@@ -81,4 +83,4 @@ A community with its own [sign-in](../security/community-security.md) can ask so
 ## Related
 
 - [Sharing projects & files](sharing-projects-and-files.md) — the Viewer and Editor levels a guest gets.
-- [Working with communities](../guides/communities.md#inviting-people-admins) — inviting members.
+- [Working with communities](../guides/communities.md#inviting-people) — inviting members.

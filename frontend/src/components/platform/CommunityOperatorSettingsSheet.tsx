@@ -33,17 +33,6 @@ import { PluginSummaryFigures } from "@/components/communities/PluginSummaryCard
 import { BillingConsoleButton, opensBillingHere } from "@/components/platform/BillingConsoleButton";
 import { CommunityRestoreWizard } from "@/components/platform/CommunityRestoreWizard";
 import { Section, SettingRow } from "@/components/platform/SettingRow";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useServerForm } from "@/hooks/useServerForm";
 import {
@@ -54,6 +43,11 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { Switch } from "@/ui/switch";
 
 const GIB = 1024 ** 3;
 
@@ -378,6 +372,45 @@ export const CommunityOperatorSettingsSheet = ({
                   disabled={
                     update.isPending || planLocked || (!supportBound && !community.support_enabled)
                   }
+                />
+              }
+            />
+            <SettingRow
+              label={t("communities.sheet.aiConnectionsLabel")}
+              help={t("communities.sheet.aiConnectionsHelp")}
+              htmlFor="community-ai-connections"
+              control={
+                <Switch
+                  id="community-ai-connections"
+                  checked={community.ai_connections_open}
+                  onCheckedChange={(checked) => patch({ ai_connections_open: Boolean(checked) })}
+                  disabled={update.isPending || planLocked}
+                />
+              }
+            />
+            <SettingRow
+              label={t("communities.sheet.pluginsLabel")}
+              help={t("communities.sheet.pluginsHelp")}
+              htmlFor="community-plugins"
+              control={
+                <Switch
+                  id="community-plugins"
+                  checked={community.plugins_open}
+                  onCheckedChange={(checked) => patch({ plugins_open: Boolean(checked) })}
+                  disabled={update.isPending || planLocked}
+                />
+              }
+            />
+            <SettingRow
+              label={t("communities.sheet.customRolesLabel")}
+              help={t("communities.sheet.customRolesHelp")}
+              htmlFor="community-custom-roles"
+              control={
+                <Switch
+                  id="community-custom-roles"
+                  checked={community.custom_roles_open}
+                  onCheckedChange={(checked) => patch({ custom_roles_open: Boolean(checked) })}
+                  disabled={update.isPending || planLocked}
                 />
               }
             />

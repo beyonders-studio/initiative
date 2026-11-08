@@ -9,7 +9,16 @@
       "title": "Overdue tasks",
       "body_one": "{{count}} task is overdue: {{title}}",
       "body_other": "{{count}} tasks are overdue, including {{title}}"
+    },
+    "reminder": {
+      "title": "Reminder",
+      "body": "{{task}}"
     }
+  },
+  "comingUp": {
+    "title": "Coming up",
+    "body_one": "{{count}} thing coming up: {{title}}",
+    "body_other": "{{count}} things coming up, starting with {{title}}"
   },
   "initiative": {
     "added": {
@@ -48,9 +57,9 @@
       "title": "Your task was mentioned",
       "body": "{{actor}} mentioned {{task}} in {{context}}"
     },
-    "taskDescription": {
+    "description": {
       "title": "You were mentioned",
-      "body": "{{actor}} mentioned you in the description of {{task}}"
+      "body": "{{actor}} mentioned you in the description of {{title}}"
     }
   },
   "comment": {
@@ -212,6 +221,14 @@
     "account": {
       "title": "An account notice",
       "body": "Open Initiative to read it."
+    },
+    "overdue": {
+      "title": "You have overdue tasks",
+      "body": "Open Initiative to see them."
+    },
+    "coming_up": {
+      "title": "You have things coming up",
+      "body": "Open Initiative to see them."
     }
   },
   "quietHours": {
@@ -263,6 +280,37 @@
     "replied": {
       "title": "A reply on a case nobody has taken",
       "body": "Open Initiative to read it."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Asked to view",
+        "body_one": "{{requester}} asks to view {{title}}",
+        "body_other": "{{requester}} asks to view {{count}} files"
+      },
+      "write": {
+        "title": "Asked to edit",
+        "body_one": "{{requester}} asks to edit {{title}}",
+        "body_other": "{{requester}} asks to edit {{count}} files"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "You can view it now",
+        "body_one": "{{answerer}} let you view {{title}}",
+        "body_other": "{{answerer}} let you view {{count}} files"
+      },
+      "write": {
+        "title": "You can edit it now",
+        "body_one": "{{answerer}} let you edit {{title}}",
+        "body_other": "{{answerer}} let you edit {{count}} files"
+      }
+    },
+    "declined": {
+      "title": "Request declined",
+      "body_one": "{{answerer}} declined your request",
+      "body_other": "{{answerer}} declined your request for {{count}} files"
     }
   }
 }

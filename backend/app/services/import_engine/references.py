@@ -2,7 +2,7 @@
 
 Inside the app a reference names what it points at by id: ``#task[Fix the
 bug](41)`` in markdown (a task's description, a comment), and an
-``entity-mention``, ``wikilink``, ``smart-chip`` or ``reference-embed`` node in
+``entity-mention``, ``smart-chip`` or ``reference-embed`` node in
 an editor state (a file, a post, a wiki page). An id means nothing where an export is
 restored — on another instance, or in a community where 41 is something else,
 and even in the same community a restore makes new rows — so the export writes
@@ -12,7 +12,10 @@ each reference as the **ref** of what it named where it was written
 * markdown: ``#task[Fix the bug](41)`` becomes ``#task[Fix the bug](task:41)``,
   which no reader takes for a reference until the restore puts an id back.
 * editor state: the node keeps its text, carries ``importSourceRef`` and holds
-  no id (``0``, or ``None`` for a wikilink) until it is placed.
+  no id (``0``) until it is placed.
+* a dashboard's statements: they cross as written, and each row id one names
+  is read as the ref of that row where it was exported (``project_id = 12`` is
+  ``project:12``) and placed like any other.
 
 Every row a restore creates registers itself with the job's link collector
 under the ref it had (``task:41``, ``file:7``), so once the last entry has
@@ -20,11 +23,13 @@ flushed :func:`resolve_references` reads each marked body again and places
 every reference: on the row its ref became in this job; on the original, when
 the export came from this same community and the thing did not come over with
 it; and otherwise on nothing — the reference is its title again, never a link
-to whatever holds that id here.
+to whatever holds that id here. A statement's id that names nothing becomes
+``0``, which no row has.
 """
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -34,6 +39,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.references import (
     REFERENCE_NODES,
+    SOURCE_REF,
     TEXT_REFERENCE,
     format_ref,
     kind_for_trigger,
@@ -41,24 +47,15 @@ from app.core.references import (
     reference_as_text,
     reference_node_kind,
 )
+from app.core.file_types import FileType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.import_engine.context import ImportContext
 
-#: The placeholder an exported reference node carries in place of its id.
-SOURCE_REF = "importSourceRef"
-
 #: An exported reference in markdown: the id's place holds the ref instead.
 _EXPORTED_TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\(([a-z_]+:\d+)\)")
-
-
-def _waiting(node_type: str) -> int | None:
-    """What a reference node's id field holds while it waits to be placed. A
-    wikilink with no file is one the editor already draws as unlinked; the
-    others keep a number, as a Confluence mention waiting on its page does."""
-    return None if node_type == "wikilink" else 0
 
 
 def _is_id(value: Any) -> bool:
@@ -105,11 +102,9 @@ def detach_editor_references(content: Any) -> Any:
         if field is not None:
             kind = reference_node_kind(node)
             if kind is not None and _is_id(node.get(field)):
-                return {
-                    **node,
-                    field: _waiting(node["type"]),
-                    SOURCE_REF: format_ref(kind, node[field]),
-                }
+                # A number while it waits, as a Confluence mention waiting on
+                # its page holds.
+                return {**node, field: 0, SOURCE_REF: format_ref(kind, node[field])}
             return node
         children = node.get("children")
         if isinstance(children, list):
@@ -122,7 +117,10 @@ def detach_editor_references(content: Any) -> Any:
 def _editor_holders(data: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:
     """Where a tool envelope keeps its editor-state bodies."""
     kind = data.get("type")
-    if kind == tool_envelope_type(Tool.file) and data.get("file_type") == "native":
+    if (
+        kind == tool_envelope_type(Tool.file)
+        and data.get("file_type") == FileType.lexical
+    ):
         return [(data, "content")]
     if kind == tool_envelope_type(Tool.post):
         return [(data, "body")]
@@ -145,7 +143,7 @@ def _editor_holders(data: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:
 
 
 def detach_envelope_references(data: Any, *, guild_id: int) -> None:
-    """Rewrite the editor-state references in one tool envelope, in place on
+    """Rewrite the references in one tool envelope, in place on
     ``data`` (a freshly built envelope dict — the content inside it is never
     edited, only replaced), and say where it was taken.
 
@@ -168,10 +166,27 @@ def detach_envelope_references(data: Any, *, guild_id: int) -> None:
 # -- import ------------------------------------------------------------------
 
 
+def _statements(definition: Any) -> list[dict[str, Any]]:
+    """The bindings of a dashboard definition that hold a statement."""
+    widgets = definition.get("widgets") if isinstance(definition, dict) else None
+    return [
+        widget["binding"]
+        for widget in widgets or ()
+        if isinstance(widget, dict)
+        and isinstance(widget.get("binding"), dict)
+        and widget["binding"].get("source") == "query"
+        and isinstance(widget["binding"].get("sql"), str)
+    ]
+
+
 def has_source_references(content: Any) -> bool:
-    """Whether a body holds a reference still waiting to be placed."""
+    """Whether a body holds a reference still waiting to be placed. A
+    dashboard's statements may name rows by id, so a definition holding one
+    does."""
     if isinstance(content, str):
         return _EXPORTED_TEXT_REFERENCE.search(content) is not None
+    if _statements(content):
+        return True
     found = False
 
     def walk(node: Any) -> None:
@@ -207,9 +222,7 @@ def place_markdown_references(
 
 def place_editor_references(content: Any, resolve: Callable[[str], int | None]) -> Any:
     """``content`` with each exported reference node placed through
-    ``resolve``. One that resolves to nothing is its text again; a wikilink
-    stays a wikilink with no file, which is how the editor draws one
-    whose file is gone."""
+    ``resolve``. One that resolves to nothing is its text again."""
     if not isinstance(content, dict) or not isinstance(content.get("root"), dict):
         return content
 
@@ -223,9 +236,6 @@ def place_editor_references(content: Any, resolve: Callable[[str], int | None]) 
             target = resolve(ref)
             if target is not None:
                 placed[field] = target
-                return placed
-            if node.get("type") == "wikilink":
-                placed[field] = None
                 return placed
             return reference_as_text(node)
         children = node.get("children")
@@ -259,6 +269,16 @@ def note_or_settle(
 def _settle(content: Any, resolve: Callable[[str], int | None]) -> Any:
     if isinstance(content, str):
         return place_markdown_references(content, resolve)
+    if _statements(content):
+        from app.services.query.resolve import remap_ids
+
+        placed = copy.deepcopy(content)
+        for binding in _statements(placed):
+            binding["sql"] = remap_ids(
+                binding["sql"],
+                lambda kind, entity_id: resolve(format_ref(kind, entity_id)) or 0,
+            )
+        return placed
     return place_editor_references(content, resolve)
 
 
@@ -269,6 +289,10 @@ def _body_column(kind: SearchEntityType) -> tuple[type, str] | None:
 
     if kind == SearchEntityType.comment:
         return Comment, "content"
+    if kind == SearchEntityType.dashboard:
+        from app.models.tenant.dashboard import Dashboard
+
+        return Dashboard, "definition"
     return BODY_COLUMNS.get(kind)
 
 

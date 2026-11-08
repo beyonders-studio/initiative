@@ -29,7 +29,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/sidebar/sidebar";
 import {
   asCommunityCategories,
   COMMUNITY_CATEGORIES,

@@ -1,6 +1,6 @@
 /**
  * A person's home views: several home pages, each a layout of its own, with
- * tabs to move between them — work on one, the scout group on another.
+ * tabs to move between them — work on one, the soccer league on another.
  *
  * The list of views is one preference (`home:views`) and each view's layout
  * another (`home:view:<id>`), so every page gets the whole room a preference

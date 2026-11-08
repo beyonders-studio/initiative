@@ -213,6 +213,17 @@ describe("MarkdownComposer", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
+  it("ticks a checklist box in the preview and stays on the preview", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Host initial="- [ ] Book the room" defaultMode="preview" />);
+
+    await user.click(screen.getByRole("checkbox"));
+
+    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent("- [x] Book the room");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
   it("opens ready to type when preview-first has nothing to preview", () => {
     renderWithProviders(<Host defaultMode="preview" />);
 

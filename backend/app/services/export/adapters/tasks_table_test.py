@@ -45,26 +45,6 @@ def test_thread_comments_handles_a_very_deep_chain_without_recursion():
     assert ordered[-1][1] == 2999  # depth grows with the chain
 
 
-def test_flatten_mentions_keeps_display_text():
-    from app.services.export.adapters.tasks_table import _flatten_mentions
-
-    assert _flatten_mentions("ping @[Ada L](7), see #task[Fix boss](12)") == (
-        "ping @Ada L, see Fix boss"
-    )
-    assert _flatten_mentions("#doc[Map](3) and #project[Arc](4)") == "Map and Arc"
-    # Plain markdown links are NOT mentions — untouched.
-    assert _flatten_mentions("[text](5)") == "[text](5)"
-    # Every kind the app can mention, not only the first few.
-    assert _flatten_mentions("#counter-group[Q1](9), #wiki-page[Home](2)") == (
-        "Q1, Home"
-    )
-    # A `#` word naming no kind is not a mention, here or on screen.
-    assert _flatten_mentions("#nope[x](1)") == "#nope[x](1)"
-    # A pasted picture prints as its alt text.
-    assert _flatten_mentions("see ![shot](/uploads/9/pasted-a.png)") == "see shot"
-    assert _flatten_mentions("![](/uploads/9/pasted-a.png)") == "[image]"
-
-
 def test_every_task_layout_field_says_how_it_exports():
     """A field a task's layout can show has an entry, a way to write it or
     ``None`` to leave it out, so a new one cannot quietly miss exports."""

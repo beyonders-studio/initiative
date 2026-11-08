@@ -19,15 +19,15 @@ import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import { MarketplaceCard } from "@/components/marketplace/MarketplaceCard";
-import { StatusMessage } from "@/components/StatusMessage";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useInstalledListings } from "@/hooks/useDashboards";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMarketplaceListings } from "@/hooks/useMarketplace";
 import { type CommunityShelf, parseCommunityShelf } from "@/lib/marketplace";
 import { catalogueSources, listingShownHere } from "@/lib/marketplaceCuration";
+import { Input } from "@/ui/input";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const PAGE_SIZE = 24;
 /** One line per shelf, so a new kind shows its own rather than the dashboards'.

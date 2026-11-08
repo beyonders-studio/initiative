@@ -23,22 +23,15 @@ import type { EmailOtpRegister, Token } from "@/api/generated/initiativeAPI.sche
 import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { ServerChip } from "@/components/auth/ServerChoice";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { browserTimezone } from "@/lib/timezones";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 type Step = "address" | "code" | "handle";
 

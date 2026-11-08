@@ -20,6 +20,7 @@ import { PrideProvider } from "@/hooks/usePride";
 import { useRouteGuardSync } from "@/hooks/useRouteGuardSync";
 import { ServerProvider, useServer } from "@/hooks/useServer";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { connectKit } from "@/lib/kitHost";
 import { prepareOfflineCache } from "@/lib/offlineBoot";
 import { bindOnlineManagerToDevice } from "@/lib/onlineStatus";
 import { queryClient } from "@/lib/queryClient";
@@ -61,6 +62,7 @@ const InnerApp = () => {
 
 async function bootstrap() {
   await initStorage();
+  connectKit();
 
   // On native, set the API base URL immediately from storage so requests
   // reach the real backend before React effects run (avoids race condition

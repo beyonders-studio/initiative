@@ -8,10 +8,10 @@ import { BirthdateField } from "@/components/auth/BirthdateField";
 import type { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
 import { ContinueButton, StepField } from "@/components/start/stepParts";
 import { type HandleCheck, UsernameField } from "@/components/UsernameField";
-import { Button } from "@/components/ui/button";
-import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /** How long typing settles before the suggestions start from it. */
 const SEED_SETTLES_MS = 400;
@@ -125,7 +125,7 @@ export const YouStep = ({
             />
           </div>
           <StepField id="start-timezone" label={t("settings:profile.timezoneLabel")}>
-            <SearchableCombobox
+            <Combobox
               items={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz }))}
               value={timezone}
               onValueChange={onTimezoneChange}

@@ -493,8 +493,8 @@ class CollaborationManager:
     ) -> bool:
         """Remove a room if it exists and has no active connections.
 
-        Used when a body is modified externally (e.g. unresolving
-        wikilinks when a target file is deleted) so the next session loads
+        Used when a body is modified externally (e.g. unlinking the
+        references to a file that is purged) so the next session loads
         fresh state from the database instead of stale in-memory state.
 
         Returns True if the room was removed, False if it is still in use (in
@@ -529,7 +529,7 @@ class CollaborationManager:
             else:
                 logger.warning(
                     "%s %s has active collaborators - "
-                    "they may see stale wikilinks until reload",
+                    "they may see stale references until reload",
                     resource_type,
                     resource_id,
                 )
@@ -629,11 +629,10 @@ class CollaborationManager:
             from app.services.tenant.relationships import Endpoint
 
             try:
-                fixed = await content_references.sync_for_entity(
+                await content_references.sync_for_entity(
                     session,
                     Endpoint(spec.entity_type, room.resource_id),
                     body=content,
-                    fix_content=True,
                 )
             except Exception as exc:
                 logger.error(
@@ -643,8 +642,7 @@ class CollaborationManager:
                     room.guild_id,
                     type(exc).__name__,
                 )
-                fixed = None
-            values[spec.content_column] = fixed if fixed else content
+            values[spec.content_column] = content
             # The body changed, as much as a PATCH of it would have changed
             # it: a reader judging what it holds against the row's age (a
             # device's unsaved scene, a list sorted by recent edits) sees it.

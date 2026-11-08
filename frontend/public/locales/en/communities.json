@@ -109,10 +109,9 @@
     "deleteConfirmPasswordPlaceholder": "Your password",
     "deleteConfirmLabel": "Type <bold>{{phrase}}</bold> to confirm:",
     "unableToDelete": "Unable to delete community.",
-    "retentionTitle": "Trash retention",
-    "retentionDescription": "How long deleted items stay in the trash before they're permanently removed. Set to \"Never\" to keep them until an admin manually deletes them.",
     "retentionDaysLabel": "Days",
-    "retentionNeverLabel": "Never auto-purge",
+    "retentionAfter_one": "Delete permanently after <days/> day",
+    "retentionAfter_other": "Delete permanently after <days/> days",
     "retentionUpdatedSuccessfully": "Retention updated.",
     "discoveryTitle": "Community directory",
     "discoveryDescription": "A listed community appears in the directory, where anyone signed in can find it and join without an invite.",
@@ -162,12 +161,14 @@
     "communityRole": {
       "admin": "Admin",
       "member": "Member",
-      "superadmin": "Superadmin"
+      "superadmin": "Superadmin",
+      "guest": "Guest"
     },
     "communityRoleHelp": {
       "member": "Takes part in what they're added to.",
       "admin": "Runs the community — members, invites, initiatives, settings.",
-      "superadmin": "All that, plus how people get in: sign-in, AI and plug-ins. Only a superadmin can appoint another."
+      "superadmin": "All that, plus how people get in: sign-in, AI and plug-ins. Only a superadmin can appoint another.",
+      "guest": "Here for a set number of days, and sees only what their invite gave them."
     },
     "loadingSettings": "Loading settings…",
     "unableToLoadSettings": "Unable to load settings.",
@@ -200,7 +201,8 @@
     "filterByHandle": "Filter by handle...",
     "userIdColumn": "User ID",
     "userColumn": "User",
-    "communityRoleColumn": "Community Role",
+    "communityRoleColumn": "Community role",
+    "communityRolePickerLabel": "Community role for {{name}}",
     "sourceColumn": "Source",
     "actionsColumn": "Actions",
     "sourceOidc": "OIDC",
@@ -269,10 +271,23 @@
     "initiativeJoinRequested": "{{requester}} asked to join {{initiativeName}}.",
     "initiativeJoinApproved": "Your request to join {{initiativeName}} was approved.",
     "initiativeJoinDenied": "Your request to join {{initiativeName}} was declined.",
+    "shareRequested": {
+      "read_one": "{{requester}} asks to view {{title}}.",
+      "read_other": "{{requester}} asks to view {{count}} files.",
+      "write_one": "{{requester}} asks to edit {{title}}.",
+      "write_other": "{{requester}} asks to edit {{count}} files."
+    },
+    "shareGranted": {
+      "read_one": "{{answerer}} gave you view access to {{title}}.",
+      "read_other": "{{answerer}} gave you view access to {{count}} files.",
+      "write_one": "{{answerer}} gave you edit access to {{title}}.",
+      "write_other": "{{answerer}} gave you edit access to {{count}} files."
+    },
+    "shareDeclined_one": "{{answerer}} declined your request.",
+    "shareDeclined_other": "{{answerer}} declined your request for {{count}} files.",
     "projectAdded": "{{projectName}} was added to {{initiativeName}} you’re part of.",
     "mentionComment": "{{mentionedBy}} mentioned you in a comment on {{contextTitle}}.",
-    "mentionFile": "{{mentionedBy}} mentioned you in {{fileTitle}}.",
-    "mentionTaskDescription": "{{mentionedBy}} mentioned you in {{taskTitle}}.",
+    "mentionIn": "{{mentionedBy}} mentioned you in {{title}}.",
     "commentOnTask": "{{commenterName}} commented on {{taskTitle}}.",
     "commentOnResource": "{{commenterName}} commented on {{entityName}}.",
     "postPublished": "{{authorName}} posted {{postName}}.",
@@ -299,6 +314,7 @@
     "eventCancelled": "{{canceller}} cancelled {{eventTitle}}.",
     "eventRsvp": "{{responder}} responded {{status}} to {{eventTitle}}.",
     "eventReminder": "{{eventTitle}} is coming up.",
+    "taskReminder": "Reminder: {{taskTitle}}",
     "accessLevelRead": "read-only",
     "accessLevelReadWrite": "read-write",
     "usernameChanged": "A moderator changed your username. You used to be {{previousHandle}}.",
@@ -307,6 +323,7 @@
     "accountSuspended": "Your account has been suspended.",
     "accountSuspendedWithReason": "Your account has been suspended: {{reason}}",
     "accountUnsuspended": "Your account is no longer suspended.",
+    "announcement": "Announcement: {{title}}",
     "communityOnHold": "{{community}} is on hold. Contact whoever runs this server to sort it out.",
     "pluginConsentRequested": "{{plugin}} asks to act as you: “{{label}}”",
     "pluginUpdatePending": "{{plugin}} version {{version}} asks for more access",
@@ -357,7 +374,6 @@
     "inbox": {
       "title": "Notifications",
       "empty": "Nothing here yet.",
-      "loadMore": "Load more",
       "markRead": "Mark read",
       "markUnread": "Mark unread",
       "dismiss": "Dismiss",
@@ -557,7 +573,6 @@
     "noDescription": "No description yet.",
     "resultCount_one": "{{count}} community",
     "resultCount_other": "{{count}} communities",
-    "showMore": "Show more",
     "emptyTitle": "No communities yet",
     "emptyDescription": "No community here has listed itself in the directory. A community admin can list theirs from community settings.",
     "noResultsTitle": "Nothing matched",

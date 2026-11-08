@@ -56,7 +56,8 @@ class Conversation(str, Enum):
     #: Nobody writes back. The filer is told the case arrived, and nothing of
     #: what is decided — a report, which is not a conversation.
     none = "none"
-    #: The filer may answer once somebody handling it has written to them.
+    #: The team starts it: the case is its filer's to follow, and to answer,
+    #: once somebody handling it has written to them.
     staff_first = "staff_first"
     #: Either side may write first.
     open = "open"
@@ -102,7 +103,6 @@ class FeedbackTopic(str, Enum):
     idea = "idea"
     problem = "problem"
     praise = "praise"
-    other = "other"
 
 
 #: The one moderation case a person files about themselves: asking for their
@@ -116,6 +116,19 @@ IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 DOCUMENT_TYPES = frozenset({"application/pdf", "text/plain"})
 
 _MB = 1024 * 1024
+
+
+class CommunityNoticeRule(str, Enum):
+    """Whether a community hears that platform staff were given access to it
+    for one of a stream's cases (``AccessGrant.community_notice``)."""
+
+    #: Never: the stream's cases are not ones a grant serves.
+    never = "never"
+    #: As whoever asks for the access chooses: when it starts, once it has
+    #: ended, or not at all.
+    optional = "optional"
+    #: Always, when it starts.
+    always = "always"
 
 
 @dataclass(frozen=True)
@@ -164,6 +177,9 @@ class IntakeStreamMeta:
     #: Whether staff may name one of the stream's cases as the reason for an
     #: access grant, which then reports what the grant did on the case.
     grant_linkable: bool = False
+    #: Whether the community a grant for one of the stream's cases reaches has
+    #: its superadmins told of it.
+    community_notice: CommunityNoticeRule = CommunityNoticeRule.never
     #: Topics whose cases talk differently from the stream's own.
     topic_conversation: Mapping[str, Conversation] = field(default_factory=dict)
     #: Topics with a cap of their own on one account's open cases, counted
@@ -208,6 +224,7 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         retention_days=365,
         isolated=True,
         grant_linkable=True,
+        community_notice=CommunityNoticeRule.optional,
     ),
     IntakeStream.moderation: IntakeStreamMeta(
         sources=frozenset({Source.submitted, Source.manual}),
@@ -220,6 +237,7 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         retention_days=90,
         isolated=True,
         grant_linkable=True,
+        community_notice=CommunityNoticeRule.optional,
         # A report is not a conversation; an appeal is one, with the person
         # whose account it is, and they keep one open at a time. It is
         # written from the time-out screen, which opens nothing but itself,
@@ -240,6 +258,8 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         evidence=EvidencePolicy(5, 10 * _MB, IMAGE_TYPES | DOCUMENT_TYPES),
         retention_days=90,
         grant_linkable=True,
+        # Support works on the community's behalf, so it always hears.
+        community_notice=CommunityNoticeRule.always,
     ),
     IntakeStream.feedback: IntakeStreamMeta(
         sources=frozenset({Source.submitted, Source.manual}),
@@ -301,7 +321,7 @@ class CaseField(str, Enum):
     subject_link = "subject_link"
 
 
-#: Each field's property type, as a ``PropertyType`` value. Declared as plain
+#: Each field's property type, as a ``MetadataType`` value. Declared as plain
 #: strings so this module stays free of model imports; ``intake_test`` checks
 #: every one against the real enum, and against what the blueprints declare.
 CASE_FIELD_TYPES: dict[CaseField, str] = {

@@ -25,6 +25,7 @@ from typing import Any, Callable, Optional, Protocol
 
 from pycrdt import Doc, Map
 
+from app.core.file_types import FileType
 from app.core.identity_boundary import MentionForm, without_mention_names
 from app.services import editor_engine
 
@@ -136,10 +137,9 @@ class _Whiteboard:
 
     @staticmethod
     def _normalized(content: Any) -> dict:
-        from app.models.tenant.file import FileType
         from app.services.tenant.files import normalize_file_content
 
-        return normalize_file_content(content, file_type=FileType.whiteboard)
+        return normalize_file_content(content, file_type=FileType.excalidraw)
 
     async def bootstrap(self, content: Any) -> bytes:
         return await self.apply(b"", self._normalized(content))
@@ -328,9 +328,9 @@ WHITEBOARD: BodyState = _Whiteboard()
 SPREADSHEET: BodyState = _Spreadsheet()
 
 _BY_KIND: dict[str, BodyState] = {
-    "native": LEXICAL,
-    "whiteboard": WHITEBOARD,
-    "spreadsheet": SPREADSHEET,
+    FileType.lexical.value: LEXICAL,
+    FileType.excalidraw.value: WHITEBOARD,
+    FileType.sheet.value: SPREADSHEET,
 }
 
 
@@ -343,7 +343,6 @@ def for_row(row: Any) -> Optional[BodyState]:
 
 
 def for_kind(kind: Any) -> Optional[BodyState]:
-    """How a body of ``kind`` — a file type, or ``"native"`` for any
-    Lexical body — moves between its views; ``None`` for one with no live
-    editor."""
+    """How a body of ``kind`` — a file type, ``lexical`` for any Lexical
+    body — moves between its views; ``None`` for one with no live editor."""
     return _BY_KIND.get(getattr(kind, "value", kind))

@@ -10,11 +10,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { ItemDraftContext } from "@/hooks/useFieldSave";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 /** Where one field's save stands. */
 export type FieldSaveState = "idle" | "saving" | "saved" | "error";
@@ -169,7 +169,11 @@ export const useFieldDraft = <V,>(
       },
       onKeyDown: (event) => {
         if (!isTyping(event.target)) return;
-        if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement)) {
+        // A textarea marked single-line (a title that wraps) saves on Enter too.
+        const multiline =
+          event.target instanceof HTMLTextAreaElement &&
+          event.target.getAttribute("aria-multiline") !== "false";
+        if (event.key === "Enter" && !multiline) {
           event.preventDefault();
           finish();
           drafting?.submit();

@@ -12,12 +12,13 @@
  * with the checkbox rather than in a policy page nobody opens.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityCategory } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +26,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 /** One key per line of the certification, so a translator sees each claim on
  *  its own rather than one paragraph to keep in sync. */
@@ -59,12 +59,14 @@ export const PublishCommunityDialog = ({
 
   // Every opening starts from the community's current shelves and an un-ticked
   // certification: it is an assertion made now, not one a previous visit made.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, initialCategories });
+  if (prev.open !== open || prev.initialCategories !== initialCategories) {
+    setPrev({ open, initialCategories });
     if (open) {
       setCategories(initialCategories);
       setCertified(false);
     }
-  }, [open, initialCategories]);
+  }
 
   const toggleCategory = (category: CommunityCategory) => {
     setCategories((current) =>

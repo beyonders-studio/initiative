@@ -46,7 +46,7 @@ from app.models.tenant.calendar_event import (
     RSVPStatus,
 )
 from app.services.tenant import calendar_events as events_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 #: What an occurrence can change alone, as ``overridden_fields`` names it.
@@ -287,7 +287,7 @@ async def _copy_lists(
         await tags_service.replace_entity_tags(session, _TAGS, target.id, [])
         await tags_service.copy_entity_tags(session, _TAGS, {source.id: target.id})
     if "properties" in lists:
-        await properties_service.copy_values(
+        await metadata_service.copy_values(
             session, type(source), {source.id: target.id}
         )
     await session.flush()

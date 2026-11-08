@@ -4,7 +4,7 @@ Two kinds of question, told apart by topic (``SupportTopic``):
 
 - **About a community** (``community``, ``data_request``). Whether its members
   can ask is an **operator** entitlement
-  (``guild_administration.support_enabled``), not something the community's
+  (the paid rule ``help_requests``), not something the community's
   own admins switch on: the deployment that would receive the requests is the
   one that decides it is staffing them. Off is the default, and the "Ask for
   help" control then offers the support address. A ``data_request`` — a copy
@@ -22,16 +22,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional, Sequence
 
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import COMMUNITY_SUPPORT_TOPICS, IntakeStream, SupportTopic
-from app.models.platform.guild_administration import GuildAdministration
+from app.services.platform import rules
 from app.models.platform.user import User
 from app.db import cohorts
 from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
 if TYPE_CHECKING:
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: Longest a request's summary and its body may be. The case is a task, whose
@@ -49,19 +49,13 @@ class NowhereToSend(Exception):
 
 
 async def _entitled(session: AsyncSession, guild_id: int) -> bool:
-    """Whether this community's members may ask. One indexed row.
+    """Whether this community's members may ask: its ``help_requests`` rule.
 
     Read on the caller's own guild-routed session: the table admits a member to
-    their own guild's row, so this is the same answer the settings page gets.
+    their own community's rules, so this is the same answer the settings page
+    gets.
     """
-    row = (
-        await session.exec(
-            select(GuildAdministration.support_enabled).where(
-                GuildAdministration.guild_id == guild_id
-            )
-        )
-    ).first()
-    return bool(row)
+    return await rules.community_value(session, guild_id, "help_requests")
 
 
 async def community_topics(requester: User, guild_id: int) -> frozenset[SupportTopic]:
@@ -113,6 +107,7 @@ async def request_help(
     subject: str,
     body: str,
     topic: SupportTopic = SupportTopic.community,
+    context: Optional["DeviceContext"] = None,
     evidence: Sequence["PreparedEvidence"] = (),
     now: Optional[datetime] = None,
 ) -> int:
@@ -121,8 +116,9 @@ async def request_help(
     The case names who asked, and for a question about a community which one,
     as the weak refs every case carries, and records them as its filer: their
     subject and their words open the case, said to them, so the conversation
-    starts where they started it. The description is the platform's summary.
-    What they attached is stored with it.
+    starts where they started it. The description is the platform's summary,
+    with the device and page they asked from where they sent it. What they
+    attached is stored with it.
 
     A question about a community is held to what that community lets them
     ask (:func:`community_topics`); a question about themselves is not about
@@ -152,6 +148,7 @@ async def request_help(
         ),
         now=moment,
         filer=CaseFiler(user_id=requester.id, subject=subject, words=body),
+        device=context,
         evidence=evidence,
         topic=topic.value,
     )

@@ -172,7 +172,7 @@ async def test_it_cannot_write_shared_tables(engine, provisioned, table, verb):
 @pytest.mark.parametrize(
     "table",
     [
-        "public.guild_auth_policies",
+        "public.community_rules",
         "public.access_grants",
         "public.app_settings",
         "public.guild_memberships",

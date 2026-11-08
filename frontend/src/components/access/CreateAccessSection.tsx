@@ -2,12 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
 import { ShareControl } from "@/components/access/ShareControl";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 
 export interface CreateAccessSectionProps {
   initiativeId: number | null;

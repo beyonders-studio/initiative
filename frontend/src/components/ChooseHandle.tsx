@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next";
 
 import { claimMyUsername } from "@/api/generated/users/users";
 import { type HandleCheck, UsernameField } from "@/components/UsernameField";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * The screen an account meets when it was handed a handle rather than picking
@@ -42,7 +42,7 @@ export const ChooseHandle = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t("chooseHandle.title")}</CardTitle>

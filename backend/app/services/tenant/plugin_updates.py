@@ -21,6 +21,12 @@ grant. The seat accepts it from the Update button, adding the scopes it
 consents to, or declines it, which stops the asking until a newer version is
 published. A version asking for nothing new applies as before.
 
+**A version waits only while the seat can take it.** Once the catalog no
+longer offers it (withdrawn, or replaced by one this server cannot run), the
+sweep clears ``pending_version``. While the deployment manages the community's
+plug-ins, the seat cannot answer, so the sweep neither records a version nor
+tells anyone; when the seat gets plug-ins back, it is asked.
+
 **A required plug-in does not wait.** The deployment's registration is what
 installed it and granted what it requests within the ceiling, with no seat
 asked; its newer versions are applied the same way, adding the new scopes
@@ -44,6 +50,7 @@ from typing import Any, Iterable, Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.rules import SURFACE_PLUGINS
 from app.db import cohorts
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
@@ -52,6 +59,7 @@ from app.models.platform.notification import NotificationType
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import registration_lookup
 from app.services.marketplace.definitions import GUILD_INSTALLABLE_PLUGIN_KINDS
+from app.services.platform import rules
 from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
@@ -59,7 +67,7 @@ from app.services.marketplace.installs import (
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connections as connections_service
-from app.services.tenant import plugin_metadata, plugin_schedules
+from app.services.tenant import metadata, plugin_schedules
 from app.services.tenant import plugin_revocation as revocation_service
 
 logger = logging.getLogger(__name__)
@@ -67,7 +75,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "AskedUpdate",
     "PendingUpdate",
-    "UPDATES_TARGET_PATH",
+    "RefusedUpdate",
     "UpdateOffer",
     "UpgradeAsks",
     "apply_version",
@@ -75,14 +83,16 @@ __all__ = [
     "notify_pending_updates",
     "reconcile_repinned",
     "update_offer",
-    "update_version",
+    "updates_target_path",
     "upgrade_asks",
     "update_guild",
 ]
 
-#: Where the seat answers a pending version, inside the community: the
-#: integrations settings, which list every plug-in with its updates.
-UPDATES_TARGET_PATH = "/settings/integrations"
+
+def updates_target_path(install_id: int) -> str:
+    """Where the seat answers a pending version, inside the community: the
+    integrations settings, with the install's row open."""
+    return f"/settings/integrations?plugin={int(install_id)}"
 
 
 @dataclass(frozen=True)
@@ -163,55 +173,49 @@ class UpdateOffer:
         return self.update.version
 
 
+@dataclass(frozen=True)
+class RefusedUpdate:
+    """A newer version of the install's listing that this server cannot run,
+    with the ``messages.py`` code of the refusal."""
+
+    version: str
+    reason: str
+
+
 async def update_offer(
     session: AsyncSession, plugin: GuildPlugin
-) -> Optional[UpdateOffer]:
-    """What the catalog offers this install and what taking it asks, or ``None``."""
-    pending = await _resolve_pending(session, plugin)
-    if pending is None:
-        return None
-    asks = upgrade_asks(
-        plugin,
-        pending.definition,
-        await _ceiling(pending.definition, plugin.listing_uid),
-        await guild_plugins_service.installed_plugin_ids(session),
-    )
-    return UpdateOffer(update=pending, asks=asks)
+) -> UpdateOffer | RefusedUpdate | None:
+    """The listing's current version, as an offer with what taking it asks, or
+    as a refusal when this server cannot run it.
 
-
-async def update_version(session: AsyncSession, plugin: GuildPlugin) -> Optional[str]:
-    """The version this install would get if it updated now, or ``None``.
-
-    ``None`` covers every reason there is nothing to offer — the listing is
-    gone, withdrawn, or has published nothing this build can run. They are one
-    answer here because they are one answer to the only question being asked:
-    is there something to move to.
-    """
-    pending = await _resolve_pending(session, plugin)
-    return pending.version if pending else None
-
-
-async def _resolve_pending(
-    session: AsyncSession, plugin: GuildPlugin
-) -> Optional[PendingUpdate]:
-    """What the catalog offers this install, or ``None`` if it offers nothing.
-
-    A version of a kind this build cannot mount is *not* offered: applying one
-    would leave the guild with an install nothing can serve, which is worse than
-    staying on a version that works.
+    ``None`` when it is the pinned version, when the listing is gone or
+    withdrawn, and when its kind is one this build cannot mount: applying that
+    would leave the guild with an install nothing can serve.
     """
     try:
         _, version = await resolve_listing_install(
             session, plugin.listing_uid, kind="plugin", already_installed=True
         )
-    except ListingInstallError:
-        return None
+    except ListingInstallError as refused:
+        newer = (refused.params or {}).get("version")
+        if newer is None or newer == plugin.listing_version:
+            return None
+        return RefusedUpdate(version=newer, reason=refused.code)
     if version.version == plugin.listing_version:
         return None
     definition = dict(version.definition)
     if definition.get("plugin_kind") not in GUILD_INSTALLABLE_PLUGIN_KINDS:
         return None
-    return PendingUpdate(version=version.version, definition=definition)
+    asks = upgrade_asks(
+        plugin,
+        definition,
+        await _ceiling(definition, plugin.listing_uid),
+        await guild_plugins_service.installed_plugin_ids(session),
+    )
+    return UpdateOffer(
+        update=PendingUpdate(version=version.version, definition=definition),
+        asks=asks,
+    )
 
 
 async def apply_version(
@@ -315,7 +319,7 @@ async def reconcile_repinned(
     await plugin_schedules.reconcile(
         guild_id, plugin.id, plugin.definition, session=session
     )
-    await plugin_metadata.reconcile_shown(guild_id, plugin.id, session=session)
+    await metadata.sync_definitions(guild_id, plugin.id, session=session)
 
 
 def decline_version(plugin: GuildPlugin, version: str) -> None:
@@ -375,7 +379,7 @@ async def notify_pending_updates(
                     "plugin_id": one.plugin_id,
                     "plugin_name": one.plugin_name,
                     "version": one.version,
-                    "target_path": UPDATES_TARGET_PATH,
+                    "target_path": updates_target_path(one.plugin_id),
                 },
             )
             for user_id in holders
@@ -410,7 +414,8 @@ async def _update_guild(
     A version that asks for more is not applied. It is recorded as the
     install's ``pending_version`` and appended to ``asked`` the first time it
     is seen, so the caller can tell the seat once it has committed. A version
-    the seat declined, or one already pending, is passed over quietly.
+    the seat declined, or one already pending, is passed over quietly. An
+    install with nothing the seat could take clears ``pending_version``.
     Returns how many installs were moved.
 
     A version that declares an assigned setting the install holds no value for
@@ -425,6 +430,10 @@ async def _update_guild(
         )
     ).all()
 
+    # The seat answers a version only while the deployment leaves the
+    # community's plug-ins to it.
+    seat_answers = await rules.community_value(session, guild_id, SURFACE_PLUGINS)
+
     applied = 0
     for plugin_id in candidates:
         plugin = (
@@ -436,41 +445,26 @@ async def _update_guild(
         if plugin is None or not plugin.auto_update:
             continue
         offer = await update_offer(session, plugin)
-        if offer is None:
+        # A required plug-in's registration stands in for the seat, as at
+        # install, so its versions never wait.
+        waits = (
+            isinstance(offer, UpdateOffer)
+            and offer.asks.asks_more
+            and not (
+                await registration_lookup.install_state(
+                    plugin.definition, guild_id=guild_id, listing_uid=plugin.listing_uid
+                )
+            ).mandatory
+        )
+        if not isinstance(offer, UpdateOffer) or (waits and not seat_answers):
+            if plugin.pending_version is not None:
+                plugin.pending_version = None
+                guild_plugins_service.touch(plugin)
+                session.add(plugin)
             continue
-        pending = offer.update
-        mandatory = (
-            await registration_lookup.install_state(
-                plugin.definition, guild_id=guild_id, listing_uid=plugin.listing_uid
-            )
-        ).mandatory
-        if offer.asks.asks_more and mandatory:
-            # The registration stands in for the seat, as at install.
-            from_version = plugin.listing_version
-            await apply_version(
-                session,
-                plugin,
-                pending,
-                guild_id=guild_id,
-                add_scopes=offer.asks.added_scopes,
-            )
-            await reconcile_repinned(guild_id, plugin, session=session)
-            await guild_plugins_service.assign_settings(
-                session, plugin, guild_id=guild_id
-            )
-            applied += 1
-            logger.info(
-                "plug-in auto-update: guild=%s plug-in=%s listing=%s required, %s -> %s",
-                guild_id,
-                plugin.id,
-                plugin.listing_uid,
-                from_version,
-                pending.version,
-            )
-            continue
-        if offer.asks.asks_more:
-            if pending.version not in (plugin.pending_version, plugin.declined_version):
-                plugin.pending_version = pending.version
+        if waits:
+            if offer.version not in (plugin.pending_version, plugin.declined_version):
+                plugin.pending_version = offer.version
                 guild_plugins_service.touch(plugin)
                 session.add(plugin)
                 if asked is not None:
@@ -478,7 +472,7 @@ async def _update_guild(
                         AskedUpdate(
                             plugin_id=plugin.id,
                             plugin_name=plugin.name,
-                            version=pending.version,
+                            version=offer.version,
                         )
                     )
                 logger.info(
@@ -486,21 +480,28 @@ async def _update_guild(
                     guild_id,
                     plugin.id,
                     plugin.listing_uid,
-                    pending.version,
+                    offer.version,
                 )
             continue
         from_version = plugin.listing_version
-        await apply_version(session, plugin, pending, guild_id=guild_id)
+        await apply_version(
+            session,
+            plugin,
+            offer.update,
+            guild_id=guild_id,
+            add_scopes=offer.asks.added_scopes,
+        )
         await reconcile_repinned(guild_id, plugin, session=session)
         await guild_plugins_service.assign_settings(session, plugin, guild_id=guild_id)
         applied += 1
         logger.info(
-            "plug-in auto-update: guild=%s plug-in=%s listing=%s %s -> %s",
+            "plug-in auto-update: guild=%s plug-in=%s listing=%s%s %s -> %s",
             guild_id,
             plugin.id,
             plugin.listing_uid,
+            " required," if offer.asks.asks_more else "",
             from_version,
-            pending.version,
+            offer.version,
         )
     return applied
 

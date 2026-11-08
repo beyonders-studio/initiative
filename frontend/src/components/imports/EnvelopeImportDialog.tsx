@@ -7,26 +7,9 @@ import {
   useImportEnvelope,
   useImportEnvelopeArchive,
 } from "@/api/generated/imports/imports";
-import type { ImportJobRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ImportPeopleStep, type PlanPerson } from "@/components/imports/ImportPeopleStep";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
@@ -34,6 +17,17 @@ import { useInitiatives } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { toolEnvelopeType, toolForEnvelopeType } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 // The real upload cap is server-owned and arrives via /api/v1/config
 // (max_upload_bytes). Until it has loaded, file.text()/JSON.parse below still
@@ -75,7 +69,7 @@ export interface EnvelopeImportDialogProps {
  * to /imports/envelope. Generalizes the old ProjectImportDialog for every
  * importable tool.
  *
- * An export that travels with its files — a gallery and its pictures — is a
+ * An export that travels with its files — a wiki and what is filed in it — is a
  * zip. That is sent as it is to /imports/envelope/archive, which reads it and
  * says whether it belongs to this tool; there is nothing to preview in the
  * browser without unpacking it.
@@ -108,7 +102,7 @@ export function EnvelopeImportDialog({
   const [fileName, setFileName] = useState("");
   // The job the server parked to ask about its people, if it did. Null is the
   // ordinary case: the import already happened.
-  const [stagedJob, setStagedJob] = useState<ImportJobRead | null>(null);
+  const [stagedJob, setStagedJob] = useState<DataJobRead | null>(null);
   // Source handle → the account picked for it, seeded from the plan's exact
   // matches. A handle left out stays unmapped on purpose.
   const [peopleMap, setPeopleMap] = useState<Record<string, number | null>>({});
@@ -256,7 +250,7 @@ export function EnvelopeImportDialog({
                 initiative_id: Number(initiativeId),
               },
             })
-      ) as { result: { entity_title: string; unmatched_handles: string[] } } | ImportJobRead;
+      ) as { result: { entity_title: string; unmatched_handles: string[] } } | DataJobRead;
       // `id` rather than `result`, which a job row also carries (its report):
       // only a job has an id, so that is what tells the two apart.
       if (!("id" in response)) {

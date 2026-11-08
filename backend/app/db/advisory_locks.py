@@ -49,6 +49,9 @@ class LockNamespace(IntEnum):
     TEST_SUITE_MIGRATION = 0x1417A7E5
     #: Copying local uploads into S3 (``app.db.backfill_uploads_to_s3``).
     UPLOAD_BACKFILL = 0x1014_5311
+    #: Encrypting what was stored before STORAGE_ENCRYPTION was set
+    #: (``app.services.storage_encryption``).
+    STORAGE_ENCRYPTION = 0x53544F52454E43
     #: The first registrations taking turns, so one of them bootstraps.
     FIRST_ACCOUNT = 0x696E6974626F6F74
     #: Refreshing the marketplace registry's TUF metadata.
@@ -77,6 +80,9 @@ class LockNamespace(IntEnum):
     QUERY_SLOT = _tag(b"QUER")
     #: One intake key in a guild, keyed by guild, stream and key.
     INTAKE_CASE = _tag(b"INTK")
+    #: Making the operations tables follow the deployment's choice of
+    #: operations community. One for the deployment.
+    OPERATIONS_CHOICE = _tag(b"OPSC")
     #: One moderation report target, keyed by guild, initiative and target.
     MODERATION_REPORT = _tag(b"MODR")
     #: One comment thread, keyed by guild, table and row: locking it and
@@ -98,6 +104,9 @@ class LockNamespace(IntEnum):
     #: Writing one property value, keyed by guild, item and property, so a
     #: change of a multi-select's options reads the value in its turn.
     PROPERTY_VALUE = _tag(b"PVAL")
+    #: Creating one person's resumable uploads, keyed by guild and person, so
+    #: two at once count each other.
+    PENDING_UPLOADS = _tag(b"RESU")
     #: Which of one install's values are shown, keyed by guild and install:
     #: shared by each write while it reads the pinned definition, exclusive
     #: while the values are reconciled to a new one.

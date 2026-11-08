@@ -4,7 +4,7 @@ icon: lucide/sparkles
 
 # AI features
 
-Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file.
+Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file or a wiki page, and tidying the sentence you have rewritten four times.
 
 Optional, off unless somebody deliberately switches it on, and never quietly running in the background while you weren't looking.
 
@@ -14,9 +14,27 @@ When AI is switched on, you'll see **Generate** options in a few places:
 
 - Drafting or improving a **task description**.
 - Suggesting a **checklist** to break something down.
-- Producing a **summary** of a file.
+- Producing a **summary** of a file or a wiki page.
+- **Catch me up**, on a community's front page or a project: what changed while you were away.
+- **Writing help** in any document, wiki page or post.
 
 You ask each time. Nothing writes itself while you're making tea.
+
+A task's description and checklist are written from the whole task, not just its title. That means its existing checklist (so you aren't offered "Book the hall" twice), the project it's in, the unfinished tasks linked to it, and its comments, newest first. A thread that has run to forty comments may not all fit. When that happens you're told how many were read, so the suggestion that ignores what Priya said on Tuesday comes with a reason.
+
+Nothing is saved until you say so. Checklist suggestions arrive ticked, and you untick what you don't want. A written description lands in your draft, and **Undo suggestion** puts back whatever you had before.
+
+A summary writes itself in as you watch, from the page as it reads right now, including whatever a colleague typed into it ten seconds ago. A very long document may not all fit, in which case the summary says how far in it got. The constitution's appendices will survive being left out.
+
+**Catch me up** reads the same cards as the activity feed, from your last visit to that page on this device, and only the ones you can open. Away for a fortnight? It covers the last week, because that's as far back as the feed goes, and it tells you where it started. If nothing happened, it says so and sends nothing anywhere, which is the cheapest answer AI will ever give you.
+
+### Writing help
+
+Select some text and the sparkle in the formatting bar offers **Rewrite**, **Shorten**, **Fix spelling and grammar** and **Translate**. Type `/` for **Continue writing**, which picks up from wherever your cursor is.
+
+The answer appears in a small box under your text, and nothing in the document changes until you pick **Replace** or **Insert below**. **Discard** makes it as if you never asked. Only the selection and the paragraphs either side of it are sent.
+
+If somebody else edits that same sentence while the answer is being written, **Replace** declines rather than flatten their change. **Insert below** works either way, and the two of you can sort it out from there.
 
 ## Who sets it up
 
@@ -54,7 +72,7 @@ Nothing. There's no key to find, no form to fill in and no setting to get wrong.
 
 ## The privacy bit, which is genuinely worth reading
 
-AI features work by sending the relevant text — a task's details, a file's contents — to whichever provider is configured. That content **leaves your server** and goes to that company, under *their* terms.
+AI features work by sending the relevant text — a task with its comments and linked tasks, a file's contents — to whichever provider is configured. Only what you can open yourself is ever sent. That content **leaves your server** and goes to that company, under *their* terms.
 
 This is the one place in Initiative where your work deliberately goes somewhere else, so we'd rather be precise about it than reassuring:
 

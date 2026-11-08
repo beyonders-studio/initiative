@@ -85,8 +85,9 @@ _SIDE_EFFECTS: frozenset[str] = frozenset(
         "event_outbox",
         # The search index, written by the refresh trigger.
         "search_entries",
-        # Queued when a task is assigned, cleared when it is unassigned.
-        "task_assignment_digest_items",
+        # Queued when a task is assigned, cleared when it is unassigned. A
+        # reaction's line is refused by kind (``guild_ddl._plugin_predicates``).
+        "batched_notices",
         # The sweep timers a write arms, read and written by public.arm_timer.
         "timer_marks",
         # The files content shows, stored, copied and claimed as a step of
@@ -98,20 +99,21 @@ _SIDE_EFFECTS: frozenset[str] = frozenset(
 #: The tables no tool governs that a plug-in reaches, by name.
 _NAMED: dict[str, PluginTableAccess] = {
     "comments": _scoped("comments"),
+    # Part of Files, with no sharing of their own.
+    "collections": _scoped("files"),
+    "collection_files": _scoped("files"),
     "relationships": _scoped("relationships"),
     "tags": _scoped("tags"),
     "initiatives": _scoped("initiatives"),
     "initiative_roles": _scoped("initiatives"),
     # Also readable with any tool's scope, so a plug-in setting a value on an
-    # item can read the definitions it chooses from
-    # (``guild_ddl._plugin_predicates``).
-    "property_definitions": _scoped("properties"),
+    # item can read the definitions it chooses from, and an install's own
+    # with none (``guild_ddl._plugin_predicates``).
+    "metadata_definitions": _scoped("properties"),
     # No scope of its own: a value takes the scope of the tool that governs the
-    # row it is on, per row (``guild_ddl._property_values_scope``).
-    "property_values": PluginTableAccess(PluginTableKind.scoped),
-    # An install's own values: on an item with the read scope of the tool that
-    # governs it, and on the install with none (``guild_ddl._plugin_metadata_scope``).
-    "plugin_metadata": PluginTableAccess(PluginTableKind.scoped),
+    # row it is on, per row, and an install reaches its own on itself with
+    # none (``guild_ddl._metadata_values_scope``).
+    "metadata_values": PluginTableAccess(PluginTableKind.scoped),
     "initiative_members": _scoped("members"),
     "webhook_subscriptions": PluginTableAccess(PluginTableKind.subscriptions),
     **{
@@ -163,13 +165,12 @@ SEARCH_ENTRY_READ_SCOPE: dict[SearchEntityType, PluginScopeResource] = (
 )
 
 #: Tables no plug-in reaches, whose policies refuse an installed plug-in outright
-#: beside the grant it does not hold: a reaction and the line queued about it
-#: are one person's gesture, a recent view one person's history, a bookmark one
-#: person's pick, and an engagement level what many people's history adds up to.
+#: beside the grant it does not hold: a reaction is one person's gesture, a
+#: recent view one person's history, a bookmark one person's pick, and an
+#: engagement level what many people's history adds up to.
 PLUGIN_REFUSED_TABLES: frozenset[str] = frozenset(
     {
         "reactions",
-        "reaction_digest_items",
         "personal_items",
         "engagement_levels",
     }

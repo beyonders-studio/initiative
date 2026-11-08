@@ -5,7 +5,7 @@
  */
 
 import { ArrowDown, ArrowUp, Loader2, Plus, X } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -15,7 +15,9 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
-import { Button } from "@/components/ui/button";
+import { fromStored, type TaskRecurrenceValue, toRRule } from "@/lib/recurrence";
+import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -23,19 +25,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { fromStored, type TaskRecurrenceValue, toRRule } from "@/lib/recurrence";
-import { PRIORITY_ORDER } from "@/lib/sorting";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 const NO_PRIORITY = "none";
 
@@ -102,9 +96,11 @@ export const TaskTypeStartsWithDialog = ({
   const [draft, setDraft] = useState<Draft>(() => draftOf(type?.starting_values));
 
   // Each type opened starts from what it holds.
-  useEffect(() => {
+  const [prevType, setPrevType] = useState(type);
+  if (prevType !== type) {
+    setPrevType(type);
     if (type) setDraft(draftOf(type.starting_values));
-  }, [type]);
+  }
 
   const setLine = (index: number, value: string) =>
     setDraft((prev) => ({

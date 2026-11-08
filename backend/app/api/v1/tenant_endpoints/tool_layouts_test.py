@@ -24,9 +24,7 @@ from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
 from app.testing import (
     create_counter_group,
-    create_gallery,
     create_project,
-    create_queue,
     create_resource_grant,
     route_session_to_guild,
 )
@@ -124,7 +122,7 @@ async def test_a_project_draws_its_layouts_as_shipped_until_one_changes(
     assert response.status_code == 200
     body = response.json()
     assert body["can_configure"] is True
-    # The board alone shows, and it opens on it; a task page for each type of
+    # Every list shows, and it opens on the first; a task page for each type of
     # task, in the types' order.
     assert [
         (
@@ -136,10 +134,10 @@ async def test_a_project_draws_its_layouts_as_shipped_until_one_changes(
         )
         for layout in body["layouts"]
     ] == [
-        ("table", False, True, None, None),
-        ("board", True, False, None, None),
-        ("gantt", False, True, None, None),
-        ("calendar", False, True, None, None),
+        ("table", True, False, None, None),
+        ("board", False, False, None, None),
+        ("gantt", False, False, None, None),
+        ("calendar", False, False, None, None),
         *(("task", None, None, task_type.id, None) for task_type in types),
     ]
 
@@ -164,7 +162,11 @@ async def test_a_project_shows_the_lists_it_chooses_and_always_one(
             f"{url}{path}", params=params, json=payload, headers=a.headers
         )
 
-    # A hidden list is not one to open on, until it is shown.
+    # A hidden list is not one to open on, until it is shown again.
+    for kind in ("table", "gantt"):
+        await put("", {"kind": kind, "definition": {"hidden": True}})
+    calendar = await put("", {"kind": "calendar", "definition": {"hidden": True}})
+    assert shown(calendar.json()) == [("board", True)]
     refused = await put("default", {"kind": "calendar"})
     assert refused.status_code == 400
     assert refused.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED"
@@ -174,17 +176,15 @@ async def test_a_project_shows_the_lists_it_chooses_and_always_one(
     assert shown(opens.json()) == [("board", False), ("calendar", True)]
 
     # Hiding the one it opens on opens it on the first still shown; hiding the
-    # last is refused, and so is putting it back as shipped when that hides it.
+    # last is refused, and putting one back as shipped shows it again, first.
     hidden = await put("", {"kind": "calendar", "definition": {"hidden": True}})
     assert shown(hidden.json()) == [("board", True)]
     last = await put("", {"kind": "board", "definition": {"hidden": True}})
     assert last.status_code == 400
     assert last.json()["detail"] == "TOOL_LAYOUTS_ONE_LIST_SHOWN"
-    await put("", {"kind": "table", "definition": {"hidden": False}})
-    await put("", {"kind": "board", "definition": {"hidden": True}})
     reset = await client.delete(f"{url}table", params=params, headers=a.headers)
-    assert reset.status_code == 400
-    assert reset.json()["detail"] == "TOOL_LAYOUTS_ONE_LIST_SHOWN"
+    assert reset.status_code == 200, reset.text
+    assert shown(reset.json()) == [("table", True), ("board", False)]
 
 
 async def test_a_layout_changes_alone_and_goes_back_to_shipped(
@@ -455,20 +455,18 @@ async def test_tools_lay_out_their_items(
 ):
     """Each its own item detail, listed among the initiative's layouts."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    queue = await create_queue(session, a.initiative, a.user, name="Turns")
-    gallery = await create_gallery(session, a.initiative, a.user, name="Wall")
     group = await create_counter_group(session, a.initiative, a.user, name="Tally")
     detail = _detail(
-        "queue_item",
-        {"type": "section", "children": [_field("person"), _field("property:12")]},
-        _field("tags"),
+        "counter",
+        {"type": "count"},
+        {"type": "section", "children": [_field("step"), _field("property:12")]},
         {"type": "relations"},
         _plugin_part(3),
     )
 
     saved = await client.put(
         a.g("/layouts/"),
-        params={"tool": "queue", "tool_id": queue.id},
+        params={"tool": "counter_group", "tool_id": group.id},
         json=detail,
         headers=a.headers,
     )
@@ -478,31 +476,10 @@ async def test_tools_lay_out_their_items(
         headers=a.headers,
     )
 
-    pictures = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "gallery", "tool_id": gallery.id},
-        json=_detail("gallery_image", {"type": "picture"}, _field("caption")),
-        headers=a.headers,
-    )
-
     assert saved.status_code == 200, saved.text
-    assert [layout["kind"] for layout in saved.json()["layouts"]] == ["queue_item"]
-    counters = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "counter_group", "tool_id": group.id},
-        json=_detail("counter", {"type": "count"}, _field("step")),
-        headers=a.headers,
-    )
-    assert counters.status_code == 200, counters.text
-    assert [layout["kind"] for layout in counters.json()["layouts"]] == ["counter"]
-    assert pictures.status_code == 200, pictures.text
-    assert [layout["kind"] for layout in pictures.json()["layouts"]] == [
-        "gallery_image"
-    ]
+    assert [layout["kind"] for layout in saved.json()["layouts"]] == ["counter"]
     assert sorted((each["tool"], each["name"]) for each in listed.json()) == [
         ("counter_group", "Tally"),
-        ("gallery", "Wall"),
-        ("queue", "Turns"),
     ]
 
 
@@ -641,7 +618,7 @@ def _task(*side: dict[str, Any]) -> dict[str, Any]:
         ),
         (_task({"type": "field", "props": {"field": "startDate"}}), 422, None),
         (_task({"type": "card"}), 422, None),
-        ({"kind": "gallery", "definition": {}}, 422, None),
+        ({"kind": "wiki", "definition": {}}, 422, None),
         (_table(columns=["plugin:x:ci"]), 422, None),
         (_card({"type": "plugin", "props": {"plugin": 3}}), 422, None),
         (
@@ -704,6 +681,57 @@ async def test_a_layout_is_refused_unless_every_part_is_one_we_draw(
     if detail == "TOOL_LAYOUTS_TOO_MANY_PLUGIN_PARTS":
         # The wording names the contract's limit.
         assert response.json()["params"] == {"max": str(MAX_PLUGIN_PARTS)}
+
+
+@pytest.mark.parametrize(
+    ("kind", "definition"),
+    [
+        (
+            "table",
+            {
+                "groupings": [{"field": "date_group"}, {"field": "tag_ids"}],
+                "group_by": "tag_ids",
+            },
+        ),
+        ("board", {"limits": [{"status_id": 1, "limit": 3}]}),
+        ("gantt", {"groupings": [{"field": "assignee_ids"}]}),
+        ("calendar", {"hidden": True}),
+    ],
+)
+async def test_a_layout_read_back_saves_again(
+    client: AsyncClient, acting_user, kind: str, definition: dict[str, Any]
+):
+    """The editor sends a layout back as it read it, nulls and all: a table's
+    ``limits``, a calendar's ``groupings``. Each is what it leaves out (#2911)."""
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    url = a.g("/layouts/")
+    saved = await client.put(
+        url,
+        params=_project(a),
+        json={"kind": kind, "definition": definition},
+        headers=a.headers,
+    )
+    assert saved.status_code == 200, saved.text
+    read = next(layout for layout in saved.json()["layouts"] if layout["kind"] == kind)[
+        "definition"
+    ]
+    if "groupings" in definition:
+        read["groupings"].reverse()
+
+    again = await client.put(
+        url,
+        params=_project(a),
+        json={"kind": kind, "definition": read},
+        headers=a.headers,
+    )
+
+    assert again.status_code == 200, again.text
+    layout = next(
+        layout for layout in again.json()["layouts"] if layout["kind"] == kind
+    )
+    assert layout["definition"] == read
 
 
 async def test_a_list_offers_the_presets_it_keeps(client: AsyncClient, acting_user):

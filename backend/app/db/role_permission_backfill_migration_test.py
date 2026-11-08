@@ -89,9 +89,14 @@ async def test_backfill_writes_only_the_missing_rows(session) -> None:
     off. Runs the statement the migration itself carries."""
     migrations = _backfill_migrations()
     assert migrations, "no backfill migration found to exercise"
-    path = max(migrations)
-    migration = _load(path)
-    defaults = getattr(migration, DEFAULTS_NAME)
+    migration = _load(max(migrations))
+    # A key a later tool's removal retired is not one this build stores.
+    known = {key.value for key in PermissionKey}
+    defaults = {
+        key: value
+        for key, value in getattr(migration, DEFAULTS_NAME).items()
+        if key in known
+    }
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
@@ -116,27 +121,27 @@ async def test_backfill_writes_only_the_missing_rows(session) -> None:
     # backfill does not rewrite it.
     await session.exec(
         text(
-            "DELETE FROM initiative_role_permissions "
+            "DELETE FROM initiative_rules "
             "WHERE initiative_role_id IN (:pm, :member) "
-            "AND permission_key IN ('posts_enabled', 'create_posts')"
+            "AND key IN ('posts_enabled', 'create_posts')"
         ).bindparams(pm=pm.id, member=member.id)
     )
     await session.exec(
         text(
-            "UPDATE initiative_role_permissions SET enabled = false "
-            "WHERE initiative_role_id = :pm AND permission_key = 'projects_enabled'"
+            "UPDATE initiative_rules SET enabled = false "
+            "WHERE initiative_role_id = :pm AND key = 'projects_enabled'"
         ).bindparams(pm=pm.id)
     )
 
     await session.exec(text(migration.backfill_sql(defaults)))
 
     stored = {
-        (row.initiative_role_id, row.permission_key): row.enabled
+        (row.initiative_role_id, row.key): row.enabled
         for row in (
             await session.exec(
                 text(
-                    "SELECT initiative_role_id, permission_key, enabled "
-                    "FROM initiative_role_permissions "
+                    "SELECT initiative_role_id, key, enabled "
+                    "FROM initiative_rules "
                     "WHERE initiative_role_id IN (:pm, :member)"
                 ).bindparams(pm=pm.id, member=member.id)
             )

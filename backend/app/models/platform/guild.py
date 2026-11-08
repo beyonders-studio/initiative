@@ -260,7 +260,6 @@ class Guild(SQLModel, table=True):
             postgresql_using="gin",
             postgresql_where=text("is_community"),
         ),
-        CheckConstraint("guest_max_days >= 1", name="ck_guilds_guest_max_days"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -350,89 +349,6 @@ class Guild(SQLModel, table=True):
     has_adult_content: Optional[bool] = Field(
         default=None, sa_column=Column(Boolean, nullable=True)
     )
-    # Whether this guild's members are held to the compliance session standard:
-    # they sign in again every ``COMPLIANCE_SESSION_HOURS``, whatever the
-    # deployment's own limit says. A single standard rather than a number per
-    # guild, so somebody in two of them has one answer and not a comparison.
-    #
-    # Here rather than on ``GuildAuthPolicy`` for the same reason ``status`` is
-    # here: it says what is asked of a session reaching this community, and the
-    # answer has to survive the guild lifting its sign-in requirement (which
-    # deletes the policy row). Set by the guild's superadmin; read when a
-    # sign-in is stamped with its deadline.
-    enforce_compliance_session: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-    # Whether reaching this community asks for a second factor. The community
-    # asks for one; which kinds exist, and which providers' word counts as
-    # having presented one, are the deployment's answers.
-    #
-    # Here for the reason the one above is: it says what is asked of a session
-    # reaching this community, and the answer has to survive the guild lifting
-    # its sign-in requirement. Set by the guild's superadmin; read by the
-    # guild-access gate.
-    require_second_factor: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-    # What this community's notifications may leave the app carrying. Three
-    # answers, each also asked of the deployment on ``app_settings``; the
-    # stricter of the pair applies, so a community can decline what the
-    # deployment permits and never the reverse.
-    #
-    # Here rather than on ``GuildAdministration`` for the reason the two above
-    # are: it says what is done on this community's behalf, and the answer has
-    # to survive the guild lifting its sign-in requirement. Set by the guild's
-    # superadmin; read where a notification is sent.
-    #
-    # Whether this community's notifications may reach a phone.
-    allow_push_notifications: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether they may reach a mailbox. The notification half of email only:
-    # what an account is sent about itself, and about signing in, is not this
-    # community's to switch off.
-    allow_email_notifications: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether a notification about this community may say what it is about once
-    # it has left the app. Set, it reduces to the kind of thing that happened,
-    # and the community itself is where the rest of it is. The bell inside the
-    # app still says everything.
-    redact_notification_content: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-
-    # Whether search orders this community's content by how many members
-    # engaged with it lately. Also asked of the deployment on ``app_settings``,
-    # and off wins. Here for the reason the notification answers are: the seat
-    # sets it under ``restrictions``, and it has to survive the community
-    # lifting its sign-in requirement.
-    allow_engagement_ranking: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether AI features may send this community's content to a provider at
-    # all, whatever the deployment offers. Here for the reason the answers
-    # above are: the seat sets it under ``restrictions``, and off wins.
-    allow_ai: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-    # The longest a guest may stay, in days, under the deployment's ceiling
-    # (``app_settings.max_guest_days``). NULL leaves the ceiling alone. The
-    # seat sets it with the guests' sign-in rule.
-    guest_max_days: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
-
     # The operator-set caps, plan label, and sign-in entitlement — everything
     # this row is NOT. See GuildAdministration for why they live apart.
     administration: Optional["GuildAdministration"] = Relationship(
@@ -512,6 +428,58 @@ GUILD_ADMIN_ROLES: frozenset[CommunityRole] = frozenset(
     role for role in CommunityRole if role.reaches(CommunityRole.admin)
 )
 
+
+class AdminSurface(str, Enum):
+    """A part of administering a community, held as a whole.
+
+    The admin rung holds every one. What the rung holds beyond them, the reach
+    into all of the community's content (``initiative_access``, "Full access",
+    the trash's reads), is not one of these: it is the rung's own. Each admin
+    route names the surface it guards, and so does each policy leg that guards
+    one, reading the request's ``held_surfaces``.
+    """
+
+    #: The community's name, pictures, listing and retention.
+    profile = "profile"
+    #: Invites to the community, and what a guest invite gives.
+    invites = "invites"
+    #: The roster: rungs, guests, display names, removal, a departing
+    #: member's content, and how people sign in to join.
+    members = "members"
+    #: Creating, archiving and deleting initiatives, every initiative's setup,
+    #: and what every initiative uses.
+    initiatives = "initiatives"
+    #: Calendars that belong to the whole community.
+    community_calendars = "community_calendars"
+    #: Contacts that belong to the whole community.
+    community_contacts = "community_contacts"
+    #: Webhook subscriptions that report on the whole community.
+    webhooks = "webhooks"
+    #: Restoring anybody's deletions, and purging.
+    trash = "trash"
+    #: Storage used, and what installed plug-ins report.
+    usage = "usage"
+    #: The community's custom roles: defining them. Assigning one is
+    #: ``members``.
+    roles = "roles"
+
+
+#: What a custom role on the member rung may hold. The rest reach the
+#: community's content (``initiatives`` writes every roster, ``webhooks``
+#: report across initiatives, ``trash`` reads the trash) or define roles, so
+#: they are for a role on the admin rung.
+MEMBER_ROLE_SURFACES: frozenset[AdminSurface] = frozenset(
+    {
+        AdminSurface.profile,
+        AdminSurface.invites,
+        AdminSurface.members,
+        AdminSurface.community_calendars,
+        AdminSurface.community_contacts,
+        AdminSurface.usage,
+    }
+)
+
+
 #: What an ordinary guild admin may hand out. ``support`` is never persisted at
 #: all, and ``superadmin`` is passed on only by somebody already holding it.
 GUILD_ASSIGNABLE_ROLES: frozenset[CommunityRole] = frozenset(
@@ -579,15 +547,6 @@ class GuildMembership(SQLModel, table=True):
     display_name: Optional[str] = Field(
         default=None,
         sa_column=Column(String(MEMBER_DISPLAY_NAME_MAX_LENGTH), nullable=True),
-    )
-    #: Whether this person's personal API keys reach this community. True
-    #: unless its superadmin turned it off for them, and read only while the
-    #: community holds the ``restrictions`` option: without it every member's
-    #: keys reach it. Read by the guild-access gate, by key creation and by the
-    #: cross-guild aggregates, so turning it off stops a key already made.
-    api_keys_allowed: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
     #: The provider whose claims put this person here, and the only one whose
     #: sign-in may take it away again. NULL is a membership nobody manages —

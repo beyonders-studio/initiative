@@ -31,6 +31,13 @@ from app.core.audit_events import AuditEventType
 from app.core.config import DEFAULT_OIDC_SCOPES
 from app.core.config import settings as app_config
 from app.core.intake import IntakeStream
+from app.core.rules import (
+    OPTION_RULES,
+    RETENTION_WINDOWS,
+    SURFACE_AI_CONNECTIONS,
+    SURFACE_CUSTOM_ROLES,
+    SURFACE_PLUGINS,
+)
 from app.db import cohorts
 from app.db.query import build_paginated_response, paginated_query
 from app.db.request_context import SystemGuild
@@ -119,13 +126,17 @@ from app.core.login_methods import (
     LoginMethod,
     SecondFactorRequirement,
 )
-from app.services.platform import auth_posture
+from app.services.platform import auth_posture, rules
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import push_config, push_relay
 from app.services import captcha as captcha_service
 from app.services.captcha_config import ResolvedCaptchaConfig
 from app.services.platform import billing as billing_service
-from app.services.platform.retention import COMMUNITY_DELETION
+from app.services.platform.retention import (
+    ACCOUNT_DELETION,
+    COMMUNITY_DELETION,
+    COMMUNITY_HOLD,
+)
 from app.services.platform import guilds as guilds_service
 from app.services.platform import case_activity, grant_cases
 from app.core.user_display import handle_of
@@ -138,16 +149,6 @@ logger = logging.getLogger(__name__)
 
 # Reason stamped on a grant self-issued by the Guilds tab's billing button.
 BILLING_PORTAL_GRANT_REASON = "Opened the billing portal from the Guilds tab"
-
-#: What the operator's caps and entitlements for one community consist of.
-_GUILD_ADMINISTRATION_FIELDS: tuple[str, ...] = (
-    "max_storage_bytes",
-    "max_users",
-    "max_guests",
-    "auth_options",
-    "banner_image_enabled",
-    "support_enabled",
-)
 
 
 router = APIRouter()
@@ -210,8 +211,8 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
     consequence before the write instead of after a refusal — and so the figure
     an operator acknowledges is one the page actually showed them.
     """
-    row = await app_settings_service.get_app_settings(session)
-    permitted = auth_posture.methods_from_row(row)
+    stored = await rules.platform_values(session)
+    permitted = stored["login_methods"]
     stranding, without_factor = await auth_posture.account_figures(
         session, permitted=permitted
     )
@@ -230,9 +231,10 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
             session
         ),
         factor_methods_permitted=bool(permitted.intersection(FACTOR_METHODS)),
-        session_max_hours=row.session_max_hours,
-        session_idle_minutes=row.session_idle_minutes,
-        second_factor_requirement=auth_posture.requirement_from_row(row),
+        session_max_hours=stored["session_max_hours"],
+        session_idle_minutes=stored["session_idle_minutes"],
+        second_factor_requirement=stored["second_factor_requirement"],
+        breached_password_check_enabled=stored["breached_password_check_enabled"],
         accounts_without_factor=AccountsWithoutFactor(
             platform_roles=without_factor[SecondFactorRequirement.platform_roles],
             everyone=without_factor[SecondFactorRequirement.everyone],
@@ -275,6 +277,10 @@ async def update_platform_auth_settings(
         for key in ("session_max_hours", "session_idle_minutes")
         if key in payload.model_fields_set
     }
+    if payload.breached_password_check_enabled is not None:
+        changes["breached_password_check_enabled"] = (
+            payload.breached_password_check_enabled
+        )
     if payload.methods is not None:
         changes["login_methods"] = frozenset(payload.methods)
     if payload.second_factor_requirement is not None:
@@ -289,11 +295,11 @@ async def update_platform_auth_settings(
 
 
 async def _notification_payload(session) -> NotificationSettingsResponse:
-    row = await app_settings_service.get_app_settings(session)
+    stored = await rules.platform_values(session)
     return NotificationSettingsResponse(
-        push_notifications_enabled=row.push_notifications_enabled,
-        email_notifications_enabled=row.email_notifications_enabled,
-        redact_notification_content=row.redact_notification_content,
+        push_notifications_enabled=stored["push_notifications_enabled"],
+        email_notifications_enabled=stored["email_notifications_enabled"],
+        redact_notification_content=stored["redact_notification_content"],
     )
 
 
@@ -345,17 +351,65 @@ async def update_interface_settings(
     session: UserSessionDep,
     owner: ConfigManageDep,
 ) -> InterfaceSettingsResponse:
-    settings_obj = await app_settings_service.update_interface_settings(
+    """The accent colours, and whether arriving visitors are asked about
+    cookies. ``cookie_consent_enabled`` is left alone when omitted, so saving a
+    colour does not silently answer it."""
+    await app_settings_service.update_interface_settings(
         session,
         light_accent_color=payload.light_accent_color,
         dark_accent_color=payload.dark_accent_color,
-        cookie_consent_enabled=payload.cookie_consent_enabled,
         actor_user_id=owner.id,
     )
+    changes: dict[str, object] = {}
+    if payload.cookie_consent_enabled is not None:
+        changes["cookie_consent_enabled"] = payload.cookie_consent_enabled
+    # Commits the colours with the rule.
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner), changes
+    )
+    settings_obj = await app_settings_service.get_app_settings(session)
     return InterfaceSettingsResponse(
         light_accent_color=settings_obj.light_accent_color,
         dark_accent_color=settings_obj.dark_accent_color,
-        cookie_consent_enabled=settings_obj.cookie_consent_enabled,
+        cookie_consent_enabled=(await rules.platform_values(session))[
+            "cookie_consent_enabled"
+        ],
+    )
+
+
+#: The community page's switches and limits that are left alone when omitted,
+#: by field and the rule each writes.
+_COMMUNITY_RULE_FIELDS = (
+    ("age_gate_enabled", "community_age_gate_enabled"),
+    ("default_dm_policy", "default_dm_policy"),
+    ("direct_messages_enabled", "direct_messages_enabled"),
+    ("engagement_ranking_enabled", "engagement_ranking_enabled"),
+    ("guests_enabled", "guests_enabled"),
+    ("max_guest_days", "max_guest_days"),
+    ("public_registration_enabled", "public_registration_enabled"),
+    ("community_creation_enabled", "community_creation_enabled"),
+    ("community_creation_daily_limit", "community_creation_daily_limit"),
+    ("community_export_cooldown_hours", "community_export_cooldown_hours"),
+)
+
+
+async def _community_payload(session: AsyncSession) -> CommunitySettingsResponse:
+    stored = await rules.platform_values(session)
+    return CommunitySettingsResponse(
+        community_directory_enabled=stored["community_directory_enabled"],
+        age_gate_enabled=stored["community_age_gate_enabled"],
+        default_dm_policy=stored["default_dm_policy"],
+        direct_messages_enabled=stored["direct_messages_enabled"],
+        deleted_community_retention_days=COMMUNITY_DELETION.days(stored),
+        deleted_account_retention_days=ACCOUNT_DELETION.days(stored),
+        on_hold_community_deletion_days=COMMUNITY_HOLD.days(stored),
+        engagement_ranking_enabled=stored["engagement_ranking_enabled"],
+        guests_enabled=stored["guests_enabled"],
+        max_guest_days=stored["max_guest_days"],
+        public_registration_enabled=stored["public_registration_enabled"],
+        community_creation_enabled=stored["community_creation_enabled"],
+        community_creation_daily_limit=stored["community_creation_daily_limit"],
+        community_export_cooldown_hours=stored["community_export_cooldown_hours"],
     )
 
 
@@ -372,19 +426,7 @@ async def read_community_settings(
     behind the capability that writes it, rather than added to everyone's boot
     payload.
     """
-    settings_obj = await app_settings_service.get_app_settings(session)
-    return CommunitySettingsResponse(
-        community_directory_enabled=settings_obj.community_directory_enabled,
-        age_gate_enabled=settings_obj.community_age_gate_enabled,
-        default_dm_policy=settings_obj.default_dm_policy,
-        direct_messages_enabled=settings_obj.direct_messages_enabled,
-        deleted_community_retention_days=settings_obj.deleted_community_retention_days,
-        deleted_account_retention_days=settings_obj.deleted_account_retention_days,
-        on_hold_community_deletion_days=settings_obj.on_hold_community_deletion_days,
-        engagement_ranking_enabled=settings_obj.engagement_ranking_enabled,
-        guests_enabled=settings_obj.guests_enabled,
-        max_guest_days=settings_obj.max_guest_days,
-    )
+    return await _community_payload(session)
 
 
 @router.put("/community", response_model=CommunitySettingsResponse)
@@ -438,38 +480,23 @@ async def update_community_settings(
     the longest one may stay. Off, no guest reaches anything until it is back
     on. Omitted, each is left alone.
     """
-    settings_obj = await app_settings_service.update_community_settings(
-        session,
-        community_directory_enabled=payload.community_directory_enabled,
-        community_age_gate_enabled=payload.age_gate_enabled,
-        default_dm_policy=payload.default_dm_policy,
-        direct_messages_enabled=payload.direct_messages_enabled,
-        engagement_ranking_enabled=payload.engagement_ranking_enabled,
-        guests_enabled=payload.guests_enabled,
-        max_guest_days=payload.max_guest_days,
-        deleted_community_retention_days=payload.deleted_community_retention_days,
-        retention_provided="deleted_community_retention_days"
-        in payload.model_fields_set,
-        deleted_account_retention_days=payload.deleted_account_retention_days,
-        account_retention_provided="deleted_account_retention_days"
-        in payload.model_fields_set,
-        on_hold_community_deletion_days=payload.on_hold_community_deletion_days,
-        hold_deletion_provided="on_hold_community_deletion_days"
-        in payload.model_fields_set,
-        actor_user_id=owner.id,
+    changes: dict[str, object] = {
+        "community_directory_enabled": payload.community_directory_enabled
+    }
+    for field, key in _COMMUNITY_RULE_FIELDS:
+        value = getattr(payload, field)
+        if value is not None:
+            changes[key] = value
+    for key, switch in RETENTION_WINDOWS.items():
+        if key in payload.model_fields_set:
+            days = getattr(payload, key)
+            changes[switch] = days is not None
+            if days is not None:
+                changes[key] = days
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner), changes
     )
-    return CommunitySettingsResponse(
-        community_directory_enabled=settings_obj.community_directory_enabled,
-        age_gate_enabled=settings_obj.community_age_gate_enabled,
-        default_dm_policy=settings_obj.default_dm_policy,
-        direct_messages_enabled=settings_obj.direct_messages_enabled,
-        deleted_community_retention_days=settings_obj.deleted_community_retention_days,
-        deleted_account_retention_days=settings_obj.deleted_account_retention_days,
-        on_hold_community_deletion_days=settings_obj.on_hold_community_deletion_days,
-        engagement_ranking_enabled=settings_obj.engagement_ranking_enabled,
-        guests_enabled=settings_obj.guests_enabled,
-        max_guest_days=settings_obj.max_guest_days,
-    )
+    return await _community_payload(session)
 
 
 @router.get("/email", response_model=EmailSettingsResponse)
@@ -926,21 +953,41 @@ async def _moderating(session: Any, *, user_id: int, guild_ids: list[int]) -> se
     return {int(guild_id) for guild_id in rows.all()}
 
 
+def _plan_fields(plan: rules.Values) -> dict[str, Any]:
+    """What the operator's caps and entitlements for one community consist of:
+    its paid rules, under the names the operator's page and its records use."""
+    return {
+        "max_storage_bytes": plan["max_storage_bytes"],
+        "max_users": plan["max_users"],
+        "max_guests": plan["max_guests"],
+        "auth_options": sorted(
+            option.value for option, key in OPTION_RULES.items() if plan[key]
+        ),
+        "banner_image_enabled": plan["banner_image"],
+        "support_enabled": plan["help_requests"],
+        "ai_connections_open": plan[SURFACE_AI_CONNECTIONS],
+        "plugins_open": plan[SURFACE_PLUGINS],
+        "custom_roles_open": plan[SURFACE_CUSTOM_ROLES],
+    }
+
+
 def _guild_storage_read(
     guild: Guild,
     administration: GuildAdministration | None,
     *,
+    plan: rules.Values,
     member_count: int,
     has_seat: bool,
-    deployment: AppSetting,
+    deployment: rules.Values,
     actor: User,
     moderating: bool = False,
 ) -> PlatformCommunityStorageRead:
     """One row of the Guilds tab, as ``actor`` may act on it.
 
     ``administration`` is None only for a guild missing its companion row,
-    which is listed with blank caps rather than dropped. The status choices
-    are offered only to whoever sets them.
+    which is listed with a blank plan label rather than dropped. ``plan`` is
+    its rules (``rules.community_values``). The status choices are offered
+    only to whoever sets them.
     """
     current = CommunityStatus(guild.status)
     recorded = administration.billing_status if administration else None
@@ -953,11 +1000,9 @@ def _guild_storage_read(
         purge_at=COMMUNITY_DELETION.ends_at(guild, deployment),
         has_seat=has_seat,
         tier_name=administration.tier_name if administration else None,
-        max_storage_bytes=(
-            administration.max_storage_bytes if administration else None
-        ),
-        max_users=administration.max_users if administration else None,
-        max_guests=administration.max_guests if administration else None,
+        max_storage_bytes=plan["max_storage_bytes"],
+        max_users=plan["max_users"],
+        max_guests=plan["max_guests"],
         status=current,
         status_changed_at=guild.status_changed_at,
         status_choices=(
@@ -977,11 +1022,12 @@ def _guild_storage_read(
             else None
         ),
         allowed_actions=actions,
-        auth_options=sorted(administration.auth_options) if administration else [],
-        banner_image_enabled=(
-            administration.banner_image_enabled if administration else True
-        ),
-        support_enabled=administration.support_enabled if administration else False,
+        auth_options=_plan_fields(plan)["auth_options"],
+        banner_image_enabled=plan["banner_image"],
+        support_enabled=plan["help_requests"],
+        ai_connections_open=plan[SURFACE_AI_CONNECTIONS],
+        plugins_open=plan[SURFACE_PLUGINS],
+        custom_roles_open=plan[SURFACE_CUSTOM_ROLES],
     )
 
 
@@ -1076,7 +1122,8 @@ async def list_platform_community_storage(
         page=page,
         page_size=page_size,
     )
-    deployment = await app_settings_service.get_app_settings(session)
+    deployment = await rules.platform_values(session)
+    plans = await rules.community_values(session, [g.id for g, _ in rows])
     counts, seated = await _member_tallies([g.id for g, _ in rows])
     # The reader's own grants, under the requester's own-row policy.
     moderating = await _moderating(
@@ -1086,6 +1133,7 @@ async def list_platform_community_storage(
         _guild_storage_read(
             g,
             administration,
+            plan=plans[g.id],
             member_count=counts.get(g.id, 0),
             has_seat=g.id in seated,
             deployment=deployment,
@@ -1136,6 +1184,9 @@ async def update_platform_community_storage(
         or payload.auth_options is not None
         or payload.banner_image_enabled is not None
         or payload.support_enabled is not None
+        or payload.ai_connections_open is not None
+        or payload.plugins_open is not None
+        or payload.custom_roles_open is not None
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1145,9 +1196,8 @@ async def update_platform_community_storage(
     status_before: str | None = None
     status_after: str | None = None
     try:
-        before = audit_service.snapshot(
-            await guilds_service.get_administration(session, guild_id=guild_id),
-            _GUILD_ADMINISTRATION_FIELDS,
+        before = _plan_fields(
+            (await rules.community_values(session, [guild_id]))[guild_id]
         )
         guild = await guilds_service.update_guild(
             session,
@@ -1161,6 +1211,9 @@ async def update_platform_community_storage(
             auth_options=payload.auth_options,
             banner_image_enabled=payload.banner_image_enabled,
             support_enabled=payload.support_enabled,
+            ai_connections_open=payload.ai_connections_open,
+            plugins_open=payload.plugins_open,
+            custom_roles_open=payload.custom_roles_open,
         )
         if payload.status is not None and guild.status != payload.status.value:
             recorded = (
@@ -1209,7 +1262,8 @@ async def update_platform_community_storage(
         raise
     administration = await guilds_service.get_administration(session, guild_id=guild_id)
     changed = audit_service.changed_fields(
-        before, audit_service.snapshot(administration, _GUILD_ADMINISTRATION_FIELDS)
+        before,
+        _plan_fields((await rules.community_values(session, [guild_id]))[guild_id]),
     )
     if changed["changed"]:
         await audit_service.record(
@@ -1239,9 +1293,10 @@ async def update_platform_community_storage(
     return _guild_storage_read(
         guild,
         administration,
+        plan=(await rules.community_values(session, [guild.id]))[guild.id],
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild.id),
-        deployment=await app_settings_service.get_app_settings(session),
+        deployment=await rules.platform_values(session),
         actor=operator,
         moderating=guild.id
         in await _moderating(session, user_id=operator.id, guild_ids=[guild.id]),
@@ -1337,7 +1392,7 @@ async def set_platform_community_suspension(
     await session.commit()
     if grant is not None:
         await grant_cases.note(
-            grant.case_task_id,
+            (await grant_cases.cases_of([grant.id])).get(grant.id),
             case_activity.ActivityKind.guild_act,
             f"{handle_of(moderator)} "
             + ("suspended" if payload.suspended else "lifted the suspension of")
@@ -1347,9 +1402,10 @@ async def set_platform_community_suspension(
     return _guild_storage_read(
         guild,
         administration,
+        plan=(await rules.community_values(session, [guild.id]))[guild.id],
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild_id),
-        deployment=await app_settings_service.get_app_settings(session),
+        deployment=await rules.platform_values(session),
         actor=moderator,
         moderating=True,
     )
@@ -1516,9 +1572,10 @@ async def restore_platform_community(
     return _guild_storage_read(
         guild,
         administration,
+        plan=(await rules.community_values(session, [guild.id]))[guild.id],
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild_id),
-        deployment=await app_settings_service.get_app_settings(session),
+        deployment=await rules.platform_values(session),
         actor=operator,
         moderating=guild_id
         in await _moderating(session, user_id=operator.id, guild_ids=[guild_id]),

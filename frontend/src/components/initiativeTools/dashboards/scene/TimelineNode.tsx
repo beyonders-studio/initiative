@@ -1,9 +1,7 @@
 import { ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { dateTimeFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
 import { formatValue } from "@/lib/widgets/format";
 import type { SceneNode, TimelineSpan } from "@/lib/widgets/sceneSpec";
 import {
@@ -21,6 +19,8 @@ import {
   weekStartDay,
 } from "@/lib/widgets/timelineAxis";
 import { toneColor } from "@/lib/widgets/tone";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
 
 type Node = Extract<SceneNode, { kind: "timeline" }>;
 
@@ -84,6 +84,9 @@ export function TimelineNode({ node }: { node: Node }) {
   const body = useRef<HTMLTableSectionElement>(null);
   const [focused, setFocused] = useState(0);
   const current = Math.min(focused, Math.max(0, rows.length - 1));
+  // Folding changes which rows exist, so a focus that pointed past the end has
+  // to come back inside rather than leave the table untabbable.
+  if (focused !== current) setFocused(current);
 
   const focusRow = useCallback((index: number) => {
     const row = body.current?.querySelectorAll("tr")[index];
@@ -92,12 +95,6 @@ export function TimelineNode({ node }: { node: Node }) {
       row.focus();
     }
   }, []);
-
-  // Folding changes which rows exist, so a focus that pointed past the end has
-  // to come back inside rather than leave the table untabbable.
-  useEffect(() => {
-    if (focused > rows.length - 1) setFocused(Math.max(0, rows.length - 1));
-  }, [focused, rows.length]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTableSectionElement>) => {
     const row = rows[current];

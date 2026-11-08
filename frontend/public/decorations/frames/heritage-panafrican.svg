@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"
-     role="presentation">
-  <title>Pan-African</title>
-  <!-- Aperture r=50 at (64,64): see FRAME_APERTURE in lib/profileDecorations.ts.
-       Red, black and green, run round the picture in the order they are flown. -->
-  <circle cx="64" cy="64" r="61.25" fill="none" stroke="#C4211C" stroke-width="4.4"/><circle cx="64" cy="64" r="56.95" fill="none" stroke="#1A1A1A" stroke-width="4.4"/><circle cx="64" cy="64" r="52.7" fill="none" stroke="#1B7A3E" stroke-width="4.3"/>
-  <circle cx="64" cy="64" r="50.6" fill="none" stroke="#0E0A06" stroke-width="1.8"/>
-  <circle cx="64" cy="64" r="63.4" fill="none" stroke="#0E0A06" stroke-width="1.2"/>
-</svg>

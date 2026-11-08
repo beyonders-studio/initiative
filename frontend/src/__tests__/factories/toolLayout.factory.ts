@@ -19,45 +19,59 @@ const sameLayout = (
   (("task_type_id" in a ? a.task_type_id : null) ?? null) === (b.task_type_id ?? null);
 
 /** A target's layouts as the server reads them until it changes any, each as
- *  shipped: a project's table, board (which alone it shows, and opens on),
- *  Gantt and calendar, then
- *  the page of its task type 1, "Task"; or, with `tool: "calendar"`, the
- *  initiative calendar's calendar and its event's detail. `layouts` replaces
- *  those of the same kind (and type), and another type's page is added. */
+ *  shipped: a project's table (which it opens on), board, Gantt and calendar,
+ *  every one shown, then
+ *  the page of its task type 1, "Task"; with `tool: "calendar"`, the
+ *  initiative calendar's calendar and its event's detail; or, with
+ *  `tool: "collection"`, a collection's four lists and its file's detail.
+ *  `hidden` names lists the target hides, as stored, and it opens on the first still shown.
+ *  `layouts` replaces those of the same kind (and type), and another type's
+ *  page is added. */
 export function buildToolLayoutSet(
   overrides: Partial<Omit<ToolLayoutSetRead, "layouts">> & {
     layouts?: (ListLayoutRead | DetailLayoutRead)[];
-    tool?: "project" | "calendar";
+    tool?: "project" | "calendar" | "collection";
+    hidden?: ListLayoutReadKind[];
   } = {}
 ): ToolLayoutSetRead {
-  const { layouts = [], tool = "project", ...rest } = overrides;
+  const { layouts = [], tool = "project", hidden = [], ...rest } = overrides;
   const lists: ListLayoutReadKind[] =
-    tool === "project" ? ["table", "board", "gantt", "calendar"] : ["calendar"];
-  // A project shows its board alone, and opens on it.
-  const hidden = (kind: ListLayoutReadKind) => tool === "project" && kind !== "board";
+    tool === "project"
+      ? ["table", "board", "gantt", "calendar"]
+      : tool === "collection"
+        ? ["masonry", "grid", "timeline", "table"]
+        : ["calendar"];
+  const pages: DetailLayoutRead[] =
+    tool === "project"
+      ? [
+          {
+            kind: "task",
+            task_type_id: 1,
+            task_type_name: "Task",
+            definition: {},
+            updated_at: null,
+          },
+        ]
+      : [
+          {
+            kind: tool === "calendar" ? "calendar_event" : "file",
+            task_type_id: null,
+            task_type_name: null,
+            definition: {},
+            updated_at: null,
+          },
+        ];
+  // A target shows every list it does not hide, and opens on the first.
+  const opensOn = lists.find((kind) => !hidden.includes(kind));
   const shipped: (ListLayoutRead | DetailLayoutRead)[] = [
     ...lists.map((kind) => ({
       kind,
-      is_default: !hidden(kind),
-      hidden: hidden(kind),
-      definition: {},
-      updated_at: null,
+      is_default: kind === opensOn,
+      hidden: hidden.includes(kind),
+      definition: hidden.includes(kind) ? { hidden: true } : {},
+      updated_at: hidden.includes(kind) ? "2026-01-01T00:00:00Z" : null,
     })),
-    tool === "project"
-      ? {
-          kind: "task",
-          task_type_id: 1,
-          task_type_name: "Task",
-          definition: {},
-          updated_at: null,
-        }
-      : {
-          kind: "calendar_event",
-          task_type_id: null,
-          task_type_name: null,
-          definition: {},
-          updated_at: null,
-        },
+    ...pages,
   ];
   const key = (each: ListLayoutRead | DetailLayoutRead) => ({
     kind: each.kind,

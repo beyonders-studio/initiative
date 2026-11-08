@@ -1,5 +1,5 @@
 import { Copy, Loader2, Tags, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FileType, TagSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -10,11 +10,11 @@ import {
 } from "@/components/access/BulkEditAccessDialog";
 import { BulkExportButton } from "@/components/exports/BulkExportButton";
 import { BulkEditTagsDialog } from "@/components/shared/BulkEditTagsDialog";
-import { Button } from "@/components/ui/button";
 import { useDeleteTools, useDuplicateTools } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toast } from "@/lib/mascotToast";
 import { everyCan } from "@/lib/permissions";
+import { Button } from "@/ui/button";
 
 /** The slice of {@link useGridSelection} this section drives. */
 interface GridSelectionLike<T> {
@@ -37,6 +37,8 @@ interface BulkAccessSectionProps<T extends BulkItem> {
   tool: Tool;
   /** Invalidate the tool's list caches after a successful change. */
   invalidate: () => void;
+  /** The page's own actions, before the shared ones. */
+  actions?: ReactNode;
 }
 
 /**
@@ -51,6 +53,7 @@ export function BulkAccessSection<T extends BulkItem>({
   selection,
   tool,
   invalidate,
+  actions,
 }: BulkAccessSectionProps<T>) {
   const { t } = useTranslation(["access", "common"]);
   const communityId = useActiveCommunityId();
@@ -88,6 +91,7 @@ export function BulkAccessSection<T extends BulkItem>({
           onEditAccess={() => setAccessOpen(true)}
           onExit={selection.exit}
         >
+          {actions}
           <BulkExportButton tool={tool} items={items} />
           <Button
             variant="outline"

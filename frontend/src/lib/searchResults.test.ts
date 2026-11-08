@@ -59,6 +59,10 @@ describe("searchHitPath", () => {
         target({ entity_type: "counter", entity_id: 9, tool: Tool.counter_group, tool_id: 6 })
       )
     ).toBe("/i/5/counter-groups/6/counter/9");
+    // A collection is in the initiative's Files, not in one file.
+    expect(
+      searchHitPath(target({ entity_type: "collection", entity_id: 12, tool: Tool.file }))
+    ).toBe("/i/5/files/collections/12");
   });
 
   it("keeps a wiki page's own id in its address", () => {
@@ -70,14 +74,6 @@ describe("searchHitPath", () => {
         target({ entity_type: "wiki_page", entity_id: 31, tool: Tool.wiki, tool_id: 4 })
       )
     ).toBe("/i/5/wikis/4/pages/31");
-  });
-
-  it("sends a queue item to its queue, which is where it is read", () => {
-    expect(
-      searchHitPath(
-        target({ entity_type: "queue_item", entity_id: 4, tool: Tool.queue, tool_id: 2 })
-      )
-    ).toBe("/i/5/queues/2");
   });
 
   it("sends a comment to the thing it is on, which is where it is read", () => {
@@ -185,18 +181,18 @@ describe("hitIcon", () => {
   it("marks a tool from its kind when nobody filled in the tool", () => {
     // A relation being composed knows what kind it points at and not the tool
     // that governs it — which for a tool's own row is the same thing. Falling
-    // through to the tag mark made every queue and gallery look like a label.
-    expect(hitIcon(target({ entity_type: SearchEntityType.queue }))).toBe(TOOL_ICONS[Tool.queue]);
-    expect(hitIcon(target({ entity_type: SearchEntityType.gallery }))).toBe(
-      TOOL_ICONS[Tool.gallery]
+    // through to the tag mark made every counter group and wiki look like a label.
+    expect(hitIcon(target({ entity_type: SearchEntityType.counter_group }))).toBe(
+      TOOL_ICONS[Tool.counter_group]
     );
+    expect(hitIcon(target({ entity_type: SearchEntityType.wiki }))).toBe(TOOL_ICONS[Tool.wiki]);
     expect(hitIcon(target({ entity_type: SearchEntityType.file }))).toBe(TOOL_ICONS[Tool.file]);
   });
 
   it("still takes the tool a hit names", () => {
-    expect(hitIcon(target({ entity_type: SearchEntityType.queue, tool: Tool.queue }))).toBe(
-      TOOL_ICONS[Tool.queue]
-    );
+    expect(
+      hitIcon(target({ entity_type: SearchEntityType.counter_group, tool: Tool.counter_group }))
+    ).toBe(TOOL_ICONS[Tool.counter_group]);
   });
 
   it("marks a thing inside a tool with its own icon, not its tool's", () => {

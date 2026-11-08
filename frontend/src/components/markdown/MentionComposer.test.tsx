@@ -16,7 +16,17 @@ import { MentionComposer } from "./MentionComposer";
 vi.mock("@/components/comments/MentionPopover", () => ({
   MentionPopover: ({ onSelect }: { onSelect: (choice: MentionChoice) => void }) => (
     <div>
-      <button type="button" onClick={() => onSelect({ user: true, id: 4, label: "Ada" })}>
+      <button
+        type="button"
+        onClick={() =>
+          onSelect({
+            user: true,
+            id: 4,
+            label: "Ada",
+            member: buildUserSummary({ id: 4, display_name: "Ada" }),
+          })
+        }
+      >
         pick-person
       </button>
       <button type="button" onClick={() => onSelect({ user: false, create: "Roadmap" })}>

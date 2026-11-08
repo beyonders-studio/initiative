@@ -322,11 +322,15 @@ def verb_params() -> dict[str, Any]:
     }
 
 
-def query(tools: dict[str, list[int]], *, reader_id: int) -> tuple[Any, dict]:
-    """The candidates' statement over ``tools``, and its parameters."""
+def query(
+    tools: dict[str, list[int]], *, reader_id: int, since: Optional[datetime] = None
+) -> tuple[Any, dict]:
+    """The candidates' statement over ``tools``, from ``since`` where that is
+    inside the :data:`WINDOW`, and its parameters."""
+    start = datetime.now(timezone.utc) - WINDOW
     params: dict[str, Any] = {
         "reader": reader_id,
-        "since": datetime.now(timezone.utc) - WINDOW,
+        "since": max(since, start) if since else start,
         "candidates": CANDIDATE_CHANGES,
         **verb_params(),
         **{f"ids_{tool}": ids for tool, ids in tools.items()},
@@ -389,21 +393,23 @@ async def feed(
     initiative_id: Optional[int] = None,
     tool: Optional[Tool] = None,
     tool_id: Optional[int] = None,
+    since: Optional[datetime] = None,
     page: int = 1,
     page_size: int = PAGE_SIZE,
 ) -> tuple[list[FeedEntry], bool]:
     """One page of the reader's feed, on their own routed session.
 
     Narrowed to one initiative, or to one tool (any :class:`Tool`, with the id
-    of the instance), where those are given. Narrowing only removes changes.
-    Returns the page's entries and whether another page follows.
+    of the instance), or to the changes since a moment, where those are given.
+    Narrowing only removes changes. Returns the page's entries and whether
+    another page follows.
     """
     tools = await readable_tools(
         session, initiative_id=initiative_id, tool=tool, tool_id=tool_id
     )
     if not tools:
         return [], False
-    statement, params = query(tools, reader_id=reader_id)
+    statement, params = query(tools, reader_id=reader_id, since=since)
     rows = (await session.exec(statement, params=params)).mappings().all()  # type: ignore[call-overload]
 
     by_kind: dict[str, list[int]] = {}

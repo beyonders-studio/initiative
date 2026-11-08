@@ -442,18 +442,37 @@ async def replace_resource_grants(
 
         tool = Tool(resource_type)
         view_key = PermissionKey(tool.view_permission)
-        permitted_users = await rls_service.members_permitted(
-            session,
-            initiative_id=initiative_id,
-            user_ids=valid_users,
-            permission_key=view_key,
-        )
-        permitted_roles = await rls_service.roles_permitting(
-            session,
-            initiative_id=initiative_id,
-            role_ids=valid_roles,
-            permission_key=view_key,
-        )
+
+        async def permitted(reader: Any) -> tuple[set[int], set[int]]:
+            return (
+                await rls_service.members_permitted(
+                    reader,
+                    initiative_id=initiative_id,
+                    user_ids=valid_users,
+                    permission_key=view_key,
+                ),
+                await rls_service.roles_permitting(
+                    reader,
+                    initiative_id=initiative_id,
+                    role_ids=valid_roles,
+                    permission_key=view_key,
+                ),
+            )
+
+        if by_install:
+            # What a role may do is the initiative's administration, out of an
+            # installed plug-in's reach. Whether the people it names may use
+            # the tool is asked on the system engine; the grants themselves are
+            # still written under the install's own policies.
+            from app.db import cohorts
+            from app.db.request_context import SystemGuild
+            from app.db.session import set_rls_context
+
+            async with cohorts.system_session(guild_id) as system:
+                await set_rls_context(system, SystemGuild(guild_id, read_only=True))
+                permitted_users, permitted_roles = await permitted(system)
+        else:
+            permitted_users, permitted_roles = await permitted(session)
         if valid_users - permitted_users or valid_roles - permitted_roles:
             raise tool.grantee_lacks_access()
         valid_users, valid_roles = permitted_users, permitted_roles
@@ -530,45 +549,61 @@ async def replace_resource_grants(
         )
 
 
-async def grant_to_person(
+async def share_with(
     session: Any,
     *,
     resource_type: Tool,
     resource_id: int,
     guild_id: int,
     initiative_id: int | None,
-    user_id: int,
+    user_id: int | None,
     level: ResourceAccessLevel,
     actor_user_id: int | None,
+    raise_lower: bool = False,
 ) -> None:
-    """Share one resource with ``user_id`` at ``level``, unless a grant
-    already names them there, which is left as it is. Recorded as a share is.
-    Caller commits."""
-    held = await session.exec(
-        select(ResourceGrant.id).where(
-            ResourceGrant.resource_type == resource_type,
-            ResourceGrant.resource_id == resource_id,
-            ResourceGrant.user_id == user_id,
-        )
-    )
-    if held.first() is not None:
-        return
-    # Two writers can both find none; the unique grantee key keeps one, and
-    # the other is the share the caller asked for.
-    try:
-        async with session.begin_nested():
-            session.add(
-                ResourceGrant(
-                    resource_type=resource_type,
-                    resource_id=resource_id,
-                    initiative_id=initiative_id,
-                    user_id=user_id,
-                    level=level,
-                )
+    """Share one resource with ``user_id`` at ``level`` — with every member of
+    its initiative where ``user_id`` is ``None``. A grant already there is left
+    as it is, unless ``raise_lower`` and it gives less, when it is raised.
+    Recorded as a share is. Caller commits."""
+    key: _Grantee = ("user", user_id) if user_id is not None else ("all_members", None)
+    held = (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == resource_type,
+                ResourceGrant.resource_id == resource_id,
+                ResourceGrant.user_id == user_id
+                if user_id is not None
+                else ResourceGrant.all_initiative_members.is_(True),
             )
-            await session.flush()
-    except IntegrityError:
-        return
+        )
+    ).first()
+    before: dict[_Grantee, str] = {}
+    if held is not None:
+        was = _grant_level(held.level)
+        if not raise_lower or ResourceAccessLevel(was).reaches(level):
+            return
+        held.level = level
+        session.add(held)
+        await session.flush()
+        before = {key: was}
+    else:
+        # Two writers can both find none; the unique grantee key keeps one,
+        # and the other is the share the caller asked for.
+        try:
+            async with session.begin_nested():
+                session.add(
+                    ResourceGrant(
+                        resource_type=resource_type,
+                        resource_id=resource_id,
+                        initiative_id=initiative_id,
+                        user_id=user_id,
+                        all_initiative_members=user_id is None,
+                        level=level,
+                    )
+                )
+                await session.flush()
+        except IntegrityError:
+            return
     await _record_grant_changes(
         session,
         actor_user_id=actor_user_id,
@@ -576,8 +611,8 @@ async def grant_to_person(
         resource_id=resource_id,
         guild_id=guild_id,
         initiative_id=initiative_id,
-        before={},
-        after={("user", user_id): _grant_level(level)},
+        before=before,
+        after={key: _grant_level(level)},
     )
 
 

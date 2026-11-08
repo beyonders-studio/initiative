@@ -34,6 +34,7 @@ for real.
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+import asyncio
 import json
 import httpx
 import jwt
@@ -48,7 +49,8 @@ from app.models.platform.plugin_service_registration import PluginServiceRegistr
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.plugin_metadata import PluginMetadata
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
+from app.models.tenant.task import Task
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
@@ -63,11 +65,15 @@ from app.services.tenant.dashboard_definition import normalize_dashboard_definit
 from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
 from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
 from app.models.platform.user import UserRole
+from app.models.tenant.dashboard import DashboardViewMode
+from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.testing import (
     create_plugin_user_connection,
     create_access_grant,
     create_initiative,
     create_project,
+    create_property_definition,
+    create_property_value,
     create_resource_grant,
     create_task,
     create_user,
@@ -258,7 +264,7 @@ def _definition() -> dict:
     }
 
 
-def _dashboard_definition(*endpoint_ids: str, sql: str | None = None) -> dict:
+def _dashboard_definition(*endpoint_ids: str) -> dict:
     return normalize_dashboard_definition(
         {
             "widgets": [
@@ -269,7 +275,6 @@ def _dashboard_definition(*endpoint_ids: str, sql: str | None = None) -> dict:
                         "source": "plugin",
                         "plugin_uid": PLUGIN_UID,
                         "endpoint_id": endpoint_id,
-                        **({"sql": sql} if sql else {}),
                     },
                 }
                 for index, endpoint_id in enumerate(endpoint_ids)
@@ -319,6 +324,8 @@ def upstream(monkeypatch):
             self.rows: list = [{"id": 1}]
             self.values: dict = {}
             self.error: Exception | None = None
+            #: Holds each call until this many are waiting together.
+            self.together: asyncio.Barrier | None = None
 
         @property
         def count(self) -> int:
@@ -328,6 +335,8 @@ def upstream(monkeypatch):
 
     async def _fake_read_answer(request, *, endpoint, transport=None):
         recorder.calls.append(request)
+        if recorder.together is not None:
+            await asyncio.wait_for(recorder.together.wait(), timeout=2)
         if recorder.error is not None:
             raise recorder.error
         return list(recorder.rows), dict(recorder.values)
@@ -361,9 +370,7 @@ async def _install(session: AsyncSession, actor, **overrides):
     )
 
 
-async def _workspace(
-    session: AsyncSession, acting_user, *sources: str, sql: str | None = None
-):
+async def _workspace(session: AsyncSession, acting_user, *sources: str):
     """A guild admin with a dashboards-enabled initiative, an installed plug-in, a
     live registration, and a dashboard binding the given sources."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -377,9 +384,23 @@ async def _workspace(
         session,
         a.initiative,
         a.user,
-        definition=_dashboard_definition(*(sources or (ORDERS_SUMMARY,)), sql=sql),
+        definition=_dashboard_definition(*(sources or (ORDERS_SUMMARY,))),
     )
     return a, plugin, dashboard
+
+
+async def _editor(session: AsyncSession, acting_user, a, dashboard):
+    """A member of the dashboard's initiative who may edit it."""
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    await create_resource_grant(
+        session, dashboard, level=ResourceAccessLevel.write, user=member.user
+    )
+    return member
 
 
 def _url(actor, plugin, endpoint_id: str, dashboard, **params) -> str:
@@ -442,6 +463,26 @@ class TestGates:
         assert response.status_code == 404
         assert upstream.count == 0
 
+    async def test_previewing_a_widget_takes_write_access_to_its_dashboard(
+        self, client, acting_user, session, upstream
+    ):
+        """Somebody who reads the dashboard reads its widgets with the canvas,
+        with the parameters each stores."""
+        a, plugin, dashboard = await _workspace(session, acting_user)
+        viewer = await acting_user(
+            guild_role=CommunityRole.member,
+            guild=a.guild,
+            initiative=a.initiative,
+            initiative_role="member",
+        )
+
+        response = await client.get(
+            _url(viewer, plugin, ORDERS_SUMMARY, dashboard, params='{"range":"7d"}'),
+            headers=viewer.headers,
+        )
+        assert response.status_code == 403
+        assert upstream.count == 0
+
     async def test_a_dashboard_is_not_a_key_to_every_source(
         self, client, acting_user, session, upstream
     ):
@@ -490,12 +531,7 @@ class TestAdminOnly:
         ``visibility: "guild_admin"`` — not against anything the request
         supplied."""
         a, plugin, dashboard = await _workspace(session, acting_user, source)
-        member = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        member = await _editor(session, acting_user, a, dashboard)
 
         response = await client.get(
             _url(member, plugin, source, dashboard), headers=member.headers
@@ -764,15 +800,10 @@ class TestCache:
     async def test_repeat_reads_of_guild_data_cost_one_upstream_call(
         self, client, acting_user, session, upstream
     ):
-        """Twenty viewers of a dashboard are one call to the plug-in, which is what
-        keeps a single-replica community container comfortable."""
+        """Two people reading one source are one call to the plug-in, which is
+        what keeps a single-replica community container comfortable."""
         a, plugin, dashboard = await _workspace(session, acting_user)
-        member = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        member = await _editor(session, acting_user, a, dashboard)
 
         first = await client.get(
             _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
@@ -812,12 +843,7 @@ class TestCache:
         shared entry would show one person the other's data.
         """
         a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
-        b = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        b = await _editor(session, acting_user, a, dashboard)
         await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
         await _connect(session, plugin=plugin, user=b.user, ref="cr_bob")
 
@@ -938,6 +964,7 @@ class TestWidgetCatalog:
         entry = response.json()["items"][0]
         assert entry["plugin_uid"] == PLUGIN_UID
         assert entry["plugin_id"] == plugin.id
+        assert entry["public_id"] == PUBLIC_ID
 
         widget = entry["widgets"][0]
         assert widget["type"] == f"plugin:{PLUGIN_UID}:summary"
@@ -1388,16 +1415,12 @@ class TestListParams:
         assert upstream.count == 0
 
 
-class TestAStatementOverTheRows:
-    """A built-in widget pointed at a plug-in.
+class TestTheCanvas:
+    """A dashboard's widgets read a plug-in with what they store, in its
+    canvas read: a plug-in's own widget with its binding's parameters, and a
+    built-in widget with a statement that names the endpoint."""
 
-    The plug-in's own rows are read by its own module, by the names its manifest
-    declared. A statement is what lets a chart or a table be pointed at them
-    instead — evaluated here, over the answer the proxy already fetched, so
-    twenty viewers are still one upstream call.
-    """
-
-    async def test_the_widget_gets_what_its_statement_made_of_the_rows(
+    async def test_a_statement_and_a_plugin_widget_read_one_answer(
         self, client, session, acting_user, upstream
     ):
         upstream.rows = [
@@ -1405,79 +1428,107 @@ class TestAStatementOverTheRows:
             {"days": "mon", "totals": 4},
             {"days": "tue", "totals": 5},
         ]
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days AS day, sum(totals) AS total FROM rows GROUP BY days",
-        )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="w1"),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.json()
-        body = response.json()
-        assert body["table"]["columns"] == [
-            {"name": "day", "type": "text", "grain": None, "date_only": False},
-            {"name": "total", "type": "number", "grain": None, "date_only": False},
-        ]
-        assert body["table"]["rows"] == [["mon", 7.0], ["tue", 5.0]]
-
-    async def test_two_outputs_of_one_name_both_survive(
-        self, client, session, acting_user, upstream
-    ):
-        """Positional, for the reason every read of this surface is: a mapping
-        would keep one of the two."""
-        upstream.rows = [{"days": "mon", "totals": 3}]
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days, totals AS days FROM rows",
-        )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="w1"),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.json()
-        assert response.json()["table"]["rows"] == [["mon", 3]]
-
-    async def test_a_binding_with_no_statement_is_untouched(
-        self, client, session, acting_user, upstream
-    ):
-        """The plug-in's own widget still reads its own rows, by its own names."""
+        upstream.values = {"total": 12}
         a, plugin, dashboard = await _workspace(session, acting_user)
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": "own",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": "7d"},
+                        },
+                    },
+                    {
+                        "id": "chart",
+                        "type": "table",
+                        "binding": {
+                            "source": "query",
+                            "sql": f"SELECT o.days AS day, sum(o.totals) AS total "
+                            f"FROM plugin('{PUBLIC_ID}', 'orders-summary', "
+                            f"range => '7d') AS o GROUP BY o.days ORDER BY 1",
+                        },
+                    },
+                ]
+            }
         )
-        assert response.status_code == 200
-        body = response.json()
-        assert body["table"] is None
-        assert body["rows"] == [{"id": 1}]
+        session.add(dashboard)
+        await session.commit()
 
-    async def test_the_statement_that_runs_is_the_stored_one(
+        response = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        assert response.status_code == 200, response.text
+        widgets = response.json()["widgets"]
+        assert widgets["own"]["plugin"]["rows"] == upstream.rows
+        assert widgets["own"]["plugin"]["values"] == {"total": 12}
+        assert widgets["chart"]["result"]["rows"] == [["mon", 7], ["tue", 5]]
+        assert upstream.count == 1
+        assert json.loads(upstream.calls[0].content)["params"] == {"range": "7d"}
+
+    async def test_plugins_are_called_together(
         self, client, session, acting_user, upstream
     ):
-        """Naming a widget that is not on this dashboard changes nothing —
-        there is nowhere for a request to put a statement of its own."""
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days AS day FROM rows",
+        """Each widget's call is settled first, and then every plug-in is
+        called at once, so the canvas waits for the slowest of them."""
+        upstream.together = asyncio.Barrier(2)
+        a, plugin, dashboard = await _workspace(session, acting_user)
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": f"w{days}",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": f"{days}d"},
+                        },
+                    }
+                    for days in (7, 30)
+                ]
+            }
         )
+        session.add(dashboard)
+        await session.commit()
+
         response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="nope"),
-            headers=a.headers,
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
         )
-        assert response.status_code == 200
-        # Untransformed, because no widget of that id binds this endpoint.
-        assert response.json()["table"] is None
+        widgets = response.json()["widgets"]
+        assert widgets["w7"]["plugin"]["rows"] == [{"id": 1}]
+        assert widgets["w30"]["plugin"]["rows"] == [{"id": 1}]
+        assert upstream.count == 2
 
+    async def test_a_dashboard_run_as_its_initiative_calls_as_the_installation(
+        self, client, session, acting_user, upstream
+    ):
+        """An endpoint on each member's own connection answers for one person,
+        so a dashboard everyone sees the same way says it needs one."""
+        a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
+        await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
 
-# ---------------------------------------------------------------------------
-# A declarative plug-in: Initiative calls the vendor itself
-# ---------------------------------------------------------------------------
+        mine = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        dashboard.view_mode = DashboardViewMode.initiative.value
+        session.add(dashboard)
+        await session.commit()
+        everyones = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+
+        assert mine.json()["widgets"]["w1"]["plugin"]["rows"] == [{"id": 1}]
+        assert (
+            everyones.json()["widgets"]["w1"]["error"]
+            == PluginDataMessages.CONNECTION_REQUIRED
+        )
+        assert upstream.count == 1
 
 
 class TestDeclarative:
@@ -1999,6 +2050,23 @@ async def _action_board(
     return admin, member, plugin, tasks
 
 
+async def _kept(session: AsyncSession) -> dict:
+    """The plug-ins' values, by key, each as its column keeps it."""
+    rows = await session.exec(
+        select(MetadataDefinition.key, MetadataValue)
+        .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+        .where(MetadataDefinition.install_id.is_not(None))
+    )
+    return {
+        key: next(
+            held
+            for held in (row.value_number, row.value_json, row.value_text)
+            if held is not None
+        )
+        for key, row in rows
+    }
+
+
 def _run(actor, plugin, action: str = "link") -> str:
     return actor.g(f"/plugins/{plugin.id}/actions/{action}")
 
@@ -2011,23 +2079,28 @@ class TestActions:
 
         async def the_plugin_writes() -> None:
             await route_session_to_guild(session, member.guild.id)
-            session.add_all(
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=tasks["shared"],
+            task = await session.get(Task, tasks["shared"])
+            for key, kind, listed, shown, value in (
+                ("issue", MetadataType.number, False, ["task"], {"value_number": 7}),
+                ("etag", MetadataType.json, False, [], {"value_json": 7}),
+                (
+                    "pulls",
+                    MetadataType.json,
+                    True,
+                    ["task"],
+                    {"ref": "812", "value_json": {}},
+                ),
+            ):
+                definition = await create_property_definition(
+                    session,
+                    None,
+                    plugin=plugin,
                     key=key,
-                    ref=ref,
-                    value=value,
-                    shown=shown,
+                    type=kind,
+                    list=listed,
+                    shown_on=shown,
                 )
-                for key, ref, value, shown in (
-                    ("issue", "", 7, True),
-                    ("etag", "", 7, False),
-                    ("pulls", "812", {"ref": "812"}, True),
-                )
-            )
-            await session.commit()
+                await create_property_value(session, task, definition, **value)
 
         plugin_write.then = the_plugin_writes
         response = await client.post(
@@ -2095,7 +2168,7 @@ class TestActions:
             (
                 "member",
                 "shared",
-                {"entity_type": "queue_item"},
+                {"entity_type": "counter"},
                 404,
                 "ACTION_NOT_FOUND",
             ),
@@ -2200,9 +2273,7 @@ class TestActions:
         assert labelling["method"] == "PUT"
         assert labelling["headers"]["authorization"] == "Bearer tok"
         await route_session_to_guild(session, member.guild.id)
-        kept = {
-            row.key: row.value for row in await session.exec(select(PluginMetadata))
-        }
+        kept = await _kept(session)
         assert kept == {"task": tasks["shared"], "was": 12}
 
     @pytest.mark.parametrize(
@@ -2236,15 +2307,18 @@ class TestActions:
                     )
                 )
             else:
-                session.add(
-                    PluginMetadata(
-                        install_id=plugin.id,
-                        entity_type="task",
-                        entity_id=tasks["shared"],
+                await create_property_value(
+                    session,
+                    await session.get(Task, tasks["shared"]),
+                    await create_property_definition(
+                        session,
+                        None,
+                        plugin=plugin,
                         key="issue",
-                        value=5,
-                        shown=True,
-                    )
+                        type=MetadataType.number,
+                        shown_on=["task"],
+                    ),
+                    value_number=5,
                 )
             await session.commit()
             return vendor.handle(request)
@@ -2260,9 +2334,7 @@ class TestActions:
 
         assert response.status_code == status_code, response.text
         await route_session_to_guild(session, member.guild.id)
-        assert {
-            row.key: row.value for row in await session.exec(select(PluginMetadata))
-        } == kept
+        assert await _kept(session) == kept
 
     @pytest.mark.parametrize(
         ("who", "task", "action", "status_code", "detail"),
@@ -2309,7 +2381,7 @@ class TestActions:
         assert response.json()["detail"] == getattr(PluginDataMessages, detail)
         assert vendor.api_requests == []
         await route_session_to_guild(session, admin.guild.id)
-        assert (await session.exec(select(PluginMetadata))).all() == []
+        assert await _kept(session) == {}
 
     async def test_a_declarative_action_is_sent_what_the_reader_answered(
         self, client, acting_user, session, monkeypatch
@@ -2341,9 +2413,7 @@ class TestActions:
             f"https://{API_HOST}/repos/acme/widgets/issues/7/labels"
         )
         await route_session_to_guild(session, member.guild.id)
-        assert {
-            row.key: row.value for row in await session.exec(select(PluginMetadata))
-        } == {"issue": 7, "repo": "acme/widgets"}
+        assert await _kept(session) == {"issue": 7, "repo": "acme/widgets"}
 
     async def test_a_declarative_action_run_from_an_element_reads_it(
         self, client, acting_user, session, monkeypatch
@@ -2356,19 +2426,24 @@ class TestActions:
             session, acting_user, _declarative_action_definition()
         )
         await route_session_to_guild(session, member.guild.id)
+        links = await create_property_definition(
+            session,
+            None,
+            plugin=plugin,
+            key="links",
+            type=MetadataType.link,
+            list=True,
+            shown_on=["task"],
+        )
         for ref in ("a", "b"):
-            session.add(
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=tasks["shared"],
-                    key="links",
-                    ref=ref,
-                    value={"ref": ref, "url": f"https://x.example/{ref}"},
-                    shown=True,
-                )
+            await create_property_value(
+                session,
+                await session.get(Task, tasks["shared"]),
+                links,
+                ref=ref,
+                value_json={"url": f"https://x.example/{ref}"},
+                value_text=f"https://x.example/{ref}",
             )
-        await session.commit()
 
         response = await client.post(
             _run(member, plugin, "drop"),
@@ -2419,4 +2494,4 @@ class TestActions:
         assert response.json()["detail"] == PluginDataMessages.INVALID_PARAMS
         assert vendor.api_requests == []
         await route_session_to_guild(session, member.guild.id)
-        assert (await session.exec(select(PluginMetadata))).all() == []
+        assert await _kept(session) == {}

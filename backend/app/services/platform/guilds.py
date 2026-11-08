@@ -43,6 +43,13 @@ from app.models.platform.guild import (
     restore_status_choices,
 )
 from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
+from app.core.rules import (
+    OPTION_RULES,
+    SURFACE_AI_CONNECTIONS,
+    SURFACE_CUSTOM_ROLES,
+    SURFACE_PLUGINS,
+    SetBy,
+)
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.notification import NotificationType
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
@@ -57,7 +64,7 @@ from app.services.platform import billing as billing_service
 
 from app.services.platform import account_stream, user_stream
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 from app.services.platform import contact_grants as contact_grants_service
 from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
 from app.db.request_context import Platform, SystemGuild, Unattributed
@@ -381,10 +388,10 @@ async def ensure_membership(
         return membership
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
-    # blocked. SSO/OIDC provisioning uses a separate insert path
-    # (oidc_sync._create_guild_membership) and is intentionally exempt.
+    # blocked. Sign-in sync inserts on a path of its own
+    # (oidc_sync._create_guild_membership) and asks the same cap first.
     if guest_until is None:
-        await _assert_member_capacity(session, guild_id=guild_id)
+        await assert_member_capacity(session, guild_id=guild_id)
     else:
         await _assert_guest_capacity(session, guild_id=guild_id)
     # A listed community never gains somebody who has answered the age question
@@ -518,7 +525,7 @@ def align_admin_initiative_roles(
     post_commit.after_commit(session, align_guild_admin_membership_roles)
 
 
-async def _assert_member_capacity(
+async def assert_member_capacity(
     session: AsyncSession, *, guild_id: int, claiming_seat: bool = True
 ) -> None:
     """Raise ``GuildCapacityError`` if the guild is at its ``max_users`` cap.
@@ -541,12 +548,12 @@ async def _assert_member_capacity(
     point-in-time reading either way, so serializing joins against it would buy
     nothing. The join path stays the authoritative gate.
     """
-    administration = await get_administration(session, guild_id=guild_id)
-    if administration.max_users is None:
+    cap = await rules.community_value(session, guild_id, "max_users")
+    if cap is None:
         return
     if claiming_seat:
         await advisory_lock(session, LockNamespace.MEMBER_CAP, guild_id)
-    if await count_members(session, guild_id=guild_id) >= administration.max_users:
+    if await count_members(session, guild_id=guild_id) >= cap:
         raise GuildCapacityError(GuildMessages.COMMUNITY_USER_LIMIT_REACHED)
 
 
@@ -555,17 +562,17 @@ async def _assert_guest_capacity(
 ) -> None:
     """Raise ``GuildCapacityError`` if the guild is at its ``max_guests`` cap.
 
-    The guest half of :func:`_assert_member_capacity`: the same session
+    The guest half of :func:`assert_member_capacity`: the same session
     requirement and the same ``claiming_seat``, with the lock under its own
     namespace so guests and members do not queue behind each other. A cap of 0
     takes no new guests.
     """
-    administration = await get_administration(session, guild_id=guild_id)
-    if administration.max_guests is None:
+    cap = await rules.community_value(session, guild_id, "max_guests")
+    if cap is None:
         return
     if claiming_seat:
         await advisory_lock(session, LockNamespace.GUEST_CAP, guild_id)
-    if await count_guests(session, guild_id=guild_id) >= administration.max_guests:
+    if await count_guests(session, guild_id=guild_id) >= cap:
         raise GuildCapacityError(GuildMessages.COMMUNITY_GUEST_LIMIT_REACHED)
 
 
@@ -573,13 +580,11 @@ async def _guest_days(session: AsyncSession, *, guild_id: int, days: int) -> int
     """``days`` held to the community's longest guest stay and the
     deployment's. Raises ``GuestsDisabledError`` while the deployment allows no
     guests."""
-    from app.services.platform import app_settings as app_settings_service
-
-    settings_row = await app_settings_service.get_app_settings(session)
-    if not settings_row.guests_enabled:
+    platform = await rules.platform_values(session)
+    if not platform["guests_enabled"]:
         raise GuestsDisabledError(GuildMessages.COMMUNITY_GUESTS_DISABLED)
-    guild = await get_guild(session, guild_id=guild_id)
-    limits = (days, settings_row.max_guest_days, guild.guest_max_days)
+    guild_limit = await rules.community_value(session, guild_id, "guest_max_days")
+    limits = (days, platform["max_guest_days"], guild_limit)
     return min(limit for limit in limits if limit is not None)
 
 
@@ -654,7 +659,7 @@ async def make_guest_a_member(
     )
     if membership is None or membership.guest_until is None:
         raise NotAGuestError(GuildMessages.NOT_A_GUEST)
-    await _assert_member_capacity(session, guild_id=guild_id)
+    await assert_member_capacity(session, guild_id=guild_id)
     membership.guest_until = None
     if membership.role == CommunityRole.guest:
         membership.role = CommunityRole.member
@@ -799,8 +804,8 @@ async def list_memberships(
       settings surface (:func:`gather_across_guilds`). A guild the seam does not
       admit the caller to right now reports ``None``; a member's entry is
       ``None`` and costs no query.
-    * ``accepts_api_keys`` is :func:`guild_entitlements.accepts_api_keys`,
-      selected beside the membership row.
+    * ``accepts_api_keys`` is the member's ``api_keys`` rule, selected beside
+      the membership row.
     """
     # lazy: avoids a circular import
     from app.db.session import SystemSessionLocal, set_rls_context
@@ -812,8 +817,8 @@ async def list_memberships(
             select(
                 Guild,
                 GuildMembership,
-                guild_entitlements.accepts_api_keys(
-                    Guild.id, GuildMembership.api_keys_allowed
+                rules.community_rule_sql(
+                    Guild.id, "api_keys", user_id=GuildMembership.user_id
                 ),
             )
             .join(GuildMembership, GuildMembership.guild_id == Guild.id)
@@ -992,15 +997,15 @@ async def create_guild_settings(session: AsyncSession, guild_id: int) -> GuildSe
 
 
 async def may_create_another_guild(session: AsyncSession, *, user_id: int) -> bool:
-    """Has this account created fewer than ``GUILD_CREATION_DAILY_LIMIT``
-    communities in the last day?
+    """Has this account created fewer than the deployment's
+    ``community_creation_daily_limit`` communities in the last day?
 
     Takes a per-account lock held until the transaction ends, so the guild the
     caller then inserts is committed before the next creation for this account
     counts. A deleted community still counts: its row stays for at least
     ``MIN_GUILD_RETENTION_DAYS`` after deletion, which is at least this window.
     """
-    limit = settings.GUILD_CREATION_DAILY_LIMIT
+    limit = (await rules.platform_values(session))["community_creation_daily_limit"]
     if not limit:
         return True
     await advisory_lock(session, LockNamespace.GUILD_CREATION, user_id)
@@ -1289,6 +1294,9 @@ async def update_guild(
     auth_options: list[CommunityAuthOption] | None = None,
     banner_image_enabled: bool | None = None,
     support_enabled: bool | None = None,
+    ai_connections_open: bool | None = None,
+    plugins_open: bool | None = None,
+    custom_roles_open: bool | None = None,
 ) -> Guild:
     guild = await get_guild(session, guild_id=guild_id)
     updated = False
@@ -1329,7 +1337,7 @@ async def update_guild(
         # Listing a community — or taking it back off the shelf — changes what
         # is asked of everybody already in it, none of whom did anything. The
         # one fan-out this channel has, and it is addressed to the roster.
-        await _signal_members_present(session, guild_id=guild.id)
+        await signal_members_present(session, guild_id=guild.id)
     if categories_provided:
         normalized = normalize_categories(categories)
         if guild.categories != normalized:
@@ -1355,10 +1363,11 @@ async def update_guild(
         session.add(guild)
         await session.flush()
 
-    # The operator-set fields live on their own row and are writable only on the
-    # system engine, so they are applied separately from the identity edits
-    # above — a guild admin's PATCH carries none of them, and skipping the whole
-    # block spares that path a query it would never use.
+    # The operator-set fields are the community's paid rules, written as the
+    # deployment's rows on the system engine, so they are applied separately
+    # from the identity edits above — a guild admin's PATCH carries none of
+    # them, and skipping the whole block spares that path a query it would
+    # never use.
     if (
         max_storage_bytes_provided
         or max_users_provided
@@ -1366,21 +1375,18 @@ async def update_guild(
         or auth_options is not None
         or banner_image_enabled is not None
         or support_enabled is not None
+        or ai_connections_open is not None
+        or plugins_open is not None
+        or custom_roles_open is not None
     ):
-        administration_updated = False
-        administration = await get_administration(session, guild_id=guild_id)
-        if (
-            max_storage_bytes_provided
-            and administration.max_storage_bytes != max_storage_bytes
-        ):
-            administration.max_storage_bytes = max_storage_bytes
-            administration_updated = True
-        if max_users_provided and administration.max_users != max_users:
-            administration.max_users = max_users
-            administration_updated = True
-        if max_guests_provided and administration.max_guests != max_guests:
-            administration.max_guests = max_guests
-            administration_updated = True
+        plan = await rules.community_values(session, [guild_id])
+        changes: dict[str, Any] = {}
+        if max_storage_bytes_provided:
+            changes["max_storage_bytes"] = max_storage_bytes
+        if max_users_provided:
+            changes["max_users"] = max_users
+        if max_guests_provided:
+            changes["max_guests"] = max_guests
         # An explicit ``null`` is meaningless for an entitlement (unlike the
         # caps, where null resets to unlimited), so guard on ``is not None`` and
         # treat null/omitted alike as a no-op — mirroring how the operator
@@ -1391,20 +1397,11 @@ async def update_guild(
         # A sent list replaces the set outright: these are grants, and the
         # operator is stating which ones the guild holds now.
         if auth_options is not None:
-            requested = sorted({option.value for option in auth_options})
-            if sorted(administration.auth_options or []) != requested:
-                administration.auth_options = requested
-                administration_updated = True
-        if (
-            banner_image_enabled is not None
-            and administration.banner_image_enabled != banner_image_enabled
-        ):
-            administration.banner_image_enabled = banner_image_enabled
-            administration_updated = True
-        if (
-            support_enabled is not None
-            and administration.support_enabled != support_enabled
-        ):
+            for option, key in OPTION_RULES.items():
+                changes[key] = option in auth_options
+        if banner_image_enabled is not None:
+            changes["banner_image"] = banner_image_enabled
+        if support_enabled is not None:
             # Switching it on offers the community's members a form. Where the
             # deployment has bound no support stream, that form has nowhere to
             # send what somebody writes in it, so the entitlement is refused
@@ -1413,15 +1410,32 @@ async def update_guild(
             # help stops offering it.
             from app.services.platform.intake import stream_is_bound
 
-            if support_enabled and not await stream_is_bound(IntakeStream.support):
+            if (
+                support_enabled
+                and not plan[guild_id]["help_requests"]
+                and not await stream_is_bound(IntakeStream.support)
+            ):
                 raise SupportIntakeMissingError(
                     GuildMessages.SUPPORT_INTAKE_NOT_CONFIGURED
                 )
-            administration.support_enabled = support_enabled
-            administration_updated = True
-        if administration_updated:
-            session.add(administration)
-            await session.flush()
+            changes["help_requests"] = support_enabled
+        if ai_connections_open is not None:
+            changes[SURFACE_AI_CONNECTIONS] = ai_connections_open
+        if plugins_open is not None:
+            changes[SURFACE_PLUGINS] = plugins_open
+        if custom_roles_open is not None:
+            changes[SURFACE_CUSTOM_ROLES] = custom_roles_open
+        # The deployment's rows: a community's own seat never writes these.
+        for key, value in changes.items():
+            await rules.put(
+                session, key, value, guild_id=guild_id, set_by=SetBy.deployment
+            )
+        await session.flush()
+        # The plan is on every member's community list: each one reads it again.
+        await signal_members_present(session, guild_id=guild_id)
+        from app.services import ai_settings
+
+        ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
     if retention_days_provided:
         from app.services.platform.app_settings import get_or_create_guild_settings
 
@@ -1562,7 +1576,7 @@ async def create_guild_invite(
     # A full guild mints no new invites: every seat is taken, so any code handed
     # out now could only fail at redemption. Raises ``GuildCapacityError``.
     if guest_days is None:
-        await _assert_member_capacity(session, guild_id=guild_id, claiming_seat=False)
+        await assert_member_capacity(session, guild_id=guild_id, claiming_seat=False)
     else:
         guest_days = await _guest_days(session, guild_id=guild_id, days=guest_days)
         await _assert_guest_capacity(session, guild_id=guild_id, claiming_seat=False)
@@ -1697,7 +1711,7 @@ def _give_guest_invite_grants(
         row = await guild_session.get(MODELS_BY_TABLE[tool.plural], grant.resource_id)
         if row is None or grant.level is None:
             return
-        await permissions_service.grant_to_person(
+        await permissions_service.share_with(
             guild_session,
             resource_type=tool,
             resource_id=row.id,
@@ -1801,7 +1815,7 @@ async def delete_guild(
     reached.
     """
     guild_id = guild.id
-    await _signal_members_present(session, guild_id=guild_id, action="membership")
+    await signal_members_present(session, guild_id=guild_id, action="membership")
     if actor_user_id is not None:
         await audit_service.record(
             session,
@@ -1889,7 +1903,6 @@ async def announce_on_hold(session: AsyncSession, guild_id: int) -> None:
     """
     from app.db.session import set_rls_context
     from app.services import email as email_service
-    from app.services.platform import app_settings as app_settings_service
     from app.services.platform import email_outbox, notice_outbox
     from app.services.platform import intake as intake_service
 
@@ -1900,9 +1913,7 @@ async def announce_on_hold(session: AsyncSession, guild_id: int) -> None:
     if guild is None or guild.status != CommunityStatus.on_hold.value:
         return
     contact = await intake_service.contact_for(session, IntakeStream.support)
-    delete_at = COMMUNITY_HOLD.ends_at(
-        guild, await app_settings_service.get_app_settings(session)
-    )
+    delete_at = COMMUNITY_HOLD.ends_at(guild, await rules.platform_values(session))
     seat_holders = (
         await session.exec(
             select(User).where(
@@ -2164,12 +2175,11 @@ async def soft_delete_guild(
     by the time this returns, every one of those people has an account that
     says something different.
     """
-    from app.services.platform import app_settings as app_settings_service
 
     guild_id = guild.id
     # Read while the roster is still there: a community of one loses it below.
     recipients = await _deletion_recipients(session, guild)
-    await _signal_members_present(session, guild_id=guild_id, action="membership")
+    await signal_members_present(session, guild_id=guild_id, action="membership")
     members = await count_members(session, guild_id=guild_id)
     clear_roster = not keep_roster and members <= 1
     await audit_service.record(
@@ -2195,7 +2205,7 @@ async def soft_delete_guild(
         community_name=guild.name,
         recipients=recipients,
         purge_at=COMMUNITY_DELETION.ends_at(
-            guild, await app_settings_service.get_app_settings(session)
+            guild, await rules.platform_values(session)
         ),
     )
 
@@ -2438,10 +2448,17 @@ async def redeem_invite_for_user(
     return guild
 
 
-async def _signal_members_present(
-    session: AsyncSession, *, guild_id: int, action: str = "community"
+async def signal_members_present(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    action: str = "community",
+    reader: AsyncSession | None = None,
 ) -> None:
     """Poke this guild's members: what their account says about it has changed.
+
+    The frames go when ``session`` commits. The members are read on ``reader``
+    where ``session``'s role cannot read the membership, as billing's cannot.
 
     Addressed to the whole membership rather than to the sockets this process
     holds. A frame is published on the cross-worker bus, so narrowing to the
@@ -2454,7 +2471,7 @@ async def _signal_members_present(
     no socket. That is the price of the question being unanswerable from one
     process; they would re-read their account on arriving anyway.
     """
-    rows = await session.exec(
+    rows = await (reader or session).exec(
         select(GuildMembership.user_id).where(GuildMembership.guild_id == guild_id)
     )
     user_stream.queue_signals(session, rows.all(), account_stream.RESOURCE, action)
@@ -2493,11 +2510,8 @@ async def _assert_listable(session: AsyncSession, guild: Guild) -> None:
         )
     if guild.has_adult_content:
         raise CommunityListingError(GuildMessages.COMMUNITY_COMMUNITY_ADULT_CONTENT)
-    administration = await get_administration(session, guild_id=guild.id)
-    if (
-        administration.max_users is not None
-        and administration.max_users < MIN_COMMUNITY_SEATS
-    ):
+    cap = await rules.community_value(session, guild.id, "max_users")
+    if cap is not None and cap < MIN_COMMUNITY_SEATS:
         raise CommunityListingError(GuildMessages.COMMUNITY_COMMUNITY_REQUIRES_CAPACITY)
 
 
@@ -2512,17 +2526,15 @@ def community_listing_filters() -> list:
     Two of the three are CHECK constraints on ``guilds`` as well (a listed
     guild is on a shelf and has declared itself free of adult content), so a
     row that reaches this query already satisfies them. The seat cap is not: it
-    lives on ``guild_administration``, only an operator sets it, and it can be
-    lowered long after the listing was made.
+    is a paid rule, only the deployment sets it, and it can be lowered long
+    after the listing was made.
     """
+    cap = rules.community_rule_sql(Guild.id, "max_users")
     return [
         Guild.is_community.is_(True),
         Guild.status == CommunityStatus.active.value,
-        # NULL is unlimited, hence the explicit null leg.
-        or_(
-            GuildAdministration.max_users.is_(None),
-            GuildAdministration.max_users >= MIN_COMMUNITY_SEATS,
-        ),
+        # No cap is unlimited, hence the explicit null leg.
+        or_(cap.is_(None), cap >= MIN_COMMUNITY_SEATS),
     ]
 
 
@@ -2537,12 +2549,7 @@ async def is_listed_in_directory(session: AsyncSession, *, guild_id: int) -> boo
 
     if not await app_settings_service.community_directory_enabled(session):
         return False
-    statement = (
-        select(func.count())
-        .select_from(Guild)
-        .join(GuildAdministration, GuildAdministration.guild_id == Guild.id)
-        .where(Guild.id == guild_id)
-    )
+    statement = select(func.count()).select_from(Guild).where(Guild.id == guild_id)
     for condition in community_listing_filters():
         statement = statement.where(condition)
     return bool((await session.exec(statement)).one())
@@ -2658,9 +2665,6 @@ async def list_profile_communities(
     stmt = (
         select(Guild)
         .join(GuildMembership, GuildMembership.guild_id == Guild.id)
-        .join(
-            GuildAdministration, GuildAdministration.guild_id == Guild.id, isouter=True
-        )
         .where(GuildMembership.user_id == user_id, *community_listing_filters())
         .order_by(Guild.name.asc())
     )
@@ -2738,16 +2742,8 @@ async def list_community_guilds(
             matches.append(location["country"].astext.in_(query_countries))
         filters.append(or_(*matches))
 
-    # Every guild has exactly one administration row, created with it, so this
-    # is an inner join by construction.
-    administration_join = (
-        GuildAdministration,
-        GuildAdministration.guild_id == Guild.id,
-    )
-    count_statement = select(func.count()).select_from(Guild).join(*administration_join)
-    statement = select(Guild, member_count, already_member > 0).join(
-        *administration_join
-    )
+    count_statement = select(func.count()).select_from(Guild)
+    statement = select(Guild, member_count, already_member > 0)
     for condition in filters:
         statement = statement.where(condition)
         count_statement = count_statement.where(condition)

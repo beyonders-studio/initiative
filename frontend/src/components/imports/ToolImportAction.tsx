@@ -5,14 +5,14 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { EnvelopeImportDialog } from "@/components/imports/EnvelopeImportDialog";
-import { Button } from "@/components/ui/button";
+import { NON_EXPORTABLE_TOOLS } from "@/lib/tools";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { NON_EXPORTABLE_TOOLS } from "@/lib/tools";
+} from "@/ui/dropdown-menu";
 
 export interface ToolImportActionProps {
   tool: Tool;

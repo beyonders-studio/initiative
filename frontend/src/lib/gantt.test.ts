@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildTask } from "@/__tests__/factories";
 import type { TaskEdgeRead } from "@/api/generated/initiativeAPI.schemas";
 import {
+  criticalPath,
   DAY,
   draggedDates,
   ganttWindow,
@@ -10,12 +11,14 @@ import {
   scheduledDates,
   spanOf,
   taskRows,
+  waitingOn,
   wholesOf,
 } from "@/lib/gantt";
 
 const day = (iso: string) => new Date(`${iso}T00:00:00`).getTime();
 const at = (iso: string) => new Date(`${iso}T09:30:00`).toISOString();
 const partOf = (source_id: number, target_id: number): TaskEdgeRead => ({
+  id: source_id * 1000 + target_id,
   source_id,
   target_id,
   relationship_type: "part_of",
@@ -103,5 +106,25 @@ describe("gantt", () => {
     expect(scheduledDates(day("2026-10-31"), 2).due_date).toBe(
       new Date(day("2026-11-02")).toISOString()
     );
+  });
+
+  it("finds what waits on a task through the chain, once each, of the project's", () => {
+    const waits = (source_id: number, target_id: number): TaskEdgeRead => ({
+      id: source_id * 1000 + target_id,
+      source_id,
+      target_id,
+      relationship_type: "depends_on",
+    });
+    const edges = [waits(2, 1), waits(3, 2), waits(4, 2), waits(1, 3), waits(9, 1)];
+    expect(waitingOn(1, edges, new Set([1, 2, 3, 4])).sort()).toEqual([2, 3, 4]);
+
+    // The chain ending last: 4 ends after 3, and waits on 2, which waits on 1.
+    const spans = new Map([
+      [1, { end: day("2026-03-03") }],
+      [2, { end: day("2026-03-06") }],
+      [3, { end: day("2026-03-08") }],
+      [4, { end: day("2026-03-10") }],
+    ]);
+    expect([...criticalPath(spans, edges.slice(0, 3))]).toEqual([4, 2, 1]);
   });
 });

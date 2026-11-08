@@ -16,7 +16,7 @@
     "titleAria": "Votre groupe a beaucoup à gérer. Il est temps de prendre l'Initiative.",
     "subtitle": "Les projets, tâches, fichiers et plans de votre groupe, au même endroit. Plutôt qu'éparpillés entre un chat de groupe, deux tableurs, un fil d'e-mails de mars et la tête de la personne qui s'en occupe depuis le plus longtemps.",
     "freeTitle": "L'inscription est gratuite",
-    "freeBody": "Votre compte et votre première communauté sont gratuits, et chaque forfait payant commence par 14 jours d'essai gratuits.",
+    "freeBody": "Votre compte et les communautés rien que pour vous sont gratuits, et chaque forfait payant commence par 14 jours d'essai gratuits.",
     "signUp": "S'inscrire",
     "signIn": "Se connecter",
     "download": "Télécharger",
@@ -62,13 +62,12 @@
     "note": "Activez ceux dont votre groupe a besoin. En désactiver un plus tard ne supprime rien.",
     "projects": "Tableaux, listes et calendriers des mêmes tâches, avec des confettis si le cœur vous en dit.",
     "files": "Pages, tableurs et tableaux blancs que vous modifiez ensemble en direct.",
-    "queues": "Gardez la trace de qui a son tour, puisque apparemment ce n'est jamais personne.",
     "counterGroups": "Billets vendus, gâteaux promis, chaises toujours introuvables.",
     "calendars": "Des événements avec réponses et rappels, pour que ce ne soit pas vous qui relanciez tout le monde.",
     "dashboards": "Vos chiffres sur un seul écran, et chacun ne voit que ce à quoi il a accès.",
     "wikis": "Notez ce que le groupe sait, avec des liens qui marchent toujours après un renommage.",
     "posts": "Des annonces qui ne se perdent pas, avec sondages et accusés de lecture.",
-    "galleries": "Les photos de la journée réunies, plutôt que dans six téléphones différents."
+    "contacts": "Tous ceux pour qui ou avec qui vous travaillez, à un geste d’un appel, avec ce qui reste ouvert pour chacun."
   },
   "together": {
     "titleStart": "Fait pour le faire",
@@ -156,10 +155,6 @@
       "rsvpMaybe": "Peut-être",
       "rsvpNo": "Impossible",
       "reminder": "Rappel une heure avant"
-    },
-    "rota": {
-      "title": "Tour des snacks",
-      "detail": "Tour 6, c'est Luis cette semaine"
     },
     "points": {
       "planTitle": "Organiser ensemble",

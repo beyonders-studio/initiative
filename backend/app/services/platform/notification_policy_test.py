@@ -16,7 +16,6 @@ from app.core.notification_categories import NotificationCategory, category_of
 from app.models.platform.email_outbox import EmailOutboxItem
 from app.models.platform.notification import NotificationType
 from app.services import email as email_service
-from app.services.platform import app_settings as app_settings_service
 from app.services.platform import (
     email_outbox,
     notice_outbox,
@@ -27,14 +26,13 @@ from app.testing import (
     create_user,
     push_switched_on,
 )
+from app.services.platform import rules
 
 
 async def _platform(session: AsyncSession, **fields: bool) -> None:
     """Set the deployment's answers, as an owner's PUT would."""
-    row = await app_settings_service.ensure_settings_row(session)
     for name, value in fields.items():
-        setattr(row, name, value)
-    session.add(row)
+        await rules.put(session, name, value)
     await session.commit()
 
 
@@ -78,9 +76,8 @@ async def test_the_deployment_binds_every_community(session: AsyncSession) -> No
 async def test_a_community_answers_only_for_itself(session: AsyncSession) -> None:
     quiet = await create_guild(session)
     other = await create_guild(session)
-    quiet.allow_push_notifications = False
-    quiet.redact_notification_content = True
-    session.add(quiet)
+    await rules.put(session, "allow_push_notifications", False, guild_id=quiet.id)
+    await rules.put(session, "redact_notification_content", True, guild_id=quiet.id)
     await session.commit()
 
     here = await notification_policy.resolve(session, quiet.id)
@@ -98,10 +95,9 @@ async def test_a_community_answers_only_for_itself(session: AsyncSession) -> Non
 async def test_the_stricter_of_the_pair_binds(session: AsyncSession) -> None:
     """A community may narrow what the deployment permits, never widen it."""
     guild = await create_guild(session)
-    guild.allow_push_notifications = True
-    guild.allow_email_notifications = True
-    guild.redact_notification_content = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", True, guild_id=guild.id)
+    await rules.put(session, "allow_email_notifications", True, guild_id=guild.id)
+    await rules.put(session, "redact_notification_content", False, guild_id=guild.id)
     await session.commit()
     await _platform(
         session,
@@ -119,8 +115,7 @@ async def test_resolve_many_answers_each_community(session: AsyncSession) -> Non
     from, and one for the items belonging to none."""
     quiet = await create_guild(session)
     loud = await create_guild(session)
-    quiet.allow_email_notifications = False
-    session.add(quiet)
+    await rules.put(session, "allow_email_notifications", False, guild_id=quiet.id)
     await session.commit()
 
     answers = await notification_policy.resolve_many(session, [quiet.id, loud.id, None])
@@ -189,8 +184,7 @@ async def test_a_community_that_declines_push_gets_none(
     session: AsyncSession, push_on
 ) -> None:
     guild = await create_guild(session)
-    guild.allow_push_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
     user = await create_user(session, email="declines-push@example.com")
 
@@ -201,8 +195,7 @@ async def test_a_redacting_community_sends_the_kind_of_thing(
     session: AsyncSession, push_on
 ) -> None:
     guild = await create_guild(session)
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     user = await create_user(session, email="redacts@example.com")
 
@@ -226,8 +219,7 @@ async def test_a_redacted_push_reads_the_recipients_language(
     session: AsyncSession, push_on
 ) -> None:
     guild = await create_guild(session)
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     user = await create_user(session, email="french-push@example.com", locale="fr")
 
@@ -249,8 +241,7 @@ async def test_a_community_that_declines_email_writes_nothing(
     session: AsyncSession, configured
 ) -> None:
     guild = await create_guild(session)
-    guild.allow_email_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_email_notifications", False, guild_id=guild.id)
     await session.commit()
     user = await create_user(session, email="declines-email@example.com")
 
@@ -271,8 +262,7 @@ async def test_a_redacting_community_stores_no_more_than_the_mail_will(
     session: AsyncSession, configured
 ) -> None:
     guild = await create_guild(session)
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     user = await create_user(session, email="redacted-email@example.com")
 
@@ -378,8 +368,7 @@ async def test_the_next_transaction_reads_the_switches_again(
 
     await session.exec(select(1))
     first, _body = await _mention_push(session, user, guild.id)
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     await session.exec(select(1))
     second, _body = await _mention_push(session, user, guild.id)

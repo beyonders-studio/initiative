@@ -120,6 +120,7 @@
   "imageDialog": {
     "urlTab": "URL",
     "fileTab": "File",
+    "filesTab": "Files",
     "imageUrl": "Image URL",
     "imageUrlPlaceholder": "https://example.com/picture.png",
     "altText": "Alt text",
@@ -153,9 +154,6 @@
       "total_one": "{{count}} task",
       "total_other": "{{count}} tasks",
       "none": "No tasks match.",
-      "previous": "Previous",
-      "next": "Next",
-      "page": "Page {{page}} of {{pages}}",
       "label": "Label",
       "labelPlaceholder": "Open launch tasks",
       "from": "From",
@@ -182,12 +180,17 @@
       "assignee": "Assignee",
       "checklist": "Done",
       "due": "Due date",
+      "email": "Email",
+      "phone": "Phone",
       "priority": "Priority",
       "progress": "Progress",
       "status": "Status",
       "value": "Value",
       "when": "Date"
     },
+    "callHint": "Click to call",
+    "contactEmail": "Contact email",
+    "contactPhone": "Contact phone",
     "counterValue": "Counter value",
     "eventWhen": "Event date",
     "insert": "Smart chip",
@@ -206,6 +209,35 @@
     "taskDue": "Task due date",
     "taskPriority": "Task priority",
     "taskStatus": "Task status",
-    "whichFact": "Which fact should the chip show?"
+    "whichFact": "Which fact should the chip show?",
+    "writeHint": "Click to write"
+  },
+  "summary": {
+    "title": "Summary",
+    "aiNotEnabled": "AI features are not enabled. Configure AI settings to generate summaries.",
+    "generateDescription": "Generate an AI-powered summary of this document.",
+    "generateButton": "Generate Summary",
+    "generateError": "Failed to generate summary. Please try again.",
+    "generating": "Generating summary…",
+    "copy": "Copy summary",
+    "regenerate": "Regenerate summary",
+    "cut": "Written from the first {{percent}}% of it. The rest did not fit."
+  },
+  "writing": {
+    "menu": "Writing help",
+    "rewrite": "Rewrite",
+    "shorten": "Shorten",
+    "fix": "Fix spelling and grammar",
+    "translate": "Translate…",
+    "continue": "Continue writing",
+    "preview": "Suggested text",
+    "writing": "Writing…",
+    "discard": "Discard",
+    "insert": "Insert",
+    "insertBelow": "Insert below",
+    "replace": "Replace",
+    "changed": "The text changed while writing. Insert this below it instead, or discard it.",
+    "cannotKeep": "Writing help can't put this selection back whole: it runs across list items or a heading, or holds something like a picture. Select text within one of them instead.",
+    "error": "Couldn't write that. Please try again."
   }
 }

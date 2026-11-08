@@ -33,9 +33,11 @@
     "autoUpdateOff": "Les mises à jour sont désormais appliquées manuellement.",
     "upgradeTo": "Mettre à jour vers {{version}}",
     "upToDate": "À jour",
+    "updateWaiting": "Mise à jour en attente",
     "upgraded": "Mise à jour vers {{version}}.",
     "removeManagedNeutral": "Les frais de ce plug-in sont gérés par votre fournisseur.",
-    "removeManagedAction": "Gérer"
+    "removeManagedAction": "Gérer",
+    "closed": "La personne qui gère ce serveur s'occupe des plug-ins de cette communauté."
   },
   "updates": {
     "wants": "La version {{version}} souhaite :",
@@ -44,7 +46,8 @@
     "decline": "Refuser",
     "declined": "Vous avez refusé la version {{version}}. Le plug-in reste sur sa version actuelle.",
     "declinedDone": "Version {{version}} refusée.",
-    "moved": "Une autre version est maintenant disponible. Vérifiez ce qu'elle demande."
+    "moved": "Une autre version est maintenant disponible. Vérifiez ce qu'elle demande.",
+    "refused": "La version {{version}} ne peut pas fonctionner sur ce serveur."
   },
   "install": {
     "title": "Ajouter {{name}}",
@@ -250,7 +253,7 @@
       "comments": "Commentaires",
       "relationships": "Liens",
       "tags": "Étiquettes",
-      "properties": "Propriétés",
+      "properties": "Métadonnées",
       "sharing": "Partage",
       "members": "Membres",
       "initiatives": "Initiatives",
@@ -264,10 +267,6 @@
       "files": {
         "read": "Lire les fichiers",
         "write": "Lire et modifier les fichiers"
-      },
-      "queues": {
-        "read": "Lire les files",
-        "write": "Lire et modifier les files"
       },
       "counter_groups": {
         "read": "Lire les compteurs",
@@ -285,13 +284,13 @@
         "read": "Lire les publications",
         "write": "Lire et modifier les publications"
       },
-      "galleries": {
-        "read": "Lire les galeries",
-        "write": "Lire et modifier les galeries"
-      },
       "wikis": {
         "read": "Lire les wikis",
         "write": "Lire et modifier les wikis"
+      },
+      "contacts": {
+        "read": "Lire les contacts",
+        "write": "Lire et modifier les contacts"
       },
       "comments": {
         "read": "Lire les commentaires",
@@ -306,8 +305,8 @@
         "write": "Lire et modifier les étiquettes"
       },
       "properties": {
-        "read": "Lire les propriétés personnalisées et leurs options",
-        "write": "Lire, créer et modifier les propriétés personnalisées"
+        "read": "Lire les métadonnées de l'initiative et leurs options",
+        "write": "Lire, créer et modifier les métadonnées de l'initiative"
       },
       "sharing": {
         "read": "Voir qui a accès à quoi",

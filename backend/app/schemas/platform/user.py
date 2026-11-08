@@ -43,7 +43,6 @@ from app.core.identity_boundary import (
 )
 from app.models.platform.user import Presence, UserRole, UserStatus
 from app.services.platform import user_avatars
-from app.core.config import settings
 
 # ``avatar_url`` is where a user's picture is: either a path this API serves
 # (``/api/v1/users/{id}/avatar/{sha256}`` — the bytes live in ``user_avatars``
@@ -734,11 +733,11 @@ class UserRead(UserBase):
     timezone: str = "UTC"
     event_reminder_minutes_before: Optional[int] = 15
     last_overdue_notification_at: Optional[datetime] = None
-    last_task_assignment_digest_at: Optional[datetime] = None
     color_theme: str = "kobold"
     task_completion_visual_feedback: str = "none"
     task_completion_audio_feedback: bool = True
     task_completion_haptic_feedback: bool = True
+    smart_task_titles: bool = True
     locale: str = "en"
     # True when the account has a linked external identity (SSO). Consumed by
     # the profile/deletion UI to hide the password confirmation, since SSO-only
@@ -762,19 +761,12 @@ class UserRead(UserBase):
     #: The demo copy this account was made for; ``None`` for every other
     #: account. Populated with the fields above.
     demo_community_id: Optional[int] = None
+    #: Whether this account may create a community: the deployment lets
+    #: anybody (``community_creation_enabled``), or the account manages
+    #: communities. Never a suspended account or a demo visitor. Populated
+    #: with the fields above.
+    can_create_communities: bool = False
     initiative_roles: List["UserInitiativeRole"] = Field(default_factory=list)
-
-    @computed_field(return_type=bool)  # type: ignore[misc]
-    @property
-    def can_create_communities(self) -> bool:
-        if self.status == UserStatus.suspended or self.demo_expires_at is not None:
-            return False
-        if not settings.DISABLE_GUILD_CREATION:
-            return True
-        # When disabled, only platform roles that manage guilds can create them.
-        return Capability.COMMUNITIES_MANAGE in standing_capabilities(
-            self.role, self.status
-        )
 
     @computed_field(return_type=List[Capability])  # type: ignore[misc]
     @property
@@ -941,6 +933,7 @@ class UserSelfUpdate(SanitizedBaseModel):
     task_completion_visual_feedback: Optional[str] = None
     task_completion_audio_feedback: Optional[bool] = None
     task_completion_haptic_feedback: Optional[bool] = None
+    smart_task_titles: Optional[bool] = None
     locale: Optional[str] = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
 
     @field_validator("avatar_url")

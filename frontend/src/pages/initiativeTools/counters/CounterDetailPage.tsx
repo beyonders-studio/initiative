@@ -16,15 +16,7 @@ import { useTranslation } from "react-i18next";
 import { type CounterRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { EditCounterDialog } from "@/components/initiativeTools/counters/EditCounterDialog";
 import { CounterView } from "@/components/initiativeTools/counters/views/CounterView";
-import { CounterFocusSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
   useCounterGroup,
@@ -38,7 +30,15 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { getContrastingTextColor } from "@/lib/counter-color";
 import { isAtMax, isAtMin } from "@/lib/counter-math";
 import { counterRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
+import { CounterFocusSkeleton } from "@/ui/page-skeletons";
 
 const SWIPE_THRESHOLD_PX = 60;
 
@@ -136,6 +136,7 @@ export function CounterDetailPage() {
           keys="counterGroups:"
           backTo={gp(toolListRoute(Tool.counter_group, initiativeId))}
           backLabel={t("backToGroups")}
+          entity={groupId === null ? undefined : { kind: "counter_group", id: groupId }}
         />
       </div>
     );

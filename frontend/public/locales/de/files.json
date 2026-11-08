@@ -10,9 +10,12 @@
   "columns": {
     "owner": "Eigentümer",
     "type": "Typ",
+    "created": "Erstellt",
+    "added": "Hinzugefügt",
     "community": "Community",
     "initiative": "Initiative",
-    "ownerFallback": "Benutzer {{id}}"
+    "ownerFallback": "Benutzer {{id}}",
+    "size": "Größe"
   },
   "create": {
     "title": "Neue Datei",
@@ -47,11 +50,11 @@
     "templateToggle": "Vorlagenstatus umschalten",
     "fileLabel": "Datei",
     "dropPrompt": "Leg eine Datei hier ab, oder",
-    "fileHelp": "Unterstützt: PDF, Word, Excel, PowerPoint, TXT, HTML, Bilder, Markdown (max. 50 MB)",
-    "fileTooLarge": "Die Datei ist zu groß. Die maximale Größe beträgt 50 MB.",
+    "fileHelp": "Jede Datei außer Programmen. Eine große Datei macht nach einem Verbindungsabbruch dort weiter, wo sie stehen geblieben ist.",
     "creating": "Wird erstellt…",
     "createFile": "Datei erstellen",
     "uploadingFile": "Wird hochgeladen…",
+    "uploadingProgress": "Wird hochgeladen… {{percent}}",
     "uploadFile": "Datei hochladen",
     "createdAttached": "Datei erstellt und angehängt.",
     "created": "Datei erstellt.",
@@ -103,9 +106,15 @@
   "featuredImage": {
     "label": "Beitragsbild",
     "upload": "Bild hochladen",
+    "fromFiles": "Aus Dateien",
     "replace": "Ersetzen",
     "remove": "Entfernen",
     "uploading": "Wird hochgeladen…"
+  },
+  "imageChooser": {
+    "title": "Bild aus Dateien wählen",
+    "description": "Es wird so eingefügt, wie es jetzt ist: Eine neuere Version der Datei ändert es nicht.",
+    "none": "Hier gibt es keine Bilder."
   },
   "outline": {
     "show": "Inhalt anzeigen",
@@ -121,9 +130,6 @@
     "updateAccessError": "Zugriff kann nicht aktualisiert werden",
     "dangerDescription": "Gelöschte Dateien landen im Papierkorb und können vor Ablauf der Aufbewahrungsfrist der Community wiederhergestellt werden.",
     "deleting": "Wird gelöscht…"
-  },
-  "sidePanel": {
-    "summaryTab": "Zusammenfassung"
   },
   "smartLink": {
     "missingUrl": "Dieser Smart-Link hat keine URL.",
@@ -296,15 +302,6 @@
       "replaced_other": "{{count}} Zellen ersetzt"
     }
   },
-  "summary": {
-    "aiNotEnabled": "KI-Funktionen sind nicht aktiviert. Konfiguriere die KI-Einstellungen, um Dateizusammenfassungen zu generieren.",
-    "generateDescription": "Generiere eine KI-gestützte Zusammenfassung dieser Datei.",
-    "generateButton": "Zusammenfassung generieren",
-    "generateError": "Zusammenfassung konnte nicht generiert werden. Bitte versuche es erneut.",
-    "generating": "Zusammenfassung wird generiert…",
-    "copy": "Zusammenfassung kopieren",
-    "regenerate": "Zusammenfassung neu generieren"
-  },
   "type": {
     "template": "Vorlage",
     "file": "Datei"
@@ -322,6 +319,26 @@
     "deleteSuccess": "Version gelöscht",
     "uploadError": "Hochladen der neuen Version fehlgeschlagen",
     "deleteError": "Löschen der Version fehlgeschlagen"
+  },
+  "convert": {
+    "edit": "Bearbeiten",
+    "title": "Zum Bearbeiten umwandeln?",
+    "toSheet": {
+      "xlsx": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte, Formeln, Füllungen, Rahmen und Zahlenformate kommen mit; Diagramme, Bilder und Makros nicht.",
+      "ods": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte und Formeln kommen mit; die Formatierung bleibt zurück.",
+      "values": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter und Werte kommen mit. Formeln kommen als die Werte mit, die sie anzeigen, und die Formatierung bleibt zurück.",
+      "table": "Daraus wird eine Tabelle, die du hier bearbeiten kannst, mit den Zeilen und Spalten als ein Blatt."
+    },
+    "toDocument": {
+      "markdown": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Listen, Tabellen, Links und Textformatierung kommen mit.",
+      "text": "Daraus wird ein Dokument, das du hier bearbeiten kannst, mit dem Text als Absätze.",
+      "word": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Textformatierung, Listen, Tabellen, Links und Bilder kommen mit. Seitenlayout, Kopf- und Fußzeilen, Fußnoten, Kommentare und Textfelder bleiben zurück, und nachverfolgte Änderungen kommen angenommen an."
+    },
+    "replaces": "Die hochgeladene Datei und ihre früheren Versionen werden ersetzt. Über den Export bekommst du jederzeit wieder eine Datei.",
+    "confirm": "Umwandeln",
+    "converting": "Wird umgewandelt…",
+    "success": "Umgewandelt. Jetzt kannst du sie bearbeiten.",
+    "error": "Diese Datei konnte nicht umgewandelt werden."
   },
   "viewer": {
     "loadError": "Datei kann nicht geladen werden",
@@ -341,6 +358,8 @@
     "unknownFileType": "Dieser Dateityp kann im Browser nicht in der Vorschau angezeigt werden.",
     "downloadFile": "Datei herunterladen",
     "image": "Bild",
+    "video": "Video",
+    "audio": "Audio",
     "markdownDocument": "Markdown-Dokument",
     "showSource": "Quelltext anzeigen",
     "showRendered": "Gerendert anzeigen"
@@ -362,12 +381,124 @@
     "noMatchingFiles": "Keine Dateien entsprechen deinen Filtern.",
     "type": "Nach Typ filtern",
     "allTypes": "Alle Typen",
-    "types": {
-      "native": "Textdokument",
-      "file": "Datei",
+    "kinds": {
+      "document": "Dokument",
+      "spreadsheet": "Tabelle",
+      "presentation": "Präsentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Smart-Link",
-      "spreadsheet": "Tabelle"
+      "pdf": "PDF",
+      "image": "Bild",
+      "video": "Video",
+      "audio": "Audio",
+      "text": "Text",
+      "compressed": "Komprimiert",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Schrift",
+      "raw": "Kamera-RAW",
+      "code": "Code",
+      "ebook": "E-Book",
+      "cad": "CAD",
+      "link": "Link",
+      "other": "Sonstiges"
+    }
+  },
+  "collections": {
+    "heading": "Sammlungen",
+    "fileCount_one": "{{count}} Datei",
+    "fileCount_other": "{{count}} Dateien",
+    "addTo": "Zur Sammlung hinzufügen",
+    "addToDescription_one": "Lege diese Datei in eine Sammlung. Sie bleibt in Dateien, und wer sie öffnen kann, ändert sich nicht.",
+    "addToDescription_other": "Lege diese {{count}} Dateien in eine Sammlung. Sie bleiben in Dateien, und wer sie öffnen kann, ändert sich nicht.",
+    "noneToAddTo": "Noch keine Sammlung, zu der du hinzufügen kannst. Benenne unten eine neue.",
+    "namePlaceholder": "Name der neuen Sammlung",
+    "addToNew": "Zu neuer Sammlung hinzufügen",
+    "added_one": "Zu {{name}} hinzugefügt",
+    "added_other": "{{count}} Dateien zu {{name}} hinzugefügt",
+    "created": "{{name}} erstellt",
+    "addFiles": "Dateien hinzufügen",
+    "pickFile": "Welche Datei?",
+    "noFilesToAdd": "Keine Dateien zum Hinzufügen",
+    "fileAdded": "Datei zur Sammlung hinzugefügt",
+    "uploadFiles": "Dateien hochladen",
+    "dropPrompt": "Dateien ablegen, um sie in diese Sammlung hochzuladen",
+    "removeFrom": "Aus der Sammlung entfernen",
+    "removed_one": "{{count}} Datei aus der Sammlung entfernt",
+    "removed_other": "{{count}} Dateien aus der Sammlung entfernt",
+    "emptied": "Ihre letzte Datei ist draußen, also liegt die Sammlung jetzt im Papierkorb",
+    "trash": "In den Papierkorb",
+    "trashTitle": "Diese Sammlung in den Papierkorb legen?",
+    "trashDescription": "Ihre Dateien bleiben, wo sie sind. Bis zum Ende der Aufbewahrungsfrist kann sie aus dem Papierkorb wiederhergestellt werden.",
+    "trashed": "Sammlung in den Papierkorb gelegt",
+    "noFiles": "Noch keine Dateien in dieser Sammlung",
+    "noFilesDescription": "Füge Dateien aus dieser Initiative hinzu oder lege Dateien irgendwo auf dieser Seite ab, um sie hochzuladen.",
+    "loadingFiles": "Dateien werden geladen...",
+    "openFile": "Datei öffnen",
+    "filter": "Sammlung",
+    "anyCollection": "Jede Sammlung",
+    "groupByTag": "Nach Tag gruppieren",
+    "order": "Reihenfolge",
+    "newestFirst": "Neueste zuerst",
+    "oldestFirst": "Älteste zuerst",
+    "views": {
+      "label": "Ansicht",
+      "masonry": "Mauerwerk",
+      "timeline": "Zeitleiste"
+    },
+    "groups": {
+      "untagged": "Ohne Tag",
+      "count_one": "{{count}} Datei",
+      "count_other": "{{count}} Dateien"
+    },
+    "upload": {
+      "progress": "{{done}} von {{total}} werden hochgeladen...",
+      "finished_one": "{{count}} Datei hinzugefügt",
+      "finished_other": "{{count}} Dateien hinzugefügt",
+      "finishedWithFailures": "{{done}} hinzugefügt, {{failed}} nicht möglich",
+      "dismiss": "Ausblenden",
+      "tooLarge": "größer, als dieser Server annimmt"
+    },
+    "backToFiles": "Zurück zu Dateien",
+    "notFound": "Sammlung nicht gefunden",
+    "notFoundDescription": "Die gesuchte Sammlung existiert nicht, oder du kannst keine ihrer Dateien öffnen.",
+    "noAccess": "Zugriff verweigert",
+    "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
+    "error": "Die Sammlung konnte nicht geändert werden",
+    "properties": {
+      "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
+      "create": "Neue Eigenschaft",
+      "edit": "Eigenschaft bearbeiten",
+      "delete": "Eigenschaft löschen",
+      "deleteTitle": "Diese Eigenschaft löschen?",
+      "deleteBody": "Damit werden die Eigenschaft und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
+      "none": "Noch keine Eigenschaften",
+      "heading": "In dieser Sammlung",
+      "saveError": "Der Wert konnte nicht gespeichert werden",
+      "of": "Eigenschaften von {{name}}"
+    },
+    "addedOn": "Hinzugefügt {{date}}",
+    "createdOn": "Erstellt {{date}}",
+    "listHelp": {
+      "masonry": "Jede Datei in ihrer eigenen Form, in Spalten gepackt: was ihre Karte unter dem Bild zeigt.",
+      "grid": "Jede Datei als quadratische Kachel: was ihre Karte unter dem Bild zeigt.",
+      "timeline": "Dateien nach dem Tag, an dem sie hinzugefügt wurden: was jede Karte unter dem Bild zeigt.",
+      "table": "Die Dateien der Sammlung als Tabelle: welche Spalten, in welcher Reihenfolge."
+    },
+    "shapes": {
+      "name": "Name",
+      "blank": "Leer",
+      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Eigenschaften.",
+      "lists": "Zeigt {{lists}}",
+      "properties": "Eigenschaften: {{properties}}",
+      "copyLabel": "Oder die Form übernehmen von",
+      "copyPlaceholder": "Einer anderen Sammlung",
+      "copyHint": "Ihre Eigenschaften und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
+      "create": "Sammlung erstellen"
+    },
+    "required": {
+      "title": "Was {{name}} verlangt",
+      "description": "Jede Datei, die in diese Sammlung kommt, beginnt mit diesen Werten.",
+      "confirm": "Weiter"
     }
   }
 }

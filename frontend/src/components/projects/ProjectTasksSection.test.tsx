@@ -9,7 +9,7 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -76,23 +76,11 @@ const withTags = (ids: number[]) => {
   );
 };
 
-/** A project made before a new one showed its board alone, as the upgrade
- *  left it: its table, board and Gantt shown, opening on its table. */
-const EXISTING_LISTS = (["table", "board", "gantt"] as const).map((kind) => ({
-  kind,
-  is_default: kind === "table",
-  hidden: false,
-  definition: {},
-  updated_at: null,
-}));
-const existingProject = (overrides: Parameters<typeof buildToolLayoutSet>[0] = {}) =>
-  buildToolLayoutSet({ ...overrides, layouts: [...(overrides.layouts ?? []), ...EXISTING_LISTS] });
-
-/** Such a project's layouts, but for `overrides`. */
+/** A project's layouts, but for `overrides`. */
 const withLayouts = (overrides: Parameters<typeof buildToolLayoutSet>[0]) => {
   server.use(
     communityHttp.get("/layouts/", () =>
-      HttpResponse.json<ToolLayoutSetRead>(existingProject(overrides))
+      HttpResponse.json<ToolLayoutSetRead>(buildToolLayoutSet(overrides))
     )
   );
 };
@@ -120,8 +108,8 @@ const rememberView = ({
     ])
   );
   server.use(
-    http.get("/api/v1/user-view-preferences", () =>
-      HttpResponse.json({ items: { "view:1:project:1": { layout, mode: null, parts } } })
+    communityHttp.get("/view-preferences", () =>
+      HttpResponse.json({ items: { "view:project:1": { layout, mode: null, parts } } })
     )
   );
 };
@@ -130,7 +118,7 @@ const rememberView = ({
 const captureViewWrites = () => {
   const writes: unknown[] = [];
   server.use(
-    http.put("/api/v1/user-view-preferences/:scopeKey", async ({ request }) => {
+    communityHttp.put("/view-preferences/:scopeKey", async ({ request }) => {
       writes.push(((await request.json()) as { value: unknown }).value);
       return HttpResponse.json({});
     })
@@ -202,6 +190,7 @@ describe("ProjectTasksSection layouts", () => {
       "Table",
       "Board",
       "Gantt",
+      "Calendar",
     ]);
   });
 
@@ -281,7 +270,7 @@ describe("ProjectTasksSection layouts", () => {
     let taskRequests = 0;
     server.use(
       communityHttp.get("/layouts/", () =>
-        fail ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(existingProject())
+        fail ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(buildToolLayoutSet())
       ),
       communityHttp.get("/tasks/", () => {
         taskRequests += 1;

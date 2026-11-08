@@ -10,8 +10,7 @@ from sqlmodel import select
 
 from app.core.config import settings
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.export_job import ExportJobStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeJoinPolicy
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
@@ -44,8 +43,8 @@ async def exported(client, acting_user, session, tmp_path):
     assert queued.status_code == 202, queued.text
     await export_worker.process_export_jobs()
     job_id = queued.json()["id"]
-    job = await client.get(a.g(f"/exports/jobs/{job_id}"), headers=a.headers)
-    assert job.json()["status"] == ExportJobStatus.done.value
+    job = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
+    assert job.json()["status"] == DataJobStatus.done.value
     download = await client.get(
         a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers
     )
@@ -63,7 +62,7 @@ async def _restore(session, a, bundle: Path, anchor: datetime | None) -> Initiat
         guild_id=guild_id,
         user=a.user,
         payload=bundle,
-        status=ImportJobStatus.queued,
+        status=DataJobStatus.queued,
         anchor=anchor,
     )
     await session.commit()
@@ -72,8 +71,8 @@ async def _restore(session, a, bundle: Path, anchor: datetime | None) -> Initiat
 
     session.expire_all()
     await route_session_to_guild(session, guild_id)
-    job = await session.get(ImportJob, job_id)
-    assert job is not None and job.status == ImportJobStatus.done, job.error
+    job = await session.get(DataJob, job_id)
+    assert job is not None and job.status == DataJobStatus.done, job.error
     (restored,) = job.result["initiatives"]
     initiative = await session.get(Initiative, restored["initiative_id"])
     assert initiative is not None

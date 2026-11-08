@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import GuildContext, RLSSessionDep, get_guild_membership
 from app.db.session import routed_context
+from app.schemas.field_catalog import FieldDescription
 from app.schemas.sql_query import (
     QueryBuildRequest,
     QueryFilterGroupSpec,
@@ -30,10 +31,15 @@ from app.schemas.sql_query import (
     QueryColumnDescription,
     QueryRequest,
     QueryResponse,
+    QueryPluginDescription,
     QueryShapeResponse,
+    QuerySheetDescription,
 )
+from app.services import fields as fields_registry
 from app.services import query as query_service
 from app.services.query import build as query_builder
+from app.services.query import plugins as query_plugins
+from app.services.query.resolve import PluginCall, SheetCall
 
 router = APIRouter()
 
@@ -46,14 +52,47 @@ async def describe_query(
 ) -> QueryShapeResponse:
     """Say what one statement would return, without running it.
 
-    Costs a plan and no rows, so a builder may ask as often as it likes.
+    Costs a plan and no rows, so a builder may ask as often as it likes: a
+    plug-in it reads is described from its declaration, not called.
     """
-    columns, relations = await query_service.describe(
-        payload.sql,
+    columns, statement = await query_service.describe(
+        await query_plugins.with_rows(session, payload.sql, fetch=False),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
-    return QueryShapeResponse(columns=_described(columns), relations=list(relations))
+    return QueryShapeResponse(
+        columns=_described(columns),
+        relations=list(statement.relations),
+        sheets=_sheets(statement),
+        plugins=_plugins(statement),
+    )
+
+
+def _sheets(statement: query_service.ResolvedQuery) -> list[QuerySheetDescription]:
+    """The ranges a statement read, as both endpoints describe them."""
+    return [
+        QuerySheetDescription(
+            alias=alias,
+            sheets=list(sheet.sheet_names),
+            fields=[
+                FieldDescription(**entry) for entry in fields_registry.describe(sheet)
+            ],
+        )
+        for alias, sheet in statement.sheets
+    ]
+
+
+def _plugins(statement: query_service.ResolvedQuery) -> list[QueryPluginDescription]:
+    """The plug-in endpoints a statement read, as both endpoints describe them."""
+    return [
+        QueryPluginDescription(
+            alias=alias,
+            fields=[
+                FieldDescription(**entry) for entry in fields_registry.describe(rows)
+            ],
+        )
+        for alias, rows in statement.plugins
+    ]
 
 
 def _described(
@@ -78,8 +117,8 @@ async def run_query(
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
 ) -> QueryResponse:
     """Read one statement and return its rows."""
-    result = await query_service.run(
-        payload.sql,
+    result = await query_service.execute(
+        await query_plugins.with_rows(session, payload.sql),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
@@ -104,13 +143,17 @@ async def build_query(
     plan and no rows, so asking on each click is affordable.
     """
     sql = query_builder.build(_spec(payload))
-    columns, relations = await query_service.describe(
-        sql,
+    columns, statement = await query_service.describe(
+        await query_plugins.with_rows(session, sql, fetch=False),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
     return QueryBuildResponse(
-        sql=sql, columns=_described(columns), relations=list(relations)
+        sql=sql,
+        columns=_described(columns),
+        relations=list(statement.relations),
+        sheets=_sheets(statement),
+        plugins=_plugins(statement),
     )
 
 
@@ -130,6 +173,21 @@ def _spec(payload: QueryBuildRequest) -> query_builder.QuerySpec:
     """The request as the builder's own vocabulary."""
     return query_builder.QuerySpec(
         dataset=payload.dataset,
+        sheet=SheetCall(file=payload.sheet.file, range=payload.sheet.range)
+        if payload.sheet
+        else None,
+        plugin=PluginCall(
+            plugin=payload.plugin.plugin,
+            endpoint=payload.plugin.endpoint,
+            params=tuple(
+                sorted(
+                    (name, tuple(value) if isinstance(value, list) else value)
+                    for name, value in payload.plugin.params.items()
+                )
+            ),
+        )
+        if payload.plugin
+        else None,
         columns=tuple(
             query_builder.Column(
                 field=column.field,

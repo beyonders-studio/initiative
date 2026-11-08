@@ -23,7 +23,10 @@ migrations (``scripts/gen_guild_migration.py``).
 
 from __future__ import annotations
 
+import json
+
 import re
+from collections.abc import Callable
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.dialects import postgresql
@@ -31,23 +34,30 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.schema import CheckConstraint, CreateTable
 
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
-from app.core.tools import INSTALL_METADATA_KIND, ITEM_KINDS, PROPERTY_TARGETS, Tool
+from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
+from app.core.tools import (
+    INSTALL_METADATA_KIND,
+    KINDS,
+    PROPERTY_TARGETS,
+    Tool,
+)
 from app.db.plugin_rls import (
     PLUGIN_REFUSED_TABLES,
     PLUGIN_TABLE_ACCESS,
     SEARCH_ENTRY_READ_SCOPE,
     PluginTableKind,
 )
+from app.db.guild_migrations import split_sql_statements
 from app.db.initiative_rls import (
     ANSWERED,
     COMMENT_PARENTS,
+    ENTITY_INITIATIVE_FN,
     INITIATIVE_PATHS,
     NAMED_PEOPLE,
     NamedPerson,
     initiative_of,
     INITIATIVE_SCOPED_TABLES,
     dac_asks_at_write,
-    entity_tables,
     governing_path,
     managed_write,
     render_content_item_fn,
@@ -56,6 +66,7 @@ from app.db.initiative_rls import (
     InitiativePath,
 )
 from app.db import gucs
+from app.db.presence import VIEW as PRESENCE_VIEW
 from app.db.authorization import (
     IN_POLICY,
     POLICY_SEAT,
@@ -83,6 +94,7 @@ from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.db.tenancy import (
     GUILD_SCOPED_TABLES,
     LEDGER_TABLES,
+    OPERATIONS_TABLES,
     MANAGED_TABLES,
     OWN_ROW_TABLES,
     MEMBER_CREDENTIAL_TABLES,
@@ -90,8 +102,11 @@ from app.db.tenancy import (
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
     SEAT_READ_TABLES,
+    SEAT_SURFACES,
     SEAT_TABLES,
 )
+from app.models.platform.guild import AdminSurface, CommunityRole
+from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
 
@@ -117,22 +132,26 @@ _GUILD_LEVEL_PURGE_TABLES: frozenset[str] = (
     frozenset(SOFT_DELETE_TABLES) - INITIATIVE_SCOPED_TABLES
 )
 
-# Admit only a community's administrator, or trusted system maintenance.
-# Matches the same two legs of initiative_access exactly: the admin fact the
-# standing statement computed from the membership row, and the connection's own
-# login for a sweep.
-_PURGE_GUARD_PREDICATE = f"({IN_POLICY.system} OR {IN_POLICY.admin})"
+#: The reader holds the community's trash: restores anybody's deletions and
+#: purges.
+_HOLDS_TRASH = IN_POLICY.holds(AdminSurface.trash)
+
+# Admit only the holder of the community's trash, or trusted system
+# maintenance: the surface the standing statement computed from the membership
+# row, and the connection's own login for a sweep.
+_PURGE_GUARD_PREDICATE = f"({IN_POLICY.system} OR {_HOLDS_TRASH})"
 
 # Who may READ a row that is in the trash. Deleting something takes it out of
 # sight, so the ordinary answer is nobody: the trash is a place to recover from,
 # not a second copy of the guild's content that outlives the decision to remove
-# it. Two legs open it — the guild admin, who manages the trash for everyone,
-# and whoever deleted the row, who gets their own deletions back from /me/trash.
+# it. Two legs open it — the guild admin, whose reach into all of the
+# community's content takes in its trash, and whoever deleted the row, who gets
+# their own deletions back from /me/trash.
 # RESTRICTIVE, so it AND-combines with the membership gate rather than widening
 # it: a trashed row is still only visible to someone who could see it alive.
 _TRASH_READ_PREDICATE = (
     "deleted_at IS NULL"
-    f" OR {_PURGE_GUARD_PREDICATE}"
+    f" OR {IN_POLICY.system_or_admin}"
     f" OR deleted_by = {gucs.USER_ID.once}"
 )
 
@@ -182,7 +201,7 @@ _HEADER = """\
 --
 -- SCOPE: only INITIATIVE-scoped CONTENT tables are here, exactly
 -- app.db.initiative_rls.INITIATIVE_SCOPED_TABLES. The STRUCTURAL initiative tables
--- (initiatives, initiative_members, initiative_roles, initiative_role_permissions)
+-- (initiatives, initiative_members, initiative_roles, initiative_rules)
 -- are read within the schema boundary (co-members read their roster, and the
 -- standing statement reads the membership table before any standing exists) and
 -- written by their managers — the managed_* policies further down, from
@@ -232,13 +251,13 @@ _GUILD_LEVEL_SECTION = """\
 -- allow-all — it adds no row gate, it just lets the RESTRICTIVE delete policy bind.
 -- ==========================================================================="""
 
-# Header for the own-row section (export_jobs, …).
+# Header for the own-row section (data_jobs, …).
 _OWN_ROW_SECTION = """\
 -- ===========================================================================
 -- Own-row guild-level tables (app.db.tenancy.OWN_ROW_TABLES): rows belong to
 -- ONE user. Unlike guild_level_open, this IS a row gate — a member must not
--- see another member's rows (an export_jobs row leaks the selector and gates
--- the artifact download). Owner OR the community's administrator OR trusted
+-- see another member's rows (a data_jobs row leaks the selector and gates
+-- the file download). Owner OR the community's administrator OR trusted
 -- system maintenance; the last two legs match initiative_access and the purge
 -- guard exactly. A settings rung reads them, and writes them only beside a
 -- read_write grant. A read-only PAM grantee is routed to guild_<id>_ro with
@@ -260,7 +279,46 @@ _MANAGED_SECTION = """\
 -- community's admin, a settings rung beside a read_write grant, or the system
 -- engine. A member's own row into an initiative whose join policy is open is
 -- the one further way in. initiatives keeps its purge guard and trash reads.
+--
+-- private_initiative_read: a private initiative's row reads as absent to
+-- anybody in the community who is not in it. RESTRICTIVE, beside the open
+-- read: its members (read from the roster itself, since the standing
+-- statement reads initiatives before any standing exists), whoever holds an
+-- item shared with them there, the community's admin, a grant, an installed
+-- plug-in (held to its own placements by its policies), a trigger, or the
+-- system engine.
+-- tr_initiatives_community_columns: whether new members of the community join
+-- an initiative (auto_join) and whether it is archived are the community's to
+-- say, not the initiative's managers': only a holder of the initiatives
+-- surface, or the system engine, changes them.
 -- ==========================================================================="""
+
+#: Who reads a private initiative's row. Its members and sharees come from
+#: ``reader_initiatives()``, read from the rows rather than the standing, which
+#: the standing statement is still computing when it reads initiatives.
+_PRIVATE_INITIATIVE_READ = (
+    f"(initiatives.join_policy <> '{InitiativeJoinPolicy.private.value}'"
+    f" OR {IN_POLICY.system} OR {IN_POLICY.admin} OR {IN_POLICY.pam_any}"
+    f" OR {POLICY_SETTINGS_ADMIN} OR {IN_POLICY.install_id} IS NOT NULL"
+    " OR pg_trigger_depth() > 0"
+    " OR initiatives.id = ANY ((SELECT reader_initiatives())::integer[]))"
+)
+
+#: The columns of an initiative the community decides rather than its managers.
+INITIATIVE_COMMUNITY_COLUMNS: tuple[str, ...] = ("auto_join", "archived_at")
+
+_INITIATIVE_COMMUNITY_COLUMNS_FN = f"""
+CREATE OR REPLACE FUNCTION public.fn_initiative_community_columns() RETURNS trigger
+    LANGUAGE plpgsql AS $community_columns$
+BEGIN
+    IF ({" OR ".join(f"NEW.{c} IS DISTINCT FROM OLD.{c}" for c in INITIATIVE_COMMUNITY_COLUMNS)})
+       AND NOT ({IN_POLICY.system} OR {IN_POLICY.holds(AdminSurface.initiatives)}) THEN
+        RAISE EXCEPTION 'the community decides this' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$community_columns$;
+"""
 
 
 #: A member's own row into an initiative that is open to join — the self-join
@@ -307,6 +365,17 @@ def _managed_block(table: str, initiative_expr: str) -> str:
             f"  USING ({_PURGE_GUARD_PREDICATE});",
             *_trash_read_policy(table),
             *_query_trash_policy(table),
+        ]
+    if table == "initiatives":
+        lines += [
+            "DROP POLICY IF EXISTS private_initiative_read ON initiatives;",
+            "CREATE POLICY private_initiative_read ON initiatives AS RESTRICTIVE"
+            f" FOR SELECT USING ({_PRIVATE_INITIATIVE_READ});",
+            _INITIATIVE_COMMUNITY_COLUMNS_FN,
+            "CREATE OR REPLACE TRIGGER tr_initiatives_community_columns"
+            f" BEFORE UPDATE OF {', '.join(INITIATIVE_COMMUNITY_COLUMNS)}"
+            " ON initiatives FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_initiative_community_columns();",
         ]
     return "\n".join(lines)
 
@@ -378,7 +447,11 @@ def _table_block(table: str, path: InitiativePath) -> str:
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
     ]
     for suffix, command, clause, write in _COMMANDS:
-        pred = path.predicate(table, write)
+        pred = (
+            path.folded(table, write, dac_asks_at_write(table, command))
+            if path.folded is not None
+            else path.predicate(table, write)
+        )
         if path.dac is not None:
             # What the command asks of sharing is per table: changing content
             # takes write on the resource, where responding to it (a comment,
@@ -526,14 +599,14 @@ CREATE OR REPLACE FUNCTION public.fn_comment_author_guard() RETURNS trigger
 DECLARE
     lifecycle text[] := ARRAY[{", ".join(f"'{c}'" for c in LIFECYCLE_COLUMNS)}];
 BEGIN
-    IF {IN_POLICY.system} OR ({IN_POLICY.admin} AND {gucs.PURGING})
+    IF {IN_POLICY.system} OR ({_HOLDS_TRASH} AND {gucs.PURGING})
        OR OLD.created_by = {gucs.USER_ID.once} THEN
         RETURN NEW;
     END IF;
     IF (to_jsonb(NEW) - lifecycle) IS NOT DISTINCT FROM (to_jsonb(OLD) - lifecycle) AND (
         (OLD.deleted_at IS NULL AND NEW.deleted_by = {gucs.USER_ID.once})
         OR (NEW.deleted_at IS NULL
-            AND ({IN_POLICY.admin} OR OLD.deleted_by = {gucs.USER_ID.once}))
+            AND ({_HOLDS_TRASH} OR OLD.deleted_by = {gucs.USER_ID.once}))
     ) THEN
         RETURN NEW;
     END IF;
@@ -704,6 +777,126 @@ PLUGIN_CONNECTION_SECRET_FIELDS_TRIGGER = (
 )
 
 
+_CUSTOM_ROLES_SECTION = """\
+-- ===========================================================================
+-- Custom roles (custom_roles, custom_role_members): read within the schema.
+-- Written while the deployment leaves surface.custom_roles open, by a holder
+-- of the surface the write is part of (defining a role is roles, giving one
+-- is members), by a settings rung beside a read_write grant, or by the system
+-- engine. Nobody writes or gives a role holding a surface they do not hold,
+-- and a role on the admin rung takes an admin writer. Taking one off its
+-- holders, by deleting it or the assignment, widens an admin back to every
+-- surface, so that takes a writer who holds every surface. A role the
+-- deployment defined (set_by) is the system engine's to write; the community
+-- gives it as it gives its own (custom_role_set_by_*, RESTRICTIVE).
+--
+-- tr_custom_roles_rung_fixed: a role keeps the rung it was made on.
+-- ==========================================================================="""
+
+_HELD_SURFACES = IN_POLICY.field("held_surfaces")
+
+
+def _gives(role: str) -> str:
+    """The writer may give ``role``: it holds nothing they do not, and a role
+    on the admin rung takes an admin."""
+    return (
+        f"({role}.surfaces <@ {_HELD_SURFACES}"
+        f" AND ({role}.base_rung = '{CommunityRole.member.value}'"
+        f" OR {IN_POLICY.admin}))"
+    )
+
+
+def _takes_off(role: str) -> str:
+    """The writer may take ``role`` off its holders: it holds nothing they do
+    not, and an admin's widens them to every surface, so it takes a writer
+    who holds every one."""
+    return (
+        f"({role}.surfaces <@ {_HELD_SURFACES}"
+        f" AND ({role}.base_rung = '{CommunityRole.member.value}'"
+        f" OR {IN_POLICY.holds_every_surface}))"
+    )
+
+
+def _custom_role_writer(surface: AdminSurface, may: str) -> str:
+    """The system engine, or, while the surface key is open, a settings rung
+    beside a read_write grant or a holder of ``surface`` for whom ``may``."""
+    is_open = (
+        f"NOT ('{SURFACE_CUSTOM_ROLES}' = ANY ({IN_POLICY.field('closed_surfaces')}))"
+    )
+    return (
+        f"({IN_POLICY.system} OR ({is_open} AND ("
+        f"({POLICY_SETTINGS_ADMIN} AND {IN_POLICY.pam_write})"
+        f" OR ({IN_POLICY.holds(surface)} AND {may}))))"
+    )
+
+
+def _role_of(may: Callable[[str], str]) -> str:
+    return (
+        "EXISTS (SELECT 1 FROM custom_roles r"
+        f" WHERE r.id = custom_role_members.role_id AND {may('r')})"
+    )
+
+
+CUSTOM_ROLE_RUNG_FIXED_FN = """
+CREATE OR REPLACE FUNCTION public.fn_custom_role_rung_fixed() RETURNS trigger
+    LANGUAGE plpgsql AS $rung_fixed$
+BEGIN
+    IF NEW.base_rung IS DISTINCT FROM OLD.base_rung THEN
+        RAISE EXCEPTION 'a custom role keeps its rung' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$rung_fixed$;
+"""
+
+
+def _custom_roles_block() -> str:
+    gives = _custom_role_writer(AdminSurface.roles, _gives("custom_roles"))
+    takes_off = _custom_role_writer(AdminSurface.roles, _takes_off("custom_roles"))
+    assigns = _custom_role_writer(AdminSurface.members, _role_of(_gives))
+    unassigns = _custom_role_writer(AdminSurface.members, _role_of(_takes_off))
+    lines: list[str] = []
+    for table, write, remove in (
+        ("custom_roles", gives, takes_off),
+        ("custom_role_members", assigns, unassigns),
+    ):
+        lines += [
+            f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
+            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
+            *(
+                f"DROP POLICY IF EXISTS custom_role_{c} ON {table};"
+                for c in ("select", "insert", "update", "delete")
+            ),
+            f"CREATE POLICY custom_role_select ON {table} AS PERMISSIVE FOR SELECT"
+            "  USING (true);",
+            f"CREATE POLICY custom_role_insert ON {table} AS PERMISSIVE FOR INSERT"
+            f"  WITH CHECK ({write});",
+            f"CREATE POLICY custom_role_update ON {table} AS PERMISSIVE FOR UPDATE"
+            f"  USING ({remove if table == 'custom_role_members' else write})"
+            f" WITH CHECK ({write});",
+            f"CREATE POLICY custom_role_delete ON {table} AS PERMISSIVE FOR DELETE"
+            f"  USING ({remove});",
+        ]
+    communitys = f"({IN_POLICY.system} OR set_by = '{SetBy.community.value}')"
+    lines += [
+        *(
+            f"DROP POLICY IF EXISTS custom_role_set_by_{c} ON custom_roles;"
+            for c in ("insert", "update", "delete")
+        ),
+        "CREATE POLICY custom_role_set_by_insert ON custom_roles AS RESTRICTIVE"
+        f" FOR INSERT WITH CHECK ({communitys});",
+        "CREATE POLICY custom_role_set_by_update ON custom_roles AS RESTRICTIVE"
+        f" FOR UPDATE USING ({communitys}) WITH CHECK ({communitys});",
+        "CREATE POLICY custom_role_set_by_delete ON custom_roles AS RESTRICTIVE"
+        f" FOR DELETE USING ({communitys});",
+        CUSTOM_ROLE_RUNG_FIXED_FN,
+        "CREATE OR REPLACE TRIGGER tr_custom_roles_rung_fixed"
+        " BEFORE UPDATE OF base_rung ON custom_roles FOR EACH ROW"
+        " EXECUTE FUNCTION public.fn_custom_role_rung_fixed();",
+    ]
+    return "\n".join(lines)
+
+
 _SEAT_SECTION = """\
 -- ===========================================================================
 -- Seat-held guild-level tables (app.db.tenancy.SEAT_TABLES): configuration the
@@ -727,6 +920,17 @@ _SEAT_READ_PREDICATE = f"({IN_POLICY.system} OR {POLICY_SEAT})"
 _SEAT_WRITES = f"({POLICY_SEAT} AND ({IN_POLICY.admin} OR {IN_POLICY.pam_write}))"
 
 _SEAT_WRITE_PREDICATE = f"({IN_POLICY.system} OR {_SEAT_WRITES})"
+
+
+def _seat_write_predicate(table: str) -> str:
+    """The seat's write on ``table``: and, where a surface key governs it
+    (``SEAT_SURFACES``), only while the deployment leaves that surface open.
+    The system engine writes either way."""
+    surface = SEAT_SURFACES.get(table)
+    if surface is None:
+        return _SEAT_WRITE_PREDICATE
+    is_open = f"NOT ('{surface}' = ANY ({IN_POLICY.field('closed_surfaces')}))"
+    return f"({IN_POLICY.system} OR ({_SEAT_WRITES} AND {is_open}))"
 
 
 # Seat tables a trigger also writes: table -> the leg OR'd into the INSERT
@@ -776,13 +980,14 @@ def _seat_block(table: str) -> str:
     writing by the seat or the system engine, and inserting by a trigger too
     where ``_SEAT_TRIGGER_WRITTEN_INSERT`` names one."""
     read = _SEAT_READ_PREDICATE if table in SEAT_READ_TABLES else "true"
+    write = _seat_write_predicate(table)
     trigger = _SEAT_TRIGGER_WRITTEN_INSERT.get(table)
-    insert = f"({trigger} OR {_SEAT_WRITE_PREDICATE})" if trigger else None
+    insert = f"({trigger} OR {write})" if trigger else None
     return "\n".join(
         [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
-            *_policies(table, "seat", read, _SEAT_WRITE_PREDICATE, insert=insert),
+            *_policies(table, "seat", read, write, insert=insert),
         ]
     )
 
@@ -1027,37 +1232,38 @@ def _plugin_search_read() -> str:
 
 def _entity_tool_scope(table: str, kinds: tuple[str, ...]) -> str:
     """The scope resource of the tool that governs the thing a ``table`` row
-    names by ``(entity_type, entity_id)`` — a task's is ``projects``."""
-    tables = entity_tables()
-    arms = " ".join(
-        f"WHEN '{kind}' THEN '{tool_resource(governing_path(tables[kind])[0]).value}'"  # ty: ignore[not-subscriptable] — every kind has a tool
-        for kind in kinds
+    names by ``(entity_type, entity_id)`` — a task's is ``projects`` — read
+    from one constant map, which parses far smaller than a branch per kind;
+    a kind it does not hold reads as ``NULL``."""
+    resources = json.dumps(
+        {kind: tool_resource(KINDS[kind].tool).value for kind in kinds},
+        separators=(",", ":"),
     )
-    return f"(CASE {table}.entity_type {arms} END)"
+    return f"(CAST('{resources}' AS jsonb) ->> {table}.entity_type::text)"
 
 
-def _property_values_scope(write: bool) -> str:
-    """An installed plug-in reaches a property value with the scope of the tool
-    that governs the row it is on — a task's with ``projects``."""
+def _metadata_values_scope(write: bool) -> str:
+    """What an installed plug-in reaches of a metadata value, by its
+    definition's owner. A value no plug-in owns takes the scope of the tool
+    that governs the row it is on, a task's ``projects``. A plug-in's own
+    values it reaches on an item with that tool's read scope, for writing
+    too, and on the install itself with none; it writes none while the
+    community's content is on hold. Another install's values it never
+    reaches."""
     held = IN_POLICY.field("install_write" if write else "install_read")
-    scope = _entity_tool_scope("property_values", PROPERTY_TARGETS)
-    return f"({_IID} IS NULL OR {scope} = ANY ({held}))"
-
-
-def _plugin_metadata_scope(write: bool) -> str:
-    """An installed plug-in reaches its own values and no other install's: on
-    an item with the read scope of the tool that governs it, for writing too,
-    and on the install itself with none. It writes none while the community's
-    content is on hold."""
-    held = IN_POLICY.field("install_read")
-    scope = _entity_tool_scope("plugin_metadata", ITEM_KINDS)
-    reach = (
-        f"(plugin_metadata.entity_type = '{INSTALL_METADATA_KIND}'"
-        f" OR COALESCE({scope} = ANY ({held}), false))"
-    )
+    read = IN_POLICY.field("install_read")
+    scope = _entity_tool_scope("metadata_values", PROPERTY_TARGETS)
     hold = f" AND NOT {IN_POLICY.content_hold}" if write else ""
+    # The tool's scope is named once: the one a value no plug-in owns is
+    # written with, or the read scope an install keeps its own with.
     return (
-        f"({_IID} IS NULL OR (plugin_metadata.install_id = {_IID}{hold} AND {reach}))"
+        f"({_IID} IS NULL OR COALESCE((SELECT (md.install_id IS NULL"  # noqa: S608
+        f" OR md.install_id = {_IID}{hold}) AND ((md.install_id IS NOT NULL"
+        f" AND metadata_values.entity_type = '{INSTALL_METADATA_KIND}')"
+        f" OR COALESCE({scope} = ANY (CASE WHEN md.install_id IS NULL THEN {held}"
+        f" ELSE {read} END), false))"
+        " FROM metadata_definitions md WHERE md.id = metadata_values.property_id),"
+        " false))"
     )
 
 
@@ -1080,18 +1286,10 @@ def _plugin_predicates(table: str) -> dict[str, str]:
         }
     if table in PLUGIN_REFUSED_TABLES:
         return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), refused)
-    if table == "property_values":
-        write = _property_values_scope(True)
+    if table == "metadata_values":
+        write = _metadata_values_scope(True)
         return {
-            "SELECT": _property_values_scope(False),
-            "INSERT": write,
-            "UPDATE": write,
-            "DELETE": write,
-        }
-    if table == "plugin_metadata":
-        write = _plugin_metadata_scope(True)
-        return {
-            "SELECT": _plugin_metadata_scope(False),
+            "SELECT": _metadata_values_scope(False),
             "INSERT": write,
             "UPDATE": write,
             "DELETE": write,
@@ -1109,6 +1307,11 @@ def _plugin_predicates(table: str) -> dict[str, str]:
                 f"{_plugin_placed_initiatives()})"
             )
             return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), placed)
+        if table == "batched_notices":
+            # Queued when a plug-in assigns a task; a reaction's line is one
+            # person's gesture, which no plug-in reaches.
+            own = f"({_IID} IS NULL OR batched_notices.kind <> '{BatchedNoticeKind.reaction.value}')"
+            return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), own)
         # The initiative gate already asks of a side effect it governs; one with
         # no gate of its own (timer_marks) is written by a trigger alone.
         if (
@@ -1128,17 +1331,36 @@ def _plugin_predicates(table: str) -> dict[str, str]:
     read = plugin_scope(access.resource, False, IN_POLICY)
     if table == "initiatives":
         read = f"({read} OR initiatives.id IN {_plugin_placed_initiatives()})"
-    elif table == "property_definitions":
+    elif table == "metadata_definitions":
         # A value is set with the scope of the tool its item belongs to, and
-        # any item in the initiative may carry any of its definitions.
+        # any item in the initiative may carry any of its definitions. An
+        # install reads its own definitions and no other install's.
         tools = ", ".join(f"'{tool_resource(tool).value}'" for tool in Tool)
         held = IN_POLICY.field("install_read")
-        read = f"({read} OR {held} && ARRAY[{tools}]::text[])"
+        read = (
+            f"(CASE WHEN metadata_definitions.install_id IS NULL"
+            f" THEN ({read} OR {held} && ARRAY[{tools}]::text[])"
+            f" ELSE ({_IID} IS NULL OR metadata_definitions.install_id = {_IID}) END)"
+        )
     elif table in _PLUGIN_MEMBER_OWN_READ:
         read = f"({read} OR {_PLUGIN_MEMBER_OWN_READ[table]})"
     write = (
         plugin_scope(access.resource, True, IN_POLICY) if access.writable else refused
     )
+    if table == "metadata_definitions":
+        # A project's metadata is part of the project and a collection's of
+        # Files, each written with that tool's scope; an install keeps its
+        # own while the community's content is not on hold.
+        projects = plugin_scope(tool_resource(Tool.project), True, IN_POLICY)
+        files = plugin_scope(tool_resource(Tool.file), True, IN_POLICY)
+        write = (
+            f"(CASE WHEN metadata_definitions.install_id IS NOT NULL"
+            f" THEN ({_IID} IS NULL OR (metadata_definitions.install_id = {_IID}"
+            f" AND NOT {IN_POLICY.content_hold}))"
+            f" WHEN metadata_definitions.project_id IS NOT NULL THEN {projects}"
+            f" WHEN metadata_definitions.collection_id IS NOT NULL THEN {files}"
+            f" ELSE {write} END)"
+        )
     return {"SELECT": read, "INSERT": write, "UPDATE": write, "DELETE": write}
 
 
@@ -1233,6 +1455,67 @@ _RECLAIMS_ROW = (
 )
 
 
+_SHARE_REQUESTS_SECTION = """\
+-- ===========================================================================
+-- Share requests: a person asks for a resource, whoever may share it answers.
+--
+-- RESTRICTIVE, in addition to the table's initiative check:
+--   * a request is read by the person who made it and whoever may share its
+--     resource (resource_shares);
+--   * one is made by the person it names, pending and unanswered, for a
+--     resource in its initiative they can read, or know is there without
+--     reading it (app.db.presence);
+--   * whoever may share the resource answers it;
+--   * one goes when its requester leaves (a trigger), or by the system engine.
+-- ==========================================================================="""
+
+_REQUEST_SHARES = (
+    "resource_shares(share_requests.resource_type, share_requests.resource_id,"
+    f" {_PLUGIN_MEMBER}, share_requests.initiative_id, {STANDING})"
+)
+_REQUEST_READ = (
+    f"({IN_POLICY.system} OR share_requests.user_id = {_PLUGIN_MEMBER}"
+    f" OR {_REQUEST_SHARES})"
+)
+_REQUEST_MADE = (
+    f"(share_requests.user_id = {_PLUGIN_MEMBER}"
+    " AND share_requests.status = 'pending'"
+    " AND share_requests.granted_level IS NULL AND share_requests.scope IS NULL"
+    " AND share_requests.resolved_at IS NULL AND share_requests.resolved_by IS NULL"
+    f" AND ({ENTITY_INITIATIVE_FN}(share_requests.resource_type,"
+    " share_requests.resource_id) = share_requests.initiative_id"
+    f" OR EXISTS (SELECT 1 FROM {PRESENCE_VIEW} ep"
+    " WHERE ep.kind = share_requests.resource_type"
+    " AND ep.id = share_requests.resource_id"
+    " AND ep.initiative_id = share_requests.initiative_id AND NOT ep.trashed)))"
+)
+_REQUEST_ANSWERED = f"({IN_POLICY.system} OR {_REQUEST_SHARES})"
+#: Somebody leaving takes what they asked for with them (the departure
+#: section); nothing else deletes a request but the system engine.
+_REQUEST_REMOVED = f"(pg_trigger_depth() > 0 OR {IN_POLICY.system})"
+
+
+def _share_requests_block() -> str:
+    lines: list[str] = []
+    for name, command, using, check in (
+        ("requests_read", "SELECT", _REQUEST_READ, None),
+        ("requests_made", "INSERT", None, _REQUEST_MADE),
+        ("requests_answered", "UPDATE", _REQUEST_ANSWERED, _REQUEST_ANSWERED),
+        ("requests_removed", "DELETE", _REQUEST_REMOVED, None),
+    ):
+        lines.append(f"DROP POLICY IF EXISTS {name} ON share_requests;")
+        lines.append(
+            f"CREATE POLICY {name} ON share_requests AS RESTRICTIVE FOR {command}"
+        )
+        clauses = []
+        if using is not None:
+            clauses.append(f"USING ({using})")
+        if check is not None:
+            clauses.append(f"WITH CHECK ({check})")
+        lines.append("  " + " ".join(clauses) + ";")
+    return "\n".join(lines)
+
+
 def _sharing_block() -> str:
     """The share gate on ``resource_grants``, one RESTRICTIVE policy per write
     command."""
@@ -1284,12 +1567,99 @@ def _draft_block() -> str:
     )
 
 
+_DEFINITIONS_SECTION = """\
+-- ===========================================================================
+-- An initiative's own metadata (metadata_definitions naming no project,
+-- collection or plug-in): any member defines a field, and adds options to a
+-- choice field as they pick a value nobody has offered; reshaping or removing
+-- one is setting the initiative up, which is its managers' and the
+-- community's admin's.
+--
+-- definition_removal: RESTRICTIVE on DELETE.
+-- tr_metadata_definitions_reshape: an UPDATE by anybody else may only append
+--   options with values the field doesn't have yet: the options already there
+--   come first, exactly as they were, the options stay a list, and every other
+--   column (its update time aside) is left as it is. A policy cannot compare the old row with the new
+--   one.
+-- ==========================================================================="""
+
+#: An initiative's own field, as against a project's, a collection's or a
+#: plug-in's, which their owners' policies govern.
+_INITIATIVE_FIELD = (
+    "project_id IS NULL AND collection_id IS NULL AND install_id IS NULL"
+)
+
+
+def _sets_up(initiative: str) -> str:
+    """Who sets ``initiative`` up: its managers, the community's admin, or the
+    system engine (``property_definitions._manages``)."""
+    return (
+        f"({IN_POLICY.system} OR {IN_POLICY.admin} OR ({IN_POLICY.this_guild}"
+        f" AND {initiative} = ANY ({IN_POLICY.field('manager_initiatives')})))"
+    )
+
+
+def _options(row: str) -> str:
+    """A definition's options as an array: none, SQL or JSON null, reads as
+    empty."""
+    return (
+        f"(CASE WHEN jsonb_typeof({row}.options) = 'array'"
+        f" THEN {row}.options ELSE '[]'::jsonb END)"
+    )
+
+
+_DEFINITION_RESHAPE_FN = f"""
+CREATE OR REPLACE FUNCTION public.fn_metadata_definition_reshape() RETURNS trigger
+    LANGUAGE plpgsql AS $reshape$
+DECLARE
+    v_old jsonb;
+    v_new jsonb;
+BEGIN
+    IF OLD.project_id IS NOT NULL OR OLD.collection_id IS NOT NULL
+       OR OLD.install_id IS NOT NULL OR {_sets_up("OLD.initiative_id")} THEN
+        RETURN NEW;
+    END IF;
+    v_old := {_options("OLD")};
+    v_new := {_options("NEW")};
+    IF (to_jsonb(NEW) - 'options' - 'updated_at')
+           IS DISTINCT FROM (to_jsonb(OLD) - 'options' - 'updated_at')
+       OR v_old IS DISTINCT FROM COALESCE((
+              SELECT jsonb_agg(t.o ORDER BY t.n)
+              FROM jsonb_array_elements(v_new) WITH ORDINALITY AS t(o, n)
+              WHERE t.n <= jsonb_array_length(v_old)
+          ), '[]'::jsonb)
+       OR jsonb_typeof(NEW.options) NOT IN ('array', 'null')
+       OR (SELECT count(DISTINCT o ->> 'value') <> count(*)
+           FROM jsonb_array_elements(v_new) o) THEN
+        RAISE EXCEPTION 'only a manager reshapes this field' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$reshape$;
+"""
+
+
+def _definitions_block() -> str:
+    return "\n".join(
+        [
+            "DROP POLICY IF EXISTS definition_removal ON metadata_definitions;",
+            "CREATE POLICY definition_removal ON metadata_definitions AS RESTRICTIVE"
+            f" FOR DELETE USING (NOT ({_INITIATIVE_FIELD})"
+            f" OR {_sets_up('initiative_id')});",
+            _DEFINITION_RESHAPE_FN,
+            "CREATE OR REPLACE TRIGGER tr_metadata_definitions_reshape"
+            " BEFORE UPDATE ON metadata_definitions FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_metadata_definition_reshape();",
+        ]
+    )
+
+
 _DEPARTURE_SECTION = """\
 -- ===========================================================================
 -- Leaving: when someone's initiative membership row is deleted, every grant
 -- naming them in that initiative is deleted too, owner rows included, and
--- they are taken off its content: task assignees, event attendees, person
--- fields and queue items. Anything they owned there becomes unowned, and a
+-- they are taken off its content: task assignees, event attendees and person
+-- fields. Anything they owned there becomes unowned, and a
 -- community admin can claim it. A trigger, so this happens however the
 -- membership is removed. Leaving the community runs the same function once
 -- more for the community's own content (no initiative).
@@ -1310,9 +1680,10 @@ def _departs(named: NamedPerson) -> str:
     else:
         head = f"DELETE FROM %1$I.{named.table} t"
         frozen = freeze_leg(named.table, "DELETE", alias="t")
+    kept = f" AND NOT ({named.kept})" if named.kept else ""
     return (
         f"    EXECUTE format($q${head} WHERE t.{named.column} = $1"
-        f" AND {initiative} IS NOT DISTINCT FROM $2"
+        f" AND {initiative} IS NOT DISTINCT FROM $2{kept}"
         f" AND (pg_trigger_depth() > 0 OR NOT COALESCE({frozen}, false))$q$,"
         " p_schema) USING p_user_id, p_initiative_id;"
     )
@@ -1398,7 +1769,7 @@ _FREEZE_SECTION = """\
 --   unstamped, for a row that can be trashed but never archived. Unstamped
 --   inside an archived thing is the only state such a row has, so it is asked
 --   about a trashed ancestry alone — otherwise a restore could never put the
---   comments, queue items, counters, pictures and events back.
+--   comments, counters, pictures and events back.
 --
 -- tr_<t>_frozen_delete / tr_<t>_frozen_ancestor_delete: DELETE has no WITH
 -- CHECK, so RLS could only refuse it by returning no rows. A row that carries
@@ -1436,6 +1807,7 @@ def render_guild_rls_ddl() -> str:
     from app.db.guest_access import render_guest_rls_ddl
     from app.db.holds import render_holds_ddl
     from app.db.moderation_log import render_moderation_log_ddl
+    from app.db.presence import render_presence_policies  # noqa: PLC0415
 
     blocks = [_table_block(t, INITIATIVE_PATHS[t]) for t in sorted(INITIATIVE_PATHS)]
     # Shared, and written before the policies that call it. Re-rendered on every
@@ -1495,6 +1867,7 @@ def render_guild_rls_ddl() -> str:
     )
     seats = [_seat_block(t) for t in sorted(SEAT_TABLES)]
     out += "\n\n" + _SEAT_SECTION + "\n\n" + "\n\n".join(seats)
+    out += "\n\n" + _CUSTOM_ROLES_SECTION + "\n\n" + _custom_roles_block()
     out += "\n" + PLUGIN_SECRET_FIELDS_FN + "\n" + PLUGIN_SECRET_FIELDS_TRIGGER
     out += "\n" + AI_KEY_PRESENT_FN + "\n" + AI_KEY_PRESENT_TRIGGER
     ledgers = [_ledger_block(t, p) for t, p in sorted(LEDGER_TABLES.items())]
@@ -1507,8 +1880,11 @@ def render_guild_rls_ddl() -> str:
     plugin_blocks = [_plugin_block(t) for t in sorted(PLUGIN_POLICY_TABLES)]
     out += "\n\n" + _PLUGIN_SECTION + "\n\n" + "\n\n".join(plugin_blocks)
     out += "\n\n" + render_guest_rls_ddl()
+    out += "\n\n" + render_presence_policies()
     out += "\n\n" + _SHARING_SECTION + "\n\n" + _sharing_block()
+    out += "\n\n" + _SHARE_REQUESTS_SECTION + "\n\n" + _share_requests_block()
     out += "\n\n" + _DRAFT_SECTION + "\n\n" + _draft_block()
+    out += "\n\n" + _DEFINITIONS_SECTION + "\n\n" + _definitions_block()
     out += "\n\n" + render_holds_ddl()
     out += "\n\n" + render_moderation_log_ddl()
     out += (
@@ -1562,14 +1938,12 @@ _CONSTRAINT_SQL = text(
 )
 
 
-def _build_tables(sync_conn) -> list[str]:
+def _build_tables(sync_conn, tables: frozenset[str]) -> list[str]:
     md = MetaData()
-    md.reflect(
-        bind=sync_conn, schema=_SRC_SCHEMA, only=lambda n, _m: n in GUILD_SCOPED_TABLES
-    )
+    md.reflect(bind=sync_conn, schema=_SRC_SCHEMA, only=lambda n, _m: n in tables)
     rel = MetaData()
     out: list[str] = []
-    for name in sorted(GUILD_SCOPED_TABLES):
+    for name in sorted(tables):
         t = md.tables[f"{_SRC_SCHEMA}.{name}"].to_metadata(rel, schema=None)
         # CHECK + FK come from pg_get_constraintdef below; drop them here so the
         # CREATE TABLE only carries columns + PRIMARY KEY + UNIQUE.
@@ -1672,6 +2046,7 @@ def _registry_ddl() -> str:
             render_guild_capture_ddl(),
             render_guild_search_ddl(None),
             render_guild_timer_ddl(),
+            render_guild_timer_ddl(operations=True),
         )
     )
 
@@ -1699,6 +2074,41 @@ def rendered_constraint_names() -> frozenset[str]:
     return frozenset(_CONSTRAINT_NAME_RE.findall(_registry_ddl()))
 
 
+#: The table a statement acts on: after ``ON`` (a policy, a trigger, a grant),
+#: or after ``ALTER TABLE``.
+_STATEMENT_TARGET = re.compile(
+    r'\bON\s+(?:TABLE\s+)?(?:"?\w+"?\.)?"?(\w+)"?'
+    r'|\bALTER TABLE\s+(?:"?\w+"?\.)?"?(\w+)"?'
+)
+_OPERATIONS_NAME = re.compile(r"\b(" + "|".join(sorted(OPERATIONS_TABLES)) + r")\b")
+
+
+def is_operations_statement(statement: str) -> bool:
+    """Whether ``statement`` acts on one of :data:`OPERATIONS_TABLES`, which
+    the operations community's schema alone has. Raises for one that names
+    such a table while acting on another: what every community has may not
+    depend on them."""
+    if not _OPERATIONS_NAME.search(statement):
+        return False
+    target = _STATEMENT_TARGET.search(statement)
+    acts_on = target and (target.group(1) or target.group(2))
+    if acts_on not in OPERATIONS_TABLES:
+        raise ValueError(
+            f"a statement on {acts_on} names an operations table: {statement[:120]}"
+        )
+    return True
+
+
+def split_operations(ddl: str) -> tuple[str, str]:
+    """``ddl`` in two: what every community's schema applies, and what the
+    operations community's applies besides."""
+    every: list[str] = []
+    operations: list[str] = []
+    for statement in split_sql_statements(ddl):
+        (operations if is_operations_statement(statement) else every).append(statement)
+    return "".join(f"{s};\n" for s in every), "".join(f"{s};\n" for s in operations)
+
+
 def _guard(conname: str, body: str) -> str:
     # Idempotent ADD CONSTRAINT: skip if a constraint of this name already exists
     # in the current schema (search_path puts the guild schema first).
@@ -1709,23 +2119,24 @@ def _guard(conname: str, body: str) -> str:
     )
 
 
-async def render_guild_schema_ddl(engine: AsyncEngine) -> str:
+async def render_guild_schema_ddl(
+    engine: AsyncEngine,
+    tables: frozenset[str] = GUILD_SCOPED_TABLES - OPERATIONS_TABLES,
+) -> str:
     """Reflect the live ``guild_template`` and return the schema-relative,
-    idempotent structure DDL for provisioning a guild schema."""
+    idempotent structure DDL of ``tables`` for provisioning a guild schema:
+    by default every community's, and :data:`OPERATIONS_TABLES` for the
+    operations community's own."""
     async with engine.connect() as conn:
         # Visible-name resolution: with the template first on the search_path,
         # pg_get_*def emit its tables unqualified (and shared public objects
         # qualified only when shadowed) — keeping the DDL schema-relative.
         await conn.execute(text(f'SET search_path TO "{_SRC_SCHEMA}", public'))
-        table_stmts = await conn.run_sync(_build_tables)
-        index_rows = (
-            await conn.execute(_INDEX_SQL, {"t": sorted(GUILD_SCOPED_TABLES)})
-        ).fetchall()
-        rows = (
-            await conn.execute(_CONSTRAINT_SQL, {"t": sorted(GUILD_SCOPED_TABLES)})
-        ).fetchall()
+        table_stmts = await conn.run_sync(_build_tables, tables)
+        index_rows = (await conn.execute(_INDEX_SQL, {"t": sorted(tables)})).fetchall()
+        rows = (await conn.execute(_CONSTRAINT_SQL, {"t": sorted(tables)})).fetchall()
         trigger_rows = (
-            await conn.execute(_TRIGGER_SQL, {"t": sorted(GUILD_SCOPED_TABLES)})
+            await conn.execute(_TRIGGER_SQL, {"t": sorted(tables)})
         ).fetchall()
 
     rendered = rendered_trigger_names()
@@ -1746,6 +2157,11 @@ async def render_guild_schema_ddl(engine: AsyncEngine) -> str:
                 )
             )
         elif r.contype == "f" and r.tgt in GUILD_SCOPED_TABLES:  # intra-schema only
+            if r.tgt in OPERATIONS_TABLES and r.tbl not in OPERATIONS_TABLES:
+                raise ValueError(
+                    f"{r.tbl}.{r.conname} names {r.tgt}, which only the"
+                    " operations community's schema has"
+                )
             fks.append(
                 _guard(
                     r.conname,

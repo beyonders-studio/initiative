@@ -9,7 +9,7 @@ way anyone who can see a project's tasks can export those.
 
 ``params`` is the calendar page's own selector: ``{"initiative_id", "scope",
 "calendar_ids", "exclude_calendar_ids", "property_filters", "start_after",
-"start_before"}``. It is what an ExportJob row persists,
+"start_before"}``. It is what an export job row persists,
 and what the worker replays here at render time.
 """
 

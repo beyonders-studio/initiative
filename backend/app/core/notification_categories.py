@@ -33,6 +33,10 @@ account notice is somebody else acting on your account, which is why it is not
 optional. The same asymmetry puts ``access_grant_requested`` in ``approvals``
 (waiting on your decision) and its resolutions in ``account`` (somebody else's
 decision landing on you).
+
+Digests (``overdue``, ``coming_up``) are not events but summaries on a
+schedule, each with its own (``notification_prefs.digest_schedule``). They
+write no bell line: what they gather is already there, told as it happened.
 """
 
 from __future__ import annotations
@@ -74,6 +78,8 @@ class NotificationCategory(str, Enum):
     direct_messages = "direct_messages"
     jobs = "jobs"
     account = "account"
+    overdue = "overdue"
+    coming_up = "coming_up"
 
 
 #: How the settings page groups the rows. Presentation only — nothing resolves
@@ -86,6 +92,9 @@ class CategoryGroup(str, Enum):
     community = "community"
     #: Yours alone, outside any community's content.
     account = "account"
+    #: Summaries on a schedule of the account's choosing, each with its own.
+    #: They gather what is already in the bell rather than add to it.
+    digests = "digests"
 
 
 _ON = {
@@ -119,12 +128,19 @@ class CategorySpec:
         return channel in self.mutable_channels
 
     @property
+    def digest(self) -> bool:
+        """A summary on its own schedule rather than an event."""
+        return self.group is CategoryGroup.digests
+
+    @property
     def per_community(self) -> bool:
         """Whether each community can switch this row off on its own."""
         return self.group is CategoryGroup.your_communities
 
 
 _ALL_MUTABLE = frozenset(ALL_CHANNELS)
+#: A digest is a letter and a ping; it writes no line of its own.
+_DIGEST_CHANNELS = frozenset({Channel.email, Channel.push})
 #: In-app stays on; the reachable channels are still the account's own choice.
 _KEEP_IN_APP = frozenset({Channel.email, Channel.push, Channel.desktop})
 
@@ -151,7 +167,6 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         types=frozenset(
             {
                 NotificationType.task_assignment,
-                NotificationType.overdue_tasks,
                 NotificationType.event_invitation,
                 NotificationType.event_cancelled,
                 NotificationType.event_reminder,
@@ -166,11 +181,13 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
     # What you follow, which includes what you made
     # (``personal_items.subscribers_of``): changes, comments, reactions to a
     # post and answers to an event. Ambient: it scales with how busy the
-    # thing is.
+    # thing is. A reminder you set on a task is kept with it, in the same
+    # personal row as a subscription.
     NotificationCategory.subscriptions: CategorySpec(
         types=frozenset(
             {
                 NotificationType.subscription_activity,
+                NotificationType.task_reminder,
                 NotificationType.comment_on_task,
                 NotificationType.comment_on_resource,
                 NotificationType.event_rsvp,
@@ -182,7 +199,8 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         mutable_channels=_ALL_MUTABLE,
     ),
     # What arrived in a community for you to see: a post went up, you were
-    # added to an initiative or a project, your request to join was answered.
+    # added to an initiative or a project, your request to join or to see
+    # something was answered.
     NotificationCategory.news: CategorySpec(
         types=frozenset(
             {
@@ -191,6 +209,8 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.initiative_added,
                 NotificationType.initiative_join_approved,
                 NotificationType.initiative_join_denied,
+                NotificationType.share_granted,
+                NotificationType.share_declined,
             }
         ),
         group=CategoryGroup.your_communities,
@@ -204,6 +224,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         types=frozenset(
             {
                 NotificationType.initiative_join_requested,
+                NotificationType.share_requested,
                 NotificationType.access_grant_requested,
                 NotificationType.plugin_consent_requested,
                 NotificationType.plugin_update_pending,
@@ -276,10 +297,12 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         guild_scoped=True,
         mutable_channels=_ALL_MUTABLE,
     ),
-    # Somebody else acted on this account. Being told is not a preference.
+    # Somebody else acted on this account, or the platform told it something.
+    # Being told is not a preference.
     NotificationCategory.account: CategorySpec(
         types=frozenset(
             {
+                NotificationType.announcement,
                 NotificationType.avatar_removed,
                 NotificationType.username_changed,
                 NotificationType.profile_field_cleared,
@@ -301,7 +324,32 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         guild_scoped=False,
         mutable_channels=_KEEP_IN_APP,
     ),
+    # Every task still overdue, across every community, at the account's time.
+    NotificationCategory.overdue: CategorySpec(
+        types=frozenset({NotificationType.overdue_tasks}),
+        group=CategoryGroup.digests,
+        personal=False,
+        guild_scoped=False,
+        mutable_channels=_DIGEST_CHANNELS,
+    ),
+    # What is due and what starts before the next one. Asked for, never sent
+    # unbidden.
+    NotificationCategory.coming_up: CategorySpec(
+        types=frozenset({NotificationType.coming_up}),
+        group=CategoryGroup.digests,
+        personal=False,
+        guild_scoped=False,
+        mutable_channels=_DIGEST_CHANNELS,
+        defaults={**_ON, Channel.email: False, Channel.push: False},
+    ),
 }
+
+#: The categories that are digests, in the order the settings page lists them.
+DIGEST_CATEGORIES: tuple[NotificationCategory, ...] = tuple(
+    category
+    for category, spec in CATEGORY_SPECS.items()
+    if spec.group is CategoryGroup.digests
+)
 
 
 #: Type -> category, built from the registry so the two can never disagree.

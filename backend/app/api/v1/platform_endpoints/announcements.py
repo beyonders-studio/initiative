@@ -39,6 +39,7 @@ from app.api.deps import (
     require_capability,
 )
 from app.core.capabilities import Capability
+from app.core.image_headers import image_response
 from app.db.session import set_rls_context
 from app.core.messages import ImageMessages, AnnouncementMessages
 from app.models.platform.announcement import (
@@ -88,8 +89,8 @@ async def list_announcements(
 ) -> AnnouncementListResponse:
     """Live announcements for this reader, newest first.
 
-    The archive page asks for the dismissed ones too; an expired notice is
-    gone from both, which is what an end date is for.
+    A bell line opening a notice again asks for the dismissed ones too; an
+    expired notice is gone from both, which is what an end date is for.
     """
     items = await announcements_service.list_for_user(
         session, user=current_user, include_dismissed=include_dismissed
@@ -154,16 +155,7 @@ async def read_announcement_image(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ImageMessages.IMAGE_NOT_FOUND,
         )
-    return Response(
-        content=image.data,
-        media_type=image.content_type,
-        headers={
-            # The digest is in the path, so these bytes are these bytes
-            # forever.
-            "Cache-Control": "private, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return image_response(image.data, image.content_type, shared=False)
 
 
 # --- authoring ---------------------------------------------------------------

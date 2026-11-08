@@ -757,7 +757,7 @@ class TestErasing:
 
 async def _deleted(session: AsyncSession, guild_id: int) -> datetime:
     """Delete the community, and answer a moment past its retention window."""
-    from app.models.platform.app_setting import DEFAULT_GUILD_RETENTION_DAYS
+    from app.core.rules import DEFAULT_GUILD_RETENTION_DAYS
     from app.models.platform.guild import Guild
 
     await set_rls_context(session, Unattributed())

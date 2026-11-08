@@ -21,6 +21,7 @@ Resolution (member M generating in guild G):
 from __future__ import annotations
 
 import logging
+from functools import partial
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
@@ -29,18 +30,18 @@ from sqlalchemy import func, text, update
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db import cohorts
+from app.core.rules import SURFACE_AI_CONNECTIONS
+from app.db import cohorts, post_commit
 from app.db.session import routed_guild_id, set_rls_context
 from app.core.audit_events import AuditEventType
 from app.core.encryption import SALT_AI_API_KEY, decrypt_field, encrypt_field
 from app.core.messages import AIMessages, GuildMessages
 from app.db import session as db_session
-from app.core.guild_auth_options import CommunityAuthOption
 from app.models.platform.ai_connection import PlatformAIConnection
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.tenant.ai_connection import GuildAIConnection, GuildAIConnectionKey
 from app.services.platform.app_settings import get_app_settings, locked_settings
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 from app.schemas.ai_settings import (
     AIConfigMode,
     AIConnectionCommunity,
@@ -52,7 +53,6 @@ from app.schemas.ai_settings import (
     AIProvider,
     ConnectionScope,
     PlatformAIModeResponse,
-    PlatformAIModeUpdate,
     ResolvedAISettings,
     ResolvedAISettingsResponse,
 )
@@ -133,8 +133,8 @@ class _PlatformConfig:
 
 
 # Only the owner-only platform CONNECTIONS are cached (the expensive read). The
-# mode + a monotonic version live on app_settings, which every role can read, so
-# each request reads them fresh on its own (guild) session and reloads the cached
+# mode (the rule ai_config_mode) and a monotonic version (on app_settings) are
+# read by every role, so each request reads them fresh on its own (guild) session and reloads the cached
 # connections only when the version moves. An operator change therefore reaches
 # every worker/replica at once — there is no per-process staleness window.
 _cache: _PlatformConfig | None = None
@@ -173,13 +173,14 @@ async def _load_platform_connections() -> tuple[_ConnRow, ...]:
 async def get_platform_ai_config(session: AsyncSession) -> _PlatformConfig:
     """Resolve the global mode + (in platform mode) operator connections.
 
-    ``mode`` + ``version`` come from ``app_settings`` on the caller's own session
+    ``mode`` (the rule ``ai_config_mode``) and ``version`` (on ``app_settings``)
+    come from the caller's own session
     (cheap, always fresh, seen by every worker). Only platform mode needs the
     operator connections, cached and reloaded whenever ``version`` changes.
     """
     global _cache
-    settings = await get_app_settings(session)
-    mode, version = settings.ai_config_mode, settings.ai_config_version
+    mode = (await rules.platform_values(session))["ai_config_mode"].value
+    version = (await get_app_settings(session)).ai_config_version
     if mode != AIConfigMode.platform.value:
         return _PlatformConfig(mode=mode, version=version, connections=())
     if _cache is not None and _cache.version == version:
@@ -200,10 +201,10 @@ def invalidate_platform_ai_cache() -> None:
     _cache = None
 
 
-async def _bump_ai_config_version(session: AsyncSession) -> None:
+async def bump_ai_config_version(session: AsyncSession) -> None:
     """Advance the version so every worker's cache reloads on its next read.
-    Called on every operator write that changes the mode or a platform
-    connection. The caller owns the commit."""
+    Called on every operator write that changes the mode (as the rule's
+    follow-up) or a platform connection. The caller owns the commit."""
     settings = await get_app_settings(session)
     settings.ai_config_version += 1
     session.add(settings)
@@ -328,6 +329,33 @@ async def record_health(
         await system.exec(stmt)
 
 
+async def turn_off_guild_connections(guild_id: int) -> None:
+    """While a community's AI is off, turn its own connections off, on the
+    system engine. Run once a change that may have switched it off commits."""
+    async with cohorts.system_session(guild_id) as system, system.begin():
+        if await rules.community_value(system, guild_id, "allow_ai"):
+            return
+        await set_rls_context(system, SystemGuild(guild_id))
+        await system.exec(
+            update(GuildAIConnection)
+            .where(col(GuildAIConnection.enabled))
+            .values(enabled=False)
+        )
+
+
+def turn_off_guild_connections_once_committed(
+    session: AsyncSession, guild_id: int
+) -> None:
+    """:func:`turn_off_guild_connections` once ``session`` commits the
+    deployment's rules for the community, which may have switched its AI off.
+    The seat's own change runs it as its rule's follow-up."""
+    post_commit.after_commit(
+        session,
+        partial(turn_off_guild_connections, guild_id),
+        key=("ai_connections_off", guild_id),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Resolution
 # ---------------------------------------------------------------------------
@@ -350,17 +378,7 @@ async def resolve_ai_settings(
         return ResolvedAISettings(enabled=False, source="disabled")
 
     # The community's own answer, while it holds the option that sets it.
-    switch = (
-        await session.exec(
-            select(
-                Guild.allow_ai,
-                guild_entitlements.holds_option(
-                    Guild.id, CommunityAuthOption.restrictions
-                ),
-            ).where(Guild.id == guild_id)
-        )
-    ).first()
-    if switch is not None and not switch[0] and switch[1]:
+    if not await rules.community_value(session, guild_id, "allow_ai"):
         return ResolvedAISettings(enabled=False, source=cfg.mode)
 
     # Connections available in the active mode.
@@ -374,13 +392,17 @@ async def resolve_ai_settings(
             for c in given or [c for c in cfg.connections if not c.community_ids]
             if c.enabled
         ]
-    else:
+    elif await rules.community_value(session, guild_id, SURFACE_AI_CONNECTIONS):
         rows = (
             await session.exec(
                 select(GuildAIConnection).where(GuildAIConnection.enabled.is_(True))
             )
         ).all()
         conns = [_conn_from_guild(r) for r in rows]
+    else:
+        # The deployment has taken the community's own connections away: they
+        # are kept, and not used.
+        conns = []
     # A connection that names no model yet is not one a request can use.
     conns = [c for c in conns if c.model and _provider_or_none(c.provider) is not None]
     if not conns:
@@ -431,34 +453,8 @@ async def get_resolved_ai_settings_response(
 # Platform mode + connection CRUD (config.manage — owner only)
 # ---------------------------------------------------------------------------
 async def get_platform_ai_mode(session: AsyncSession) -> PlatformAIModeResponse:
-    settings = await get_app_settings(session)
-    return PlatformAIModeResponse(mode=AIConfigMode(settings.ai_config_mode))
-
-
-async def update_platform_ai_mode(
-    session: AsyncSession,
-    payload: PlatformAIModeUpdate,
-    *,
-    actor_user_id: int | None = None,
-) -> PlatformAIModeResponse:
-    settings = await get_app_settings(session)
-    before = {"ai_config_mode": settings.ai_config_mode}
-    settings.ai_config_mode = payload.mode.value
-    settings.ai_config_version += 1
-    session.add(settings)
-    changed = audit_service.changed_fields(
-        before, {"ai_config_mode": settings.ai_config_mode}
-    )
-    if actor_user_id is not None and changed["changed"]:
-        await audit_service.record(
-            session,
-            event_type=AuditEventType.PLATFORM_SETTINGS_CHANGED,
-            actor_user_id=actor_user_id,
-            detail={"area": "ai_mode", **changed},
-        )
-    await session.commit()
-    invalidate_platform_ai_cache()
-    return PlatformAIModeResponse(mode=payload.mode)
+    mode = (await rules.platform_values(session))["ai_config_mode"]
+    return PlatformAIModeResponse(mode=mode)
 
 
 def _platform_conn_response(
@@ -579,7 +575,7 @@ async def create_platform_connection(
     session.add(row)
     await session.flush()
     await _give_communities(session, row, payload.community_ids)
-    await _bump_ai_config_version(session)
+    await bump_ai_config_version(session)
     await audit_service.record(
         session,
         event_type=AuditEventType.AI_CONNECTION_CREATED,
@@ -657,7 +653,7 @@ async def update_platform_connection(
     if payload.community_ids is not None:
         await _give_communities(session, row, payload.community_ids)
     session.add(row)
-    await _bump_ai_config_version(session)
+    await bump_ai_config_version(session)
     secret_changed = row.api_key_encrypted != key_before
     changed = audit_service.changed_fields(
         before, audit_service.snapshot(row, AUDITED_PLATFORM_FIELDS)
@@ -688,7 +684,7 @@ async def delete_platform_connection(
     if row is None:
         raise HTTPException(status_code=404, detail=AIMessages.CONNECTION_NOT_FOUND)
     await session.delete(row)
-    await _bump_ai_config_version(session)
+    await bump_ai_config_version(session)
     await audit_service.record(
         session,
         event_type=AuditEventType.AI_CONNECTION_DELETED,
@@ -757,7 +753,9 @@ async def create_guild_connection(
         provider=payload.provider.value,
         base_url=base_url,
         model=_normalize_optional_string(payload.model),
-        enabled=payload.enabled,
+        # While the community's AI is off, a new connection starts off too.
+        enabled=payload.enabled
+        and await rules.community_value(session, guild_id, "allow_ai"),
         is_default=payload.is_default,
     )
     key = (
@@ -831,6 +829,14 @@ async def update_guild_connection(
         # A key goes only where it was given for.
         key = None
     if "enabled" in data and payload.enabled is not None:
+        if (
+            payload.enabled
+            and not row.enabled
+            and not await rules.community_value(
+                session, routed_guild_id(session), "allow_ai"
+            )
+        ):
+            raise HTTPException(status_code=409, detail=AIMessages.NOT_ENABLED)
         row.enabled = payload.enabled
     if "is_default" in data and payload.is_default is not None:
         if payload.is_default:

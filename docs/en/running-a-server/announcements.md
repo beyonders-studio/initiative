@@ -68,7 +68,7 @@ The **category** sets the label and colour on the dialog and in the archive: **R
 - The dialog appears the next time they use Initiative — or, with a path pattern, when they reach that page.
 - **Got it** dismisses it. It comes back only if you asked for more than one acknowledgement, and the dialog says so ("shows once more").
 - Pictures open **full size** on a click.
-- Every notice they were eligible for stays readable afterwards under **Past announcements** — the info icon in the sidebar footer — where read and unread are marked and unread can be filtered on its own.
+- Every notice they close leaves a line in their notifications, already read, that opens it again until the notice reaches its end date or the line clears itself 30 days later.
 
 !!! screenshot "The announcements archive"
     **Show:** the archive page with a mix of read and unread notices, and the unread filter.

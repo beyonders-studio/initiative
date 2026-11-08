@@ -31,15 +31,13 @@ from app.testing import (
     create_comment,
     create_counter_group,
     create_file,
-    create_queue,
-    create_queue_item,
     create_task,
     create_task_status,
     create_user,
     create_wiki,
     create_wiki_page,
 )
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType
 
 
 ActingUser = Callable[..., Awaitable[Actor]]
@@ -305,7 +303,7 @@ async def test_an_embedded_text_file_shows_its_body(
         a.initiative,
         a.user,
         name="Ledger",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={"cells": {"A1": "1"}},
     )
     task = await create_task(session, a.project, title="Roll call")
@@ -731,25 +729,25 @@ async def test_a_reference_reads_the_current_name(
 async def test_every_kind_answers_with_whatever_it_calls_its_name(
     client, session, acting_user: ActingUser
 ) -> None:
-    """A queue item has a label, a task a title, a project a name. The column is
+    """A task has a title, a project and a counter a name. The column is
     derived from the search registry, so none of them is written down twice."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="A task")
-    queue = await create_queue(session, a.initiative, a.user)
-    item = await create_queue_item(session, queue, label="An item")
+    group = await create_counter_group(session, a.initiative, a.user)
+    counter = await create_counter(session, group, name="A counter")
 
     body = await _chips(
         client,
         a,
         f"task:{task.id}",
         f"project:{a.project.id}",
-        f"queue:{queue.id}",
-        f"queue_item:{item.id}",
+        f"counter_group:{group.id}",
+        f"counter:{counter.id}",
     )
     assert body[f"task:{task.id}"]["text"] == "A task"
     assert body[f"project:{a.project.id}"]["text"] == a.project.name
-    assert body[f"queue:{queue.id}"]["text"] == queue.name
-    assert body[f"queue_item:{item.id}"]["text"] == "An item"
+    assert body[f"counter_group:{group.id}"]["text"] == group.name
+    assert body[f"counter:{counter.id}"]["text"] == "A counter"
 
 
 async def test_a_title_stops_at_the_same_gate_a_chip_does(

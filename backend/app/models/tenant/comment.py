@@ -94,12 +94,6 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    queue_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("queues.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
     counter_group_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
@@ -124,16 +118,16 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    gallery_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("galleries.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
     wiki_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("wikis.id", ondelete="CASCADE"), nullable=True
+        ),
+    )
+    contact_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=True
         ),
     )
     # A wiki's conversation happens on its pages: a note about the rota belongs
@@ -143,6 +137,12 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
         default=None,
         sa_column=Column(
             Integer, ForeignKey("wiki_pages.id", ondelete="CASCADE"), nullable=True
+        ),
+    )
+    collection_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=True
         ),
     )
     #: Who said this where it came from, when an import could not match them

@@ -1,7 +1,9 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import type {
+  InitiativeDefaultsRead,
+  InitiativeDefaultsUpdate,
   InitiativeRoleCreate,
   InitiativeRoleRead,
   InitiativeRoleUpdate,
@@ -11,8 +13,11 @@ import type {
 import {
   createInitiativeRole,
   deleteInitiativeRole,
+  getGetInitiativeDefaultsQueryKey,
+  getInitiativeDefaults,
   getListInitiativeRolesQueryKey,
   listInitiativeRoles,
+  updateInitiativeDefaults,
   updateInitiativeRole,
 } from "@/api/generated/initiatives/initiatives";
 import { invalidate, q } from "@/api/query-keys";
@@ -207,3 +212,37 @@ export const PERMISSION_LABEL_KEYS: Record<PermissionKey, string> = Object.fromE
   ]),
   ...EXTRA_PERMISSION_KEYS.map((key) => [key, `settings.permissions.${key}`]),
 ]) as Record<PermissionKey, string>;
+
+/** What the community sets for every initiative in it: the tool switches and
+ *  member permissions an initiative's managers see as set, and whether they
+ *  may add roles. */
+export const useInitiativeDefaults = () => {
+  const communityId = useActiveCommunityId();
+  return useQuery<InitiativeDefaultsRead>({
+    queryKey: getGetInitiativeDefaultsQueryKey(communityId),
+    queryFn: () => getInitiativeDefaults(communityId),
+    enabled: communityId > 0,
+    staleTime: 30 * 1000,
+  });
+};
+
+/** Change what every initiative uses. The community's admins only. */
+export const useSetInitiativeDefaults = () => {
+  const { t } = useTranslation("initiatives");
+  const communityId = useActiveCommunityId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: InitiativeDefaultsUpdate) => updateInitiativeDefaults(communityId, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: getGetInitiativeDefaultsQueryKey(communityId),
+      });
+      // Each initiative answers with its switches as they now stand.
+      void invalidate(q.allInitiatives());
+      toast.success(t("communityDefaults.saved"));
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "initiatives:communityDefaults.error"));
+    },
+  });
+};

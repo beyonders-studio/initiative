@@ -1,31 +1,37 @@
-import { Check, ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  MetadataType,
   type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
-  PropertyType,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { type MemberLike, MemberSelect } from "@/components/members/MemberSearchSelect";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppendPropertyOption } from "@/hooks/useProperties";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Combobox } from "@/ui/combobox";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Input } from "@/ui/input";
+import { toPickerValue } from "@/ui/lib/localDateTime";
+import { cn } from "@/ui/lib/utils";
+import { Slider } from "@/ui/slider";
+
+import { FileFieldInput } from "./FileFieldInput";
+import {
+  counterCount,
+  counterSettings,
+  type FieldDisplay,
+  fileFieldValue,
+  numericValue,
+  scaleValue,
+  steppedCount,
+  withinBounds,
+} from "./propertyHelpers";
+import { SignatureFieldInput } from "./SignatureFieldInput";
 
 type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
 
@@ -35,7 +41,7 @@ export interface PropertyInputProps {
   onChange: (value: unknown) => void;
   disabled?: boolean;
   className?: string;
-  /** Initiative that scopes the `user_reference` picker. Falls back to the
+  /** Initiative that scopes the `user_reference` and `file` pickers. Falls back to the
    *  definition's own `initiative_id` when it carries one (a full
    *  `PropertyDefinitionRead`); required via this prop when the definition
    *  arrives as an embedded `PropertySummary`. */
@@ -48,6 +54,16 @@ export interface PropertyInputProps {
    *  name without a search round-trip (the server returns `{id, display_name}`
    *  on reads). */
   selectedUser?: MemberLike | null;
+  /** How a scale is set: as a number, by stars, or along a bar. A number
+   *  without. */
+  display?: FieldDisplay | null;
+  /** Steps a counter from what it holds when the step lands, so two people
+   *  stepping it at once both count. Without it, a step is a value like any
+   *  other: something nothing has saved yet, a filter. */
+  onStep?: (up: boolean) => void;
+  /** When the item last changed, on its own page, which a signature made
+   *  before it says. */
+  updatedAt?: string | null;
 }
 
 // ── Type guards / coercion helpers ──────────────────────────────────────────
@@ -78,7 +94,7 @@ const coerceStringArray = (value: unknown): string[] => {
   return [];
 };
 
-const coerceUserId = (value: unknown): number | null => {
+const coerceId = (value: unknown): number | null => {
   if (value == null) return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "object" && value !== null && "id" in value) {
@@ -105,9 +121,168 @@ const toDefinitionForPatch = (defn: PropertyDefinitionLike): PropertyDefinitionR
     position: 0,
     color: null,
     options: summary.options ?? null,
+    currency: summary.currency ?? null,
+    counter: summary.counter ?? null,
+    project_id: summary.project_id,
+    collection_id: summary.collection_id,
     created_at: "",
     updated_at: "",
   } as PropertyDefinitionRead;
+};
+
+/** A scale of 0–100 set as its layout draws it: a number, one of five stars
+ *  (each a fifth), or a point along a bar. */
+const ScaleInput = ({
+  name,
+  value,
+  onChange,
+  display,
+  disabled,
+  className,
+}: {
+  name: string;
+  value: number | null;
+  onChange: (value: unknown) => void;
+  display: FieldDisplay;
+  disabled: boolean;
+  className?: string;
+}) => {
+  const { t } = useTranslation("properties");
+  if (display === "stars") {
+    const filled = value === null ? 0 : Math.ceil(value / 20);
+    return (
+      <fieldset aria-label={name} className={cn("flex h-9 min-w-0 items-center", className)}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            aria-pressed={star === filled}
+            aria-label={t("input.stars", { count: star })}
+            disabled={disabled}
+            className="rounded-sm p-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed"
+            onClick={() => onChange(star * 20)}
+          >
+            <Star
+              aria-hidden
+              className={cn(
+                "h-4 w-4",
+                star <= filled ? "fill-current text-warning" : "text-muted-foreground/40"
+              )}
+            />
+          </button>
+        ))}
+      </fieldset>
+    );
+  }
+  if (display === "bar") {
+    return (
+      <div className={cn("flex h-9 items-center", className)}>
+        <Slider
+          min={0}
+          max={100}
+          step={1}
+          value={[value ?? 0]}
+          onValueChange={([next]) => onChange(next)}
+          disabled={disabled}
+          thumbLabel={name}
+        />
+      </div>
+    );
+  }
+  // A whole number from 0 to 100; anything outside is brought within.
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      <Input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={100}
+        step={1}
+        value={value === null ? "" : String(value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const parsed = Math.round(Number(raw));
+          onChange(
+            raw === "" || !Number.isFinite(parsed) ? null : Math.min(100, Math.max(0, parsed))
+          );
+        }}
+        placeholder={t("input.scalePlaceholder")}
+        disabled={disabled}
+        className="bg-transparent"
+      />
+      <span className="shrink-0 text-muted-foreground text-sm">%</span>
+    </div>
+  );
+};
+
+/** A counter: stepped down and up by its step, typed, or reset to its
+ *  initial value, never past its bounds. */
+const CounterInput = ({
+  definition,
+  value,
+  onChange,
+  onStep,
+  disabled,
+  className,
+}: {
+  definition: PropertyDefinitionLike;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  onStep?: (up: boolean) => void;
+  disabled: boolean;
+  className?: string;
+}) => {
+  const { t } = useTranslation("properties");
+  const settings = counterSettings(definition.counter);
+  const count = counterCount(settings, value);
+  const step = (up: boolean) => (onStep ? onStep(up) : onChange(steppedCount(settings, value, up)));
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={t("input.stepDown", { name: definition.name })}
+        disabled={disabled || (settings.min !== null && count <= settings.min)}
+        onClick={() => step(false)}
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      <Input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        aria-label={definition.name}
+        value={coerceNumber(value)}
+        // As typed: the bounds hold it once it is saved, not a digit at a time.
+        onChange={(e) => onChange(numericValue(e.target.value))}
+        placeholder={String(settings.initial)}
+        disabled={disabled}
+        className="w-24 bg-transparent text-center tabular-nums"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={t("input.stepUp", { name: definition.name })}
+        disabled={disabled || (settings.max !== null && count >= settings.max)}
+        onClick={() => step(true)}
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground"
+        aria-label={t("input.reset", { name: definition.name })}
+        disabled={disabled || count === withinBounds(settings, settings.initial)}
+        onClick={() => onChange(withinBounds(settings, settings.initial))}
+      >
+        <RotateCcw className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -121,6 +296,9 @@ export const PropertyInput = ({
   initiativeId,
   canOpen,
   selectedUser,
+  display,
+  onStep,
+  updatedAt,
 }: PropertyInputProps) => {
   const { t } = useTranslation(["properties", "common"]);
 
@@ -130,7 +308,7 @@ export const PropertyInput = ({
   );
 
   switch (definition.type) {
-    case PropertyType.text: {
+    case MetadataType.text: {
       return (
         <Input
           type="text"
@@ -146,7 +324,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.number: {
+    case MetadataType.number: {
       return (
         <Input
           type="number"
@@ -168,7 +346,58 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.checkbox: {
+    case MetadataType.currency: {
+      // An amount, in the currency the property names, beside it.
+      return (
+        <div className={cn("flex items-center gap-2", className)}>
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={coerceNumber(value)}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const parsed = Number(raw);
+              onChange(raw === "" || !Number.isFinite(parsed) ? null : parsed);
+            }}
+            placeholder={t("properties:input.numberPlaceholder")}
+            disabled={disabled}
+            className="bg-transparent"
+          />
+          {definition.currency ? (
+            <span className="shrink-0 text-muted-foreground text-sm">{definition.currency}</span>
+          ) : null}
+        </div>
+      );
+    }
+
+    case MetadataType.scale: {
+      return (
+        <ScaleInput
+          name={definition.name}
+          value={scaleValue(value)}
+          onChange={onChange}
+          display={display ?? "number"}
+          disabled={disabled}
+          className={className}
+        />
+      );
+    }
+
+    case MetadataType.counter: {
+      return (
+        <CounterInput
+          definition={definition}
+          value={value}
+          onChange={onChange}
+          onStep={onStep}
+          disabled={disabled}
+          className={className}
+        />
+      );
+    }
+
+    case MetadataType.checkbox: {
       return (
         <div className={cn("flex h-9 items-center", className)}>
           <Checkbox
@@ -180,7 +409,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.url: {
+    case MetadataType.url: {
       return (
         <Input
           type="url"
@@ -196,7 +425,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.date: {
+    case MetadataType.date: {
       const stored = coerceString(value);
       return (
         <DateTimePicker
@@ -209,12 +438,12 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.datetime: {
+    case MetadataType.datetime: {
       // DateTimePicker stores `yyyy-MM-dd'T'HH:mm` as a local-time string.
       // Convert to a fully-qualified ISO string (with TZ offset) on write so
       // the backend stores an unambiguous instant.
       const stored = coerceString(value);
-      const localValue = stored ? localFromIso(stored) : "";
+      const localValue = stored ? toPickerValue(stored) : "";
       return (
         <DateTimePicker
           value={localValue}
@@ -237,7 +466,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.select: {
+    case MetadataType.select: {
       return (
         <PropertyOptionPicker
           definition={definition}
@@ -251,7 +480,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.multi_select: {
+    case MetadataType.multi_select: {
       return (
         <PropertyOptionPicker
           definition={definition}
@@ -265,8 +494,8 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.user_reference: {
-      const currentId = coerceUserId(value);
+    case MetadataType.user_reference: {
+      const currentId = coerceId(value);
       // The people who can open the row the value sits on; without that row
       // (a filter), the property's initiative. Prefer the explicit prop,
       // falling back to the definition's own initiative when it carries one.
@@ -286,6 +515,32 @@ export const PropertyInput = ({
           emptyMessage={t("properties:input.textPlaceholder")}
           disabled={disabled}
           className={className}
+        />
+      );
+    }
+
+    case MetadataType.file: {
+      return (
+        <FileFieldInput
+          value={coerceId(value)}
+          shown={"value" in definition ? fileFieldValue(definition.value) : null}
+          onChange={onChange}
+          initiativeId={
+            initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null)
+          }
+          disabled={disabled}
+        />
+      );
+    }
+
+    case MetadataType.signature: {
+      return (
+        <SignatureFieldInput
+          name={definition.name}
+          value={value}
+          onChange={onChange}
+          updatedAt={updatedAt}
+          disabled={disabled}
         />
       );
     }
@@ -338,7 +593,6 @@ const PropertyOptionPicker = ({
 }: PropertyOptionPickerProps) => {
   const { t } = useTranslation(["properties", "common"]);
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const { appendOption, isPending } = useAppendPropertyOption();
 
   const isMulti = mode === "multi";
@@ -346,54 +600,16 @@ const PropertyOptionPicker = ({
 
   const knownValues = useMemo(() => new Set(options.map((option) => option.value)), [options]);
 
-  const filteredOptions = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(needle));
-  }, [options, search]);
-
-  const exactLabelMatch = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return null;
-    return options.find((option) => option.label.trim().toLowerCase() === needle) ?? null;
-  }, [options, search]);
-
-  const canCreate = search.trim().length > 0 && !exactLabelMatch && !disabled;
-
-  const handleToggle = (value: string) => {
+  // A failure is toasted by the hook, and rejects so the picker keeps the
+  // typed name to try again.
+  const handleCreate = async (label: string) => {
+    if (isPending) return;
+    const slug = (await appendOption(toDefinitionForPatch(definition), label)).option.value;
     if (isMulti) {
-      const current = selectedMulti ?? [];
-      const next = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value];
-      onChangeMulti(next);
-      return;
-    }
-    if (selected === value) {
-      onChangeSingle(null);
+      if (!selectedArr.includes(slug)) onChangeMulti([...selectedArr, slug]);
     } else {
-      onChangeSingle(value);
+      onChangeSingle(slug);
       setOpen(false);
-    }
-  };
-
-  const handleCreate = async () => {
-    if (!search.trim()) return;
-    try {
-      const result = await appendOption(toDefinitionForPatch(definition), search);
-      setSearch("");
-      const slug = result.option.value;
-      if (isMulti) {
-        const current = selectedMulti ?? [];
-        if (!current.includes(slug)) {
-          onChangeMulti([...current, slug]);
-        }
-      } else {
-        onChangeSingle(slug);
-        setOpen(false);
-      }
-    } catch {
-      // Toast surfaced by the hook.
     }
   };
 
@@ -411,146 +627,99 @@ const PropertyOptionPicker = ({
     ? t("properties:input.multiSelectPlaceholder")
     : t("properties:input.selectPlaceholder");
 
-  return (
-    <Popover open={open} onOpenChange={(next) => (!disabled ? setOpen(next) : null)}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "h-9 w-full justify-between bg-transparent font-normal",
-            selectedOptions.length === 0 && "text-muted-foreground",
-            className
-          )}
-        >
-          {selectedOptions.length === 0 ? (
-            <span className="truncate">{placeholder}</span>
-          ) : (
-            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1 overflow-hidden">
-              {selectedOptions.map((option) => (
-                <span
-                  key={option.value}
-                  className={cn(
-                    "inline-flex max-w-full items-center gap-1 truncate rounded-sm px-1.5 py-0.5 text-xs",
-                    option.known
-                      ? "bg-muted text-foreground"
-                      : "bg-muted text-muted-foreground italic"
-                  )}
-                >
-                  {option.color ? (
-                    <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: option.color }}
-                    />
-                  ) : null}
-                  <span className="truncate">
-                    {option.known
-                      ? option.label
-                      : t("properties:input.unknownOption", { value: option.value })}
-                  </span>
-                  {isMulti ? (
-                    // biome-ignore lint/a11y/useSemanticElements: can't nest a <button> inside the parent PopoverTrigger button; span+role is the workaround
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={t("properties:input.clear")}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onChangeMulti((selectedMulti ?? []).filter((v) => v !== option.value));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onChangeMulti((selectedMulti ?? []).filter((v) => v !== option.value));
-                        }
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </span>
-                  ) : null}
+  const shared = {
+    items: options.map((option) => ({
+      value: option.value,
+      label: option.label,
+      icon: option.color ? (
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: option.color }} />
+      ) : undefined,
+    })),
+    open,
+    onOpenChange: setOpen,
+    typedLabel: (typed: string) => typed && t("properties:input.createOption", { label: typed }),
+    onCreate: handleCreate,
+    loading: isPending,
+    searchPlaceholder: t("properties:input.searchOptions"),
+    emptyMessage: t("properties:picker.empty"),
+    disabled,
+    trigger: (
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled}
+        className={cn(
+          "h-9 w-full justify-between bg-transparent font-normal",
+          selectedOptions.length === 0 && "text-muted-foreground",
+          className
+        )}
+      >
+        {selectedOptions.length === 0 ? (
+          <span className="truncate">{placeholder}</span>
+        ) : (
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1 overflow-hidden">
+            {selectedOptions.map((option) => (
+              <span
+                key={option.value}
+                className={cn(
+                  "inline-flex max-w-full items-center gap-1 truncate rounded-sm px-1.5 py-0.5 text-xs",
+                  option.known
+                    ? "bg-muted text-foreground"
+                    : "bg-muted text-muted-foreground italic"
+                )}
+              >
+                {option.color ? (
+                  <span
+                    className="inline-block h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: option.color }}
+                  />
+                ) : null}
+                <span className="truncate">
+                  {option.known
+                    ? option.label
+                    : t("properties:input.unknownOption", { value: option.value })}
                 </span>
-              ))}
-            </span>
-          )}
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={t("properties:input.searchOptions")}
-            value={search}
-            onValueChange={setSearch}
-            disabled={isPending}
-          />
-          <CommandList>
-            {filteredOptions.length === 0 && !canCreate ? (
-              <CommandEmpty>{t("properties:picker.empty")}</CommandEmpty>
-            ) : null}
-            {filteredOptions.length > 0 ? (
-              <CommandGroup>
-                {filteredOptions.map((option) => {
-                  const isSelected = selectedArr.includes(option.value);
-                  return (
-                    <CommandItem
-                      key={option.value}
-                      value={option.value}
-                      onSelect={() => handleToggle(option.value)}
-                      className="flex items-center gap-2"
-                    >
-                      {option.color ? (
-                        <span
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: option.color }}
-                        />
-                      ) : null}
-                      <span className="flex-1 truncate">{option.label}</span>
-                      {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            ) : null}
-            {canCreate ? (
-              <>
-                {filteredOptions.length > 0 ? <CommandSeparator /> : null}
-                <CommandGroup>
-                  <CommandItem
-                    value="__create__"
-                    onSelect={handleCreate}
-                    disabled={isPending}
-                    className="flex items-center gap-2"
+                {isMulti ? (
+                  // biome-ignore lint/a11y/useSemanticElements: can't nest a <button> inside the parent PopoverTrigger button; span+role is the workaround
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("properties:input.clear")}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChangeMulti(selectedArr.filter((v) => v !== option.value));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onChangeMulti(selectedArr.filter((v) => v !== option.value));
+                      }
+                    }}
                   >
-                    <Plus className="h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {t("properties:input.createOption", { label: search.trim() })}
-                    </span>
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            ) : null}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                    <X className="h-3 w-3" />
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </span>
+        )}
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    ),
+  };
+
+  return isMulti ? (
+    <Combobox {...shared} multiple value={selectedArr} onValueChange={onChangeMulti} />
+  ) : (
+    // Choosing the chosen option again clears it.
+    <Combobox
+      {...shared}
+      value={selected || null}
+      onValueChange={(next) => onChangeSingle(next === selected ? null : next)}
+    />
   );
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Convert a stored ISO-8601 timestamp into the local-time `yyyy-MM-dd'T'HH:mm`
- * format the DateTimePicker primitive expects.
- */
-const localFromIso = (iso: string): string => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
-};

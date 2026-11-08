@@ -8,10 +8,12 @@ import {
   CommunityStatusNotice,
   communityStatusNoticeApplies,
 } from "@/components/communities/CommunityStatusNotice";
-import { StatusMessage } from "@/components/StatusMessage";
-import { CommunityHomeSkeleton, PageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { HelpLink } from "@/components/support/HelpLink";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useToolPageTitle } from "@/hooks/useToolPageTitle";
+import { prefetchViewPreferences } from "@/lib/viewPreferences";
+import { CommunityHomeSkeleton, PageSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId")({
   beforeLoad: async ({ context, params, cause }) => {
@@ -57,6 +59,9 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
     // query keys) before child routes render. Per-tab and local only — the
     // community itself travels in each request's /c/{communityId} path.
     await communities?.syncCommunityFromUrl(communityId);
+    // The person's views of the community's lists, which most of its pages
+    // open with.
+    prefetchViewPreferences(communityId);
 
     // Provide validated community info to child routes via route context
     return { urlCommunityId: communityId, urlCommunity: community };
@@ -67,13 +72,20 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
 /** The community subtree's waiting state — shown while the community list is still
  *  arriving, and while this tab is catching up to the URL's community. The front
  *  page gets its own outline; anything deeper gets a page's. */
+/** Names the browser tab after the tool the route is in. A component of its
+ *  own so it asks only once this tab has adopted the URL's community. */
+function ToolPageTitle() {
+  useToolPageTitle();
+  return null;
+}
+
 function CommunityLoading({ communityId }: { communityId: number }) {
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const atHome = pathname === `/c/${communityId}` || pathname === `/c/${communityId}/`;
   return atHome ? <CommunityHomeSkeleton /> : <PageSkeleton />;
 }
 
-export function CommunityLayout() {
+function CommunityLayout() {
   const { t } = useTranslation("communities");
   const params = useParams({ from: "/_serverRequired/_authenticated/c/$communityId" });
   const communityId = Number(params.communityId);
@@ -99,7 +111,7 @@ export function CommunityLayout() {
 
   if (!community) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-app items-center justify-center">
         <StatusMessage
           icon={<ShieldAlert />}
           title={t("notMember.title")}
@@ -116,7 +128,7 @@ export function CommunityLayout() {
   // see it listed, and land here rather than on a page of refusals.
   if (closed) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-app items-center justify-center">
         <StatusMessage
           icon={<Lock />}
           title={t("closed.title")}
@@ -151,6 +163,7 @@ export function CommunityLayout() {
 
   return (
     <>
+      <ToolPageTitle />
       {notice}
       <Outlet />
     </>

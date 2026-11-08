@@ -99,9 +99,9 @@ export function useMyToolRows(tool: Tool, page: number, pageSize: number, view: 
 /**
  * The tools with something behind them, in registry order.
  *
- * A reader who is in no queue anywhere is not offered a queue tab — an empty
+ * A reader who can open no wiki anywhere is not offered a wiki tab — an empty
  * table of a tool they have never used says nothing. Before the counts land,
- * no tab is drawn rather than six that might vanish.
+ * no tab is drawn rather than several that might vanish.
  */
 export const toolsWithContent = (counts: MyToolCountsResponse | undefined): Tool[] =>
   counts ? TOOLS.filter((tool) => (counts.counts[tool] ?? 0) > 0) : [];
@@ -125,7 +125,7 @@ const pagesOf = (results: { data?: unknown; isLoading: boolean; isError: boolean
  * What changed most recently across several kinds of tool, from every
  * community, newest first: each kind's own `/me/{tool}` list at its freshest,
  * merged. Only the kinds the reader has anything of are asked — the counts
- * say which — so a reader in no queue pays for no queue list.
+ * say which — so a reader with no wiki pays for no wiki list.
  */
 export function useRecentlyChangedTools(tools: readonly Tool[], limit: number) {
   const { t } = useTranslation("communityHome");

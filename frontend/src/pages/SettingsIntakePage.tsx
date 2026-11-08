@@ -25,21 +25,6 @@ import {
   type IntakeSettingsRead,
   type IntakeStream,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useDeleteIntakeBinding,
@@ -57,6 +42,15 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** Sentinel for "no community", which a Select cannot express with "". */
 const NONE = "none";
@@ -141,7 +135,7 @@ export const SettingsIntakePage = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <Label>{t("community.label")}</Label>
-          <AsyncCombobox
+          <Combobox
             className="max-w-md"
             aria-label={t("community.label")}
             value={boundCommunityId === null ? NONE : String(boundCommunityId)}

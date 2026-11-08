@@ -1,6 +1,7 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildTask } from "@/__tests__/factories";
@@ -154,6 +155,24 @@ describe("TaskChecklist", () => {
     ]);
   });
 
+  it("says when a suggestion was written from only the newest comments", async () => {
+    server.use(
+      communityHttp.get("/settings/ai/resolved", () =>
+        HttpResponse.json({ enabled: true, source: "platform" })
+      ),
+      communityHttp.post("/tasks/:taskId/ai/checklist", () =>
+        HttpResponse.json({ items: ["Book the hall"], comments_read: 12, comments_total: 40 })
+      )
+    );
+    const user = userEvent.setup();
+    renderChecklist();
+
+    await user.click(await screen.findByRole("button", { name: "AI Generate" }));
+
+    expect(await screen.findByLabelText("Book the hall")).toBeChecked();
+    expect(screen.getByText("Written from the 12 most recent of 40 comments.")).toBeInTheDocument();
+  });
+
   it("offers no edits without write access", async () => {
     stubWrites();
     renderChecklist(false);
@@ -208,5 +227,78 @@ describe("TaskChecklist", () => {
 
     await waitFor(() => expect(listWrites).toHaveLength(1));
     expect((listWrites[0] as { text: string }[])[0].text).toBe(`${LONG} — and more`);
+  });
+
+  it("makes a saved line a task and takes it off the list", async () => {
+    const user = userEvent.setup();
+    stubWrites();
+    const promoted: string[] = [];
+    server.use(
+      communityHttp.post("/tasks/:taskId/checklist/:itemId/promote", ({ params }) => {
+        promoted.push(String(params.itemId));
+        return HttpResponse.json(buildTask({ id: 99, title: "Get it reviewed" }), { status: 201 });
+      })
+    );
+    renderChecklist();
+
+    const buttons = await screen.findAllByLabelText("Make this checklist item a task");
+    await user.click(buttons[1]);
+
+    await waitFor(() => expect(promoted).toEqual(["two"]));
+    await waitFor(() => expect(screen.queryByDisplayValue("Get it reviewed")).toBeNull());
+    expect(screen.getByDisplayValue("Draft the copy")).toBeInTheDocument();
+  });
+
+  it("keeps what is typed into another line while one becomes a task", async () => {
+    const user = userEvent.setup();
+    stubWrites();
+    let answer: () => void = () => {};
+    server.use(
+      communityHttp.post(
+        "/tasks/:taskId/checklist/:itemId/promote",
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = () =>
+              resolve(HttpResponse.json(buildTask({ id: 99 }), { status: 201 }) as Response);
+          })
+      )
+    );
+    // The task as the server holds it, which a refetch hands the checklist.
+    let refetch: (next: ChecklistItem[]) => void = () => {};
+    const Held = () => {
+      const [held, setHeld] = useState(items);
+      refetch = setHeld;
+      return <TaskChecklist taskId={TASK_ID} items={held} canEdit />;
+    };
+    renderPage(() => <Held />, { queryClient: createTestQueryClient() });
+
+    const buttons = await screen.findAllByLabelText("Make this checklist item a task");
+    await user.click(buttons[1]);
+    await user.type(screen.getByDisplayValue("Draft the copy"), " today");
+    answer();
+    await waitFor(() => expect(screen.queryByDisplayValue("Get it reviewed")).toBeNull());
+    act(() => refetch([items[0]]));
+
+    expect(screen.getByDisplayValue("Draft the copy today")).toBeInTheDocument();
+  });
+
+  it("offers no task for a line the server does not hold yet", async () => {
+    const user = userEvent.setup();
+    stubWrites();
+    renderChecklist();
+
+    const first = await screen.findByDisplayValue("Draft the copy");
+    await user.type(first, " now");
+
+    const buttons = screen.getAllByLabelText("Make this checklist item a task");
+    expect(buttons[0]).toBeDisabled();
+    expect(buttons[1]).toBeEnabled();
+  });
+
+  it("offers nothing to a reader who cannot change the task", async () => {
+    renderChecklist(false);
+
+    await screen.findByDisplayValue("Draft the copy");
+    expect(screen.queryByLabelText("Make this checklist item a task")).toBeNull();
   });
 });

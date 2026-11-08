@@ -38,7 +38,7 @@ describe("isPersistablePath", () => {
     expect(isPersistablePath("/api/v1/c/3/tasks/2866")).toBe(true);
     expect(isPersistablePath("/api/v1/c/3/files")).toBe(true);
     expect(isPersistablePath("/api/v1/c/12/projects/1/tasks")).toBe(true);
-    expect(isPersistablePath("/api/v1/c/3/galleries/4")).toBe(true);
+    expect(isPersistablePath("/api/v1/c/3/collections/4")).toBe(true);
     expect(isPersistablePath("/api/v1/c/3/wiki-pages/5")).toBe(true);
   });
 
@@ -78,7 +78,7 @@ describe("isPersistablePath", () => {
     expect(isPersistablePath("/api/v1/me/dm-settings")).toBe(false);
     expect(isPersistablePath("/api/v1/me/connections")).toBe(false);
     expect(isPersistablePath("/api/v1/me/dm-permissions")).toBe(false);
-    expect(isPersistablePath("/api/v1/me/contacts")).toBe(false);
+    expect(isPersistablePath("/api/v1/me/people")).toBe(false);
     expect(isPersistablePath("/api/v1/me/ignored")).toBe(false);
     expect(isPersistablePath("/api/v1/users/8/dm/devices")).toBe(false);
   });
@@ -137,7 +137,7 @@ describe("shouldPersistQuery", () => {
 
   it("drops hand-written keys, which are not request paths", () => {
     expect(shouldPersistQuery(query(["dm", "unread"], "success"))).toBe(false);
-    expect(shouldPersistQuery(query(["contacts", "community", 3, ""], "success"))).toBe(false);
+    expect(shouldPersistQuery(query(["people", "community", 3, ""], "success"))).toBe(false);
     expect(shouldPersistQuery(query([{ scope: "community-plugin" }], "success"))).toBe(false);
   });
 });

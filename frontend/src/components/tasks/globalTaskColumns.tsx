@@ -9,12 +9,9 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
-import { SortHeader } from "@/components/SortIcon";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { TaskPrioritySelector } from "@/components/tasks/TaskPrioritySelector";
 import { TaskStatusSelector } from "@/components/tasks/TaskStatusSelector";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
 import { type FieldColumnOptions, fieldColumn } from "@/lib/layouts/columns";
@@ -27,11 +24,14 @@ import {
   prioritySortingFn,
   textSortingFn,
 } from "@/lib/sorting";
-import type { AppColumnDef } from "@/lib/table";
 import { getTaskDateStatus, getTaskDateStatusLabel } from "@/lib/taskDateStatus";
 import { entityRefRoute, initiativeRoute, toolDetailRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SortHeader } from "@/ui/sort-icon";
 
 interface GlobalTaskColumnsOptions {
   activeCommunityId: number | null;

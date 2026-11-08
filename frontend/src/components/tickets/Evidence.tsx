@@ -8,15 +8,15 @@
  * keeps a link that outlives their access.
  */
 import { Download, Eye, FileText, Paperclip, X } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EvidencePolicyRead, EvidenceRead } from "@/api/generated/initiativeAPI.schemas";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Button } from "@/components/ui/button";
-import { formatBytes } from "@/lib/fileUtils";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
+import { Lightbox } from "@/ui/lightbox";
 
 /** Pictures the browser shows in place; anything else is a download. */
 const SHOWN_IN_PLACE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -40,28 +40,6 @@ const acceptFor = (types: string[]) =>
 /** One chosen file, told apart from the rest without its place in the list. */
 const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 
-/** The chosen files a policy still takes, in the order they were chosen, and
- *  those it no longer does — for a form whose policy changed under them. */
-export const fitToPolicy = (
-  files: File[],
-  policy: EvidencePolicyRead
-): { kept: File[]; dropped: File[] } => {
-  const kept: File[] = [];
-  const dropped: File[] = [];
-  for (const file of files) {
-    if (
-      mayTake(file, policy.types) &&
-      file.size <= policy.max_bytes &&
-      kept.length < policy.max_files
-    ) {
-      kept.push(file);
-    } else {
-      dropped.push(file);
-    }
-  }
-  return { kept, dropped };
-};
-
 /** Where a file the reader filed is fetched from. */
 export const filedEvidenceUrl = (taskId: number, evidenceId: number) =>
   resolveHeaderlessApiUrl(`/api/v1/me/tickets/${taskId}/evidence/${evidenceId}`);
@@ -76,29 +54,40 @@ interface EvidencePickerProps {
   files: File[];
   onChange: (files: File[]) => void;
   disabled?: boolean;
+  /** The button's words. "Attach files" when not given. */
+  label?: string;
+  /** Where files pasted in or dropped on are taken as though chosen: the box
+   *  a screenshot goes into. */
+  takeFrom?: RefObject<HTMLElement | null>;
 }
 
 /** Choose files to send, held to what the stream takes. */
-export const EvidencePicker = ({ policy, files, onChange, disabled }: EvidencePickerProps) => {
+export const EvidencePicker = ({
+  policy,
+  files,
+  onChange,
+  disabled,
+  label,
+  takeFrom,
+}: EvidencePickerProps) => {
   const { t } = useTranslation("intake");
   const input = useRef<HTMLInputElement>(null);
   const hintId = useId();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const taking = Boolean(policy && policy.max_files > 0 && !disabled);
 
-  if (!policy || policy.max_files <= 0) return null;
-  const size = formatBytes(policy.max_bytes, 0);
-
-  const add = (chosen: FileList | null) => {
-    if (!chosen) return;
+  const add = (chosen: File[]) => {
+    if (!policy) return;
     const next = [...files];
     let said: string | null = null;
-    for (const file of Array.from(chosen)) {
+    for (const file of chosen) {
       if (next.some((held) => fileKey(held) === fileKey(file))) {
         // Chosen twice: it is sent once.
       } else if (!mayTake(file, policy.types)) {
         said = t("evidence.notAllowed", { name: file.name });
       } else if (file.size > policy.max_bytes) {
-        said = t("evidence.tooLarge", { name: file.name, size });
+        said = t("evidence.tooLarge", { name: file.name, size: formatBytes(policy.max_bytes, 0) });
       } else if (next.length >= policy.max_files) {
         said = t("evidence.tooMany", { count: policy.max_files });
       } else {
@@ -111,6 +100,46 @@ export const EvidencePicker = ({ policy, files, onChange, disabled }: EvidencePi
     if (input.current) input.current.value = "";
   };
 
+  // Bound again each render, so a paste or a drop adds to the files as they
+  // are now. Only a drag carrying files is taken; dragged text drops as text.
+  useEffect(() => {
+    const target = takeFrom?.current;
+    if (!target || !taking) return;
+    const onPaste = (event: ClipboardEvent) => {
+      const pasted = Array.from(event.clipboardData?.files ?? []);
+      if (pasted.length === 0) return;
+      event.preventDefault();
+      add(pasted);
+    };
+    const carriesFiles = (event: DragEvent) =>
+      Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    const onDragOver = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      setDropping(true);
+    };
+    const onDragLeave = () => setDropping(false);
+    const onDrop = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      setDropping(false);
+      add(Array.from(event.dataTransfer?.files ?? []));
+    };
+    target.addEventListener("paste", onPaste);
+    target.addEventListener("dragover", onDragOver);
+    target.addEventListener("dragleave", onDragLeave);
+    target.addEventListener("drop", onDrop);
+    return () => {
+      target.removeEventListener("paste", onPaste);
+      target.removeEventListener("dragover", onDragOver);
+      target.removeEventListener("dragleave", onDragLeave);
+      target.removeEventListener("drop", onDrop);
+    };
+  });
+
+  if (!policy || policy.max_files <= 0) return null;
+  const size = formatBytes(policy.max_bytes, 0);
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -120,7 +149,7 @@ export const EvidencePicker = ({ policy, files, onChange, disabled }: EvidencePi
           multiple
           className="sr-only"
           accept={acceptFor(policy.types)}
-          onChange={(event) => add(event.target.files)}
+          onChange={(event) => add(Array.from(event.target.files ?? []))}
           disabled={disabled}
           aria-describedby={hintId}
           data-testid="evidence-input"
@@ -134,10 +163,12 @@ export const EvidencePicker = ({ policy, files, onChange, disabled }: EvidencePi
           onClick={() => input.current?.click()}
         >
           <Paperclip className="h-4 w-4" aria-hidden="true" />
-          {t("evidence.attach")}
+          {label ?? t("evidence.attach")}
         </Button>
         <span id={hintId} className="text-muted-foreground text-xs">
-          {t("evidence.limits", { count: policy.max_files, size })}
+          {dropping
+            ? t("evidence.dropHere")
+            : t("evidence.limits", { count: policy.max_files, size })}
         </span>
       </div>
       {files.length > 0 ? (

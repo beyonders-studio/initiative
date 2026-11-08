@@ -42,57 +42,33 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { TaskTypeAddDialog } from "@/components/projects/TaskTypeAddDialog";
 import { TaskTypeCopyDialog } from "@/components/projects/TaskTypeCopyDialog";
+import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import {
   startsWithSomething,
   TaskTypeStartsWithDialog,
 } from "@/components/projects/TaskTypeStartsWithDialog";
-import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { IconPicker } from "@/components/ui/icon-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   useCopyTaskTypes,
   useCreateTaskType,
-  useDeleteTaskType,
   usePlaceTaskTypeFields,
   useProjectTaskTypes,
   useReorderTaskTypes,
   useUpdateTaskType,
 } from "@/hooks/useProjects";
 import { useInstanceLayouts } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { IconPicker } from "@/ui/icon-picker";
+import { Input } from "@/ui/input";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 /** The most types a project may have; the server holds it to the same. */
 export const MAX_TASK_TYPES = 20;
@@ -111,14 +87,6 @@ const sortTypes = (items: TaskTypeRead[]): TaskTypeRead[] => {
 
 /** The `?layout=` value that opens the layout editor on one type's page. */
 export const taskTypeLayout = (typeId: number): string => `task:${typeId}`;
-
-/** Where a deleted type's tasks go unless the reader picks another: the
- *  project's default, or, when the default is the one going, the first type
- *  left. */
-const defaultFallback = (types: TaskTypeRead[], target: TaskTypeRead): number | null => {
-  const others = types.filter((type) => type.id !== target.id);
-  return (others.find((type) => type.is_default) ?? others[0])?.id ?? null;
-};
 
 interface ProjectTaskTypesManagerProps {
   projectId: number;
@@ -145,8 +113,7 @@ export const ProjectTaskTypesManager = ({
   const [addOpen, setAddOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [startsWithTarget, setStartsWithTarget] = useState<TaskTypeRead | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TaskTypeRead | null>(null);
-  const [fallbackId, setFallbackId] = useState<string>("");
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
@@ -225,16 +192,6 @@ export const ProjectTaskTypesManager = ({
     },
     onError: (error) => {
       toast.error(getErrorMessage(error, "projects:taskTypes.updateError"));
-    },
-  });
-
-  const deleteTypeMutation = useDeleteTaskType(projectId, {
-    onSuccess: () => {
-      toast.success(t("taskTypes.deleted"));
-      setDeleteTarget(null);
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:taskTypes.deleteError"));
     },
   });
 
@@ -373,25 +330,6 @@ export const ProjectTaskTypesManager = ({
     });
   };
 
-  const openDelete = (type: TaskTypeRead) => {
-    const fallback = defaultFallback(types, type);
-    setFallbackId(fallback === null ? "" : String(fallback));
-    setDeleteTarget(type);
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!deleteTarget || !fallbackId) {
-      return;
-    }
-    deleteTypeMutation.mutate({
-      typeId: deleteTarget.id,
-      data: { fallback_type_id: Number(fallbackId) },
-    });
-  };
-
-  const fallbackOptions = deleteTarget ? types.filter((type) => type.id !== deleteTarget.id) : [];
-  const isOnlyType = Boolean(deleteTarget) && fallbackOptions.length === 0;
-
   const isLoading = typesQuery.isLoading || typesQuery.isRefetching;
 
   return (
@@ -477,7 +415,7 @@ export const ProjectTaskTypesManager = ({
                         onFieldChange={handleFieldChange}
                         onSetDefault={handleDefaultChange}
                         onStartsWith={() => setStartsWithTarget(type)}
-                        onDelete={() => openDelete(type)}
+                        onDelete={() => setDeleteTarget(type.id)}
                         t={t}
                       />
                     ))}
@@ -532,48 +470,11 @@ export const ProjectTaskTypesManager = ({
         onSave={handleStartsWith}
       />
 
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="bg-card">
-          <DialogHeader>
-            <DialogTitle>{t("taskTypes.deleteTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("taskTypes.deleteDescription", { name: deleteTarget?.name })}
-            </DialogDescription>
-          </DialogHeader>
-          {isOnlyType ? (
-            <p className="text-muted-foreground text-sm">{t("taskTypes.onlyType")}</p>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="fallback-task-type">{t("taskTypes.fallbackLabel")}</Label>
-              <Select value={fallbackId} onValueChange={setFallbackId}>
-                <SelectTrigger id="fallback-task-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {fallbackOptions.map((option) => (
-                    <SelectItem key={option.id} value={String(option.id)}>
-                      <TaskTypeOption type={option} />
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteConfirm}
-              disabled={deleteTypeMutation.isPending || isOnlyType || !fallbackId}
-            >
-              {deleteTypeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("common:delete")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TaskTypeDeleteDialog
+        projectId={projectId}
+        typeId={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+      />
     </Card>
   );
 };

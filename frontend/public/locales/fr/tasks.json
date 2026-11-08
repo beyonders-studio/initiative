@@ -129,6 +129,10 @@
   "tagTasks": {
     "loadError": "Impossible de charger les tâches."
   },
+  "ai": {
+    "fromComments_one": "Rédigé sans le commentaire de la tâche, qui ne tenait pas.",
+    "fromComments_other": "Rédigé à partir des {{read}} commentaires les plus récents sur {{count}}."
+  },
   "checklist": {
     "title": "Checklist",
     "progressLabel": "Progression de la checklist",
@@ -153,7 +157,20 @@
     "progress_one": "{{completed}}/{{total}} élément",
     "progress_other": "{{completed}}/{{total}} éléments",
     "expandItem": "Afficher l’élément en entier",
-    "collapseItem": "Afficher moins"
+    "collapseItem": "Afficher moins",
+    "promote": "En faire une tâche",
+    "promoteLabel": "Faire de cet élément de liste une tâche",
+    "promoted": "Une tâche faisant partie de celle-ci a été créée",
+    "openPromoted": "Ouvrir",
+    "promoteError": "Impossible de faire de cet élément une tâche. Veuillez réessayer."
+  },
+  "subtasks": {
+    "progressLabel": "Avancement des sous-tâches",
+    "progress_one": "{{completed}}/{{total}} sous-tâche",
+    "progress_other": "{{completed}}/{{total}} sous-tâches",
+    "partOf": "Fait partie de {{title}}",
+    "fold": "Masquer les sous-tâches de {{title}}",
+    "unfold": "Afficher les sous-tâches de {{title}}"
   },
   "prioritySelector": {
     "ariaLabel": "Priorité : {{priority}}. Cliquez pour la modifier.",
@@ -182,8 +199,7 @@
     "noInitiatives": "Aucune initiative trouvée dans cette communauté.",
     "noProjects": "Aucun projet trouvé dans cette initiative.",
     "back": "Retour",
-    "searchProjects": "Rechercher des projets…",
-    "loadMore": "Charger plus"
+    "searchProjects": "Rechercher des projets…"
   },
   "bulkEdit": {
     "title": "Modifier les tâches",
@@ -200,6 +216,11 @@
     "detailsSection": "Détails",
     "statusLabel": "Statut",
     "selectStatus": "Sélectionner un statut",
+    "typeLabel": "Type",
+    "selectType": "Sélectionner un type",
+    "keepType": "Laisser inchangé",
+    "typeLeavesEmpty_one": "{{name}} exige des champs que {{count}} tâche laisse vides",
+    "typeLeavesEmpty_other": "{{name}} exige des champs que {{count}} tâches laissent vides",
     "priorityLabel": "Priorité",
     "selectPriority": "Sélectionner une priorité",
     "recurrenceSection": "Récurrence",
@@ -220,5 +241,94 @@
     "sections": {
       "schedule": "Planification"
     }
+  },
+  "smartTitle": {
+    "read": "Lu dans le titre",
+    "due": "Échéance {{when}}",
+    "priority": "Priorité {{priority}}",
+    "keep": "Garder « {{text}} » dans le titre",
+    "hints": {
+      "button": "Ce qu’un titre peut dire",
+      "title": "Tapez les détails dans le titre",
+      "dates": {
+        "label": "Dates",
+        "examples": "vendredi|semaine prochaine|dans 3 jours|le 3 novembre"
+      },
+      "times": {
+        "label": "Heures",
+        "examples": "à 17h|demain à 9h30"
+      },
+      "repeats": {
+        "label": "Répétitions",
+        "examples": "chaque semaine|chaque lundi|chaque! 2 jours",
+        "note": "Avec « chaque! », la suivante compte à partir du moment où la précédente est faite."
+      },
+      "priority": {
+        "label": "Priorité",
+        "examples": "!haute|!1",
+        "note": "!1 est urgente, jusqu’à !4 pour faible."
+      },
+      "tags": {
+        "label": "Étiquettes",
+        "examples": "#facturation"
+      },
+      "people": {
+        "label": "Personnes",
+        "examples": "@sam|@moi"
+      },
+      "type": {
+        "label": "Type de tâche",
+        "examples": "bug:|jalon:",
+        "note": "Tout au début, l’un des types du projet."
+      },
+      "footer": "Chacun est retiré du titre et appliqué à la tâche. Retirez sa pastille pour garder les mots tels que tapés."
+    },
+    "words": {
+      "today": "aujourd'hui",
+      "tomorrow": "demain",
+      "next": "prochain|prochaine",
+      "nextAfter": "prochain|prochaine",
+      "in": "dans|d'ici",
+      "every": "chaque|tous les|toutes les",
+      "other": "",
+      "lead": "pour|le|avant|pour le|avant le",
+      "at": "à",
+      "one": "un|une",
+      "of": "",
+      "ordinal": "er|e|ème",
+      "day": "jour|jours",
+      "week": "semaine|semaines",
+      "month": "mois",
+      "year": "an|ans|année|années",
+      "weekday": "jour ouvré|jours ouvrés|jour ouvrable|jours ouvrables",
+      "noon": "midi",
+      "midnight": "minuit",
+      "am": "",
+      "pm": "",
+      "oclock": "h|heure|heures",
+      "me": "moi|me",
+      "weekend": "week-end|week-ends|weekend|weekends",
+      "hour": "heure|heures",
+      "first": "premier|première|premiers|premières",
+      "second": "deuxième|deuxièmes|second|seconde",
+      "third": "troisième|troisièmes",
+      "fourth": "quatrième|quatrièmes",
+      "fifth": "cinquième|cinquièmes",
+      "last": "dernier|dernière|derniers|dernières",
+      "ofTheMonth": "du mois|de chaque mois|de tous les mois",
+      "ofEveryMonth": "de chaque mois|de tous les mois|chaque mois|mensuel",
+      "and": "et|&",
+      "the": "le|la|les",
+      "until": "jusqu'au|jusqu'à",
+      "times": "fois"
+    }
+  },
+  "reminder": {
+    "label": "Me le rappeler",
+    "placeholder": "Aucun rappel",
+    "clear": "Aucun rappel",
+    "private": "Le rappel n’est que pour vous.",
+    "repeats": "À chaque répétition, le rappel suit la date d’échéance.",
+    "sent": "Rappel envoyé."
   }
 }

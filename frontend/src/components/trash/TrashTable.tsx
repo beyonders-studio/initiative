@@ -2,20 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EntityType, TrashItem } from "@/api/generated/initiativeAPI.schemas";
-import { PaginationBar } from "@/components/PaginationBar";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   useCommunityTrashList,
   useMyTrashList,
@@ -24,6 +10,13 @@ import {
 } from "@/hooks/useTrash";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
+import { RelativeTime } from "@/ui/relative-time";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 /**
  * `user` — the viewer's own deletions across every community (personal settings).
@@ -187,16 +180,14 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
           </TableBody>
         </Table>
       </div>
-      {data.has_prev || data.has_next ? (
-        <PaginationBar
-          className="mt-4"
-          page={data.page}
-          pageSize={data.page_size}
-          totalCount={data.total_count}
-          hasNext={data.has_next}
-          onPageChange={setPage}
-        />
-      ) : null}
+      <PaginationBar
+        className="mt-4"
+        page={data.page}
+        pageSize={data.page_size}
+        totalCount={data.total_count}
+        hasNext={data.has_next}
+        onPageChange={setPage}
+      />
 
       {purgeConfirm.open && (
         <ConfirmDialog

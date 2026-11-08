@@ -17,9 +17,8 @@
     "children": {
       "task": "Tâches",
       "calendar_event": "Événements",
-      "gallery_image": "Images",
-      "queue_item": "Éléments de la file",
-      "wiki_page": "Pages"
+      "wiki_page": "Pages",
+      "collection": "Collections"
     },
     "columns": {
       "in": "Dans"
@@ -50,11 +49,7 @@
     "creating": "Création en cours…",
     "create": "Créer",
     "searchPlaceholder": "Rechercher ou créer des étiquettes…",
-    "loading": "Chargement…",
-    "existingTags": "Étiquettes existantes",
-    "noTagsFound": "Aucune étiquette trouvée.",
     "createTag": "Créer « {{name}} »",
-    "selected": "{{count}} sélectionné(e)(s)",
     "filterLabel": "Tags",
     "anyTag": "N'importe quel tag"
   },

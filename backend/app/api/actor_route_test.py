@@ -239,7 +239,11 @@ async def test_an_install_reads_people_and_its_community_by_reference(
 
     response = await client.get(
         _url(installed.guild.id, "/people"),
-        headers=_bearer(installed.guild.id, installed.plugin.id, ["files:read"]),
+        headers={
+            **_bearer(installed.guild.id, installed.plugin.id, ["files:read"]),
+            # Uncompressed, so the length is the rewritten body's own.
+            "Accept-Encoding": "identity",
+        },
     )
 
     assert response.status_code == 200, response.text

@@ -6,7 +6,7 @@
  * into markup, and a second table mapping each kind to its icon's path data —
  * the same thing written twice, and the two would drift.
  *
- * So this reads `iconNode`, which is lucide's own description of an icon: a list
+ * So this reads the icon node, which is lucide's own description of an icon: a list
  * of `[tag, attributes]` that its components draw from. Taking the data and
  * drawing it here means the icon in the picture is the icon in the list, from
  * one source, and it costs nothing. The component itself is never called — it
@@ -53,11 +53,16 @@ const shape = ([tag, attrs]: IconNodeChild): string => {
 /** Lucide's description of an icon, read off the element it makes. */
 const iconNodeOf = (Icon: ComponentType<unknown>): IconNodeChild[] | null => {
   const forwarded = Icon as unknown as {
-    render?: (props: object, ref: null) => { props?: { iconNode?: unknown } } | null;
+    render?: (
+      props: object,
+      ref: null
+    ) => { props?: { iconNode?: unknown; icon?: { node?: unknown } } } | null;
   };
   if (typeof forwarded.render !== "function") return null;
   // Making the element is not rendering it: this one call reaches no hook.
-  const node = forwarded.render({}, null)?.props?.iconNode;
+  const props = forwarded.render({}, null)?.props;
+  // lucide 1.58 passes `icon: { node }`; earlier releases passed `iconNode`.
+  const node = props?.icon?.node ?? props?.iconNode;
   return Array.isArray(node) ? (node as IconNodeChild[]) : null;
 };
 

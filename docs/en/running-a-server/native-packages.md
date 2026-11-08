@@ -40,10 +40,11 @@ APT resolves the declared distribution dependencies. The `.deb` and checksum
 manifest are release downloads, not an APT repository.
 
 On Alpine, install the release's `initiative-server.rsa.pub` into `/etc/apk/keys/`
-before using `apk add ./<downloaded-package>.apk`. Obtain and verify the public key
+before using `apk add ./<downloaded-package>.alpine`. Obtain and verify the public key
 through a trusted channel before installing it. Keep that trust key for subsequent
-upgrades. Do not use `--allow-untrusted`. The server `.apk` is an Alpine package;
-the separately named Android APK is a phone application.
+upgrades. Do not use `--allow-untrusted`. The Alpine package is named `.alpine`
+rather than `.apk` so Android updaters don't mistake it for the phone app; `apk`
+installs it the same.
 
 The package creates the unprivileged `initiative` account and installs a service,
 but **does not start it automatically**. This gives you time to configure a private

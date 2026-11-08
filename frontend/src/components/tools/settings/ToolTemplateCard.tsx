@@ -7,21 +7,23 @@
  * is no card.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Switch } from "@/ui/switch";
 
 export const ToolTemplateCard = () => {
   const { t } = useTranslation("common");
   const { entity, template } = useToolSettings();
   const [isTemplate, setIsTemplate] = useState(Boolean(entity.is_template));
 
-  useEffect(() => {
+  const [prevIsTemplate, setPrevIsTemplate] = useState(entity.is_template);
+  if (prevIsTemplate !== entity.is_template) {
+    setPrevIsTemplate(entity.is_template);
     setIsTemplate(Boolean(entity.is_template));
-  }, [entity.is_template]);
+  }
 
   if (!template) {
     return null;

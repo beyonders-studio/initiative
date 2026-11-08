@@ -4,7 +4,7 @@ A guild-schema table, one row per stored object. A row hangs off exactly one
 parent — the community report it came with, or the operations case — and is
 reached exactly as that parent is: a report's evidence by those who settle the
 report, a case's by those in the case's initiative, and its filer's own by the
-filer through their filer role (``app.db.filer_access``).
+filer through their filer role (``app.db.operations_schema``).
 
 The object itself is never in ``uploads`` and never served by the upload route.
 It is stored encrypted under a key of its own (``app.core.blob_crypto``), and
@@ -59,7 +59,7 @@ class Evidence(CreatedByMixin, table=True):
     __tablename__ = "evidence"
     __table_args__ = (
         CheckConstraint(
-            "num_nonnulls(report_id, case_id) = 1", name="ck_evidence_one_parent"
+            "num_nonnulls(report_id, case_task_id) = 1", name="ck_evidence_one_parent"
         ),
         CheckConstraint(f"kind IN ({_KIND_SQL})", name="ck_evidence_kind"),
     )
@@ -75,11 +75,13 @@ class Evidence(CreatedByMixin, table=True):
             index=True,
         ),
     )
-    case_id: Optional[int] = Field(
+    #: The operations case, named by its task: a case is its task, and every
+    #: community's schema has ``tasks``.
+    case_task_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
             Integer,
-            ForeignKey("intake_cases.id", ondelete="CASCADE"),
+            ForeignKey("tasks.id", ondelete="CASCADE"),
             nullable=True,
             index=True,
         ),

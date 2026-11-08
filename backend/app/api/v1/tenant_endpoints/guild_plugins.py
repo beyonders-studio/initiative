@@ -49,6 +49,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
+    get_guild_seat_write_session,
+    refuse_closed_surface,
+    require_surface_open,
+)
+from app.core.rules import SURFACE_PLUGINS
+from app.api.deps import (
     AgeViewerDep,
     CurrentUser,
     GuildContextDep,
@@ -138,6 +144,11 @@ from app.services.tenant.plugin_age import AgeViewer
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+#: Configuring this surface, which the deployment may close for one community.
+_SURFACE_OPEN = Depends(
+    require_surface_open(SURFACE_PLUGINS, get_guild_seat_write_session)
+)
 
 #: The same installs, reached from inside one initiative. Mounted at the guild
 #: root rather than under ``/plugins`` because the initiative comes first in the
@@ -234,7 +245,7 @@ async def _plugin_names(
     """The names of the plug-ins the install's ``plugins:`` scopes name, and those a
     pending version's new ones name."""
     scopes = list(guild_plugins_service.requested_scopes(plugin.definition))
-    if offer is not None:
+    if isinstance(offer, plugin_updates_service.UpdateOffer):
         scopes.extend(offer.asks.added_scopes)
     return await guild_plugins_service.plugin_scope_names(session, scopes)
 
@@ -396,7 +407,9 @@ async def _detail(
     user_id: int,
     viewer: AgeViewer,
     *,
-    offer: Optional[plugin_updates_service.UpdateOffer] = None,
+    offer: (
+        plugin_updates_service.UpdateOffer | plugin_updates_service.RefusedUpdate | None
+    ) = None,
 ) -> CommunityPluginDetail:
     """One install with its connections and consents, as ``user_id`` sees it.
 
@@ -414,7 +427,12 @@ async def _detail(
             guild_id=context.guild_id,
             listing_uid=plugin.listing_uid,
         ),
-        update_offer=offer,
+        update_offer=(
+            offer if isinstance(offer, plugin_updates_service.UpdateOffer) else None
+        ),
+        update_refused=(
+            offer if isinstance(offer, plugin_updates_service.RefusedUpdate) else None
+        ),
         installed=await guild_plugins_service.installed_plugin_ids(session),
         plugin_names=await _plugin_names(session, plugin, offer),
         context=context,
@@ -522,7 +540,10 @@ async def get_community_plugin(
 
 
 @router.post(
-    "/", response_model=CommunityPluginRead, status_code=status.HTTP_201_CREATED
+    "/",
+    response_model=CommunityPluginRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[_SURFACE_OPEN],
 )
 async def install_community_plugin(
     payload: CommunityPluginInstall,
@@ -646,7 +667,11 @@ async def install_community_plugin(
     return installed
 
 
-@router.post("/{plugin_id}/upgrade", response_model=CommunityPluginDetail)
+@router.post(
+    "/{plugin_id}/upgrade",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def upgrade_community_plugin(
     plugin_id: int,
     session: SeatWriteSessionDep,
@@ -768,7 +793,11 @@ async def upgrade_community_plugin(
     return await _detail(session, plugin, guild_context, current_user.id, viewer)
 
 
-@router.post("/{plugin_id}/upgrade/decline", response_model=CommunityPluginDetail)
+@router.post(
+    "/{plugin_id}/upgrade/decline",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def decline_community_plugin_upgrade(
     plugin_id: int,
     payload: CommunityPluginDecline,
@@ -785,7 +814,7 @@ async def decline_community_plugin_upgrade(
     """
     plugin = await _load(session, plugin_id, for_update=True)
     offer = await plugin_updates_service.update_offer(session, plugin)
-    if offer is None:
+    if not isinstance(offer, plugin_updates_service.UpdateOffer):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=MarketplaceMessages.ALREADY_LATEST_VERSION,
@@ -814,7 +843,9 @@ async def decline_community_plugin_upgrade(
     )
 
 
-@router.patch("/{plugin_id}", response_model=CommunityPluginRead)
+@router.patch(
+    "/{plugin_id}", response_model=CommunityPluginRead, dependencies=[_SURFACE_OPEN]
+)
 async def update_community_plugin(
     plugin_id: int,
     payload: CommunityPluginUpdate,
@@ -925,7 +956,9 @@ async def read_uninstall_notice(
     )
 
 
-@router.delete("/{plugin_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{plugin_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_SURFACE_OPEN]
+)
 async def uninstall_community_plugin(
     plugin_id: int,
     session: SeatWriteSessionDep,
@@ -972,7 +1005,11 @@ async def uninstall_community_plugin(
 # ---------------------------------------------------------------------------
 
 
-@router.put("/{plugin_id}/config", response_model=CommunityPluginDetail)
+@router.put(
+    "/{plugin_id}/config",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def update_community_plugin_config(
     plugin_id: int,
     payload: CommunityPluginConfigUpdate,
@@ -1003,7 +1040,11 @@ async def update_community_plugin_config(
     return await _detail(session, plugin, guild_context, current_user.id, viewer)
 
 
-@router.put("/{plugin_id}/settings/{key}", response_model=CommunityPluginDetail)
+@router.put(
+    "/{plugin_id}/settings/{key}",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def update_community_plugin_setting(
     plugin_id: int,
     key: str,
@@ -1042,7 +1083,9 @@ async def update_community_plugin_setting(
 
 
 @router.put(
-    "/{plugin_id}/placements/{initiative_id}", response_model=PluginPlacementRead
+    "/{plugin_id}/placements/{initiative_id}",
+    response_model=PluginPlacementRead,
+    dependencies=[_SURFACE_OPEN],
 )
 async def put_community_plugin_placement(
     plugin_id: int,
@@ -1094,7 +1137,11 @@ async def put_community_plugin_placement(
     return PluginPlacementRead(initiative_id=initiative_id, role_ids=after)
 
 
-@router.put("/{plugin_id}/scopes", response_model=CommunityPluginRead)
+@router.put(
+    "/{plugin_id}/scopes",
+    response_model=CommunityPluginRead,
+    dependencies=[_SURFACE_OPEN],
+)
 async def put_community_plugin_scopes(
     plugin_id: int,
     payload: CommunityPluginScopesUpdate,
@@ -1277,6 +1324,9 @@ async def connect_community_plugin(
     if guild_wide:
         require_seat(guild_context)
         require_grant_writes(guild_context)
+        # The community's own credential is its configuration; a member's own
+        # account is theirs whatever the deployment leaves the seat.
+        await refuse_closed_surface(session, guild_context.guild_id, SURFACE_PLUGINS)
 
     registration = await handoff_service.require_live_registration(
         plugin, guild_context.guild_id
@@ -1324,7 +1374,8 @@ async def connect_community_plugin(
 
 
 @router.delete(
-    "/{plugin_id}/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/{plugin_id}/connections/{connection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def disconnect_community_plugin(
     plugin_id: int,
@@ -1345,6 +1396,7 @@ async def disconnect_community_plugin(
 
     if connection.get("scope") == "static":
         require_seat(guild_context)
+        await refuse_closed_surface(session, guild_context.guild_id, SURFACE_PLUGINS)
         require_grant_writes(guild_context)
         # Clearing rewrites both configuration maps, so it takes the row: a plug-in
         # writing back at the same moment must not put back what was cleared.

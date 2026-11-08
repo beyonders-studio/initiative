@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Open a pull request for the current changes, then watch it to green — poll CI and the Greptile review together, addressing review findings as soon as they post instead of waiting for the full rollup, fixing failures and re-reviewing until confidence is high. Use when the user says "make a PR", "open a pull request", "ship this", or asks to watch a PR's CI / review status.
+description: Open a pull request for the current changes, then watch it to green — poll CI and the Greptile review together, addressing review findings as soon as they post instead of waiting for the full rollup, fixing failures; asks Greptile to re-review until confidence is high only when the user wants that. Use when the user says "make a PR", "open a pull request", "ship this", or asks to watch a PR's CI / review status.
 user-invocable: true
 ---
 
@@ -8,9 +8,14 @@ user-invocable: true
 
 Create a pull request for the working changes, then stay with it: watch CI and
 the Greptile review *at the same time*, fix whatever lands first, and keep
-looping until every check is green and the review is clean (or the user tells
-you to stop). Greptile's feedback almost always arrives before CI finishes —
-address it then, rather than sitting on it until the rollup completes.
+looping until every check is green and every review finding is fixed or
+answered (or the user tells you to stop). Greptile's feedback almost always
+arrives before CI finishes — address it then, rather than sitting on it until
+the rollup completes.
+
+Asking Greptile to review again, round after round until it reaches 5/5, is a
+separate ask: do it only when the user asks for it ("get it to 5/5", "loop
+Greptile").
 
 Repo rules that this skill must honor (from `CLAUDE.md`):
 - **PRs target `dev`, never `main`.**
@@ -27,7 +32,7 @@ Repo rules that this skill must honor (from `CLAUDE.md`):
 2. Run the quality gates for what changed (don't run the whole world if only
    one side changed):
    - **`scripts/ci/check`**: the fast checks CI runs, by the same script CI
-     calls (ruff, ruff format, ty, frozen migrations and one Alembic head,
+     calls (ruff, ruff format, ty, no merged migration edited, one Alembic head,
      biome, tsc, and generated-types / `env-contract.json` drift), for what the
      branch changed against `origin/dev`. No database, no tests; seconds.
      When `codegen` fails, read why before committing anything:
@@ -125,8 +130,12 @@ session for 26 minutes would be wrong even if it could. Background it, do the
 Greptile work while it runs, and read its output when it breaks.
 
 Each time it breaks, handle the event (§5 or §6) and then **re-enter this loop**
-with `SEEN` updated to the review you just read. The loop is only finished when
-`EVENT=ci-green` *and* the Greptile bar in §5 is met.
+with `SEEN` updated to the review you just read. The loop is finished when
+`EVENT=ci-green`, Greptile's first review has posted, and every finding in it is
+fixed or answered (and, when the user asked for the re-review loop, the bar in
+§5 is met). CI often goes green first on a small PR, so after `EVENT=ci-green`
+keep waiting for that first review. Greptile sometimes never answers: if it
+hasn't posted 15 minutes after CI went green, stop and say so in the report.
 
 **Batching pushes.** A push cancels the in-flight run and restarts it from
 zero, so never push once per finding — collect a whole Greptile round (plus any
@@ -157,16 +166,25 @@ For each finding, judge whether it's a real issue in scope for this PR.
 - **In scope + valid** → fix it (edit, commit with the rest of the batch, push).
 - **Out of scope / false positive** → reply briefly saying why; don't fix.
 
-After pushing a round of fixes, ask for a re-review:
+After pushing a round of fixes, reply on each thread, one call per reply, with
+the path in quotes (never built from a word-split loop variable, which posts to
+the PR itself):
+
+```bash
+gh api "repos/$REPO/pulls/$PR/comments/<comment id>/replies" -f body="<reply>"
+```
+
+Then go back to §4's loop (with `SEEN` set to the review you just handled).
+
+Only when the user asked for a re-review or the 5/5 loop, also post a comment
+holding only `@greptile` (it re-runs reliably only when it stands alone); §4's
+loop then waits on the re-review and any still-running CI together:
 
 ```bash
 gh pr comment "$PR" --body "@greptile"
 ```
 
-Then go back to §4's loop (with `SEEN` set to the review you just handled) —
-the re-review and any still-running CI are waited on together, not in sequence.
-
-**Aim for 5/5 confidence.** Accept 4/5 only if the remaining findings are
+**In the re-review loop, aim for 5/5 confidence.** Accept 4/5 only if the remaining findings are
 genuinely out of scope for this PR.
 
 ## 6. Handle a CI failure

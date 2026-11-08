@@ -7,8 +7,8 @@
  * read alike because they are built from these two pieces.
  */
 
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+import { Label } from "@/ui/label";
+import { Separator } from "@/ui/separator";
 
 /** One labelled control with its explanation, so every row reads the same. */
 export const SettingRow = ({

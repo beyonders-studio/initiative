@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DirectoryCommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CommunitySidebar } from "@/components/communities/CommunitySidebar";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 import type { CommunityEntry } from "@/hooks/useCommunities";
 import { routeTree } from "@/routeTree.gen";
 

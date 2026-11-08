@@ -8,7 +8,7 @@ records about how it was opened.
 """
 
 import secrets
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 import pytest
 from httpx import AsyncClient
@@ -16,10 +16,9 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
+from app.core.login_methods import LoginMethod
 from app.core.audit_events import AuditEventType
 from app.core.security import (
-    REFRESH_COOKIE_NAME,
-    SESSION_COOKIE_NAME,
     get_password_hash,
 )
 from app.models.platform.auth_challenge import AuthChallenge
@@ -678,11 +677,13 @@ async def _begin_sign_in(client: AsyncClient, **payload) -> str:
 
 async def _withdraw_passkeys(session: AsyncSession) -> None:
     """Leave the deployment permitting the other three."""
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    row = await app_settings_service.get_app_settings(session)
-    row.login_methods = ["password", "sso", "totp"]
-    session.add(row)
+    await rules.put(
+        session,
+        "login_methods",
+        frozenset({LoginMethod.password, LoginMethod.sso, LoginMethod.totp}),
+    )
     await session.commit()
 
 
@@ -727,7 +728,8 @@ async def test_an_assertion_opens_a_session(
     body = response.json()
     assert body["access_token"]
     assert body["token_type"] == "bearer"
-    assert body["redirect_to"] is None
+    # A browser keeps its refresh token in a cookie it never reads.
+    assert body["refresh_token"] is None
 
     session.expire_all()
     sessions = (
@@ -970,92 +972,50 @@ async def test_a_sign_in_challenge_cannot_finish_a_registration(
     assert refused.json()["detail"] == "PASSKEY_REGISTRATION_INVALID"
 
 
-async def test_a_phone_is_handed_a_code(
-    client: AsyncClient, session: AsyncSession, assertion, capfd
+async def test_the_app_finishes_the_sign_in_it_began(
+    client: AsyncClient, session: AsyncSession, assertion
 ):
-    """The relay page in the system browser opens no session of its own: it is
-    given the address the app is waiting at, carrying a code bound to the app's
-    challenge. The app's verifier opens the session this sign-in earned."""
+    """The app begins with its S256 challenge, the prompt runs wherever it can,
+    and only the verifier behind that challenge finishes the sign-in. The app
+    is handed the refresh token it keeps, on a session named for the device."""
     from app.core.security import decode_session_token
     from app.services.auth.oidc.flow_state import s256
 
-    user = await _account(session, "pk-mobile@example.com")
+    user = await _account(session, "pk-app@example.com")
     user_id = user.id
     await create_passkey(session, user)
-    capfd.readouterr()
 
     verifier = secrets.token_urlsafe(48)
-    challenge = await _begin_sign_in(client)
+    challenge = await _begin_sign_in(client, code_challenge=s256(verifier))
+    credential = assertion_for(challenge)
+    app = {"Origin": "https://studio.beyonders.initiative"}
+
+    for wrong in ({}, {"code_verifier": secrets.token_urlsafe(48)}):
+        refused = await client.post(
+            SIGN_IN_FINISH, json={"credential": credential, **wrong}, headers=app
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"] == "PASSKEY_SIGN_IN_INVALID"
+
     response = await client.post(
         SIGN_IN_FINISH,
         json={
-            "credential": assertion_for(challenge),
-            "mobile": True,
+            "credential": credential,
             "device_name": "Pixel 9",
-            "code_challenge": s256(verifier),
+            "code_verifier": verifier,
         },
+        headers=app,
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["access_token"] is None
-    redirect = body["redirect_to"]
-    assert redirect.startswith("initiative://oidc/callback?")
-    assert SESSION_COOKIE_NAME not in response.cookies
-    assert REFRESH_COOKIE_NAME not in response.cookies
+    assert body["refresh_token"]
+    assert sorted(decode_session_token(body["access_token"])["amr"]) == ["hwk", "mfa"]
+
     session.expire_all()
-    assert (
+    opened = (
         await session.exec(select(AuthSession).where(AuthSession.user_id == user_id))
-    ).all() == []
-
-    # So the session the app opens is the one this sign-in earned: a community
-    # asking for a passkey is answered by the phone that just presented one.
-    redeemed = await client.post(
-        "/api/v1/auth/native/token",
-        json={
-            "code": parse_qs(urlsplit(redirect).query)["code"][0],
-            "code_verifier": verifier,
-        },
-    )
-    assert redeemed.status_code == 200, redeemed.text
-    assert redeemed.json()["refresh_token"]
-    opened = decode_session_token(redeemed.json()["access_token"])
-    assert sorted(opened["amr"]) == ["hwk", "mfa"]
-
-    events = [
-        row
-        for row in emitted(capfd, AuditEventType.AUTH_SIGNED_IN)
-        if row["actor_user_id"] == user_id
-    ]
-    assert [event["detail"] for event in events] == [
-        {"method": "passkey", "native": True}
-    ]
-
-
-async def test_an_older_app_is_asked_to_update(
-    client: AsyncClient, session: AsyncSession, assertion
-):
-    """An app bundle from before the code flow sends no challenge, and can only
-    be handed a session through the code, so it is asked to update and nothing
-    is opened."""
-    user = await _account(session, "pk-unnamed@example.com")
-    user_id = user.id
-    await create_passkey(session, user)
-
-    challenge = await _begin_sign_in(client)
-    response = await client.post(
-        SIGN_IN_FINISH,
-        json={
-            "credential": assertion_for(challenge),
-            "mobile": True,
-            "device_name": "  ",
-        },
-    )
-    assert response.status_code == 400, response.text
-    assert response.json()["detail"] == "NATIVE_APP_UPDATE_REQUIRED"
-    session.expire_all()
-    assert (
-        await session.exec(select(AuthSession).where(AuthSession.user_id == user_id))
-    ).all() == []
+    ).one()
+    assert opened.device_name == "Pixel 9"
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 
 export const Route = createFileRoute("/_serverRequired/verify-email")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/VerifyEmailPage").then((m) => ({ default: m.VerifyEmailPage }))
-  ),
+  component: VerifyEmailPage,
 });

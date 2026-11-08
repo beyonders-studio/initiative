@@ -43,22 +43,15 @@
     "task": "A task",
     "file": "A file",
     "project": "A project",
-    "queue": "A queue",
-    "queue_item": "A queue item",
-    "gallery": "A gallery",
-    "gallery_image": "A picture",
     "calendar": "A calendar",
     "calendar_event": "An event",
     "counter": "A counter",
     "counter_group": "A counter group",
     "dashboard": "A dashboard",
     "wiki": "A wiki",
-    "wiki_page": "A wiki page"
-  },
-  "paging": {
-    "newer": "Newer",
-    "older": "Older",
-    "page": "Page {{page}}"
+    "wiki_page": "A wiki page",
+    "contact": "A contact",
+    "collection": "A collection"
   },
   "report": {
     "action": "Report",

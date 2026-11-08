@@ -1,7 +1,8 @@
-"""Export endpoints: create (auto inline-vs-job), poll, and download.
+"""Export endpoints: create (auto inline-vs-job) and download; a job is polled
+through ``data_jobs``.
 
 The artifact is content, so its download is a gated read: the download route
-loads the ExportJob row under RLS (own-row + guild-admin policies), asks again
+loads the DataJob row under RLS (own-row + guild-admin policies), asks again
 that the caller reaches every initiative the artifact holds, and only then
 streams the file from the guild's storage backend. Artifacts are deliberately
 never registered in ``uploads``, so the guild-wide ``/uploads/{community_id}/…``
@@ -21,8 +22,8 @@ from pydantic import Field
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import func, not_
-from sqlmodel import select
+from starlette.background import BackgroundTask
+from sqlmodel import col, select
 
 from app.api.deps import (
     GuildContext,
@@ -38,7 +39,7 @@ from app.core.tools import Tool, tool_export_source
 from app.core.user_display import display_name
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.schemas.query import DateBucket
 from app.schemas.tenant.backup_export import BackupEstimate
@@ -47,13 +48,11 @@ from app.schemas.tenant.tool_layout import (
     MAX_HIDDEN_GROUPS,
     MAX_NODES,
 )
-from app.schemas.tenant.export_job import (
-    ExportJobRead,
-    CommunityExportStatus,
-    artifact_expired,
-    serialize_export_job,
-)
+from app.schemas.tenant.data_job import file_expired, serialize_data_job
+from app.schemas.tenant.export_job import CommunityExportStatus
 from app.services import audit as audit_service
+from app.services import data_jobs
+from app.services.platform import rules
 from app.services.export.adapters import ADAPTERS
 from app.services.export.adapters.backup import (
     GuildExportAdapter,
@@ -73,19 +72,22 @@ router = APIRouter()
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
-_LIST_LIMIT = 50
-
 
 def _inline_response(result: InlineExport) -> Response:
     # The filename can carry user text (file titles, original upload
     # names) — the helper escapes it (RFC 5987) so it can't break the header.
-    return Response(
-        content=result.content,
-        media_type=result.content_type,
-        headers={
-            "Content-Disposition": content_disposition_attachment(result.filename)
-        },
+    headers = {"Content-Disposition": content_disposition_attachment(result.filename)}
+    if isinstance(result.content, bytes):
+        return Response(
+            content=result.content, media_type=result.content_type, headers=headers
+        )
+    # A stored file or an archive on disk streams rather than being read in.
+    response = build_upload_response(
+        result.content, headers=headers, media_type=result.content_type
     )
+    if result.temporary is not None:
+        response.background = BackgroundTask(result.temporary.unlink, missing_ok=True)
+    return response
 
 
 def _allow_job(guild_context: GuildContext) -> bool:
@@ -100,11 +102,11 @@ def _allow_job(guild_context: GuildContext) -> bool:
 
 
 def _job_response(
-    job: ExportJob, *, guild_id: int, status_code: int = status.HTTP_200_OK
+    job: DataJob, *, guild_id: int, status_code: int = status.HTTP_200_OK
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
-        content=serialize_export_job(job, guild_id=guild_id).model_dump(mode="json"),
+        content=serialize_data_job(job, guild_id=guild_id).model_dump(mode="json"),
     )
 
 
@@ -116,7 +118,7 @@ async def _start_export(
     source: str,
     format: str,
     params: dict[str, Any],
-) -> Union[InlineExport, ExportJob]:
+) -> Union[InlineExport, DataJob]:
     """Start an export through the engine: rendered here when it is small, or
     queued as a job the caller polls."""
     return await start_export(
@@ -131,7 +133,7 @@ async def _start_export(
 
 
 def _export_response(
-    result: Union[InlineExport, ExportJob], guild_context: GuildContext
+    result: Union[InlineExport, DataJob], guild_context: GuildContext
 ) -> Response:
     """The file itself for an inline export; ``202`` and the job for a queued
     one."""
@@ -307,7 +309,7 @@ def _parse_json_param(raw: Optional[str]) -> Optional[dict]:
 _FILTERS_DESCRIPTION = (
     "JSON object of tool→filters narrowing what each tool exports: the tool's "
     "own list filters (as its list route takes them, such as "
-    '``{"queue": {"tag_ids": [3]}}``), and for calendars an ``events`` date '
+    '``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date '
     "range. ``archived`` omitted exports live and archived rows alike."
 )
 
@@ -317,7 +319,7 @@ async def _guild_export_available_at(session) -> Optional[datetime]:
 
     A whole community's content is not a thing to re-read on a loop. The bound
     that actually matters for what this costs a deployment: one community-wide
-    export per ``EXPORT_GUILD_COOLDOWN_HOURS``, counted across the community
+    export per the deployment's ``community_export_cooldown_hours``, counted across the community
     rather than per person, so a second admin does not reset it. Failed and
     expired jobs do not hold the door — only work that was really done counts.
 
@@ -325,24 +327,26 @@ async def _guild_export_available_at(session) -> Optional[datetime]:
     endpoint reports it, so what the settings page says and what the door
     does cannot come apart.
     """
-    if settings.EXPORT_GUILD_COOLDOWN_HOURS <= 0:
+    hours = (await rules.platform_values(session))["community_export_cooldown_hours"]
+    if hours <= 0:
         return None
-    window = timedelta(hours=settings.EXPORT_GUILD_COOLDOWN_HOURS)
+    window = timedelta(hours=hours)
     started_at = (
         await session.exec(
-            select(ExportJob.created_at)
+            select(DataJob.created_at)
             .where(
-                ExportJob.source == "community",
-                ExportJob.status.in_(
+                DataJob.direction == DataJobDirection.export,
+                DataJob.source == "community",
+                DataJob.status.in_(
                     (
-                        ExportJobStatus.queued,
-                        ExportJobStatus.running,
-                        ExportJobStatus.done,
+                        DataJobStatus.queued,
+                        DataJobStatus.running,
+                        DataJobStatus.done,
                     )
                 ),
-                ExportJob.created_at >= datetime.now(timezone.utc) - window,
+                DataJob.created_at >= datetime.now(timezone.utc) - window,
             )
-            .order_by(ExportJob.created_at.desc())
+            .order_by(col(DataJob.created_at).desc())
             .limit(1)
         )
     ).first()
@@ -407,7 +411,7 @@ async def export_initiative(
     include: Optional[str] = Query(
         default=None,
         description=(
-            'JSON object of tool→bool, e.g. {"project": true, "queue": false}. '
+            'JSON object of tool→bool, e.g. {"project": true, "calendar": false}. '
             "Omitted = every tool."
         ),
     ),
@@ -415,8 +419,8 @@ async def export_initiative(
         default=None,
         description=(
             "Report mode: JSON object of tool→format; the file entry is a "
-            'nested map, e.g. {"project": "pdf", "file": {"native": "md", '
-            '"spreadsheet": "xlsx"}}. Unlisted tools use their backup format.'
+            'nested map, e.g. {"project": "pdf", "file": {"lexical": "md", '
+            '"sheet": "xlsx"}}. Unlisted tools use their backup format.'
         ),
     ),
     include_uploads: bool = Query(
@@ -549,9 +553,12 @@ async def read_community_export_status(
     require_seat(guild_context, detail=ExportMessages.EXPORT_SUPERADMIN_REQUIRED)
     latest = (
         await session.exec(
-            select(ExportJob)
-            .where(ExportJob.source == "community")
-            .order_by(ExportJob.created_at.desc())
+            select(DataJob)
+            .where(
+                DataJob.direction == DataJobDirection.export,
+                DataJob.source == "community",
+            )
+            .order_by(col(DataJob.created_at).desc())
             .limit(1)
         )
     ).first()
@@ -562,65 +569,34 @@ async def read_community_export_status(
     if latest is not None:
         started_by = display_name(await session.get(MemberProfile, latest.created_by))
     return CommunityExportStatus(
-        cooldown_hours=settings.EXPORT_GUILD_COOLDOWN_HOURS,
+        cooldown_hours=(await rules.platform_values(session))[
+            "community_export_cooldown_hours"
+        ],
         next_available_at=await _guild_export_available_at(session),
-        latest=serialize_export_job(latest, guild_id=guild_context.guild_id)
+        latest=serialize_data_job(latest, guild_id=guild_context.guild_id)
         if latest is not None
         else None,
         latest_started_by=started_by or None,
     )
 
 
-@router.get("/jobs", response_model=list[ExportJobRead])
-async def list_export_jobs(
-    session: RLSSessionDep,
-    current_user: CurrentUserDep,
-    guild_context: GuildContextDep,
-) -> list[ExportJobRead]:
-    """The caller's export jobs, newest first (RLS scopes the rows: own rows,
-    or the whole guild for a guild admin)."""
-    jobs = await session.exec(
-        select(ExportJob).order_by(ExportJob.created_at.desc()).limit(_LIST_LIMIT)
-    )
-    return [serialize_export_job(job, guild_id=guild_context.guild_id) for job in jobs]
-
-
-@router.get("/jobs/{job_id}", response_model=ExportJobRead)
-async def get_export_job(
-    job_id: int,
-    session: RLSSessionDep,
-    current_user: CurrentUserDep,
-    guild_context: GuildContextDep,
-) -> ExportJobRead:
-    job = await session.get(ExportJob, job_id)
-    if job is None:  # includes rows RLS hides — 404, never 403
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ExportMessages.EXPORT_JOB_NOT_FOUND,
-        )
-    return serialize_export_job(job, guild_id=guild_context.guild_id)
-
-
 async def _require_reach(
     session: RLSSessionDep, user: User, initiative_ids: list[int]
 ) -> None:
-    """Refuse unless the caller reaches every initiative in ``initiative_ids``
-    that still exists. One deleted since the render, in the trash or purged,
-    is skipped."""
+    """Refuse unless the caller reaches every initiative in ``initiative_ids``.
+    One they cannot see, purged, in a trash they don't see or private to
+    others, is not reached."""
     if not initiative_ids:
         return
-    unreached = (
+    reached = (
         await session.exec(
-            select(func.count())
-            .select_from(Initiative)
-            .where(
+            select(Initiative.id).where(
                 Initiative.id.in_(initiative_ids),
-                Initiative.deleted_at.is_(None),
-                not_(initiative_scope_clause(user.id, Initiative.id)),
+                initiative_scope_clause(user.id, Initiative.id),
             )
         )
-    ).one()
-    if unreached:
+    ).all()
+    if set(initiative_ids) - set(reached):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ExportMessages.EXPORT_OUT_OF_REACH,
@@ -637,19 +613,19 @@ async def download_export_artifact(
     """Stream a finished export's artifact. The RLS-gated job lookup and the
     initiatives the artifact holds are the authorization, asked now rather
     than when it was rendered; storage is touched only after both pass."""
-    job = await session.get(ExportJob, job_id)
+    job = await data_jobs.find(session, job_id, DataJobDirection.export)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ExportMessages.EXPORT_JOB_NOT_FOUND,
         )
-    if artifact_expired(job):
+    if file_expired(job):
         # Past its expiry the artifact is gone or about to be: the next GC
         # pass deletes it, and until then it is no longer served.
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail=ExportMessages.EXPORT_EXPIRED
         )
-    if job.status != ExportJobStatus.done or not job.artifact_ref:
+    if job.status != DataJobStatus.done or not job.file_ref:
         # A delivered job is finished and has nothing to download — it was
         # written to the operator's destination, which the job row names.
         raise HTTPException(
@@ -692,15 +668,14 @@ async def download_export_artifact(
     storage = get_guild_storage(guild_context.guild_id)
     # Recover the download name from the artifact key. A named artifact
     # (passthrough / .lexical) is stored as `exports/{job_id}-{filename}`;
-    # strip the `{job_id}-` prefix back off. A generic artifact is
-    # `exports/{job_id}.{format}` — no such prefix, so use the generic name.
-    # build_upload_response escapes the name (RFC 5987) — original filenames
-    # are user text and must not break out of the header.
-    basename = job.artifact_ref.rsplit("/", 1)[-1]
-    named_prefix = f"{job.id}-"
-    if basename.startswith(named_prefix):
-        filename = basename[len(named_prefix) :]
-    else:
+    # strip the id prefix back off. The id is the one the job had when it was
+    # rendered, which an export from before 20261030_0564 no longer has. A
+    # generic artifact is `exports/{job_id}.{format}` — no such prefix, so use
+    # the generic name. build_upload_response escapes the name (RFC 5987) —
+    # original filenames are user text and must not break out of the header.
+    basename = job.file_ref.rsplit("/", 1)[-1]
+    rendered_id, named, filename = basename.partition("-")
+    if not (named and rendered_id.isdigit() and filename):
         filename = f"{job.source}-{job.id}.{job.format}"
 
     # Where the operator has turned it on and the backend can sign a URL,
@@ -712,7 +687,7 @@ async def download_export_artifact(
     # whatever the setting says.
     signed = (
         storage.presign_get(
-            job.artifact_ref,
+            job.file_ref,
             ttl=export_limits.EXPORT_DOWNLOAD_URL_TTL_SECONDS,
             filename=filename,
         )
@@ -724,7 +699,7 @@ async def download_export_artifact(
             url=signed, status_code=status.HTTP_307_TEMPORARY_REDIRECT
         )
 
-    blob = storage.open_readable(job.artifact_ref)
+    blob = storage.open_readable(job.file_ref)
     if blob is None:  # GC'd or missing — fail closed
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { isAxiosError } from "axios";
 import { KeyRound, Mail } from "lucide-react";
 import { type FormEvent, useState } from "react";
@@ -6,7 +6,16 @@ import { useTranslation } from "react-i18next";
 
 import { AUTH_FACTOR_REQUIRED_EVENT, type FactorChallengeDetail } from "@/api/client";
 import { sendStepUpCode, useListPasskeys, useReadSecondFactor } from "@/api/generated/auth/auth";
-import { Button } from "@/components/ui/button";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { useAuth } from "@/hooks/useAuth";
+import { useAuthChallenge } from "@/hooks/useAuthChallenge";
+import { isAnsweredVisitRead } from "@/hooks/useNotifications";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { describePasskeyPromptError } from "@/lib/passkeys";
+import { queryClient } from "@/lib/queryClient";
+import { returnPath } from "@/lib/returnPath";
+import { compactCode } from "@/lib/secondFactorAnswer";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,19 +23,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useAuth } from "@/hooks/useAuth";
-import { useAuthChallenge } from "@/hooks/useAuthChallenge";
-import { isAnsweredVisitRead } from "@/hooks/useNotifications";
-import { useServer } from "@/hooks/useServer";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { appRunsPasskeys, describePasskeyPromptError } from "@/lib/passkeys";
-import { queryClient } from "@/lib/queryClient";
-import { returnPath } from "@/lib/returnPath";
-import { compactCode } from "@/lib/secondFactorAnswer";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /**
  * Global handler for a community that requires a factor of the account's own.
@@ -37,10 +36,9 @@ import { compactCode } from "@/lib/secondFactorAnswer";
  * the person was on fills in behind the dialog rather than needing a reload.
  *
  * Two factors can be asked for, and the event says which: a code from the
- * account's authenticator app, or a passkey. The code branch works on native
- * too — the answer is typed against the live session, which the app holds just
- * as a browser does. The passkey branch does not: the ceremony belongs to the
- * browser the credential is registered to, so the app says where to go instead.
+ * account's authenticator app, or a passkey. Both work in the app too: the
+ * code is typed against the live session, and the passkey's prompt runs
+ * wherever `lib/passkeys` can run it.
  *
  * A third ask arrives from the account's own settings rather than a community:
  * a change to how it signs in wants a session opened a moment ago. A passkey
@@ -60,17 +58,15 @@ export const SecondFactorStepUpDialog = () => {
   const { t } = useTranslation(["auth", "common"]);
   const { logout, stepUpWithFactor, stepUpWithPasskey, stepUpWithEmailCode } = useAuth();
   const { emailOtpLoginEnabled } = useAppConfig();
-  const { isNativePlatform } = useServer();
-  /** A phone whose app cannot run the ceremony itself, so the dialog points
-   *  to the browser instead of offering a key. */
-  const browserOnly = isNativePlatform && !appRunsPasskeys();
-  const location = useLocation();
+  const router = useRouter();
   const navigate = useNavigate();
   // Everything is accepted except the deployment's own ask while the person
   // is on the page that answers it: the shell around that page makes requests
   // of its own, and each would put this dialog back over the thing it is
   // asking them to do. Their next request elsewhere raises it again.
-  const onSecurityPage = location.pathname.startsWith("/profile/security");
+  const onSecurityPage = useLocation({
+    select: (location) => location.pathname.startsWith("/profile/security"),
+  });
   const { challenge, clear, open } = useAuthChallenge<FactorChallengeDetail>(
     AUTH_FACTOR_REQUIRED_EVENT,
     (detail) => !(detail?.platform === true && onSecurityPage)
@@ -104,7 +100,7 @@ export const SecondFactorStepUpDialog = () => {
   // passkey records the factor too, so an account with a key and no
   // authenticator app has one already.
   const passkeyQuery = useListPasskeys({
-    query: { enabled: open && !browserOnly },
+    query: { enabled: open },
   });
   // Three states, not two. While the answer is in flight, offer the way in:
   // the refusal that opened this dialog is the common case and an account that
@@ -116,8 +112,7 @@ export const SecondFactorStepUpDialog = () => {
   const statusUnknown = statusQuery.isError;
   const hasNoPasskey = passkeyQuery.isSuccess && (passkeyQuery.data.passkeys ?? []).length === 0;
   /** A key to present, where the ask is for a code and the account has none. */
-  const canPresentPasskey =
-    !browserOnly && passkeyQuery.isSuccess && (passkeyQuery.data.passkeys ?? []).length > 0;
+  const canPresentPasskey = passkeyQuery.isSuccess && (passkeyQuery.data.passkeys ?? []).length > 0;
   const passkeysUnknown = passkeyQuery.isError;
 
   const dismiss = () => {
@@ -206,7 +201,7 @@ export const SecondFactorStepUpDialog = () => {
   /** The other way to open a fresh session, for an account with no passkey to
    *  present: start one over, and come back to the page this was raised on. */
   const signInAgain = async () => {
-    const next = returnPath(location.href);
+    const next = returnPath(router.state.location.href);
     setSubmitting(true);
     try {
       await logout();
@@ -219,11 +214,9 @@ export const SecondFactorStepUpDialog = () => {
 
   const presentDescription = offersEmailCode
     ? t("factorStepUp.proofEmail")
-    : browserOnly
-      ? t(wantsProof ? "factorStepUp.proofNative" : "factorStepUp.passkeyNative")
-      : hasNoPasskey
-        ? t(wantsProof ? "factorStepUp.proofSignIn" : "factorStepUp.passkeyNone")
-        : t(wantsProof ? "factorStepUp.proofDescription" : "factorStepUp.passkeyDescription");
+    : hasNoPasskey
+      ? t(wantsProof ? "factorStepUp.proofSignIn" : "factorStepUp.passkeyNone")
+      : t(wantsProof ? "factorStepUp.proofDescription" : "factorStepUp.passkeyDescription");
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && dismiss()}>
@@ -290,31 +283,27 @@ export const SecondFactorStepUpDialog = () => {
                   {t("factorStepUp.emailCode")}
                 </Button>
               )}
-              {!browserOnly &&
-                (hasNoPasskey ? (
-                  wantsProof ? (
-                    <Button type="button" onClick={signInAgain} disabled={submitting}>
-                      {t("factorStepUp.signInAgain")}
-                    </Button>
-                  ) : (
-                    <Button asChild>
-                      <Link to="/profile/security" onClick={dismiss}>
-                        {t("factorStepUp.passkeyAdd")}
-                      </Link>
-                    </Button>
-                  )
-                ) : (
-                  <Button type="button" onClick={presentPasskey} disabled={submitting}>
-                    <KeyRound className="h-4 w-4" aria-hidden="true" />
-                    {submitting
-                      ? t("factorStepUp.passkeyWorking")
-                      : t("factorStepUp.passkeyPresent")}
+              {hasNoPasskey ? (
+                wantsProof ? (
+                  <Button type="button" onClick={signInAgain} disabled={submitting}>
+                    {t("factorStepUp.signInAgain")}
                   </Button>
-                ))}
+                ) : (
+                  <Button asChild>
+                    <Link to="/profile/security" onClick={dismiss}>
+                      {t("factorStepUp.passkeyAdd")}
+                    </Link>
+                  </Button>
+                )
+              ) : (
+                <Button type="button" onClick={presentPasskey} disabled={submitting}>
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                  {submitting ? t("factorStepUp.passkeyWorking") : t("factorStepUp.passkeyPresent")}
+                </Button>
+              )}
             </DialogFooter>
 
-            {!browserOnly &&
-              passkeysUnknown &&
+            {passkeysUnknown &&
               (wantsProof ? (
                 <p className="text-muted-foreground text-sm">
                   <button

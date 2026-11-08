@@ -100,6 +100,13 @@ export function canAccessPlatformAreas(user: WithCapabilities): boolean {
 export const isAdminRole = (communityRole: string | null | undefined): boolean =>
   communityRole === CommunityRole.admin || communityRole === CommunityRole.superadmin;
 
+/** The rungs a roster offers, in order. The seat is offered only to somebody
+ *  who holds it: an admin can neither appoint nor demote one. */
+export const assignableCommunityRoles = (holdsSeat: boolean): CommunityRole[] =>
+  holdsSeat
+    ? [CommunityRole.superadmin, CommunityRole.admin, CommunityRole.member]
+    : [CommunityRole.admin, CommunityRole.member];
+
 /** Whether the viewer may take `action` on every one of `items` — a selection
  *  read against each row's server-computed `can`. */
 export const everyCan = (items: readonly { can: ToolCan }[], action: keyof ToolCan): boolean =>

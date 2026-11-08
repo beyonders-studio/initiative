@@ -40,7 +40,7 @@ from seed.common import NOW, Community, share, tag
 _DUNGEON_AREAS = [
     "Entrance Hall",
     "Crypt of Whispers",
-    "The Bone Gallery",
+    "The Bone Library",
     "Flooded Caverns",
     "Shadow Forge",
     "Hall of Mirrors",
@@ -192,6 +192,37 @@ PROJECTS: dict[str, list[dict]] = {
                         "Escape before the house collapses",
                     ],
                     "tags": ["quest", "combat", "exploration"],
+                },
+                # The Death House's rooms, as tasks of their own under it.
+                {
+                    "title": "Search the library for the secret door",
+                    "priority": TaskPriority.medium,
+                    "category": TaskStatusCategory.done,
+                    "assignees": ["Vex Shadowstep"],
+                    "start_days": -6,
+                    "due_days": -4,
+                    "part_of": "Survive the Death House",
+                    "tags": ["exploration"],
+                },
+                {
+                    "title": "Lay the ghosts of Rose and Thorn to rest",
+                    "priority": TaskPriority.high,
+                    "category": TaskStatusCategory.in_progress,
+                    "assignees": ["Elara Moonwhisper"],
+                    "start_days": -3,
+                    "due_days": 0,
+                    "part_of": "Survive the Death House",
+                    "tags": ["roleplay"],
+                },
+                {
+                    "title": "Destroy the shambling mound",
+                    "priority": TaskPriority.high,
+                    "category": TaskStatusCategory.todo,
+                    "assignees": ["Thorn Ironforge"],
+                    "start_days": 0,
+                    "due_days": 2,
+                    "part_of": "Survive the Death House",
+                    "tags": ["combat"],
                 },
                 {
                     "title": "Find the Sunsword in the Amber Temple",
@@ -487,7 +518,7 @@ PROJECTS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Retire the old initiative-tracker house rule",
-                    "description": "Superseded by the queues feature. Kept for the archive view.",
+                    "description": "Superseded by the turn order project. Kept for the archive view.",
                     "priority": TaskPriority.low,
                     "category": TaskStatusCategory.done,
                     "archived": True,
@@ -685,13 +716,13 @@ PROJECTS: dict[str, list[dict]] = {
             "name": "Rules Playtest: Old Initiative Tracker",
             "initiative": "lmop",
             "icon": "\U0001f570\ufe0f",
-            "description": "Superseded by the queues feature. Archived long enough ago "
+            "description": "Superseded by the turn order project. Archived long enough ago "
             "to sort last.",
             "owner": "Admin User",
             "archived_days_ago": 210,
             "tasks": [
                 {
-                    "title": "Compare the tracker against queues",
+                    "title": "Compare the tracker against the turn order project",
                     "priority": TaskPriority.low,
                     "category": TaskStatusCategory.done,
                     "assignees": ["Admin User"],
@@ -1559,8 +1590,21 @@ async def create_project(c: Community, d: dict) -> Project:
         # A task names its type ("Bug"), or is a Task.
         task_type = types.get(td.get("type", "Task"), types["Task"])
         await _create_task(c, project, status, task_type, position, td)
-    # Once every task exists, so a task may wait on one listed after it.
+    # Once every task exists, so a task may wait on, or be part of, one listed
+    # after it.
     for td in d.get("tasks", ()):
+        if td.get("part_of"):
+            await relationships_service.create(
+                c.session,
+                source=relationships_service.Endpoint(
+                    SearchEntityType.task, c.tasks[td["title"]].id
+                ),
+                relationship_type=RelationshipType.part_of,
+                target=relationships_service.Endpoint(
+                    SearchEntityType.task, c.tasks[td["part_of"]].id
+                ),
+                created_by=c.users[d["owner"]].id,
+            )
         for title in td.get("waits_on", ()):
             await relationships_service.create(
                 c.session,

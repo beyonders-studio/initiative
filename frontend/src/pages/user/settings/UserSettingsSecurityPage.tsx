@@ -4,6 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import { useReadSecondFactor } from "@/api/generated/auth/auth";
 import type { ApiKeyMetadata } from "@/api/generated/initiativeAPI.schemas";
+import {
+  isSubscription,
+  NewSubscriptionLinkDialog,
+  type SubscriptionKey,
+} from "@/components/initiativeTools/events/CalendarSubscribeDialog";
 import { HeldChangeNotice } from "@/components/settings/HeldChangeNotice";
 import { PasskeysSection } from "@/components/settings/PasskeysSection";
 import { PasswordSection } from "@/components/settings/PasswordSection";
@@ -15,11 +20,17 @@ import {
   SecurityReportDialog,
   useSecurityReporting,
 } from "@/components/tickets/ReportSecurityProblem";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { useAuth } from "@/hooks/useAuth";
+import { useCommunities } from "@/hooks/useCommunities";
+import { useCreateApiKey, useDeleteApiKey, useMyApiKeys } from "@/hooks/useSecurity";
+import { formatDateTime } from "@/lib/formatDate";
+import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -27,22 +38,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useAuth } from "@/hooks/useAuth";
-import { useCommunities } from "@/hooks/useCommunities";
-import { useCreateApiKey, useDeleteApiKey, useMyApiKeys } from "@/hooks/useSecurity";
-import { formatDateTime } from "@/lib/formatDate";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const computeStatus = (key: ApiKeyMetadata) => {
   if (!key.is_active) {
@@ -216,9 +215,10 @@ const NewApiKeyDialog = ({
 };
 
 export const UserSettingsSecurityPage = () => {
-  const { t } = useTranslation(["settings", "common", "intake"]);
+  const { t } = useTranslation(["settings", "common", "intake", "calendars"]);
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ApiKeyMetadata | null>(null);
+  const [relinkTarget, setRelinkTarget] = useState<SubscriptionKey | null>(null);
   const [reporting, setReporting] = useState(false);
   const securityReporting = useSecurityReporting();
   const { user, refreshUser } = useAuth();
@@ -329,14 +329,26 @@ export const UserSettingsSecurityPage = () => {
                       <p className="text-muted-foreground text-sm">{detail}</p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeleteTarget(key)}
-                  >
-                    {t("security.deleteButton")}
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    {isSubscription(key) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRelinkTarget(key)}
+                      >
+                        {t("calendars:subscribe.getNewLink")}
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeleteTarget(key)}
+                    >
+                      {t("security.deleteButton")}
+                    </Button>
+                  </div>
                 </li>
               );
             })}
@@ -345,6 +357,9 @@ export const UserSettingsSecurityPage = () => {
       </SettingsSection>
 
       <NewApiKeyDialog open={creating} onOpenChange={setCreating} />
+      {relinkTarget ? (
+        <NewSubscriptionLinkDialog apiKey={relinkTarget} onClose={() => setRelinkTarget(null)} />
+      ) : null}
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -354,7 +369,6 @@ export const UserSettingsSecurityPage = () => {
         title={t("security.deleteDialogTitle")}
         description={t("security.deleteDialogDescription", { name: deleteTarget?.name ?? "" })}
         confirmLabel={t("security.deleteButton")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("security.deleting")}
         isLoading={deleteKey.isPending}
         destructive

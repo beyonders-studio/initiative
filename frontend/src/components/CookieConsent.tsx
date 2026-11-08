@@ -3,15 +3,15 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PrivacyLink } from "@/components/auth/LegalNotice";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useConsent } from "@/hooks/useConsent";
 import { useServer } from "@/hooks/useServer";
 import { captchaProvider } from "@/lib/captchaProviders";
 import { type ConsentCategory, dismissReopenedConsent, recordConsent } from "@/lib/consent";
 import { COOKIE_DOCS_URL } from "@/lib/links";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 /**
  * The cookie question, put once to somebody arriving.

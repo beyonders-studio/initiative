@@ -18,6 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlmodel import select
 
+from app.services.platform import rules
 from app.testing.schema_harness import route_session_to_guild
 from app.models.platform.guild import Guild, GuildMembership, CommunityRole
 from app.models.platform.notification import Notification, NotificationType
@@ -233,7 +234,7 @@ async def test_create_guild_requires_name(client: AsyncClient, acting_user):
     assert response.status_code == 422
 
 
-# --- free communities are billing's ------------------------------------------
+# --- how many communities one account makes ---------------------------------
 
 
 @pytest.fixture
@@ -250,10 +251,8 @@ def billed(monkeypatch):
 async def test_a_billed_deployment_refuses_no_second_community(
     client: AsyncClient, acting_user, billed
 ):
-    """How many free communities a person may hold is billing's to say, from
-    its catalog, when it hears a community was created: an enterprise contract
-    may have no such limit, and one admin setting up many is normal. Here the
-    only limit is the daily allowance below."""
+    """One account makes as many communities as it likes; the only limit is
+    the daily allowance below."""
     a = await acting_user("member")
     for name in ("My notebook", "One more"):
         created = await client.post(
@@ -268,10 +267,10 @@ async def test_an_account_creates_only_its_daily_allowance_of_guilds(
     """Past the allowance the request is refused before anything is made, and
     deleting a community does not give the allowance back; the staff who stand
     communities up for others are not counted."""
-    from app.core.config import settings
     from app.services.platform import guilds as guilds_service
 
-    monkeypatch.setattr(settings, "GUILD_CREATION_DAILY_LIMIT", 1)
+    await rules.put(session, "community_creation_daily_limit", 1)
+    await session.commit()
     a = await acting_user("member")
     first = await client.post(
         "/api/v1/communities/", headers=a.headers, json={"name": "First"}
@@ -296,29 +295,6 @@ async def test_an_account_creates_only_its_daily_allowance_of_guilds(
             "/api/v1/communities/", headers=staff.headers, json={"name": name}
         )
         assert created.status_code == 201, created.text
-
-
-async def test_staff_standing_a_community_up_for_somebody_are_not_refused(
-    client: AsyncClient, acting_user, billed
-):
-    """An enterprise onboarding is a community made for a customer who is about
-    to be invoiced, not a second free notebook — and the person it is for may
-    well already have one of those."""
-    staff = await acting_user(UserRole.owner)
-    customer = await acting_user("member")
-    theirs = await client.post(
-        "/api/v1/communities/",
-        headers=customer.headers,
-        json={"name": "Their notebook"},
-    )
-    assert theirs.status_code == 201, theirs.text
-
-    for_them = await client.post(
-        "/api/v1/communities/",
-        headers=staff.headers,
-        json={"name": "Acme", "owner_user_id": customer.user.id},
-    )
-    assert for_them.status_code == 201, for_them.text
 
 
 # --- creating a guild for another account ----------------------------------

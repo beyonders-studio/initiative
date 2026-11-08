@@ -14,18 +14,8 @@ import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { SubscribeButton } from "@/components/SubscribeButton";
-import { DetailPageSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   useCalendarEvent,
   useDeleteCalendarEvent,
@@ -44,6 +34,16 @@ import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { toast } from "@/lib/mascotToast";
 import { eventRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**
  * An event's detail: every field of it, each saved on its own where the reader
@@ -144,6 +144,7 @@ export function EventDetailPage() {
         keys="calendars:"
         backTo={leaveTo}
         backLabel={t("backToEvents")}
+        entity={{ kind: "calendar_event", id: parsedId }}
       />
     );
   }
@@ -293,7 +294,6 @@ export function EventDetailPage() {
         title={t("deleteEvent")}
         description={t("deleteEventConfirm")}
         confirmLabel={t("deleteEvent")}
-        cancelLabel={t("common:cancel")}
         onConfirm={() => deleteEvent.mutate({ eventId: parsedId })}
         isLoading={deleteEvent.isPending}
         destructive

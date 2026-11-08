@@ -14,8 +14,10 @@ import { Activity, MessageSquare, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FeedView } from "@/api/generated/initiativeAPI.schemas";
+import { AdminSurface, FeedView } from "@/api/generated/initiativeAPI.schemas";
+import { CatchUpButton } from "@/components/activity/CatchUpButton";
 import { CommunityLocationLine } from "@/components/communities/CommunityLocationLine";
+import { InviteMembersDialog } from "@/components/communities/InviteMembersDialog";
 import { CommunityActivityFeed } from "@/components/communityHome/CommunityActivityFeed";
 import { CommunityBannerBadges } from "@/components/communityHome/CommunityBannerBadges";
 import { CommunityComingUp } from "@/components/communityHome/CommunityComingUp";
@@ -29,14 +31,15 @@ import { NodeRail, TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { liveInitiatives, useInitiativeAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
+import { useLastVisit } from "@/hooks/useLastVisit";
 import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { renderableBanner } from "@/lib/banner";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { readableTextShadow } from "@/lib/contrastColor";
-import { getItem, setItem } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** The rail's circles, in order; the first is the default. All and Yours are
  *  views of the activity feed; Comments shows the comments themselves. */
@@ -48,22 +51,6 @@ const FEED_NODES = [
 
 const isFeedView = (value: unknown): value is FeedView =>
   FEED_NODES.some((node) => node.view === value);
-
-/**
- * When the reader last opened this community's front page, read once as the
- * page opens, then moved to now. Kept on the device, per account: it orders
- * nothing and nobody else needs it.
- */
-const useLastVisit = (userId: number | undefined, communityId: number): string | null => {
-  const key = userId === undefined ? null : activityLastVisitKey(userId, communityId);
-  // Read again only for another account or community: moving it to now must
-  // not take the marks off the entries this visit is showing.
-  const lastVisit = useMemo(() => (key ? getItem(key) : null), [key]);
-  useEffect(() => {
-    if (key) void setItem(key, new Date().toISOString());
-  }, [key]);
-  return lastVisit;
-};
 
 export function CommunityHomePage() {
   const { t } = useTranslation("communityHome");
@@ -78,19 +65,29 @@ export function CommunityHomePage() {
   const view = isFeedView(search.node) ? search.node : FeedView.all;
   const communityId = useActiveCommunityId();
   const { user } = useAuth();
-  const lastVisit = useLastVisit(user?.id, communityId);
+  const lastVisit = useLastVisit(user ? activityLastVisitKey(user.id, communityId) : null);
 
   const initiativesQuery = useInitiatives();
   const directoryQuery = useInitiativeDirectory();
   const directoryEntries = directoryQuery.data ?? [];
   const { isCommunityAdmin } = useInitiativeAccess();
 
-  // Creating an initiative is community-admin only (the backend enforces it), and
-  // the affordance is threaded down as a callback: passing one IS the gate.
-  const canCreateInitiatives = Boolean(activeCommunity && isCommunityAdmin);
+  // Creating an initiative takes the community's initiatives surface (the
+  // backend enforces it), and the affordance is threaded down as a callback:
+  // passing one IS the gate.
+  const heldSurfaces = useHeldSurfaces();
+  const canCreateInitiatives = Boolean(
+    activeCommunity && heldSurfaces.holds(AdminSurface.initiatives)
+  );
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const openCreateDialog = useCallback(() => setCreateDialogOpen(true), []);
   const onCreate = canCreateInitiatives ? openCreateDialog : undefined;
+  // Inviting people takes the invites surface, and may be all somebody holds:
+  // the banner offers it beside the member count.
+  const [inviting, setInviting] = useState(false);
+  const openInviteDialog = useCallback(() => setInviting(true), []);
+  const onInvite =
+    heldSurfaces.writes && heldSurfaces.holds(AdminSurface.invites) ? openInviteDialog : undefined;
 
   // `?create=true` opens the dialog once — the deep link the sidebar and the
   // retired initiatives page both point at. Consumed once so dismissing the
@@ -159,6 +156,7 @@ export function CommunityHomePage() {
               memberCount={activeCommunity.member_count}
               onlineCount={activeCommunity.online_count}
               ink={banner.text_color}
+              onInvite={onInvite}
             />
           ) : null
         }
@@ -191,7 +189,12 @@ export function CommunityHomePage() {
                 {view === FeedView.comments ? (
                   <CommunityRecentComments />
                 ) : (
-                  <CommunityActivityFeed view={view} lastVisit={lastVisit} />
+                  <>
+                    <div className="mb-2 flex justify-end">
+                      <CatchUpButton since={lastVisit} />
+                    </div>
+                    <CommunityActivityFeed view={view} lastVisit={lastVisit} />
+                  </>
                 )}
               </div>
             </div>
@@ -219,6 +222,8 @@ export function CommunityHomePage() {
             }}
           />
         ) : null}
+
+        {inviting ? <InviteMembersDialog open onOpenChange={setInviting} /> : null}
 
         {canCreateInitiatives ? (
           <CreateInitiativeWizard

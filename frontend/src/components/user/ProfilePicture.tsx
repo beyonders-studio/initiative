@@ -8,17 +8,17 @@ import type {
   UserSelfUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { deleteMyAvatar, uploadMyAvatar } from "@/api/generated/users/users";
-import { Button } from "@/components/ui/button";
-import { ImagePicker } from "@/components/ui/image-picker";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { ImageRenditionError, renderAvatar } from "@/lib/imageRenditions";
 import { toast } from "@/lib/mascotToast";
 import type { AvatarSourceUser, DisplayableUser } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { ImagePicker } from "@/ui/image-picker";
+import { Input } from "@/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 /** Where this server serves an uploaded picture from. A linked one — from a
  *  single sign-on account — is any other URL. */

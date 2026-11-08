@@ -58,7 +58,7 @@ export const useCommunityTrashList = (
 
 // Maps entity_type -> what a restore makes stale, so the row reappears in
 // active lists across the app without an explicit reload. Child entities (task,
-// comment, queue_item, counter) name their parent tool's lists.
+// comment, counter) name their parent tool's lists.
 const RESTORED: Record<EntityType, () => Spec> = {
   project: q.allProjects,
   wiki: q.allWikis,
@@ -68,16 +68,14 @@ const RESTORED: Record<EntityType, () => Spec> = {
   comment: q.allComments,
   initiative: q.allInitiatives,
   tag: q.allTags,
-  queue: q.allQueues,
-  queue_item: q.allQueues,
   calendar: q.allCalendars,
   calendar_event: q.allCalendarEvents,
   counter_group: q.allCounterGroups,
   counter: q.allCounterGroups,
   post: q.allPosts,
-  gallery: q.allGalleries,
-  gallery_image: q.allGalleries,
+  collection: q.allCollections,
   dashboard: q.allDashboards,
+  contact: q.allContacts,
 };
 
 export type RestoreTrashVars = {

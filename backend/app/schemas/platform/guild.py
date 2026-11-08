@@ -243,14 +243,10 @@ class CommunityRead(CommunityBase):
     # entitlement), so their settings UI knows which surfaces to offer;
     # ``None`` for non-admin members (they never configure auth).
     auth_options: Optional[List[CommunityAuthOption]] = None
-    # ADMIN-ONLY. Whether this guild holds its members to the twelve-hour
-    # session standard. ``None`` for non-admin members: the settings surface
-    # that sets it is what reads it, and nothing a member does depends on the
-    # answer.
-    enforce_compliance_session: Optional[bool] = None
-    # ADMIN-ONLY. Whether reaching this guild asks for a second factor.
-    # ``None`` for non-admin members, like the one above.
-    require_second_factor: Optional[bool] = None
+    # ADMIN-ONLY. The settings the deployment has taken away from this
+    # community (``ai_connections``, ``plugins``), so their settings UI says so
+    # instead of offering them; ``None`` for non-admin members.
+    closed_surfaces: Optional[List[str]] = None
     # Community directory opt-in and its subject tags. Guild identity, not
     # administration: every member sees them (they are published to strangers
     # anyway), and the settings page shows the controls to admins.
@@ -311,6 +307,10 @@ class CommunityBillingSummaryRead(SanitizedBaseModel):
     next_charge: Optional[CommunityBillingChargeRead] = None
     scheduled_change: Optional[CommunityBillingChangeRead] = None
     payment_failed: bool = False
+    #: Whether the portal offers a plan above this one, and whether it can
+    #: cancel this one; the panel offers each only when billing says so.
+    can_upgrade: bool = False
+    can_cancel: bool = False
 
 
 class CommunityInviteGrant(SanitizedBaseModel):
@@ -526,6 +526,13 @@ class PlatformCommunityStorageRead(SanitizedBaseModel):
     # Off by default: the deployment that receives them is the one that decides
     # it is staffing them.
     support_enabled: bool = False
+    # Whether this guild's seat may set up its own AI connections, and install
+    # and configure plug-ins, and whether its admins may define and give custom
+    # roles (operator toggles). Open by default; closed, what it set up stays
+    # and nobody in it can change it.
+    ai_connections_open: bool = True
+    plugins_open: bool = True
+    custom_roles_open: bool = True
     # Where lifting its suspension returns it, while it is suspended. ``deleted``
     # where it was suspended out of deletion.
     lifts_to: Optional[CommunityStatus] = None
@@ -611,6 +618,11 @@ class PlatformCommunityStorageUpdate(SanitizedBaseModel):
     banner_image_enabled: Optional[bool] = None
     # Help-request entitlement. Omit-to-skip, same as the one above.
     support_enabled: Optional[bool] = None
+    # The seat's own AI connections and plug-ins, and the community's custom
+    # roles. Omit-to-skip, same as above.
+    ai_connections_open: Optional[bool] = None
+    plugins_open: Optional[bool] = None
+    custom_roles_open: Optional[bool] = None
 
 
 #: What a community may require, beyond naming one provider. ``sso`` means its
@@ -693,6 +705,9 @@ class CommunityAuthSettingsRead(SanitizedBaseModel):
     #: which applies when it is ``None`` or longer.
     guest_max_days: Optional[int] = None
     guest_max_days_by_platform: int
+    #: The rules above the deployment sets for this community: shown here, and
+    #: changed only by the deployment.
+    set_by_deployment: List[str] = Field(default_factory=list)
 
 
 class CommunityAuthSettingsUpdate(SanitizedBaseModel):

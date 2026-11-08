@@ -7,9 +7,10 @@ Pinned:
   every claim, the key bundle's rotation, and the self-host default (503);
 * ``communities/sync``: a community takes billing's whole state at a version
   only when it's newer, and is answered with the version it holds; each item
-  stands alone; a capability package replaces rather than merges; the pushed
-  storage cap is the one uploads are held to; a suspension is never lifted;
-  a hold tells the seat once;
+  stands alone; a capability package replaces rather than merges; the
+  deployment's custom roles are its own; the pushed storage cap is the one
+  uploads are held to; a suspension is never lifted; a hold tells the seat
+  once;
 * ``communities/read``: status, usage, members, guests, name, the version
   held and each statement's version, and nothing for a community that isn't
   there.
@@ -24,11 +25,14 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.testing import community_plan
 from app.core import config as config_module
+from app.core.login_methods import LoginMethod
 from app.models.platform.billing import BillingJti
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.guild_administration import GuildAdministration
 from app.services.marketplace import plugin_entitlements
+from app.services.platform import rules
 from app.services.tenant.attachments import (
     StorageQuotaExceededError,
     enforce_storage_quota,
@@ -42,9 +46,9 @@ from app.testing import (
     create_upload,
     create_user,
     drain_notices,
-    guild_administration,
 )
 from app.testing.schema_harness import route_session_to_guild
+from app.testing.sockets import settle
 
 LISTING = "PAYDAPP0000001"
 
@@ -183,29 +187,42 @@ async def test_a_malformed_batch_is_refused_after_verification(client: AsyncClie
 
 
 async def test_a_newer_version_lands_and_an_older_one_changes_nothing(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, account_socket
 ):
     guild = await create_guild(session)
     guild_id = guild.id
+    member = await create_user(session)
+    await create_guild_membership(session, user=member, guild=guild)
+    await session.commit()
     ref = await billing_guild_ref(guild_id)
+    tab = account_socket(member.id)
 
     first = await _sync(client, (guild_id, 5, _fields(tier_name="Gold")))
     assert first.status_code == 200, first.text
     assert first.json() == {"results": [{"community_ref": ref, "version": 5}]}
+    await settle()
+    # The plan is on the member's community list, so their open tab reads it again.
+    assert [(frame["resource"], frame["action"]) for frame in tab.sent] == [
+        ("account", "community")
+    ]
     older = await _sync(client, (guild_id, 4, _fields(tier_name="Silver")))
     same = await _sync(client, (guild_id, 5, _fields(tier_name="Silver")))
     assert older.json() == same.json() == first.json()
+    await settle()
+    assert len(tab.sent) == 1
 
     administration = await _administration(session, guild_id)
     assert (administration.tier_name, administration.billing_version) == ("Gold", 5)
-    assert (administration.max_users, administration.max_guests) == (50, 5)
+    plan = await community_plan(session, guild_id)
+    assert (plan["max_users"], plan["max_guests"]) == (50, 5)
 
     newer = await _sync(
         client, (guild_id, 9, _fields(tier_name="Silver", max_users=None))
     )
     assert newer.json()["results"] == [{"community_ref": ref, "version": 9}]
     administration = await _administration(session, guild_id)
-    assert (administration.tier_name, administration.max_users) == ("Silver", None)
+    assert administration.tier_name == "Silver"
+    assert (await community_plan(session, guild_id))["max_users"] is None
 
 
 async def test_each_item_stands_alone(client: AsyncClient, session: AsyncSession):
@@ -245,23 +262,163 @@ async def test_a_capability_package_replaces_rather_than_merges(
     withdrawn by the same write that renamed the tier. A name this build
     can't enforce is ignored, not a reason to drop the caps beside it."""
     guild = await create_guild(session)
-    administration = await guild_administration(session, guild)
     guild_id = guild.id
 
     every = ["banner_image", "help_requests", "community_sign_in", "security_standards"]
     await _sync(client, (guild_id, 1, _fields(feature_keys=every)))
-    await session.refresh(administration)
-    assert administration.banner_image_enabled is True
-    assert administration.support_enabled is True
-    assert sorted(administration.auth_options) == ["providers", "restrictions"]
+    plan = await community_plan(session, guild_id)
+    assert all(plan[key] is True for key in every)
 
     await _sync(
         client, (guild_id, 2, _fields(feature_keys=["banner_image", "teleportation"]))
     )
-    await session.refresh(administration)
-    assert administration.banner_image_enabled is True
-    assert administration.support_enabled is False
-    assert list(administration.auth_options) == []
+    plan = await community_plan(session, guild_id)
+    assert plan["banner_image"] is True
+    assert not any(plan[key] for key in every if key != "banner_image")
+
+
+async def test_the_deployments_rules_stand_over_the_seat_until_withdrawn(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A rule the sync sets wins over the community's own, is shown to its
+    seat and refused from it; a sync without it gives the community back its
+    own answer. A key this build doesn't know is ignored; one the plan's
+    fields carry, or a value its rule doesn't take, refuses the item."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin)
+    guild_id = seat.guild.id
+    settings_url = f"/api/v1/communities/{guild_id}/auth-settings"
+
+    async def read() -> dict:
+        response = await client.get(settings_url, headers=seat.headers)
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    restricted = _fields(feature_keys=["security_standards"])
+    await _sync(client, (guild_id, 1, restricted))
+    own = await client.patch(
+        settings_url, headers=seat.headers, json={"allow_ai": False}
+    )
+    assert own.status_code == 200, own.text
+
+    control = [{"key": "allow_ai", "value": True}, {"key": "teleport", "value": 1}]
+    synced = await _sync(client, (guild_id, 2, {**restricted, "rules": control}))
+    assert synced.json()["results"] == [
+        {"community_ref": await billing_guild_ref(guild_id), "version": 2}
+    ]
+    held = await read()
+    assert held["allow_ai"] is True
+    assert held["set_by_deployment"] == ["allow_ai"]
+    refused = await client.patch(
+        settings_url, headers=seat.headers, json={"allow_ai": False}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "COMMUNITY_RULE_SET_BY_DEPLOYMENT"
+
+    await _sync(client, (guild_id, 3, restricted))
+    released = await read()
+    assert released["allow_ai"] is False
+    assert released["set_by_deployment"] == []
+
+    for bad in (
+        [{"key": "max_users", "value": 3}],
+        [{"key": "allow_ai", "value": 3}],
+        [{"key": "guest_max_days", "value": True}],
+        [{"key": "allow_ai", "value": True}, {"key": "allow_ai", "value": False}],
+    ):
+        refused_item = await _sync(client, (guild_id, 4, {**restricted, "rules": bad}))
+        assert refused_item.json()["results"][0]["error"] == "BILLING_INVALID_PAYLOAD"
+
+
+async def test_the_deployments_custom_roles_are_set_by_its_sync(
+    client: AsyncClient, acting_user
+):
+    """The sync's custom roles land in the community, set by the deployment:
+    its admins give one and change or delete none, and its name is reserved,
+    so a role of the community's own with it is renamed as the community's.
+    The same roles again change nothing; one whose rung moved is made anew,
+    and one left out goes, with its holders."""
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    gid = admin.guild.id
+    base = admin.g("/custom-roles/")
+
+    async def listed() -> dict[str, dict]:
+        response = await client.get(base, headers=admin.headers)
+        return {role["name"]: role for role in response.json()}
+
+    own = await client.post(
+        base,
+        headers=admin.headers,
+        json={"name": "Door", "base_rung": "member", "surfaces": ["invites"]},
+    )
+    assert own.status_code == 201, own.text
+    doors = [
+        {"name": "door", "base_rung": "member", "surfaces": ["members", "invites"]}
+    ]
+    synced = await _sync(client, (gid, 1, _fields(custom_roles=doors)))
+    assert synced.json()["results"][0]["version"] == 1, synced.text
+    roles = await listed()
+    assert roles["Door (community)"]["set_by"] == "community"
+    deployed = roles["door"]
+    assert deployed["set_by"] == "deployment"
+    assert deployed["surfaces"] == ["invites", "members"]
+
+    given = await client.put(
+        admin.g(f"/custom-roles/holders/{member.user.id}"),
+        headers=admin.headers,
+        json={"role_id": deployed["id"]},
+    )
+    assert given.status_code == 204, given.text
+    for refused in (
+        await client.patch(
+            admin.g(f"/custom-roles/{deployed['id']}"),
+            headers=admin.headers,
+            json={"name": "Gate"},
+        ),
+        await client.delete(
+            admin.g(f"/custom-roles/{deployed['id']}"), headers=admin.headers
+        ),
+    ):
+        assert refused.status_code == 409
+        assert refused.json()["detail"] == "CUSTOM_ROLE_SET_BY_DEPLOYMENT"
+    taken = await client.post(
+        base,
+        headers=admin.headers,
+        json={"name": "DOOR", "base_rung": "member", "surfaces": []},
+    )
+    assert taken.status_code == 409
+    assert taken.json()["detail"] == "CUSTOM_ROLE_NAME_RESERVED"
+
+    await _sync(client, (gid, 2, _fields(custom_roles=doors)))
+    assert (await listed())["door"] == deployed
+    moved = [{"name": "door", "base_rung": "admin", "surfaces": ["invites"]}]
+    await _sync(client, (gid, 3, _fields(custom_roles=moved)))
+    anew = (await listed())["door"]
+    assert anew["id"] != deployed["id"] and anew["base_rung"] == "admin"
+    holders = await client.get(admin.g("/custom-roles/holders"), headers=admin.headers)
+    assert holders.json() == []
+
+    await _sync(client, (gid, 4, _fields()))
+    assert set(await listed()) == {"Door (community)"}
+
+    for bad in (
+        [*doors, {**doors[0], "name": "DOOR"}],
+        [{"name": "Bins", "base_rung": "member", "surfaces": ["trash"]}],
+        [{"name": "Seat", "base_rung": "superadmin", "surfaces": []}],
+    ):
+        refused_item = await _sync(client, (gid, 5, _fields(custom_roles=bad)))
+        assert refused_item.json()["results"][0]["error"] == "BILLING_INVALID_PAYLOAD"
+
+
+async def test_a_rule_the_deployment_offers_nothing_to_meet_refuses_the_item(
+    client: AsyncClient, session: AsyncSession
+):
+    guild = await create_guild(session)
+    await rules.put(session, "login_methods", frozenset({LoginMethod.password}))
+    await session.commit()
+    factor = [{"key": "require_second_factor", "value": True}]
+    response = await _sync(client, (guild.id, 1, _fields(rules=factor)))
+    assert response.json()["results"][0]["error"] == "BILLING_RULE_NOT_OFFERED"
 
 
 async def test_the_pushed_ceiling_is_the_one_uploads_are_held_to(
@@ -300,10 +457,8 @@ async def test_a_suspended_community_stays_suspended(
     )
     assert response.status_code == 200, response.text
     administration = await _administration(session, guild_id)
-    assert (administration.billing_status, administration.max_storage_bytes) == (
-        "on_hold",
-        2048,
-    )
+    assert administration.billing_status == "on_hold"
+    assert (await community_plan(session, guild_id))["max_storage_bytes"] == 2048
     read = await billing_boundary.post(
         client,
         "communities/read",

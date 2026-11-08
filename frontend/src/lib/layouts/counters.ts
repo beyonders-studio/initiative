@@ -32,6 +32,7 @@ export const counterFields = (
           label,
           source: "builtin",
           hideable: id !== "name",
+          requireable: false,
           value: () => null,
         })
       ),

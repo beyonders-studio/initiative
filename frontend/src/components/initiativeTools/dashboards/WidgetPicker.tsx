@@ -29,7 +29,12 @@ import type {
   WidgetCatalogEntry,
   WidgetOption,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { useWidgetMetas } from "@/hooks/useWidgetMeta";
+import { MAX_WIDGETS } from "@/lib/widgets/definition";
+import { sampleFor } from "@/lib/widgets/sampleData";
+import { resolveMapping } from "@/lib/widgets/shape";
+import { localized, type WidgetMeta, widgetDisplayName } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -37,15 +42,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useWidgetMetas } from "@/hooks/useWidgetMeta";
-import { cn } from "@/lib/utils";
-import { MAX_WIDGETS } from "@/lib/widgets/definition";
-import { sampleFor } from "@/lib/widgets/sampleData";
-import { resolveMapping } from "@/lib/widgets/shape";
-import { localized, type WidgetMeta, widgetDisplayName } from "@/lib/widgets/widgetMeta";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 import { WidgetTile } from "./WidgetTile";
 
