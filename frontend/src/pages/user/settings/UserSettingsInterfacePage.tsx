@@ -330,37 +330,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
           onChange={(next) => savePrefs({ color_theme: next })}
         />
         <SettingsRow
-          label={t("interface.mode")}
-          action={
-            <TooltipProvider delayDuration={300}>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                value={theme}
-                onValueChange={(next) => next && setTheme(next as Theme)}
-                aria-label={t("interface.mode")}
-              >
-                {THEME_CHOICES.map(({ value, icon: Icon, labelKey }) => (
-                  <Tooltip key={value}>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem value={value} aria-label={t(labelKey)}>
-                        <Icon />
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent>{t(labelKey)}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </ToggleGroup>
-            </TooltipProvider>
-          }
-        />
-        <SettingsRow
-          label={t("interface.eventThemes.label")}
-          description={t("interface.eventThemes.description")}
-        >
-          <Switch checked={eventThemes} onCheckedChange={setEventThemes} />
-        </SettingsRow>
-        <SettingsRow
           label={t("interface.recentTabsLimit")}
           description={t("interface.recentTabsLimitDescription")}
         >
@@ -580,6 +549,37 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
         title={t("interface.deviceTitle")}
         description={t("interface.deviceDescription")}
       >
+        <SettingsRow
+          label={t("interface.mode")}
+          action={
+            <TooltipProvider delayDuration={300}>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={theme}
+                onValueChange={(next) => next && setTheme(next as Theme)}
+                aria-label={t("interface.mode")}
+              >
+                {THEME_CHOICES.map(({ value, icon: Icon, labelKey }) => (
+                  <Tooltip key={value}>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem value={value} aria-label={t(labelKey)}>
+                        <Icon />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent>{t(labelKey)}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </ToggleGroup>
+            </TooltipProvider>
+          }
+        />
+        <SettingsRow
+          label={t("interface.eventThemes.label")}
+          description={t("interface.eventThemes.description")}
+        >
+          <Switch checked={eventThemes} onCheckedChange={setEventThemes} />
+        </SettingsRow>
         <SettingsRow
           label={t("interface.keepScreenAwake.label")}
           description={
