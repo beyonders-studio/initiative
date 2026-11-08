@@ -36,12 +36,11 @@ import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
+import { TASK_LIST_SHAPE, taskColumnId, taskFields } from "@/lib/layouts/tasks";
 import { flattenTaskTree, nestTaskRows, type TaskTreeRow, treeParents } from "@/lib/taskTree";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { DataTable, type DataTableRowWrapperProps } from "@/ui/data-table";
-import { fieldColumnId } from "@/ui/layouts/columns";
 import { columnsOf } from "@/ui/layouts/draft";
 import { withDisplays } from "@/ui/layouts/fields";
 import { groupRowId, groupRows, NO_GROUP, uniqueItemsFromRows } from "@/ui/layouts/grouping";
@@ -404,7 +403,7 @@ const ProjectTasksTableViewComponent = ({
     () =>
       columnsOf({ columns: viewColumns }, fields, TASK_LIST_SHAPE)
         .filter((id) => fields.has(id))
-        .map(fieldColumnId),
+        .map(taskColumnId),
     [viewColumns, fields]
   );
   const columnVisibility = useMemo(
@@ -412,7 +411,7 @@ const ProjectTasksTableViewComponent = ({
       ...Object.fromEntries(
         [...fields.values()]
           .filter((field) => field.hideable)
-          .map(({ id }) => [fieldColumnId(id), shown.includes(fieldColumnId(id))])
+          .map(({ id }) => [taskColumnId(id), shown.includes(taskColumnId(id))])
       ),
       ...Object.fromEntries(groupings.map(({ column }) => [column, false])),
     }),
@@ -626,7 +625,7 @@ const ProjectTasksTableViewComponent = ({
     );
     if (!editing) return ordered;
     const fieldOf = new Map(
-      [...fields.values()].map((field) => [fieldColumnId(field.id), field.id])
+      [...fields.values()].map((field) => [taskColumnId(field.id), field.id])
     );
     return ordered.map((column): AppColumnDef<TaskTreeRow> => {
       const fieldId = column.id === undefined ? undefined : fieldOf.get(column.id);

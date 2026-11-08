@@ -24,6 +24,7 @@ import { ProjectTasksGanttView } from "@/components/projects/ProjectTasksGanttVi
 import { ProjectTasksKanbanView } from "@/components/projects/ProjectTasksKanbanView";
 import { ProjectTasksTableView } from "@/components/projects/ProjectTasksTableView";
 import { columnLimitsOf } from "@/hooks/useColumnLimits";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import type { ProjectTaskTableState } from "@/hooks/useProjectTaskView";
 import { useGroupables, useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useTasks } from "@/hooks/useTasks";
@@ -40,7 +41,7 @@ import {
   type Selection,
   sameSelection,
 } from "@/ui/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
+import type { FieldDef } from "@/ui/layouts/fields";
 import { viewGrouping, withGroupShown } from "@/ui/layouts/grouping";
 import { cn } from "@/ui/lib/utils";
 

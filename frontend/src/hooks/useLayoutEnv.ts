@@ -10,7 +10,20 @@ import type { PropertyDefinitionRead, PropertyTarget } from "@/api/generated/ini
 import { useStepCounter } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { TranslateFn } from "@/types/i18n";
-import { LAYOUT_NAMESPACES, type LayoutEnv, type LayoutItem } from "@/ui/layouts/fields";
+import type { LayoutEnv, LayoutItem } from "@/ui/layouts/fields";
+
+// The namespaces Initiative's layouts name their fields and parts in, loaded
+// together so none shows as a key: an event's fields are named in
+// `calendars`, whether or not an event is drawn beside them. `projects` is
+// the one a key without a prefix is read in.
+export const LAYOUT_NAMESPACES = [
+  "projects",
+  "layouts",
+  "tasks",
+  "dates",
+  "relations",
+  "calendars",
+] as const;
 
 /** How a list of `target`s steps its counters: an item's, where `may` says
  *  its reader may change that counter on it from the list. `may` is kept

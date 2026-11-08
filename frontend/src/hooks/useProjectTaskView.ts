@@ -165,12 +165,13 @@ export function useProjectTaskView({
         fields,
         TASK_LIST_SHAPE
       ),
+      // A plug-in's part, which only a browser draws, is left out.
       detail: pageParts(
         taskLayoutFor(defaultType?.layout_preset).tree(
           detailLayoutOf(layoutsQuery.data, "task", defaultType?.id) as StoredRegions | null,
           shippedPluginParts(plugins)
         )
-      ),
+      ).filter((part) => part !== "plugin"),
     };
   }, [lists, plugins, i18n.language, layoutsQuery.data, defaultType]);
 

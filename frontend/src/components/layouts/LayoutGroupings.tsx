@@ -8,6 +8,7 @@ import type {
   LayoutGrouping,
   TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useGroupables } from "@/hooks/useTaskGroupings";
 import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import type { TranslateFn } from "@/types/i18n";
@@ -16,7 +17,7 @@ import { Checkbox } from "@/ui/checkbox";
 import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import type { ListLayout } from "@/ui/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
+import type { FieldDef } from "@/ui/layouts/fields";
 import {
   DATE_BUCKETS,
   groupingsFor,

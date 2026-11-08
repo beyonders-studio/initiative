@@ -87,7 +87,7 @@ export const DescriptionField = <I, P>({
   /** The most characters it may hold, as the server allows. */
   maxLength?: number;
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation(["common", "ui"]);
   const communityId = useActiveCommunityId();
   const { user } = useAuth();
   const uploadImage = usePastedImages();
@@ -237,7 +237,7 @@ export const DescriptionField = <I, P>({
               role="alert"
               className="space-y-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2"
             >
-              <p className="text-sm">{t("fieldSave.changed")}</p>
+              <p className="text-sm">{t("ui:fieldSave.changed")}</p>
               <div className="rounded-md border bg-background px-3 py-2">
                 <TaskDescription content={current} />
               </div>

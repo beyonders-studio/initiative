@@ -79,7 +79,7 @@ const renderChildren = <I,>(
   parts: Parts<I>
 ): ReactNode =>
   node.children?.map((child, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: a tree is fixed for the life of a view
+    // Keyed by place: a tree is fixed for the life of a view.
     <Fragment key={index}>{renderNode(child, item, view, parts)}</Fragment>
   ));
 
@@ -193,7 +193,7 @@ const column =
     <div className={cn("canvas-md:flex contents canvas-md:min-w-0 canvas-md:flex-col", className)}>
       {node.children?.map((child, index) => (
         <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: a tree is fixed for the life of a view
+          // Keyed by place: a tree is fixed for the life of a view.
           key={index}
           className={cn("min-w-0 empty:hidden", ORDER[Number(child.props?.order)])}
         >

@@ -132,5 +132,11 @@
     "placeholder": "Selecciona un icono",
     "empty": "No se encontró ningún icono",
     "other": "Otro"
+  },
+  "fieldSave": {
+    "saving": "Guardando…",
+    "saved": "Guardado",
+    "failed": "No se pudo guardar",
+    "changed": "Esto cambió mientras lo editabas"
   }
 }

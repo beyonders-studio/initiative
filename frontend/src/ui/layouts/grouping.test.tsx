@@ -16,7 +16,7 @@ import {
   MetadataType,
   type TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { BOARD_COLUMNS, taskGroups } from "@/lib/layouts/taskGroupings";
+import { BOARD_COLUMNS, groupingName, taskGroups } from "@/lib/layouts/taskGroupings";
 import { taskFields } from "@/lib/layouts/tasks";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -57,7 +57,12 @@ const sprint = buildPropertyDefinition({
 const note = buildPropertyDefinition({ name: "Note", type: MetadataType.text });
 const sprintField = propertyFieldId(sprint.id);
 
-const all = groupables(TASK_GROUPINGS, taskFields([sprint, note]), t, BOARD_COLUMNS);
+const all = groupables(
+  TASK_GROUPINGS,
+  taskFields([sprint, note]),
+  (field) => groupingName(field, t),
+  BOARD_COLUMNS
+);
 const choices = catalogChoices(TASK_GROUPINGS, BOARD_COLUMNS);
 
 const offered = (

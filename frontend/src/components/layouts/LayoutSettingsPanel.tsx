@@ -12,6 +12,7 @@ import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settin
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
@@ -29,7 +30,7 @@ import {
   removable,
   type Selection,
 } from "@/ui/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
+import type { FieldDef } from "@/ui/layouts/fields";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { listFormat } from "@/ui/lib/intl";
 import {

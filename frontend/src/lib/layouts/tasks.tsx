@@ -379,6 +379,16 @@ export const TASK_COLUMNS = [
   "comments",
 ];
 
+// A table's column for a task's field, where its id is not the field's: what
+// stored visibility, grouping and sorting are keyed by.
+const TASK_COLUMN_OF: Readonly<Record<string, string>> = {
+  startDate: "start date",
+  dueDate: "due date",
+};
+
+/** The id of the table column that draws a task's field. */
+export const taskColumnId = (fieldId: string): string => TASK_COLUMN_OF[fieldId] ?? fieldId;
+
 /** The board's card as shipped. */
 export const TASK_CARD: LayoutNode = {
   type: "card",

@@ -263,7 +263,7 @@ const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
 /** The side of an item being added, folded until it is asked for. What is
  *  folded stays drawn, so a field keeps what it is holding. */
 const MoreOptions = ({ children }: { children: ReactNode }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("layouts");
   const [open, setOpen] = useState(false);
   const id = useId();
   return (

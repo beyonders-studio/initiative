@@ -22,7 +22,7 @@ import type {
 import { useListTaskGroups } from "@/api/generated/tasks/tasks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
-import { BOARD_COLUMNS, taskGroups } from "@/lib/layouts/taskGroupings";
+import { BOARD_COLUMNS, groupingName, taskGroups } from "@/lib/layouts/taskGroupings";
 import { browserTimezone } from "@/lib/timezones";
 import type { TranslateFn } from "@/types/i18n";
 import type { FieldDef } from "@/ui/layouts/fields";
@@ -32,7 +32,10 @@ import { activeGrouping, groupables, offeredGroupings } from "@/ui/layouts/group
  *  and the project's properties that do. */
 export function useGroupables(fields: ReadonlyMap<string, FieldDef>, t: TranslateFn) {
   const { groupings: catalog } = useFieldCatalog("tasks");
-  return useMemo(() => groupables(catalog, fields, t, BOARD_COLUMNS), [catalog, fields, t]);
+  return useMemo(
+    () => groupables(catalog, fields, (field) => groupingName(field, t), BOARD_COLUMNS),
+    [catalog, fields, t]
+  );
 }
 
 export function useTaskGroupings({

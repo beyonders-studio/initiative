@@ -184,7 +184,7 @@ describe("where a dragged part lands", () => {
 
 describe("a task detail laid out", () => {
   it("reads top to bottom as a phone draws it, for an export of the page", () => {
-    // A plug-in's part after the checklist, which only a browser draws.
+    // A plug-in's part placed after the checklist, named by its kind.
     const stored = storedLayout(
       insertAt(TASK_LAYOUT.root(null), [1], { type: "plugin", props: { plugin: 3, part: "ci" } }, 2)
     );
@@ -204,6 +204,7 @@ describe("a task detail laid out", () => {
       "tags",
       "properties",
       "checklist",
+      "plugin",
       "case",
       "relations",
       "comments",

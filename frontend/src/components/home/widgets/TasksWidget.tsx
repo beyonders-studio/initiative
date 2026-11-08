@@ -14,6 +14,7 @@ import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useFocusPreferences } from "@/hooks/useFocusSummary";
 import { MY_TASKS_VIEW, useGlobalTasksTable } from "@/hooks/useGlobalTasksTable";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useListView } from "@/hooks/useListView";
 import { useMyToolRows } from "@/hooks/useMyTools";
 import { useProperties } from "@/hooks/useProperties";
@@ -27,7 +28,7 @@ import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import { Label } from "@/ui/label";
-import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/ui/layouts/fields";
+import type { LayoutEnv } from "@/ui/layouts/fields";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 

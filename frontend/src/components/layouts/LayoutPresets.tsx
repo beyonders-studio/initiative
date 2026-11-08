@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ListLayoutReadKind, SortField } from "@/api/generated/initiativeAPI.schemas";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { tableSortFields, taskTableSorting } from "@/lib/filters/taskFilters";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
@@ -17,7 +18,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import type { ListLayout } from "@/ui/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
+import type { FieldDef } from "@/ui/layouts/fields";
 import {
   MAX_PRESETS,
   type Preset,

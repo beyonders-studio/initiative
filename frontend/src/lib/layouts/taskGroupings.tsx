@@ -32,6 +32,12 @@ import {
 /** A board's columns are its statuses already, so its bands never are. */
 export const BOARD_COLUMNS = "task_status_id";
 
+/** What a task list calls a field the catalog says it groups by. */
+export const groupingName = (field: string, t: TranslateFn): string =>
+  t(`layouts:groupings.fields.${field}`, {
+    defaultValue: t(`dashboards:filterField.${field}`, { defaultValue: field }),
+  });
+
 /** What a drop from one group into another writes. */
 export type GroupMove =
   | { status: number }

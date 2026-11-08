@@ -63,7 +63,7 @@ const Filling = <I extends DetailItem, C, P>({
   onConfirm,
   pending = false,
 }: FillProps<I, C, P>) => {
-  const { t } = useTranslation(["common", "layouts"]);
+  const { t } = useTranslation("layouts");
   const { item, holding, latest, draft, written } = useItemDraft<I, P>(start, {
     onSubmit: () => confirm(),
   });
@@ -94,7 +94,7 @@ const Filling = <I extends DetailItem, C, P>({
     <>
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{t("layouts:required.ask")}</DialogDescription>
+        <DialogDescription>{t("required.ask")}</DialogDescription>
       </DialogHeader>
       <ItemDraftContext.Provider value={draft}>
         <DetailLayoutView detail={detail} item={item} context={context} layout={layout} />
@@ -106,7 +106,7 @@ const Filling = <I extends DetailItem, C, P>({
           disabled={holding.size > 0 || missing.length > 0}
           pending={pending}
         >
-          {t("layouts:required.confirm")}
+          {t("required.confirm")}
         </Button>
       </DialogFooter>
     </>

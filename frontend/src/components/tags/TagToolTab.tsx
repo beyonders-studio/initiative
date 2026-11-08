@@ -27,6 +27,7 @@ import { type ToolSortField, ToolTable } from "@/components/toolBrowser/ToolTabl
 import { MentionText } from "@/components/user/MentionText";
 import { useCommunityToolRows } from "@/hooks/useCommunityToolRows";
 import { useInitiatives } from "@/hooks/useInitiatives";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import { useTagEntities } from "@/hooks/useTags";
 import { useTasks } from "@/hooks/useTasks";
@@ -47,7 +48,7 @@ import {
 import type { TranslateFn } from "@/types/i18n";
 import { DataTable } from "@/ui/data-table";
 import { fieldColumn } from "@/ui/layouts/columns";
-import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/ui/layouts/fields";
+import type { LayoutEnv } from "@/ui/layouts/fields";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { TableSkeleton } from "@/ui/page-skeletons";

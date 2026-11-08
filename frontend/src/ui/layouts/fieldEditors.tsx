@@ -361,7 +361,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
    *  taking it off the item. */
   placed?: boolean;
 }) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation(["properties", "ui"]);
   const save = saves.useSave(property.name);
   const adding = useContext(ItemDraftContext) !== null;
   const saved = normalizePropertyValue(property);
@@ -418,7 +418,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
             className="text-muted-foreground"
             onClick={placed ? () => draft.edit(null) : remove}
             disabled={readOnly}
-            aria-label={placed ? t("common:clear") : t("remove")}
+            aria-label={placed ? t("ui:clear") : t("remove")}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -502,7 +502,7 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
    *  and the owner's metadata: a collection's metadata. */
   definitions?: PropertyDefinitionRead[];
 }) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation(["properties", "ui"]);
   const { env } = props;
   const properties = props.saves.useShown(props.properties);
   const definition = (given ?? env?.definitions.data)?.find((each) => each.id === propertyId);
@@ -519,7 +519,7 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
           size="sm"
           onClick={() => void env.definitions.refetch()}
         >
-          {t("common:tryAgain")}
+          {t("ui:tryAgain")}
         </Button>
       </div>
     );

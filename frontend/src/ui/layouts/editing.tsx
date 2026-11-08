@@ -315,7 +315,7 @@ export const useFieldDraft = <V,>(
 };
 
 const FieldSaveStatus = ({ save }: { save: FieldSave }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   if (save.state === "error") {
     return (
       <span
@@ -384,7 +384,7 @@ export const FieldFrame = ({
   className?: string;
   children: ReactNode;
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <fieldset aria-label={label} className={cn("relative min-w-0 space-y-2", className)} {...keys}>
       {hideLabel ? (
