@@ -7,8 +7,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
-import { EMPTY_DRAFT, updateHelp } from "@/components/help/helpStore";
-import { docsUrl } from "@/lib/links";
+import {
+  claimHelp,
+  currentHelp,
+  EMPTY_DRAFT,
+  openHelp,
+  setHelpDraft,
+  updateHelp,
+} from "@/components/help/helpStore";
+import { DOCS_SITE_URL, docsUrl } from "@/lib/links";
 
 const CONTEXT = vi.hoisted(() => ({
   app_version: "0.79.0",
@@ -83,8 +90,10 @@ vi.mock("@/hooks/useTickets", async (importOriginal) => ({
 import { HelpHost } from "./HelpHost";
 
 const openPanel = async () => {
-  act(() => updateHelp({ open: true }));
   renderPage(HelpHost);
+  // Opened once the host has claimed Help for the account signed in.
+  await act(async () => {});
+  act(() => openHelp());
   return screen.findByRole("searchbox", { name: "Search the user guide" });
 };
 
@@ -114,7 +123,7 @@ describe("Help", () => {
     expect(screen.getByText("For this page")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Projects and tasks/ })).toHaveAttribute(
       "href",
-      docsUrl("en/guides/projects/")
+      `${DOCS_SITE_URL}en/guides/projects/`
     );
   });
 
@@ -125,7 +134,7 @@ describe("Help", () => {
     await user.type(search, "invite link");
     expect(
       await screen.findByRole("link", { name: /My invite link doesn't work/ })
-    ).toHaveAttribute("href", docsUrl("en/faq/#my-invite-link-doesnt-work"));
+    ).toHaveAttribute("href", `${DOCS_SITE_URL}en/faq/#my-invite-link-doesnt-work`);
 
     await user.clear(search);
     await user.type(search, "zebra");
@@ -142,6 +151,15 @@ describe("Help", () => {
     expect(await screen.findByRole("textbox", { name: "What happened?" })).toHaveValue(
       "invite link expired"
     );
+    // About the community it was started in, wherever the reader goes next.
+    expect(currentHelp().communityId).toBe(3);
+  });
+
+  it("drops a draft when another account or server takes over", () => {
+    claimHelp("https://one.example/api/v1 7");
+    setHelpDraft({ text: "My card was charged twice" });
+    claimHelp("https://one.example/api/v1 8");
+    expect(currentHelp().draft).toEqual(EMPTY_DRAFT);
   });
 
   it("sends the request about the community, with this device's details", async () => {

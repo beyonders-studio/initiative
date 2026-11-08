@@ -18,6 +18,8 @@ export interface HelpDraft {
 }
 
 export interface HelpState {
+  /** The server and account Help was opened under; a draft belongs to them. */
+  owner: string;
   open: boolean;
   view: HelpView;
   query: string;
@@ -28,7 +30,15 @@ export interface HelpState {
 
 export const EMPTY_DRAFT: HelpDraft = { text: "", topic: "", files: [], sendContext: true };
 
-let state: HelpState = { open: false, view: "search", query: "", draft: EMPTY_DRAFT };
+const CLOSED: Omit<HelpState, "owner"> = {
+  open: false,
+  view: "search",
+  query: "",
+  draft: EMPTY_DRAFT,
+  communityId: undefined,
+};
+
+let state: HelpState = { owner: "", ...CLOSED };
 const listeners = new Set<() => void>();
 
 export const updateHelp = (patch: Partial<HelpState>) => {
@@ -48,6 +58,17 @@ const subscribe = (listener: () => void) => {
 };
 
 export const hasDraft = (draft: HelpDraft) => draft.text.trim() !== "" || draft.files.length > 0;
+
+/**
+ * Hand Help to the server and account now signed in: under another one, it
+ * starts closed with nothing written.
+ */
+export const claimHelp = (owner: string) => {
+  if (state.owner !== owner) updateHelp({ owner, ...CLOSED });
+};
+
+/** Throw away what was written, and the community it was about. */
+export const discardHelpDraft = () => updateHelp({ draft: EMPTY_DRAFT, communityId: undefined });
 
 /**
  * Open Help: where a draft is waiting, on it; otherwise on the search. A

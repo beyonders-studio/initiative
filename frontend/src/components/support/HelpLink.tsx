@@ -24,6 +24,8 @@ export interface HelpLinkProps {
   communityId: number | null;
   /** The button's words. "Ask for help" when not given. */
   label?: string;
+  /** Called as Help opens: a dialog the button sits in closes, so Help is not behind it. */
+  onAsk?: () => void;
   variant?: ButtonLook["variant"];
   size?: ButtonLook["size"];
   className?: string;
@@ -33,6 +35,7 @@ export const HelpLink = ({
   topic,
   communityId,
   label,
+  onAsk,
   variant = "link",
   size = "sm",
   className,
@@ -50,7 +53,11 @@ export const HelpLink = ({
       variant={variant}
       size={size}
       className={cn(variant === "link" && "h-auto p-0", className)}
-      onClick={() => (form ? openHelp({ topic, communityId }) : openHelp())}
+      onClick={() => {
+        onAsk?.();
+        if (form) openHelp({ topic, communityId });
+        else openHelp();
+      }}
     >
       {label ?? t("help.action")}
     </Button>

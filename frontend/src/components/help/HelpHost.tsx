@@ -1,8 +1,10 @@
 import { MessageCircleQuestionMark } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useLayoutEffect } from "react";
 import { useTranslation } from "react-i18next";
 
-import { hasDraft, openHelp, useHelpState } from "@/components/help/helpStore";
+import { claimHelp, hasDraft, openHelp, useHelpState } from "@/components/help/helpStore";
+import { useAuth } from "@/hooks/useAuth";
+import { useServer } from "@/hooks/useServer";
 
 const HelpPanel = lazy(() =>
   import("@/components/help/HelpPanel").then((module) => ({ default: module.HelpPanel }))
@@ -11,12 +13,18 @@ const HelpPanel = lazy(() =>
 /**
  * Help, drawn once at the root: the panel while it is open, loaded the first
  * time it is, and while it is closed with a request half written, a pill that
- * opens it again. It renders on every page, signed in or not, so it reads only
- * the preloaded `common` namespace itself.
+ * opens it again. A draft belongs to the server and account it was written
+ * under, and is dropped when either changes. It renders on every page, signed
+ * in or not, so it reads only the preloaded `common` namespace itself.
  */
 export const HelpHost = () => {
   const { t } = useTranslation("common");
   const help = useHelpState();
+  const { user } = useAuth();
+  const { serverUrl } = useServer();
+  const owner = `${serverUrl ?? ""} ${user?.id ?? ""}`;
+  // Before paint, so another account never sees the pill for what was written.
+  useLayoutEffect(() => claimHelp(owner), [owner]);
   if (!help.open) {
     return hasDraft(help.draft) ? (
       <button

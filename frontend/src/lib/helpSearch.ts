@@ -97,9 +97,15 @@ export const helpSearch =
     return ranked.filter((match) => match.rank >= best / 2).map((match) => match.entry);
   };
 
-/** What a page is about, from its route template: its named segments, ids left out. */
+/**
+ * What a page is about, from its route template: the last two things it names,
+ * a parameter by what it holds (`$initiativeId` is an initiative) and the
+ * one-letter prefixes (`/c/`, `/i/`) left out, since its parameter names it.
+ */
 export const pageTerms = (routeTemplate: string): string =>
   routeTemplate
     .split("/")
-    .filter((segment) => segment && !segment.startsWith("$"))
+    .map((segment) => (segment.startsWith("$") ? segment.slice(1).replace(/Id$/, "") : segment))
+    .filter((segment) => segment.length > 1)
+    .slice(-2)
     .join(" ");

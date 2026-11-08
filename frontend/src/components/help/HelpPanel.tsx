@@ -24,6 +24,7 @@ import { useReadHelpIndex } from "@/api/generated/help/help";
 import type { HelpIndexEntry, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import {
   currentHelp,
+  discardHelpDraft,
   EMPTY_DRAFT,
   type HelpDraft,
   type HelpState,
@@ -49,7 +50,7 @@ import {
 } from "@/hooks/useTickets";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
 import { helpSearch, pageTerms } from "@/lib/helpSearch";
-import { docsUrl } from "@/lib/links";
+import { DOCS_SITE_URL, docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { listFormat } from "@/ui/lib/intl";
@@ -88,7 +89,7 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
     <>
       {/* On a phone the panel is a sheet, and the page behind it waits. */}
       <div
-        className="fixed inset-0 z-40 bg-black/50 sm:hidden"
+        className="fixed inset-0 z-50 bg-black/50 sm:hidden"
         onClick={close}
         aria-hidden="true"
       />
@@ -98,7 +99,7 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 flex h-[88dvh] flex-col rounded-t-2xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-xl",
+          "fixed inset-x-0 bottom-0 z-50 flex h-[88dvh] flex-col rounded-t-2xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-xl",
           "sm:inset-x-auto sm:right-4 sm:bottom-4 sm:h-[min(560px,calc(100dvh-var(--title-bar-height,0px)-2rem))] sm:w-[400px] sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:border sm:pb-0"
         )}
       >
@@ -106,6 +107,7 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
           <SearchView
             titleId={titleId}
             query={help.query}
+            communityId={communityId}
             canAsk={canAsk}
             contact={contact}
             signedIn={Boolean(user)}
@@ -176,7 +178,7 @@ const HelpResult = ({
   onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
 }) => (
   <a
-    href={docsUrl(entry.location)}
+    href={`${DOCS_SITE_URL}${entry.location}`}
     onKeyDown={onKeyDown}
     target="_blank"
     rel="noopener noreferrer"
@@ -207,6 +209,7 @@ const useHelpSearch = () => {
 const SearchView = ({
   titleId,
   query,
+  communityId,
   canAsk,
   contact,
   signedIn,
@@ -214,6 +217,8 @@ const SearchView = ({
 }: {
   titleId: string;
   query: string;
+  /** The community a request asked from here is about. */
+  communityId: number | null;
   canAsk: boolean;
   contact: string | null;
   signedIn: boolean;
@@ -261,10 +266,12 @@ const SearchView = ({
   };
 
   const ask = () => {
-    // What was searched starts the request, unless a draft is already there.
+    // What was searched starts the request, unless a draft is already there,
+    // and the request stays about the community it was started in.
     const { draft } = currentHelp();
     updateHelp({
       view: "ask",
+      communityId,
       draft: draft.text.trim() || !typed ? draft : { ...draft, text: typed },
     });
   };
@@ -578,7 +585,7 @@ const AskView = ({
             {held ?? t("help.panel.sendShortcut")}
           </span>
           {hasDraft(draft) ? (
-            <Button variant="ghost" size="sm" onClick={() => setHelpDraft(EMPTY_DRAFT)}>
+            <Button variant="ghost" size="sm" onClick={discardHelpDraft}>
               {t("help.panel.discard")}
             </Button>
           ) : null}
