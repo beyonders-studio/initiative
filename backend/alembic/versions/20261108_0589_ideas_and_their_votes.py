@@ -52,6 +52,10 @@ def _create() -> None:
         sa.ForeignKeyConstraint(["task_id"], ["tasks.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("task_id"),
     )
+    op.execute(
+        "CREATE TRIGGER tr_ideas_set_created_by BEFORE INSERT "
+        "ON ideas FOR EACH ROW EXECUTE FUNCTION public.fn_set_created_by()"
+    )
     op.create_table(
         "idea_votes",
         sa.Column("id", sa.Integer(), nullable=False),

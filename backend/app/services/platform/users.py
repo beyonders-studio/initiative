@@ -292,6 +292,21 @@ async def _erase_in_guild(
     await guild_session.exec(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id)
     )
+    # The operations community alone names people from outside it: its votes
+    # for ideas, which go, and the cases they filed, which stay with nobody to
+    # tell about them.
+    from app.models.tenant.intake import IdeaVote, IntakeCase
+    from app.services.tenant.cases import holds_cases
+
+    if await holds_cases(guild_session):
+        await guild_session.exec(
+            delete(IdeaVote).where(col(IdeaVote.user_id) == user_id)
+        )
+        await guild_session.exec(
+            update(IntakeCase)
+            .where(col(IntakeCase.filer_user_id) == user_id)
+            .values(filer_user_id=None)
+        )
     await guild_session.exec(
         delete(CalendarEventAttendee).where(CalendarEventAttendee.user_id == user_id)
     )

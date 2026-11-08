@@ -17,7 +17,8 @@ from app.models.platform.notification import NotificationType
 from app.models.tenant.intake import Idea, IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import ideas as ideas_service
-from app.testing import create_task, get_auth_headers
+from app.services.platform import users as user_service
+from app.testing import create_project, create_task, get_auth_headers
 
 IDEAS = "/api/v1/ideas"
 
@@ -55,6 +56,7 @@ async def board(session, operations, cloud):  # noqa: F811
     return {
         **operations,
         "staff": get_auth_headers(operations["staff"]),
+        "staff_user": operations["staff"],
         "published": published,
         "draft": draft,
         "case": case,
@@ -203,3 +205,39 @@ async def test_voters_hear_when_an_idea_moves(client, session, acting_user, boar
     ).one()
     assert notice.data["task_id"] == board["published"].id
     assert notice.data["target_path"] == f"/ideas/{board['published'].id}"
+
+
+async def test_a_task_moved_off_the_board_is_nobodys_to_read(
+    client, session, acting_user, board
+):
+    """An idea's task moved to another project keeps its row and its votes,
+    but nobody reads it and nobody is told about it."""
+    voter = await acting_user()
+    await client.put(f"{IDEAS}/{board['published'].id}/vote", headers=voter.headers)
+    elsewhere = await create_project(session, board["initiative"], board["staff_user"])
+    moved = await create_task(
+        session, elsewhere, status_category=TaskStatusCategory.done
+    )
+    await set_rls_context(session, SystemGuild(board["guild"].id))
+    task = (
+        await session.exec(select(Task).where(Task.id == board["published"].id))
+    ).one()
+    task.project_id = elsewhere.id
+    task.task_status_id = moved.task_status_id
+    session.add(task)
+    await session.commit()
+    await set_rls_context(session, Unattributed())
+
+    response = await client.get(f"{IDEAS}/{board['published'].id}")
+    assert response.status_code == 404
+    assert await ideas_service.notify_voters() == 0
+
+
+async def test_erasing_a_voter_takes_their_vote(client, session, acting_user, board):
+    voter = await acting_user()
+    await client.put(f"{IDEAS}/{board['published'].id}/vote", headers=voter.headers)
+    await user_service.hard_delete_user(session, voter.user.id)
+
+    await _move(session, board, board["published"], TaskStatusCategory.in_progress)
+    assert await ideas_service.notify_voters() == 0
+    assert (await client.get(f"{IDEAS}/{board['published'].id}")).json()["votes"] == 0

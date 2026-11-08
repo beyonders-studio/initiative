@@ -133,6 +133,24 @@ def _status(row: Any) -> IdeaStatus:
     )
 
 
+def _public(query):
+    """``query`` over ``Task``, kept to what anybody may read: a published
+    idea still on the board bound to ``ideas``, not archived, trashed or held."""
+    return (
+        query.join(Idea, Idea.task_id == Task.id)
+        .join(
+            IntakeBinding,
+            and_(
+                IntakeBinding.stream == IntakeStream.ideas.value,
+                IntakeBinding.project_id == Task.project_id,
+            ),
+        )
+        .where(Task.archived_at.is_(None))  # type: ignore[union-attr]
+        .where(Task.deleted_at.is_(None))  # type: ignore[union-attr]
+        .where(Task.held_at.is_(None))  # type: ignore[union-attr]
+    )
+
+
 def _ideas_query(user: Optional[User], *, with_description: bool = False):
     # Counted as rows: the ideas role reads which task a vote is for and whose
     # it is, and no other column.
@@ -168,17 +186,10 @@ def _ideas_query(user: Optional[User], *, with_description: bool = False):
         voted.label("voted"),
         (Task.description if with_description else literal(None)).label("description"),
     ]
-    return (
-        (
-            select(*columns)
-            .select_from(Task)
-            .join(Idea, Idea.task_id == Task.id)
-            .join(TaskStatus, TaskStatus.id == Task.task_status_id)
-            .where(Task.archived_at.is_(None))  # type: ignore[union-attr]
-        ),
-        votes,
-        voted,
+    query = _public(select(*columns).select_from(Task)).join(
+        TaskStatus, TaskStatus.id == Task.task_status_id
     )
+    return query, votes, voted
 
 
 def _read(row: Any) -> IdeaRead:
@@ -286,6 +297,20 @@ async def vote(user: User, task_id: int, *, on: bool) -> IdeaRead:
         raise VoteRefused
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
+        # Asked again under a share lock on the task, so the team cannot close
+        # or unpublish it between this answer and the write.
+        category = (
+            await session.exec(
+                _public(select(TaskStatus.category).select_from(Task))
+                .join(TaskStatus, TaskStatus.id == Task.task_status_id)
+                .where(Task.id == task_id)
+                .with_for_update(of=Task, read=True)
+            )
+        ).first()
+        if category is None:
+            raise IdeaNotFound
+        if category == TaskStatusCategory.done:
+            raise VoteRefused
         if on:
             await session.exec(
                 pg_insert(IdeaVote)
@@ -374,17 +399,18 @@ async def notify_voters() -> int:
     notices: list[dict[str, Any]] = []
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
+        # Only what anybody may still read: the system's own role would also
+        # see a task moved off the board, trashed or held.
         rows = await session.exec(
-            select(IdeaVote, Task.task_status_id, Task.title, TaskStatus.name)
-            .join(Idea, Idea.task_id == IdeaVote.task_id)
-            .join(Task, Task.id == IdeaVote.task_id)
+            _public(
+                select(IdeaVote, Task.task_status_id, Task.title, TaskStatus.name)
+                .select_from(IdeaVote)
+                .join(Task, Task.id == IdeaVote.task_id)
+            )
             .join(TaskStatus, TaskStatus.id == Task.task_status_id)
             .where(
-                and_(
-                    IdeaVote.notified_status_id.is_distinct_from(  # type: ignore[union-attr]
-                        Task.task_status_id
-                    ),
-                    Task.archived_at.is_(None),  # type: ignore[union-attr]
+                IdeaVote.notified_status_id.is_distinct_from(  # type: ignore[union-attr]
+                    Task.task_status_id
                 )
             )
             .order_by(IdeaVote.id)
