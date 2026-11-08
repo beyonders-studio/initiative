@@ -53,9 +53,11 @@ def _upgrade() -> None:
     ).scalar()
     if forced:
         op.execute("ALTER TABLE intake_cases NO FORCE ROW LEVEL SECURITY")
-    op.execute("DELETE FROM intake_cases WHERE stream = 'ideas'")
-    if forced:
-        op.execute("ALTER TABLE intake_cases FORCE ROW LEVEL SECURITY")
+    try:
+        op.execute("DELETE FROM intake_cases WHERE stream = 'ideas'")
+    finally:
+        if forced:
+            op.execute("ALTER TABLE intake_cases FORCE ROW LEVEL SECURITY")
     _streams_check(_AFTER)
 
 

@@ -10,7 +10,10 @@ import { buildComment, buildUser } from "@/__tests__/factories";
 import { renderPage, renderWithProviders } from "@/__tests__/helpers/render";
 import type { AccessGrantRead, TaskCaseRead } from "@/api/generated/initiativeAPI.schemas";
 
-const state = vi.hoisted(() => ({ found: undefined as TaskCaseRead | undefined }));
+const state = vi.hoisted(() => ({
+  found: undefined as TaskCaseRead | undefined,
+  isError: false,
+}));
 const createComment = vi.fn();
 const updateTask = vi.fn();
 const takeCase = vi.fn();
@@ -19,7 +22,7 @@ vi.mock("@/hooks/useTickets", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useTickets")>("@/hooks/useTickets");
   return {
     ...actual,
-    useTaskCase: () => ({ data: state.found }),
+    useTaskCase: () => ({ data: state.found, isError: state.isError }),
     useTakeCase: () => ({ mutate: takeCase, isPending: false }),
     refreshTaskCase: vi.fn(),
   };
@@ -74,6 +77,7 @@ const renderRouted = (capabilities: string[] = []) =>
 describe("CasePanel", () => {
   beforeEach(() => {
     state.found = undefined;
+    state.isError = false;
     createComment.mockReset().mockResolvedValue(buildComment({ id: 1 }));
     updateTask.mockReset().mockResolvedValue({});
     takeCase.mockReset();
@@ -106,6 +110,15 @@ describe("CasePanel", () => {
     expect(screen.getByText("Ideas")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Take this case" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Request access" })).toBeNull();
+  });
+
+  it("renders nothing once the task is no case, though the last answer is cached", () => {
+    // A published idea put back to a draft: the refetch is a 404, and the
+    // query keeps the idea it read before.
+    state.found = supportCase({ stream: "ideas", filer: null, votes: 3 });
+    state.isError = true;
+    const { container } = renderPanel();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("lets somebody who works it take it", async () => {

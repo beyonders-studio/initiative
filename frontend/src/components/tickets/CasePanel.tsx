@@ -198,7 +198,9 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
   const updateTask = useUpdateTask();
   const filed = useRelativeTime(caseQuery.data?.opened_at ?? null);
 
-  const found = caseQuery.data;
+  // A 404 keeps the last answer cached: a published idea put back to a draft
+  // is no longer a case, though it was one a moment ago.
+  const found = caseQuery.isError ? undefined : caseQuery.data;
   if (!found) return null;
 
   const filerName = found.filer ? getUserDisplayName(found.filer) : null;
