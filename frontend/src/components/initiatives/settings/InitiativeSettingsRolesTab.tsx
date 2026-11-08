@@ -67,7 +67,12 @@ const SetByCommunity = ({ on, t }: { on: boolean; t: (key: never) => string }) =
   <TooltipProvider delayDuration={200}>
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex h-5 items-center gap-1 rounded bg-muted px-1.5 font-medium text-foreground text-xs">
+        {/* Focusable so the reason is reachable from the keyboard too. */}
+        <span
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: the tooltip trigger needs focus
+          tabIndex={0}
+          className="inline-flex h-5 items-center gap-1 rounded bg-muted px-1.5 font-medium text-foreground text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Lock className="h-3 w-3" aria-hidden="true" />
           {t((on ? "settings.fixedOn" : "settings.fixedOff") as never)}
           <span className="sr-only">{t("settings.setByCommunity" as never)}</span>

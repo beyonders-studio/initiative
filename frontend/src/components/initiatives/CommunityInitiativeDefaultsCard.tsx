@@ -131,15 +131,18 @@ export const CommunityInitiativeDefaultsCard = ({
   };
 
   /** What saving `draft` over `current` changes in each live initiative:
-   *  where a value turns on, and where it turns off. A member permission
-   *  counts only where the tool is on afterwards. */
+   *  where a value turns on, and where it turns off. A member permission is
+   *  what members can reach, so it counts with the tool's switch, and only
+   *  where the tool is on afterwards: turning a tool off is said once. */
   const changes = (tool: Tool, current: Rule, draft: Rule): string[] => {
-    const holds = (rule: Rule, key: RuleKey, id: number) => {
+    const value = (rule: Rule, key: RuleKey, id: number) => {
       const answer = answerFor(rule, key);
       if (answer !== "each") return answer === "on";
       const own = key === "tool" ? defaults.own_tools[tool] : defaults.own_member_permissions[key];
       return own?.includes(id) ?? false;
     };
+    const holds = (rule: Rule, key: RuleKey, id: number) =>
+      value(rule, "tool", id) && (key === "tool" || value(rule, key, id));
     const names = (ids: number[]) =>
       listFormat(i18n.language).format(
         initiatives.filter((initiative) => ids.includes(initiative.id)).map((i) => i.name)
