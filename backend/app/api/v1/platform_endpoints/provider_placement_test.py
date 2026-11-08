@@ -1,7 +1,7 @@
 """The platform's sign-in placement rules, written on a provider."""
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

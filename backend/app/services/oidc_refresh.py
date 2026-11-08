@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta
 
-import httpx
+import httpx2
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -40,7 +40,7 @@ async def _fetch_oidc_metadata(issuer_url: str) -> dict:
     well_known_suffix = "/.well-known/openid-configuration"
     normalized = normalized.removesuffix(well_known_suffix)
     discovery_url = f"{normalized}{well_known_suffix}"
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx2.AsyncClient(timeout=10) as client:
         resp = await client.get(discovery_url)
         resp.raise_for_status()
         return resp.json()
@@ -84,7 +84,7 @@ async def _refresh_and_sync_identity(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx2.AsyncClient(timeout=10) as client:
             token_resp = await client.post(token_endpoint, data=token_payload)
             if token_resp.status_code in (400, 401):
                 logger.warning(
@@ -120,10 +120,10 @@ async def _refresh_and_sync_identity(
             )
             userinfo_resp.raise_for_status()
             profile = userinfo_resp.json()
-    except httpx.HTTPStatusError:
+    except httpx2.HTTPStatusError:
         logger.exception("HTTP error during OIDC refresh for user %s", user.id)
         return False
-    except httpx.RequestError:
+    except httpx2.RequestError:
         logger.exception("Network error during OIDC refresh for user %s", user.id)
         return False
 

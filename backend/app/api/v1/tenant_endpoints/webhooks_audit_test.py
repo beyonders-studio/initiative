@@ -12,7 +12,7 @@ import socket
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole

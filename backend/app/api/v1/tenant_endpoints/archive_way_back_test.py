@@ -6,7 +6,7 @@ somewhere to see what has been put away, and an answer to "may I take this
 back", which the capped permission level cannot give.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool

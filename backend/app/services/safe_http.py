@@ -19,7 +19,7 @@ import time
 from collections.abc import Mapping
 from typing import Any, BinaryIO
 
-import httpx
+import httpx2
 
 from app.services.webhook_target_url import resolve_validated_target_async
 
@@ -39,7 +39,7 @@ class ResponseTooLargeError(Exception):
 
 def _log_sent(
     method: str,
-    url: httpx.URL,
+    url: httpx2.URL,
     began: float,
     *,
     status: int | None = None,
@@ -60,7 +60,7 @@ def _log_sent(
     )
 
 
-def _authority(url: httpx.URL) -> str:
+def _authority(url: httpx2.URL) -> str:
     """``host[:port]`` for the ``Host`` header, bracketing IPv6 literals
     and including the port only when the URL specified one."""
     host = url.host
@@ -77,7 +77,7 @@ async def build_validated_request(
     content: bytes | None = None,
     json: Any = None,
     allow_private: bool = False,
-) -> httpx.Request:
+) -> httpx2.Request:
     """Resolve and validate ``url``, then build a request whose connection
     target is the validated address, keeping the hostname for TLS SNI,
     certificate verification, and the ``Host`` header. ``allow_private``
@@ -88,7 +88,7 @@ async def build_validated_request(
     or :class:`~app.services.webhook_target_url.WebhookTargetUrlPrivateError`
     for a disallowed target.
     """
-    original = httpx.URL(url)
+    original = httpx2.URL(url)
     target = await resolve_validated_target_async(url, allow_private=allow_private)
     return _pin_request(
         method,
@@ -103,21 +103,21 @@ async def build_validated_request(
 
 def _pin_request(
     method: str,
-    original: httpx.URL,
+    original: httpx2.URL,
     ip: str,
     hostname: str,
     *,
     headers: Mapping[str, str] | None,
     content: bytes | None = None,
     json: Any = None,
-    stream: httpx.AsyncByteStream | None = None,
+    stream: httpx2.AsyncByteStream | None = None,
     extensions: Mapping[str, Any] | None = None,
-) -> httpx.Request:
+) -> httpx2.Request:
     """Build a request aimed at ``ip`` while keeping ``hostname`` for TLS
     SNI, certificate verification, and the ``Host`` header."""
     merged = {k: v for k, v in (headers or {}).items() if k.lower() != "host"}
     merged["Host"] = _authority(original)
-    return httpx.Request(
+    return httpx2.Request(
         method,
         original.copy_with(host=ip),
         headers=merged,
@@ -128,7 +128,7 @@ def _pin_request(
     )
 
 
-class _BoundedStream(httpx.AsyncByteStream):
+class _BoundedStream(httpx2.AsyncByteStream):
     """A response body that stops at ``max_bytes``."""
 
     def __init__(self, inner: Any, max_bytes: int, status_code: int) -> None:
@@ -150,7 +150,7 @@ class _BoundedStream(httpx.AsyncByteStream):
         await self._inner.aclose()
 
 
-class PinnedTransport(httpx.AsyncBaseTransport):
+class PinnedTransport(httpx2.AsyncBaseTransport):
     """A transport that sends every request to a validated address of its
     host, as :func:`request_public_target` does, for a client that builds
     its own requests (an SDK's). A redirect it follows is a new request,
@@ -167,13 +167,13 @@ class PinnedTransport(httpx.AsyncBaseTransport):
         *,
         allow_private: bool = False,
         max_bytes: int | None = None,
-        inner: httpx.AsyncBaseTransport | None = None,
+        inner: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._allow_private = allow_private
         self._max_bytes = max_bytes
-        self._inner = inner or httpx.AsyncHTTPTransport()
+        self._inner = inner or httpx2.AsyncHTTPTransport()
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         original = request.url
         target = await resolve_validated_target_async(
             str(original), allow_private=self._allow_private
@@ -185,7 +185,7 @@ class PinnedTransport(httpx.AsyncBaseTransport):
         }
         if self._max_bytes is not None:
             headers["accept-encoding"] = "identity"
-        last_exc: httpx.ConnectError | None = None
+        last_exc: httpx2.ConnectError | None = None
         for address in target.addresses:
             pinned = _pin_request(
                 request.method,
@@ -199,11 +199,11 @@ class PinnedTransport(httpx.AsyncBaseTransport):
             began = time.perf_counter()
             try:
                 response = await self._inner.handle_async_request(pinned)
-            except httpx.ConnectError as exc:
+            except httpx2.ConnectError as exc:
                 _log_sent(request.method, original, began, failure=exc)
                 last_exc = exc
                 continue
-            except httpx.HTTPError as exc:
+            except httpx2.HTTPError as exc:
                 _log_sent(request.method, original, began, failure=exc)
                 raise
             _log_sent(request.method, original, began, status=response.status_code)
@@ -212,7 +212,7 @@ class PinnedTransport(httpx.AsyncBaseTransport):
             raise last_exc
         raise RuntimeError(f"no validated address to connect to for {original!r}")
 
-    async def _bounded(self, response: httpx.Response) -> httpx.Response:
+    async def _bounded(self, response: httpx2.Response) -> httpx2.Response:
         if self._max_bytes is None:
             return response
         encoding = response.headers.get("content-encoding", "identity").lower()
@@ -222,7 +222,7 @@ class PinnedTransport(httpx.AsyncBaseTransport):
             raise ResponseTooLargeError(
                 self._max_bytes, status_code=response.status_code
             )
-        return httpx.Response(
+        return httpx2.Response(
             response.status_code,
             headers=response.headers,
             stream=_BoundedStream(
@@ -242,12 +242,12 @@ async def request_public_target(
     headers: dict[str, str] | None = None,
     content: bytes | None = None,
     json: Any = None,
-    timeout: httpx.Timeout | float,
-    transport: httpx.AsyncBaseTransport | None = None,
+    timeout: httpx2.Timeout | float,
+    transport: httpx2.AsyncBaseTransport | None = None,
     allow_private: bool = False,
     max_bytes: int | None = None,
     sink: BinaryIO | None = None,
-) -> httpx.Response:
+) -> httpx2.Response:
     """Send a request to a validated public target. The host is resolved
     once; the request connects to a validated address and, if one fails
     fast (connection refused / unreachable), falls back to the other
@@ -261,10 +261,10 @@ async def request_public_target(
     decoding, and raises :class:`ResponseTooLargeError` past it. Unset, the
     body is read whole. With ``sink`` as well, the body is written to it from
     its start rather than held, and the response carries none."""
-    original = httpx.URL(url)
+    original = httpx2.URL(url)
     target = await resolve_validated_target_async(url, allow_private=allow_private)
-    last_exc: httpx.ConnectError | None = None
-    async with httpx.AsyncClient(
+    last_exc: httpx2.ConnectError | None = None
+    async with httpx2.AsyncClient(
         timeout=timeout, follow_redirects=False, transport=transport
     ) as client:
         for address in target.addresses:
@@ -280,18 +280,18 @@ async def request_public_target(
             began = time.perf_counter()
             try:
                 response = await client.send(request, stream=max_bytes is not None)
-            except httpx.ConnectError as exc:
+            except httpx2.ConnectError as exc:
                 # Fast failure for this validated address; try the next one.
                 _log_sent(method, original, began, failure=exc)
                 last_exc = exc
                 continue
-            except httpx.HTTPError as exc:
+            except httpx2.HTTPError as exc:
                 _log_sent(method, original, began, failure=exc)
                 raise
             if max_bytes is not None:
                 try:
                     response = await _read_bounded(response, max_bytes, sink)
-                except (httpx.HTTPError, ResponseTooLargeError) as exc:
+                except (httpx2.HTTPError, ResponseTooLargeError) as exc:
                     _log_sent(method, original, began, failure=exc)
                     raise
             _log_sent(method, original, began, status=response.status_code)
@@ -309,8 +309,8 @@ _SINK_PIECE_BYTES = 1024 * 1024
 
 
 async def _read_bounded(
-    response: httpx.Response, max_bytes: int, sink: BinaryIO | None = None
-) -> httpx.Response:
+    response: httpx2.Response, max_bytes: int, sink: BinaryIO | None = None
+) -> httpx2.Response:
     """A streamed response read up to ``max_bytes`` decoded bytes: into
     memory, or written to ``sink`` from its start, emptied first, so that
     after a retry or a redirect it holds the last response's body. A sink is
@@ -345,7 +345,7 @@ async def _read_bounded(
         if name.lower()
         not in ("content-encoding", "content-length", "transfer-encoding")
     ]
-    return httpx.Response(
+    return httpx2.Response(
         response.status_code,
         headers=headers,
         content=bytes(body),

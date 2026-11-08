@@ -4,7 +4,7 @@ from datetime import UTC
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings

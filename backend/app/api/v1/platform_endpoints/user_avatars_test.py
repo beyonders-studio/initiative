@@ -5,7 +5,7 @@ who may take one down (its owner, or a platform moderator).
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

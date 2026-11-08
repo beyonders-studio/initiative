@@ -19,12 +19,12 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import cryptography.fernet
-import httpx
+import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import delete, text, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -421,13 +421,13 @@ async def _connected_row(
 def _during_refresh(monkeypatch, vendor: FakeVendor, write) -> None:
     """Run ``write`` while the vendor is answering a refresh."""
 
-    async def handle(request: httpx.Request) -> httpx.Response:
+    async def handle(request: httpx2.Request) -> httpx2.Response:
         if b"grant_type=refresh_token" in request.content:
             await write()
         return vendor.handle(request)
 
     monkeypatch.setattr(
-        plugin_connection_flows, "http_transport", httpx.MockTransport(handle)
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(handle)
     )
 
 
@@ -2810,7 +2810,7 @@ class TestDeclarativePlugins:
         await _due(session, guild_id, "workspace")
         await _run_due(worker, guild_id)
 
-        async def answer(request: httpx.Request) -> httpx.Response:
+        async def answer(request: httpx2.Request) -> httpx2.Response:
             if request.headers.get("host") == vendor.api_host:
                 await route_session_to_guild(session, guild_id)
                 await session.exec(
@@ -2830,7 +2830,7 @@ class TestDeclarativePlugins:
             return vendor.handle(request)
 
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(answer)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(answer)
         )
         vendor.api_answers = [{"status": 404}]
         await _due(session, guild_id, "workspace")

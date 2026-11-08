@@ -4,7 +4,7 @@ edge, grouped by, and made from a checklist line."""
 import itertools
 from datetime import UTC, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 
 from app.core.messages import ChecklistMessages, RelationshipMessages, TaskMessages

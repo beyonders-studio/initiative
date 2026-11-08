@@ -22,7 +22,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from fastapi import HTTPException
 from sqlmodel import select
@@ -741,7 +741,7 @@ class TestFetching:
 
         async def request(method, target, *, headers, **kwargs):
             sent.update(headers)
-            return httpx.Response(200, content=b"{}")
+            return httpx2.Response(200, content=b"{}")
 
         monkeypatch.setattr(tuf_registry, "request_public_target", request)
         monkeypatch.setattr(settings, "MARKETPLACE_REGISTRY_URL", BASE_URL)

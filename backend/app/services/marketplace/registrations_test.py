@@ -7,7 +7,7 @@ the operator.
 
 import json
 
-import httpx
+import httpx2
 import pytest
 from fastapi import HTTPException
 from sqlmodel import select
@@ -346,13 +346,13 @@ def _serving(*documents: dict):
     from then on."""
     fetched: list[str] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         fetched.append(str(request.url))
-        return httpx.Response(
+        return httpx2.Response(
             200, json=documents[min(len(fetched), len(documents)) - 1]
         )
 
-    return fetched, httpx.MockTransport(handler)
+    return fetched, httpx2.MockTransport(handler)
 
 
 async def test_connect_shows_the_fingerprints_of_the_set_the_plugin_serves(session):
@@ -453,14 +453,14 @@ async def test_connect_refuses_when_the_base_url_moved_during_the_read(
 @pytest.mark.parametrize(
     ("answer", "status", "code"),
     [
-        (httpx.Response(404), 502, PluginServiceMessages.KEYS_UNREADABLE),
+        (httpx2.Response(404), 502, PluginServiceMessages.KEYS_UNREADABLE),
         (
-            httpx.Response(200, content=b"<html>"),
+            httpx2.Response(200, content=b"<html>"),
             502,
             PluginServiceMessages.KEYS_UNREADABLE,
         ),
         (
-            httpx.Response(200, json={"keys": []}),
+            httpx2.Response(200, json={"keys": []}),
             400,
             PluginServiceMessages.INVALID_JWKS,
         ),
@@ -471,7 +471,7 @@ async def test_connect_refuses_what_is_not_a_key_set(session, answer, status, co
 
     with pytest.raises(HTTPException) as excinfo:
         await service.published_keys(
-            session, row.id, transport=httpx.MockTransport(lambda request: answer)
+            session, row.id, transport=httpx2.MockTransport(lambda request: answer)
         )
 
     assert (excinfo.value.status_code, excinfo.value.detail) == (status, code)

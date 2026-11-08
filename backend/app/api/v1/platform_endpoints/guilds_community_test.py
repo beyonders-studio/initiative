@@ -10,7 +10,7 @@ from collections.abc import Callable
 from datetime import UTC
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

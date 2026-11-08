@@ -8,7 +8,7 @@ with ``permission denied for table notifications``.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.notification_categories import category_of

@@ -9,8 +9,8 @@ Runs against the same fake IdP harness as the operator flow tests.
 
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
-from httpx import AsyncClient
+import httpx2
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -57,7 +57,7 @@ async def _sign_in(
 ):
     """One sign-in at the deployment, through ``slug``."""
     state, nonce = await _begin_login(client, slug)
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200,
         json={
             "access_token": "at-1",

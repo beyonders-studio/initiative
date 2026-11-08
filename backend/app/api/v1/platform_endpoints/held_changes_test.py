@@ -7,7 +7,7 @@ longer allows it by the time it is due.
 
 from datetime import UTC, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.account_change_hold import AccountChangeHold, HeldChangeKind

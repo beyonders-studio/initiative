@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse

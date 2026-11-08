@@ -12,7 +12,7 @@ import base64
 import json
 from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from pycrdt import Doc, Text
 from sqlalchemy.orm import undefer
 from sqlmodel import select

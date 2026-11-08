@@ -1,6 +1,6 @@
 """Tests for the JWKS signing-key resolver.
 
-Outbound fetches are stubbed with ``httpx.MockTransport`` (injected via
+Outbound fetches are stubbed with ``httpx2.MockTransport`` (injected via
 ``client_factory`` — no global patching, no real network), so key selection,
 caching, the rate-limited refetch, and the https/size guards are all exercised
 in isolation. The happy path composes with the id_token verifier to prove the
@@ -13,7 +13,7 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
-import httpx
+import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -79,16 +79,16 @@ class _Endpoint:
         self._response = response
 
     def factory(self):
-        def handler(request: httpx.Request) -> httpx.Response:
+        def handler(request: httpx2.Request) -> httpx2.Response:
             self.calls += 1
             resp = self._response
             return resp(request) if callable(resp) else resp
 
-        return lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        return lambda: httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
 
 
-def _json_response(payload: dict) -> httpx.Response:
-    return httpx.Response(200, json=payload)
+def _json_response(payload: dict) -> httpx2.Response:
+    return httpx2.Response(200, json=payload)
 
 
 # --- resolution + composition ----------------------------------------------
@@ -270,7 +270,7 @@ async def test_response_size_cap_enforced():
 
 
 async def test_http_error_raises_resolution_error():
-    endpoint = _Endpoint(httpx.Response(500, text="down"))
+    endpoint = _Endpoint(httpx2.Response(500, text="down"))
     resolver = JwksResolver(client_factory=endpoint.factory())
     token = _sign(RSA1, kid="k1")
 
@@ -279,7 +279,7 @@ async def test_http_error_raises_resolution_error():
 
 
 async def test_invalid_jwks_body_raises():
-    endpoint = _Endpoint(httpx.Response(200, text="not json"))
+    endpoint = _Endpoint(httpx2.Response(200, text="not json"))
     resolver = JwksResolver(client_factory=endpoint.factory())
     token = _sign(RSA1, kid="k1")
 

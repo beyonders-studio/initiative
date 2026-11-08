@@ -9,7 +9,7 @@ record names them; the boot sweep runs as nobody and the record names nobody.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType

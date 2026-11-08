@@ -19,7 +19,7 @@ from datetime import UTC
 from typing import Any, ClassVar
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

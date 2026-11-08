@@ -33,7 +33,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-import httpx
+import httpx2
 from sqlalchemy import func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -48,7 +48,7 @@ INDEX_PATH = "/api/v1/legal"
 
 #: Short: every one of these calls sits in front of somebody waiting to read
 #: a policy or finish signing up.
-_TIMEOUT = httpx.Timeout(4.0, connect=2.0)
+_TIMEOUT = httpx2.Timeout(4.0, connect=2.0)
 
 #: How long an index is trusted before it is asked for again. Revisions are
 #: rare; the cost of being a few minutes behind is a version string.
@@ -185,7 +185,7 @@ async def get_index(*, force: bool = False) -> tuple[LegalDocument, ...]:
         ):
             raise LegalPortalUnavailable("the portal's index was unreadable just now")
         try:
-            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            async with httpx2.AsyncClient(timeout=_TIMEOUT) as client:
                 response = await client.get(
                     _portal_url(INDEX_PATH), headers={"Accept": "application/json"}
                 )
@@ -238,7 +238,7 @@ async def get_document(
     if if_none_match:
         headers["If-None-Match"] = if_none_match
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        async with httpx2.AsyncClient(timeout=_TIMEOUT) as client:
             response = await client.get(
                 _portal_url(f"{INDEX_PATH}/{slug}"), headers=headers
             )

@@ -1,7 +1,7 @@
 """This server's registration with the push relay, and the relay's Android
 settings.
 
-The relay is stood in for by an ``httpx.MockTransport``; the credential is
+The relay is stood in for by an ``httpx2.MockTransport``; the credential is
 stored for real, on ``app_setting_secrets``, through the system engine.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-import httpx
+import httpx2
 import pytest
 from sqlalchemy import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -32,25 +32,25 @@ class FakeRelay:
         self.android_status = 200
         self.android_auth: list[str] = []
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/v1/servers":
             if self.register_status != 201:
-                return httpx.Response(
+                return httpx2.Response(
                     self.register_status,
                     json={"error": {"message": "RELAY_REGISTRATION_LIMIT"}},
                 )
             self.registrations.append(json.loads(request.content))
             n = len(self.registrations)
-            return httpx.Response(
+            return httpx2.Response(
                 201, json={"server_id": f"srv_{n}", "server_key": f"key-{n}"}
             )
         if request.url.path == "/v1/android-config":
             self.android_auth.append(request.headers.get("authorization", ""))
             if self.android_status != 200:
-                return httpx.Response(
+                return httpx2.Response(
                     self.android_status, json={"error": {"message": "nope"}}
                 )
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "project_id": "beyonders-studio-app",
@@ -59,10 +59,10 @@ class FakeRelay:
                     "sender_id": "42",
                 },
             )
-        return httpx.Response(404)
+        return httpx2.Response(404)
 
-    def client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(self.handler))
+    def client(self) -> httpx2.AsyncClient:
+        return httpx2.AsyncClient(transport=httpx2.MockTransport(self.handler))
 
 
 @pytest.fixture(autouse=True)

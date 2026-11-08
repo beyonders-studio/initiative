@@ -8,7 +8,7 @@ endpoints ran as the de-granted bare login role and failed with
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.services.platform import push_tokens as push_tokens_service

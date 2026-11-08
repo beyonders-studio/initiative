@@ -70,7 +70,7 @@ class OidcDiscovery:
 
     Hold one instance per process (the cache is shared). The network client is
     built per fetch via ``client_factory`` so tests can inject a
-    ``httpx.MockTransport`` without patching globals.
+    ``httpx2.MockTransport`` without patching globals.
     """
 
     def __init__(

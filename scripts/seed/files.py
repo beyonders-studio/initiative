@@ -7,6 +7,7 @@ from app.core.file_types import FileType
 from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import relationships as relationships_service
@@ -680,6 +681,7 @@ async def seed(c: Community) -> None:
             or lexical([para(text) for text in d["paragraphs"]]),
             file_type=d.get("file_type", FileType.lexical),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
         )
         c.session.add(doc)
         await c.session.flush()

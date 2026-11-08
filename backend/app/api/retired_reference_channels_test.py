@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 pytestmark = pytest.mark.always
 

@@ -27,7 +27,7 @@ from datetime import date
 from typing import Literal
 from urllib.parse import urlsplit
 
-import httpx
+import httpx2
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.config import settings
@@ -43,8 +43,8 @@ UNINSTALL_NOTICE_PATH = "/api/v1/plugin-uninstall-notice"
 
 # httpx defaults to no total deadline; keep the whole attempt short — the
 # ping is advisory and must never hold resources behind a slow billing pod.
-_PING_TIMEOUT = httpx.Timeout(3.0, connect=2.0)
-_PLAN_SUMMARY_TIMEOUT = httpx.Timeout(2.0, connect=1.0)
+_PING_TIMEOUT = httpx2.Timeout(3.0, connect=2.0)
+_PLAN_SUMMARY_TIMEOUT = httpx2.Timeout(2.0, connect=1.0)
 _PLAN_SUMMARY_MAX_BYTES = 1024
 #: The whole answer to an uninstall-notice read, before it is shown verbatim.
 UNINSTALL_NOTICE_SECONDS = 2.0
@@ -95,7 +95,7 @@ async def nudge() -> None:
         return
     try:
         url, body, headers = build_ping()
-        async with httpx.AsyncClient(timeout=_PING_TIMEOUT) as client:
+        async with httpx2.AsyncClient(timeout=_PING_TIMEOUT) as client:
             await client.post(url, content=body, headers=headers)
     except Exception:
         logger.debug("billing: ping failed (billing pulls on its own schedule too)")
@@ -169,7 +169,7 @@ async def guild_plan_summary(guild_id: int) -> PlanSummary | None:
         if guild_ref is None:
             return PlanSummary()
         url, body, headers = build_plan_summary_query(guild_ref)
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
         ) as client:
             response = await client.post(url, content=body, headers=headers)
@@ -234,7 +234,7 @@ async def _ask_uninstall_notice(
     url, body, headers = build_uninstall_notice_query(
         guild_ref, listing_uid=listing_uid, locale=locale
     )
-    async with httpx.AsyncClient(
+    async with httpx2.AsyncClient(
         timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
     ) as client:
         response = await client.post(url, content=body, headers=headers)
