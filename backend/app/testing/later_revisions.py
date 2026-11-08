@@ -35,6 +35,14 @@ LATER: tuple[str, ...] = (
     "20261106_0583_roles_take_the_contacts_pair.py",
 )
 
+#: Who made a row, and the triggers that stamp it: every table an older
+#: revision writes now names its author's kind, so a test running an older
+#: revision takes these off around it too (:func:`step_authorship`).
+AUTHORSHIP: tuple[str, ...] = (
+    "20261109_0591_who_made_it.py",
+    "20261109_0592_every_author_is_stamped.py",
+)
+
 
 def _load(name: str) -> ModuleType:
     path = _VERSIONS / name
@@ -59,9 +67,11 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             lambda: queues._upgrade_schema(bind),
             contacts._apply_upgrade,
             pair._upgrade,
+            lambda: step_authorship(forward=True),
             lambda: restate_kind_code(bind),
         ]
     return [
+        lambda: step_authorship(forward=False),
         pair._downgrade,
         contacts._apply_downgrade,
         lambda: queues._downgrade_schema(bind),
@@ -71,6 +81,20 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
         data_jobs._downgrade_schema,
         lambda: batched._downgrade(bind),
     ]
+
+
+def step_authorship(*, forward: bool) -> None:
+    """Take :data:`AUTHORSHIP` off the schema the search path leads with
+    (``forward=False``), newest first, or put it back. Run inside an alembic
+    ``Operations`` context."""
+    authors, stamped = (_load(name) for name in AUTHORSHIP)
+    steps = (
+        (authors._upgrade, stamped._upgrade)
+        if forward
+        else (stamped._downgrade, authors._downgrade)
+    )
+    for step in steps:
+        step()
 
 
 def restate_kind_code(bind: Any) -> None:
