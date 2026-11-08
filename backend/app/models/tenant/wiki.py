@@ -329,7 +329,10 @@ class WikiPage(
     )
     author: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(WikiPage.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(WikiPage.created_by) == MemberProfile.id,"
+                " WikiPage.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         }
     )

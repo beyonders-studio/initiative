@@ -44,6 +44,7 @@ from app.db.query import (
 from app.db.session import require_guild_context, routed_guild_id
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, in_thread
 from app.models.tenant.metadata import PERSON_TYPES, MetadataDefinition
 from app.models.tenant.project import Project
@@ -812,7 +813,9 @@ async def list_global_tasks(
     ``conditions``).
     """
     base_conditions = [
-        Task.created_by == current_user.id
+        and_(
+            Task.created_by_kind == ActorKind.member, Task.created_by == current_user.id
+        )
         if created
         else TaskAssignee.user_id == current_user.id,
         Project.archived_at.is_(None),

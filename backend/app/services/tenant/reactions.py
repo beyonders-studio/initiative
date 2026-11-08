@@ -379,7 +379,6 @@ async def toggle_reaction(
                     target_type=target.value,
                     target_id=ctx.target_id,
                     emoji=emoji,
-                    created_by=cast(int, user.id),
                     # Spelled out: this is a Core insert, so the model's
                     # default_factory never runs for it.
                     created_at=datetime.now(UTC),

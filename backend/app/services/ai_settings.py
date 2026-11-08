@@ -739,7 +739,6 @@ async def _clear_guild_default(session: AsyncSession) -> None:
 async def create_guild_connection(
     session: AsyncSession,
     guild_id: int,
-    user_id: int,
     payload: AIConnectionCreate,
     *,
     actor_user_id: int | None = None,
@@ -748,7 +747,6 @@ async def create_guild_connection(
     # Guild connections are always public-only (scope="community" => no private).
     await _validate_connection_base_url(payload.provider, base_url, "community")
     row = GuildAIConnection(
-        created_by=user_id,
         label=payload.label.strip(),
         provider=payload.provider.value,
         base_url=base_url,

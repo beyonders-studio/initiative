@@ -43,6 +43,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.db.guild_standing import GuildContext
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.contact import DETAILS, Contact
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -509,6 +510,7 @@ async def start_import(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=SOURCE,
         params={"initiative_id": request.initiative_id},
         file_ref=payload_ref,
@@ -535,6 +537,7 @@ async def _make(
     contact = Contact(
         initiative_id=contact_in.initiative_id,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         **contact_in.model_dump(include={"name", "is_organization", *DETAILS}),
     )
     session.add(contact)

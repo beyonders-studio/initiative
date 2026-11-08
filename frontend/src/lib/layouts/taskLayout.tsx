@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import {
+  ActorKind,
   SearchEntityType,
   type TaskListRead,
   type TaskPriority,
@@ -35,6 +36,7 @@ import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskSta
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useActorName } from "@/hooks/useActorName";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
 import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
@@ -757,20 +759,21 @@ const Byline = ({ task }: { task: TaskRead }) => {
   const dateLocale = useDateLocale();
   const createdAt = useMemo(() => new Date(task.created_at), [task.created_at]);
   const relative = useRelativeTime(createdAt);
+  const actorName = useActorName();
   const creator = task.creator;
   const anonymized = isAnonymizedUser(creator);
+  const member = task.created_by_kind === ActorKind.member;
   // A creator who has since left the community is named by id.
-  const name =
-    creator || task.created_by != null
-      ? getUserDisplayName(creator ?? { id: task.created_by })
-      : null;
+  const name = member
+    ? getUserDisplayName(creator ?? { id: task.created_by })
+    : actorName(task.created_by_kind, task.created_by_install);
   const avatarSrc = creator && !anonymized ? getAvatarSrc(creator) : undefined;
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex w-fit items-center gap-2 text-muted-foreground text-xs">
-            {name ? (
+            {member ? (
               <Avatar className="h-5 w-5 border text-3xs">
                 {avatarSrc ? <AvatarImage src={avatarSrc} alt={name} /> : null}
                 <AvatarFallback userId={anonymized ? null : (creator?.id ?? null)}>
@@ -778,11 +781,7 @@ const Byline = ({ task }: { task: TaskRead }) => {
                 </AvatarFallback>
               </Avatar>
             ) : null}
-            <span>
-              {name
-                ? t("edit.createdBy", { name, time: relative })
-                : t("edit.createdAt", { time: relative })}
-            </span>
+            <span>{t("edit.createdBy", { name, time: relative })}</span>
           </div>
         </TooltipTrigger>
         <TooltipContent>
@@ -942,6 +941,8 @@ export const blankTask = (
   position: 0,
   archived_at: null,
   created_by: null,
+  created_by_kind: ActorKind.system,
+  created_by_install: null,
   creator: null,
   assignees: [],
   comment_count: 0,

@@ -211,7 +211,6 @@ async def create_dashboard(
 
     dashboard = Dashboard(
         initiative_id=initiative.id,
-        created_by=current_user.id,
         name=dashboard_in.name.strip(),
         description=dashboard_in.description,
         definition=definition,

@@ -1485,7 +1485,8 @@ def uploads_path() -> InitiativePath:
     return InitiativePath(
         predicate=lambda t, w: (
             f"(CASE WHEN {t}.claimed_at IS NULL"
-            f" THEN ({t}.created_by = {gucs.USER_ID.once} OR {_P.system})"
+            f" THEN (({t}.created_by_kind = 'member'"
+            f" AND {t}.created_by = {gucs.USER_ID.once}) OR {_P.system})"
             f" ELSE {_access(f'{t}.initiative_id', w)} END)"
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",

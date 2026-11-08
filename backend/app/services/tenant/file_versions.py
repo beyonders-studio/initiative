@@ -152,7 +152,7 @@ def copy_version(session: AsyncSession, version: Any, copy: Any, **values: Any) 
     from app.models.tenant.file import FileVersion
 
     model, column = _history(copy)
-    left = {"version_number", "created_at"}
+    left = {"version_number", "created_at", "created_by_kind"}
     if model is FileVersion:
         left |= {"thumbnail_url", "thumbnail_state"}
     carried = {

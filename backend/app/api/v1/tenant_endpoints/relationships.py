@@ -47,6 +47,7 @@ from app.core.relationships import (
 from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -143,6 +144,7 @@ def _render(
         provenance=row.provenance,
         confidence=row.confidence,
         created_by=row.created_by,
+        created_by_kind=row.created_by_kind,
         created_at=row.created_at,
     )
 
@@ -506,7 +508,7 @@ async def _may_remove(
     replace both ask this, so a slice cannot do what a DELETE refuses. A
     person's end is never the thing you can edit.
     """
-    if row.created_by == user_id:
+    if row.created_by_kind == ActorKind.member and row.created_by == user_id:
         return True
     for kind, entity_id in (
         (row.source_type, row.source_id),

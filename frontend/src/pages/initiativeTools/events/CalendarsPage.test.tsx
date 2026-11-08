@@ -15,7 +15,11 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
 import { keepViewPreferences } from "@/__tests__/helpers/viewPreferences";
-import type { FilterCondition, FilterGroup } from "@/api/generated/initiativeAPI.schemas";
+import {
+  ActorKind,
+  type FilterCondition,
+  type FilterGroup,
+} from "@/api/generated/initiativeAPI.schemas";
 import { CALENDAR_VIEW_MODE_KEY } from "@/components/calendar";
 import { dateRangeParams } from "@/components/calendar/visibleRange";
 import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
@@ -215,6 +219,8 @@ describe("CalendarsView calendar-entries query", () => {
         initiative_id: INITIATIVE_ID,
         community_id: 1,
         created_by: 1,
+        created_by_kind: ActorKind.member,
+        created_by_install: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         can: writerCan(),
@@ -240,6 +246,8 @@ describe("CalendarsView calendar-entries query", () => {
       initiative_id: INITIATIVE_ID,
       community_id: 1,
       created_by: 1,
+      created_by_kind: ActorKind.member,
+      created_by_install: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       can: writerCan(),
@@ -362,6 +370,8 @@ describe("CalendarsView subscribing on an initiative's tab", () => {
       initiative_id: INITIATIVE_ID,
       community_id: 1,
       created_by: 1,
+      created_by_kind: ActorKind.member,
+      created_by_install: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       can: writerCan(),
@@ -392,6 +402,8 @@ describe("CalendarsView on a community calendar", () => {
     initiative_id: null,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     can: writerCan(),
@@ -479,6 +491,8 @@ describe("CalendarsView on the calendar plug-in's own surface", () => {
     initiative_id: null,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     can: writerCan(),

@@ -171,7 +171,6 @@ async def create_counter_group(
 
     group = CounterGroup(
         initiative_id=initiative.id,
-        created_by=guild_context.user_id,
         name=group_in.name,
         description=group_in.description,
     )

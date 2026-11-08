@@ -211,7 +211,6 @@ async def create_calendar(
 
     calendar = Calendar(
         initiative_id=initiative_id,
-        created_by=guild_context.user_id,
         name=calendar_in.name.strip(),
         description=calendar_in.description,
         color=calendar_in.color,

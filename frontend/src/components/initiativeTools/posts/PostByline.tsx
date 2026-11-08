@@ -1,6 +1,7 @@
-import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type PostRead } from "@/api/generated/initiativeAPI.schemas";
 import { UserName } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { useActorName } from "@/hooks/useActorName";
 import { cn } from "@/ui/lib/utils";
 import { RelativeTime } from "@/ui/relative-time";
 
@@ -11,13 +12,25 @@ import { RelativeTime } from "@/ui/relative-time";
  * title on the notice's own page, where the title comes first.
  */
 export const PostByline = ({ post, inline = false }: { post: PostRead; inline?: boolean }) => {
-  if (!post.author) return null;
+  const actorName = useActorName();
   const when = (
     <RelativeTime
       date={post.published_at ?? post.created_at}
       className={cn("text-muted-foreground text-xs", !inline && "block")}
     />
   );
+  if (post.created_by_kind !== ActorKind.member) {
+    // A plug-in or Initiative posted it: named, with no picture of a person.
+    return (
+      <div className={cn("min-w-0", inline && "flex items-center gap-2")}>
+        <span className="truncate font-medium text-sm">
+          {actorName(post.created_by_kind, post.created_by_install)}
+        </span>
+        {when}
+      </div>
+    );
+  }
+  if (!post.author) return null;
 
   return (
     <div className="flex min-w-0 items-center gap-2">

@@ -112,7 +112,10 @@ class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     )
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(CalendarEvent.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(CalendarEvent.created_by) == MemberProfile.id,"
+                " CalendarEvent.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         },
     )

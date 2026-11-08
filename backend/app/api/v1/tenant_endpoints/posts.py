@@ -382,7 +382,6 @@ async def create_post(
     )
     post = Post(
         initiative_id=initiative.id,
-        created_by=guild_context.user_id,
         name=post_in.name.strip(),
         body=_validated_body(post_in.body),
         scheduled_for=scheduled,

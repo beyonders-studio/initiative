@@ -286,7 +286,6 @@ async def create(
     now = datetime.now(UTC)
     upload = PendingUpload(
         id=upload_id,
-        created_by=user.id,
         purpose=metadata["purpose"],
         initiative_id=initiative_id,
         filename=filename,

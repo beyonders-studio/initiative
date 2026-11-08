@@ -16,11 +16,13 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 
+from sqlalchemy import or_
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.post import Post, board_time, pin_is_live
 from app.models.tenant.post_poll import PostPoll
 from app.models.tenant.post_read import PostRead
@@ -129,7 +131,7 @@ def unread_clause(user_id: int):
     from sqlalchemy import and_, exists
 
     return and_(
-        Post.created_by != user_id,
+        or_(Post.created_by_kind != ActorKind.member, Post.created_by != user_id),
         ~exists().where(PostRead.post_id == Post.id, PostRead.user_id == user_id),
     )
 
@@ -164,7 +166,7 @@ async def annotate_read_state(
         ).all()
     )
     for post in rows:
-        mine = post.created_by == user_id
+        mine = post.created_by_kind == ActorKind.member and post.created_by == user_id
         object.__setattr__(post, "is_read", mine or post.id in read_ids)
 
 
@@ -185,7 +187,10 @@ def current_readers(
     return {
         user_id
         for user_id in reader_ids
-        if user_id in audience and user_id != post.created_by
+        if user_id in audience
+        and not (
+            post.created_by_kind == ActorKind.member and user_id == post.created_by
+        )
     }
 
 
@@ -245,7 +250,11 @@ async def list_readers(
         .unique()
         .all()
     )
-    audience = await audience_user_ids(session, post, exclude=post.created_by)
+    audience = await audience_user_ids(
+        session,
+        post,
+        exclude=post.created_by if post.created_by_kind == ActorKind.member else None,
+    )
     read_ids = current_readers(
         post, (receipt.user_id for receipt in receipts), audience
     )
@@ -305,7 +314,9 @@ async def mark_read(
         await session.exec(
             select(Post.id).where(
                 Post.id.in_(tuple(post_ids)),
-                Post.created_by != user_id,
+                or_(
+                    Post.created_by_kind != ActorKind.member, Post.created_by != user_id
+                ),
             )
         )
     ).all()

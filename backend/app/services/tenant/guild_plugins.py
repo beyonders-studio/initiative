@@ -50,6 +50,7 @@ from app.core.plugin_scopes import ordered_scopes, plugin_scope, plugin_scope_ta
 from app.core.tools import Tool
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import MarketplaceListing
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.contact import Contact
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -156,6 +157,7 @@ async def _create_calendar(
         # and writes what it holds, exactly as for an initiative calendar.
         initiative_id=None,
         created_by=plugin.created_by,
+        created_by_kind=plugin.created_by_kind,
         name=name,
     )
     session.add(calendar)
@@ -393,8 +395,8 @@ async def install_plugin(
     listing_version: str,
     definition: dict,
     guild_id: int,
-    created_by: int,
     name: str,
+    created_by: int | None = None,
     actor_user_id: int | None = None,
     via: str = "install",
     granted_scopes: Sequence[str] = (),
@@ -431,6 +433,7 @@ async def install_plugin(
         config={},
         granted_scopes=sorted(set(granted_scopes)),
         created_by=created_by,
+        created_by_kind=None if created_by is None else ActorKind.member,
     )
     session.add(plugin)
     await session.flush()

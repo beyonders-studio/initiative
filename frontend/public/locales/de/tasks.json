@@ -53,7 +53,6 @@
     "backToProjects": "← Zurück zu den Projekten",
     "loadProjectError": "Der Projektkontext für diese Aufgabe konnte nicht geladen werden.",
     "createdBy": "Erstellt von {{name}} · {{time}}",
-    "createdAt": "Erstellt {{time}}",
     "readOnlyNoAccess": "Du hast nur Lesezugriff auf dieses Projekt, daher sind die Aufgabenfelder deaktiviert.",
     "readOnlyArchived": "Dieses Projekt ist archiviert. Hebe die Archivierung in den Projekteinstellungen auf, um Aufgaben zu bearbeiten.",
     "aiGenerate": "Mit KI generieren",

@@ -79,7 +79,7 @@ async def create_community_connection(
     user: CurrentUser,
 ) -> AIConnectionResponse:
     return await ai_settings_service.create_guild_connection(
-        session, ctx.guild_id, user.id, payload, actor_user_id=user.id
+        session, ctx.guild_id, payload, actor_user_id=user.id
     )
 
 

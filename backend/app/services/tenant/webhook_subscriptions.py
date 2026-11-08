@@ -283,7 +283,7 @@ async def create_subscription(
     session: AsyncSession,
     *,
     payload: WebhookSubscriptionCreate,
-    created_by: int | None,
+    actor_user_id: int | None,
     guild_id: int,
     plugin_install_id: int | None = None,
 ) -> tuple[WebhookSubscription, str]:
@@ -299,9 +299,10 @@ async def create_subscription(
     references for both at its install, and an envelope should arrive under
     those (``webhook_refs``).
 
-    ``created_by`` is the account this runs as, so it is also who the audit
-    record names. ``None`` for an installed plug-in acting as its community, which
-    names no person (:func:`create_install_subscription`).
+    ``actor_user_id`` is the account this runs as, who the audit record names:
+    ``None`` for an installed plug-in acting as its community, which names no
+    person (:func:`create_install_subscription`). The row's author is the
+    request's, stamped by the database.
     """
     await assert_vocabulary(
         list(payload.event_types),
@@ -315,7 +316,6 @@ async def create_subscription(
 
     subscription = WebhookSubscription(
         initiative_id=payload.initiative_id,
-        created_by=created_by,
         plugin_install_id=plugin_install_id,
         target_url=str(payload.target_url),
         hmac_secret=secret,
@@ -332,7 +332,7 @@ async def create_subscription(
     await audit_service.record(
         session,
         event_type=AuditEventType.WEBHOOK_CREATED,
-        actor_user_id=created_by,
+        actor_user_id=actor_user_id,
         guild_id=guild_id,
         target_type="webhook_subscription",
         target_id=subscription.id,
@@ -374,7 +374,7 @@ async def create_install_subscription(
     return await create_subscription(
         session,
         payload=payload,
-        created_by=None,
+        actor_user_id=None,
         guild_id=context.guild_id,
         plugin_install_id=context.install_id,
     )

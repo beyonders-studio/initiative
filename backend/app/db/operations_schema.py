@@ -92,6 +92,7 @@ FILER_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
         "task_id",
         "content",
         "created_by",
+        "created_by_kind",
         "created_at",
         "updated_at",
         "audience",
@@ -109,6 +110,7 @@ FILER_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
         "content_type",
         "size_bytes",
         "created_by",
+        "created_by_kind",
         "created_at",
     ),
 }
@@ -149,7 +151,10 @@ FILER_ROWS: dict[str, str] = {
         " WHERE c.stream = intake_bindings.stream)"
     ),
     "comments": f"audience = 'filer' AND task_id = ANY ({_CASES})",
-    "evidence": f"created_by = {_UID} AND case_task_id = ANY ({_CASES})",
+    "evidence": (
+        f"created_by_kind = 'member' AND created_by = {_UID}"
+        f" AND case_task_id = ANY ({_CASES})"
+    ),
 }
 
 #: What anybody reads of the published ideas: each one's title, description

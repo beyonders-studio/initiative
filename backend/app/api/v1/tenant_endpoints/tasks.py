@@ -35,6 +35,7 @@ from app.core.tools import KINDS, Tool
 from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -385,7 +386,6 @@ async def _insert_task(
         task_status_id=task_in.task_status_id,
         task_type_id=task_type.id,
         **task_data,
-        created_by=guild_context.user_id,
         checklist=checklist,
     )
     await column_limits.refuse_full_columns(session, guild_context, project.id, [task])
@@ -554,7 +554,9 @@ async def read_task_case(
                     else None
                 ),
                 from_requester=(
-                    case.filer is not None and message.created_by == case.filer.id
+                    case.filer is not None
+                    and message.created_by_kind == ActorKind.member
+                    and message.created_by == case.filer.id
                 ),
                 content=message.content,
                 created_at=message.created_at,
@@ -570,7 +572,9 @@ async def read_task_case(
                 created_at=item.created_at,
                 comment_id=item.comment_id,
                 from_requester=(
-                    case.filer is not None and item.created_by == case.filer.id
+                    case.filer is not None
+                    and item.created_by_kind == ActorKind.member
+                    and item.created_by == case.filer.id
                 ),
             )
             for item in case.evidence

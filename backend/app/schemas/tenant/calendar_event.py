@@ -27,6 +27,7 @@ from app.schemas.base import (
 from app.schemas.platform.user import PersonShape, PluginPerson, UserPublic
 from app.schemas.recurrence import EventRule, OccurrenceScope
 from app.schemas.tenant.archive import ContentCan
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertiesOnUpdate,
@@ -177,7 +178,7 @@ class CalendarEventAttendeePreview(PersonShape):
         return self._person or PluginPerson(id=self.user_id)
 
 
-class CalendarEventFields(CalendarEventBase):
+class CalendarEventFields(CalendarEventBase, CreatedByRead):
     """What every read of an event carries."""
 
     model_config = ConfigDict(
@@ -202,7 +203,6 @@ class CalendarEventFields(CalendarEventBase):
     community_id: GuildId = Field(
         validation_alias=AliasChoices("community_id", "guild_id")
     )
-    created_by: PersonId | None = None
     properties: list[PropertySummary] = Field(default_factory=list)
     tags: list[TagSummary] = Field(default_factory=list)
     #: What the caller may do to this event — its calendar's edit, since events

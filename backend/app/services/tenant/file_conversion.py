@@ -63,7 +63,7 @@ def _refuse(code: int, detail: str) -> HTTPException:
 
 
 async def convert(
-    session: AsyncSession, guild_id: int, file: File, *, user_id: int
+    session: AsyncSession, guild_id: int, file: File
 ) -> tuple[list[FileVersion], list[str]]:
     """Make ``file`` the type it converts to, from its current version, and
     delete its versions. Returns the deleted versions and the URLs of the
@@ -118,7 +118,6 @@ async def convert(
                     filename=picture.filename,
                     data=picture.data,
                     content_type=picture.content_type,
-                    created_by=user_id,
                     initiative_id=file.initiative_id,
                 )
             )

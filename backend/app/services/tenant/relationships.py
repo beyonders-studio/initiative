@@ -47,6 +47,7 @@ from app.core.relationships import (
 from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.db.session import install_context, require_actor_context
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import named_people
 
@@ -134,9 +135,9 @@ async def create(
         provenance=provenance.value,
         confidence=confidence,
         created_at=datetime.now(UTC),
+        created_by=created_by,
+        created_by_kind=None if created_by is None else ActorKind.member,
     )
-    if created_by is not None:
-        row.created_by = created_by
     session.add(row)
     await session.flush()
     return row
@@ -428,6 +429,7 @@ async def create_many(
             "provenance": provenance.value,
             "created_at": datetime.now(UTC),
             "created_by": created_by,
+            "created_by_kind": None if created_by is None else ActorKind.member,
         }
         for target in _ordered_many(source, relationship_type, targets)
     ]

@@ -57,6 +57,7 @@ from app.core.tools import Tool
 from app.db.query import build_paginated_response
 from app.db.session import require_guild_context
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.schemas.tenant.my_tools import MyToolCountsResponse
 from app.services.cross_guild import (
     gather_across_guilds,
@@ -252,6 +253,7 @@ async def _conditions(
     spec = TOOL_LISTS[tool]
     conditions = await list_conditions(spec, request)
     if created_by_me:
+        conditions.append(spec.model.created_by_kind == ActorKind.member)
         conditions.append(spec.model.created_by == user_id)
     return conditions
 

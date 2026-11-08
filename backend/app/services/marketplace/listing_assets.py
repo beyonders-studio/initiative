@@ -21,6 +21,7 @@ from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.models.tenant._mixins import ActorKind
 from app.services.marketplace import media
 
 __all__ = [
@@ -154,6 +155,7 @@ async def copy_assets_in(
             data=data,
             content_type=content_type,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             initiative_id=initiative_id,
         )
     await session.flush()

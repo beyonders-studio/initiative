@@ -1,6 +1,7 @@
-import type {
-  CalendarEventRead,
-  CalendarEventSummary,
+import {
+  ActorKind,
+  type CalendarEventRead,
+  type CalendarEventSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 
 let counter = 0;
@@ -29,6 +30,8 @@ export function buildCalendarEvent(overrides: Partial<CalendarEventRead> = {}): 
     initiative_id: 1,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     properties: [],
     tags: [],
     can: { edit: true },

@@ -1,7 +1,8 @@
-import type {
-  EntityType,
-  TrashItem,
-  TrashListResponse,
+import {
+  ActorKind,
+  type EntityType,
+  type TrashItem,
+  type TrashListResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 
 import { buildPage } from "./page.factory";
@@ -21,6 +22,7 @@ export function buildTrashItem(overrides: Partial<TrashItem> = {}): TrashItem {
     name: `Item ${counter}`,
     deleted_at: new Date(2026, 3, 20, 10, 0, 0).toISOString(),
     deleted_by_id: 1,
+    deleted_by_kind: ActorKind.member,
     deleted_by_display: "Test User",
     purge_at: new Date(2026, 6, 19, 10, 0, 0).toISOString(),
     ...overrides,

@@ -138,7 +138,10 @@ class Post(
     initiative: Optional["Initiative"] = Relationship()
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Post.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Post.created_by) == MemberProfile.id,"
+                " Post.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         }
     )
