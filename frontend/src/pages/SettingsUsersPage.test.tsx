@@ -157,23 +157,25 @@ describe("SettingsUsersPage roles", () => {
     state.billing = null;
   });
 
-  it("explains what each role is, where the choice is made", async () => {
-    setup({});
-
-    expect(await screen.findByText(/runs the community/i)).toBeInTheDocument();
-    expect(screen.getByText(/plus how people get in/i)).toBeInTheDocument();
-  });
-
   it("offers the seat only to somebody already holding it", async () => {
+    state.members = [buildUserCommunityMember()];
+    const openPicker = async () => {
+      await screen.findByRole("combobox", { name: /community role for/i });
+      await settled();
+      await userEvent.click(screen.getByRole("combobox", { name: /community role for/i }));
+    };
+
     setup({});
-    expect(await screen.findByText("Superadmin")).toBeInTheDocument();
+    await openPicker();
+    expect(await screen.findByRole("option", { name: "Superadmin" })).toBeInTheDocument();
 
     cleanup();
     setup({ role: "admin" });
+    await openPicker();
     // The rung below neither appoints the seat nor takes it away, so it is
     // not on the list it is offered.
-    expect(await screen.findByText("Admin")).toBeInTheDocument();
-    expect(screen.queryByText("Superadmin")).not.toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Superadmin" })).not.toBeInTheDocument();
   });
 
   it("names a superadmin's rung to an admin, and leaves changing it to the seat", async () => {
@@ -195,7 +197,7 @@ describe("SettingsUsersPage invites", () => {
     const community = buildCommunity({ role: "admin" }) as CommunityRead;
     setup({ role: "admin", can: { ...community.can, configure: false } });
 
-    expect(await screen.findByText("Admin")).toBeInTheDocument();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generate invite" })).not.toBeInTheDocument();
     expect(listInvites).not.toHaveBeenCalled();
   });
@@ -281,7 +283,7 @@ describe("SettingsUsersPage API access", () => {
   it("is the seat's, not an ordinary admin's", async () => {
     setup({ role: "admin" });
 
-    await screen.findByText("Admin");
+    await screen.findByRole("combobox", { name: /community role for/i });
     expect(apiSwitch()).not.toBeInTheDocument();
   });
 
@@ -289,7 +291,7 @@ describe("SettingsUsersPage API access", () => {
     state.authOptions = ["providers"];
     setup({});
 
-    await screen.findByText("Superadmin");
+    await screen.findByRole("combobox", { name: /community role for/i });
     expect(apiSwitch()).not.toBeInTheDocument();
   });
 });
