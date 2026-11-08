@@ -32,6 +32,7 @@ import type { AppColumnDef } from "@/ui/lib/table";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 // Storage caps are entered in binary GB (GiB) so a value round-trips cleanly
 // with `formatBytes` (which is also 1024-based). The editor for them, and for
@@ -410,7 +411,7 @@ export const OperatorDashboardCommunitiesPage = () => {
   }
 
   if (communitiesQuery.isError || !communitiesQuery.data) {
-    return <p className="text-destructive text-sm">{t("communities.loadError")}</p>;
+    return <StatusMessage onRetry={communitiesQuery.refetch} />;
   }
 
   return (

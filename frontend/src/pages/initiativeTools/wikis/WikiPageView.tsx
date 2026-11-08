@@ -42,6 +42,7 @@ import { Card, CardHeader, CardTitle } from "@/ui/card";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
+import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { Skeleton } from "@/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
@@ -373,7 +374,11 @@ export const WikiPageView = () => {
   // and the column beneath it is what changes, which is what stops a click on
   // a page from blanking the screen and the sidebar with it.
   if (!wiki) {
-    return <p className="p-6 text-muted-foreground text-sm">{t("pages.loading")}</p>;
+    return (
+      <SkeletonRegion className="p-6">
+        <EditorSkeleton />
+      </SkeletonRegion>
+    );
   }
 
   const isComfortable = wiki.reading_width === WikiReadingWidth.comfortable;

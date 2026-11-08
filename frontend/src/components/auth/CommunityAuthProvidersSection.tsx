@@ -49,6 +49,7 @@ import {
   DropdownMenuSeparator,
 } from "@/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/ui/empty";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 
 export const CommunityAuthProvidersSection = ({
@@ -115,7 +116,9 @@ export const CommunityAuthProvidersSection = ({
       }
     >
       {connectionsQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
       ) : empty ? (
         <Empty className="border">
           <EmptyHeader>

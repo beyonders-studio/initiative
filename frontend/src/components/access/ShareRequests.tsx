@@ -8,7 +8,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -40,8 +40,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 import { Checkbox } from "@/ui/checkbox";
 import { Label } from "@/ui/label";
 import { dateTimeFormat } from "@/ui/lib/intl";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 type GiveLevel = Exclude<ResourceAccessLevel, "owner">;
 
@@ -287,16 +289,13 @@ export const ShareRequestBatchView = ({ batchId }: { batchId: string }) => {
 
   if (query.isLoading) {
     return (
-      <div className="flex justify-center p-8">
-        <Loader2
-          className="size-5 animate-spin text-muted-foreground"
-          aria-label={t("answer.loading")}
-        />
-      </div>
+      <SkeletonRegion>
+        <FormSkeleton card={false} fields={2} />
+      </SkeletonRegion>
     );
   }
   if (query.isError) {
-    return <p className="text-destructive text-sm">{t("answer.loadError")}</p>;
+    return <StatusMessage onRetry={query.refetch} />;
   }
   if (requests.length === 0) {
     return (

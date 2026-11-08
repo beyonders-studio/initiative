@@ -62,6 +62,8 @@
     "landingStatusDefault": "Standard des Projekts",
     "caseTypeLabel": "Neue Vorgänge sind vom Typ",
     "caseTypeDefault": "Standardtyp des Projekts",
+    "ideaTypeLabel": "Der Typ, der eine Aufgabe auf die Seite „Ideen“ bringt",
+    "ideaTypeNone": "Keiner: Es wird nichts veröffentlicht",
     "enabledLabel": "Empfängt neue Vorgänge",
     "lastCase": "Letzter Vorgang {{when}} geöffnet.",
     "noCasesYet": "Noch keine Vorgänge.",
@@ -82,11 +84,6 @@
     "noAwaitingHelp": "Ohne gewählten Status sehen anfragende Personen Eingegangen, In Bearbeitung und Geschlossen, aber nie „Wartet auf dich“.",
     "sharesIsolated": "Ein anderer Kanal landet ebenfalls in dieser Initiative. Sicherheits- und Moderationsfälle sollten eine eigene Initiative haben, damit nur die Bearbeitenden sie lesen können.",
     "sharesWithIsolated": "Diese Initiative enthält auch Sicherheits- oder Moderationsfälle, die eine eigene Initiative haben sollten. Leite einen der Kanäle woandershin."
-  },
-  "loadFailed": {
-    "title": "Diese Einstellungen konnten nicht geladen werden",
-    "description": "Es wurde nichts geändert. Versuche es erneut; wenn es weiter fehlschlägt, steht der Grund im Server-Log.",
-    "retry": "Erneut versuchen"
   },
   "help": {
     "action": "Hilfe anfordern",
@@ -157,12 +154,13 @@
     "replyError": "Deine Antwort konnte nicht gesendet werden. Versuche es gleich noch einmal.",
     "closedNote": "Dieses Ticket ist geschlossen. Wenn etwas anderes ansteht, bitte erneut um Hilfe.",
     "noConversation": "Danke für die Meldung. Das Team sieht sich jede an, antwortet hier aber nicht auf Meldungen.",
-    "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst.",
-    "loadError": "Deine Tickets konnten nicht geladen werden."
+    "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst."
   },
   "case": {
     "filedBy": "Eingereicht von",
     "noFiler": "Automatisch eröffnet",
+    "votes_one": "{{count}} Stimme",
+    "votes_other": "{{count}} Stimmen",
     "noContact": "Möchte nicht kontaktiert werden",
     "theyCalledIt": "Ihr Betreff:",
     "noConversation": "Diese Art von Fall eröffnet kein Gespräch mit der einreichenden Person.",
@@ -323,15 +321,6 @@
   },
   "moderationTopics": {
     "appeal": "Einspruch gegen deine Sperre"
-  },
-  "idea": {
-    "title": "Idee",
-    "publish": "Auf der Ideen-Seite veröffentlicht",
-    "publishedHelp": "Alle sehen Titel, Beschreibung und Status und können dafür stimmen.",
-    "draftHelp": "Nicht veröffentlicht: Nur das Team sieht sie. Ihre Stimmen bleiben bei ihr.",
-    "votes_one": "{{count}} Stimme",
-    "votes_other": "{{count}} Stimmen",
-    "error": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
   },
   "ideas": {
     "title": "Ideen",

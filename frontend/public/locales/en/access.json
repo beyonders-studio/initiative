@@ -156,8 +156,6 @@
     "batchTitle": "Access requests",
     "answered": "Already answered",
     "answeredDescription": "There's nothing left to answer here.",
-    "loading": "Loading requests…",
-    "loadError": "Couldn't load these requests.",
     "error": "Couldn't send your answer. Please try again."
   }
 }

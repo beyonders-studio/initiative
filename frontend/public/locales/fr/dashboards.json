@@ -12,8 +12,6 @@
     "noMatchingDashboards": "Aucun tableau de bord ne correspond à vos filtres."
   },
   "loading": "Chargement des tableaux de bord...",
-  "loadError": "Échec du chargement des tableaux de bord.",
-  "loadingDashboard": "Chargement du tableau de bord...",
   "creating": "Création...",
   "notFound": "Tableau de bord introuvable",
   "notFoundDescription": "Le tableau de bord que vous cherchez n’existe pas ou a été supprimé.",
@@ -197,7 +195,6 @@
     "absolute": "À une date",
     "relativeDays": "Jours à partir d'aujourd'hui",
     "relativeHint": "Compté au moment où le tableau de bord est ouvert : la question ne se périme jamais.",
-    "loading": "Chargement des filtres…",
     "noFields": "Rien à filtrer ici pour l'instant.",
     "matchPrefix": "Correspondre à",
     "match": "Tous ou au moins un",

@@ -29,6 +29,7 @@ import type { AppColumnDef } from "@/ui/lib/table";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { SortHeader } from "@/ui/sort-icon";
+import { StatusMessage } from "@/ui/status-message";
 
 /** The columns the server sorts the roster by. Status sorts by how much of the
  *  app is left to an account, which brings the ones needing attention together
@@ -97,7 +98,7 @@ export const SettingsPlatformUsersPage = () => {
   }
 
   if (usersQuery.isError || !usersQuery.data) {
-    return <p className="text-destructive text-sm">{t("platformUsers.loadError")}</p>;
+    return <StatusMessage onRetry={usersQuery.refetch} />;
   }
 
   const userColumns: AppColumnDef<OperatorUserRead>[] = [

@@ -47,6 +47,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 const GIB = 1024 ** 3;
@@ -480,16 +481,9 @@ const NarrowingsSection = ({
  * other.
  */
 const PluginSummarySections = ({ communityId }: { communityId: number }) => {
-  const { t } = useTranslation("settings");
-  const { data, isError } = useListCommunityPluginSummaries(communityId);
+  const { data, isError, refetch } = useListCommunityPluginSummaries(communityId);
   // A failed list is not an empty one: say so, rather than drawing nothing.
-  if (isError) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        {t("communities.sheet.pluginSummariesUnavailable")}
-      </p>
-    );
-  }
+  if (isError) return <StatusMessage onRetry={refetch} />;
   return (
     <>
       {(data?.items ?? []).map((summary) => (

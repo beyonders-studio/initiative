@@ -71,8 +71,10 @@ import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
@@ -129,9 +131,11 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
           {t("platformUsers.sheet.cases.count", { count: user.open_case_count })}
         </p>
         {cases.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("platformUsers.sheet.cases.loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={2} avatar={false} />
+          </SkeletonRegion>
         ) : cases.isError ? (
-          <p className="text-destructive text-sm">{t("platformUsers.sheet.cases.loadError")}</p>
+          <StatusMessage onRetry={cases.refetch} />
         ) : (
           <ul className="divide-y rounded-md border">
             {(cases.data ?? []).map((item) => (
@@ -441,18 +445,19 @@ export const UserOperatorSettingsSheet = ({
                   <SettingsRow
                     label={t("platformUsers.sheet.reactivateLabel")}
                     description={t("platformUsers.sheet.reactivateHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => reactivate.mutate(user.id)}
-                      disabled={reactivate.isPending}
-                    >
-                      <UserCheck className="h-4 w-4" />
-                      {t("platformUsers.reactivate")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => reactivate.mutate(user.id)}
+                        disabled={reactivate.isPending}
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        {t("platformUsers.reactivate")}
+                      </Button>
+                    }
+                  />
                 )}
                 {/* Distinct from reactivating: nothing was dropped, so this
                     puts the account back exactly where it was. */}
@@ -460,35 +465,37 @@ export const UserOperatorSettingsSheet = ({
                   <SettingsRow
                     label={t("platformUsers.sheet.restoreLabel")}
                     description={t("platformUsers.sheet.restoreHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => restore.mutate(user.id)}
-                      disabled={restore.isPending}
-                    >
-                      <UserCheck className="h-4 w-4" />
-                      {t("platformUsers.restore")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => restore.mutate(user.id)}
+                        disabled={restore.isPending}
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        {t("platformUsers.restore")}
+                      </Button>
+                    }
+                  />
                 )}
                 {showAgeBlock && (
                   <SettingsRow
                     label={t("platformUsers.sheet.ageBlockLabel")}
                     description={t("platformUsers.sheet.ageBlockHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => clearAgeBlock.mutate(user.id)}
-                      disabled={clearAgeBlock.isPending}
-                    >
-                      <CalendarClock className="h-4 w-4" />
-                      {t("platformUsers.clearAgeBlock")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => clearAgeBlock.mutate(user.id)}
+                        disabled={clearAgeBlock.isPending}
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                        {t("platformUsers.clearAgeBlock")}
+                      </Button>
+                    }
+                  />
                 )}
               </SettingsSection>
             )}
@@ -517,23 +524,24 @@ export const UserOperatorSettingsSheet = ({
                   <SettingsRow
                     label={t("platformUsers.sheet.avatarLabel")}
                     description={t("platformUsers.sheet.avatarHelp")}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* The picture itself, because deciding whether it
+                    action={
+                      <div className="flex items-center gap-3">
+                        {/* The picture itself, because deciding whether it
                             should go is looking at it. */}
-                      <ProfileAvatar user={user} hidePresence className="size-10" />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAvatarConfirm(true)}
-                        disabled={removeAvatar.isPending}
-                      >
-                        <ImageOff className="h-4 w-4" />
-                        {t("platformUsers.sheet.avatarRemove")}
-                      </Button>
-                    </div>
-                  </SettingsRow>
+                        <ProfileAvatar user={user} hidePresence className="size-10" />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAvatarConfirm(true)}
+                          disabled={removeAvatar.isPending}
+                        >
+                          <ImageOff className="h-4 w-4" />
+                          {t("platformUsers.sheet.avatarRemove")}
+                        </Button>
+                      </div>
+                    }
+                  />
                 )}
                 {/* Like the picture: taken down for what breaches the terms
                     of use, and theirs to set again. */}
@@ -542,19 +550,20 @@ export const UserOperatorSettingsSheet = ({
                     key={item.field}
                     label={t(`platformUsers.sheet.clear.${item.key}.label`)}
                     description={t(`platformUsers.sheet.clear.${item.key}.help`)}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setClearing(item.field)}
-                      disabled={clearField.isPending}
-                      aria-label={t(`platformUsers.sheet.clear.${item.key}.action`)}
-                    >
-                      <Eraser className="h-4 w-4" />
-                      {t("platformUsers.sheet.clear.button")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setClearing(item.field)}
+                        disabled={clearField.isPending}
+                        aria-label={t(`platformUsers.sheet.clear.${item.key}.action`)}
+                      >
+                        <Eraser className="h-4 w-4" />
+                        {t("platformUsers.sheet.clear.button")}
+                      </Button>
+                    }
+                  />
                 ))}
               </SettingsSection>
             )}
@@ -583,35 +592,37 @@ export const UserOperatorSettingsSheet = ({
                     description={t("platformUsers.sheet.apiKeysHelp", {
                       count: user.api_key_count,
                     })}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setApiKeysConfirm(true)}
-                      disabled={revokeApiKeys.isPending}
-                    >
-                      <KeyRound className="h-4 w-4" />
-                      {t("platformUsers.sheet.apiKeysRevoke")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setApiKeysConfirm(true)}
+                        disabled={revokeApiKeys.isPending}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        {t("platformUsers.sheet.apiKeysRevoke")}
+                      </Button>
+                    }
+                  />
                 )}
                 {showSignOut && (
                   <SettingsRow
                     label={t("platformUsers.sheet.signOutLabel")}
                     description={t("platformUsers.sheet.signOutHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSignOutConfirm(true)}
-                      disabled={signOut.isPending}
-                    >
-                      <LogOut className="h-4 w-4" />
-                      {t("platformUsers.sheet.signOut")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSignOutConfirm(true)}
+                        disabled={signOut.isPending}
+                      >
+                        <LogOut className="h-4 w-4" />
+                        {t("platformUsers.sheet.signOut")}
+                      </Button>
+                    }
+                  />
                 )}
               </SettingsSection>
             )}
@@ -622,69 +633,73 @@ export const UserOperatorSettingsSheet = ({
                   <SettingsRow
                     label={t("platformUsers.sheet.resetLabel")}
                     description={t("platformUsers.sheet.resetHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setResetConfirm(true)}
-                      disabled={resetPassword.isPending}
-                    >
-                      <Mail className="h-4 w-4" />
-                      {t("platformUsers.resetPassword")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setResetConfirm(true)}
+                        disabled={resetPassword.isPending}
+                      >
+                        <Mail className="h-4 w-4" />
+                        {t("platformUsers.resetPassword")}
+                      </Button>
+                    }
+                  />
                 )}
                 {showResend && (
                   <SettingsRow
                     label={t("platformUsers.sheet.resendLabel")}
                     description={t("platformUsers.sheet.resendHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => resendVerification.mutate(user.id)}
-                      disabled={resendVerification.isPending}
-                    >
-                      <MailCheck className="h-4 w-4" />
-                      {t("platformUsers.sheet.resend")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => resendVerification.mutate(user.id)}
+                        disabled={resendVerification.isPending}
+                      >
+                        <MailCheck className="h-4 w-4" />
+                        {t("platformUsers.sheet.resend")}
+                      </Button>
+                    }
+                  />
                 )}
                 {showSignInLock && (
                   <SettingsRow
                     label={t("platformUsers.sheet.signInLockLabel")}
                     description={t("platformUsers.sheet.signInLockHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => liftSignInLock.mutate(user.id)}
-                      disabled={liftSignInLock.isPending}
-                    >
-                      <LockOpen className="h-4 w-4" />
-                      {t("platformUsers.sheet.signInLockLift")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => liftSignInLock.mutate(user.id)}
+                        disabled={liftSignInLock.isPending}
+                      >
+                        <LockOpen className="h-4 w-4" />
+                        {t("platformUsers.sheet.signInLockLift")}
+                      </Button>
+                    }
+                  />
                 )}
                 {showSecondFactor && (
                   <SettingsRow
                     label={t("platformUsers.sheet.secondFactorLabel")}
                     description={t("platformUsers.sheet.secondFactorHelp")}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSecondFactorConfirm(true)}
-                      disabled={clearSecondFactor.isPending}
-                    >
-                      <ShieldOff className="h-4 w-4" />
-                      {t("platformUsers.sheet.secondFactorClear")}
-                    </Button>
-                  </SettingsRow>
+                    action={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSecondFactorConfirm(true)}
+                        disabled={clearSecondFactor.isPending}
+                      >
+                        <ShieldOff className="h-4 w-4" />
+                        {t("platformUsers.sheet.secondFactorClear")}
+                      </Button>
+                    }
+                  />
                 )}
               </SettingsSection>
             )}
@@ -737,17 +752,18 @@ export const UserOperatorSettingsSheet = ({
                 <SettingsRow
                   label={t("platformUsers.deleteUser")}
                   description={t("platformUsers.sheet.deleteHelp")}
-                >
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setDeleting(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {t("platformUsers.sheet.delete")}
-                  </Button>
-                </SettingsRow>
+                  action={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleting(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t("platformUsers.sheet.delete")}
+                    </Button>
+                  }
+                />
               </SettingsSection>
             )}
           </div>

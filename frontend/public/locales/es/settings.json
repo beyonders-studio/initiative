@@ -73,8 +73,6 @@
   "addresses": {
     "title": "Direcciones de correo",
     "description": "Cualquier dirección confirmada te permite entrar, y el correo de tu cuenta llega a todas.",
-    "loadFailed": "No se pudieron cargar tus direcciones.",
-    "retry": "Reintentar",
     "primary": "Principal",
     "unverified": "Sin confirmar",
     "makePrimary": "Hacer principal",
@@ -118,8 +116,6 @@
     "waits": "Este cambio espera hasta el {{date}}. Todas las direcciones de tu cuenta han recibido un correo sobre ello."
   },
   "security": {
-    "loadingDevices": "Cargando dispositivos…",
-    "devicesError": "No se pudieron cargar los dispositivos.",
     "unknownDevice": "Dispositivo desconocido",
     "revoking": "Revocando…",
     "revokeError": "No se pudo revocar el acceso del dispositivo",
@@ -143,8 +139,6 @@
     "nameRequired": "El nombre es obligatorio",
     "createSuccess": "Clave API creada",
     "createError": "No se pudo crear la clave API",
-    "loadingKeys": "Cargando claves API…",
-    "keysError": "No se pudieron cargar las claves API.",
     "noKeys": "Aún no hay claves API.",
     "statusExpired": "Expirada",
     "statusDisabled": "Deshabilitada",
@@ -194,7 +188,6 @@
   },
   "ai": {
     "loading": "Cargando la configuración de IA…",
-    "loadError": "No se pudo cargar la configuración de IA.",
     "providerFieldLabel": "Proveedor",
     "providerPlaceholder": "Selecciona un proveedor",
     "modelLabel": "Modelo",
@@ -540,7 +533,6 @@
     "colorsTitle": "Colores de marca",
     "colorsDescription": "Personaliza los colores de acento para el modo claro y oscuro.",
     "loadingInterface": "Cargando configuración de interfaz…",
-    "interfaceError": "No se pudo cargar la configuración de interfaz.",
     "lightModeLabel": "Acento del modo claro",
     "lightModeHelp": "Los botones, resaltados y estados de enfoque usan este color mientras la aplicación está en modo claro.",
     "darkModeLabel": "Acento del modo oscuro",
@@ -615,8 +607,6 @@
   "email": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar la configuración de email.",
     "title": "Email SMTP",
-    "loading": "Cargando configuración de email…",
-    "loadError": "No se pudo cargar la configuración de email.",
     "hostLabel": "Servidor",
     "hostPlaceholder": "smtp.proveedordecorreo.com",
     "portLabel": "Puerto",
@@ -645,7 +635,6 @@
   "push": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar los ajustes de notificaciones push.",
     "loading": "Cargando ajustes de notificaciones push…",
-    "loadError": "No se pudieron cargar los ajustes de notificaciones push.",
     "title": "Firebase Cloud Messaging",
     "description": "Opcional. Sin una clave de cuenta de servicio, las notificaciones push pasan por el relé de push de BeyondersStudio y estos campos pueden quedar vacíos. Con una, las notificaciones de Android pasan por tu propio proyecto de Firebase; las de iPhone siempre usan el relé.",
     "enabledLabel": "Enviar notificaciones push",
@@ -702,7 +691,6 @@
   "auth": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar la configuración de autenticación.",
     "loading": "Cargando configuración de autenticación…",
-    "loadError": "No se pudo cargar la configuración de autenticación.",
     "postLoginRedirect": "Redirección después de inicio de sesión:",
     "mobileCallback": "Callback de app móvil:",
     "deploymentTitle": "Esta instalación",
@@ -803,7 +791,6 @@
   },
   "platformUsers": {
     "loading": "Cargando usuarios…",
-    "loadError": "No se pudieron cargar los usuarios.",
     "filterPlaceholder": "Filtrar por identificador…",
     "columnId": "ID de usuario",
     "columnHandle": "Identificador",
@@ -926,8 +913,6 @@
         "title": "Casos",
         "count_one": "{{count}} caso abierto que presentó o que trata sobre esta cuenta.",
         "count_other": "{{count}} casos abiertos que presentó o que tratan sobre esta cuenta.",
-        "loading": "Cargando casos…",
-        "loadError": "No se pudieron cargar sus casos.",
         "filed": "Presentado por esta cuenta",
         "about": "Sobre esta cuenta",
         "help": "Para abrir un caso necesitas acceso al proyecto donde se guarda."
@@ -1109,7 +1094,6 @@
   "pluginServices": {
     "platformOnly": "Solo los propietarios de la plataforma pueden gestionar los servicios de complementos.",
     "loading": "Cargando servicios de complementos…",
-    "loadError": "No se pudieron cargar los servicios de complementos.",
     "title": "Servicios de complementos",
     "description": "Los complementos que ejecuta esta instancia. La ficha de un complemento dice qué es y qué puede hacer; aquí indicas dónde responde y las claves con las que firma.",
     "empty": "Todavía no hay servicios de complementos. Un complemento aparece aquí cuando llega su ficha o cuando lo añades.",
@@ -1239,7 +1223,6 @@
   "providerPlacement": {
     "description": "Asigna a las personas que inicia sesión un proveedor —según el grupo o el directorio que indique— a una comunidad, y a una iniciativa de ella si nombras una.",
     "loading": "Cargando reglas de asignación…",
-    "loadError": "No se pudieron cargar las reglas de asignación. Inténtalo de nuevo.",
     "platformOnly": "La asignación al iniciar sesión la gestionan los operadores y propietarios de la plataforma.",
     "everywhere": {
       "label": "Aplicar las reglas de asignación a todas las comunidades",
@@ -1309,7 +1292,6 @@
     "description": "Establece límites por comunidad para el almacenamiento y el número de usuarios. Bajar un límite por debajo del uso actual bloquea las nuevas subidas o miembros, pero nunca elimina los archivos ni los miembros existentes.",
     "platformOnly": "Necesitas un rol de personal de la plataforma para ver las comunidades.",
     "loading": "Cargando comunidades…",
-    "loadError": "No se pudieron cargar las comunidades. Inténtalo de nuevo.",
     "filterByName": "Filtrar comunidades por nombre",
     "unlimitedPlaceholder": "Ilimitado",
     "helpText": "Los límites de almacenamiento están en GB; los límites de usuarios son un recuento de miembros. Ambos se guardan automáticamente: deja un campo en blanco para ilimitado.",
@@ -1389,7 +1371,6 @@
       "storageLabel": "Límite de almacenamiento",
       "decidesForItself": "Lo que decide por su cuenta",
       "deleted": "Eliminada",
-      "pluginSummariesUnavailable": "No se pudo cargar el uso de los plug-ins.",
       "narrowings": {
         "title": "A quién considera de los suyos",
         "help": "Esta comunidad indica qué llegadas a través de un proveedor son suyas. Ella misma nombra los valores, así que su acuerdo es lo que permite el ingreso automático; hasta entonces la conexión solo sirve para quienes ya están dentro.",
@@ -1442,7 +1423,6 @@
   "storage": {
     "platformOnly": "Solo los propietarios de la plataforma pueden configurar el almacenamiento.",
     "loading": "Cargando la configuración de almacenamiento…",
-    "loadError": "No se pudo cargar la configuración de almacenamiento.",
     "title": "Almacenamiento de objetos",
     "description": "Elige dónde se guardan los archivos subidos y los adjuntos. De forma predeterminada usa el sistema de archivos local; cambia a un almacén compatible con S3 para despliegues escalables o compartidos.",
     "backendLabel": "Backend de almacenamiento",
@@ -1726,7 +1706,6 @@
     "title": "Proveedores de identidad",
     "description": "Los proveedores de inicio de sesión único con los que las personas inician sesión. Cada uno tiene su propio botón en la página de inicio de sesión.",
     "addProvider": "Añadir proveedor",
-    "loading": "Cargando proveedores…",
     "empty": "Aún no hay proveedores configurados.",
     "disabledBadge": "Desactivado",
     "editTitle": "Editar proveedor de inicio de sesión",
@@ -1820,8 +1799,6 @@
     "add": "Añadir conexión",
     "toggleLabel": "Usar {{label}}",
     "empty": "Aún no hay conexiones. Añade una para activar las funciones de IA.",
-    "loading": "Cargando conexiones…",
-    "loadError": "No se pudieron cargar las conexiones.",
     "defaultBadge": "Predeterminada",
     "keySet": "Clave compartida configurada",
     "noKey": "Sin clave compartida",
@@ -2049,7 +2026,6 @@
   "twoFactor": {
     "title": "Verificación en dos pasos",
     "description": "Pedir un código de una aplicación de autenticación después de la contraseña o del código por correo, y siempre que una comunidad o este servidor pidan un segundo factor.",
-    "loading": "Comprobando…",
     "on": "Activada",
     "notSetUp": "Al iniciar sesión no se pide un código de una aplicación.",
     "setUp": "Configurar la verificación en dos pasos",
@@ -2085,7 +2061,6 @@
     "regenerateError": "No se han podido crear códigos nuevos.",
     "disableError": "No se ha podido desactivar.",
     "codePlaceholder": "123456",
-    "statusError": "No se ha podido comprobar si la verificación en dos pasos está activada. Recarga la página.",
     "copyUnavailable": "No se ha podido copiar: anota los códigos a mano.",
     "notOffered": "Esta instalación no ofrece la aplicación de autenticación.",
     "passwordlessCodes": "Tu cuenta inicia sesión sin contraseña. Con estos códigos vuelves a establecer una si pierdes tu clave de acceso."
@@ -2093,8 +2068,6 @@
   "passkeys": {
     "title": "Claves de acceso",
     "description": "Inicia sesión con la huella, la cara o el bloqueo de pantalla de tu dispositivo en lugar de tu contraseña.",
-    "loading": "Comprobando…",
-    "listError": "No se ha podido comprobar qué claves de acceso tiene esta cuenta. Recarga la página.",
     "empty": "Aún no hay claves de acceso.",
     "emptyHint": "Una clave de acceso vive en tu teléfono, tu portátil o tu gestor de contraseñas, y solo sirve en este sitio.",
     "add": "Añadir una clave de acceso",
@@ -2267,7 +2240,6 @@
     "holdsNothing": "Aún no incluye nada.",
     "builtIn": "Integrado",
     "loading": "Cargando roles",
-    "loadError": "No se pudieron cargar los roles.",
     "closed": "Quien administra este servidor ha desactivado los roles personalizados para esta comunidad. Los roles que tiene siguen aplicándose.",
     "deleteTitle": "¿Eliminar {{name}}?",
     "deleteDescription": "Quienes lo tienen vuelven a su rol normal.",
@@ -2348,9 +2320,6 @@
     "orderError": "No se pudieron reordenar las reglas",
     "removeError": "No se pudo quitar la regla",
     "closed": "Tu servidor ha desactivado los roles personalizados en esta comunidad. Estas reglas siguen aplicándose; nadie aquí puede cambiarlas.",
-    "loading": "Cargando reglas…",
-    "loadError": "No se pudieron cargar las reglas.",
-    "retry": "Reintentar",
     "editTitle": "Editar regla de rol",
     "saved": "Regla guardada",
     "saveError": "No se pudo guardar la regla"

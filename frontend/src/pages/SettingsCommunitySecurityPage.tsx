@@ -811,21 +811,24 @@ export const SettingsCommunitySecurityPage = () => {
                   {rule.detail ? ` · ${rule.detail}` : null}
                 </>
               }
-            >
-              {rule.fixed || setByDeployment.has(rule.key) ? (
-                <Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-label={t("communityAuth.changeRule", { rule: rule.label })}
-                  onClick={() => setChanging(rule.key)}
-                >
-                  {t("communityAuth.change")}
-                </Button>
-              )}
-            </SettingsRow>
+              action={
+                <>
+                  {rule.fixed || setByDeployment.has(rule.key) ? (
+                    <Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={t("communityAuth.changeRule", { rule: rule.label })}
+                      onClick={() => setChanging(rule.key)}
+                    >
+                      {t("communityAuth.change")}
+                    </Button>
+                  )}
+                </>
+              }
+            />
           ))}
       </SettingsSection>
 

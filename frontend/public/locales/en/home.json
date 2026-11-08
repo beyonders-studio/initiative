@@ -150,7 +150,6 @@
       "daysOption_other": "The next {{count}} days",
       "empty_one": "Nothing coming up today.",
       "empty_other": "Nothing coming up in the next {{count}} days.",
-      "loadError": "Couldn't load what's coming up.",
       "openCalendar": "Open My Calendar"
     },
     "calendar": {
@@ -168,7 +167,6 @@
       "toolsHint": "Narrow both lists to these kinds of tool. Leave it empty for all of them.",
       "emptyViewed": "Nothing opened yet. Projects, files and the rest show up here once you've looked at them.",
       "emptyChanged": "Nothing has changed lately.",
-      "loadError": "Couldn't load what's recent.",
       "openTools": "Open My Tools"
     },
     "bookmarks": {
@@ -176,8 +174,7 @@
       "titleIn": "Bookmarked {{tool}}",
       "description": "Everything you bookmarked, from every community, a click away.",
       "toolsHint": "Show only these kinds of tool. Leave it empty for all of them.",
-      "empty": "Nothing bookmarked yet. Bookmark a project, a file or anything else from its page, and it waits for you here.",
-      "loadError": "Couldn't load your bookmarks."
+      "empty": "Nothing bookmarked yet. Bookmark a project, a file or anything else from its page, and it waits for you here."
     },
     "activity": {
       "title": "Activity",
@@ -196,7 +193,6 @@
     "progress": {
       "title": "My progress",
       "description": "Your streak, your week, and how much lands on time.",
-      "loadError": "Couldn't load your progress.",
       "streak_one": "{{count}} day",
       "streak_other": "{{count}} days",
       "firstTask": "Finish your first task to start a streak."
@@ -258,7 +254,6 @@
   "marketplace": {
     "browse": "Browse the marketplace",
     "by": "by {{publisher}}",
-    "loadError": "Couldn't load the marketplace's layouts.",
     "empty": "No layouts in the marketplace yet."
   },
   "store": {
@@ -273,7 +268,6 @@
     "description": "Any banner you have can sit at the top of this view, and each view can wear a different one.",
     "useProfile": "Use my profile banner",
     "none": "No banner",
-    "more": "Get more banners",
-    "loadError": "Couldn't load your banners."
+    "more": "Get more banners"
   }
 }

@@ -623,7 +623,7 @@ describe("HomePage", () => {
     });
     renderHome();
 
-    expect(await screen.findByText("Couldn't load what's recent.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText("Nothing has changed lately.")).not.toBeInTheDocument();
   });
 
@@ -783,7 +783,7 @@ describe("HomePage", () => {
     await user.click(await screen.findByRole("button", { name: "Customize" }));
     await user.click(screen.getByRole("button", { name: "Banner" }));
     const picker = await screen.findByRole("dialog", { name: "This view's banner" });
-    expect(await within(picker).findByText("Couldn't load your banners.")).toBeInTheDocument();
+    expect(await within(picker).findByRole("alert")).toBeInTheDocument();
     expect(within(picker).getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });

@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 
 export interface InitiativeJoinRequestQueueProps {
   initiativeId: number;
@@ -142,7 +143,7 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
       contentClassName="p-0"
     >
       {queueQuery.isError ? (
-        <p className="p-4 text-destructive text-sm">{t("joinRequests.queueLoadError")}</p>
+        <StatusMessage onRetry={queueQuery.refetch} />
       ) : (
         <ul className="divide-y">{requests.map(renderRequest)}</ul>
       )}

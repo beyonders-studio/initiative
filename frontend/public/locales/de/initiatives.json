@@ -3,8 +3,6 @@
   "subtitle": "Öffne eine Initiative, um Dateien, Projekte und Mitgliedschaften zu verwalten.",
   "newInitiative": "Neue Initiative",
   "selectCommunity": "Community auswählen",
-  "loading": "Initiativen werden geladen…",
-  "loadError": "Initiativen können derzeit nicht geladen werden.",
   "noDescription": "Noch keine Beschreibung.",
   "members": "Mitglieder:",
   "createInitiative": "Initiative erstellen",
@@ -24,7 +22,6 @@
     "requestError": "Die Anfrage kann derzeit nicht gesendet werden.",
     "queueTitle": "Beitrittsanfragen",
     "queueDescription": "Personen, die um Beitritt zu dieser Initiative gebeten haben. Eine Zusage fügt sie als Mitglied hinzu.",
-    "queueLoadError": "Die Beitrittsanfragen können derzeit nicht geladen werden.",
     "noMessage": "Keine Nachricht",
     "unknownRequester": "Jemand",
     "priorDenials_one": "Zuvor {{count}}-mal abgelehnt",
@@ -38,8 +35,6 @@
   "manage": {
     "description": "Alle Initiativen dieser Community und wer sie leitet. Mache jemanden zum Projektmanager, um ihm eine Initiative zu übertragen; mache dich selbst dazu, um von deiner eigenen Seitenleiste aus darin zu arbeiten.",
     "adminRequired": "Du musst Community-Administrator sein, um Initiativen zu verwalten.",
-    "loading": "Initiativen werden geladen…",
-    "loadError": "Initiativen können derzeit nicht geladen werden.",
     "filterByName": "Nach Name filtern",
     "nameColumn": "Initiative",
     "managersColumn": "Projektmanager",
@@ -166,7 +161,6 @@
     "roleUpdateError": "Rolle kann derzeit nicht aktualisiert werden.",
     "rolesTitle": "Rollenberechtigungen",
     "rolesDescription": "Was jede Rolle sehen und was sie erstellen darf. Manager haben alles.",
-    "loadingRoles": "Rollen werden geladen...",
     "addCustomRole": "Benutzerdefinierte Rolle hinzufügen",
     "setByCommunity": "Deine Community legt das für jede Initiative fest.",
     "customRolesOff": "Deine Community beschränkt Initiativen auf ihre eingebauten Rollen.",
@@ -270,8 +264,7 @@
     "layouts": {
       "heading": "Layouts",
       "description": "Wie jedes Tool dieser Initiative darstellt, was es enthält: jedes Layout, wann es zuletzt geändert wurde, und mit welcher Liste ein Projekt öffnet. Geändert werden sie jeweils in ihrem Editor.",
-      "noProjects": "Diese Initiative hat noch keine Projekte.",
-      "loadError": "Die Layouts konnten nicht geladen werden."
+      "noProjects": "Diese Initiative hat noch keine Projekte."
     },
     "fixedOn": "An",
     "fixedOff": "Aus"

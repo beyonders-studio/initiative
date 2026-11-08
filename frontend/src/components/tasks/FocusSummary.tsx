@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Progress } from "@/ui/progress";
 import { Separator } from "@/ui/separator";
 import { Slider } from "@/ui/slider";
+import { StatusMessage } from "@/ui/status-message";
 import { TooltipProvider } from "@/ui/tooltip";
 
 type FocusSummaryData = ReturnType<typeof useFocusSummary>;
@@ -258,7 +259,7 @@ export const FocusSummary = ({
               {totalCount > 0 ? <Progress value={progress} className="mb-3 h-1" /> : null}
 
               {focus.hasError ? (
-                <p className="py-4 text-center text-destructive text-sm">{t("focus.loadError")}</p>
+                <StatusMessage />
               ) : focus.isEmpty ? (
                 <p className="py-4 text-center text-muted-foreground text-sm">{t("focus.empty")}</p>
               ) : (

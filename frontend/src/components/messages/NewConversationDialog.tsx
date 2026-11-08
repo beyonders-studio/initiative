@@ -32,6 +32,7 @@ import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
 import { LoadMore } from "@/ui/load-more";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** How long typing settles before the roster follows it. */
@@ -296,7 +297,9 @@ export const NewConversationDialog = () => {
 
         <div className="-mx-2 max-h-80 overflow-y-auto px-2">
           {sections.isLoading ? (
-            <p className="py-2 text-muted-foreground text-sm">{t("messages:loading")}</p>
+            <SkeletonRegion className="py-2">
+              <ListSkeleton rows={4} />
+            </SkeletonRegion>
           ) : !anybody ? (
             /* A section arrives for every community that has somebody else in
                it, listable or not, so its presence is what separates the two

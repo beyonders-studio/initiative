@@ -32,6 +32,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -395,7 +396,9 @@ export const UserSettingsNotificationsPage = ({
         description={t("notifications.channelsDescription")}
       >
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+          <SkeletonRegion>
+            <TableSkeleton rows={5} columns={4} toolbar={false} />
+          </SkeletonRegion>
         ) : (
           renderGrid()
         )}
@@ -645,19 +648,20 @@ export const UserSettingsNotificationsPage = ({
                   })
             }
             description={t("notifications.timing.pause.note")}
-          >
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={writePreferences.isPending}
-              onClick={resume}
-            >
-              {running
-                ? t("notifications.timing.pause.resume")
-                : t("notifications.timing.pause.cancel")}
-            </Button>
-          </SettingsRow>
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={writePreferences.isPending}
+                onClick={resume}
+              >
+                {running
+                  ? t("notifications.timing.pause.resume")
+                  : t("notifications.timing.pause.cancel")}
+              </Button>
+            }
+          />
         ) : (
           <SettingsRow
             label={t("notifications.timing.pause.title")}

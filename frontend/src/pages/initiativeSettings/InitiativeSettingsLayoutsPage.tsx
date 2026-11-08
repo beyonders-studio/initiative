@@ -32,6 +32,7 @@ import {
 } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { StatusMessage } from "@/ui/status-message";
 
 export const InitiativeSettingsLayoutsPage = () => {
   const { initiativeId, initiative, canManageMembers } = useInitiativeSettings();
@@ -58,7 +59,7 @@ const InitiativeLayouts = ({
   enabled: (tool: Tool) => boolean;
 }) => {
   const { t } = useTranslation("initiatives");
-  const { data, isError } = useInitiativeLayouts(initiativeId);
+  const { data, isError, refetch } = useInitiativeLayouts(initiativeId);
   // Each tool's instances; an initiative with no project yet says so.
   const instances = (tool: Tool) => {
     const entries = data?.filter((entry) => entry.tool === tool);
@@ -75,9 +76,7 @@ const InitiativeLayouts = ({
       description={t("settings.layouts.description")}
       contentClassName="space-y-3"
     >
-      {isError ? (
-        <p className="text-destructive text-sm">{t("settings.layouts.loadError")}</p>
-      ) : null}
+      {isError ? <StatusMessage onRetry={refetch} /> : null}
       {TOOLS_WITH_LAYOUTS.map((tool) =>
         tool in SHARED_LAYOUTS ? (
           enabled(tool) ? (

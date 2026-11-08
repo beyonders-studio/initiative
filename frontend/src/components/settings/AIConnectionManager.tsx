@@ -11,6 +11,8 @@ import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 import { AIConnectionDialog } from "./AIConnectionDialog";
 import { AIConnectionRow } from "./AIConnectionRow";
@@ -107,9 +109,11 @@ export const AIConnectionManager = ({
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("aiConnections.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={2} avatar={false} />
+        </SkeletonRegion>
       ) : isError ? (
-        <p className="text-destructive text-sm">{t("aiConnections.loadError")}</p>
+        <StatusMessage />
       ) : connections.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-6 text-center">
           <Plug className="h-6 w-6 text-muted-foreground" />

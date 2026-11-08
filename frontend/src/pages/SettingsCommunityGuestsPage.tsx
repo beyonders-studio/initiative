@@ -50,6 +50,7 @@ import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 /** One item a guest invite gives, and how far. */
 interface ChosenItem {
@@ -383,7 +384,7 @@ export const SettingsCommunityGuestsPage = () => {
             <TableSkeleton rows={3} columns={3} />
           </SkeletonRegion>
         ) : guestsQuery.isError ? (
-          <p className="text-destructive text-sm">{t("guests.unableToLoad")}</p>
+          <StatusMessage onRetry={guestsQuery.refetch} />
         ) : guests.length === 0 && !table.params.search ? (
           <p className="text-muted-foreground text-sm">{t("guests.noGuests")}</p>
         ) : (

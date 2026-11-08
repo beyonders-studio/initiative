@@ -39,6 +39,7 @@ import type { AppColumnDef } from "@/ui/lib/table";
 import { FormSkeleton, SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 //: The custom role picker's "none", since a select's value is a string.
@@ -165,7 +166,7 @@ export const SettingsUsersPage = () => {
   }
 
   if (usersQuery.isError || !usersQuery.data) {
-    return <p className="text-destructive text-sm">{t("users.unableToLoadSettings")}</p>;
+    return <StatusMessage onRetry={usersQuery.refetch} />;
   }
 
   // The handle leads: every member has one. A name is only the display name

@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOidcSettings } from "@/hooks/useSettings";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * Platform → Authentication.
@@ -38,7 +39,7 @@ export const SettingsAuthPage = () => {
   }
 
   if (oidcQuery.isError || !oidcQuery.data) {
-    return <p className="text-destructive text-sm">{t("auth.loadError")}</p>;
+    return <StatusMessage onRetry={oidcQuery.refetch} />;
   }
 
   return (

@@ -29,6 +29,7 @@ import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
 
@@ -175,7 +176,7 @@ export const ComingUpWidget = ({ options }: HomeWidgetProps) => {
           ))}
         </div>
       ) : entriesQuery.isError ? (
-        <p className="text-destructive text-sm">{t("widgets.comingUp.loadError")}</p>
+        <StatusMessage onRetry={entriesQuery.refetch} />
       ) : groups.length === 0 ? (
         <HomeWidgetNotice
           icon={CalendarClock}

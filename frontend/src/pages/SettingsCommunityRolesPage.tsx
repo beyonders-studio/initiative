@@ -40,6 +40,7 @@ import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 /** The longest name the server takes. */
 const MAX_NAME_LENGTH = 64;
@@ -305,7 +306,7 @@ export const SettingsCommunityRolesPage = () => {
             <ListSkeleton rows={2} avatar={false} />
           </SkeletonRegion>
         ) : rolesQuery.isError ? (
-          <p className="text-destructive text-sm">{t("customRoles.loadError")}</p>
+          <StatusMessage onRetry={rolesQuery.refetch} />
         ) : null}
       </SettingsSection>
 

@@ -52,6 +52,7 @@ import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -238,7 +239,11 @@ export function FilterBuilder({
   // the plainest thing they can draw, and editing one then rewrites a saved
   // filter into whatever that plain control emitted. So the rows wait.
   if (loading) {
-    return <p className="text-muted-foreground text-xs">{t("dashboards:filterBuilder.loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <SkeletonLines lines={2} lineClassName="h-9" />
+      </SkeletonRegion>
+    );
   }
 
   // A dataset that named no fields has nothing to build a condition from.

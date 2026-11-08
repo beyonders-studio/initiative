@@ -148,9 +148,8 @@ export const CommunityPrivacySection = ({
                 {row.platform ? ` · ${row.platform}` : null}
               </>
             }
-          >
-            <Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>
-          </SettingsRow>
+            action={<Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>}
+          />
         ) : (
           <SettingsRow key={row.key} label={row.label} description={row.help}>
             <Switch

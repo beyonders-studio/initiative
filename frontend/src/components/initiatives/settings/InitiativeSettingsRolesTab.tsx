@@ -1,4 +1,4 @@
-import { Loader2, Lock, Pencil, Plus, Trash2 } from "lucide-react";
+import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Switch } from "@/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -300,10 +301,9 @@ export const InitiativeSettingsRolesTab = ({
       </div>
 
       {rolesQuery.isLoading ? (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {t("settings.loadingRoles")}
-        </div>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} avatar={false} />
+        </SkeletonRegion>
       ) : rolesQuery.data ? (
         <>
           {/* The roles there is nothing to configure, stated once and together

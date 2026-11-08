@@ -22,7 +22,6 @@
  * there.
  */
 
-import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { PluginConnectionsPanel } from "@/components/plugins/PluginConnectionsPanel";
@@ -34,6 +33,7 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPluginDetail } from "@/hooks/useCommunityPluginDetail";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Separator } from "@/ui/separator";
 
 export interface PluginSettingsDialogProps {
@@ -76,10 +76,9 @@ export function PluginSettingsDialog({
           <DialogDescription>{t("plugins:settings.description")}</DialogDescription>
         </DialogHeader>
         {detail.isLoading || !plugin ? (
-          <div className="flex items-center gap-2 py-6 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("common:loading")}
-          </div>
+          <SkeletonRegion>
+            <FormSkeleton card={false} fields={3} action={false} />
+          </SkeletonRegion>
         ) : (
           <div className="space-y-6">
             {/* Yours first. A plug-in that acts as people asks everybody, admins

@@ -12,6 +12,7 @@ import { CardFooter } from "@/ui/card";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Field } from "@/ui/field";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 export const SettingsBrandingPage = () => {
@@ -70,7 +71,7 @@ export const SettingsBrandingPage = () => {
             <FormSkeleton card={false} fields={2} />
           </SkeletonRegion>
         ) : interfaceQuery.isError ? (
-          <p className="text-destructive text-sm">{t("branding.interfaceError")}</p>
+          <StatusMessage onRetry={interfaceQuery.refetch} />
         ) : (
           <form className="grid grid-cols-pair gap-6" onSubmit={handleInterfaceSubmit}>
             <Field

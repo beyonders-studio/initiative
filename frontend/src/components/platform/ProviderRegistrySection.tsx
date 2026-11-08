@@ -27,6 +27,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Switch } from "@/ui/switch";
 
 // The mutation surface the section needs — satisfied structurally by the
@@ -113,7 +114,9 @@ export const ProviderRegistrySection = ({
       }
     >
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
       ) : rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("authProviders.empty")}</p>
       ) : (

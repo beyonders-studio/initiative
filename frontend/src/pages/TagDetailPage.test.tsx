@@ -142,7 +142,7 @@ describe("TagDetailPage", () => {
     );
     renderTagPage();
 
-    expect(await screen.findByText("Couldn't load what carries this tag.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Nothing carries this tag yet.")).toBeInTheDocument();

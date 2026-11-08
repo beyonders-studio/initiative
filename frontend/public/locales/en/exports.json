@@ -172,7 +172,6 @@
       "dashboard": "Dashboard"
     },
     "download": "Download",
-    "empty": "No exports yet.",
-    "loadFailed": "Couldn't load exports. Refresh to try again."
+    "empty": "No exports yet."
   }
 }

@@ -58,6 +58,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
 import { useFileDrop } from "@/ui/lib/useFileDrop";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * The grid every group draws into. `min(…, 100%)` keeps a card from overflowing
@@ -187,7 +188,7 @@ export const RelationsSection = ({
     canAdd &&
     Boolean(initiative?.can.view.includes(Tool.file) && initiative.can.create.includes(Tool.file));
 
-  const { data: rows = [], isLoading, isError } = useRelationshipsFor(entity);
+  const { data: rows = [], isLoading, isError, refetch } = useRelationshipsFor(entity);
   // Only walked while the picture is the thing on screen: no other layout shows
   // more than one hop, and one hop is the list above.
   const neighbourhood = useRelationsNeighbourhood(entity, hops, {
@@ -383,7 +384,7 @@ export const RelationsSection = ({
             ))}
           </div>
         ) : isError ? (
-          <p className="text-muted-foreground text-sm">{t("loadFailed")}</p>
+          <StatusMessage onRetry={refetch} />
         ) : total === 0 ? (
           /* One line, naming two things worth linking from HERE. Not a button
              per kind of link: that would be seven doors into a room nobody has

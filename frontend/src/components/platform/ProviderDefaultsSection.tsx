@@ -30,6 +30,7 @@ import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) => {
   const { t } = useTranslation("settings");
@@ -147,7 +148,9 @@ export const ProviderDefaultsSection = () => {
       description={t("providerDefaults.description")}
     >
       {providersQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
       ) : providers.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("providerDefaults.noProviders")}</p>
       ) : (

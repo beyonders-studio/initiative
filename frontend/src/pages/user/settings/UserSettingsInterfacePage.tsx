@@ -489,40 +489,46 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
         <SettingsRow
           label={t("interface.taskCompletionAudioFeedback.label")}
           description={t("interface.taskCompletionAudioFeedback.description")}
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => playTaskCompletionSound()}
-          >
-            {t("interface.taskCompletionAudioFeedback.preview")}
-          </Button>
-          <Switch
-            checked={prefs.task_completion_audio_feedback}
-            onCheckedChange={(next) => savePrefs({ task_completion_audio_feedback: next })}
-            disabled={pending}
-          />
-        </SettingsRow>
+          action={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => playTaskCompletionSound()}
+              >
+                {t("interface.taskCompletionAudioFeedback.preview")}
+              </Button>
+              <Switch
+                checked={prefs.task_completion_audio_feedback}
+                onCheckedChange={(next) => savePrefs({ task_completion_audio_feedback: next })}
+                disabled={pending}
+              />
+            </>
+          }
+        />
 
         <SettingsRow
           label={t("interface.taskCompletionHapticFeedback.label")}
           description={t("interface.taskCompletionHapticFeedback.description")}
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => triggerTaskCompletionHaptic()}
-          >
-            {t("interface.taskCompletionHapticFeedback.preview")}
-          </Button>
-          <Switch
-            checked={prefs.task_completion_haptic_feedback}
-            onCheckedChange={(next) => savePrefs({ task_completion_haptic_feedback: next })}
-            disabled={pending}
-          />
-        </SettingsRow>
+          action={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => triggerTaskCompletionHaptic()}
+              >
+                {t("interface.taskCompletionHapticFeedback.preview")}
+              </Button>
+              <Switch
+                checked={prefs.task_completion_haptic_feedback}
+                onCheckedChange={(next) => savePrefs({ task_completion_haptic_feedback: next })}
+                disabled={pending}
+              />
+            </>
+          }
+        />
       </SettingsSection>
 
       {/* Kept by this browser or this computer rather than the account. */}

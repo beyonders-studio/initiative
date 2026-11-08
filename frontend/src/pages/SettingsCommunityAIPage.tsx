@@ -18,6 +18,7 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { getProvidersForScope } from "@/lib/ai-providers";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * The seat's AI surface: the community's own AI connections when the platform
@@ -71,7 +72,7 @@ export const SettingsCommunityAIPage = () => {
   }
 
   if (modeQuery.isError || !modeQuery.data) {
-    return <p className="text-destructive text-sm">{t("ai.loadError")}</p>;
+    return <StatusMessage />;
   }
 
   if (mode === "disabled") {

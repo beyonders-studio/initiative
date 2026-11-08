@@ -27,6 +27,8 @@ import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { getUserColorStyle } from "@/ui/lib/userColor";
+import { SkeletonRegion } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 /** How far out each ring of neighbours sits before the layout takes over. */
 const RING = 10;
@@ -459,7 +461,13 @@ export const RelationsGraph = ({
   const version = `${graph.order}:${graph.size}:${resolvedTheme}`;
 
   if (nodes.length === 0) {
-    return <p className="text-muted-foreground text-sm">{loading ? t("loading") : t("empty")}</p>;
+    return loading ? (
+      <SkeletonRegion>
+        <Skeleton className="h-[28rem] w-full rounded-xl" />
+      </SkeletonRegion>
+    ) : (
+      <p className="text-muted-foreground text-sm">{t("empty")}</p>
+    );
   }
 
   return (

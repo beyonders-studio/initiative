@@ -56,7 +56,6 @@
   "recipientHasNoDevice": "{{name}} has not set up encrypted messages yet, so this could not be delivered.",
   "peerDevicesChanged": "{{name}}'s devices changed",
   "deviceFailed": "Encrypted messages could not be set up on this device.",
-  "loading": "Loading…",
   "unsupportedBrowser": "Encrypted messages need a secure connection and a browser that can run them. Check the address starts with https (or is localhost), or try the app.",
   "start": {
     "waiting": "Waiting for them to accept. You can message each other once they do.",

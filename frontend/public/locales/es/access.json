@@ -156,8 +156,6 @@
     "batchTitle": "Solicitudes de acceso",
     "answered": "Ya respondida",
     "answeredDescription": "Aquí ya no queda nada por responder.",
-    "loading": "Cargando solicitudes…",
-    "loadError": "No se pudieron cargar estas solicitudes.",
     "error": "No se pudo enviar tu respuesta. Inténtalo de nuevo."
   }
 }

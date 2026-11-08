@@ -1,5 +1,7 @@
 {
   "loading": "Chargement…",
+  "loadError": "Impossible de charger ceci.",
+  "tryAgain": "Réessayer",
   "loadMore": "Afficher plus",
   "clear": "Effacer",
   "next": "Suivant",

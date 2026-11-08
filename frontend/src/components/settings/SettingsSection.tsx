@@ -106,6 +106,9 @@ export interface SettingsRowProps {
    *  and description, so the label names the control and a click on the label
    *  reaches it. */
   children?: ReactNode;
+  /** A button or badge at the end of the row in place of a control. It names
+   *  itself, so the label stays text. */
+  action?: ReactNode;
   /** Shown under the row, for what the control opens up when it is on. */
   below?: ReactNode;
 }
@@ -117,7 +120,14 @@ export interface SettingsRowProps {
  * as a list. Where the text and the control do not fit side by side, as on a
  * phone, the control drops under the text.
  */
-export const SettingsRow = ({ label, description, htmlFor, children, below }: SettingsRowProps) => {
+export const SettingsRow = ({
+  label,
+  description,
+  htmlFor,
+  children,
+  action,
+  below,
+}: SettingsRowProps) => {
   const madeId = useId();
   const id = htmlFor ?? madeId;
   const descriptionId = description ? `${id}-description` : undefined;
@@ -145,6 +155,7 @@ export const SettingsRow = ({ label, description, htmlFor, children, below }: Se
             </FieldContext>
           </div>
         ) : null}
+        {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
       </div>
       {below}
     </div>

@@ -23,6 +23,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
@@ -79,7 +80,7 @@ export const SettingsPushPage = () => {
   }
 
   if (query.isError || !query.data) {
-    return <p className="text-destructive text-sm">{t("push.loadError")}</p>;
+    return <StatusMessage onRetry={query.refetch} />;
   }
 
   const hasServiceAccount = query.data.has_service_account;

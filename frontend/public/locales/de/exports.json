@@ -172,7 +172,6 @@
       "dashboard": "Dashboard"
     },
     "download": "Herunterladen",
-    "empty": "Noch keine Exporte.",
-    "loadFailed": "Exporte konnten nicht geladen werden. Aktualisiere, um es erneut zu versuchen."
+    "empty": "Noch keine Exporte."
   }
 }

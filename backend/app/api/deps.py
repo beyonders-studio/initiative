@@ -1453,23 +1453,9 @@ async def establish_ideas_access(session: AsyncSession, user: Optional[User]) ->
     user_id = int(user.id) if user is not None else None
     try:
         await set_rls_context(session, IdeaReader(guild_id=guild_id, user_id=user_id))
-        # The published ideas, read through the role's own row on
-        # intake_cases: the one read the other ideas rows are then keyed on.
-        tasks = (
-            await session.exec(
-                sa_text("SELECT task_id FROM intake_cases ORDER BY task_id")
-            )
-        ).all()
-        # End the transaction, which leaves the role, before routing again.
-        await session.rollback()
-        await set_rls_context(
-            session,
-            IdeaReader(
-                guild_id=guild_id,
-                user_id=user_id,
-                tasks=tuple(row[0] for row in tasks),
-            ),
-        )
+        # Applied by the first statement: a community with no ideas role to
+        # assume is refused here rather than by the caller's first read.
+        await session.exec(sa_text("SELECT 1"))
     except DBAPIError as exc:
         clear_rls_context(session)
         await session.rollback()
