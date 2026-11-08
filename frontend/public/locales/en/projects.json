@@ -9,7 +9,6 @@
   "filters": {
     "searchLabel": "Name or description",
     "searchProjects": "Search projects",
-    "selectedInitiative": "Selected initiative",
     "filterByTag": "Filter by tag",
     "allTags": "All tags",
     "filterByAssignee": "Filter by assignee",
@@ -43,14 +42,15 @@
     "label": "Layout",
     "loadError": "Couldn't load this project's layouts."
   },
+  "namePlaceholder": "Foundation refresh",
+  "description": "Description (Markdown supported)",
+  "descriptionPlaceholder": "Share context to help the initiative prioritize.",
+  "initiative": "Initiative",
+  "selectInitiative": "Select initiative",
+  "creating": "Creating…",
   "createDialog": {
-    "title": "Create project",
     "description": "Give the project a name, optional description, and owning initiative.",
     "iconLabel": "Icon (optional)",
-    "namePlaceholder": "Foundation refresh",
-    "descriptionLabel": "Description (Markdown supported)",
-    "descriptionPlaceholder": "Share context to help the initiative prioritize.",
-    "initiativeLabel": "Initiative",
     "templateLabel": "Template (optional)",
     "loadingTemplates": "Loading templates…",
     "templateLoadError": "Unable to load templates.",
@@ -58,8 +58,6 @@
     "disableTemplateHint": "Disable “Save as template” to pick a template.",
     "saveAsTemplate": "Save as template",
     "saveAsTemplateHint": "Template projects live under the Templates tab and can be reused to spin up new work.",
-    "createError": "Unable to create project.",
-    "creating": "Creating…",
     "createProject": "Create project"
   },
   "detail": {

@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Copy, Loader2, MoreHorizontal, Trash2, Unlink } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +26,7 @@ import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
+import { useRouteId } from "@/hooks/useRouteId";
 import { detailLayoutOf, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
@@ -53,24 +54,16 @@ import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
  */
 export function EventDetailPage() {
   const { t } = useTranslation(["calendars", "common"]);
-  const { eventId, calendarId: calendarIdParam } = useParams({ strict: false }) as {
-    eventId: string;
-    calendarId?: string;
-  };
+  const eventId = useRouteId("eventId");
+  const calendarId = useRouteId("calendarId");
   // Opened from a calendar, a repeating event names the occurrence it was.
   const { occurrence: occurrenceParam } = useSearch({ strict: false }) as { occurrence?: string };
   const occurrence =
     occurrenceParam && !Number.isNaN(Date.parse(occurrenceParam)) ? occurrenceParam : undefined;
-  const calendarId = calendarIdParam ? Number(calendarIdParam) : null;
-  const parsedId = Number(eventId);
   const navigate = useNavigate();
   const gp = useCommunityPath();
 
-  const eventQuery = useCalendarEvent(
-    Number.isFinite(parsedId) ? parsedId : null,
-    undefined,
-    occurrence
-  );
+  const eventQuery = useCalendarEvent(eventId, undefined, occurrence);
   const event = eventQuery.data;
   useReadOnOpen("calendar_event", event?.id);
   useRecordOpen("calendar_event", event?.id);
@@ -104,7 +97,7 @@ export function EventDetailPage() {
       toEvent(copy);
     },
   });
-  const detach = useOccurrenceAction(event?.series_id ?? parsedId, "detach", {
+  const detach = useOccurrenceAction(event?.series_id ?? eventId ?? 0, "detach", {
     onSuccess: (detached) => {
       toast.success(t("occurrence.detached"));
       toEvent(detached);
@@ -127,7 +120,7 @@ export function EventDetailPage() {
   const layoutsQuery = useToolLayouts(
     event?.initiative_id != null ? sharedTarget(Tool.calendar, event.initiative_id) : null
   );
-  const pluginActions = usePluginMenuActions("calendar_event", parsedId, event?.initiative_id);
+  const pluginActions = usePluginMenuActions("calendar_event", eventId ?? 0, event?.initiative_id);
 
   if (eventQuery.isLoading || layoutsQuery.isLoading) {
     return (
@@ -137,14 +130,14 @@ export function EventDetailPage() {
     );
   }
 
-  if (eventQuery.isError || !event) {
+  if (eventId === null || eventQuery.isError || !event) {
     return (
       <ToolAccessStatus
         error={eventQuery.error}
         keys="calendars:"
         backTo={leaveTo}
         backLabel={t("backToEvents")}
-        entity={{ kind: "calendar_event", id: parsedId }}
+        entity={eventId === null ? undefined : { kind: "calendar_event", id: eventId }}
       />
     );
   }
@@ -165,7 +158,7 @@ export function EventDetailPage() {
     }
     const scope = await scopePrompt.ask("delete");
     if (scope) {
-      deleteEvent.mutate({ eventId: parsedId, ...occurrenceTarget(event, scope, occurrenceStart) });
+      deleteEvent.mutate({ eventId, ...occurrenceTarget(event, scope, occurrenceStart) });
     }
   };
 
@@ -177,7 +170,7 @@ export function EventDetailPage() {
         : "all";
     if (scope)
       duplicateEvent.mutate({
-        eventId: parsedId,
+        eventId,
         occurrence: scope === "this" ? occurrenceStart : undefined,
       });
   };
@@ -294,7 +287,7 @@ export function EventDetailPage() {
         title={t("deleteEvent")}
         description={t("deleteEventConfirm")}
         confirmLabel={t("deleteEvent")}
-        onConfirm={() => deleteEvent.mutate({ eventId: parsedId })}
+        onConfirm={() => deleteEvent.mutate({ eventId })}
         isLoading={deleteEvent.isPending}
         destructive
       />

@@ -11,11 +11,11 @@
  * be applied at once, so there is nothing to submit.
  */
 
-import { useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { WikiPageOrder, WikiReadingWidth } from "@/api/generated/initiativeAPI.schemas";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useUpdateWiki, useWiki } from "@/hooks/useWikis";
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { Button } from "@/ui/button";
@@ -54,12 +54,9 @@ const Setting = ({
 
 export const WikiReadingSettingsPage = () => {
   const { t } = useTranslation("wikis");
-  const { wikiId } = useParams({ strict: false }) as { wikiId?: string };
-  const parsedId = wikiId ? Number(wikiId) : Number.NaN;
-  const isValidId = Number.isFinite(parsedId);
-
-  const wikiQuery = useWiki(isValidId ? parsedId : null);
-  const update = useUpdateWiki(parsedId);
+  const wikiId = useRouteId("wikiId");
+  const wikiQuery = useWiki(wikiId);
+  const update = useUpdateWiki(wikiId ?? 0);
 
   const wiki = wikiQuery.data;
 

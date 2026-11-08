@@ -1,4 +1,3 @@
-import { useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,17 +17,17 @@ import { useDashboardEditor } from "@/hooks/useDashboardEditor";
 import { useDashboard, useUpdateDashboard, useWidgetCatalog } from "@/hooks/useDashboards";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
 import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
 
 export function DashboardDetailPage() {
   const { t } = useTranslation(["dashboards", "common"]);
-  const { dashboardId } = useParams({ strict: false }) as { dashboardId: string };
-  const parsedId = Number(dashboardId);
+  const dashboardId = useRouteId("dashboardId");
   const gp = useCommunityPath();
 
-  const dashboardQuery = useDashboard(Number.isFinite(parsedId) ? parsedId : null);
+  const dashboardQuery = useDashboard(dashboardId);
   const dashboard = dashboardQuery.data;
   // The path supplies the initiative while this loads, but the entity is the
   // authority once it arrives — a URL naming a different one is corrected
@@ -46,19 +45,19 @@ export function DashboardDetailPage() {
   // so the canvas is static without DAC write rather than merely looking it.
   const canEdit = Boolean(dashboard?.can.edit);
   const editor = useDashboardEditor(dashboard, catalogQuery.data, canEdit);
-  const rename = useUpdateDashboard(parsedId);
+  const rename = useUpdateDashboard(dashboardId ?? 0);
   const [configuringId, setConfiguringId] = useState<string | null>(null);
   const configuring =
     editor.definition.widgets.find((widget) => widget.id === configuringId) ?? null;
 
-  if (!Number.isFinite(parsedId) || dashboardQuery.isError) {
+  if (dashboardId === null || dashboardQuery.isError) {
     return (
       <ToolAccessStatus
         error={dashboardQuery.error}
         keys="dashboards:"
         backTo={gp(toolListRoute(Tool.dashboard, initiativeId))}
         backLabel={t("backToDashboards")}
-        entity={{ kind: "dashboard", id: parsedId }}
+        entity={dashboardId === null ? undefined : { kind: "dashboard", id: dashboardId }}
       />
     );
   }

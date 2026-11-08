@@ -4,18 +4,17 @@
  * Rename, describe, tag, share, and delete are identical for all six tools, so
  * they live here once. Everything the frame needs is derived from the `tool`
  * value — breadcrumb labels, section routes, the tag mutation — and all of its
- * copy comes from the shared `common:toolSettings.*` namespace, so a tool with
- * nothing of its own is mounted as `ToolSettingsPage`, over its `TOOL_HOOKS`.
+ * copy comes from the shared `common:toolSettings.*` namespace. Every tool
+ * mounts it through `ToolSettingsPage`, over its `TOOL_HOOKS`.
  *
  * The sections are real routes — `/settings/access` is a place, not a piece of
  * component state — so sharing can be linked to, and the back button walks
  * back through the sections that were visited. The bar still looks and behaves
  * like tabs; selecting one navigates.
  *
- * A tool with genuinely extra settings passes cards as `detailsExtra` /
- * `advancedExtra`, or names a whole extra section in `extraTabs` and serves it
- * from a route beside the shared ones; the shell stays the same shape for
- * every tool.
+ * A tool with genuinely extra settings passes cards as `detailsExtra`, or
+ * names a whole extra section in `extraTabs` and serves it from a route beside
+ * the shared ones; the shell stays the same shape for every tool.
  */
 
 import { Outlet } from "@tanstack/react-router";
@@ -61,8 +60,6 @@ export interface ToolSettingsLayoutProps {
   /** Extra fields inside the Details card itself, below the description. Each
    *  saves on its own; the card's Save button is for the name and description. */
   detailsInline?: ReactNode;
-  /** Extra cards for the Advanced section, e.g. duplicate or archive. */
-  advancedExtra?: ReactNode;
   /**
    * Overrides for the export card the Advanced section gives every tool — only
    * for a tool whose formats depend on the entity.
@@ -74,8 +71,6 @@ export interface ToolSettingsLayoutProps {
    * named here needs a route file beside the shared sections.
    */
   extraTabs?: { value: string; label: string }[];
-  /** Rendered outside the sections — dialogs a tool's extras need. */
-  children?: ReactNode;
 }
 
 export const ToolSettingsLayout = ({
@@ -89,10 +84,8 @@ export const ToolSettingsLayout = ({
   remove,
   detailsExtra,
   detailsInline,
-  advancedExtra,
   exportOptions,
   extraTabs = [],
-  children,
 }: ToolSettingsLayoutProps) => {
   const { t } = useTranslation(["common", "nav", "access", "layouts"]);
   const gp = useCommunityPath();
@@ -148,7 +141,6 @@ export const ToolSettingsLayout = ({
       label: t("common:toolSettings.tabAdvanced"),
       path: sectionPath("advanced"),
       visible:
-        Boolean(advancedExtra) ||
         entity.can.export ||
         entity.can.delete ||
         canUseArchiveCard(entity) ||
@@ -177,7 +169,6 @@ export const ToolSettingsLayout = ({
           remove,
           detailsExtra,
           detailsInline,
-          advancedExtra,
           exportOptions,
         }}
       >
@@ -185,8 +176,6 @@ export const ToolSettingsLayout = ({
           <Outlet />
         </Suspense>
       </ToolSettingsProvider>
-
-      {children}
     </div>
   );
 };

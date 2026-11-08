@@ -7,7 +7,7 @@
  * screen is too narrow to edit on, and keeps its draft while it is.
  */
 
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -15,15 +15,13 @@ import { ITEM_DETAILS } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
+import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolCamelSingular, toolSettingsSectionRoute } from "@/lib/tools";
 
 export const ItemLayoutEditorPage = ({ tool }: { tool: Tool }) => {
-  const params = useParams({ strict: false }) as Record<string, string | undefined>;
-  const rawId = params[`${toolCamelSingular(tool)}Id`];
-  const parsedId = rawId ? Number(rawId) : Number.NaN;
-  const id = Number.isFinite(parsedId) ? parsedId : null;
+  const id = useRouteId(`${toolCamelSingular(tool)}Id`);
   const navigate = useNavigate();
   const gp = useCommunityPath();
 

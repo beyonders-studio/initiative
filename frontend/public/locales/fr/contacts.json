@@ -5,6 +5,8 @@
   "createDescription": "Une personne ou une organisation, et comment la joindre.",
   "addPersonDescription": "Quelqu’un chez {{name}}, et comment le joindre.",
   "creating": "Création...",
+  "initiative": "Initiative",
+  "selectInitiative": "Sélectionner une initiative",
   "name": "Nom",
   "namePlaceholder": "Domaine du Lac, Priya Shah...",
   "kind": "Personne ou organisation",

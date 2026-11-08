@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRightLeft,
   CalendarPlus,
@@ -45,6 +45,7 @@ import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useRelate, useRelationshipsFor } from "@/hooks/useRelationships";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   CONTACT_DETAILS,
@@ -374,23 +375,21 @@ type RelatedLinks = { rows: RelationshipRead[]; isLoading: boolean };
  */
 export function ContactDetailPage() {
   const { t } = useTranslation(["contacts", "common"]);
-  const { contactId } = useParams({ strict: false }) as { contactId: string };
-  const parsedId = Number(contactId);
-  const validId = Number.isFinite(parsedId);
+  const contactId = useRouteId("contactId");
   const gp = useCommunityPath();
   const navigate = useNavigate();
-  const contactQuery = useContact(validId ? parsedId : null);
+  const contactQuery = useContact(contactId);
   const contact = contactQuery.data;
   const initiativeId = useCanonicalInitiativeId(contact?.initiative_id);
   useReadOnOpen(Tool.contact, contact?.id);
   useRecordOpen(Tool.contact, contact?.id);
   const canEdit = Boolean(contact?.can.edit);
-  const rename = useUpdateContact(parsedId, {
+  const rename = useUpdateContact(contactId ?? 0, {
     onSuccess: () => toast.success(t("details.saved")),
   });
   const linksQuery = useRelationshipsFor(
-    { type: EndpointKind.contact, id: parsedId },
-    { enabled: validId }
+    { type: EndpointKind.contact, id: contactId ?? 0 },
+    { enabled: contactId !== null }
   );
   const links: RelatedLinks = { rows: linksQuery.data ?? [], isLoading: linksQuery.isLoading };
   const organization = organizationOf(links.rows);
@@ -409,7 +408,7 @@ export function ContactDetailPage() {
       : Boolean(initiative?.can.create.includes(Tool.contact));
 
   const [moving, setMoving] = useState(false);
-  const move = useMoveContact(parsedId, {
+  const move = useMoveContact(contactId ?? 0, {
     onSuccess: (moved) => {
       setMoving(false);
       toast.success(t("move.moved"));
@@ -417,14 +416,14 @@ export function ContactDetailPage() {
     },
   });
 
-  if (!validId || contactQuery.isError) {
+  if (contactId === null || contactQuery.isError) {
     return (
       <ToolAccessStatus
         error={contactQuery.error}
         keys="contacts:"
         backTo={gp(toolListRoute(Tool.contact, initiativeId))}
         backLabel={t("backToContacts")}
-        entity={{ kind: "contact", id: parsedId }}
+        entity={contactId === null ? undefined : { kind: "contact", id: contactId }}
       />
     );
   }

@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useLocation, useNavigate, useSearch } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
 import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,6 +32,7 @@ import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves } from "@/hooks/useProperties";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useAddWikiPage, useUpdateWikiPage, useWiki, useWikiPage } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
@@ -79,15 +80,9 @@ export const WikiPageView = () => {
   const { t } = useTranslation(["wikis", "common", "properties", "editor"]);
   const communityId = useActiveCommunityId();
   const gp = useCommunityPath();
-  const {
-    wikiId: wikiIdParam,
-    pageId: pageIdParam,
-    initiativeId: initiativeIdParam,
-  } = useParams({ strict: false }) as {
-    wikiId?: string;
-    pageId?: string;
-    initiativeId?: string;
-  };
+  const wikiId = useRouteId("wikiId");
+  const pageId = useRouteId("pageId");
+  const initiativeId = useRouteId("initiativeId");
 
   // Reading or writing. Kept in the address, because the bar over the page and
   // the page's row in the tree both offer it from different React trees, and
@@ -96,11 +91,7 @@ export const WikiPageView = () => {
   const { edit } = useSearch({ strict: false }) as { edit?: true };
   const editWanted = edit === true;
 
-  const wikiId = Number(wikiIdParam);
-  const pageId = Number(pageIdParam);
-  const initiativeId = Number(initiativeIdParam);
-  const validIds = Number.isFinite(wikiId) && Number.isFinite(pageId);
-  const pageRef = { type: SearchEntityType.wiki_page, id: pageId };
+  const validIds = wikiId !== null && pageId !== null && initiativeId !== null;
 
   // The newest body regardless of whether it has been sent, which is what the
   // reading view is shown the moment somebody stops writing. The server hears
@@ -125,7 +116,7 @@ export const WikiPageView = () => {
   const pageQuery = useWikiPage(validIds ? pageId : null);
   // `mutate` is referentially stable, so effects can depend on it without
   // re-running every render the way the mutation object would make them.
-  const { mutate: savePage } = useUpdateWikiPage(wikiId, pageId);
+  const { mutate: savePage } = useUpdateWikiPage(wikiId ?? 0, pageId ?? 0);
 
   const canWrite = Boolean(wikiQuery.data?.can.edit);
   const initiativeQuery = useInitiative(wikiQuery.data?.initiative_id ?? null);
@@ -210,7 +201,7 @@ export const WikiPageView = () => {
 
   const onBodyChange = useCallback(
     (state: SerializedEditorState) => {
-      if (!canWrite) return;
+      if (!canWrite || pageId === null) return;
       pendingBody.current = { pageId, state };
       latestBody.current = { pageId, state };
       setBodyRevision((revision) => revision + 1);
@@ -224,7 +215,7 @@ export const WikiPageView = () => {
   // rather than treating that moment as a page of its own.
   const bodyOwner = useRef(pageId);
   useEffect(() => {
-    if (!Number.isFinite(pageId) || bodyOwner.current === pageId) return;
+    if (pageId === null || bodyOwner.current === pageId) return;
     bodyOwner.current = pageId;
     pendingBody.current = null;
     latestBody.current = null;
@@ -346,7 +337,7 @@ export const WikiPageView = () => {
   // screen waits to be asked rather than opening a drawer on arrival.
   const [railAsked, setRailAsked] = useState(false);
 
-  const createPage = useAddWikiPage(wikiId, initiativeId);
+  const createPage = useAddWikiPage(wikiId ?? 0, initiativeId ?? 0);
   const navigate = useNavigate();
   const addPage = () => createPage.mutate({});
 
@@ -354,11 +345,11 @@ export const WikiPageView = () => {
   // the inside of one.
   useRegisterPrimaryCreateAction(canWrite ? { run: addPage, label: t("pages.newPage") } : null);
 
-  if (!validIds || pageQuery.isError) {
+  if (wikiId === null || pageId === null || initiativeId === null || pageQuery.isError) {
     return (
       <NeedAccessOr
         error={pageQuery.error}
-        entity={validIds ? { kind: "wiki_page", id: pageId } : undefined}
+        entity={pageId === null ? undefined : { kind: "wiki_page", id: pageId }}
       >
         <Card className="mx-auto mt-10 max-w-md">
           <CardHeader>
@@ -381,6 +372,7 @@ export const WikiPageView = () => {
     );
   }
 
+  const pageRef = { type: SearchEntityType.wiki_page, id: pageId };
   const isComfortable = wiki.reading_width === WikiReadingWidth.comfortable;
   // Asked for, allowed by the wiki, and there is a page to have connections.
   const railOpen = showConnections && wiki.show_connections && Boolean(page);
@@ -543,7 +535,7 @@ export const WikiPageView = () => {
                       // between sweeps for anyone reading it over REST.
                       trackChanges
                       hasSynced={collaboration.hasSynced}
-                      initiativeId={Number.isFinite(initiativeId) ? initiativeId : null}
+                      initiativeId={initiativeId}
                       subject={`wiki_page:${pageId}`}
                       supportsEntityMentions
                       // Being read, the body has no sheet of its own and the

@@ -82,6 +82,7 @@ import {
 } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useUpdateTask } from "@/hooks/useTasks";
 import { listLayouts, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
@@ -953,9 +954,8 @@ export function CommunityCalendarsPage() {
  * the same calendar page with that calendar forced visible, recorded as a
  * recent open. */
 export function CalendarFocusPage() {
-  const { calendarId: calendarIdParam } = useParams({ strict: false });
-  const calendarId = Number(calendarIdParam);
-  const calendarQuery = useCalendar(Number.isFinite(calendarId) ? calendarId : null);
+  const calendarId = useRouteId("calendarId");
+  const calendarQuery = useCalendar(calendarId);
   const calendar = calendarQuery.data;
   const { t } = useTranslation("calendars");
   const gp = useCommunityPath();
@@ -980,7 +980,7 @@ export function CalendarFocusPage() {
         keys="calendars:"
         backTo={gp(toolListRoute(Tool.calendar, initiativeId))}
         backLabel={t("backToEvents")}
-        entity={{ kind: "calendar", id: calendarId }}
+        entity={calendarId === null ? undefined : { kind: "calendar", id: calendarId }}
       />
     );
   }

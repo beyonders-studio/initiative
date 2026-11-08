@@ -4,7 +4,6 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useParams } from "@tanstack/react-router";
 import { ArrowDownUp, LayoutGrid, List, Plus, RotateCcw } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -41,6 +40,7 @@ import { layoutViewSpec, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useToolRealtime } from "@/hooks/useResourceRealtime";
+import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { pickRandomCounterColor } from "@/lib/counter-color";
@@ -63,10 +63,7 @@ const layoutStorageKey = (groupId: number) => `counter-group-${groupId}-layout`;
 export function CounterGroupDetailPage() {
   const { t } = useTranslation(["counterGroups", "common"]);
   const gp = useCommunityPath();
-  const { counterGroupId: groupIdParam } = useParams({ strict: false }) as {
-    counterGroupId?: string;
-  };
-  const groupId = groupIdParam ? Number(groupIdParam) : null;
+  const groupId = useRouteId("counterGroupId");
 
   const groupQuery = useCounterGroup(groupId);
   useToolRealtime(Tool.counter_group, groupId);
@@ -162,8 +159,6 @@ export function CounterGroupDetailPage() {
     return (max + 1).toFixed(10);
   }, [counters]);
 
-  if (groupId === null) return null;
-
   if (groupQuery.isLoading) {
     return (
       <SkeletonRegion label={t("loadingGroup")}>
@@ -174,7 +169,7 @@ export function CounterGroupDetailPage() {
     );
   }
 
-  if (groupQuery.isError || !group) {
+  if (groupId === null || groupQuery.isError || !group) {
     return (
       <ToolAccessStatus
         error={groupQuery.error}
