@@ -405,6 +405,19 @@ class CaseEvidenceRead(EvidenceRead):
     from_requester: bool = False
 
 
+class CaseIdeaRead(SanitizedBaseModel):
+    """The idea a feedback case is joined to."""
+
+    task_id: int
+    title: str
+
+
+class IdeaJoin(SanitizedBaseModel):
+    """The idea on the Ideas board to join a case or another idea to."""
+
+    idea_task_id: int
+
+
 class TaskCaseRead(SanitizedBaseModel):
     """How an operations case was filed, for the people working it."""
 
@@ -434,6 +447,11 @@ class TaskCaseRead(SanitizedBaseModel):
     grants: List[AccessGrantRead] = Field(default_factory=list)
     #: How many voted for it, on a published idea; absent on any other case.
     votes: Optional[int] = None
+    #: The Ideas board's project, on a feedback case or an idea where the board
+    #: is set up: what it may be joined to.
+    ideas_board_id: Optional[int] = None
+    #: The idea a feedback case is joined to.
+    joined_idea: Optional[CaseIdeaRead] = None
     #: What the case is about, as it was opened with: the community, and the
     #: kind and id of the thing in it, where it names them.
     subject_community_id: Optional[int] = None

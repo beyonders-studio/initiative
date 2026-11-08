@@ -25,6 +25,7 @@ import type {
   IdeaListRead,
   IdeaRead,
   ListIdeasParams,
+  SimilarIdeasParams,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
@@ -165,7 +166,128 @@ export function useListIdeas<
 }
 
 /**
- * One published idea, with its description.
+ * The open published ideas whose title is close to ``text``, closest
+ * first: what somebody writing feedback may vote for instead.
+ * @summary Similar Ideas
+ */
+export const similarIdeas = (
+  params: SimilarIdeasParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<IdeaRead[]>(
+    { url: `/api/v1/ideas/similar`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getSimilarIdeasQueryKey = (params?: SimilarIdeasParams) => {
+  return [`/api/v1/ideas/similar`, ...(params ? [params] : [])] as const;
+};
+
+export const getSimilarIdeasQueryOptions = <
+  TData = Awaited<ReturnType<typeof similarIdeas>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: SimilarIdeasParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof similarIdeas>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSimilarIdeasQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof similarIdeas>>> = ({ signal }) =>
+    similarIdeas(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof similarIdeas>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type SimilarIdeasQueryResult = NonNullable<Awaited<ReturnType<typeof similarIdeas>>>;
+export type SimilarIdeasQueryError = ErrorType<HTTPValidationError>;
+
+export function useSimilarIdeas<
+  TData = Awaited<ReturnType<typeof similarIdeas>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: SimilarIdeasParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof similarIdeas>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof similarIdeas>>,
+          TError,
+          Awaited<ReturnType<typeof similarIdeas>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useSimilarIdeas<
+  TData = Awaited<ReturnType<typeof similarIdeas>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: SimilarIdeasParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof similarIdeas>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof similarIdeas>>,
+          TError,
+          Awaited<ReturnType<typeof similarIdeas>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useSimilarIdeas<
+  TData = Awaited<ReturnType<typeof similarIdeas>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: SimilarIdeasParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof similarIdeas>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Similar Ideas
+ */
+
+export function useSimilarIdeas<
+  TData = Awaited<ReturnType<typeof similarIdeas>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: SimilarIdeasParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof similarIdeas>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSimilarIdeasQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * One published idea, with its description. An idea joined into another
+ * answers with the one it joined, which has another ``task_id``.
  * @summary Read Idea
  */
 export const readIdea = (

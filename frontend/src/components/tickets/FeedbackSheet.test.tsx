@@ -37,6 +37,14 @@ vi.mock("@/hooks/useTickets", async () => ({
   },
 }));
 
+const similar = vi.hoisted(() => ({ current: [] as unknown[] }));
+const voteMutate = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/useIdeas", async () => ({
+  ...(await vi.importActual<typeof import("@/hooks/useIdeas")>("@/hooks/useIdeas")),
+  useSimilarIdeas: (text: string) => ({ data: text ? similar.current : [] }),
+  useVoteForIdea: () => ({ mutate: voteMutate, isPending: false }),
+}));
+
 vi.mock("@/lib/openExternal", () => ({ openExternal }));
 vi.mock("@/lib/cloud", async () => ({
   ...(await vi.importActual<typeof import("@/lib/cloud")>("@/lib/cloud")),
@@ -68,6 +76,8 @@ describe("FeedbackSheet", () => {
     openExternal.mockClear();
     fileOptions.pending = false;
     feedbackMode.current = "form";
+    similar.current = [];
+    voteMutate.mockReset();
   });
 
   const openAgain = async () => {
@@ -116,11 +126,44 @@ describe("FeedbackSheet", () => {
         body: "Dark print.",
         contactable: true,
         context: expect.objectContaining({ app_version: "0.0.0-test", route: "/c/$communityId" }),
+        idea_task_id: null,
       },
       files: [],
     });
     act(() => fileOptions.current?.onSuccess?.());
     expect(screen.getByText("Thanks for the feedback!")).toHaveFocus();
+  });
+
+  it("offers the ideas like what is written, and joins what is sent to the one voted for", async () => {
+    similar.current = [
+      {
+        task_id: 7,
+        title: "Recurring events skip holidays",
+        status: { id: 1, name: "Planned", color: null, category: "in_progress" },
+        votes: 12,
+        voted: false,
+        closed: false,
+        created_at: "2026-11-08T00:00:00Z",
+      },
+    ];
+    const { user } = await open();
+    const box = await screen.findByLabelText("What would you like Initiative to do?");
+    await user.type(box, "Recurring events should skip holidays");
+    await user.click(
+      await screen.findByRole("button", { name: "Vote for Recurring events skip holidays" })
+    );
+    expect(voteMutate).toHaveBeenCalledWith({ taskId: 7, on: true }, expect.anything());
+    act(() => voteMutate.mock.calls[0][1].onSuccess());
+    expect(
+      screen.getByText("Sending adds what you wrote to “Recurring events skip holidays”.")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Send feedback" }));
+    expect(fileMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ ticket: expect.objectContaining({ idea_task_id: 7 }) })
+    );
+    // Sent, the draft is done with.
+    act(() => fileOptions.current?.onSuccess?.());
   });
 
   it("keeps the kind and the draft when closed, and leaves the app's details out when asked", async () => {

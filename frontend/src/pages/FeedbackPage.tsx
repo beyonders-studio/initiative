@@ -18,7 +18,12 @@ import { type DeviceContext, TicketMode } from "@/api/generated/initiativeAPI.sc
 import { SignInFrame } from "@/components/auth/SignInFrame";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { CONTEXT_FIELDS } from "@/components/tickets/DeviceContext";
-import { EMPTY_DRAFT, type FeedbackDraft, FeedbackForm } from "@/components/tickets/FeedbackForm";
+import {
+  EMPTY_DRAFT,
+  type FeedbackDraft,
+  FeedbackForm,
+  feedbackTicket,
+} from "@/components/tickets/FeedbackForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useServer } from "@/hooks/useServer";
 import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
@@ -105,23 +110,18 @@ export const FeedbackPage = () => {
       <Navigate to="/" replace />
     );
   }
+  // Signing in leaves the page: the words are kept for when it comes back.
+  const signIn = () => {
+    const { files: _, ...words } = form;
+    void setItem(KEPT_KEY, JSON.stringify({ draft: words, context } satisfies Kept));
+    void navigate({ to: "/login", search: { next: "/feedback" } });
+  };
   const send = () => {
     if (!user) {
-      const { files: _, ...words } = form;
-      void setItem(KEPT_KEY, JSON.stringify({ draft: words, context } satisfies Kept));
-      void navigate({ to: "/login", search: { next: "/feedback" } });
+      signIn();
       return;
     }
-    file.mutate({
-      ticket: {
-        stream: "feedback",
-        type: form.kind,
-        body: form.body.trim(),
-        contactable: form.contactable,
-        context: form.withContext ? context : null,
-      },
-      files: form.files,
-    });
+    file.mutate({ ticket: feedbackTicket(form, context), files: form.files });
   };
 
   return (
@@ -138,6 +138,7 @@ export const FeedbackPage = () => {
           sent={sent}
           submitLabel={user ? t("feedback.submit") : t("feedback.signInToSend")}
           onSend={send}
+          onSignIn={signIn}
           onDone={() => void navigate({ to: "/" })}
           thanks={thanks}
         />

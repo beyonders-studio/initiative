@@ -21,7 +21,10 @@ import type {
 import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import {
   getReadTaskCaseQueryKey,
+  joinCaseToIdea,
+  joinIdeaIntoAnother,
   takeTaskCase,
+  unjoinCaseFromIdea,
   useReadTaskCase,
 } from "@/api/generated/tasks/tasks";
 import {
@@ -35,6 +38,7 @@ import {
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
+import { refreshIdeas } from "@/hooks/useIdeas";
 import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -161,6 +165,39 @@ export const useTakeCase = (options?: MutationOpts<TaskRead, number>) =>
       invalidate: (_task, taskId) =>
         Promise.all([invalidate(q.allTasks(), q.task(taskId)), refreshTaskCase(taskId)]),
       errorKey: "intake:case.takeFailed",
+    },
+    options
+  );
+
+/** What joining changes: the case, the lists an idea joined into another
+ *  leaves, and the ideas. */
+const refreshJoined = (taskId: number) =>
+  Promise.all([invalidate(q.allTasks(), q.task(taskId)), refreshTaskCase(taskId), refreshIdeas()]);
+
+/** Join a feedback case to an idea on the Ideas board, in place of any other;
+ *  `null` takes it off. Whoever sent it gets a vote. */
+export const useJoinCaseToIdea = (taskId: number, options?: MutationOpts<void, number | null>) =>
+  useCommunityMutation<void, number | null>(
+    {
+      mutationFn: (communityId, ideaTaskId) =>
+        ideaTaskId == null
+          ? unjoinCaseFromIdea(communityId, taskId)
+          : joinCaseToIdea(communityId, taskId, { idea_task_id: ideaTaskId }),
+      invalidate: () => refreshJoined(taskId),
+      errorKey: "intake:case.idea.failed",
+    },
+    options
+  );
+
+/** Join an idea into another: its votes and feedback move there, and it is
+ *  archived. */
+export const useJoinIdeaInto = (taskId: number, options?: MutationOpts<void, number>) =>
+  useCommunityMutation<void, number>(
+    {
+      mutationFn: (communityId, ideaTaskId) =>
+        joinIdeaIntoAnother(communityId, taskId, { idea_task_id: ideaTaskId }),
+      invalidate: () => refreshJoined(taskId),
+      errorKey: "intake:case.idea.failed",
     },
     options
   );

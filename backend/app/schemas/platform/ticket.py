@@ -155,6 +155,8 @@ class FeedbackTicketCreate(SanitizedBaseModel):
     contactable: bool = False
     #: The device and page they sent it from, where they chose to send it.
     context: Optional[DeviceContext] = None
+    #: The published idea they voted for while writing it, which it joins.
+    idea_task_id: Optional[int] = None
 
 
 def _ticket_kind(value: Any) -> Optional[str]:

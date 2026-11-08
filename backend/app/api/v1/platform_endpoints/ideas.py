@@ -80,13 +80,34 @@ async def list_ideas(
     )
 
 
+@router.get("/similar", response_model=list[IdeaRead])
+async def similar_ideas(
+    reader: OptionalReader,
+    text: Annotated[str, Query(min_length=1, max_length=1000)],
+) -> list[IdeaRead]:
+    """The open published ideas whose title is close to ``text``, closest
+    first: what somebody writing feedback may vote for instead."""
+    try:
+        found = await ideas_service.similar(reader, text)
+    except ideas_service.IdeaNotFound:
+        raise _not_found() from None
+    return [_read(idea) for idea in found]
+
+
 @router.get("/{task_id}", response_model=IdeaRead)
 async def read_idea(task_id: int, reader: OptionalReader) -> IdeaRead:
-    """One published idea, with its description."""
+    """One published idea, with its description. An idea joined into another
+    answers with the one it joined, which has another ``task_id``."""
     try:
         _, idea = await ideas_service.read_idea(reader, task_id)
     except ideas_service.IdeaNotFound:
-        raise _not_found() from None
+        target = await ideas_service.joined_into(task_id)
+        if target is None:
+            raise _not_found() from None
+        try:
+            _, idea = await ideas_service.read_idea(reader, target)
+        except ideas_service.IdeaNotFound:
+            raise _not_found() from None
     return _read(idea)
 
 

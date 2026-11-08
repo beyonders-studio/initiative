@@ -2504,6 +2504,14 @@ export interface CaseEvidenceRead {
 }
 
 /**
+ * The idea a feedback case is joined to.
+ */
+export interface CaseIdeaRead {
+  task_id: number;
+  title: string;
+}
+
+/**
  * One part of the conversation with whoever filed a case.
  */
 export interface CaseMessageRead {
@@ -7188,6 +7196,13 @@ export interface ICalParseResult {
 }
 
 /**
+ * The idea on the Ideas board to join a case or another idea to.
+ */
+export interface IdeaJoin {
+  idea_task_id: number;
+}
+
+/**
  * A status of the Ideas board, under the name the team gave it.
  */
 export interface IdeaStatusRead {
@@ -11547,6 +11562,8 @@ export interface TaskCaseRead {
   evidence?: CaseEvidenceRead[];
   grants?: AccessGrantRead[];
   votes?: number | null;
+  ideas_board_id?: number | null;
+  joined_idea?: CaseIdeaRead | null;
   subject_community_id?: number | null;
   resource_type?: string | null;
   resource_id?: number | null;
@@ -12837,6 +12854,7 @@ export interface FeedbackTicketCreate {
   body: string;
   contactable?: boolean;
   context?: DeviceContext | null;
+  idea_task_id?: number | null;
 }
 
 /**
@@ -12939,6 +12957,14 @@ export type ListIdeasParams = {
    * @maximum 100
    */
   page_size?: number;
+};
+
+export type SimilarIdeasParams = {
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  text: string;
 };
 
 export type RegisterUserParams = {

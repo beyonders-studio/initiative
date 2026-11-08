@@ -24,7 +24,12 @@ from app.api.deps import (
     GuildContextDep,
 )
 from app.core import recurrence
-from app.core.messages import ChecklistMessages, QueryMessages, TaskMessages
+from app.core.messages import (
+    ChecklistMessages,
+    IdeaMessages,
+    QueryMessages,
+    TaskMessages,
+)
 from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id
 from app.models.platform.user import User
@@ -42,8 +47,10 @@ from app.schemas.tenant.task import (
     ChecklistItem,
     ChecklistItemToggle,
     CaseEvidenceRead,
+    CaseIdeaRead,
     CaseMessageRead,
     ColumnFillRead,
+    IdeaJoin,
     TaskCaseRead,
     TaskCreate,
     TaskListResponse,
@@ -62,6 +69,7 @@ from app.services.tenant import column_limits
 from app.services.tenant import overwrites
 from app.services.tenant import required_fields
 from app.services.tenant import cases as cases_service
+from app.services.platform import ideas as ideas_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
@@ -566,6 +574,12 @@ async def read_task_case(
         ],
         grants=await _case_grants(guild_context.guild_id, task_id),
         votes=case.votes,
+        ideas_board_id=case.ideas_board_id,
+        joined_idea=(
+            CaseIdeaRead(task_id=case.joined_idea[0], title=case.joined_idea[1])
+            if case.joined_idea is not None
+            else None
+        ),
     )
 
 
@@ -587,6 +601,71 @@ async def take_task_case(
     _touch_project(task.project, datetime.now(timezone.utc))
     await session.commit()
     return await _response(session, task.id)
+
+
+def _not_an_idea() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=IdeaMessages.NOT_FOUND
+    )
+
+
+@router.put("/{task_id}/idea", status_code=status.HTTP_204_NO_CONTENT)
+async def join_case_to_idea(
+    task_id: int,
+    body: IdeaJoin,
+    session: RLSSessionDep,
+    guild_context: GuildContextDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> None:
+    """Join a feedback case to an idea on the Ideas board, in place of any
+    other: whoever sent it gets a vote, and hears when the idea moves. 404 for
+    a task that is no feedback case, or an idea not on the board."""
+    case = await resource_access.load_child(session, Task, task_id, access="write")
+    await resource_access.load_child(session, Task, body.idea_task_id, access="write")
+    try:
+        await ideas_service.join(session, case, body.idea_task_id, by=current_user.id)
+    except ideas_service.NotOnTheBoard:
+        raise _not_an_idea() from None
+    await session.commit()
+
+
+@router.delete("/{task_id}/idea", status_code=status.HTTP_204_NO_CONTENT)
+async def unjoin_case_from_idea(
+    task_id: int,
+    session: RLSSessionDep,
+    guild_context: GuildContextDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> None:
+    """Take a feedback case off the idea it is joined to. Its sender's vote
+    stays."""
+    case = await resource_access.load_child(session, Task, task_id, access="write")
+    try:
+        await ideas_service.unjoin(session, case, by=current_user.id)
+    except ideas_service.NotOnTheBoard:
+        raise _not_an_idea() from None
+    await session.commit()
+
+
+@router.post("/{task_id}/idea/join-into", status_code=status.HTTP_204_NO_CONTENT)
+async def join_idea_into_another(
+    task_id: int,
+    body: IdeaJoin,
+    session: RLSSessionDep,
+    guild_context: GuildContextDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> None:
+    """Join an idea into another on the Ideas board: its votes and the
+    feedback joined to it move there, and it is archived, its page opening
+    the other. 404 for a task that is not on the board."""
+    source = await resource_access.load_child(session, Task, task_id, access="write")
+    await resource_access.load_child(session, Task, body.idea_task_id, access="write")
+    try:
+        await ideas_service.join_into(
+            session, source, body.idea_task_id, by=current_user.id
+        )
+    except ideas_service.NotOnTheBoard:
+        raise _not_an_idea() from None
+    await session.commit()
 
 
 async def _case_grants(guild_id: int, task_id: int) -> list[AccessGrantRead]:

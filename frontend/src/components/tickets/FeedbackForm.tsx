@@ -2,8 +2,9 @@
  * What feedback asks for, in the sheet and on Initiative Cloud's page: the
  * kind first, an idea to start, which picks the question the box asks and
  * keeps what was written when it changes; the box, with pictures where they
- * are taken; whether the team may contact the sender; and the device and page
- * it was sent from, theirs to leave out. Once sent, the thanks.
+ * are taken, and under an idea the published ideas like it; whether the team
+ * may contact the sender; and the device and page it was sent from, theirs to
+ * leave out. Once sent, the thanks.
  */
 
 import { Link } from "@tanstack/react-router";
@@ -14,22 +15,32 @@ import { useTranslation } from "react-i18next";
 import {
   type DeviceContext,
   type EvidencePolicyRead,
+  type FeedbackTicketCreate,
   FeedbackTopic,
   SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
 import proudSvg from "@/assets/yonder/proud.svg";
 import talkingSvg from "@/assets/yonder/talking.svg";
+import { IdeaStatusBadge, VoteButton } from "@/components/ideas/IdeaParts";
 import { HelpLink } from "@/components/support/HelpLink";
 import { DeviceContextSwitch } from "@/components/tickets/DeviceContext";
 import { TicketComposer } from "@/components/tickets/TicketComposer";
+import { useSimilarIdeas } from "@/hooks/useIdeas";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Match the column behind it, so the box stops where the server would. */
 const BODY_MAX = 5000;
+
+/** How much of what is written the ideas like it are found by, as the
+ *  server takes it: an idea is said at the start. */
+const MATCH_TEXT = 1000;
+/** How many words are written before ideas like them are looked for. */
+const MATCH_WORDS = 3;
 
 /** The kinds, in the order they are offered, each with its picture. */
 const KINDS: [FeedbackTopic, LucideIcon][] = [
@@ -44,6 +55,8 @@ export interface FeedbackDraft {
   contactable: boolean;
   withContext: boolean;
   files: File[];
+  /** The published idea voted for while writing, which sending joins. */
+  idea?: { task_id: number; title: string } | null;
 }
 
 export const EMPTY_DRAFT: FeedbackDraft = {
@@ -52,6 +65,77 @@ export const EMPTY_DRAFT: FeedbackDraft = {
   contactable: false,
   withContext: true,
   files: [],
+  idea: null,
+};
+
+/** What sending `draft` files. */
+export const feedbackTicket = (
+  draft: FeedbackDraft,
+  context: DeviceContext | null
+): FeedbackTicketCreate => ({
+  stream: "feedback",
+  type: draft.kind,
+  body: draft.body.trim(),
+  contactable: draft.contactable,
+  context: draft.withContext ? context : null,
+  idea_task_id: draft.kind === FeedbackTopic.idea ? (draft.idea?.task_id ?? null) : null,
+});
+
+/**
+ * The open published ideas like what is being written. Voting for one keeps
+ * it on the draft, so sending joins what was written to it.
+ */
+const IdeasLikeThis = ({
+  draft,
+  onChange,
+  onSignIn,
+}: {
+  draft: FeedbackDraft;
+  onChange: (next: Partial<FeedbackDraft>) => void;
+  onSignIn?: () => void;
+}) => {
+  const { t } = useTranslation("intake");
+  const text = useDebouncedValue(draft.body.trim().slice(0, MATCH_TEXT), 400);
+  const enough = text.split(/\s+/).filter(Boolean).length >= MATCH_WORDS;
+  const { data: matches = [] } = useSimilarIdeas(enough ? text : "");
+  if (!matches.length && !draft.idea) return null;
+  return (
+    <div className="space-y-2">
+      <p className="font-medium text-sm">{t("feedback.matches")}</p>
+      <ul className="space-y-1.5">
+        {matches.map((idea) => (
+          <li key={idea.task_id} className="flex items-center gap-3 rounded-md border px-3 py-2">
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="font-medium text-sm">{idea.title}</p>
+              <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+                <IdeaStatusBadge status={idea.status} />
+                <span>{t("ideas.votes", { count: idea.votes })}</span>
+              </div>
+            </div>
+            <VoteButton
+              idea={idea}
+              next="/feedback"
+              onSignIn={onSignIn}
+              onVoted={(on) =>
+                onChange({
+                  idea: on
+                    ? { task_id: idea.task_id, title: idea.title }
+                    : draft.idea?.task_id === idea.task_id
+                      ? null
+                      : draft.idea,
+                })
+              }
+            />
+          </li>
+        ))}
+      </ul>
+      {draft.idea ? (
+        <p className="text-muted-foreground text-xs">
+          {t("feedback.joins", { title: draft.idea.title })}
+        </p>
+      ) : null}
+    </div>
+  );
 };
 
 interface FeedbackFormProps {
@@ -69,6 +153,9 @@ interface FeedbackFormProps {
   /** The community a problem's "ask for help" is asked in; left out, the
    *  form offers no help. */
   help?: { communityId: number | null };
+  /** Keeps the draft and sends somebody signed out to sign in, where voting
+   *  for an idea like theirs would otherwise lose it. */
+  onSignIn?: () => void;
   pending: boolean;
   sent: boolean;
   /** What the send button says. */
@@ -88,6 +175,7 @@ export const FeedbackForm = ({
   evidence,
   pagePicture,
   help,
+  onSignIn,
   pending,
   sent,
   submitLabel,
@@ -181,6 +269,9 @@ export const FeedbackForm = ({
             {t("feedback.contactable")}
           </Label>
         </div>
+        {draft.kind === FeedbackTopic.idea ? (
+          <IdeasLikeThis draft={draft} onChange={onChange} onSignIn={onSignIn} />
+        ) : null}
         {/* An idea may already be on the Ideas page, waiting for a vote. */}
         {draft.kind === FeedbackTopic.idea ? (
           <Link

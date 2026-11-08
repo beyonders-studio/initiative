@@ -258,6 +258,7 @@ async def _send_feedback(
             contactable=payload.contactable,
             context=payload.context,
             evidence=attached,
+            idea_task_id=payload.idea_task_id,
         )
     except feedback_service.NowhereToSend as exc:
         raise HTTPException(

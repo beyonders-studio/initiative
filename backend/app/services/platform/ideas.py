@@ -25,17 +25,23 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.intake import IntakeStream, meta, offered_streams
+from app.core.intake import CaseField, IntakeStream, meta, offered_streams
 from app.core.rate_limit import take_allowance
+from app.core.relationships import EndpointKind, RelationshipType
 from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
-from app.models.tenant.intake import IdeaVote, IntakeBinding
+from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
+from app.models.tenant.metadata import MetadataDefinition, MetadataValue
+from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import notice_outbox
 from app.services.platform.intake import configured_operations_guild_id
+from app.services.tenant import relationships
+from app.services.tenant.archive import archive_entity
+from app.services.tenant.search import FUZZY_THRESHOLD
 
 #: The counter namespace a vote's pace is kept under.
 _PACE_NAMESPACE = "ideas"
@@ -51,6 +57,11 @@ class VoteRefused(Exception):
 
 class VotingTooFast(Exception):
     """This account has voted as often as its pace allows."""
+
+
+class NotOnTheBoard(Exception):
+    """A join names a task that is not on the Ideas board, or joins something
+    that is not feedback."""
 
 
 class IdeaSort(str, Enum):
@@ -277,6 +288,73 @@ async def read_idea(user: Optional[User], task_id: int) -> tuple[int, IdeaRead]:
     return guild_id, _read(row)
 
 
+async def similar(user: Optional[User], text: str) -> list[IdeaRead]:
+    """The open published ideas whose title is close to ``text``, closest
+    first: what somebody writing feedback may vote for instead. Close either
+    way round, so a few words find a longer title and a long draft finds a
+    short one; the threshold decides what shows, not a count."""
+    async with _as_reader(user) as session:
+        if session is None:
+            raise IdeaNotFound
+        query, _, _ = _ideas_query(user)
+        closeness = func.greatest(
+            func.word_similarity(Task.title, text),
+            func.word_similarity(text, Task.title),
+        )
+        rows = (
+            await session.exec(
+                query.where(closeness >= FUZZY_THRESHOLD)
+                .where(
+                    cast(TaskStatus.category, String) != TaskStatusCategory.done.value
+                )
+                .order_by(closeness.desc(), Task.id.desc())
+            )
+        ).all()
+    return [_read(row) for row in rows]
+
+
+async def joined_into(task_id: int) -> Optional[int]:
+    """The published idea an idea joined into another now is, following each
+    join, so its old page opens it; ``None`` for any other task. A joined idea
+    is archived, with a ``part_of`` edge to the one it joined."""
+    guild_id = await configured_operations_guild_id() if board_open() else None
+    if guild_id is None:
+        return None
+    async with cohorts.system_session(guild_id) as session:
+        await set_rls_context(session, SystemGuild(guild_id))
+        seen: set[int] = set()
+        current = task_id
+        while current not in seen:
+            seen.add(current)
+            following = (
+                await session.exec(
+                    _edges_into_board(
+                        select(EntityRelationship.target_id).join(
+                            Task, Task.id == EntityRelationship.source_id
+                        )
+                    )
+                    .where(EntityRelationship.source_type == EndpointKind("task").value)
+                    .where(EntityRelationship.source_id == current)
+                    .where(Task.project_id == _board_project())
+                    .where(Task.archived_at.is_not(None))  # type: ignore[union-attr]
+                    .order_by(EntityRelationship.id.desc())
+                )
+            ).first()
+            if following is None:
+                return None
+            public = (
+                await session.exec(
+                    _public(select(Task.id).select_from(Task)).where(
+                        Task.id == following
+                    )
+                )
+            ).first()
+            if public is not None:
+                return following
+            current = following
+    return None
+
+
 async def vote(user: User, task_id: int, *, on: bool) -> IdeaRead:
     """Vote for an open published idea, or take the vote back.
 
@@ -355,6 +433,257 @@ async def published(session: AsyncSession, task_id: int) -> Optional[Any]:
             )
         )
     ).first()
+
+
+def _board_project():
+    """The project bound to ``ideas``, as a subquery."""
+    return (
+        select(IntakeBinding.project_id)
+        .where(IntakeBinding.stream == IntakeStream.ideas.value)
+        .scalar_subquery()
+    )
+
+
+def _edges_into_board(query):
+    """``query`` over live ``part_of`` edges whose target is a task on the
+    Ideas board."""
+    return (
+        query.where(
+            EntityRelationship.relationship_type == RelationshipType.part_of.value
+        )
+        .where(EntityRelationship.target_type == EndpointKind("task").value)
+        .where(EntityRelationship.removed_at.is_(None))  # type: ignore[union-attr]
+        .where(
+            EntityRelationship.target_id.in_(  # type: ignore[attr-defined]
+                select(Task.id).where(Task.project_id == _board_project())
+            )
+        )
+    )
+
+
+async def board_project(session: AsyncSession) -> Optional[int]:
+    """The Ideas board's project, where this server has one and it is bound,
+    on the team's own session."""
+    if not board_open():
+        return None
+    return (await session.exec(select(_board_project()))).first()
+
+
+async def _board_task(session: AsyncSession, task_id: int) -> Task:
+    task = (
+        await session.exec(
+            select(Task)
+            .where(Task.id == task_id)
+            .where(Task.project_id == _board_project())
+        )
+    ).first()
+    if task is None:
+        raise NotOnTheBoard
+    return task
+
+
+async def _joins(session: AsyncSession, case_task_id: int) -> list[EntityRelationship]:
+    """The live edges joining feedback case ``case_task_id`` to an idea."""
+    return list(
+        (
+            await session.exec(
+                _edges_into_board(select(EntityRelationship))
+                .where(EntityRelationship.source_type == EndpointKind("task").value)
+                .where(EntityRelationship.source_id == case_task_id)
+                .order_by(EntityRelationship.id)
+            )
+        ).all()
+    )
+
+
+async def joined_idea(session: AsyncSession, case_task_id: int) -> Optional[Task]:
+    """The idea feedback case ``case_task_id`` is joined to, on the team's own
+    session."""
+    joins = await _joins(session, case_task_id)
+    if not joins:
+        return None
+    return (
+        await session.exec(select(Task).where(Task.id == joins[-1].target_id))
+    ).first()
+
+
+async def _feedback(session: AsyncSession, task_id: int) -> None:
+    """Refuse a task that is not a feedback case, or a community with no
+    Ideas board."""
+    from app.services.tenant.cases import holds_cases
+
+    if not board_open() or not await holds_cases(session):
+        raise NotOnTheBoard
+    stream = (
+        await session.exec(
+            select(IntakeCase.stream).where(IntakeCase.task_id == task_id)
+        )
+    ).first()
+    if stream != IntakeStream.feedback.value:
+        raise NotOnTheBoard
+
+
+async def _sender(session: AsyncSession, case_task_id: int) -> Optional[int]:
+    """Who sent feedback case ``case_task_id``: its ``subject_user``, which it
+    holds whether or not they offered to be contacted."""
+    value = (
+        await session.exec(
+            select(MetadataValue.value_number)
+            .join(
+                MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id
+            )
+            .where(MetadataValue.entity_type == "task")
+            .where(MetadataValue.entity_id == case_task_id)
+            .where(MetadataDefinition.name == CaseField.subject_user.value)
+        )
+    ).first()
+    return int(value) if value is not None else None
+
+
+def _task(task_id: int) -> relationships.Endpoint:
+    return relationships.Endpoint(EndpointKind("task"), task_id)
+
+
+async def join(
+    session: AsyncSession, case: Task, idea_task_id: int, *, by: Optional[int]
+) -> None:
+    """Join feedback case ``case`` to the idea ``idea_task_id`` on the Ideas
+    board, published or not: a ``part_of`` edge from the case to the idea, in
+    place of any to another idea, and a vote for whoever sent it, where the
+    idea is open and they have none. Joined, they hear when the idea moves,
+    whether or not they offered to be contacted. The caller commits.
+
+    Raises :class:`NotOnTheBoard`.
+    """
+    await _feedback(session, case.id)
+    idea = await _board_task(session, idea_task_id)
+    joined = False
+    for edge in await _joins(session, case.id):
+        if edge.target_id == idea.id:
+            joined = True
+        else:
+            await relationships.remove(session, edge, removed_by=by)
+    if not joined:
+        await relationships.create(
+            session,
+            source=_task(case.id),
+            relationship_type=RelationshipType.part_of,
+            target=_task(idea.id),
+            created_by=by,
+        )
+    sender = await _sender(session, case.id)
+    category = (
+        await session.exec(
+            select(TaskStatus.category).where(TaskStatus.id == idea.task_status_id)
+        )
+    ).one()
+    if sender is not None and category != TaskStatusCategory.done:
+        await session.exec(
+            pg_insert(IdeaVote)
+            .values(
+                task_id=idea.id,
+                user_id=sender,
+                voted_at=datetime.now(timezone.utc),
+                notified_status_id=idea.task_status_id,
+            )
+            .on_conflict_do_nothing(constraint="uq_idea_votes_task_user")
+        )
+
+
+async def unjoin(session: AsyncSession, case: Task, *, by: Optional[int]) -> None:
+    """Take feedback case ``case`` off the idea it is joined to. Its sender's
+    vote stays: taking it back is theirs. The caller commits.
+
+    Raises :class:`NotOnTheBoard`.
+    """
+    await _feedback(session, case.id)
+    for edge in await _joins(session, case.id):
+        await relationships.remove(session, edge, removed_by=by)
+
+
+async def join_sent(case_task_id: int, idea_task_id: int, sender: User) -> None:
+    """Join feedback just sent to the published idea its sender voted for
+    while writing it. Nothing where that idea is not published: the feedback
+    stands on its own."""
+    try:
+        guild_id, _ = await read_idea(sender, idea_task_id)
+    except IdeaNotFound:
+        return
+    async with cohorts.system_session(guild_id) as session:
+        await set_rls_context(session, SystemGuild(guild_id))
+        case = (await session.exec(select(Task).where(Task.id == case_task_id))).one()
+        await join(session, case, idea_task_id, by=sender.id)
+        await session.commit()
+
+
+async def join_into(
+    session: AsyncSession, source: Task, target_task_id: int, *, by: Optional[int]
+) -> None:
+    """Join idea ``source`` into ``target_task_id``, both on the Ideas board.
+    Its votes move to the target, each voter's once, as does everything that
+    is part of it, the feedback joined to it among them. It is then part of
+    the target and archived, so it leaves the Ideas page and its page opens
+    the target. The caller commits.
+
+    Raises :class:`NotOnTheBoard`.
+    """
+    from app.services.tenant.cases import holds_cases
+
+    if not board_open() or not await holds_cases(session):
+        raise NotOnTheBoard
+    await _board_task(session, source.id)
+    target = await _board_task(session, target_task_id)
+    if target.id == source.id:
+        raise NotOnTheBoard
+    # Each vote keeps the status its voter was last told about: both ideas
+    # are on one board, so the next pass tells them where the target stands.
+    await session.exec(
+        pg_insert(IdeaVote)
+        .from_select(
+            ["task_id", "user_id", "voted_at", "notified_status_id"],
+            select(
+                literal(target.id),
+                IdeaVote.user_id,
+                IdeaVote.voted_at,
+                IdeaVote.notified_status_id,
+            ).where(IdeaVote.task_id == source.id),
+        )
+        .on_conflict_do_nothing(constraint="uq_idea_votes_task_user")
+    )
+    await session.exec(
+        delete(IdeaVote).where(IdeaVote.task_id == source.id)  # type: ignore[arg-type]
+    )
+    parts = (
+        await session.exec(
+            select(EntityRelationship)
+            .where(
+                EntityRelationship.relationship_type == RelationshipType.part_of.value
+            )
+            .where(EntityRelationship.target_type == EndpointKind("task").value)
+            .where(EntityRelationship.target_id == source.id)
+            .where(EntityRelationship.removed_at.is_(None))  # type: ignore[union-attr]
+        )
+    ).all()
+    for edge in parts:
+        await relationships.remove(session, edge, removed_by=by, tombstone=False)
+        if not (edge.source_type == "task" and edge.source_id == target.id):
+            await relationships.create(
+                session,
+                source=relationships.Endpoint(
+                    EndpointKind(edge.source_type), edge.source_id
+                ),
+                relationship_type=RelationshipType.part_of,
+                target=_task(target.id),
+                created_by=by,
+            )
+    await relationships.create(
+        session,
+        source=_task(source.id),
+        relationship_type=RelationshipType.part_of,
+        target=_task(target.id),
+        created_by=by,
+    )
+    await archive_entity(session, source)
 
 
 async def voter_notices(session: AsyncSession) -> list[dict[str, Any]]:
