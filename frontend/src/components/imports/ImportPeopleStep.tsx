@@ -1,7 +1,8 @@
 import { MessageSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { MemberSelect } from "@/components/members/MemberSearchSelect";
+import { useSearchMembers } from "@/hooks/useUsers";
+import { MemberPicker } from "@/ui/member-picker";
 
 /** One row of the plan's `people` list.
  *
@@ -35,6 +36,7 @@ export interface ImportPeopleStepProps {
  * keep the name they arrived with and are credited to no account at all. */
 export function ImportPeopleStep({ people, value, onChange }: ImportPeopleStepProps) {
   const { t } = useTranslation("imports");
+  const searchMembers = useSearchMembers();
 
   return (
     <div className="space-y-4">
@@ -58,7 +60,8 @@ export function ImportPeopleStep({ people, value, onChange }: ImportPeopleStepPr
                   </span>
                 )}
               </p>
-              <MemberSelect
+              <MemberPicker
+                searchMembers={searchMembers}
                 scope={{ type: "community" }}
                 value={value[person.handle] ?? null}
                 onChange={(id) => onChange({ ...value, [person.handle]: id })}

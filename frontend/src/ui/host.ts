@@ -1,7 +1,7 @@
 import { type ComponentType, createElement, type ReactNode, useSyncExternalStore } from "react";
 
 import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
-import type { Member } from "@/ui/properties/PropertyInput";
+import type { Member } from "@/ui/member-picker";
 import type { UserValue } from "@/ui/properties/propertyHelpers";
 
 /**

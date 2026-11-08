@@ -73,6 +73,9 @@
     "zoomOut": "Verkleinern",
     "close": "Schließen"
   },
+  "memberPicker": {
+    "userWithId": "Benutzer #{{id}}"
+  },
   "multiSelect": {
     "empty": "Keine Optionen verfügbar",
     "allSelected": "Alle ausgewählt",

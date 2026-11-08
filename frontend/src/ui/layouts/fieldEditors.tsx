@@ -26,14 +26,11 @@ import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { host } from "@/ui/host";
 import { cn } from "@/ui/lib/utils";
+import type { SearchMembers } from "@/ui/member-picker";
 import { AddPropertyButton } from "@/ui/properties/AddPropertyButton";
 import type { FileFieldFiles } from "@/ui/properties/FileFieldInput";
 import type { CreateProperty } from "@/ui/properties/NewPropertyForm";
-import {
-  PropertyInput,
-  type PropertyInputProps,
-  type SearchMembers,
-} from "@/ui/properties/PropertyInput";
+import { PropertyInput, type PropertyInputProps } from "@/ui/properties/PropertyInput";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
 import {
   isEmptyPropertyValue,
