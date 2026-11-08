@@ -48,6 +48,7 @@ from app.db.request_context import (
     Billing,
     ContentGrantee,
     Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
@@ -194,6 +195,16 @@ async def _as_filer(w: World, s) -> None:
     await set_rls_context(s, Filer(guild_id=w.guild_id, user_id=w.member_id))
 
 
+async def _as_idea_reader(w: World, s) -> None:
+    """Anybody reading the published ideas from outside the community: its
+    ideas role, provisioned as choosing it for operations work does."""
+    from app.db import operations_schema
+
+    await operations_schema.provision_operations(w.guild_id)
+    _FILER_GUILDS.append(w.guild_id)
+    await set_rls_context(s, IdeaReader(guild_id=w.guild_id, user_id=w.member_id))
+
+
 def _as(user: str, **kwargs) -> Route:
     return lambda w, s: route_as(
         s, user_id=getattr(w, f"{user}_id"), guild_id=w.guild_id, **kwargs
@@ -264,6 +275,16 @@ SCENARIOS: tuple[Scenario, ...] = (
     # Their cases' columns and nothing of the projects: refused outright.
     Scenario(
         "filer", Filer, "app_user", _as_filer, _NONE, _NONE, names_community=False
+    ),
+    # Published ideas' columns and nothing of the projects: refused outright.
+    Scenario(
+        "idea reader",
+        IdeaReader,
+        "app_user",
+        _as_idea_reader,
+        _NONE,
+        _NONE,
+        names_community=False,
     ),
     Scenario(
         "billing",

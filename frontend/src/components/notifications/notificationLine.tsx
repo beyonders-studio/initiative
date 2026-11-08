@@ -612,6 +612,14 @@ export const notificationText = (
             : "notifications.ticketMoving";
       return t(key, { subject: subject ?? t("notifications.ticketUnnamed") });
     }
+    case "idea_updated":
+      return t("notifications.ideaMoved", {
+        title:
+          typeof data.title === "string" && data.title
+            ? data.title
+            : t("notifications.ideaUnnamed"),
+        status: typeof data.status === "string" ? data.status : "",
+      });
     case "community_welcome":
       return t(
         !sellsHere() ? "notifications.communityWelcomeInApp" : "notifications.communityWelcome",

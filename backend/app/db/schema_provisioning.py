@@ -920,11 +920,14 @@ async def drop_guild_schema(conn: AsyncConnection, guild_id: int) -> None:
     await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
     await conn.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
     provisioning_login, _ = settings.database_login("DATABASE_URL")
-    from app.db.operations_schema import filer_role_name
+    from app.db.operations_schema import OPERATIONS_ROLES
 
-    # The filer role is created only in the operations community, but goes
-    # with whichever community holds it.
-    roles = (*_guild_roles(guild_id), filer_role_name(guild_id))
+    # The reader roles are created only in the operations community, but go
+    # with whichever community holds them.
+    roles = (
+        *_guild_roles(guild_id),
+        *(spec.name(guild_id) for spec in OPERATIONS_ROLES),
+    )
     existing = await _existing_roles(conn, roles)
     for role in roles:
         if role in existing:

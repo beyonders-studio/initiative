@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
-import { renderWithProviders } from "@/__tests__/helpers/render";
+import { renderPage } from "@/__tests__/helpers/render";
 
 const fileMutate = vi.fn();
 const fileOptions = vi.hoisted(() => ({
@@ -70,18 +70,21 @@ describe("FeedbackSheet", () => {
     feedbackMode.current = "form";
   });
 
-  const openAgain = () => act(() => screen.getByRole("button", { name: "Open feedback" }).click());
+  const openAgain = async () => {
+    const button = await screen.findByRole("button", { name: "Open feedback" });
+    act(() => button.click());
+  };
 
   // Each test signs in somebody new, whose draft starts empty.
-  const open = (user = buildUser()) => {
-    const view = renderWithProviders(<Menu />, { auth: { user } });
-    openAgain();
+  const open = async (user = buildUser()) => {
+    const view = renderPage(Menu, { auth: { user } });
+    await openAgain();
     return { ...view, user: userEvent.setup() };
   };
 
-  it("opens Initiative Cloud's page from any other server, with where the app was", () => {
+  it("opens Initiative Cloud's page from any other server, with where the app was", async () => {
     feedbackMode.current = "cloud";
-    open();
+    await open();
     const link = new URL(openExternal.mock.calls[0][0]);
     expect(link.origin + link.pathname).toBe(`${CLOUD_ORIGIN}/feedback`);
     const sent = new URLSearchParams(link.hash.slice(1));
@@ -91,7 +94,7 @@ describe("FeedbackSheet", () => {
   });
 
   it("starts on an idea and sends what was written, the contact choice and where the app was", async () => {
-    const { user } = open();
+    const { user } = await open();
     const box = await screen.findByLabelText("What would you like Initiative to do?");
     expect(box).toHaveFocus();
     expect(screen.getByRole("radio", { name: "Suggest an idea" })).toBeChecked();
@@ -121,7 +124,7 @@ describe("FeedbackSheet", () => {
   });
 
   it("keeps the kind and the draft when closed, and leaves the app's details out when asked", async () => {
-    const { user } = open();
+    const { user } = await open();
     await user.click(await screen.findByRole("radio", { name: "Something's not right" }));
     expect(
       screen.getByRole("button", { name: "Need somebody to sort it out for you? Ask for help" })
@@ -130,7 +133,7 @@ describe("FeedbackSheet", () => {
 
     await user.keyboard("{Escape}");
     expect(screen.queryByLabelText("What got in your way?")).toBeNull();
-    openAgain();
+    await openAgain();
     expect(await screen.findByLabelText("What got in your way?")).toHaveValue(
       "Export drops a row."
     );
@@ -153,7 +156,7 @@ describe("FeedbackSheet", () => {
 
   it("opens a draft again only for the account that wrote it, and stays open while sending", async () => {
     const writer = buildUser();
-    const first = open(writer);
+    const first = await open(writer);
     await first.user.type(
       await screen.findByLabelText("What would you like Initiative to do?"),
       "Dark print."
@@ -161,7 +164,7 @@ describe("FeedbackSheet", () => {
     first.unmount();
 
     fileOptions.pending = true;
-    const again = open(writer);
+    const again = await open(writer);
     expect(await screen.findByLabelText("What would you like Initiative to do?")).toHaveValue(
       "Dark print."
     );
@@ -170,7 +173,7 @@ describe("FeedbackSheet", () => {
     again.unmount();
 
     fileOptions.pending = false;
-    open(buildUser());
+    await open(buildUser());
     expect(await screen.findByLabelText("What would you like Initiative to do?")).toHaveValue("");
   });
 });

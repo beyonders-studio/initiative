@@ -36,6 +36,9 @@ class IntakeBindingRead(SanitizedBaseModel):
     #: What the stream allows with whoever filed a case: with ``none`` there
     #: is nobody to wait on, and the status roles mean nothing.
     conversation: Conversation = Conversation.none
+    #: Whether people file into the stream. One nobody files into, which the
+    #: team fills by hand, has no contact address.
+    filed: bool = True
     #: The stream keeps its initiative to itself.
     isolated: bool = False
     #: Another stream lands in the same initiative while one of the two keeps

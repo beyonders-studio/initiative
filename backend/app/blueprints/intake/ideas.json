@@ -1,0 +1,82 @@
+{
+  "type": "initiative-project",
+  "schema_version": 1,
+  "app_version": "0",
+  "exported_at": "2026-09-15T00:00:00+00:00",
+  "exported_by_handle": null,
+  "source_instance_url": null,
+  "project": {
+    "name": "Ideas",
+    "icon": "💡",
+    "description": "The ideas everybody signed in can see and vote for. Each task is one idea, written for the people who asked for it. Its status is the one they see, so name statuses the way you'd say them out loud.",
+    "is_template": false,
+    "archived_at": null,
+    "start_date": null,
+    "end_date": null
+  },
+  "tags": [],
+  "task_statuses": [
+    {
+      "name": "Under consideration",
+      "category": "todo",
+      "position": 0,
+      "color": "#F59E0B",
+      "icon": "lightbulb",
+      "is_default": true
+    },
+    {
+      "name": "Planned",
+      "category": "in_progress",
+      "position": 1,
+      "color": "#3B82F6",
+      "icon": "calendar-check",
+      "is_default": false
+    },
+    {
+      "name": "Building",
+      "category": "in_progress",
+      "position": 2,
+      "color": "#8B5CF6",
+      "icon": "hammer",
+      "is_default": false
+    },
+    {
+      "name": "Shipped",
+      "category": "done",
+      "position": 3,
+      "color": "#10B981",
+      "icon": "rocket",
+      "is_default": false
+    },
+    {
+      "name": "Not planned",
+      "category": "done",
+      "position": 4,
+      "color": "#94A3B8",
+      "icon": "circle-slash",
+      "is_default": false
+    }
+  ],
+  "property_definitions": [],
+  "tasks": [
+    {
+      "title": "How this board works",
+      "description": "Every task on this board can become an idea people see on the Ideas page, signed in or not, and vote for.\n\n**Publishing.** A new idea starts unpublished, so the wording can be right before anybody reads it. Turn on **Publish** in the task's Idea panel when it is ready. People see its title, its description and its status, and how many voted. They never see its comments, assignees, properties or tags, so talk about it in the comments.\n\n**Statuses.** People see each status by its name. Everybody who voted hears when an idea moves.\n\nThis task stays unpublished: it is here for the team.",
+      "priority": "medium",
+      "start_date": null,
+      "due_date": null,
+      "recurrence": null,
+      "recurrence_strategy": "fixed",
+      "recurrence_occurrence_count": 0,
+      "position": 1.0,
+      "archived_at": null,
+      "completed_at": null,
+      "status_name": "Under consideration",
+      "tags": [],
+      "assignee_handles": [],
+      "checklist": [],
+      "properties": []
+    }
+  ],
+  "layouts": []
+}

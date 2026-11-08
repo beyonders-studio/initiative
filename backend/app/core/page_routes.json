@@ -122,6 +122,8 @@
   "/download",
   "/feedback",
   "/forgot-password",
+  "/ideas/",
+  "/ideas/$taskId",
   "/invite/$code",
   "/legal/$slug",
   "/licences",

@@ -21,7 +21,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlalchemy.orm import selectinload
 
-from app.core.intake import Conversation, IntakeStream, conversation_for
+from app.core.intake import (
+    Conversation,
+    IntakeStream,
+    Source,
+    conversation_for,
+    meta,
+)
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
@@ -67,7 +73,9 @@ async def holds_cases(session: AsyncSession) -> bool:
 
 
 async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
-    """The case behind ``task_id``, or ``None`` where the task is not one."""
+    """The case behind ``task_id``, or ``None`` where the task is not one, or
+    is one nobody filed: a published idea is its board's case, with no filing
+    to show."""
     if not await holds_cases(session):
         return None
     case = (
@@ -76,6 +84,8 @@ async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
     if case is None:
         return None
     stream = IntakeStream(case.stream)
+    if Source.submitted not in meta(stream).sources:
+        return None
     binding = (
         await session.exec(
             select(
