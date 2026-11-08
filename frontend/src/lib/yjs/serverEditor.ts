@@ -10,7 +10,7 @@
  * States cross the boundary as hex, and the caller names the Yjs client a
  * state is written as.
  */
-import { buildEditorFromExtensions } from "@lexical/extension";
+import { buildEditorFromExtensions, getExtensionDependencyFromEditor } from "@lexical/extension";
 import { $convertFromMarkdownString } from "@lexical/markdown";
 import {
   type Binding,
@@ -43,7 +43,8 @@ import {
 } from "yjs";
 
 import { documentExtension } from "@/components/editor/document-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { MarkdownShortcutsExtension } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { InitiativeExtension } from "@/components/editor/initiative/initiative-extension";
 import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/editor/nodes/image-node";
 import { registerLegacyNodes } from "@/components/editor/nodes/legacy-nodes";
 import { readRange } from "@/lib/spreadsheet/range";
@@ -90,6 +91,7 @@ function withEditor<T>(clientId: number | null, use: (editor: LexicalEditor, doc
       onError: (error) => {
         throw error;
       },
+      extension: InitiativeExtension,
     })
   );
   const doc = new Doc();
@@ -349,6 +351,10 @@ function apply(state: string, json: string, clientId: number): string {
  */
 function fromMarkdown(text: string, plain: boolean): string {
   return withEditor(null, (editor) => {
+    const { output: transformers } = getExtensionDependencyFromEditor(
+      editor,
+      MarkdownShortcutsExtension
+    );
     editor.update(
       () => {
         const root = $getRoot();
@@ -363,7 +369,7 @@ function fromMarkdown(text: string, plain: boolean): string {
             root.append(paragraph);
           }
         } else {
-          $convertFromMarkdownString(text, MARKDOWN_TRANSFORMERS);
+          $convertFromMarkdownString(text, transformers);
         }
         if (root.getChildrenSize() === 0) root.append($createParagraphNode());
       },

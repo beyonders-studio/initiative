@@ -11,8 +11,8 @@ import type {
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { renderEmbeddable, validateEmbeddable } from "@/lib/whiteboardEmbeds";
 import { Button } from "@/ui/button";
+import { renderEmbeddable, validateEmbeddable } from "@/ui/lib/whiteboardEmbeds";
 
 export interface DrawingScene {
   elements: readonly ExcalidrawElement[];

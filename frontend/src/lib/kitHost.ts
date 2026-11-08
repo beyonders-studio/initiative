@@ -4,13 +4,14 @@ import type { ComponentType } from "react";
 import { isOwnOrigin } from "@/api/client";
 import { toast } from "@/lib/mascotToast";
 import { canCapturePhoto, capturePhoto } from "@/lib/nativeCamera";
+import { openExternal } from "@/lib/openExternal";
 import { getItem, setItem } from "@/lib/storage";
 import { type HostLinkProps, setHost } from "@/ui/host";
 
 /**
  * Hand the UI kit what it takes from Initiative: the mascot's toasts, the
- * phone's camera, the router's links, the device's storage, the emoji data
- * this app serves and the origins that are its own.
+ * phone's camera, the router's links, the phone's browser sheet, the device's
+ * storage, the emoji data this app serves and the origins that are its own.
  *
  * Each is called through when the kit uses it rather than read here, so the
  * host holds nothing a module would have to hand over at boot.
@@ -26,6 +27,7 @@ export const connectKit = (): void =>
     },
     camera: canCapturePhoto() ? { capture: (source) => capturePhoto(source) } : null,
     Link: Link as unknown as ComponentType<HostLinkProps>,
+    openExternal: (url) => openExternal(url),
     storage: { getItem: (key) => getItem(key), setItem: (key, value) => setItem(key, value) },
     emojibaseUrl: __EMOJIBASE_URL__,
     isOwnOrigin: (url) => isOwnOrigin(url),

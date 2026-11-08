@@ -17,12 +17,14 @@ import {
   ExcalidrawExtension,
   INSERT_EXCALIDRAW_COMMAND,
 } from "@/components/editor/extensions/excalidraw-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { markdownTransformers } from "@/components/editor/extensions/markdown-shortcuts-extension";
 import {
   $createExcalidrawNode,
   $isExcalidrawNode,
   EMPTY_DRAWING,
 } from "@/components/editor/nodes/excalidraw-node";
+
+const transformers = markdownTransformers([]);
 
 function makeEditor(): LexicalEditor {
   return buildEditorFromExtensions(
@@ -124,13 +126,13 @@ describe("a drawing in markdown", () => {
       { discrete: true }
     );
     editor.getEditorState().read(() => {
-      exported = $convertToMarkdownString(MARKDOWN_TRANSFORMERS);
+      exported = $convertToMarkdownString(transformers);
     });
     // Longer than the backticks the drawing holds, so they cannot close it.
     expect(exported).toContain("````excalidraw\n");
 
     const restored = makeEditor();
-    restored.update(() => $convertFromMarkdownString(exported, MARKDOWN_TRANSFORMERS), {
+    restored.update(() => $convertFromMarkdownString(exported, transformers), {
       discrete: true,
     });
     restored.getEditorState().read(() => {
@@ -144,10 +146,9 @@ describe("a drawing in markdown", () => {
 
   it("leaves a fence whose contents are not a scene to be code", () => {
     const editor = makeEditor();
-    editor.update(
-      () => $convertFromMarkdownString("```excalidraw\nnot json\n```", MARKDOWN_TRANSFORMERS),
-      { discrete: true }
-    );
+    editor.update(() => $convertFromMarkdownString("```excalidraw\nnot json\n```", transformers), {
+      discrete: true,
+    });
     editor.getEditorState().read(() => {
       expect($getRoot().getFirstChild()?.getType()).toBe("code");
     });

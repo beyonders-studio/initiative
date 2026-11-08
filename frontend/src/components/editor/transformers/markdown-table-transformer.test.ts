@@ -11,7 +11,9 @@ import {
 import { $getRoot, defineExtension, type LexicalEditor } from "lexical";
 import { describe, expect, it } from "vitest";
 
-import { TABLE } from "@/components/editor/transformers/markdown-table-transformer";
+import { createTableTransformer } from "@/components/editor/transformers/markdown-table-transformer";
+
+const TABLE = createTableTransformer([]);
 
 function makeEditor(): LexicalEditor {
   return buildEditorFromExtensions(

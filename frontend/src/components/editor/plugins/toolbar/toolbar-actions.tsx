@@ -11,6 +11,7 @@ import {
 import { INSERT_EMBED_COMMAND } from "@lexical/react/LexicalAutoEmbedPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $isDecoratorBlockNode } from "@lexical/react/LexicalDecoratorBlockNode";
+import { useExtensionDependency } from "@lexical/react/useExtensionComponent";
 import {
   $createHeadingNode,
   $createQuoteNode,
@@ -36,6 +37,7 @@ import {
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
   INDENT_CONTENT_COMMAND,
+  type LexicalEditor,
   OUTDENT_CONTENT_COMMAND,
   REDO_COMMAND,
   type TextFormatType,
@@ -52,9 +54,7 @@ import {
   IndentDecreaseIcon,
   IndentIncreaseIcon,
   ItalicIcon,
-  PanelTop,
   PenTool,
-  RectangleEllipsis,
   ScissorsIcon,
   StrikethroughIcon,
   SubscriptIcon,
@@ -67,16 +67,15 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react
 import { useTranslation } from "react-i18next";
 
 import { useToolbarContext } from "@/components/editor/context/toolbar-context";
+import type { ShowModal } from "@/components/editor/editor-hooks/use-modal";
 import { INSERT_CALLOUT_COMMAND } from "@/components/editor/extensions/callout-extension";
 import { INSERT_EXCALIDRAW_COMMAND } from "@/components/editor/extensions/excalidraw-extension";
+import { ImagesExtension } from "@/components/editor/extensions/images-extension";
 import { INSERT_STATUS_COMMAND } from "@/components/editor/extensions/status-extension";
 import { CalloutIcon } from "@/components/editor/plugins/callout-icon";
 import { EmbedConfigs } from "@/components/editor/plugins/embeds/auto-embed-plugin";
-import { InsertImageDialog } from "@/components/editor/plugins/images-plugin";
 import { InsertLayoutDialog } from "@/components/editor/plugins/layout-plugin";
-import { LazyEmbedDialog } from "@/components/editor/plugins/lazy-embed-dialog";
 import { MERMAID_LANGUAGE } from "@/components/editor/plugins/mermaid-preview-plugin";
-import { SmartChipInsertDialog } from "@/components/editor/plugins/smart-chip-insert-dialog";
 import { InsertTableDialog } from "@/components/editor/plugins/table-plugin";
 import { useBlockTypeToBlockName } from "@/components/editor/plugins/toolbar/block-format/block-format-data";
 import { getSelectedNode } from "@/components/editor/utils/get-selected-node";
@@ -96,6 +95,12 @@ export interface EditorAction {
   run: () => void;
   /** Whether the selection already carries this, where that is meaningful. */
   active?: boolean;
+}
+
+/** Something the host adds to the toolbar's Insert menu, done in the editor
+ *  the selection is in. */
+export interface InsertAction extends Omit<EditorAction, "run" | "active"> {
+  run: (editor: LexicalEditor, showModal: ShowModal) => void;
 }
 
 /** A named colour a swatch list offers. An empty value clears the property. */
@@ -327,18 +332,18 @@ export const useIndentActions = (): EditorAction[] => {
   ];
 };
 
-/** Everything the insert picker offers, gated by what this surface supports. */
+/** Everything the insert picker offers: the core's, gated by what this surface
+ *  supports, then the host's. */
 export const useBlockInsertActions = ({
   rich,
-  supportsSmartChips,
-  initiativeId,
+  hostActions,
 }: {
   rich: boolean;
-  supportsSmartChips: boolean;
-  initiativeId: number | null;
+  hostActions: readonly InsertAction[];
 }): EditorAction[] => {
   const { activeEditor, showModal } = useToolbarContext();
   const { t } = useTranslation("editor");
+  const insertImage = useExtensionDependency(ImagesExtension).config.insert;
 
   const actions: EditorAction[] = [];
 
@@ -351,26 +356,23 @@ export const useBlockInsertActions = ({
     });
   }
 
-  actions.push(
-    {
+  if (insertImage) {
+    actions.push({
       id: "image",
       label: t("image"),
       icon: <ImageIcon className="size-4" />,
-      run: () =>
-        showModal(t("insertImage"), (onClose) => (
-          <InsertImageDialog activeEditor={activeEditor} onClose={onClose} />
-        )),
-    },
-    {
-      id: "table",
-      label: t("table"),
-      icon: <TableIcon className="size-4" />,
-      run: () =>
-        showModal(t("insertTable"), (onClose) => (
-          <InsertTableDialog activeEditor={activeEditor} onClose={onClose} />
-        )),
-    }
-  );
+      run: () => insertImage(activeEditor, showModal),
+    });
+  }
+  actions.push({
+    id: "table",
+    label: t("table"),
+    icon: <TableIcon className="size-4" />,
+    run: () =>
+      showModal(t("insertTable"), (onClose) => (
+        <InsertTableDialog activeEditor={activeEditor} onClose={onClose} />
+      )),
+  });
 
   if (rich) {
     actions.push({
@@ -413,32 +415,12 @@ export const useBlockInsertActions = ({
     }))
   );
 
-  if (supportsSmartChips) {
-    actions.push({
-      id: "smart-chip",
-      label: t("smartChips.insert"),
-      icon: <RectangleEllipsis className="size-4" />,
-      run: () =>
-        showModal(t("smartChips.insert"), (onClose) => (
-          <SmartChipInsertDialog
-            initiativeId={initiativeId}
-            activeEditor={activeEditor}
-            onClose={onClose}
-          />
-        )),
-    });
-    // A thing shown in full, or the tasks a filter matches — what `![[ ]]`
-    // and the `/` menu's Embed make, for whoever reaches for the toolbar.
-    actions.push({
-      id: "reference-embed",
-      label: t("embeds.insert"),
-      icon: <PanelTop className="size-4" />,
-      run: () =>
-        showModal(t("embeds.insert"), (onClose) => (
-          <LazyEmbedDialog activeEditor={activeEditor} onClose={onClose} />
-        )),
-    });
-  }
+  actions.push(
+    ...hostActions.map(({ run, ...action }) => ({
+      ...action,
+      run: () => run(activeEditor, showModal),
+    }))
+  );
 
   return actions;
 };

@@ -6,12 +6,12 @@ import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpe
 import { ToolCard } from "@/components/tools/ToolCard";
 import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
-import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { toolDetailRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Badge } from "@/ui/badge";
 import { LazyImage } from "@/ui/lazy-image";
 import { filePicture, getFileTypeLabel } from "@/ui/lib/fileUtils";
+import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
 

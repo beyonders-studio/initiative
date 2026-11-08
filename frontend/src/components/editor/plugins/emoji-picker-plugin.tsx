@@ -8,9 +8,8 @@ import { $createTextNode, $getSelection, $isRangeSelection, type TextNode } from
 import { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import emojiList from "@/components/editor/utils/emoji-list";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/ui/command";
-
-import emojiList from "../utils/emoji-list";
 
 class EmojiOption extends MenuOption {
   title: string;

@@ -1,13 +1,13 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { TablePlugin } from "@lexical/react/LexicalTablePlugin";
-import { type RefObject, useEffect, useState } from "react";
+import { useExtensionDependency } from "@lexical/react/useExtensionComponent";
+import { type ReactNode, type RefObject, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { writeWithAi } from "@/api/generated/ai/ai";
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { ContentEditable } from "@/components/editor/editor-ui/content-editable";
-import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { ImagesExtension } from "@/components/editor/extensions/images-extension";
+import { MarkdownShortcutsExtension } from "@/components/editor/extensions/markdown-shortcuts-extension";
 import { ActionsPlugin } from "@/components/editor/plugins/actions/actions-plugin";
 import { CharacterLimitPlugin } from "@/components/editor/plugins/actions/character-limit-plugin";
 import { ClearEditorActionPlugin } from "@/components/editor/plugins/actions/clear-editor-plugin";
@@ -17,7 +17,6 @@ import { ImportExportPlugin } from "@/components/editor/plugins/actions/import-e
 import { MarkdownTogglePlugin } from "@/components/editor/plugins/actions/markdown-toggle-plugin";
 import { SpeechToTextPlugin } from "@/components/editor/plugins/actions/speech-to-text-plugin";
 import { TreeViewPlugin } from "@/components/editor/plugins/actions/tree-view-plugin";
-import { AIWritingPlugin } from "@/components/editor/plugins/ai-writing-plugin";
 import { CalloutActionMenuPlugin } from "@/components/editor/plugins/callout-action-menu-plugin";
 import { CodeActionMenuPlugin } from "@/components/editor/plugins/code-action-menu-plugin";
 import { ComponentPickerMenuPlugin } from "@/components/editor/plugins/component-picker-menu-plugin";
@@ -28,11 +27,9 @@ import { AutoEmbedPlugin } from "@/components/editor/plugins/embeds/auto-embed-p
 import { TwitterPlugin } from "@/components/editor/plugins/embeds/twitter-plugin";
 import { YouTubePlugin } from "@/components/editor/plugins/embeds/youtube-plugin";
 import { EmojiPickerPlugin } from "@/components/editor/plugins/emoji-picker-plugin";
-import { EntityMentionsPlugin } from "@/components/editor/plugins/entity-mentions-plugin";
 import { FloatingLinkEditorPlugin } from "@/components/editor/plugins/floating-link-editor-plugin";
 import { FloatingTextFormatToolbarPlugin } from "@/components/editor/plugins/floating-text-format-plugin";
 import { LegacyNodesPlugin } from "@/components/editor/plugins/legacy-nodes-plugin";
-import { MentionsPlugin } from "@/components/editor/plugins/mentions-plugin";
 import { MermaidPreviewPlugin } from "@/components/editor/plugins/mermaid-preview-plugin";
 import { AlignmentPickerPlugin } from "@/components/editor/plugins/picker/alignment-picker-plugin";
 import { BulletedListPickerPlugin } from "@/components/editor/plugins/picker/bulleted-list-picker-plugin";
@@ -40,7 +37,7 @@ import { CalloutPickerPlugins } from "@/components/editor/plugins/picker/callout
 import { CheckListPickerPlugin } from "@/components/editor/plugins/picker/check-list-picker-plugin";
 import { CodePickerPlugin } from "@/components/editor/plugins/picker/code-picker-plugin";
 import { ColumnsLayoutPickerPlugin } from "@/components/editor/plugins/picker/columns-layout-picker-plugin";
-import { ContinueWritingPickerPlugin } from "@/components/editor/plugins/picker/continue-writing-picker-plugin";
+import type { ComponentPickerOption } from "@/components/editor/plugins/picker/component-picker-option";
 import { DiagramPickerPlugin } from "@/components/editor/plugins/picker/diagram-picker-plugin";
 import { DividerPickerPlugin } from "@/components/editor/plugins/picker/divider-picker-plugin";
 import { DrawingPickerPlugin } from "@/components/editor/plugins/picker/drawing-picker-plugin";
@@ -50,10 +47,6 @@ import { ImagePickerPlugin } from "@/components/editor/plugins/picker/image-pick
 import { NumberedListPickerPlugin } from "@/components/editor/plugins/picker/numbered-list-picker-plugin";
 import { ParagraphPickerPlugin } from "@/components/editor/plugins/picker/paragraph-picker-plugin";
 import { QuotePickerPlugin } from "@/components/editor/plugins/picker/quote-picker-plugin";
-import {
-  EmbedPickerPlugin,
-  SmartChipPickerPlugins,
-} from "@/components/editor/plugins/picker/smart-chip-picker-plugin";
 import { StatusPickerPlugin } from "@/components/editor/plugins/picker/status-picker-plugin";
 import {
   DynamicTablePickerPlugin,
@@ -76,6 +69,7 @@ import { SubSuperToolbarPlugin } from "@/components/editor/plugins/toolbar/subsu
 import {
   BLOCK_FORMAT_ORDER,
   type BlockFormatType,
+  type InsertAction,
 } from "@/components/editor/plugins/toolbar/toolbar-actions";
 import {
   BlockFormatMenuItems,
@@ -92,10 +86,7 @@ import {
   SubSuperMenuItems,
 } from "@/components/editor/plugins/toolbar/toolbar-menu-items";
 import { ToolbarPlugin } from "@/components/editor/plugins/toolbar/toolbar-plugin";
-import { WikilinksPlugin } from "@/components/editor/plugins/wikilinks-plugin";
 import type { EditorVariant } from "@/components/editor/variant";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { cn } from "@/ui/lib/utils";
 import { OverflowToolbar, type OverflowToolbarItem } from "@/ui/overflow-toolbar";
 
@@ -118,14 +109,12 @@ const DOCUMENT_BLOCK_TYPES: readonly BlockFormatType[] = BLOCK_FORMAT_ORDER;
 function DocumentToolbar({
   blockType,
   variant,
-  initiativeId,
-  supportsEntityMentions,
+  insertActions,
   setIsLinkEditMode,
 }: {
   blockType: string;
   variant: EditorVariant;
-  initiativeId: number | null;
-  supportsEntityMentions: boolean;
+  insertActions: readonly InsertAction[];
   setIsLinkEditMode: (value: boolean) => void;
 }) {
   const { t } = useTranslation("editor");
@@ -133,7 +122,7 @@ function DocumentToolbar({
   // notice is a place to say something, so it gets the writing controls and
   // not the layout ones.
   const rich = variant === "document";
-  const insert = { rich, supportsSmartChips: supportsEntityMentions, initiativeId };
+  const insert = { rich, hostActions: insertActions };
 
   const items: OverflowToolbarItem[] = [
     { id: "history", node: <HistoryToolbarPlugin />, menu: <HistoryMenuItems /> },
@@ -248,28 +237,18 @@ export function Plugins({
   readOnly = false,
   collaborative = false,
   cursorsContainerRef,
-  initiativeId = null,
-  subject,
-  supportsEntityMentions = false,
   variant = "document",
   maxLength,
   compact = false,
-  onWikilinkNavigate,
-  onCreateReferencedThing,
+  plugins,
+  pickerOptions = [],
+  insertActions = [],
+  selectionActions,
 }: {
   showToolbar?: boolean;
   readOnly?: boolean;
   collaborative?: boolean;
   cursorsContainerRef?: RefObject<HTMLDivElement>;
-  initiativeId?: number | null;
-  /** This page, as a reference (`file:12`). Neither trigger offers it: a
-   *  page does not point at itself, and a link to it would open the page the
-   *  words are already on. */
-  subject?: string | null;
-  /** Whether this is a standard document — prose with a caret. `#` is offered
-   *  only here: a whiteboard and a spreadsheet are not written into, and a file
-   *  or a linked page has no body of its own to write in. */
-  supportsEntityMentions?: boolean;
   /** Which surface this is. `post` narrows the toolbar to what writing a
    *  notice needs — see `EditorVariant`. */
   variant?: EditorVariant;
@@ -284,11 +263,15 @@ export function Plugins({
    *  the same offset a writer sees, not shift left because of who is looking.
    *  Height is a separate question and does follow `readOnly`. */
   compact?: boolean;
-  onWikilinkNavigate?: (fileId: number) => void;
-  onCreateReferencedThing?: (
-    name: string,
-    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void
-  ) => void;
+  /** The host's behaviours, mounted with the core's, given the element the
+   *  floating menus are drawn in. */
+  plugins?: (anchorElem: HTMLDivElement | null) => ReactNode;
+  /** What the host adds to the `/` menu, after the core's inserts. */
+  pickerOptions?: readonly ComponentPickerOption[];
+  /** What the host adds to the toolbar's Insert menu, after the core's. */
+  insertActions?: readonly InsertAction[];
+  /** What the host adds to the toolbar over a selection. */
+  selectionActions?: ReactNode;
 }) {
   const { t } = useTranslation("editor");
   const [editor] = useLexicalComposerContext();
@@ -297,10 +280,8 @@ export function Plugins({
   // not the layout ones.
   const rich = variant === "document";
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null);
-  const communityId = useActiveCommunityId();
-  const { isEnabled: aiEnabled } = useAIEnabled();
-  // Writing help is for writing: offered where AI is on and the body is editable.
-  const aiWriting = aiEnabled && !readOnly && communityId > 0;
+  const transformers = useExtensionDependency(MarkdownShortcutsExtension).output;
+  const insertImage = useExtensionDependency(ImagesExtension).config.insert;
   const [isLinkEditMode, setIsLinkEditMode] = useState<boolean>(false);
 
   // Enforce read-only mode
@@ -330,8 +311,7 @@ export function Plugins({
             <DocumentToolbar
               blockType={blockType}
               variant={variant}
-              initiativeId={initiativeId}
-              supportsEntityMentions={supportsEntityMentions}
+              insertActions={insertActions}
               setIsLinkEditMode={setIsLinkEditMode}
             />
           )}
@@ -369,7 +349,7 @@ export function Plugins({
             the document, and a read-only view mounts one of these per card on
             a board. Left mounted it was the largest thing a post cost to
             scroll past. What is NOT gated is what a reader needs: the nodes
-            themselves, the chip scope, wikilinks, link sanitizing. */}
+            themselves and link sanitizing. The host gates its own plugins. */}
         {!readOnly && <TableActionMenuPlugin anchorElem={floatingAnchorElem} readOnly={readOnly} />}
         {!readOnly && <CalloutActionMenuPlugin anchorElem={floatingAnchorElem} />}
         {!readOnly && <TabIndentationPlugin />}
@@ -377,16 +357,7 @@ export function Plugins({
         <LegacyNodesPlugin />
         {/* Ungated: a reader needs the diagram more than a writer does. */}
         <MermaidPreviewPlugin />
-        {!readOnly && <MentionsPlugin initiativeId={initiativeId ?? undefined} />}
-        {supportsEntityMentions && !readOnly && (
-          <EntityMentionsPlugin initiativeId={initiativeId} subject={subject} />
-        )}
-        <WikilinksPlugin
-          initiativeId={initiativeId}
-          subject={subject}
-          onNavigate={onWikilinkNavigate}
-          onCreateThing={onCreateReferencedThing}
-        />
+        {plugins?.(floatingAnchorElem)}
         {!readOnly && <DraggableBlockPlugin anchorElem={floatingAnchorElem} />}
 
         {/* Turns a pasted URL into an embed. The embed NODES render without
@@ -416,15 +387,11 @@ export function Plugins({
               DividerPickerPlugin(),
               EmbedsPickerPlugin({ embed: "tweet" }),
               EmbedsPickerPlugin({ embed: "youtube-video" }),
-              ImagePickerPlugin(),
+              ...(insertImage ? [ImagePickerPlugin(insertImage)] : []),
               DrawingPickerPlugin(t),
               DiagramPickerPlugin(t),
               StatusPickerPlugin(t),
-              // Live chips, offered where `#` is: prose only.
-              ...(supportsEntityMentions
-                ? [...SmartChipPickerPlugins(t, initiativeId), EmbedPickerPlugin(t)]
-                : []),
-              ...(aiWriting ? [ContinueWritingPickerPlugin(t)] : []),
+              ...pickerOptions,
               ColumnsLayoutPickerPlugin(),
               AlignmentPickerPlugin({ alignment: "left" }),
               AlignmentPickerPlugin({ alignment: "center" }),
@@ -447,14 +414,8 @@ export function Plugins({
         <FloatingTextFormatToolbarPlugin
           anchorElem={floatingAnchorElem}
           setIsLinkEditMode={setIsLinkEditMode}
-          aiWriting={aiWriting}
+          actions={selectionActions}
         />
-        {aiWriting && (
-          <AIWritingPlugin
-            anchorElem={floatingAnchorElem}
-            write={(body) => (options, signal) => writeWithAi(communityId, body, options, signal)}
-          />
-        )}
       </div>
       {showToolbar && (
         <ActionsPlugin>
@@ -479,7 +440,7 @@ export function Plugins({
                 <>
                   <SpeechToTextPlugin />
                   <ImportExportPlugin />
-                  <MarkdownTogglePlugin transformers={MARKDOWN_TRANSFORMERS} />
+                  <MarkdownTogglePlugin transformers={transformers} />
                   <EditModeTogglePlugin forceReadOnly={readOnly} />
                   <ClearEditorActionPlugin />
                   <TreeViewPlugin />

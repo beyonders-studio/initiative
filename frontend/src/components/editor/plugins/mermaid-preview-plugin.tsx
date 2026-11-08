@@ -5,7 +5,7 @@ import { $getNodeByKey, type LexicalEditor, type NodeKey, setDOMUnmanaged } from
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useTheme } from "@/hooks/useTheme";
+import { useResolvedTheme } from "@/ui/lib/useResolvedTheme";
 
 /** The language a code block names to be drawn as a diagram. */
 export const MERMAID_LANGUAGE = "mermaid";
@@ -47,7 +47,7 @@ interface Preview {
 export function MermaidPreviewPlugin() {
   const [editor] = useLexicalComposerContext();
   const { t } = useTranslation("editor");
-  const { resolvedTheme } = useTheme();
+  const resolvedTheme = useResolvedTheme();
 
   useEffect(() => {
     const previews = new Map<NodeKey, Preview>();

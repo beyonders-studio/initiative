@@ -2,7 +2,7 @@ import { HeadingNode } from "@lexical/rich-text";
 import { mergeRegister } from "@lexical/utils";
 import { defineExtension } from "lexical";
 
-import { slugify } from "@/lib/slug";
+import { slugify } from "@/ui/lib/slug";
 
 export const HeadingAnchorExtension = defineExtension({
   name: "@initiative/heading-anchor",

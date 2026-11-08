@@ -37,7 +37,7 @@ function Harness({ readOnly }: { readOnly: boolean }) {
     <LexicalExtensionComposer extension={extension} contentEditable={null}>
       <TooltipProvider>
         <Grab />
-        <Plugins showToolbar={false} readOnly={readOnly} initiativeId={7} />
+        <Plugins showToolbar={false} readOnly={readOnly} />
       </TooltipProvider>
     </LexicalExtensionComposer>
   );
@@ -109,7 +109,7 @@ describe("a Mermaid code block", () => {
 
   it("keeps its language through markdown's fence", async () => {
     const { $convertFromMarkdownString } = await import("@lexical/markdown");
-    const { MARKDOWN_TRANSFORMERS } = await import(
+    const { markdownTransformers } = await import(
       "@/components/editor/extensions/markdown-shortcuts-extension"
     );
     renderPage(() => <Harness readOnly={false} />);
@@ -118,7 +118,7 @@ describe("a Mermaid code block", () => {
       () =>
         $convertFromMarkdownString(
           "```mermaid\nflowchart LR\n  A --> B\n```",
-          MARKDOWN_TRANSFORMERS
+          markdownTransformers([])
         ),
       { discrete: true }
     );

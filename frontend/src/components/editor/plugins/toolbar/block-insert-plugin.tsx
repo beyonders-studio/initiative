@@ -1,21 +1,16 @@
 import { PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { useBlockInsertActions } from "@/components/editor/plugins/toolbar/toolbar-actions";
+import {
+  type InsertAction,
+  useBlockInsertActions,
+} from "@/components/editor/plugins/toolbar/toolbar-actions";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/ui/select";
 
 /** The insert picker: pictures, tables, embeds and the rest. */
-export function BlockInsertPlugin({
-  rich,
-  supportsSmartChips,
-  initiativeId,
-}: {
-  rich: boolean;
-  supportsSmartChips: boolean;
-  initiativeId: number | null;
-}) {
+export function BlockInsertPlugin(props: { rich: boolean; hostActions: readonly InsertAction[] }) {
   const { t } = useTranslation("editor");
-  const actions = useBlockInsertActions({ rich, supportsSmartChips, initiativeId });
+  const actions = useBlockInsertActions(props);
 
   return (
     <Select value="">

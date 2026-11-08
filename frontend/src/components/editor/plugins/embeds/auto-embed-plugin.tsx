@@ -15,11 +15,11 @@ import { useTranslation } from "react-i18next";
 import { useEditorModal } from "@/components/editor/editor-hooks/use-modal";
 import { INSERT_TWEET_COMMAND } from "@/components/editor/plugins/embeds/twitter-plugin";
 import { INSERT_YOUTUBE_COMMAND } from "@/components/editor/plugins/embeds/youtube-plugin";
-import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { Button } from "@/ui/button";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/ui/command";
 import { DialogFooter } from "@/ui/dialog";
 import { Input } from "@/ui/input";
+import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 export interface CustomEmbedConfig extends EmbedConfig {

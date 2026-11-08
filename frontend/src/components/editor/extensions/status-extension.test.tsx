@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
 import { documentExtension } from "@/components/editor/document-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { markdownTransformers } from "@/components/editor/extensions/markdown-shortcuts-extension";
 import {
   INSERT_STATUS_COMMAND,
   StatusExtension,
@@ -26,6 +26,8 @@ import {
 import { $createStatusNode, $isStatusNode } from "@/components/editor/nodes/status-node";
 import { Plugins } from "@/components/editor/plugins";
 import { TooltipProvider } from "@/ui/tooltip";
+
+const transformers = markdownTransformers([]);
 
 function makeEditor(): LexicalEditor {
   return buildEditorFromExtensions(
@@ -81,12 +83,12 @@ describe("a status", () => {
       { discrete: true }
     );
     editor.getEditorState().read(() => {
-      exported = $convertToMarkdownString(MARKDOWN_TRANSFORMERS);
+      exported = $convertToMarkdownString(transformers);
     });
     expect(exported).toBe('State: :status[In progress]{color="blue"}');
 
     const restored = makeEditor();
-    restored.update(() => $convertFromMarkdownString(exported, MARKDOWN_TRANSFORMERS), {
+    restored.update(() => $convertFromMarkdownString(exported, transformers), {
       discrete: true,
     });
     restored.getEditorState().read(() => {
@@ -113,7 +115,7 @@ function Harness() {
     <LexicalExtensionComposer extension={extension} contentEditable={null}>
       <TooltipProvider>
         <Grab />
-        <Plugins showToolbar={false} readOnly={false} initiativeId={7} />
+        <Plugins showToolbar={false} readOnly={false} />
       </TooltipProvider>
     </LexicalExtensionComposer>
   );

@@ -5,12 +5,12 @@ import { Check, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { CHIP_TONE_CLASSES } from "@/components/editor/editor-ui/chip-tones";
 import {
   $isStatusNode,
   STATUS_COLORS,
   type StatusColor,
 } from "@/components/editor/nodes/status-node";
-import { CHIP_TONE_CLASSES } from "@/lib/smartChips";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";

@@ -1,5 +1,7 @@
 import { type ComponentType, createElement, type ReactNode, useSyncExternalStore } from "react";
 
+import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
+
 /**
  * What the app hands the kit.
  *
@@ -7,8 +9,8 @@ import { type ComponentType, createElement, type ReactNode, useSyncExternalStore
  * needs from that app arrives here. The reader's clock and week start change
  * while the app runs: the app writes them and components subscribe. The rest
  * is set once, at boot, with `setHost`: how to show a notice, take a picture,
- * link to a page, keep a preference, find the emoji data and recognise the
- * app's own origin.
+ * link to a page, open another site, keep a preference, find the emoji data
+ * and recognise the app's own origin.
  */
 
 export type TimeFormatPreference = "system" | "12" | "24";
@@ -56,6 +58,8 @@ export interface Host {
   camera: { capture: (source: PhotoSource) => Promise<File | null> } | null;
   /** A link to one of the app's own pages. */
   Link: ComponentType<HostLinkProps>;
+  /** Opens another site, away from the app. */
+  openExternal: (url: string) => void;
   /** Where a preference is kept between visits. */
   storage: {
     getItem: (key: string) => string | null;
@@ -73,6 +77,10 @@ export const host: Host = {
   toast: { success: () => {}, error: () => {} },
   camera: null,
   Link: ({ to, className, children }) => createElement("a", { href: to, className }, children),
+  openExternal: (url) => {
+    const safe = sanitizeUrl(url);
+    if (safe !== BLOCKED_URL) window.open(safe, "_blank", "noopener,noreferrer");
+  },
   storage: {
     getItem: (key) => kept.get(key) ?? null,
     setItem: (key, value) => kept.set(key, value),

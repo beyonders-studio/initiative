@@ -48,7 +48,7 @@ import { Label } from "@/ui/label";
 import { Skeleton } from "@/ui/skeleton";
 
 const Editor = lazy(() =>
-  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/initiative/editor").then((m) => ({ default: m.Editor }))
 );
 
 type CreatePostDialogProps = DialogProps & {

@@ -16,7 +16,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getItem, setItem } from "@/lib/storage";
+import { host } from "@/ui/host";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
@@ -520,10 +520,10 @@ export const DocumentOutlinePanel = ({
 /** Whether the outline is showing. Closed until somebody opens it, and then
  *  remembered, the same as the document's other panels. */
 export const useDocumentOutline = () => {
-  const [isOpen, setIsOpen] = useState(() => getItem(STORAGE_KEY) === "true");
+  const [isOpen, setIsOpen] = useState(() => host.storage.getItem(STORAGE_KEY) === "true");
 
   useEffect(() => {
-    setItem(STORAGE_KEY, String(isOpen));
+    host.storage.setItem(STORAGE_KEY, String(isOpen));
   }, [isOpen]);
 
   return {
