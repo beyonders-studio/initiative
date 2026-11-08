@@ -1,13 +1,13 @@
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useEmailSettings, useSendTestEmail, useUpdateEmailSettings } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -108,104 +108,92 @@ export const SettingsEmailPage = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("email.title")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="grid grid-cols-pair gap-4">
-            <Field label={t("email.hostLabel")}>
-              <Input
-                value={form.values.host}
-                onChange={(event) => form.set({ host: event.target.value })}
-                placeholder={t("email.hostPlaceholder")}
-              />
-            </Field>
-            <Field label={t("email.portLabel")}>
-              <Input
-                type="number"
-                min={1}
-                max={65535}
-                value={form.values.port}
-                onChange={(event) => form.set({ port: event.target.value })}
-                placeholder={t("email.portPlaceholder")}
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-pair gap-4">
-            <div className="flex items-center justify-between rounded-md border px-4 py-3">
-              <div>
-                <p className="font-medium">{t("email.secureLabel")}</p>
-                <p className="text-muted-foreground text-sm">{t("email.secureHelp")}</p>
-              </div>
-              <Switch
-                checked={form.values.secure}
-                onCheckedChange={(checked) => form.set({ secure: Boolean(checked) })}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-4 py-3">
-              <div>
-                <p className="font-medium">{t("email.rejectUnauthorizedLabel")}</p>
-                <p className="text-muted-foreground text-sm">{t("email.rejectUnauthorizedHelp")}</p>
-              </div>
-              <Switch
-                checked={form.values.reject_unauthorized}
-                onCheckedChange={(checked) => form.set({ reject_unauthorized: Boolean(checked) })}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-pair gap-4">
-            <Field label={t("email.usernameLabel")}>
-              <Input
-                value={form.values.username}
-                onChange={(event) => form.set({ username: event.target.value })}
-              />
-            </Field>
-            <Field label={t("email.passwordLabel")} hint={t("email.passwordHelp")}>
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={emailQuery.data.has_password ? t("email.passwordPlaceholder") : ""}
-              />
-            </Field>
-          </div>
-          <Field label={t("email.fromAddressLabel")}>
+    <SettingsSection title={t("email.title")}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        <div className="grid grid-cols-pair gap-4">
+          <Field label={t("email.hostLabel")}>
             <Input
-              value={form.values.from_address}
-              onChange={(event) => form.set({ from_address: event.target.value })}
-              placeholder={t("email.fromAddressPlaceholder")}
+              value={form.values.host}
+              onChange={(event) => form.set({ host: event.target.value })}
+              placeholder={t("email.hostPlaceholder")}
             />
           </Field>
-          <div className="grid grid-cols-pair gap-4">
-            <Field label={t("email.testRecipientLabel")}>
-              <Input
-                type="email"
-                value={form.values.test_recipient}
-                onChange={(event) => form.set({ test_recipient: event.target.value })}
-                placeholder={t("email.testRecipientPlaceholder")}
-              />
-            </Field>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() =>
-                  testMutation.mutate({ recipient: form.values.test_recipient || null })
-                }
-                disabled={testMutation.isPending}
-              >
-                {testMutation.isPending ? t("email.sendingTest") : t("email.sendTest")}
-              </Button>
-            </div>
+          <Field label={t("email.portLabel")}>
+            <Input
+              type="number"
+              min={1}
+              max={65535}
+              value={form.values.port}
+              onChange={(event) => form.set({ port: event.target.value })}
+              placeholder={t("email.portPlaceholder")}
+            />
+          </Field>
+        </div>
+        <div className="space-y-4">
+          <SettingsRow label={t("email.secureLabel")} description={t("email.secureHelp")}>
+            <Switch
+              checked={form.values.secure}
+              onCheckedChange={(checked) => form.set({ secure: Boolean(checked) })}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={t("email.rejectUnauthorizedLabel")}
+            description={t("email.rejectUnauthorizedHelp")}
+          >
+            <Switch
+              checked={form.values.reject_unauthorized}
+              onCheckedChange={(checked) => form.set({ reject_unauthorized: Boolean(checked) })}
+            />
+          </SettingsRow>
+        </div>
+        <div className="grid grid-cols-pair gap-4">
+          <Field label={t("email.usernameLabel")}>
+            <Input
+              value={form.values.username}
+              onChange={(event) => form.set({ username: event.target.value })}
+            />
+          </Field>
+          <Field label={t("email.passwordLabel")} hint={t("email.passwordHelp")}>
+            <Input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={emailQuery.data.has_password ? t("email.passwordPlaceholder") : ""}
+            />
+          </Field>
+        </div>
+        <Field label={t("email.fromAddressLabel")}>
+          <Input
+            value={form.values.from_address}
+            onChange={(event) => form.set({ from_address: event.target.value })}
+            placeholder={t("email.fromAddressPlaceholder")}
+          />
+        </Field>
+        <div className="grid grid-cols-pair gap-4">
+          <Field label={t("email.testRecipientLabel")}>
+            <Input
+              type="email"
+              value={form.values.test_recipient}
+              onChange={(event) => form.set({ test_recipient: event.target.value })}
+              placeholder={t("email.testRecipientPlaceholder")}
+            />
+          </Field>
+          <div className="flex items-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => testMutation.mutate({ recipient: form.values.test_recipient || null })}
+              disabled={testMutation.isPending}
+            >
+              {testMutation.isPending ? t("email.sendingTest") : t("email.sendTest")}
+            </Button>
           </div>
-          <Button type="submit" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? t("email.saving") : t("email.save")}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+        <Button type="submit" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? t("email.saving") : t("email.save")}
+        </Button>
+      </form>
+    </SettingsSection>
   );
 };

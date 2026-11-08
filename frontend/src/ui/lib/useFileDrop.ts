@@ -70,7 +70,7 @@ export const useFileDrop = (
       depth.current = 0;
       setDragging(false);
       const dropped = Array.from(event.dataTransfer.files);
-      const files = accept ? dropped.filter((file) => matchesAccept(file.name, accept)) : dropped;
+      const files = accept ? dropped.filter((file) => matchesAccept(file, accept)) : dropped;
       if (files.length > 0) onFiles(files);
       else if (dropped.length > 0) host.toast.error(t("fileDrop.unsupported"));
     },

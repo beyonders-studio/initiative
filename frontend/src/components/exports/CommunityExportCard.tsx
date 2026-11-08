@@ -8,13 +8,13 @@ import {
 } from "@/api/generated/exports/exports";
 import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { ExportWizard } from "@/components/exports/ExportWizard";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunities } from "@/hooks/useCommunities";
 import { downloadExportArtifact } from "@/lib/exportDownload";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { RelativeTime } from "@/ui/relative-time";
 
 const ACTIVE = new Set(["queued", "running"]);
@@ -87,12 +87,11 @@ export function CommunityExportCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("entry.communityTitle")}</CardTitle>
-        <CardDescription>{t("entry.communityDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <>
+      <SettingsSection
+        title={t("entry.communityTitle")}
+        description={t("entry.communityDescription")}
+      >
         {status != null && (
           <div className="space-y-2 rounded-lg border p-3">
             <p className="font-medium text-sm">{t("community.lastExport")}</p>
@@ -174,10 +173,10 @@ export function CommunityExportCard() {
             </span>
           )}
         </div>
-      </CardContent>
+      </SettingsSection>
       {/* Mounted outside the open check so a job started here keeps polling
           (and delivers its download) after the dialog closes. */}
       <ExportWizard scope={{ kind: "community" }} open={wizardOpen} onOpenChange={closeWizard} />
-    </Card>
+    </>
   );
 }

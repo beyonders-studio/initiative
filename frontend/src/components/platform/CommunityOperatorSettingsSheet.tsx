@@ -32,7 +32,7 @@ import {
 import { PluginSummaryFigures } from "@/components/communities/PluginSummaryCards";
 import { BillingConsoleButton, opensBillingHere } from "@/components/platform/BillingConsoleButton";
 import { CommunityRestoreWizard } from "@/components/platform/CommunityRestoreWizard";
-import { Section, SettingRow } from "@/components/platform/SettingRow";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useServerForm } from "@/hooks/useServerForm";
 import {
@@ -199,7 +199,7 @@ export const CommunityOperatorSettingsSheet = ({
 
         <div className="space-y-6 py-6">
           {deleted ? (
-            <Section title={t("communities.sheet.deleted")}>
+            <SettingsSection plain title={t("communities.sheet.deleted")}>
               <div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4">
                 <p className="text-sm">
                   {purgeDate
@@ -211,7 +211,7 @@ export const CommunityOperatorSettingsSheet = ({
                   {t("communities.restore.open")}
                 </Button>
               </div>
-            </Section>
+            </SettingsSection>
           ) : null}
 
           {planIsBillings && !deleted ? (
@@ -229,193 +229,163 @@ export const CommunityOperatorSettingsSheet = ({
             </div>
           ) : null}
 
-          <Section title={t("communities.sheet.limits")}>
-            <SettingRow
+          <SettingsSection plain title={t("communities.sheet.limits")}>
+            <SettingsRow
               label={t("communities.sheet.usersLabel")}
-              help={t("communities.sheet.usersHelp")}
-              htmlFor="community-max-users"
-              control={
-                <Input
-                  id="community-max-users"
-                  type="number"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  className="w-32"
-                  value={form.values.users}
-                  onChange={(event) => form.set({ users: event.target.value })}
-                  onBlur={commitUsers}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") event.currentTarget.blur();
-                  }}
-                  placeholder={t("communities.unlimitedPlaceholder")}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-            <SettingRow
+              description={t("communities.sheet.usersHelp")}
+            >
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                className="w-32"
+                value={form.values.users}
+                onChange={(event) => form.set({ users: event.target.value })}
+                onBlur={commitUsers}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                placeholder={t("communities.unlimitedPlaceholder")}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t("communities.sheet.guestsLabel")}
-              help={t("communities.sheet.guestsHelp")}
-              htmlFor="community-max-guests"
-              control={
+              description={t("communities.sheet.guestsHelp")}
+            >
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                className="w-32"
+                value={form.values.guests}
+                onChange={(event) => form.set({ guests: event.target.value })}
+                onBlur={commitGuests}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                placeholder={t("communities.unlimitedPlaceholder")}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={t("communities.sheet.storageLabel")}
+              description={t("communities.sheet.storageHelp")}
+            >
+              <div className="relative w-32">
                 <Input
-                  id="community-max-guests"
                   type="number"
                   min={0}
-                  step={1}
-                  inputMode="numeric"
-                  className="w-32"
-                  value={form.values.guests}
-                  onChange={(event) => form.set({ guests: event.target.value })}
-                  onBlur={commitGuests}
+                  step="any"
+                  inputMode="decimal"
+                  className="pr-9"
+                  value={form.values.storage}
+                  onChange={(event) => form.set({ storage: event.target.value })}
+                  onBlur={commitStorage}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") event.currentTarget.blur();
                   }}
                   placeholder={t("communities.unlimitedPlaceholder")}
                   disabled={update.isPending || planLocked}
                 />
-              }
-            />
-            <SettingRow
-              label={t("communities.sheet.storageLabel")}
-              help={t("communities.sheet.storageHelp")}
-              htmlFor="community-max-storage"
-              control={
-                <div className="relative w-32">
-                  <Input
-                    id="community-max-storage"
-                    type="number"
-                    min={0}
-                    step="any"
-                    inputMode="decimal"
-                    className="pr-9"
-                    value={form.values.storage}
-                    onChange={(event) => form.set({ storage: event.target.value })}
-                    onBlur={commitStorage}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") event.currentTarget.blur();
-                    }}
-                    placeholder={t("communities.unlimitedPlaceholder")}
-                    disabled={update.isPending || planLocked}
-                  />
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground text-xs">
-                    GB
-                  </span>
-                </div>
-              }
-            />
-          </Section>
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground text-xs">
+                  GB
+                </span>
+              </div>
+            </SettingsRow>
+          </SettingsSection>
 
           {deleted ? null : <PluginSummarySections communityId={community.id} />}
 
           {/* Two separate grants. Either one can be given on its own. */}
-          <Section title={t("communities.sheet.decidesForItself")}>
-            <SettingRow
+          <SettingsSection plain title={t("communities.sheet.decidesForItself")}>
+            <SettingsRow
               label={t("communities.sheet.authOption.providers.label")}
-              help={t("communities.sheet.authOption.providers.help")}
-              htmlFor="community-auth-providers"
-              control={
-                <Switch
-                  id="community-auth-providers"
-                  checked={options.includes("providers")}
-                  onCheckedChange={(checked) => toggleOption("providers", Boolean(checked))}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-            <SettingRow
+              description={t("communities.sheet.authOption.providers.help")}
+            >
+              <Switch
+                checked={options.includes("providers")}
+                onCheckedChange={(checked) => toggleOption("providers", Boolean(checked))}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t("communities.sheet.authOption.restrictions.label")}
-              help={t("communities.sheet.authOption.restrictions.help")}
-              htmlFor="community-auth-restrictions"
-              control={
-                <Switch
-                  id="community-auth-restrictions"
-                  checked={options.includes("restrictions")}
-                  onCheckedChange={(checked) => toggleOption("restrictions", Boolean(checked))}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-          </Section>
+              description={t("communities.sheet.authOption.restrictions.help")}
+            >
+              <Switch
+                checked={options.includes("restrictions")}
+                onCheckedChange={(checked) => toggleOption("restrictions", Boolean(checked))}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+          </SettingsSection>
 
           <NarrowingsSection communityId={community.id} disabled={deleted} />
 
-          <Section title={t("communities.sheet.features")}>
-            <SettingRow
+          <SettingsSection plain title={t("communities.sheet.features")}>
+            <SettingsRow
               label={t("communities.sheet.bannerLabel")}
-              help={t("communities.sheet.bannerHelp")}
-              htmlFor="community-banner-image"
-              control={
-                <Switch
-                  id="community-banner-image"
-                  checked={community.banner_image_enabled}
-                  onCheckedChange={(checked) => patch({ banner_image_enabled: Boolean(checked) })}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-            <SettingRow
+              description={t("communities.sheet.bannerHelp")}
+            >
+              <Switch
+                checked={community.banner_image_enabled}
+                onCheckedChange={(checked) => patch({ banner_image_enabled: Boolean(checked) })}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t("communities.sheet.supportLabel")}
-              help={
+              description={
                 supportBound || community.support_enabled
                   ? t("communities.sheet.supportHelp")
                   : t("communities.sheet.supportNeedsIntake")
               }
-              htmlFor="community-support"
-              control={
-                <Switch
-                  id="community-support"
-                  checked={community.support_enabled}
-                  onCheckedChange={(checked) => patch({ support_enabled: Boolean(checked) })}
-                  // Switching it off stays available wherever it is on: a
-                  // deployment that has stopped staffing help stops offering
-                  // it, binding or no binding.
-                  disabled={
-                    update.isPending || planLocked || (!supportBound && !community.support_enabled)
-                  }
-                />
-              }
-            />
-            <SettingRow
+            >
+              <Switch
+                checked={community.support_enabled}
+                onCheckedChange={(checked) => patch({ support_enabled: Boolean(checked) })}
+                // Switching it off stays available wherever it is on: a
+                // deployment that has stopped staffing help stops offering
+                // it, binding or no binding.
+                disabled={
+                  update.isPending || planLocked || (!supportBound && !community.support_enabled)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t("communities.sheet.aiConnectionsLabel")}
-              help={t("communities.sheet.aiConnectionsHelp")}
-              htmlFor="community-ai-connections"
-              control={
-                <Switch
-                  id="community-ai-connections"
-                  checked={community.ai_connections_open}
-                  onCheckedChange={(checked) => patch({ ai_connections_open: Boolean(checked) })}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-            <SettingRow
+              description={t("communities.sheet.aiConnectionsHelp")}
+            >
+              <Switch
+                checked={community.ai_connections_open}
+                onCheckedChange={(checked) => patch({ ai_connections_open: Boolean(checked) })}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t("communities.sheet.pluginsLabel")}
-              help={t("communities.sheet.pluginsHelp")}
-              htmlFor="community-plugins"
-              control={
-                <Switch
-                  id="community-plugins"
-                  checked={community.plugins_open}
-                  onCheckedChange={(checked) => patch({ plugins_open: Boolean(checked) })}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-            <SettingRow
+              description={t("communities.sheet.pluginsHelp")}
+            >
+              <Switch
+                checked={community.plugins_open}
+                onCheckedChange={(checked) => patch({ plugins_open: Boolean(checked) })}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+            <SettingsRow
               label={t("communities.sheet.customRolesLabel")}
-              help={t("communities.sheet.customRolesHelp")}
-              htmlFor="community-custom-roles"
-              control={
-                <Switch
-                  id="community-custom-roles"
-                  checked={community.custom_roles_open}
-                  onCheckedChange={(checked) => patch({ custom_roles_open: Boolean(checked) })}
-                  disabled={update.isPending || planLocked}
-                />
-              }
-            />
-          </Section>
+              description={t("communities.sheet.customRolesHelp")}
+            >
+              <Switch
+                checked={community.custom_roles_open}
+                onCheckedChange={(checked) => patch({ custom_roles_open: Boolean(checked) })}
+                disabled={update.isPending || planLocked}
+              />
+            </SettingsRow>
+          </SettingsSection>
         </div>
       </SheetContent>
       {restoring ? (
@@ -457,8 +427,11 @@ const NarrowingsSection = ({
   if (narrowings.isLoading || rows.length === 0) return null;
 
   return (
-    <Section title={t("communities.sheet.narrowings.title")}>
-      <p className="text-muted-foreground text-sm">{t("communities.sheet.narrowings.help")}</p>
+    <SettingsSection
+      plain
+      title={t("communities.sheet.narrowings.title")}
+      description={t("communities.sheet.narrowings.help")}
+    >
       <ul className="space-y-3">
         {rows.map((row) => (
           <li
@@ -497,7 +470,7 @@ const NarrowingsSection = ({
           </li>
         ))}
       </ul>
-    </Section>
+    </SettingsSection>
   );
 };
 
@@ -529,10 +502,8 @@ const PluginSummarySection = ({
 }) => {
   const { data, isError } = useReadCommunityPluginSummary(communityId, summary.plugin_id);
   return (
-    <Section title={summary.name}>
-      <div className="space-y-6 py-3">
-        <PluginSummaryFigures summary={summary} data={data} isError={isError} />
-      </div>
-    </Section>
+    <SettingsSection plain title={summary.name} contentClassName="space-y-6">
+      <PluginSummaryFigures summary={summary} data={data} isError={isError} />
+    </SettingsSection>
   );
 };

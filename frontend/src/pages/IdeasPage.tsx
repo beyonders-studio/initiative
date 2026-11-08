@@ -27,12 +27,12 @@ export const IdeasPage = () => {
   const { t } = useTranslation("intake");
   const { user } = useAuth();
   const [typed, setTyped] = useState("");
-  const q = useDebouncedValue(typed.trim(), 300);
+  const search = useDebouncedValue(typed.trim(), 300);
   const [sort, setSort] = useState<IdeaSort>(IdeaSort.votes);
   const [statusId, setStatusId] = useState<number | null>(null);
   const [mine, setMine] = useState(false);
   const query = useIdeas({
-    q: q || undefined,
+    search: search || undefined,
     sort,
     status_id: statusId ?? undefined,
     voted: mine && Boolean(user),

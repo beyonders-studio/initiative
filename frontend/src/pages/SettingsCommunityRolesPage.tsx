@@ -7,6 +7,7 @@ import {
   CommunityRole,
   type CustomRoleRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import {
@@ -22,7 +23,6 @@ import type { DialogProps } from "@/types/dialog";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Checkbox } from "@/ui/checkbox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
@@ -225,97 +225,90 @@ export const SettingsCommunityRolesPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1.5">
-            <CardTitle>{t("customRoles.title")}</CardTitle>
-            <CardDescription>{t("customRoles.description")}</CardDescription>
-          </div>
-          {addButton}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {closed ? (
-            <Alert>
-              <AlertDescription>{t("customRoles.closed")}</AlertDescription>
-            </Alert>
-          ) : null}
-          <ul className="divide-y rounded-md border">
-            {builtInRoles.map((role) => (
-              <li key={role} className="space-y-1.5 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">
-                    {t(`communities:users.communityRole.${role}` as never)}
-                  </p>
-                  <Badge variant="secondary" className="font-normal">
-                    {t("customRoles.builtIn")}
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  {t(`communities:users.communityRoleHelp.${role}` as never)}
+      <SettingsSection
+        title={t("customRoles.title")}
+        description={t("customRoles.description")}
+        action={addButton}
+      >
+        {closed ? (
+          <Alert>
+            <AlertDescription>{t("customRoles.closed")}</AlertDescription>
+          </Alert>
+        ) : null}
+        <ul className="divide-y rounded-md border">
+          {builtInRoles.map((role) => (
+            <li key={role} className="space-y-1.5 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">
+                  {t(`communities:users.communityRole.${role}` as never)}
                 </p>
-              </li>
-            ))}
-            {roles.map((role) => (
-              <li key={role.id} className="flex items-start justify-between gap-3 p-3">
-                <div className="min-w-0 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{role.name}</p>
-                    <span className="text-muted-foreground text-xs">
-                      {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
-                    </span>
-                  </div>
-                  {role.surfaces.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {role.surfaces.map((surface) => (
-                        <Badge key={surface} variant="secondary" className="font-normal">
-                          {t(`customRoles.surfaces.${surface}.label`)}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-xs">{t("customRoles.holdsNothing")}</p>
-                  )}
-                  {fromDeployment(role) ? (
-                    <p className="text-muted-foreground text-xs">
-                      {t("customRoles.setByDeployment")}
-                    </p>
-                  ) : changes && !held.gives(role) ? (
-                    <p className="text-muted-foreground text-xs">{t("customRoles.beyondYours")}</p>
-                  ) : changes && !held.takesOff(role) ? (
-                    <p className="text-muted-foreground text-xs">
-                      {t("customRoles.widensAnAdmin")}
-                    </p>
-                  ) : null}
+                <Badge variant="secondary" className="font-normal">
+                  {t("customRoles.builtIn")}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {t(`communities:users.communityRoleHelp.${role}` as never)}
+              </p>
+            </li>
+          ))}
+          {roles.map((role) => (
+            <li key={role.id} className="flex items-start justify-between gap-3 p-3">
+              <div className="min-w-0 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{role.name}</p>
+                  <span className="text-muted-foreground text-xs">
+                    {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
+                  </span>
                 </div>
-                {changes && held.gives(role) && !fromDeployment(role) ? (
-                  <RowActionsMenu subject={role.name}>
-                    <DropdownMenuItem onSelect={() => setEditing(role)}>
-                      <Pencil className="h-4 w-4" />
-                      {t("common:edit")}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      disabled={!held.takesOff(role)}
-                      onSelect={() => setDeleting(role)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {t("common:delete")}
-                    </DropdownMenuItem>
-                  </RowActionsMenu>
+                {role.surfaces.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {role.surfaces.map((surface) => (
+                      <Badge key={surface} variant="secondary" className="font-normal">
+                        {t(`customRoles.surfaces.${surface}.label`)}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs">{t("customRoles.holdsNothing")}</p>
+                )}
+                {fromDeployment(role) ? (
+                  <p className="text-muted-foreground text-xs">
+                    {t("customRoles.setByDeployment")}
+                  </p>
+                ) : changes && !held.gives(role) ? (
+                  <p className="text-muted-foreground text-xs">{t("customRoles.beyondYours")}</p>
+                ) : changes && !held.takesOff(role) ? (
+                  <p className="text-muted-foreground text-xs">{t("customRoles.widensAnAdmin")}</p>
                 ) : null}
-              </li>
-            ))}
-          </ul>
-          {rolesQuery.isLoading ? (
-            <SkeletonRegion label={t("customRoles.loading")}>
-              <ListSkeleton rows={2} avatar={false} />
-            </SkeletonRegion>
-          ) : rolesQuery.isError ? (
-            <StatusMessage onRetry={rolesQuery.refetch} />
-          ) : null}
-        </CardContent>
-      </Card>
+              </div>
+              {changes && held.gives(role) && !fromDeployment(role) ? (
+                <RowActionsMenu subject={role.name}>
+                  <DropdownMenuItem onSelect={() => setEditing(role)}>
+                    <Pencil className="h-4 w-4" />
+                    {t("common:edit")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    disabled={!held.takesOff(role)}
+                    onSelect={() => setDeleting(role)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("common:delete")}
+                  </DropdownMenuItem>
+                </RowActionsMenu>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {rolesQuery.isLoading ? (
+          <SkeletonRegion label={t("customRoles.loading")}>
+            <ListSkeleton rows={2} avatar={false} />
+          </SkeletonRegion>
+        ) : rolesQuery.isError ? (
+          <StatusMessage onRetry={rolesQuery.refetch} />
+        ) : null}
+      </SettingsSection>
 
       <CustomRoleDialog
         open={editing !== null}

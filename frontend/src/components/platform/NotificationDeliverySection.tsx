@@ -13,11 +13,10 @@
 
 import { useTranslation } from "react-i18next";
 
-import { SettingsSection } from "@/components/settings/SettingsSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 
 export const NotificationDeliverySection = () => {
@@ -81,24 +80,11 @@ export const NotificationDeliverySection = () => {
       title={t("notificationDelivery.title")}
       description={t("notificationDelivery.description")}
     >
-      <div className="space-y-5">
-        {rows.map((row) => (
-          <div key={row.id} className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <Label htmlFor={row.id} className="font-medium">
-                {row.label}
-              </Label>
-              <p className="text-muted-foreground text-sm">{row.help}</p>
-            </div>
-            <Switch
-              id={row.id}
-              checked={row.checked}
-              onCheckedChange={row.change}
-              disabled={update.isPending}
-            />
-          </div>
-        ))}
-      </div>
+      {rows.map((row) => (
+        <SettingsRow key={row.id} label={row.label} description={row.help}>
+          <Switch checked={row.checked} onCheckedChange={row.change} disabled={update.isPending} />
+        </SettingsRow>
+      ))}
     </SettingsSection>
   );
 };

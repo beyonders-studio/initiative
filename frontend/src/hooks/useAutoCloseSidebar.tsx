@@ -32,7 +32,7 @@ export const useAutoCloseSidebar = () => {
     }
   }, [pathname, isMobile, setOpenMobile, consumeAutoCloseSuppression]);
 
-  // Help opens over the page as a sheet of its own on a phone.
+  // Help opens over the page, so the sidebar is not left open under it.
   const helpOpen = useHelpOpen();
   useEffect(() => {
     if (helpOpen && isMobile) setOpenMobile(false);

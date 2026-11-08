@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolsSection } from "@/components/initiatives/ToolsToggles";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useInitiativeDefaults } from "@/hooks/useInitiativeRoles";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
@@ -54,49 +54,44 @@ export const InitiativeSettingsDetailsTab = ({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardDescription>{t("settings.detailsDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={onSaveDetails}>
-            <div className="grid grid-cols-pair gap-4">
-              <Field label={t("settings.nameLabel")}>
-                <Input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  maxLength={255}
-                  disabled={!canManageMembers || isSaving}
-                  required
-                />
-              </Field>
-              <Field label={t("settings.colorLabel")}>
-                <ColorPickerPopover
-                  value={color}
-                  onChange={setColor}
-                  disabled={!canManageMembers || isSaving}
-                />
-              </Field>
-            </div>
-            <Field label={t("settings.descriptionLabel")}>
-              <Textarea
-                rows={4}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder={t("settings.descriptionPlaceholder")}
+      <SettingsSection description={t("settings.detailsDescription")}>
+        <form className="space-y-4" onSubmit={onSaveDetails}>
+          <div className="grid grid-cols-pair gap-4">
+            <Field label={t("settings.nameLabel")}>
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={255}
+                disabled={!canManageMembers || isSaving}
+                required
+              />
+            </Field>
+            <Field label={t("settings.colorLabel")}>
+              <ColorPickerPopover
+                value={color}
+                onChange={setColor}
                 disabled={!canManageMembers || isSaving}
               />
             </Field>
-            {canManageMembers ? (
-              <Button type="submit" pending={isSaving}>
-                {isSaving ? t("settings.saving") : t("settings.saveChanges")}
-              </Button>
-            ) : (
-              <p className="text-muted-foreground text-sm">{t("settings.editPermissionNote")}</p>
-            )}
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+          <Field label={t("settings.descriptionLabel")}>
+            <Textarea
+              rows={4}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t("settings.descriptionPlaceholder")}
+              disabled={!canManageMembers || isSaving}
+            />
+          </Field>
+          {canManageMembers ? (
+            <Button type="submit" pending={isSaving}>
+              {isSaving ? t("settings.saving") : t("settings.saveChanges")}
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("settings.editPermissionNote")}</p>
+          )}
+        </form>
+      </SettingsSection>
       {/* Saves on change, unlike the details form above: each switch is a
           single setting, not a field waiting on a Save button. */}
       <ToolsSection

@@ -28,6 +28,7 @@ import {
   createBillingDirectoryHandoff,
   createBillingInsightsHandoff,
 } from "@/api/generated/settings/settings";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -35,7 +36,6 @@ import { toast } from "@/lib/mascotToast";
 import { openExternal, reserveTab } from "@/lib/openExternal";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 type Door = "insights" | "contracts" | "directory" | "control";
 
@@ -91,112 +91,104 @@ export const OperatorDashboardBillingPage = () => {
   return (
     <div className="space-y-6">
       {canInsights && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <SettingsSection
+          title={
+            <span className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" aria-hidden />
               {t("billingInsights.title")}
-            </CardTitle>
-            <CardDescription>{t("billingInsights.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-              <li>{t("billingInsights.fromPaddle")}</li>
-              <li>{t("billingInsights.fromBilling")}</li>
-              <li>{t("billingInsights.noCommunity")}</li>
-            </ul>
-            {billing?.insights ? (
-              <Button onClick={() => void open("insights")} disabled={opening !== null}>
-                <ExternalLink className="h-4 w-4" aria-hidden />
-                {opening === "insights" ? t("billingInsights.opening") : t("billingInsights.open")}
-              </Button>
-            ) : (
-              <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
-            )}
-          </CardContent>
-        </Card>
+            </span>
+          }
+          description={t("billingInsights.description")}
+        >
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
+            <li>{t("billingInsights.fromPaddle")}</li>
+            <li>{t("billingInsights.fromBilling")}</li>
+            <li>{t("billingInsights.noCommunity")}</li>
+          </ul>
+          {billing?.insights ? (
+            <Button onClick={() => void open("insights")} disabled={opening !== null}>
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              {opening === "insights" ? t("billingInsights.opening") : t("billingInsights.open")}
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
+          )}
+        </SettingsSection>
       )}
       {canContracts && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <SettingsSection
+          title={
+            <span className="flex items-center gap-2">
               <FileText className="h-5 w-5" aria-hidden />
               {t("billingContracts.title")}
-            </CardTitle>
-            <CardDescription>{t("billingContracts.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-              <li>{t("billingContracts.invoices")}</li>
-              <li>{t("billingContracts.keys")}</li>
-              <li>{t("billingContracts.noCommunity")}</li>
-            </ul>
-            {billing?.contracts ? (
-              <Button onClick={() => void open("contracts")} disabled={opening !== null}>
-                <ExternalLink className="h-4 w-4" aria-hidden />
-                {opening === "contracts"
-                  ? t("billingInsights.opening")
-                  : t("billingContracts.open")}
-              </Button>
-            ) : (
-              <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
-            )}
-          </CardContent>
-        </Card>
+            </span>
+          }
+          description={t("billingContracts.description")}
+        >
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
+            <li>{t("billingContracts.invoices")}</li>
+            <li>{t("billingContracts.keys")}</li>
+            <li>{t("billingContracts.noCommunity")}</li>
+          </ul>
+          {billing?.contracts ? (
+            <Button onClick={() => void open("contracts")} disabled={opening !== null}>
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              {opening === "contracts" ? t("billingInsights.opening") : t("billingContracts.open")}
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
+          )}
+        </SettingsSection>
       )}
       {canDirectory && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <SettingsSection
+          title={
+            <span className="flex items-center gap-2">
               <BookUser className="h-5 w-5" aria-hidden />
               {t("billingDirectory.title")}
-            </CardTitle>
-            <CardDescription>{t("billingDirectory.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-              <li>{t("billingDirectory.lists")}</li>
-              <li>{t("billingDirectory.readOnly")}</li>
-              <li>{t("billingDirectory.ownersOnly")}</li>
-            </ul>
-            {billing?.directory ? (
-              <Button onClick={() => void open("directory")} disabled={opening !== null}>
-                <ExternalLink className="h-4 w-4" aria-hidden />
-                {opening === "directory"
-                  ? t("billingInsights.opening")
-                  : t("billingDirectory.open")}
-              </Button>
-            ) : (
-              <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
-            )}
-          </CardContent>
-        </Card>
+            </span>
+          }
+          description={t("billingDirectory.description")}
+        >
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
+            <li>{t("billingDirectory.lists")}</li>
+            <li>{t("billingDirectory.readOnly")}</li>
+            <li>{t("billingDirectory.ownersOnly")}</li>
+          </ul>
+          {billing?.directory ? (
+            <Button onClick={() => void open("directory")} disabled={opening !== null}>
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              {opening === "directory" ? t("billingInsights.opening") : t("billingDirectory.open")}
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
+          )}
+        </SettingsSection>
       )}
       {canControl && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <SettingsSection
+          title={
+            <span className="flex items-center gap-2">
               <SlidersHorizontal className="h-5 w-5" aria-hidden />
               {t("billingControl.title")}
-            </CardTitle>
-            <CardDescription>{t("billingControl.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
-              <li>{t("billingControl.revisions")}</li>
-              <li>{t("billingControl.ownersOnly")}</li>
-              <li>{t("billingControl.noCommunity")}</li>
-            </ul>
-            {billing?.control ? (
-              <Button onClick={() => void open("control")} disabled={opening !== null}>
-                <ExternalLink className="h-4 w-4" aria-hidden />
-                {opening === "control" ? t("billingInsights.opening") : t("billingControl.open")}
-              </Button>
-            ) : (
-              <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
-            )}
-          </CardContent>
-        </Card>
+            </span>
+          }
+          description={t("billingControl.description")}
+        >
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground text-sm">
+            <li>{t("billingControl.revisions")}</li>
+            <li>{t("billingControl.ownersOnly")}</li>
+            <li>{t("billingControl.noCommunity")}</li>
+          </ul>
+          {billing?.control ? (
+            <Button onClick={() => void open("control")} disabled={opening !== null}>
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              {opening === "control" ? t("billingInsights.opening") : t("billingControl.open")}
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("billingInsights.notConfigured")}</p>
+          )}
+        </SettingsSection>
       )}
     </div>
   );
