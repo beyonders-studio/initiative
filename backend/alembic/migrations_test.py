@@ -57,23 +57,6 @@ BASELINE_REVISION = ScriptDirectory(str(ALEMBIC_SCRIPT_LOCATION)).get_base()
 INTENTIONALLY_IRREVERSIBLE = frozenset(
     {
         BASELINE_REVISION,
-        # post_squash_reconcile: folds the (never-shipped) 0126–0130 chain —
-        # legacy healing + policy strips + grant matrices. It reconciles
-        # pre-collapse states that no longer have code paths; roll forward only.
-        "20260702_0126",
-        # drop_frozen_public_guild_copies: the dropped rows can't be restored,
-        # so stamping 0162 back would leave the revision disagreeing with the
-        # physical schema. One-way door; restore from a backup instead.
-        "20260811_0163",
-        # an_account_is_reached_by_its_addresses: users.email_hash was NOT NULL
-        # and unique across the table, and user_emails allows an account to hold
-        # no address, so the column cannot be rebuilt for every row. Roll
-        # forward; restore from a backup instead.
-        "20260915_0274",
-        # apps_are_plug_ins: the app tables, roles and stored values move to
-        # their plug-in names with nothing kept under the old ones. Roll
-        # forward; restore from a backup instead.
-        "20261005_0457",
     }
 )
 
