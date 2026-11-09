@@ -31,10 +31,6 @@ const EMPTY: Remembered = { last: null, byUser: {} };
 const read = (): Remembered => {
   const stored = getItem(COMMUNITY_STORAGE_KEY);
   if (!stored) return EMPTY;
-  // A bare number is what this key held before it was kept per account.
-  // ``legacyCommunityId`` serves it to the readers; there is nothing per-account in
-  // it, and the first write under the new shape replaces it.
-  if (Number.isFinite(Number(stored))) return EMPTY;
   try {
     const parsed = JSON.parse(stored) as Partial<Remembered> | null;
     if (!parsed || typeof parsed !== "object") return EMPTY;
@@ -47,21 +43,12 @@ const read = (): Remembered => {
   }
 };
 
-const legacyCommunityId = (): number | null => {
-  const stored = getItem(COMMUNITY_STORAGE_KEY);
-  if (!stored) return null;
-  const parsed = Number(stored);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
 /**
  * The community to open before anyone has said who they are — whoever used this
  * browser last. A fallback, never an authority: the community list replaces it as
  * soon as it answers.
  */
 export const readStoredCommunityId = (): number | null => {
-  const legacy = legacyCommunityId();
-  if (legacy !== null) return legacy;
   const { last, byUser } = read();
   if (last === null) return null;
   return byUser[String(last)] ?? null;
@@ -70,8 +57,6 @@ export const readStoredCommunityId = (): number | null => {
 /** The community this account last had open on this browser. */
 export const readStoredCommunityIdFor = (userId: number | null): number | null => {
   if (userId === null) return null;
-  const legacy = legacyCommunityId();
-  if (legacy !== null) return legacy;
   return read().byUser[String(userId)] ?? null;
 };
 

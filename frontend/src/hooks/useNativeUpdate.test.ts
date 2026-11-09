@@ -77,18 +77,20 @@ describe("buildBundleDownloadUrl", () => {
 });
 
 describe("floorFor", () => {
-  const statement = { v: 1, version: "0.75.0", sha256: "", minNativeVersion: "0.73.0" } as const;
+  const statement = {
+    v: 1,
+    version: "0.75.0",
+    sha256: "",
+    minNativeVersion: "0.73.0",
+    minDesktopVersion: "0.75.0",
+  } as const;
 
   it("holds the phone app to the phone floor", () => {
-    expect(floorFor({ ...statement, minDesktopVersion: "0.75.0" }, "android")).toBe("0.73.0");
+    expect(floorFor(statement, "android")).toBe("0.73.0");
   });
 
   it("holds the desktop app to its own floor", () => {
-    expect(floorFor({ ...statement, minDesktopVersion: "0.75.0" }, "electron")).toBe("0.75.0");
-  });
-
-  it("falls back to the phone floor for a statement made before the desktop had one", () => {
-    expect(floorFor(statement, "electron")).toBe("0.73.0");
+    expect(floorFor(statement, "electron")).toBe("0.75.0");
   });
 });
 

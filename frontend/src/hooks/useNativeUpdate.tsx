@@ -44,13 +44,10 @@ export const buildBundleDownloadUrl = (serverUrl: string, manifestUrl: string): 
 
 /**
  * The oldest app this device's kind of app may be to run the bundle. The
- * desktop app has a floor of its own; a statement from before it names only
- * the phone app's.
+ * desktop app has a floor of its own.
  */
 export const floorFor = (statement: UpdateStatement, platform: string): string =>
-  platform === "electron"
-    ? (statement.minDesktopVersion ?? statement.minNativeVersion)
-    : statement.minNativeVersion;
+  platform === "electron" ? statement.minDesktopVersion : statement.minNativeVersion;
 
 /** The `major.minor.patch` of a version, without any `-suffix`. */
 const coreOf = (version: string): string => version.split("-")[0];
@@ -188,7 +185,7 @@ export const useNativeUpdate = () => {
         headers: { Accept: "application/json" },
       });
       if (!manifestRes.ok) {
-        return; // older server without OTA support, or no bundle in this build
+        return; // no bundle in this build
       }
       const manifest = (await manifestRes.json()) as NativeBundleManifest;
 
