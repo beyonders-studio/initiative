@@ -288,9 +288,7 @@ pub fn verify_verification(
 
 /// Open a session with a device, spending a prekey claimed from the directory.
 ///
-/// A signed prekey must verify against the device's fingerprint key; an
-/// unsigned one is accepted only from a device the caller already trusts
-/// unsigned (see the trust module).
+/// The prekey's signature must verify against the device's fingerprint key.
 #[wasm_bindgen]
 pub fn create_outbound_session(
     pickle: &str,
@@ -298,7 +296,7 @@ pub fn create_outbound_session(
     their_identity_key: &str,
     their_fingerprint_key: &str,
     their_one_time_key: &str,
-    one_time_key_signature: Option<String>,
+    one_time_key_signature: &str,
     fallback: bool,
 ) -> Result<JsValue, JsError> {
     let account = load_account(pickle, key)?;
@@ -306,12 +304,10 @@ pub fn create_outbound_session(
         .map_err(|_| JsError::new("bad identity key"))?;
     let one_time = Curve25519PublicKey::from_base64(their_one_time_key)
         .map_err(|_| JsError::new("bad one-time key"))?;
-    if let Some(signature) = one_time_key_signature {
-        let fingerprint = Ed25519PublicKey::from_base64(their_fingerprint_key)
-            .map_err(|_| JsError::new("bad fingerprint key"))?;
-        if !verify(&fingerprint, &key_bytes(&one_time, fallback), &signature) {
-            return Err(JsError::new("one-time key signature does not verify"));
-        }
+    let fingerprint = Ed25519PublicKey::from_base64(their_fingerprint_key)
+        .map_err(|_| JsError::new("bad fingerprint key"))?;
+    if !verify(&fingerprint, &key_bytes(&one_time, fallback), one_time_key_signature) {
+        return Err(JsError::new("one-time key signature does not verify"));
     }
     let session = account.create_outbound_session(SessionConfig::version_2(), identity, one_time);
     to_js(&OutboundSession {
