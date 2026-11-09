@@ -7,30 +7,21 @@ collected message stops existing.
 """
 
 import base64
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from sqlalchemy import text
 
-from app.core.transitions import DM_SIGNED_DEVICES
 from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_ignore import UserIgnore
-from app.services.platform import app_settings as app_settings_service
 
 
-def _key(seed: int) -> str:
-    """One public key, written the way the ratchet writes it: no padding."""
-    return base64.b64encode(bytes([seed % 251]) * 32).decode().rstrip("=")
-
-
-def _registration(seed: int = 1) -> dict:
-    return {
-        "identity_key": _key(seed),
-        "fingerprint_key": _key(seed + 1),
-        "fallback_key": {"key_id": "fb", "public_key": _key(seed + 2)},
-        "one_time_keys": [{"key_id": "otk-1", "public_key": _key(seed + 3)}],
-    }
+def _registration(user_id: int, seed: int = 1) -> dict:
+    """A registration as a device sends it, signed by its own key."""
+    registration = _signed_registration(user_id, seed)
+    registration.pop("_device")
+    return registration
 
 
 def _b64(raw: bytes) -> str:
@@ -121,7 +112,7 @@ FIREFOX_ON_LINUX = (
 async def _register(client, actor, seed=1, user_agent=FIREFOX_ON_LINUX) -> str:
     response = await client.post(
         "/api/v1/me/dm/devices",
-        json=_registration(seed),
+        json=_registration(actor.user.id, seed),
         headers={**actor.headers, "user-agent": user_agent},
     )
     assert response.status_code == 201, response.text
@@ -152,7 +143,7 @@ async def test_a_device_publishes_only_public_keys(client, acting_user):
 
 async def test_a_malformed_key_is_refused(client, acting_user):
     a = await acting_user()
-    payload = _registration()
+    payload = _registration(a.user.id)
     payload["identity_key"] = "not-base64!!"
 
     response = await client.post(
@@ -225,7 +216,7 @@ async def test_a_fallback_key_may_reuse_a_prekey_id(client, acting_user):
     """Fallback keys are numbered in their own sequence on the client, so the
     same id string can arrive on both -- registration must not collide."""
     a = await acting_user()
-    payload = _registration()
+    payload = _registration(a.user.id)
     payload["fallback_key"]["key_id"] = "AAAAAAAAAAA"
     payload["one_time_keys"][0]["key_id"] = "AAAAAAAAAAA"
 
@@ -237,7 +228,7 @@ async def test_a_fallback_key_may_reuse_a_prekey_id(client, acting_user):
 
 async def test_a_short_key_is_refused(client, acting_user):
     a = await acting_user()
-    payload = _registration()
+    payload = _registration(a.user.id)
     payload["identity_key"] = base64.b64encode(b"tooshort").decode()
 
     response = await client.post(
@@ -352,8 +343,8 @@ async def test_claiming_spends_a_prekey_but_never_the_fallback(
 
 async def test_a_device_signs_its_keys(client, session, acting_user):
     """A signature must verify against the device's own key, a signed device's
-    keys are signed too, and a device registered before signing signs itself
-    once. After this deployment's grace, an unsigned registration is refused."""
+    keys are signed too, an unsigned registration is refused, and a device
+    registered before signing signs itself once."""
     a = await acting_user()
 
     wrong_key = _signed_registration(a.user.id)
@@ -369,12 +360,26 @@ async def test_a_device_signs_its_keys(client, session, acting_user):
         assert refused.status_code == 400, refused.text
         assert refused.json()["detail"] == "DM_INVALID_SIGNATURE"
 
-    legacy = _signed_registration(a.user.id, seed=7, sign=False)
+    unsigned = _signed_registration(a.user.id, seed=20, sign=False)
+    unsigned.pop("_device")
+    refused = await client.post(
+        "/api/v1/me/dm/devices", json=unsigned, headers=a.headers
+    )
+    assert refused.json()["detail"] == "DM_INVALID_SIGNATURE"
+
+    # A device registered before signing: its row has no signature.
+    legacy = _signed_registration(a.user.id, seed=7)
     device = legacy.pop("_device")
     registered = await client.post(
         "/api/v1/me/dm/devices", json=legacy, headers=a.headers
     )
     device_id = registered.json()["device_id"]
+    await session.exec(
+        text(
+            "UPDATE public.dm_devices SET signature = NULL WHERE id = CAST(:id AS uuid)"
+        ).bindparams(id=device_id)
+    )
+    await session.commit()
     signed = _signed_registration(a.user.id, seed=7)
     signed.pop("_device")
     fingerprint = base64.b64decode(legacy["fingerprint_key"] + "=")
@@ -411,22 +416,6 @@ async def test_a_device_signs_its_keys(client, session, acting_user):
     assert listed["one_time_key_count"] == 2
     again = await client.put(url, json=backfill, headers=a.headers)
     assert again.json()["detail"] == "DM_INVALID_SIGNATURE"
-
-    await app_settings_service.record_running_version(
-        session, version="0.99.0", transitions=[DM_SIGNED_DEVICES.name]
-    )
-    row = await app_settings_service.get_app_settings(session)
-    row.transitions = {
-        DM_SIGNED_DEVICES.name: (
-            datetime.now(UTC) - DM_SIGNED_DEVICES.grace - timedelta(days=1)
-        ).isoformat()
-    }
-    session.add(row)
-    await session.commit()
-    late = _signed_registration(a.user.id, seed=20, sign=False)
-    late.pop("_device")
-    refused = await client.post("/api/v1/me/dm/devices", json=late, headers=a.headers)
-    assert refused.json()["detail"] == "DM_INVALID_SIGNATURE"
 
 
 # ------------------------------------------------------------ conversations ---
@@ -1274,7 +1263,6 @@ class TestAGroupSend:
     test, and it is already meant to carry any roster."""
 
     async def _group(self, client, session, members):
-        from datetime import datetime
 
         from app.models.platform.dm_conversation import (
             DmConversation,

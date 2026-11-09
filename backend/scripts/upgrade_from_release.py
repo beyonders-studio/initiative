@@ -58,7 +58,7 @@ Usage, from ``backend/`` with ``SECRET_KEY`` set, as each boot reads it::
 
     docker build -t initiative:local --build-arg VERSION=$(cat ../VERSION) ..
     python scripts/upgrade_from_release.py --image initiative:local \\
-        --from v0.73.1 \\
+        --from v0.77.1 \\
         --server postgresql://initiative:initiative@localhost:5432 \\
         --fresh-server postgresql://initiative:initiative@localhost:5433
 
@@ -170,6 +170,17 @@ WITHDRAWN = {
 
 #: Every database setting a boot may be given; each boot gets only its own.
 _DATABASE_SETTINGS = (*LOGINS, "DATABASE_URL_BOOTSTRAP")
+
+
+def _floor() -> str:
+    """The release the migration chain starts at. The current tree refuses a
+    database from before it, so only a walk, which boots that release on the
+    way, may start older."""
+    for path in (BACKEND / "alembic" / "versions").glob("*_baseline.py"):
+        found = re.search(r'^release = "(v[\d.]+)"$', path.read_text(), re.MULTILINE)
+        if found:
+            return found.group(1)
+    raise SystemExit("No baseline revision names the release it was cut at.")
 
 
 def _environment(server: str, *, one_url: bool) -> dict[str, str]:
@@ -1005,6 +1016,12 @@ def main() -> None:
     start = args.start or (walk_from if args.walk else tags[-1])
     if args.one_url and tags.index(start) < tags.index(ONE_URL_FROM):
         parser.error(f"{start} predates one-URL setups; the first is {ONE_URL_FROM}")
+    floor = _floor()
+    if not args.walk and tags.index(start) < tags.index(floor):
+        parser.error(
+            f"{start} is older than {floor}, where the migrations start; "
+            "start at it or later, or --walk"
+        )
     releases = (
         [tag for tag in tags[tags.index(start) :] if tag not in WITHDRAWN]
         if args.walk

@@ -34,7 +34,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
 from app.core.messages import DirectMessageTransportMessages as Messages
-from app.core.transitions import DM_SIGNED_DEVICES
 from app.core.user_agents import describe as describe_client
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.dm_conversation import (
@@ -61,7 +60,6 @@ from app.schemas.platform.dm_transport import (
     DmSessionKey,
     DmVerificationMessage,
 )
-from app.services.platform import app_settings as app_settings_service
 from app.services.platform import presence as presence_service
 
 #: A public key is 32 bytes on both curves.
@@ -286,9 +284,8 @@ async def register_device(
 ) -> DmDevice:
     """Publish a new installed client's public keys, signed by the device.
 
-    An unsigned registration is accepted until this deployment's
-    ``DM_SIGNED_DEVICES`` transition ends, from app bundles that do not sign
-    yet. A signed device's keys must be signed too.
+    An unsigned registration is refused, and a signed device's keys must be
+    signed too.
 
     A fallback key is required rather than optional: without one, a device whose
     prekeys run out becomes unreachable to anyone starting a new conversation,
@@ -302,9 +299,7 @@ async def register_device(
     """
     identity = _decode(identity_key, expect=KEY_BYTES)
     fingerprint = _decode(fingerprint_key, expect=KEY_BYTES)
-    if signature is None and await app_settings_service.transition_over(
-        session, DM_SIGNED_DEVICES
-    ):
+    if signature is None:
         raise DmTransportError(Messages.INVALID_SIGNATURE)
     device = DmDevice(
         user_id=user_id,

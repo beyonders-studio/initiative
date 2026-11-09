@@ -56,7 +56,9 @@ async def _install(
     the same sign-in (a fresh one unless ``headers`` names it)."""
     headers = headers or await signed_in_headers(session, actor.user)
     registered = await client.post(
-        "/api/v1/me/dm/devices", json=_registration(seed), headers=headers
+        "/api/v1/me/dm/devices",
+        json=_registration(actor.user.id, seed),
+        headers=headers,
     )
     assert registered.status_code == 201, registered.text
     push = await client.post(
@@ -173,7 +175,9 @@ class TestTheLink:
         # A second key store on the same account, collected under the first
         # installation's sign-in.
         registered = await client.post(
-            "/api/v1/me/dm/devices", json=_registration(21), headers=a.headers
+            "/api/v1/me/dm/devices",
+            json=_registration(a.user.id, 21),
+            headers=a.headers,
         )
         second = registered.json()["devices"][-1]["id"]
 
@@ -201,7 +205,7 @@ class TestTheLink:
         first, headers = await _install(client, session, a, seed=15)
 
         registered = await client.post(
-            "/api/v1/me/dm/devices", json=_registration(31), headers=headers
+            "/api/v1/me/dm/devices", json=_registration(a.user.id, 31), headers=headers
         )
         assert registered.status_code == 201, registered.text
 

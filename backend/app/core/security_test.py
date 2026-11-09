@@ -432,6 +432,24 @@ def test_decode_session_token_refuses_the_pre_session_shape():
         decode_session_token(legacy)
 
 
+def test_decode_session_token_refuses_a_token_with_no_session():
+    """Every access token names its session; one that doesn't was not minted
+    by this server's ``mint_access_token``."""
+    sessionless = jwt.encode(
+        {
+            "sub": "ucli_seven",
+            "ver": 2,
+            "aud": AUTH_ACCESS_AUDIENCE,
+            "iss": TOKEN_ISSUER,
+            "exp": datetime.now(UTC) + timedelta(minutes=10),
+        },
+        settings.jwt_signing_key,
+        algorithm=JWT_ALGORITHM,
+    )
+    with pytest.raises(jwt.PyJWTError):
+        decode_session_token(sessionless)
+
+
 def test_decode_session_token_rejects_scoped_upload_token():
     """A scoped upload token carries a foreign aud — it must NOT be honored as
     a session credential on either decode path (the key security property)."""

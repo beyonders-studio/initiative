@@ -379,7 +379,7 @@ def decode_session_token(token: str) -> dict[str, Any]:
         token,
         audience=AUTH_ACCESS_AUDIENCE,
         issuer=TOKEN_ISSUER,
-        require=["exp", "sub", "ver", "aud", "iss"],
+        require=["exp", "sub", "ver", "sid", "aud", "iss"],
     )
 
 

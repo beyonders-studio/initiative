@@ -115,6 +115,8 @@ async def _session(session: AsyncSession, token_data: TokenPayload) -> Authentic
     if token_data.ver is None or token_data.ver != user.token_version:
         raise CredentialRefused(AuthMessages.INVALID_TOKEN)
     session_id = _session_row_id(token_data.sid)
+    if session_id is None:
+        raise CredentialRefused(AuthMessages.INVALID_TOKEN)
     auth_context.record(
         satisfied_providers=frozenset(token_data.sat or ()),
         satisfied_claims=claims_from_provider_auth(token_data.satd),
@@ -123,10 +125,8 @@ async def _session(session: AsyncSession, token_data: TokenPayload) -> Authentic
         # answered.
         session_amr=policy_markers(token_data.amr),
         asked_of_account=asked_of_an_account(asked),
-        session_credential=(
-            SessionCredential(session_id=session_id, token_version=token_data.ver)
-            if session_id is not None
-            else None
+        session_credential=SessionCredential(
+            session_id=session_id, token_version=token_data.ver
         ),
     )
     return Authenticated(user=user, kind=CredentialKind.session, session_id=session_id)

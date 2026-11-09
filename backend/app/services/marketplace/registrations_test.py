@@ -970,37 +970,6 @@ async def test_reconcile_reads_the_key_set_address(session, tmp_path, monkeypatc
     assert row.jwks_uri == f"{HTTPS_BASE_URL}/jwks.json"
 
 
-async def test_reconcile_ignores_grants_in_a_file_written_for_an_earlier_release(
-    session, tmp_path, monkeypatch, caplog
-):
-    """A registration no longer has grants. An entry that still names them is
-    applied without them and the pass says so, so the file does not stop a
-    boot."""
-    await _listed(session, "acme.earlier")
-    monkeypatch.setattr(
-        settings,
-        "PLUGIN_SERVICES_CONFIG",
-        _write_config(
-            tmp_path,
-            [
-                {
-                    "public_id": "acme.earlier",
-                    "base_url": BASE_URL,
-                    "grants": ["delegation", "plugin_directory"],
-                }
-            ],
-        ),
-    )
-
-    with caplog.at_level("WARNING", logger="app.services.marketplace.registrations"):
-        result = await service.reconcile_from_config(session)
-
-    assert (result.updated, result.skipped) == (1, 0)
-    assert any("names grants" in record.getMessage() for record in caplog.records)
-    row = await _registration(session, "acme.earlier")
-    assert not hasattr(row, "grants")
-
-
 async def test_reconcile_is_a_no_op_without_the_setting(session, monkeypatch):
     monkeypatch.setattr(settings, "PLUGIN_SERVICES_CONFIG", None)
     assert (await service.reconcile_from_config(session)).total == 0
