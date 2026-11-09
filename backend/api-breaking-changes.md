@@ -9,6 +9,30 @@ matter and can be deleted.
 
 ## After 0.78.0
 
+### Every message device signs its keys
+
+A device registered before 0.73 signed itself later through its own route;
+those that never did are removed, so the route goes and a registration, and
+every key it publishes, carries its signature.
+
+- POST /api/v1/me/dm/devices the request property `fallback_key/signature` became required
+- POST /api/v1/me/dm/devices the request property `one_time_keys/items/signature` became required
+- POST /api/v1/me/dm/devices the request property `signature` became required
+- POST /api/v1/me/dm/devices request property `fallback_key/signature` list-of-types was narrowed by removing types `null` from media type `application/json`
+- POST /api/v1/me/dm/devices request property `one_time_keys/items/signature` list-of-types was narrowed by removing types `null` from media type `application/json`
+- POST /api/v1/me/dm/devices request property `signature` list-of-types was narrowed by removing types `null` from media type `application/json`
+- POST /api/v1/me/dm/devices the `fallback_key/signature` request property's maxLength was set to `88`
+- POST /api/v1/me/dm/devices the `one_time_keys/items/signature` request property's maxLength was set to `88`
+- POST /api/v1/me/dm/devices the `signature` request property's maxLength was set to `88`
+- POST /api/v1/me/dm/devices the `fallback_key/signature` request property's minLength was set to `1`
+- POST /api/v1/me/dm/devices the `one_time_keys/items/signature` request property's minLength was set to `1`
+- POST /api/v1/me/dm/devices the `signature` request property's minLength was set to `1`
+- PUT /api/v1/me/dm/devices/{device_id}/signature api path removed without deprecation
+- POST /api/v1/me/dm/one-time-keys the request property `one_time_keys/items/signature` became required
+- POST /api/v1/me/dm/one-time-keys request property `one_time_keys/items/signature` list-of-types was narrowed by removing types `null` from media type `application/json`
+- POST /api/v1/me/dm/one-time-keys the `one_time_keys/items/signature` request property's maxLength was set to `88`
+- POST /api/v1/me/dm/one-time-keys the `one_time_keys/items/signature` request property's minLength was set to `1`
+
 ### An account's email address as it is stored
 
 The backend's type cleanup reads an account's `email` as the string it is
