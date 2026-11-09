@@ -327,16 +327,25 @@ async def test_the_wrapper_is_a_no_op_when_there_is_nothing_to_move(session):
     await session.exec(text(block))
 
 
-async def test_nothing_is_said_when_the_connecting_login_owns_its_objects(session):
-    """The ordinary case, and the one a warning must not fire on: the test
-    database was handed to the declared provisioner by conftest's bootstrap,
-    so the handover would move nothing."""
-    from app.db.bootstrap import owners_to_hand_over
-
-    owners = await owners_to_hand_over(
-        await session.connection(), login_roles()[0].name
+async def test_nothing_is_said_after_the_handover(session):
+    """The warning and the handover agree: once the handover has run, as the
+    bootstrap runs it, the dry run names nobody. Run here rather than read
+    off the shared test database, which other tests leave objects in as the
+    superuser."""
+    from app.db.bootstrap import (
+        _handover_settings,
+        _set_local,
+        _transfer_ownership,
+        owners_to_hand_over,
     )
-    assert not owners, f"the handover would still move objects owned by {owners}"
+
+    conn = await session.connection()
+    provisioner = login_roles()[0].name
+    for key, value in [("app._bootstrap_role", provisioner), *_handover_settings()]:
+        await _set_local(conn, key, value)
+    await _transfer_ownership(conn)
+    owners = await owners_to_hand_over(conn, provisioner)
+    assert not owners, f"the handover left objects owned by {owners}"
 
 
 async def test_an_object_owned_elsewhere_is_seen(session):
