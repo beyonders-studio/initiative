@@ -168,7 +168,7 @@
     "cross-env": "^10.1.0",
     "emojibase-data": "^18.0.0",
     "esbuild": "0.28.2",
-    "fake-indexeddb": "^6.2.6",
+    "fake-indexeddb": "^6.2.7",
     "fflate": "^0.8.3",
     "husky": "^9.1.7",
     "initiative-desktop-plugins": "link:electron/plugins",
