@@ -186,7 +186,7 @@ async def _subject(session: AsyncSession, task_id: int) -> dict[str, object]:
         value = values.get(name)
         try:
             return int(value) if value is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     kind = values.get(CaseField.resource_type.value)

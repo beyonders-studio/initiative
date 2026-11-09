@@ -130,7 +130,7 @@ def _mounted():
 
 
 @contextmanager
-def _counting() -> Generator[list[str], None, None]:
+def _counting() -> Generator[list[str]]:
     """Every statement any engine runs meanwhile, in order."""
     statements: list[str] = []
     _state["statements"] = statements

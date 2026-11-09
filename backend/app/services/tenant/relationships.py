@@ -193,7 +193,7 @@ async def link_many(
             refuse_derived(made.relationship_type)
             _refuse_link(made, ends, writable)
             await _create_link(session, made, user_id)
-        except (Refused, SelfLoop):
+        except Refused, SelfLoop:
             continue
 
 

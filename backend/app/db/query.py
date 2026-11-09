@@ -308,7 +308,7 @@ def _column_python_type(col: Any) -> type | None:
     """The Python type *col* stores, or ``None`` if it doesn't declare one."""
     try:
         return col.type.python_type
-    except (AttributeError, NotImplementedError):
+    except AttributeError, NotImplementedError:
         return None
 
 

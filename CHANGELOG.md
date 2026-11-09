@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Accounts that haven't signed in with a password since 0.44 sign in another way once.** Their passwords were stored in an old form that's no longer read. **Forgot password** sets a new one (it needs email set up on the server), and a passkey or single sign-on still works.
 - **Backups made before 0.78 no longer restore.** Restore one on 0.78 first, then back up again.
 - **A message device that never signed its keys is removed.** Devices on the app since 0.73 already have. One left over registers again the next time it opens, without the messages it held.
+- **Server operators: Initiative runs on Python 3.14 everywhere.** The image and both server packages use it; the Debian package carries its own, since Debian 13's is 3.13, and its fixes come with Initiative's releases.
 - **The desktop app has its own title bar,** with the app's name, **Help** and **Update** in place of the File, Edit, View and Window menus. It still drags and maximizes the window.
 - **Search forgives typos.** The command palette, the icon picker and every list you pick from find a name through a wrong, swapped or extra letter, or with its words in any order. A table's filter stays exact.
 - **Announcements you close stay in your notifications,** as a read line that opens them again, in place of the **Past announcements** page.

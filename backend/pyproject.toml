@@ -3,7 +3,7 @@ name = "initiative-backend"
 version = "0.1.0"
 description = "FastAPI backend for Initiative project management app"
 authors = [{ name = "Jordan", email = "jordan@morels.me" }]
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.136.1,<0.163",
     "uvicorn[standard]>=0.41.0,<0.55",
@@ -74,6 +74,11 @@ dev = [
 # Application, not a distributable package — sync dependencies only, never build/install the project itself.
 package = false
 
+[tool.ruff.per-file-target-version]
+# A merged revision is never edited (AGENTS.md), so ruff formats every revision
+# as the 3.12 code the older ones were written as, which 3.14 runs all the same.
+"alembic/versions/*.py" = "py312"
+
 [tool.ruff.lint]
 # Ruff's default rules, plus the logging-format rules (arguments passed to the
 # logger rather than formatted into the message).
@@ -96,6 +101,10 @@ ignore = [
 # the same file, and these subclass SanitizedBaseModel from app/schemas/base.py.
 "app/schemas/**" = ["RUF012"]
 "app/services/import_engine/{backup,contract}.py" = ["RUF012"]
+# SQLModel resolves a relationship from its annotation's text, so
+# `Optional["User"]` and `list["Tag"]` stay as written rather than becoming
+# `User | None`, which it would look up as one name.
+"app/models/**" = ["UP037", "UP045"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI declares where a parameter comes from as its default.

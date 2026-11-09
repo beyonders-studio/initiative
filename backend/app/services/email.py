@@ -529,7 +529,7 @@ def render_digest(
         # that rather than as something it is not.
         try:
             spec = CATEGORY_SPECS[NotificationCategory(category)]
-        except (KeyError, ValueError):
+        except KeyError, ValueError:
             return email_t("digest.noCommunity.other", locale=locale)
         if spec.guild_scoped:
             return email_t("digest.noCommunity.other", locale=locale)

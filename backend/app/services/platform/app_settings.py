@@ -613,7 +613,7 @@ async def _settings_area(
     actor_user_id: int | None,
     secret: _SecretChange | None = None,
     commit: bool = True,
-) -> AsyncGenerator[AppSetting, None]:
+) -> AsyncGenerator[AppSetting]:
     """Save one area of the settings row with its record, in one commit.
 
     Yields the stored row for the caller to change. On leaving, the fields

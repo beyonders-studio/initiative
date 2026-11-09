@@ -85,7 +85,7 @@ class AIWriteRequest(SanitizedBaseModel):
     language: str | None = Field(default=None, max_length=35)
 
     @model_validator(mode="after")
-    def _says_what_to_work_on(self) -> "AIWriteRequest":
+    def _says_what_to_work_on(self) -> AIWriteRequest:
         if self.action is AIWriteAction.translate and not self.language:
             raise ValueError("translate needs a language")
         if self.language and not set(self.language) <= _LANGUAGE_TAG_CHARS:

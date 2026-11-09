@@ -259,7 +259,7 @@ async def _estimated_cost(connection: Any, statement: ResolvedQuery) -> float:
 
 
 @asynccontextmanager
-async def _translated_failures() -> AsyncGenerator[None, None]:
+async def _translated_failures() -> AsyncGenerator[None]:
     """Turn what the database says into what this surface answers.
 
     Three things a statement this surface accepted can still do. It can run out

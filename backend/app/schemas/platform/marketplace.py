@@ -12,7 +12,7 @@ agreement.
 
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict, Field
 
@@ -158,7 +158,7 @@ class MarketplaceListingDetail(MarketplaceListingSummary):
     has_initiative_surfaces: bool = False
     #: For a plug-in: the installs here that ask to use it, which the install
     #: dialog asks the seat about.
-    callers: list["MarketplaceListingCaller"] = []
+    callers: list[MarketplaceListingCaller] = []
 
 
 class MarketplaceListingCaller(SanitizedBaseModel):
@@ -298,7 +298,7 @@ class MarketplaceListingPage(PageMeta):
 
 
 def serialize_version(
-    version: Optional["MarketplaceListingVersion"],
+    version: MarketplaceListingVersion | None,
 ) -> MarketplaceVersionRead | None:
     # Local import avoids a schema -> service import cycle.
     from app.services.marketplace.catalog import version_runs_here
@@ -315,8 +315,8 @@ def serialize_version(
 
 
 def serialize_listing_summary(
-    listing: "MarketplaceListing",
-    latest: Optional["MarketplaceListingVersion"],
+    listing: MarketplaceListing,
+    latest: MarketplaceListingVersion | None,
 ) -> MarketplaceListingSummary:
     """One browse card. Shared by every surface that lists or reads a listing,
     so a card and the page it opens describe the same thing."""

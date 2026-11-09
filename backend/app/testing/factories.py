@@ -2444,7 +2444,7 @@ async def create_claim_rule(
     session: AsyncSession,
     *,
     provider: AuthProvider,
-    guild: "Guild",
+    guild: Guild,
     initiative: Initiative | None = None,
     initiative_role_id: int | None = None,
     **overrides: Any,
@@ -2485,8 +2485,8 @@ async def create_claim_rule(
 
 async def create_guild_auth_policy(
     session: AsyncSession,
-    guild: "Guild",
-    provider: "AuthProvider | None" = None,
+    guild: Guild,
+    provider: AuthProvider | None = None,
     *,
     commit: bool = True,
     guest: bool = False,
@@ -2532,7 +2532,7 @@ async def create_federated_identity(
     user: User,
     *,
     subject: str | None = None,
-    provider: "AuthProvider | None" = None,
+    provider: AuthProvider | None = None,
     commit: bool = True,
     **overrides: Any,
 ) -> FederatedIdentity:

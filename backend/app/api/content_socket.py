@@ -97,7 +97,7 @@ async def read_auth_frame(
         raw = frame.get("text")
     try:
         payload = json.loads(raw) if raw else None
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except json.JSONDecodeError, UnicodeDecodeError:
         payload = None
     if not isinstance(payload, dict):
         await _refuse(websocket)
@@ -248,7 +248,7 @@ def tool_authorizer(guild_id: int, tool: Tool, resource_id: int) -> Authorizer:
             resource_access.authorize(
                 tool, row, user, context=require_guild_context(session)
             )
-        except (HTTPException, CodedError):
+        except HTTPException, CodedError:
             return None
         return frozenset({tool_room(guild_id, tool, resource_id)})
 

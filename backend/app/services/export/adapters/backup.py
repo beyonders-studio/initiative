@@ -184,7 +184,7 @@ async def _resolve_scope(
     initiative_id = params.get("initiative_id")
     try:
         initiative_id = int(initiative_id)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     statement = (
         select(Initiative)

@@ -50,7 +50,7 @@ _RSVP_TO_PARTSTAT = {
 
 def event_export_dict(
     event: CalendarEvent,
-    files: "Sequence[Related]" = (),
+    files: Sequence[Related] = (),
     answers: Mapping[int, RSVPStatus] | None = None,
 ) -> dict:
     """One event's JSON-safe export record — the single intermediate both the
@@ -252,8 +252,8 @@ def _picked_zone(start: datetime, shift: int) -> tzinfo:
 
 
 async def files_for_events(
-    session: "AsyncSession", events: list[CalendarEvent]
-) -> "dict[int, list[Related]]":
+    session: AsyncSession, events: list[CalendarEvent]
+) -> dict[int, list[Related]]:
     """Attached files for many events, in two queries.
 
     Here rather than at each caller: the builders above are synchronous and hold

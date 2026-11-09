@@ -686,7 +686,7 @@ def test_a_shipped_version_keeps_its_content():
             text=True,
             check=True,
         ).stdout.split()
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         pytest.skip("no git history here")
     if not tags:
         pytest.skip("no release tag in this checkout's history")

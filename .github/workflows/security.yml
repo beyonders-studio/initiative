@@ -14,7 +14,7 @@ name: Security
 #                 frontend/pnpm-lock.yaml), Dockerfile / IaC misconfig, and
 #                 committed secrets.
 #   trivy-image — the built runtime image: base-image OS packages (the Debian in
-#                 python:3.12-slim, its OpenSSL, etc.) plus anything baked into a
+#                 python:3.14-slim, its OpenSSL, etc.) plus anything baked into a
 #                 layer. The fs scan cannot see these — they only exist in the
 #                 assembled image. Built here for scanning only, never pushed.
 #

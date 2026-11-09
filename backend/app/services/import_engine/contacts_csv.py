@@ -697,7 +697,7 @@ async def apply(
                         ),
                         user_id=user.id,
                     )
-        except (HTTPException, ValidationError):
+        except HTTPException, ValidationError:
             failed.append(ImportRowFailure(row=row.number, field=blamed))
             continue
         created += 1

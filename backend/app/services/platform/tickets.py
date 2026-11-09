@@ -291,7 +291,7 @@ class ReplyRefused(Exception):
 
 
 @asynccontextmanager
-async def _as_filer(user: User) -> AsyncGenerator[AsyncSession | None, None]:
+async def _as_filer(user: User) -> AsyncGenerator[AsyncSession | None]:
     """A request session routed as ``user`` reading the cases they filed, or
     ``None`` where there is no operations community to read them in.
 

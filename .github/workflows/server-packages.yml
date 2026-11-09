@@ -67,7 +67,7 @@ jobs:
           names = ("python-dotenv", "ruff", "ty")
           versions = {package["name"]: package["version"] for package in locked["package"] if package["name"] in names}
           requirements = [f"{name}=={versions[name]}" for name in names]
-          subprocess.run(["uv", "venv", "--python", "3.13", str(tooling)], check=True)
+          subprocess.run(["uv", "venv", "--python", "3.14", str(tooling)], check=True)
           subprocess.run(["uv", "pip", "install", "--python", str(tooling / "bin/python"), *requirements], check=True)
           with open(os.environ["GITHUB_PATH"], "a") as path_file:
               path_file.write(str(tooling / "bin") + "\n")

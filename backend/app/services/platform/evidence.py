@@ -837,7 +837,7 @@ async def held_cases(session: AsyncSession, task_ids: Sequence[int]) -> set[int]
                 continue
             try:
                 subject = int(summary.value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             by_subject.setdefault(subject, []).append(task_id)
     if not by_subject:

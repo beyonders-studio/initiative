@@ -149,7 +149,7 @@ def _instant(value: str | None) -> datetime | None:
         return None
     try:
         instant = datetime.fromisoformat(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     # A bound without a zone is read as UTC, as the calendar's own window is.
     return instant if instant.tzinfo else instant.replace(tzinfo=UTC)

@@ -57,7 +57,7 @@ def test_guild_name_builders_reject_or_sanitize_hostile_ids(builder, hostile):
     to a digits-only name (a float truncates to its integer part)."""
     try:
         name = builder(hostile)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return  # rejected outright — the common case
     assert re.fullmatch(r"[A-Za-z0-9_]*guild_[0-9]+[a-z_]*", name), name
 

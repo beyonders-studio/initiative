@@ -1424,7 +1424,10 @@ def _rolled_up_reactor_ids(data: Mapping[str, Any]) -> list[int]:
 def _rolled_up_count(data: Mapping[str, Any]) -> int:
     """How many reactions the line stands for, including any that have rolled
     past :data:`MAX_ROLLED_UP_REACTIONS`."""
-    return int(data.get("count") or 0)
+    try:
+        return int(data.get("count") or 0)
+    except TypeError, ValueError:
+        return 0
 
 
 #: What a reaction line carries about where it sits, kept as a line rolls and

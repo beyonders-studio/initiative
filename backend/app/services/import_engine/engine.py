@@ -98,7 +98,7 @@ async def load_target_initiative(
 
     try:
         initiative_id = int(initiative_id)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
 
     initiative = (
@@ -398,9 +398,7 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
 
 
 @asynccontextmanager
-async def spooled_upload(
-    source: BinaryIO, *, max_bytes: int
-) -> AsyncGenerator[Path, None]:
+async def spooled_upload(source: BinaryIO, *, max_bytes: int) -> AsyncGenerator[Path]:
     """An uploaded file as a local file for the length of the block.
 
     Copied off the event loop a chunk at a time, so no more than one chunk is
@@ -441,9 +439,7 @@ def _spool_payload(guild_id: int, payload_ref: str) -> tuple[Path, bool] | None:
 
 
 @asynccontextmanager
-async def open_payload(
-    guild_id: int, payload_ref: str
-) -> AsyncGenerator[Path | None, None]:
+async def open_payload(guild_id: int, payload_ref: str) -> AsyncGenerator[Path | None]:
     """A staged payload as a local file for the length of the block, or
     ``None`` when the blob is gone.
 

@@ -501,7 +501,7 @@ async def _drop_case_files(conn: AsyncConnection, schema: str) -> list[str]:
 
 
 @asynccontextmanager
-async def choice_turn() -> AsyncGenerator[None, None]:
+async def choice_turn() -> AsyncGenerator[None]:
     """The deployment's one turn at the choice of operations community: who
     changes it, and who makes the tables follow it, holds this throughout, so
     neither acts on a choice another has since replaced."""

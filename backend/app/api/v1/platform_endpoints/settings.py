@@ -1467,7 +1467,7 @@ async def agree_community_narrowing(
 @asynccontextmanager
 async def _routed_to_community(
     session: AsyncSession, guild_id: int
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """A system session routed to a community that is still there."""
     guild = await session.get(Guild, guild_id)
     if guild is None or guild.status == CommunityStatus.deleted:

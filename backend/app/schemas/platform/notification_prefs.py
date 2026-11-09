@@ -207,7 +207,7 @@ class NotificationPreferencesUpdate(SanitizedBaseModel):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
 
     @model_validator(mode="after")
-    def _a_real_window(self) -> "NotificationPreferencesUpdate":
+    def _a_real_window(self) -> NotificationPreferencesUpdate:
         if self.pause_until is None:
             if self.pause_from is not None:
                 raise ValueError("a pause needs an end date")

@@ -83,7 +83,7 @@ class TaskTypeCreate(SanitizedBaseModel):
     starting_values: TaskTypeStartingValues | None = None
 
     @model_validator(mode="after")
-    def _one_start(self) -> "TaskTypeCreate":
+    def _one_start(self) -> TaskTypeCreate:
         if self.start_from_type_id is not None and self.gallery_key is not None:
             raise ValueError("start from one of the project's types or the gallery")
         return self

@@ -63,7 +63,7 @@ class _Worker:
             if header is None:
                 return None
             return self._read(_LENGTH.unpack(header)[0], deadline)
-        except (BrokenPipeError, OSError):
+        except BrokenPipeError, OSError:
             return None
 
     def _read(self, size: int, deadline: float) -> bytes | None:

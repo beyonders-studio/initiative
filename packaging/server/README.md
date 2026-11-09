@@ -7,9 +7,8 @@ package `initiative`.
 
 ## Build inputs
 
-Run on **Debian 13** (distribution Python 3.13) or **Alpine 3.24**
-(distribution Python 3.14), on amd64/x86_64 or arm64/aarch64. A VM, LXC or
-ordinary native host works; installing Docker is not a prerequisite. Do not
+Run on **Debian 13** or **Alpine 3.24**, on amd64/x86_64 or arm64/aarch64. A VM,
+LXC or ordinary native host works; installing Docker is not a prerequisite. Do not
 reuse a Python virtualenv between distributions or architectures.
 
 Install the matching build manifest as root from the repository root:
@@ -46,8 +45,10 @@ sh packaging/server/build.sh apk --assets prepared-assets --output dist/server -
 ```
 
 Builds install hash-pinned uv into an isolated build-tool venv and resolve the
-locked backend runtime using the distribution interpreter. They reject a stale
-lockfile and disable Python downloads. The package contains the runtime venv,
+locked backend runtime for Python 3.14: Alpine's own, and on Debian, whose own
+is 3.13, the CPython build (`BUNDLED_PYTHON` in `build.py`) uv installs into the
+package at `/usr/lib/initiative/python`. They reject a stale lockfile and
+download no other interpreter. The package contains the runtime venv,
 source, migrations, browser, editor, signed OTA assets, version floors, channel,
 changelog, source licence, artwork notice and installed dependency notices.
 Development/test tooling and uv do not ship. The launcher and worker subprocesses

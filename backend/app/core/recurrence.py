@@ -964,5 +964,5 @@ def imported(
         if not -_MAX_SHIFT <= shift <= _MAX_SHIFT:
             raise ValueError("A shift is at most a day.")
         return (normalize(value, kind=kind), shift) if value else (None, 0)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None, 0

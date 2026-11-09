@@ -272,7 +272,7 @@ def _decode_cursor(cursor: str | None) -> tuple[int, int] | None:
             cursor, SALT_PLUGIN_INSTALLS_CURSOR
         ).partition(":")
         return int(guild), int(install)
-    except (InvalidToken, ValueError):
+    except InvalidToken, ValueError:
         return None
 
 

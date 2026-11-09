@@ -66,7 +66,7 @@ def selection_ids(params: dict, *, single_key: str, multi_key: str) -> list[int]
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     try:
         ids = [int(value) for value in raw]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     return list(dict.fromkeys(ids))
 
@@ -91,7 +91,7 @@ async def _export_grouping(
         return await group_rows(
             session, dataset_name, field, ids, bucket=bucket, tz=params.get("tz")
         )
-    except (GroupingError, ValueError):
+    except GroupingError, ValueError:
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
 
 

@@ -70,7 +70,7 @@ class CounterSettings(SanitizedBaseModel):
     initial: float = Field(default=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
-    def _ordered(self) -> "CounterSettings":
+    def _ordered(self) -> CounterSettings:
         if self.min is not None and self.max is not None and self.min > self.max:
             raise ValueError(PropertyMessages.COUNTER_MIN_GREATER_THAN_MAX)
         return self
@@ -97,7 +97,7 @@ class PropertyDefinitionBase(SanitizedBaseModel):
         return v
 
     @model_validator(mode="after")
-    def _validate_options(self) -> "PropertyDefinitionBase":
+    def _validate_options(self) -> PropertyDefinitionBase:
         if self.type in PLUGIN_ONLY_TYPES:
             raise ValueError("only a plug-in's metadata is of this type")
         if self.type in _SELECT_TYPES:
@@ -133,7 +133,7 @@ class PropertyDefinitionCreate(PropertyDefinitionBase):
     collection_id: int | None = None
 
     @model_validator(mode="after")
-    def _one_owner(self) -> "PropertyDefinitionCreate":
+    def _one_owner(self) -> PropertyDefinitionCreate:
         if self.project_id is not None and self.collection_id is not None:
             raise ValueError("a definition has one owner")
         return self
@@ -312,7 +312,7 @@ class PropertyValuesSetRequest(SanitizedBaseModel):
     steps: list[PropertyStep] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
-    def removal_merges(self) -> "PropertyValuesSetRequest":
+    def removal_merges(self) -> PropertyValuesSetRequest:
         if (self.removed or self.options or self.steps) and not self.merge:
             raise ValueError("removed, options and steps need merge")
         changed = [

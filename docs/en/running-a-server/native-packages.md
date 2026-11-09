@@ -12,8 +12,10 @@ The `initiative-<version>.deb` on a release is the desktop app. For a server, ta
 
 | Distribution | Python | Service manager | Architectures |
 |---|---|---|---|
-| Debian 13 | 3.13, the system's | systemd | `amd64`, `arm64` |
+| Debian 13 | 3.14, carried in the package | systemd | `amd64`, `arm64` |
 | Alpine 3.24 | 3.14, the system's | OpenRC | `x86_64`, `aarch64` |
+
+Initiative runs on Python 3.14 everywhere. Debian 13's own Python is 3.13, so the Debian package carries 3.14 in `/usr/lib/initiative/python`, and its fixes arrive with Initiative's releases rather than Debian's updates.
 
 The native dependencies are built for each target's Python and C library, so a Debian package won't install on Alpine, and copying a virtual environment between them won't work either. A major distribution or Python upgrade needs the matching package from a newer release.
 

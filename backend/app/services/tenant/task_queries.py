@@ -458,7 +458,7 @@ _LIST_ROW_OPTIONS = (
 )
 
 
-def list_statement(build, q: "TaskListQuery", *options, columns=()):
+def list_statement(build, q: TaskListQuery, *options, columns=()):
     """``build``'s tasks, each with ``columns`` beside it, in the order ``q``
     asked for, loaded with ``options``."""
     return apply_sorting(
@@ -470,7 +470,7 @@ def list_statement(build, q: "TaskListQuery", *options, columns=()):
     )
 
 
-def list_row_statement(build, q: "TaskListQuery"):
+def list_row_statement(build, q: TaskListQuery):
     """The rows :func:`list_reads` serializes: each task loaded for a list,
     with its description head and flag beside it."""
     return list_statement(build, q, *_LIST_ROW_OPTIONS, columns=_DESCRIPTION_COLUMNS)
@@ -580,7 +580,7 @@ def _confining_project_id(
             return None
         try:
             return int(cond.value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
     return None
 
@@ -792,7 +792,7 @@ async def _gather_global_task_reads(
 async def list_global_tasks(
     session: AsyncSession,
     current_user: User,
-    q: "TaskListQuery",
+    q: TaskListQuery,
     *,
     created: bool = False,
     include_archived: bool = False,
@@ -944,7 +944,7 @@ async def parse_task_list_query(
         if isinstance(cond.value, dict):
             try:
                 property_ids_needed.append(int(cond.value.get("property_id")))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
     guild_ids = extract_condition_value(user_conditions, "community_ids")
     if across_guilds_for is not None:
@@ -997,7 +997,7 @@ def read_person_filters(q: TaskListQuery) -> None:
         elif cond.field == "property_values" and isinstance(cond.value, dict):
             try:
                 defn = q.property_definitions.get(int(cond.value.get("property_id")))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 defn = None
             if (
                 defn is not None

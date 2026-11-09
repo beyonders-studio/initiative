@@ -210,7 +210,7 @@ def verify_password(plain_password: str, hashed_password: str | None) -> bool:
         try:
             _argon2_hasher.verify(hashed_password, plain_password)
             return True
-        except (VerifyMismatchError, VerificationError, InvalidHashError):
+        except VerifyMismatchError, VerificationError, InvalidHashError:
             return False
     return False
 
@@ -534,7 +534,7 @@ def _resolve_handoff_signing_material() -> tuple[str, str | None]:
 def _is_ed25519_private_key(private_pem: str) -> bool:
     try:
         key = load_pem_private_key(private_pem.encode("utf-8"), password=None)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
     return isinstance(key, ed25519.Ed25519PrivateKey)
 
