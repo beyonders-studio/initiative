@@ -122,6 +122,35 @@ class IntakeBinding(CreatedByMixin, table=True):
         ),
     )
 
+    # The Ideas board's own roles, named when the board is bound: the field
+    # whose value is an idea's category, the field recording the release it
+    # shipped in, and the status that means it shipped. NULL on every other
+    # stream, and where the board has no such field or status.
+    category_field_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey("metadata_definitions.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    release_field_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey("metadata_definitions.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    shipped_status_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey("task_statuses.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+
     # Whether the writer routes to this project right now. A disabled binding
     # keeps the project and the history; it just stops receiving.
     enabled: bool = Field(

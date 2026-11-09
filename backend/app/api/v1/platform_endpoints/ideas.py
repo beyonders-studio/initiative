@@ -15,7 +15,14 @@ from app.api.deps import get_current_active_user, get_current_user_optional
 from app.core.messages import AuthMessages, IdeaMessages
 from app.db.query import build_paginated_response
 from app.models.platform.user import User
-from app.schemas.platform.idea import IdeaListRead, IdeaRead, IdeaStatusRead
+from app.schemas.platform.idea import (
+    IdeaCategoryCount,
+    IdeaListRead,
+    IdeaRead,
+    IdeaRoadmapColumn,
+    IdeaRoadmapRead,
+    IdeaStatusRead,
+)
 from app.services.platform import ideas as ideas_service
 
 router = APIRouter()
@@ -32,7 +39,11 @@ def _not_found() -> HTTPException:
 
 def _status_read(found: ideas_service.IdeaStatus) -> IdeaStatusRead:
     return IdeaStatusRead(
-        id=found.id, name=found.name, color=found.color, category=found.category
+        id=found.id,
+        name=found.name,
+        color=found.color,
+        icon=found.icon,
+        category=found.category,
     )
 
 
@@ -46,6 +57,9 @@ def _read(idea: ideas_service.IdeaRead) -> IdeaRead:
         closed=idea.closed,
         created_at=idea.created_at,
         updated_at=idea.updated_at,
+        category=idea.category,
+        release=idea.release,
+        summary=idea.summary,
         description=idea.description,
     )
 
@@ -55,18 +69,23 @@ async def list_ideas(
     reader: OptionalReader,
     search: Annotated[str | None, Query(max_length=200)] = None,
     status_id: int | None = None,
+    category: Annotated[str | None, Query(max_length=100)] = None,
     voted: bool = False,
     sort: ideas_service.IdeaSort = ideas_service.IdeaSort.votes,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> IdeaListRead:
-    """The published ideas: those whose title holds ``search``, in ``status_id``,
-    or that the reader voted for, as asked; most voted or newest first."""
+    """The published ideas: those whose title holds ``search``, that read as
+    ``status_id``, in the category named ``category``, or that the reader
+    voted for, as asked; most voted or newest first. With them, the statuses
+    they read as, and how many of them each category holds, the category
+    asked for aside."""
     try:
         found = await ideas_service.list_ideas(
             reader,
             search=search,
             status_id=status_id,
+            category=category,
             voted_only=voted and reader is not None,
             sort=sort,
             page=page,
@@ -81,8 +100,45 @@ async def list_ideas(
             page,
             page_size,
             statuses=[_status_read(s) for s in found.statuses],
+            categories=[
+                IdeaCategoryCount(name=c.name, count=c.count) for c in found.categories
+            ],
         )
     )
+
+
+@router.get("/roadmap", response_model=IdeaRoadmapRead)
+async def read_roadmap(reader: OptionalReader) -> IdeaRoadmapRead:
+    """The board's in-progress statuses in its order, then its shipped
+    status, each with the published ideas that read as it, most voted
+    first."""
+    try:
+        columns = await ideas_service.roadmap(reader)
+    except ideas_service.IdeaNotFound:
+        raise _not_found() from None
+    return IdeaRoadmapRead(
+        columns=[
+            IdeaRoadmapColumn(
+                status=_status_read(column.status),
+                items=[_read(idea) for idea in column.items],
+            )
+            for column in columns
+        ]
+    )
+
+
+@router.get("/shipped", response_model=list[IdeaRead])
+async def list_shipped(
+    reader: OptionalReader,
+    release: Annotated[str, Query(min_length=1, max_length=32)],
+) -> list[IdeaRead]:
+    """The published ideas that shipped in ``release``, most voted first:
+    none for a release this server is not yet on."""
+    try:
+        found = await ideas_service.shipped_in(reader, release)
+    except ideas_service.IdeaNotFound:
+        raise _not_found() from None
+    return [_read(idea) for idea in found]
 
 
 @router.get("/similar", response_model=list[IdeaRead])

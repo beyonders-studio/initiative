@@ -328,17 +328,18 @@ async def _annotate_tasks(
 #: How long a list row's description excerpt runs: two lines of a board card.
 _DESCRIPTION_EXCERPT_CHARS: Final = 160
 
-#: How much of the stored markdown a list reads to make the excerpt from —
-#: room for the markup (pictures, links, mentions) the excerpt leaves out.
-_DESCRIPTION_SOURCE_CHARS: Final = 4 * _DESCRIPTION_EXCERPT_CHARS
 
-#: What a list row reads in place of the description: its head, one character
-#: past the source length so a cut one can be told apart, and whether there is
-#: any description at all.
+def description_head(description: Any, chars: int = _DESCRIPTION_EXCERPT_CHARS):
+    """The head of ``description`` an excerpt of ``chars`` is made from: room
+    for the markup (pictures, links, mentions) the excerpt leaves out, and one
+    character past it so a cut one can be told apart."""
+    return func.left(description, 4 * chars + 1)
+
+
+#: What a list row reads in place of the description: its head, and whether
+#: there is any description at all.
 _DESCRIPTION_COLUMNS = (
-    func.left(Task.description, _DESCRIPTION_SOURCE_CHARS + 1).label(
-        "description_head"
-    ),
+    description_head(Task.description).label("description_head"),
     func.coalesce(Task.description != "", False).label("has_description"),
 )
 
@@ -351,39 +352,54 @@ _UNFINISHED_LINK = re.compile(r"(?:[!@]|#[\w-]+)?\[[^\]]*(?:\]\([^)]*)?$")
 _HELD_MENTION = re.compile("\ue000(\\d*)(\ue001)?")
 
 
-def _description_excerpt(head: str | None) -> str | None:
-    """A list row's plain-text excerpt of a description, from its head.
+def description_excerpt(
+    head: str | None,
+    chars: int = _DESCRIPTION_EXCERPT_CHARS,
+    *,
+    first_block: bool = False,
+) -> str | None:
+    """A plain-text excerpt of a description of at most ``chars``, from its
+    head (:func:`description_head` with the same ``chars``).
 
-    ``head`` is the first :data:`_DESCRIPTION_SOURCE_CHARS` + 1 characters of
-    the markdown; one past the source length means the description goes on, so
-    the excerpt is cut even when the text read so far is short. The excerpt is
-    the words of the description's blocks (:func:`blocks_from_markdown`):
-    pictures and code blocks drop out, a link keeps the words it shows, a
-    thing mentioned reads as its name, and a mention of somebody stays its
-    markdown, ``@[](42)``, which the client names.
+    One past the head's source length means the description goes on, so the
+    excerpt is cut even when the text read so far is short. The excerpt is
+    the words of the description's blocks (:func:`blocks_from_markdown`), or
+    with ``first_block`` of the first that has any: pictures and code blocks
+    drop out, a link keeps the words it shows, a thing mentioned reads as its
+    name, and a mention of somebody stays its markdown, ``@[](42)``, which the
+    client names.
     """
     if not head:
         return None
-    source_cut = len(head) > _DESCRIPTION_SOURCE_CHARS
-    source = head[:_DESCRIPTION_SOURCE_CHARS]
+    source_chars = 4 * chars
+    source_cut = len(head) > source_chars
+    source = head[:source_chars]
     if source_cut:
         # A link, picture or mention the cut goes through is left out whole.
         source = _UNFINISHED_LINK.sub("", source)
     words: list[str] = []
+    # Whether a block with words was read, and with ``first_block`` whether
+    # another followed it, so it was read whole.
+    found = ended = False
     for runs in runs_of(blocks_from_markdown(source)):
+        if first_block and found:
+            ended = True
+            break
         for run in runs:
             if "mention" in run:
                 words.append(f"\ue000{run['mention']}\ue001")
             elif not run.get("picture"):
                 words.append(run["text"])
         words.append(" ")
+        found = bool("".join(words).strip())
     text = " ".join("".join(words).split())
-    if not source_cut and len(text) <= _DESCRIPTION_EXCERPT_CHARS:
+    whole = not source_cut or ended
+    if whole and len(text) <= chars:
         return _released(text) or None
     # Leave room for the ellipsis, and end on a whole word: unless the cut
     # falls before a space, drop what follows the last one, which is part of a
     # word or, where the source was cut, of a piece of markup.
-    cut = text[: _DESCRIPTION_EXCERPT_CHARS - 1]
+    cut = text[: chars - 1]
     if not text[len(cut) :].startswith(" "):
         cut = cut.rpartition(" ")[0] or cut
     cut = _released(cut).rstrip()
@@ -421,7 +437,7 @@ def _task_to_list_read(
     initiative = project.initiative if project else None
     return TaskListRead.model_validate(task, from_attributes=True).model_copy(
         update={
-            "description_excerpt": _description_excerpt(description_head),
+            "description_excerpt": description_excerpt(description_head),
             "has_description": has_description,
             "community_id": guild_id,
             "community_name": guild_name,

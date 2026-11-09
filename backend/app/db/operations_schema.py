@@ -52,7 +52,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -158,8 +158,9 @@ FILER_ROWS: dict[str, str] = {
 }
 
 #: What anybody reads of the published ideas: each one's title, description
-#: and status, never its assignees, properties or tags; the Ideas board's
-#: statuses; and the votes, as counts.
+#: and status, and the values of the two fields the board's binding names,
+#: never its assignees, other fields or tags; the Ideas board's statuses; the
+#: category field's options, for their labels; and the votes, as counts.
 IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
     "tasks": (
         "id",
@@ -173,10 +174,57 @@ IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
         "archived_at",
         "deleted_at",
     ),
-    "task_statuses": ("id", "project_id", "name", "color", "category", "position"),
-    "intake_bindings": ("id", "stream", "project_id", "task_type_id"),
+    "task_statuses": (
+        "id",
+        "project_id",
+        "name",
+        "color",
+        "icon",
+        "category",
+        "position",
+    ),
+    "intake_bindings": (
+        "id",
+        "stream",
+        "project_id",
+        "task_type_id",
+        "category_field_id",
+        "release_field_id",
+        "shipped_status_id",
+    ),
     "idea_votes": ("task_id", "user_id"),
+    "metadata_definitions": ("id", "options"),
+    "metadata_values": ("entity_type", "entity_id", "property_id", "value_text"),
 }
+
+#: Columns the community's own policies on the metadata tables read while
+#: deciding the ideas role's statement: whether the thing a value is on can be
+#: read, for every kind of thing, and the value's definition. Granted, as
+#: :data:`POLICY_READS` are, so those policies can be evaluated; the role's
+#: own policies on each admit no row of it.
+IDEAS_POLICY_READS: dict[str, tuple[str, ...]] = {
+    "metadata_definitions": ("install_id", "shown_on"),
+    "initiative_members": ("initiative_id", "user_id"),
+    "collection_files": ("collection_id", "file_id"),
+    **{
+        table: ("id",)
+        for table in (
+            "calendar_events",
+            "collections",
+            "contacts",
+            "counters",
+            "dashboards",
+            "files",
+            "posts",
+            "wiki_pages",
+        )
+    },
+    **{
+        table: ("id", "initiative_id")
+        for table in ("calendars", "counter_groups", "wikis")
+    },
+}
+
 
 IDEAS_ROWS: dict[str, str] = {
     # A published idea: a task on the board bound to ``ideas``, of the type
@@ -196,6 +244,27 @@ IDEAS_ROWS: dict[str, str] = {
     "idea_votes": (
         'EXISTS (SELECT 1 FROM "{s}".tasks t WHERE t.id = idea_votes.task_id)'
     ),
+    # The category field, whose options name each idea's category.
+    "metadata_definitions": (
+        'id IN (SELECT b.category_field_id FROM "{s}".intake_bindings b'
+        " WHERE b.stream = 'ideas')"
+    ),
+    # A published idea's category, and the release it shipped in once it is
+    # in the shipped status.
+    "metadata_values": (
+        "entity_type = 'task' AND EXISTS (SELECT 1"
+        ' FROM "{s}".tasks t, "{s}".intake_bindings b'
+        " WHERE t.id = metadata_values.entity_id AND b.stream = 'ideas'"
+        " AND (metadata_values.property_id = b.category_field_id"
+        " OR (metadata_values.property_id = b.release_field_id"
+        " AND t.task_status_id = b.shipped_status_id)))"
+    ),
+    # Read only for the community's own policies to be evaluated.
+    **{
+        table: "false"
+        for table in IDEAS_POLICY_READS
+        if table not in IDEAS_TABLE_ACCESS
+    },
 }
 
 
@@ -219,6 +288,9 @@ class OperationsRole:
     #: rows") from handing it rows its own policy would not.
     permissive: str
     restrictive: str
+    #: Columns read only so the community's own policies on those tables can
+    #: be evaluated for it, beside :data:`POLICY_READS`.
+    policy_reads: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def name(self, guild_id: int) -> str:
         """The role for ``guild_id``, e.g. ``guild_7_filer``."""
@@ -229,7 +301,12 @@ FILER = OperationsRole(
     "_filer", FILER_TABLE_ACCESS, FILER_ROWS, "filer_read", "filer_only"
 )
 IDEAS = OperationsRole(
-    "_ideas", IDEAS_TABLE_ACCESS, IDEAS_ROWS, "ideas_read", "ideas_only"
+    "_ideas",
+    IDEAS_TABLE_ACCESS,
+    IDEAS_ROWS,
+    "ideas_read",
+    "ideas_only",
+    IDEAS_POLICY_READS,
 )
 
 #: Every reader role the operations community has.
@@ -269,7 +346,7 @@ def _grant_statements(schema: str, spec: OperationsRole, role: str) -> list[str]
         f'GRANT USAGE ON SCHEMA public TO "{role}"',
     ]
     readable: dict[str, tuple[str, ...]] = {}
-    for source in (spec.tables, POLICY_READS):
+    for source in (spec.tables, POLICY_READS, spec.policy_reads):
         for table, columns in source.items():
             seen = readable.get(table, ())
             readable[table] = seen + tuple(c for c in columns if c not in seen)

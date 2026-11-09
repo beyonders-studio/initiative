@@ -8,7 +8,7 @@
   "project": {
     "name": "Ideas",
     "icon": "💡",
-    "description": "The ideas everybody can read and vote for on the Ideas page, signed in or not. A task here is a draft until its type is Published. Its status is the one people see, so name statuses the way you'd say them out loud.",
+    "description": "The ideas everybody can read and vote for on the Suggestions page, signed in or not. A task here is a draft until its type is Published. Its status is the one people see, so name statuses the way you'd say them out loud.",
     "is_template": false,
     "archived_at": null,
     "start_date": null,
@@ -75,11 +75,84 @@
       "layout_preset": "discussion"
     }
   ],
-  "property_definitions": [],
+  "property_definitions": [
+    {
+      "name": "Category",
+      "type": "select",
+      "position": 0.0,
+      "color": null,
+      "options": [
+        {
+          "value": "projects",
+          "label": "Projects",
+          "color": null
+        },
+        {
+          "value": "files",
+          "label": "Files",
+          "color": null
+        },
+        {
+          "value": "counters",
+          "label": "Counters",
+          "color": null
+        },
+        {
+          "value": "calendars",
+          "label": "Calendars",
+          "color": null
+        },
+        {
+          "value": "dashboards",
+          "label": "Dashboards",
+          "color": null
+        },
+        {
+          "value": "posts",
+          "label": "Posts",
+          "color": null
+        },
+        {
+          "value": "wikis",
+          "label": "Wikis",
+          "color": null
+        },
+        {
+          "value": "contacts",
+          "label": "Contacts",
+          "color": null
+        },
+        {
+          "value": "notifications",
+          "label": "Notifications",
+          "color": null
+        },
+        {
+          "value": "account",
+          "label": "Account",
+          "color": null
+        },
+        {
+          "value": "plug-ins",
+          "label": "Plug-ins",
+          "color": null
+        }
+      ],
+      "project": true
+    },
+    {
+      "name": "Release",
+      "type": "text",
+      "position": 1.0,
+      "color": null,
+      "options": null,
+      "project": true
+    }
+  ],
   "tasks": [
     {
       "title": "How this board works",
-      "description": "A task on this board is a draft, which only the team sees, until its type is **Published**. Change its type to Published when the wording is right, and it shows on the Ideas page, where everybody can read it and vote for it, signed in or not. Change the type back to take it down. Its votes stay with it.\n\nPeople see an idea's title, its description and its status, and how many voted. They never see its comments, assignees, properties or tags, so talk about it in the comments.\n\n**Statuses.** People see each status by its name. Everybody who voted hears when an idea moves.\n\nThis task stays a draft: it is here for the team.",
+      "description": "A task on this board is a draft, which only the team sees, until its type is **Published**. Change its type to Published when the wording is right, and it shows on the Suggestions page, where everybody can read it and vote for it, signed in or not. Change the type back to take it down. Its votes stay with it.\n\nPeople see an idea's title, its description, its status and its **Category**, and how many voted. They never see its comments, assignees, tags or other fields, so talk about it in the comments.\n\n**Category** fills itself from the idea's words while it is empty: an idea that mentions projects goes under Projects. Change it whenever it guessed wrong; it is never changed for you once set.\n\n**Statuses.** People see each status by its name. Everybody who voted hears when an idea moves.\n\n**Shipped.** When an idea ships, fill in **Release** with the version it goes out in. People see it as Shipped once that release is out, and as the last status before it until then. When the next release is out, it leaves the board and stays on its release's What's new post.\n\nThis task stays a draft: it is here for the team.",
       "priority": "medium",
       "start_date": null,
       "due_date": null,

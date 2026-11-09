@@ -436,6 +436,7 @@ async def _insert_task(
 
     _touch_project(project, datetime.now(UTC))
     await metadata_service.write_on_create(session, task, task_in.properties)
+    await ideas_service.fill_category(session, task)
     return task
 
 
@@ -802,6 +803,7 @@ async def _apply_update(
     )
     previous_start = task.due_date or task.start_date
     previous_repeat = (task.recurrence, task.recurrence_shift, task.recurrence_strategy)
+    previous_title = task.title
     previous_description = task.description
     previous_status_category = task.task_status.category if task.task_status else None
     new_status_id = update_data.pop("task_status_id", None)
@@ -994,6 +996,8 @@ async def _apply_update(
             let_go = attachments_service.upload_urls_in_markdown(
                 previous_description
             ) - attachments_service.upload_urls_in_markdown(task.description)
+    if task.title != previous_title or task.description != previous_description:
+        await ideas_service.fill_category(session, task)
     await attachments_service.claim_uploads(session, task)
     _touch_project(project, now)
     return let_go, [
