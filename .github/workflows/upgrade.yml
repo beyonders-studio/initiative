@@ -9,7 +9,7 @@ on:
   workflow_call:
     inputs:
       mode:
-        description: hop (from the newest release) or walk (every release since WALK_FROM); walk also runs arm64.
+        description: hop (from the newest release) or walk (every release since the baseline's); walk also runs arm64.
         required: true
         type: string
       image:
