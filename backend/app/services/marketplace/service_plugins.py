@@ -178,18 +178,8 @@ RETIRED_AUDIENCE_TERM = "visibility"
 
 
 def is_admin_only(declared: Any) -> bool:
-    """Whether a stored surface or endpoint is for the community's admins alone.
-
-    Read off a *pinned* definition, which may predate ``admin_only``: one
-    normalized under the earlier contract says ``visibility: "guild_admin"``
-    instead, and it means the same thing until the install moves to a version
-    published under this one.
-    """
-    if not isinstance(declared, dict):
-        return False
-    if declared.get("admin_only") is True:
-        return True
-    return declared.get(RETIRED_AUDIENCE_TERM) == "guild_admin"
+    """Whether a stored surface or endpoint is for the community's admins alone."""
+    return isinstance(declared, dict) and declared.get("admin_only") is True
 
 
 #: Browser features a page may ask its frame for.

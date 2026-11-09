@@ -946,15 +946,10 @@ def test_an_emission_is_not_admin_only():
         ({}, False),
         ({"admin_only": False}, False),
         ({"admin_only": True}, True),
-        # Pinned under the earlier contract: the same meaning, until the
-        # install moves to a version published under this one.
-        ({"visibility": "guild_admin"}, True),
-        ({"visibility": "member"}, False),
-        ({"visibility": "initiative_manager"}, False),
         (None, False),
     ],
 )
-def test_is_admin_only_reads_both_contracts(declared, expected):
+def test_is_admin_only_reads_its_flag(declared, expected):
     from app.services.marketplace.service_plugins import is_admin_only
 
     assert is_admin_only(declared) is expected

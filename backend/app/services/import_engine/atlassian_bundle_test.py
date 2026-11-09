@@ -39,7 +39,7 @@ def _finish(writer, **kwargs):
         guild_id=1,
         guild_name="acme.atlassian.net",
         target_initiative_id=9,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         site_url="https://acme.atlassian.net",
         **kwargs,
     )

@@ -11,7 +11,6 @@ Tests the business logic in app.services.users including:
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy.orm import undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -692,36 +691,19 @@ async def test_soft_delete_removes_membership_in_guild_schema(
     assert refreshed.status == UserStatus.anonymized
 
 
-async def test_soft_delete_takes_their_name_out_of_collaboration(
+async def test_soft_delete_takes_their_name_out_of_digest_lines(
     session: AsyncSession, role_session
 ):
     """Anonymizing a user leaves content as it is, since a mention holds no
-    name, and takes the names out of the collaboration state of every file
-    and wiki page that mentions them, archived ones included: an editor from
-    before names were left out can have written one into it. A state that
-    cannot be read is left as it is. Batched lines lose
-    the assigner's name snapshot and id (issue #794)."""
-    from sqlalchemy import text
-
-    from app.db.session import set_rls_context
+    name; batched lines lose the assigner's name snapshot and id (issue
+    #794)."""
     from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
-    from app.models.tenant.file import File
-    from app.models.tenant.wiki import WikiPage
-    from app.services.tenant.mention_parser import (
-        ANONYMIZED_MENTION_NAME,
-        nameless_state,
-    )
-    from app.testing import MENTIONING_YJS_STATE
+    from app.services.tenant.mention_parser import ANONYMIZED_MENTION_NAME
     from app.testing.factories import (
-        create_file,
         create_initiative,
         create_initiative_member,
         create_project,
         create_task,
-        create_wiki,
-        create_wiki_page,
-        enable_all_tools,
-        lexical_body,
     )
     from app.testing.schema_harness import route_session_to_guild
 
@@ -733,36 +715,6 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
     await create_initiative_member(session, initiative=initiative, user=victim)
     project = await create_project(session, initiative, author)
     task = await create_task(session, project)
-    mentioning = lexical_body("Thanks ", mentioning=victim.id)
-    file = await create_file(
-        session, initiative, author, content=mentioning, yjs_state=MENTIONING_YJS_STATE
-    )
-    archived = await create_file(
-        session,
-        initiative,
-        author,
-        content=mentioning,
-        yjs_state=MENTIONING_YJS_STATE,
-        archived_at=datetime.now(UTC),
-    )
-    elsewhere = await create_file(
-        session,
-        initiative,
-        author,
-        content=lexical_body("Thanks ", mentioning=author.id),
-        yjs_state=b"kept-state",
-    )
-    unreadable = await create_file(
-        session, initiative, author, content=mentioning, yjs_state=b"unreadable"
-    )
-    await enable_all_tools(session, initiative)
-    page = await create_wiki_page(
-        session,
-        await create_wiki(session, initiative, author),
-        author,
-        content=mentioning,
-        yjs_state=MENTIONING_YJS_STATE,
-    )
     line = BatchedNotice(
         user_id=author.id,
         kind=BatchedNoticeKind.task_assignment,
@@ -780,50 +732,11 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
     line_id = line.id
     victim_id = victim.id
 
-    # Account erasure is trusted system work and must not be narrowed by an
-    # evolving tenant UPDATE policy. This restrictive policy independently
-    # proves the lifecycle path retains its system identity while routed into
-    # the guild schema.
-    await set_rls_context(session, Unattributed())
-    await session.exec(
-        text(
-            f'CREATE POLICY test_erasure_system_path ON "guild_{guild.id}".files '
-            "AS RESTRICTIVE FOR UPDATE USING (false) WITH CHECK (false)"
-        )
-    )
-    await session.commit()
-
     system_session = await role_session("app_admin")
     await user_service.soft_delete_user(system_session, victim_id)
 
     session.expunge_all()
     await route_session_to_guild(session, guild.id)
-    states = dict(
-        (
-            await session.exec(
-                select(File.id, File.yjs_state)
-                .where(
-                    File.id.in_(  # type: ignore[union-attr]
-                        [file.id, archived.id, elsewhere.id, unreadable.id]
-                    )
-                )
-                .execution_options(include_archived=True)
-            )
-        ).all()
-    )
-    assert states.pop(elsewhere.id) == b"kept-state"
-    assert states.pop(unreadable.id) == b"unreadable"
-    refreshed_page = (
-        await session.exec(
-            select(WikiPage)
-            .where(WikiPage.id == page.id)
-            .options(undefer(WikiPage.content), undefer(WikiPage.yjs_state))
-        )
-    ).one()
-    assert refreshed_page.content == mentioning
-    for state in (*states.values(), refreshed_page.yjs_state):
-        assert state != MENTIONING_YJS_STATE and nameless_state(state) is None
-
     line_name, line_by = (
         await session.exec(
             select(BatchedNotice.actor_name, BatchedNotice.actor_id).where(
@@ -1038,7 +951,9 @@ async def test_soft_delete_user_empties_the_shared_tables(
             AnnouncementReadReceipt(user_id=user.id, announcement_key="builtin:x"),
             UserCookieConsent(user_id=user.id, version=1),
             UserBirthdate(user_id=user.id, birthdate_encrypted="sealed"),
-            DmDevice(user_id=user.id, identity_key=b"i", fingerprint_key=b"f"),
+            DmDevice(
+                user_id=user.id, identity_key=b"i", fingerprint_key=b"f", signature=b"s"
+            ),
             DmConversationMember(conversation_id=conversation.id, user_id=user.id),
             DmConversationMember(conversation_id=conversation.id, user_id=other.id),
             UserDmGuildOptout(user_id=user.id, guild_id=guild.id),

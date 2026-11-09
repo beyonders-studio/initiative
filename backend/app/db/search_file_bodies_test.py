@@ -3,8 +3,7 @@
 ``files.content`` holds a different shape per ``file_type``, so each
 gets its own extraction. These assert the text actually reaches the index
 against a real Postgres, including the shapes that would otherwise be silent:
-a legacy spreadsheet, a file type that stores no prose, and content nested
-below the top level.
+a file type that stores no prose, and content nested below the top level.
 """
 
 from __future__ import annotations
@@ -171,30 +170,6 @@ async def test_a_current_spreadsheet_indexes_cells_and_sheet_names(
     assert "1234" in body
     # Sheet names are addressable in formulas, so they are worth finding.
     assert "Budget" in body
-
-
-async def test_a_legacy_spreadsheet_still_indexes(
-    session: AsyncSession, acting_user: ActingUser
-) -> None:
-    """v1 and v2 payloads are upcast only when next saved, so both shapes are
-    live in the database and the extraction has to read either."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    doc = await create_file(
-        session,
-        a.initiative,
-        a.user,
-        name="Legacy",
-        file_type=FileType.sheet,
-        content={
-            "schema_version": 1,
-            "kind": "sheet",
-            "dimensions": {"rows": 2, "cols": 2},
-            "cells": {"0:0": "legacy total", "0:1": 99},
-        },
-    )
-    body = await _body(session, a.guild.id, doc.id)
-    assert "legacy total" in body
-    assert "99" in body
 
 
 async def test_a_smart_link_indexes_its_url(

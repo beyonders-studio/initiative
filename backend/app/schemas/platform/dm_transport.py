@@ -42,9 +42,8 @@ MAX_GROUP_MEMBERS = 40
 class DmOneTimeKeyUpload(BaseModel):
     key_id: str = Field(min_length=1, max_length=64)
     public_key: str = Field(min_length=1, max_length=KEY_B64_LENGTH)
-    #: The publishing device's signature over the key. Absent only from a device
-    #: registered before signing.
-    signature: str | None = Field(default=None, max_length=SIGNATURE_B64_LENGTH)
+    #: The publishing device's signature over the key.
+    signature: str = Field(min_length=1, max_length=SIGNATURE_B64_LENGTH)
     #: On a claim: whether this is the device's reusable fallback key, which is
     #: signed under its own tag. Ignored on upload.
     fallback: bool = False
@@ -54,7 +53,7 @@ class DmDeviceRegistration(BaseModel):
     identity_key: str = Field(min_length=1, max_length=KEY_B64_LENGTH)
     fingerprint_key: str = Field(min_length=1, max_length=KEY_B64_LENGTH)
     #: The device's signature over its keys and account.
-    signature: str | None = Field(default=None, max_length=SIGNATURE_B64_LENGTH)
+    signature: str = Field(min_length=1, max_length=SIGNATURE_B64_LENGTH)
     #: The reusable last-resort key, so a sender who arrives after the pool is
     #: drained can still open a session.
     fallback_key: DmOneTimeKeyUpload
@@ -65,17 +64,6 @@ class DmDeviceRegistration(BaseModel):
     # user-agent, so it is a fact about the connection rather than a string the
     # client chose -- which is what the device list is more useful for, and what
     # keeps a name field out of a request body.
-
-
-class DmDeviceSignature(BaseModel):
-    """A device registered before signing, signing itself: its signature, and a
-    signed fallback and pool to replace the unsigned ones."""
-
-    signature: str = Field(min_length=1, max_length=SIGNATURE_B64_LENGTH)
-    fallback_key: DmOneTimeKeyUpload
-    one_time_keys: list[DmOneTimeKeyUpload] = Field(
-        default_factory=list, max_length=MAX_ONE_TIME_KEYS
-    )
 
 
 class DmOneTimeKeyBatch(BaseModel):
@@ -93,7 +81,7 @@ class DmDeviceRead(BaseModel):
     #: arriving from one of the account's other clients, and public by nature.
     identity_key: str
     fingerprint_key: str
-    signature: str | None
+    signature: str
     label: str | None
     created_at: datetime
     last_seen_at: datetime
@@ -113,9 +101,8 @@ class DmSessionKey(BaseModel):
     device_id: uuid.UUID
     identity_key: str
     fingerprint_key: str
-    #: The device's signature over its keys and account; absent from a device
-    #: registered before signing.
-    signature: str | None = None
+    #: The device's signature over its keys and account.
+    signature: str
     #: Absent only if the device published nothing at all, which a registered
     #: device cannot do — a fallback key is required at registration.
     one_time_key: DmOneTimeKeyUpload | None = None

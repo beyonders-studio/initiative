@@ -442,30 +442,6 @@ SELECT format('schema %I', n.nspname),
 """
 
 
-# A login role must hold no default privilege: a new shared table gives it
-# nothing until a migration grants it from the audited registry. Revoked rather
-# than merely not granted, so a database that was handed over by an earlier
-# build converges instead of keeping what that build set.
-_REVOKE_LOGIN_DEFAULT_PRIVILEGES = """
-DO $$
-DECLARE
-    provisioner text := current_setting('app._bootstrap_role');
-    grantee text := current_setting('app._bootstrap_grantee');
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = grantee) THEN
-        RETURN;
-    END IF;
-    EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public '
-        'REVOKE ALL ON TABLES FROM %I', provisioner, grantee);
-    EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public '
-        'REVOKE ALL ON SEQUENCES FROM %I', provisioner, grantee);
-END
-$$;
-"""
-
-
 # Tables created by future provisioner-run migrations reach the routed roles
 # through the two shared floors. The login roles are deliberately absent: a new
 # shared table grants them nothing until a migration decides, from the audited
@@ -652,7 +628,6 @@ def _role_steps(roles: tuple[LoginRole, ...]) -> list[_Step]:
         steps += [
             ("app._bootstrap_grantee", role.name),
             _ADMINISTER_LOGIN_ROLE,
-            _REVOKE_LOGIN_DEFAULT_PRIVILEGES,
         ]
     steps += [
         _administer_existing_roles(),

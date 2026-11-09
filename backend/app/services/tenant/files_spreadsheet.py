@@ -8,19 +8,13 @@ provider; the JSON shape this module validates is the snapshot persisted
 to ``File.content`` whenever the room empties (or the user creates
 the file via a non-collab POST/PATCH).
 
-Schema versions
----------------
-* **v1** (legacy): ``{schema_version, kind, dimensions, cells}`` — one
-  implicit sheet, no formatting.
-* **v2** (legacy): adds ``columns`` / ``rows`` / ``cellStyles``
-  formatting maps and a ``frozen`` pane hint. Still one implicit sheet.
-* **v3** (current): ``{schema_version, kind, sheets: [...]}``, where each
-  entry carries everything v2 kept at the top level plus an ``id`` and a
-  user-facing ``name``.
-
-A v1/v2 payload is accepted and **upcast** to v3 by reading its top level
-as the workbook's single sheet, so existing files keep saving without
-a data migration. The output ``schema_version`` is always the current one.
+Shape
+-----
+``{schema_version: 3, kind, sheets: [...]}``, where each sheet carries its
+``id``, a user-facing ``name``, ``dimensions``, ``cells``, the ``columns`` /
+``rows`` / ``cellStyles`` formatting maps and a ``frozen`` pane hint. Any
+other version is refused, as is a payload with no ``sheets`` and something
+else at its top level, which would otherwise be dropped.
 
 Sheet names are load-bearing, not decoration: a formula addresses another
 sheet by name (``=Sheet2!A1``). They are therefore sanitized (the
@@ -53,9 +47,6 @@ from app.services.tenant.files import FileContentError
 SCHEMA_VERSION = 3
 """Current snapshot shape. Bump on breaking changes."""
 
-SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3)
-"""Inbound versions we accept. Anything else is a hard reject. v1 and v2
-are upcast to ``SCHEMA_VERSION`` transparently."""
 
 MAX_ROWS = 100_000
 MAX_COLS = 1_000
@@ -70,8 +61,8 @@ MAX_SHEET_NAME = 31
 silently rename a sheet."""
 
 DEFAULT_SHEET_ID = "s1"
-"""Id of the implicit sheet a v1/v2 payload upcasts into. Fixed (not
-random) so the upcast is deterministic and repeatable."""
+"""Id of a workbook's first sheet when it names none. Fixed (not random)
+so two editors seeding the same empty file write the same sheet."""
 
 MIN_COL_WIDTH = 24
 MAX_COL_WIDTH = 2_000
@@ -103,8 +94,8 @@ def normalize_spreadsheet_content(payload: Any) -> dict[str, Any]:
     Accepts ``None`` / non-dict payloads as the empty spreadsheet (the
     same forgiving behavior whiteboard uses for fresh docs). Otherwise
     walks the payload, rejects anything that violates the cell / container
-    invariants, drops malformed formatting entries, upcasts v1/v2 → v3,
-    and returns a sanitized dict.
+    invariants, drops malformed formatting entries, and returns a sanitized
+    dict.
     """
     if not isinstance(payload, dict):
         return _empty_snapshot()
@@ -115,20 +106,19 @@ def normalize_spreadsheet_content(payload: Any) -> dict[str, Any]:
     if (
         not isinstance(schema_version, int)
         or isinstance(schema_version, bool)
-        or schema_version not in SUPPORTED_SCHEMA_VERSIONS
+        or schema_version != SCHEMA_VERSION
     ):
         raise FileContentError(FileMessages.SPREADSHEET_INVALID_PAYLOAD)
 
     sheets_in = payload.get("sheets")
-    if sheets_in is None:
-        # v1 / v2: the file's top level *is* the one and only sheet.
-        entries: list[Any] = [payload]
-    elif isinstance(sheets_in, list):
-        # An explicitly empty list still has to produce a usable file —
-        # an editor with no sheet has nothing to render.
-        entries = sheets_in[:MAX_SHEETS] or [{}]
-    else:
+    # A workbook is its sheets: cells or formatting at the top would be lost.
+    if sheets_in is None and payload.keys() - {"schema_version", "kind"}:
         raise FileContentError(FileMessages.SPREADSHEET_INVALID_PAYLOAD)
+    if not isinstance(sheets_in, list | None):
+        raise FileContentError(FileMessages.SPREADSHEET_INVALID_PAYLOAD)
+    # No sheets, or an empty list, still has to produce a usable file — an
+    # editor with no sheet has nothing to render.
+    entries: list[Any] = (sheets_in or [])[:MAX_SHEETS] or [{}]
 
     sheets_out: list[dict[str, Any]] = []
     used_ids: set[str] = set()
@@ -155,9 +145,7 @@ def _normalize_sheet(
     used_ids: set[str],
     used_names: set[str],
 ) -> dict[str, Any]:
-    """Normalize one sheet. The same call handles a v3 ``sheets[i]`` entry
-    and a v1/v2 file's top level — which is precisely the upcast, since
-    the old shape already *was* a sheet."""
+    """Normalize one ``sheets[i]`` entry."""
     if payload is None:
         payload = {}
     if not isinstance(payload, dict):
@@ -207,10 +195,9 @@ def _normalize_sheet(
     rows = _coerce_dim(dims_in.get("rows"), default=max(max_row + 1, 100), cap=MAX_ROWS)
     cols = _coerce_dim(dims_in.get("cols"), default=max(max_col + 1, 26), cap=MAX_COLS)
 
-    # Formatting structures. Absent for v1 payloads → empty maps (the
-    # upcast). Each container must be a dict (a list / scalar is a real
-    # serialization bug → reject); individual malformed entries are
-    # dropped, not rejected.
+    # Formatting structures; absent → empty maps. Each container must be a
+    # dict (a list / scalar is a real serialization bug → reject);
+    # individual malformed entries are dropped, not rejected.
     columns = _normalize_index_map(
         payload.get("columns", {}), cap=MAX_COLS, allow_width=True
     )

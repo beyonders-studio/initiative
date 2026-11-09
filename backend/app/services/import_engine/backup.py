@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import zipfile
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
@@ -80,7 +81,6 @@ from app.services.import_engine.common import (
     load_guild_member_handles,
     load_initiative_member_handles,
     unique_name,
-    unique_name_in_initiative,
 )
 from app.services.import_engine.context import (
     ImportContext,
@@ -139,8 +139,19 @@ _ATTACH_RELATIONSHIPS: dict[str, RelationshipType] = {
     "wiki": RelationshipType.part_of,
 }
 
-#: An older build's gallery entry: its pictures become files in a collection.
-_GALLERY_TYPE = "initiative-gallery"
+#: The oldest release whose archives this one restores: one from before it
+#: names tools, kinds and references as they were then.
+ARCHIVE_FLOOR = (0, 78, 0)
+
+
+def _release(version: object) -> tuple[int, int, int]:
+    """A release's ``major.minor.patch``; ``(0, 0, 0)`` when it names none."""
+    found = (
+        re.match(r"(\d+)\.(\d+)\.(\d+)", version) if isinstance(version, str) else None
+    )
+    if found is None:
+        return (0, 0, 0)
+    return (int(found[1]), int(found[2]), int(found[3]))
 
 
 def _entry_ref(path: str) -> str:
@@ -182,8 +193,14 @@ def read_manifest(archive: zipfile.ZipFile, *, fetched: bool = False) -> BackupM
         raise
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
+    # An archive from before ARCHIVE_FLOOR names tools, kinds and references
+    # as they were then; it is refused rather than half restored.
+    if _release(raw.get("app_version") if isinstance(raw, dict) else None) < (
+        ARCHIVE_FLOOR
+    ):
+        raise ImportEngineError(ImportEngineMessages.IMPORT_ARCHIVE_TOO_OLD)
     try:
-        manifest = BackupManifest.model_validate(import_engine.current_shape(raw))
+        manifest = BackupManifest.model_validate(raw)
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
     if not (
@@ -662,9 +679,7 @@ async def _resolve_target_initiative(
         # A file entry is a file whatever tool it was filed under, so it
         # is the file importer's permission that governs it.
         envelope_type = (
-            tool_envelope_type(Tool.file)
-            if entry.type in ("file", _GALLERY_TYPE)
-            else entry.type
+            tool_envelope_type(Tool.file) if entry.type == "file" else entry.type
         )
         if envelope_type in seen:
             continue
@@ -734,17 +749,6 @@ async def _apply_entry(
         )
         _record_entry(context, entry, outcome)
         return outcome
-    if entry.type == _GALLERY_TYPE:
-        return await _apply_gallery_entry(
-            session,
-            archive,
-            entry,
-            initiative,
-            user,
-            base,
-            max_json_bytes,
-            context=context,
-        )
     if entry.type in _STRUCTURAL_TYPES:
         return await _apply_structural_entry(
             session,
@@ -765,7 +769,7 @@ async def _apply_entry(
         raw = await asyncio.to_thread(
             read_json_member, archive, entry.path, max_bytes=max_json_bytes
         )
-        envelope = import_engine.current_shape(raw)
+        envelope = raw
         if shift_days and isinstance(envelope, dict) and entry.tool in _TOOL_ORDER:
             envelope = shift_dates(Tool(entry.tool), envelope, shift_days)
         validated = importer.validate(envelope)
@@ -873,7 +877,6 @@ async def _apply_structural_entry(
         return invalid
     if not isinstance(payload, dict):
         return invalid
-    payload = import_engine.current_shape(payload)
     try:
         async with session.begin_nested():
             if entry.type == "initiative-properties":
@@ -1201,178 +1204,6 @@ async def _uploaded_file(
         "file_size": upload.size_bytes,
     }
     return file, stored
-
-
-class _GalleryPicture(SanitizedBaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    storage_key: str
-    title: str | None = None
-    caption: str | None = None
-    original_filename: str | None = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-
-
-class _Gallery(SanitizedBaseModel):
-    """An older build's gallery envelope, as much of it as a collection keeps."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    name: str
-    description: str | None = None
-    cover: str | None = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    images: list[_GalleryPicture] = []
-
-
-async def _apply_gallery_entry(
-    session: AsyncSession,
-    archive: zipfile.ZipFile,
-    entry: ManifestEntry,
-    initiative,
-    user: User,
-    base: dict,
-    max_json_bytes: int,
-    *,
-    context: ImportContext | None = None,
-) -> EntryResult:
-    """An older build's gallery: each picture whose bytes were restored is a
-    file of the initiative, owned by the importer, and the files one collection
-    named as the gallery was, made as the Gallery shape in the importer's
-    language. The gallery's tags and properties go on the collection, each
-    picture's on its file, and its caption is its file's Caption."""
-    from app.core.collection_shapes import SHAPES_BY_KEY
-    from app.models.tenant.collection import Collection
-    from app.models.tenant.file import File
-    from app.models.tenant.metadata import MetadataValue
-    from app.services.import_engine.importers._base import (
-        PropertyRestore,
-        TagRestore,
-        grant_ownership,
-    )
-    from app.services.tenant import collections as collections_service
-    from app.services.tenant import file_versions
-
-    try:
-        raw = await asyncio.to_thread(
-            read_json_member, archive, entry.path, max_bytes=max_json_bytes
-        )
-        gallery = _Gallery.model_validate(raw)
-    except ImportEngineError as exc:
-        return EntryResult(**base, status="failed", error=exc.code)
-    except ValueError:
-        return EntryResult(
-            **base, status="failed", error=ImportEngineMessages.IMPORT_INVALID_ENVELOPE
-        )
-    missing = 0
-    files: list[Any] = []
-    captions: dict[int, str] = {}
-    cover: int | None = None
-    try:
-        async with session.begin_nested():
-            tags = TagRestore(session)
-            props = PropertyRestore(
-                session, initiative_id=initiative.id, context=context
-            )
-            for picture in gallery.images:
-                key = picture.storage_key
-                filename = picture.original_filename or key
-                made = await _uploaded_file(
-                    session,
-                    key,
-                    name=await unique_name_in_initiative(
-                        session, File, initiative.id, picture.title or filename
-                    ),
-                    filename=filename,
-                    initiative=initiative,
-                    user=user,
-                )
-                if made is None:
-                    missing += 1
-                    continue
-                file, stored = made
-                session.add(file)
-                await session.flush()
-                await grant_ownership(
-                    session,
-                    tool=Tool.file,
-                    entity_id=file.id,
-                    target_initiative=initiative,
-                    importer=user,
-                )
-                await file_versions.add_version(
-                    session,
-                    file,
-                    created_by=user.id,
-                    created_by_kind=ActorKind.member,
-                    **stored,
-                )
-                await tags.attach(file, picture.tags)
-                await props.attach(file, picture.properties)
-                files.append(file)
-                if picture.caption and picture.caption.strip():
-                    captions[file.id] = picture.caption.strip()
-                if gallery.cover and key == gallery.cover:
-                    cover = file.id
-            collection = None
-            if files:
-                collection = Collection(
-                    initiative_id=initiative.id,
-                    name=gallery.name,
-                    description=gallery.description,
-                    cover_file_id=cover,
-                    created_by=user.id,
-                    created_by_kind=ActorKind.member,
-                )
-                session.add(collection)
-                await session.flush()
-                await collections_service.add_files(
-                    session, collection, [f.id for f in files], added_by=user.id
-                )
-                shaped = await collections_service.apply_shape(
-                    session,
-                    collection,
-                    SHAPES_BY_KEY["gallery"],
-                    locale=user.locale or "en",
-                )
-                session.add_all(
-                    MetadataValue(
-                        entity_type=Tool.file.value,
-                        entity_id=file_id,
-                        property_id=shaped["caption"].id,
-                        value_text=caption,
-                    )
-                    for file_id, caption in captions.items()
-                )
-                await tags.attach(collection, gallery.tags)
-                await props.attach(collection, gallery.properties)
-            unmatched: set[str] = set()
-            for row in [*files, *([collection] if collection else [])]:
-                unmatched.update(await props.settle(row))
-            unmatched_handles = sorted(unmatched)
-    except Exception:
-        logger.exception("backup gallery entry failed path=%s", entry.path)
-        return EntryResult(
-            **base, status="failed", error=ImportEngineMessages.IMPORT_APPLY_FAILED
-        )
-    if collection is None:
-        return EntryResult(
-            **base, status="skipped", error=ImportEngineMessages.IMPORT_ASSET_MISSING
-        )
-    return EntryResult(
-        **base,
-        status="created",
-        detail=EnvelopeImportResult(
-            entity_id=collection.id,
-            entity_title=collection.name,
-            created={Tool.file.plural: len(files), "collections": 1},
-            failed={Tool.file.plural: missing} if missing else {},
-            unmatched_handles=unmatched_handles,
-            warnings=[f"missing_image_files:{missing}"] if missing else [],
-        ),
-    )
 
 
 async def _apply_file_entry(

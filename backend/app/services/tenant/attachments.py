@@ -962,7 +962,7 @@ async def store_upload(
     guild_id: int,
     filename: str,
     data: bytes | Path,
-    content_type: str | None,
+    content_type: str,
     created_by: int | None = None,
     created_by_kind: ActorKind | None = None,
     initiative_id: int | None = None,
@@ -989,7 +989,6 @@ async def store_upload(
 
     scan = upload_scanning.enabled() and not filename.startswith(THUMBNAIL_PREFIX)
     storage = get_guild_storage(guild_id)
-    stored_type = content_type or "application/octet-stream"
     if isinstance(data, Path):
         size = data.stat().st_size
         if scan:
@@ -997,13 +996,15 @@ async def store_upload(
                 upload_scanning.scan_stream, blob_pieces(ReadableBlob(path=data)), size
             )
         await asyncio.to_thread(
-            storage.write_file, filename, data, content_type=stored_type
+            storage.write_file, filename, data, content_type=content_type
         )
     else:
         size = len(data)
         if scan:
             await asyncio.to_thread(upload_scanning.scan_bytes, data)
-        await asyncio.to_thread(storage.write, filename, data, content_type=stored_type)
+        await asyncio.to_thread(
+            storage.write, filename, data, content_type=content_type
+        )
     return record_upload(
         session,
         guild_id=guild_id,
@@ -1023,7 +1024,7 @@ def record_upload(
     guild_id: int,
     filename: str,
     size: int,
-    content_type: str | None,
+    content_type: str,
     content_hash: str | None,
     initiative_id: int | None,
     created_by: int | None = None,

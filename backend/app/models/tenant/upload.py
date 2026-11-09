@@ -22,10 +22,8 @@ class Upload(HoldMixin, CreatedByMixin, table=True):
     size_bytes: int = Field(default=0)
     # MIME type recorded at upload time, so serving can set Content-Type without
     # sniffing the bytes (and a future object-store backend can set it on the
-    # object). Nullable: legacy rows stay NULL until backfilled.
-    content_type: str | None = Field(
-        default=None, sa_column=Column(String(255), nullable=True)
-    )
+    # object).
+    content_type: str = Field(sa_column=Column(String(255), nullable=False))
     # SHA-256 hex of the stored bytes — integrity verification for the eventual
     # object-store migration, and the basis for future content dedup.
     content_hash: str | None = Field(

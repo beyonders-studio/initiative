@@ -221,10 +221,8 @@ def _device_bytes(user_id: int, identity_key: bytes, fingerprint_key: bytes) -> 
     return _DEVICE_TAG + user_id.to_bytes(8, "big") + identity_key + fingerprint_key
 
 
-def _signature(fingerprint_key: bytes, message: bytes, signature: str | None) -> bytes:
+def _signature(fingerprint_key: bytes, message: bytes, signature: str) -> bytes:
     """The raw signature, once it verifies against the device's fingerprint key."""
-    if signature is None:
-        raise DmTransportError(Messages.INVALID_SIGNATURE)
     raw = _decode(signature, expect=SIGNATURE_BYTES)
     try:
         Ed25519PublicKey.from_public_bytes(fingerprint_key).verify(raw, message)
@@ -236,16 +234,12 @@ def _signature(fingerprint_key: bytes, message: bytes, signature: str | None) ->
 def _key_row(
     device: DmDevice, key: DmOneTimeKeyUpload, *, fallback: bool
 ) -> DmOneTimeKey:
-    """A published key, its signature checked when the device signs."""
+    """A published key, once its signature checks against the device's."""
     public_key = _decode(key.public_key, expect=KEY_BYTES)
-    signature = (
-        _signature(
-            device.fingerprint_key,
-            (_FALLBACK_KEY_TAG if fallback else _ONE_TIME_KEY_TAG) + public_key,
-            key.signature,
-        )
-        if device.signature is not None
-        else None
+    signature = _signature(
+        device.fingerprint_key,
+        (_FALLBACK_KEY_TAG if fallback else _ONE_TIME_KEY_TAG) + public_key,
+        key.signature,
     )
     return DmOneTimeKey(
         device_id=device.id,
@@ -276,7 +270,7 @@ async def register_device(
     user_id: int,
     identity_key: str,
     fingerprint_key: str,
-    signature: str | None,
+    signature: str,
     fallback_key: DmOneTimeKeyUpload,
     one_time_keys: list[DmOneTimeKeyUpload],
     label: str | None,
@@ -284,8 +278,7 @@ async def register_device(
 ) -> DmDevice:
     """Publish a new installed client's public keys, signed by the device.
 
-    An unsigned registration is refused, and a signed device's keys must be
-    signed too.
+    The device and each key it publishes are signed by the device.
 
     A fallback key is required rather than optional: without one, a device whose
     prekeys run out becomes unreachable to anyone starting a new conversation,
@@ -299,18 +292,12 @@ async def register_device(
     """
     identity = _decode(identity_key, expect=KEY_BYTES)
     fingerprint = _decode(fingerprint_key, expect=KEY_BYTES)
-    if signature is None:
-        raise DmTransportError(Messages.INVALID_SIGNATURE)
     device = DmDevice(
         user_id=user_id,
         identity_key=identity,
         fingerprint_key=fingerprint,
-        signature=(
-            _signature(
-                fingerprint, _device_bytes(user_id, identity, fingerprint), signature
-            )
-            if signature is not None
-            else None
+        signature=_signature(
+            fingerprint, _device_bytes(user_id, identity, fingerprint), signature
         ),
         label=label,
         session_id=session_id,
@@ -327,30 +314,6 @@ async def register_device(
     _add_keys(session, device, fallback_key=fallback_key, one_time_keys=one_time_keys)
     await session.flush()
     return device
-
-
-async def sign_device(
-    session: AsyncSession,
-    *,
-    user_id: int,
-    device_id: uuid.UUID,
-    signature: str,
-    fallback_key: DmOneTimeKeyUpload,
-    one_time_keys: list[DmOneTimeKeyUpload],
-) -> None:
-    """Sign a device registered before signing, once, and replace the keys it
-    published unsigned with signed ones."""
-    device = await _own_device(session, user_id=user_id, device_id=device_id)
-    if device.signature is not None:
-        raise DmTransportError(Messages.INVALID_SIGNATURE)
-    device.signature = _signature(
-        device.fingerprint_key,
-        _device_bytes(user_id, device.identity_key, device.fingerprint_key),
-        signature,
-    )
-    await session.exec(delete(DmOneTimeKey).where(DmOneTimeKey.device_id == device.id))
-    _add_keys(session, device, fallback_key=fallback_key, one_time_keys=one_time_keys)
-    await session.flush()
 
 
 async def add_one_time_keys(
@@ -400,7 +363,7 @@ async def list_devices(session: AsyncSession, *, user_id: int) -> list[DmDeviceR
             id=device.id,
             identity_key=_encode_key(device.identity_key),
             fingerprint_key=_encode_key(device.fingerprint_key),
-            signature=_encode_key(device.signature) if device.signature else None,
+            signature=_encode_key(device.signature),
             # Stored as the user agent that registered it, which is no name a
             # person would recognise their own laptop by.
             label=describe_client(device.label),
@@ -474,7 +437,7 @@ def _session_key(
         device_id=device.id,
         identity_key=_encode_key(device.identity_key),
         fingerprint_key=_encode_key(device.fingerprint_key),
-        signature=_encode_key(device.signature) if device.signature else None,
+        signature=_encode_key(device.signature),
         one_time_key=one_time_key,
     )
 
@@ -536,7 +499,7 @@ async def _claim_for(
         key_id=row[0],
         public_key=_encode_key(bytes(row[1])),
         fallback=row[2],
-        signature=_encode_key(bytes(row[3])) if row[3] is not None else None,
+        signature=_encode_key(bytes(row[3])),
     )
 
 

@@ -1708,16 +1708,6 @@ async def create_dashboard(
     return dashboard
 
 
-#: A collaboration state as the editor's binding writes one: a paragraph,
-#: ``Hi `` and a mention of user 42 holding the name ``Ada``, the way an editor
-#: from before mentions stopped storing names wrote it. Made with ``yjs``.
-MENTIONING_YJS_STATE = base64.b64decode(
-    "AQeWo/S3AwAHAQRyb290BigAlqP0twMABl9fdHlwZQF3CXBhcmFncmFwaAQAlqP0twMAA0hp"
-    "IIeWo/S3AwQDB21lbnRpb24oAJaj9LcDBQZfX3R5cGUBdwdtZW50aW9uKACWo/S3AwUJX19t"
-    "ZW50aW9uAXcDQWRhKACWo/S3AwUPX19tZW50aW9uVXNlcklkAX0qAA=="
-)
-
-
 def lexical_body(
     text: str, *, mentioning: int | str | None = None, name: str = ""
 ) -> dict[str, Any]:
@@ -2301,6 +2291,7 @@ async def create_upload(
         "created_by_kind": ActorKind.member,
         "filename": filename or f"file-{datetime.now(UTC).timestamp()}.txt",
         "size_bytes": 1,
+        "content_type": "text/plain",
     }
     upload = Upload(**{**defaults, **overrides})
     session.add(upload)

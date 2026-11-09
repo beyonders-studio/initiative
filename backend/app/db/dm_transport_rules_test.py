@@ -72,6 +72,7 @@ async def _device(session: AsyncSession, user: User) -> DmDevice:
         user_id=user.id,
         identity_key=b"identity-" + str(user.id).encode(),
         fingerprint_key=b"fingerprint-" + str(user.id).encode(),
+        signature=b"signature",
     )
     session.add(device)
     await session.flush()
@@ -493,6 +494,7 @@ class TestClaimingAPrekey:
                     device_id=device.id,
                     key_id=f"otk-{index}",
                     public_key=f"key-{index}".encode(),
+                    signature=b"signature",
                 )
             )
         session.add(
@@ -501,6 +503,7 @@ class TestClaimingAPrekey:
                 key_id="fb",
                 public_key=b"fallback",
                 fallback=True,
+                signature=b"signature",
             )
         )
         await session.flush()
@@ -573,13 +576,18 @@ class TestIgnoredClaimerSpendsNothing:
     """
 
     async def _publish(self, session: AsyncSession, device: DmDevice) -> None:
-        session.add(DmOneTimeKey(device_id=device.id, key_id="otk-0", public_key=b"k0"))
+        session.add(
+            DmOneTimeKey(
+                device_id=device.id, key_id="otk-0", public_key=b"k0", signature=b"s"
+            )
+        )
         session.add(
             DmOneTimeKey(
                 device_id=device.id,
                 key_id="fb",
                 public_key=b"fallback",
                 fallback=True,
+                signature=b"signature",
             )
         )
         await session.flush()

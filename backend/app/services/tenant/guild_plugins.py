@@ -1594,8 +1594,7 @@ def surface_access(
       guild admin or holds one of the placement's roles.
     * At the community level, the viewer is a guild admin.
     * A surface marked ``admin_only`` is opened by guild admins alone,
-      wherever it is (read by :func:`is_admin_only`, which also honours the
-      earlier contract's term on a definition pinned before it).
+      wherever it is (read by :func:`is_admin_only`).
 
     ``member_role_ids`` are the viewer's initiative roles across the community.
     A role belongs to one initiative and a placement names only its own

@@ -860,66 +860,6 @@ class TestReactionNotifications:
         session.expunge_all()
         assert await _bell() == []
 
-    async def test_a_pre_rollup_line_can_still_be_un_said(
-        self, client, session, acting_user
-    ):
-        """A line written before reactions rolled up carries no reaction id, so
-        it has to be matched on who reacted and with what — otherwise the first
-        un-react after the upgrade leaves it standing forever."""
-        from sqlmodel import select
-
-        from app.models.platform.notification import Notification, NotificationType
-
-        a = await acting_user(
-            guild_role=CommunityRole.member, initiative=True, project=True
-        )
-        b = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
-        await create_resource_grant(
-            session, a.project, user=b.user, level=ResourceAccessLevel.write
-        )
-        task = await create_task(session, a.project)
-        comment_id = await _comment_on_task(client, a, task.id)
-
-        await client.put(
-            a.g(f"/reactions/comment/{comment_id}"),
-            headers=b.headers,
-            json={"emoji": THUMBS},
-        )
-
-        async def _bell():
-            await drain_notices()
-            return (
-                await session.exec(
-                    select(Notification).where(
-                        Notification.user_id == a.user.id,
-                        Notification.type == NotificationType.comment_reaction,
-                    )
-                )
-            ).all()
-
-        # Rewrite the line into the shape this feature replaced.
-        [line] = await _bell()
-        line.data = {
-            key: value
-            for key, value in line.data.items()
-            if key not in {"count", "reactions", "reactor_count", "reactor_ids"}
-        }
-        session.add(line)
-        await session.commit()
-
-        await client.put(
-            a.g(f"/reactions/comment/{comment_id}"),
-            headers=b.headers,
-            json={"emoji": THUMBS},
-        )
-        session.expunge_all()
-        assert await _bell() == []
-
     async def test_taking_a_reaction_back_withdraws_the_queued_line(
         self, client, session, acting_user
     ):

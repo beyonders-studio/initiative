@@ -332,6 +332,7 @@ async def test_an_upload_is_not_served_to_a_key_the_guild_declines(
             created_by=admin.id,
             created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()

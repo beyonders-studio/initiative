@@ -1413,48 +1413,18 @@ MAX_ROLLED_UP_REACTIONS = 20
 
 def _rolled_up_reactions(data: Mapping[str, Any]) -> list[dict[str, Any]]:
     """The individual reactions a bell line is already carrying."""
-    rolled = data.get("reactions")
-    if isinstance(rolled, list):
-        return [entry for entry in rolled if isinstance(entry, dict)]
-    # A line written before the bell rolled these up names its one reaction in
-    # the top-level fields instead.
-    if data.get("emoji"):
-        return [
-            {
-                "id": None,
-                "emoji": data.get("emoji"),
-                "reactor_id": data.get("reactor_id"),
-                "reactor_name": data.get("reactor_name"),
-            }
-        ]
-    return []
+    return list(data.get("reactions") or [])
 
 
 def _rolled_up_reactor_ids(data: Mapping[str, Any]) -> list[int]:
-    """The distinct people a bell line has rostered, oldest first.
-
-    A line written before the roster existed answers from the reactions it
-    still remembers, which for such a line is all it ever had.
-    """
-    rostered = data.get("reactor_ids")
-    if isinstance(rostered, list):
-        return [value for value in rostered if isinstance(value, int)]
-    seen: list[int] = []
-    for entry in _rolled_up_reactions(data):
-        reactor_id = entry.get("reactor_id")
-        if isinstance(reactor_id, int) and reactor_id not in seen:
-            seen.append(reactor_id)
-    return seen
+    """The distinct people a bell line has rostered, oldest first."""
+    return list(data.get("reactor_ids") or [])
 
 
 def _rolled_up_count(data: Mapping[str, Any]) -> int:
     """How many reactions the line stands for, including any that have rolled
     past :data:`MAX_ROLLED_UP_REACTIONS`."""
-    try:
-        count = int(data.get("count") or 0)
-    except (TypeError, ValueError):
-        count = 0
-    return count or len(_rolled_up_reactions(data))
+    return int(data.get("count") or 0)
 
 
 #: What a reaction line carries about where it sits, kept as a line rolls and
@@ -1572,24 +1542,6 @@ async def enqueue_reaction_event(
                 emoji=reaction.emoji,
             )
         )
-
-
-def _matches_withdrawn(
-    entry: Mapping[str, Any], *, reaction_id: int, reactor_id: int, emoji: str
-) -> bool:
-    """Whether a rolled-up entry is the gesture being taken back.
-
-    Normally the reaction's own id answers it. A line written before the
-    rollup carries no id, so it is matched on who reacted and with what —
-    which for a line holding a single gesture is the same question.
-    """
-    if entry.get("id") == reaction_id:
-        return True
-    return (
-        entry.get("id") is None
-        and entry.get("reactor_id") == reactor_id
-        and entry.get("emoji") == emoji
-    )
 
 
 async def withdraw_reaction_event(
@@ -1735,16 +1687,7 @@ async def _take_back_reaction(
         return
     previous: Mapping[str, Any] = existing.data or {}
     entries = _rolled_up_reactions(previous)
-    remaining = [
-        entry
-        for entry in entries
-        if not _matches_withdrawn(
-            entry,
-            reaction_id=data["reaction_id"],
-            reactor_id=reactor_id,
-            emoji=data["emoji"],
-        )
-    ]
+    remaining = [entry for entry in entries if entry.get("id") != data["reaction_id"]]
     if len(remaining) == len(entries):
         return
     count = _rolled_up_count(previous) - 1
@@ -1773,10 +1716,7 @@ async def _take_back_reaction(
             target_type=target_type,
             target_id=target_id,
             guild_id=guild_id,
-            place={
-                **previous,
-                "target_path": previous.get("target_path") or MY_TASKS_TARGET_PATH,
-            },
+            place=previous,
         ),
         bump=False,
     )

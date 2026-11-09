@@ -341,81 +341,30 @@ async def test_claiming_spends_a_prekey_but_never_the_fallback(
     assert [row["device_id"] for row in named.json()["devices"]] == [other]
 
 
-async def test_a_device_signs_its_keys(client, session, acting_user):
-    """A signature must verify against the device's own key, a signed device's
-    keys are signed too, an unsigned registration is refused, and a device
-    registered before signing signs itself once."""
+async def test_a_device_signs_its_keys(client, acting_user):
+    """A signature must verify against the device's own key, and a device and
+    each key it publishes are signed."""
     a = await acting_user()
 
     wrong_key = _signed_registration(a.user.id)
     wrong_key.pop("_device")
     wrong_key["signature"] = _b64(Ed25519PrivateKey.generate().sign(b"x"))
+    refused = await client.post(
+        "/api/v1/me/dm/devices", json=wrong_key, headers=a.headers
+    )
+    assert refused.status_code == 400, refused.text
+    assert refused.json()["detail"] == "DM_INVALID_SIGNATURE"
+
     unsigned_key = _signed_registration(a.user.id)
     unsigned_key.pop("_device")
     unsigned_key["one_time_keys"][0].pop("signature")
-    for body in (wrong_key, unsigned_key):
+    unsigned = _signed_registration(a.user.id, seed=20, sign=False)
+    unsigned.pop("_device")
+    for body in (unsigned_key, unsigned):
         refused = await client.post(
             "/api/v1/me/dm/devices", json=body, headers=a.headers
         )
-        assert refused.status_code == 400, refused.text
-        assert refused.json()["detail"] == "DM_INVALID_SIGNATURE"
-
-    unsigned = _signed_registration(a.user.id, seed=20, sign=False)
-    unsigned.pop("_device")
-    refused = await client.post(
-        "/api/v1/me/dm/devices", json=unsigned, headers=a.headers
-    )
-    assert refused.json()["detail"] == "DM_INVALID_SIGNATURE"
-
-    # A device registered before signing: its row has no signature.
-    legacy = _signed_registration(a.user.id, seed=7)
-    device = legacy.pop("_device")
-    registered = await client.post(
-        "/api/v1/me/dm/devices", json=legacy, headers=a.headers
-    )
-    device_id = registered.json()["device_id"]
-    await session.exec(
-        text(
-            "UPDATE public.dm_devices SET signature = NULL WHERE id = CAST(:id AS uuid)"
-        ).bindparams(id=device_id)
-    )
-    await session.commit()
-    signed = _signed_registration(a.user.id, seed=7)
-    signed.pop("_device")
-    fingerprint = base64.b64decode(legacy["fingerprint_key"] + "=")
-    identity = base64.b64decode(legacy["identity_key"] + "=")
-    tags = (b"initiative-dm-fallback-v1\0", b"initiative-dm-otk-v1\0")
-    backfill = {
-        "signature": _b64(
-            device.sign(
-                b"initiative-dm-device-v1\0"
-                + a.user.id.to_bytes(8, "big")
-                + identity
-                + fingerprint
-            )
-        ),
-        "fallback_key": {
-            "key_id": "fb-2",
-            "public_key": _b64(bytes([9]) * 32),
-            "signature": _b64(device.sign(tags[0] + bytes([9]) * 32)),
-        },
-        "one_time_keys": [
-            {
-                "key_id": f"otk-{n}",
-                "public_key": _b64(bytes([n]) * 32),
-                "signature": _b64(device.sign(tags[1] + bytes([n]) * 32)),
-            }
-            for n in (10, 11)
-        ],
-    }
-    url = f"/api/v1/me/dm/devices/{device_id}/signature"
-    signed_itself = await client.put(url, json=backfill, headers=a.headers)
-    assert signed_itself.status_code == 200, signed_itself.text
-    listed = signed_itself.json()["devices"][0]
-    assert listed["signature"] == backfill["signature"]
-    assert listed["one_time_key_count"] == 2
-    again = await client.put(url, json=backfill, headers=a.headers)
-    assert again.json()["detail"] == "DM_INVALID_SIGNATURE"
+        assert refused.status_code == 422, refused.text
 
 
 # ------------------------------------------------------------ conversations ---

@@ -205,7 +205,7 @@ async def test_the_export_maps_to_a_wiki_with_its_files():
     fetched, site = await ce.export_to_fetched(
         export_zip(),
         guild_id=1,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         asset_budget=AssetBudget(bytes_left=10_000_000, files_left=100),
         store=_discard,
         files_allowed=True,
@@ -238,7 +238,7 @@ async def test_pages_past_what_may_be_held_are_left_out_and_counted(monkeypatch)
     fetched, _site = await ce.export_to_fetched(
         export_zip(**bunting),
         guild_id=1,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         asset_budget=None,
         files_allowed=True,
     )
@@ -250,7 +250,7 @@ async def test_without_a_budget_no_file_is_read():
     fetched, _site = await ce.export_to_fetched(
         export_zip(),
         guild_id=1,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         asset_budget=None,
         files_allowed=True,
     )
@@ -290,7 +290,7 @@ def _real_fetched():
     return ce.export_to_fetched(
         open_zip(real_export_bytes()),
         guild_id=1,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         asset_budget=bundle_budget(),
         store=_discard,
         files_allowed=True,

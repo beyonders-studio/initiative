@@ -61,28 +61,6 @@ async def test_a_spreadsheet_write_leaves_a_cell_somebody_else_edited() -> None:
     assert cells["0:0"] == "Mortgage" and cells["5:5"] == "theirs"
 
 
-async def test_a_sheet_from_before_workbooks_reads_as_its_one_sheet() -> None:
-    legacy = Doc()
-    legacy.get("cells", type=Map)["0:0"] = "kept"
-    legacy.get("meta", type=Map)["name"] = "Old"
-    state = bytes(legacy.get_update())
-
-    rendered = await SPREADSHEET.render(state)
-    assert rendered is not None
-    moved = _merged(state, await SPREADSHEET.apply(state, rendered))
-
-    [sheet] = rendered["sheets"]
-    assert (sheet["id"], sheet["name"], sheet["cells"]) == (
-        "s1",
-        "Old",
-        {"0:0": "kept"},
-    )
-    assert await SPREADSHEET.render(moved) == rendered
-    reread = Doc()
-    reread.apply_update(moved)
-    assert len(reread.get("cells", type=Map)) == 0
-
-
 async def test_a_whiteboard_reads_back_as_it_was_drawn() -> None:
     scene = {
         "elements": [{"id": "a", "type": "rectangle", "x": 10, "y": 2.5}],

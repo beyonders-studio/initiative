@@ -34,7 +34,6 @@ from app.schemas.platform.dm_transport import (
     DmConversationRead,
     DmConversationsResponse,
     DmDeviceRegistration,
-    DmDeviceSignature,
     DmDevicesResponse,
     DmGroupCreate,
     DmOneTimeKeyBatch,
@@ -94,29 +93,6 @@ async def register_device(
     return DmDevicesResponse(
         devices=await service.list_devices(session, user_id=current_user.id),
         device_id=device_id,
-    )
-
-
-@me_router.put("/dm/devices/{device_id}/signature", response_model=DmDevicesResponse)
-async def sign_device(
-    device_id: uuid.UUID,
-    body: DmDeviceSignature,
-    session: UserSessionDep,
-    current_user: CurrentUser,
-) -> DmDevicesResponse:
-    """Sign a device registered before signing, once, and replace the keys it
-    published with signed ones."""
-    await service.sign_device(
-        session,
-        user_id=current_user.id,
-        device_id=device_id,
-        signature=body.signature,
-        fallback_key=body.fallback_key,
-        one_time_keys=body.one_time_keys,
-    )
-    await session.commit()
-    return DmDevicesResponse(
-        devices=await service.list_devices(session, user_id=current_user.id)
     )
 
 

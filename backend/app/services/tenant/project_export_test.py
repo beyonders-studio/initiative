@@ -987,7 +987,7 @@ async def test_a_status_with_no_look_gets_its_categorys(session: AsyncSession):
     )
     envelope = ProjectExportEnvelope.model_validate(
         {
-            "app_version": "0.0.0-test",
+            "app_version": "0.78.0-test",
             "exported_at": "2026-07-15T00:00:00+00:00",
             "project": {"name": "From elsewhere"},
             "tags": [],
@@ -1138,7 +1138,7 @@ async def test_an_envelope_without_types_gets_the_starting_ones_in_the_importers
     await session.commit()
     envelope = ProjectExportEnvelope.model_validate(
         {
-            "app_version": "0.0.0-test",
+            "app_version": "0.78.0-test",
             "exported_at": "2026-07-15T00:00:00+00:00",
             "project": {"name": "Antes de los tipos"},
             "tags": [],

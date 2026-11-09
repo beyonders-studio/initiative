@@ -235,8 +235,7 @@ async def _erase_in_guild(
     # Written under the guild role that staged them, before the switch below.
     await guild_session.flush()
 
-    # Scrub the display name out of content that embedded it as literal text
-    # (@-mentions in comments, file mention nodes, digest name snapshots).
+    # Scrub the display name out of the digest lines that snapshot it.
     await set_rls_context(guild_session, SystemMaintenance(guild_id))
     await anonymize_user_mentions(guild_session, user_id=user_id)
     await set_rls_context(guild_session, SystemGuild(guild_id))
