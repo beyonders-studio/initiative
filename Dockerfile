@@ -47,7 +47,7 @@ RUN --mount=type=secret,id=ota_signing_key \
 # until the lockfile changes; built in the runtime stage it sat above the
 # package refresh, which every published build runs again, and was rebuilt
 # (and stored in the build cache again) every time. uv never reaches the image.
-FROM python:3.14.6-slim@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144 AS backend-deps
+FROM python:3.14.9-slim@sha256:35caba83af2fe6da9a5d922f9b0156f21d1246a48278c58a08bd253303ba42e8 AS backend-deps
 # uv (pinned, hash-checked) for native, lockfile-based dependency installs.
 # From PyPI rather than uv's ghcr.io image, which refused pulls under load.
 COPY backend/uv-requirements.txt /tmp/
@@ -68,7 +68,7 @@ FROM scratch AS dependencies
 COPY --from=frontend-deps /frontend/package.json /frontend/
 COPY --from=backend-deps /app/pyproject.toml /backend/
 
-FROM python:3.14.6-slim@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144 AS backend-runtime
+FROM python:3.14.9-slim@sha256:35caba83af2fe6da9a5d922f9b0156f21d1246a48278c58a08bd253303ba42e8 AS backend-runtime
 ARG VERSION=0.1.0
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.title="Initiative"
