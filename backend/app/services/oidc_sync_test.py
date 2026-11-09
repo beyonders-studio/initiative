@@ -66,14 +66,26 @@ async def _membership(
     ).one_or_none()
 
 
-async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
+@pytest.mark.parametrize(
+    "on_arrival",
+    [
+        pytest.param(False, id="the rule admits them"),
+        pytest.param(True, id="the connection joins them on arrival"),
+    ],
+)
+async def test_claim_mapped_role_survives_auto_join(
+    session: AsyncSession, on_arrival: bool
+):
     """A mapped role wins over the plain membership auto-join would write.
 
     Both apply to the same initiative on the same first arrival. Enrolment runs
     after the mapping for this reason: it writes a non-oidc-managed row, and the
     mapping loop leaves those alone by design, so enrolling first would silently
-    strand a manager on the member role.
+    strand a manager on the member role. A community its connection joins the
+    person to on arrival is enrolled by the sync too, after the rules.
     """
+    from app.services.auth.guild_provider_connections import join_on_arrival
+
     provider = await create_auth_provider(session)
     owner = await create_user(session)
     guild = await create_guild(session, creator=owner)
@@ -83,7 +95,9 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     pm_role = await get_role_by_name(
         session, initiative_id=initiative.id, role_name="project_manager"
     )
-    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    await create_guild_provider_connection(
+        session, guild=guild, provider=provider, auto_join=on_arrival
+    )
 
     newcomer = await create_user(session)
     await create_claim_rule(
@@ -96,12 +110,24 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     )
 
     await set_rls_context(session, Unattributed())
+    arrived = []
+    if on_arrival:
+        arrived = await join_on_arrival(
+            session,
+            provider_id=provider.id,
+            user_id=newcomer.id,
+            claims=_ADMITTED,
+            auto_join=False,
+        )
+        await post_commit.settle(session)
+        assert arrived == [guild.id]
     await sync_oidc_assignments(
         session,
         user_id=newcomer.id,
         provider_id=provider.id,
         claim_values={"engineering"},
         claims=_ADMITTED,
+        arrived=arrived,
     )
     await session.commit()
 

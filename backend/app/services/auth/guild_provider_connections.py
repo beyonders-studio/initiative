@@ -30,6 +30,7 @@ from app.core.login_methods import LoginMethod
 from app.core.messages import AuthProviderMessages
 from app.db.errors import UNIQUE_VIOLATION_SQLSTATE, dbapi_sqlstate
 from app.models.platform.auth_provider import AuthProvider
+from app.models.platform.guild import GuildMembership
 from app.models.platform.guild_provider_connection import (
     GuildProviderConnection,
     narrowing_admits,
@@ -655,13 +656,17 @@ async def join_on_arrival(
     provider_id: int,
     user_id: int,
     claims: dict,
+    auto_join: bool = True,
 ) -> list[int]:
     """Place somebody in the communities whose connection says to, and return
-    which.
+    the ones they were not in before.
 
-    A community at capacity is skipped rather than failing the sign-in: the
-    person signed in to the deployment, and one community being full is that
-    community's business rather than a reason to refuse them their account.
+    A community that refuses somebody new is skipped rather than failing the
+    sign-in: the person signed in to the deployment, and one community's
+    refusal is its own business rather than a reason to refuse them their
+    account. ``auto_join=False`` leaves the communities' auto-join initiatives
+    to the claim sync that follows, which enrols the returned communities once
+    its rules have placed the person.
     """
     from app.services.platform import guilds as guilds_service
 
@@ -679,11 +684,23 @@ async def join_on_arrival(
         # not something it gets to do on its own word alone.
         if connection.auto_join and connection.narrowing_approved_at is not None
     )
+    if wanted:
+        already = set(
+            (
+                await session.exec(
+                    select(GuildMembership.guild_id).where(
+                        GuildMembership.user_id == user_id,
+                        GuildMembership.guild_id.in_(wanted),
+                    )
+                )
+            ).all()
+        )
+        wanted = [guild_id for guild_id in wanted if guild_id not in already]
 
     joined: list[int] = []
     for guild_id in wanted:
-        # A savepoint each, so a community at capacity undoes its own attempt
-        # and leaves the sign-in that carried it here alone.
+        # A savepoint each, so a community that refuses them undoes its own
+        # attempt and leaves the sign-in that carried it here alone.
         try:
             async with session.begin_nested():
                 await guilds_service.ensure_membership(
@@ -692,11 +709,10 @@ async def join_on_arrival(
                     user_id=user_id,
                     actor_user_id=user_id,
                     via="sso",
+                    auto_join=auto_join,
                 )
-        except guilds_service.GuildCapacityError:
-            logger.info(
-                "guild %s is at capacity; nobody joined it on arrival", guild_id
-            )
+        except guilds_service.ADMISSION_REFUSALS as exc:
+            logger.info("guild %s took nobody on arrival: %s", guild_id, exc)
             continue
         joined.append(guild_id)
     if joined:
