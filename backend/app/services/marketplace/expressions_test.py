@@ -277,7 +277,12 @@ async def test_an_expression_answers_what_the_sdk_answers(
     [
         ("($f := function($n) { $f($n + 1) + 1 }; $f(0))", "Stack overflow", False),
         (f'$pad("", {expressions.OUTPUT_BYTES}, "x")', "over 1048576 bytes", False),
-        ("[1..10000000].($ * 2)", "timeout after 1000 milliseconds", True),
+        # Slow but small: one large range runs out of memory before time.
+        (
+            "$sum([1..3000].($sum([1..3000])))",
+            "timeout after 1000 milliseconds",
+            True,
+        ),
         ('$pad("", 2000000000, "x")', "ran out of memory", True),
     ],
     ids=["depth", "output", "time", "memory"],
