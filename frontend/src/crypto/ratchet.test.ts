@@ -130,6 +130,17 @@ describe("the double ratchet", () => {
         false
       )
     ).rejects.toThrow();
+    // Nor is one taken with no signature at all.
+    await expect(
+      ratchet.createOutboundSession(
+        alice.pickle,
+        bob.identity_key,
+        bob.fingerprint_key,
+        oneTime.public_key,
+        "",
+        false
+      )
+    ).rejects.toThrow();
     const opened = await ratchet.createOutboundSession(
       alice.pickle,
       bob.identity_key,

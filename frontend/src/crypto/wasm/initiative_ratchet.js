@@ -167,15 +167,13 @@ export function create_inbound_session(pickle, key, their_identity_key, cipherte
 /**
  * Open a session with a device, spending a prekey claimed from the directory.
  *
- * A signed prekey must verify against the device's fingerprint key; an
- * unsigned one is accepted only from a device the caller already trusts
- * unsigned (see the trust module).
+ * The prekey's signature must verify against the device's fingerprint key.
  * @param {string} pickle
  * @param {string} key
  * @param {string} their_identity_key
  * @param {string} their_fingerprint_key
  * @param {string} their_one_time_key
- * @param {string | null | undefined} one_time_key_signature
+ * @param {string} one_time_key_signature
  * @param {boolean} fallback
  * @returns {any}
  */
@@ -190,8 +188,8 @@ export function create_outbound_session(pickle, key, their_identity_key, their_f
     const len3 = WASM_VECTOR_LEN;
     const ptr4 = passStringToWasm0(their_one_time_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len4 = WASM_VECTOR_LEN;
-    var ptr5 = isLikeNone(one_time_key_signature) ? 0 : passStringToWasm0(one_time_key_signature, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len5 = WASM_VECTOR_LEN;
+    const ptr5 = passStringToWasm0(one_time_key_signature, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len5 = WASM_VECTOR_LEN;
     const ret = wasm.create_outbound_session(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, fallback);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
