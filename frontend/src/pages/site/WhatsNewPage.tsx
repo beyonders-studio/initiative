@@ -3,8 +3,9 @@
  *
  * Each released version is one post, newest first, read from the changelog
  * the server ships with. The list shows a release's first few headlines as
- * its teaser; a post shows the whole release. The unreleased section isn't
- * a post, since nobody can have it yet.
+ * its teaser; a post shows the whole release, and on Initiative Cloud the
+ * suggestions that shipped in it. The unreleased section isn't a post, since
+ * nobody can have it yet.
  */
 
 import { Link, useParams } from "@tanstack/react-router";
@@ -14,7 +15,10 @@ import { useTranslation } from "react-i18next";
 
 import type { ChangelogEntry } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/markdown/Markdown";
+import { useShippedIdeas } from "@/hooks/useIdeas";
+import { useServer } from "@/hooks/useServer";
 import { useChangelog } from "@/hooks/useSettings";
+import { isCloudOrigin } from "@/lib/cloud";
 import { DOCS_URL, REPO_URL } from "@/lib/links";
 import { RELEASE_IMAGE_DIR } from "@/lib/releaseImages";
 import { Button } from "@/ui/button";
@@ -122,6 +126,38 @@ const PostCard = ({ entry }: { entry: ChangelogEntry }) => {
   );
 };
 
+/** The suggestions that shipped in `version`, on Initiative Cloud, which
+ *  alone has them; nothing where none did. */
+const ShippedSuggestions = ({ version }: { version: string }) => {
+  const { t } = useTranslation("intake");
+  const onCloud = isCloudOrigin(useServer().getServerOrigin());
+  const { data: shipped = [] } = useShippedIdeas(version, onCloud);
+  if (!onCloud || shipped.length === 0) return null;
+  return (
+    <section className="mt-10 border-t pt-8" aria-labelledby="shipped-suggestions">
+      <h2 id="shipped-suggestions" className="font-bold text-2xl tracking-tight">
+        {t("ideas.shippedTitle")}
+      </h2>
+      <ul className="mt-3 divide-y">
+        {shipped.map((idea) => (
+          <li key={idea.task_id} className="flex items-baseline justify-between gap-4 py-3">
+            <Link
+              to="/suggestions/$taskId"
+              params={{ taskId: String(idea.task_id) }}
+              className="font-semibold hover:underline"
+            >
+              {idea.title}
+            </Link>
+            <span className="shrink-0 text-muted-foreground text-sm tabular-nums">
+              {t("ideas.votes", { count: idea.votes })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
 export const WhatsNewPage = () => {
   const { t } = useTranslation("landing");
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -199,9 +235,12 @@ export const WhatsNewPostPage = () => {
         ) : isError ? (
           <StatusMessage onRetry={refetch} />
         ) : entry ? (
-          <article>
-            <Markdown surface="release" remoteImages content={asPost(entry.changes)} />
-          </article>
+          <>
+            <article>
+              <Markdown surface="release" remoteImages content={asPost(entry.changes)} />
+            </article>
+            <ShippedSuggestions version={entry.version} />
+          </>
         ) : (
           <p className="text-muted-foreground">{t("whatsNew.notFound")}</p>
         )}

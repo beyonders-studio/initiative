@@ -27,6 +27,7 @@ export {
   resetCounter as resetDmCounter,
 } from "./dm.factory";
 export { buildFileSummary, resetCounter as resetFileCounter } from "./file.factory";
+export { buildIdea, buildIdeaStatus, resetCounter as resetIdeaCounter } from "./idea.factory";
 export {
   buildInitiative,
   buildInitiativeDirectoryEntry,
@@ -117,6 +118,7 @@ import { resetCounter as resetContactCounter } from "./contact.factory";
 import { resetCounter as resetDataJobCounter } from "./dataJob.factory";
 import { resetCounter as resetDmCounter } from "./dm.factory";
 import { resetCounter as resetFileCounter } from "./file.factory";
+import { resetCounter as resetIdeaCounter } from "./idea.factory";
 import { resetCounter as resetInitiativeCounter } from "./initiative.factory";
 import { resetCounter as resetMarketplaceCounter } from "./marketplace.factory";
 import { resetCounter as resetNotificationCounter } from "./notification.factory";
@@ -161,4 +163,5 @@ export function resetFactories(): void {
   resetCalendarEventCounter();
   resetShareRequestCounter();
   resetTrashCounter();
+  resetIdeaCounter();
 }

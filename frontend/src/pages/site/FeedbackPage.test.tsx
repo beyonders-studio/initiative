@@ -1,7 +1,10 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildIdea } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { CLOUD_ORIGIN } from "@/lib/cloud";
 
@@ -46,5 +49,25 @@ describe("FeedbackPage", () => {
     );
     await user.click(screen.getByRole("button", { name: "See what" }));
     expect(screen.getByText("0.79.0")).toBeInTheDocument();
+  });
+
+  it("puts the suggestion it was opened from on the draft, and keeps no copy in the address", async () => {
+    const idea = buildIdea({ title: "Print a month" });
+    server.use(http.get("/api/v1/ideas/:taskId", () => HttpResponse.json(idea)));
+    const { router } = renderPage(FeedbackPage, {
+      initialRoute: "/feedback",
+      routerSearch: { idea: idea.task_id },
+      server: { getServerOrigin: () => CLOUD_ORIGIN },
+      auth: { user: null },
+    });
+
+    expect(
+      await screen.findByText("Sending adds what you wrote to “Print a month”.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Suggest an idea" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(router.state.location.search).toEqual({});
   });
 });

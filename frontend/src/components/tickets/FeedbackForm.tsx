@@ -101,34 +101,40 @@ const IdeasLikeThis = ({
   if (!matches.length && !draft.idea) return null;
   return (
     <div className="space-y-2">
-      <p className="font-medium text-sm">{t("feedback.matches")}</p>
-      <ul className="space-y-1.5">
-        {matches.map((idea) => (
-          <li key={idea.task_id} className="flex items-center gap-3 rounded-md border px-3 py-2">
-            <div className="min-w-0 flex-1 space-y-0.5">
-              <p className="font-medium text-sm">{idea.title}</p>
-              <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
-                <IdeaStatusBadge status={idea.status} />
-                <span>{t("ideas.votes", { count: idea.votes })}</span>
-              </div>
-            </div>
-            <VoteButton
-              idea={idea}
-              next="/feedback"
-              onSignIn={onSignIn}
-              onVoted={(on) =>
-                onChange({
-                  idea: on
-                    ? { task_id: idea.task_id, title: idea.title }
-                    : draft.idea?.task_id === idea.task_id
-                      ? null
-                      : draft.idea,
-                })
-              }
-            />
-          </li>
-        ))}
-      </ul>
+      {matches.length ? (
+        <>
+          <p className="font-medium text-sm">{t("feedback.matches")}</p>
+          <ul className="space-y-1.5">
+            {matches.map((idea) => (
+              <li
+                key={idea.task_id}
+                className="flex items-center gap-3 rounded-md border px-3 py-2"
+              >
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="font-medium text-sm">{idea.title}</p>
+                  <div className="text-xs">
+                    <IdeaStatusBadge status={idea.status} />
+                  </div>
+                </div>
+                <VoteButton
+                  idea={idea}
+                  next="/feedback"
+                  onSignIn={onSignIn}
+                  onVoted={(on) =>
+                    onChange({
+                      idea: on
+                        ? { task_id: idea.task_id, title: idea.title }
+                        : draft.idea?.task_id === idea.task_id
+                          ? null
+                          : draft.idea,
+                    })
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {draft.idea ? (
         <p className="text-muted-foreground text-xs">
           {t("feedback.joins", { title: draft.idea.title })}
@@ -272,10 +278,10 @@ export const FeedbackForm = ({
         {draft.kind === FeedbackTopic.idea ? (
           <IdeasLikeThis draft={draft} onChange={onChange} onSignIn={onSignIn} />
         ) : null}
-        {/* An idea may already be on the Ideas page, waiting for a vote. */}
+        {/* An idea may already be on the Suggestions page, waiting for a vote. */}
         {draft.kind === FeedbackTopic.idea ? (
           <Link
-            to="/ideas"
+            to="/suggestions"
             className="inline-block text-muted-foreground text-sm underline underline-offset-2 hover:text-foreground"
           >
             {t("feedback.seeIdeas")}

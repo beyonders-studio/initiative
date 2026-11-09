@@ -43,7 +43,7 @@
     },
     "ideas": {
       "title": "Ideen",
-      "description": "Die Ideen, die alle lesen und für die alle stimmen können, auf Initiative Cloud."
+      "description": "Was alle auf der Seite „Vorschläge“ lesen und wofür alle stimmen können, auf Initiative Cloud."
     }
   },
   "stream": {
@@ -62,7 +62,7 @@
     "landingStatusDefault": "Standard des Projekts",
     "caseTypeLabel": "Neue Vorgänge sind vom Typ",
     "caseTypeDefault": "Standardtyp des Projekts",
-    "ideaTypeLabel": "Der Typ, der eine Aufgabe auf die Seite „Ideen“ bringt",
+    "ideaTypeLabel": "Der Typ, der eine Aufgabe auf die Seite „Vorschläge“ bringt",
     "ideaTypeNone": "Keiner: Es wird nichts veröffentlicht",
     "enabledLabel": "Empfängt neue Vorgänge",
     "lastCase": "Letzter Vorgang {{when}} geöffnet.",
@@ -242,7 +242,7 @@
       "joinInto": "In eine andere Idee zusammenführen",
       "joinIntoHelp": "Für ein Duplikat: Seine Stimmen und das zugeordnete Feedback gehen auf die andere Idee über.",
       "joinIntoTitle": "In „{{title}}“ zusammenführen?",
-      "joinIntoBody": "Seine Stimmen und das zugeordnete Feedback gehen auf „{{title}}“ über. Es verschwindet von der Seite „Ideen“ und wird archiviert, und seine Seite öffnet stattdessen „{{title}}“.",
+      "joinIntoBody": "Seine Stimmen und das zugeordnete Feedback gehen auf „{{title}}“ über. Es verschwindet von der Seite „Vorschläge“ und wird archiviert, und seine Seite öffnet stattdessen „{{title}}“.",
       "joinIntoConfirm": "Zusammenführen",
       "failed": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
     }
@@ -303,8 +303,8 @@
       }
     },
     "contactable": "Ihr dürft mich bei Fragen dazu kontaktieren",
-    "seeIdeas": "Sieh dir an, was sich andere gewünscht haben",
-    "matches": "Ideen wie deine",
+    "seeIdeas": "Alle Vorschläge ansehen",
+    "matches": "Vorschläge wie deiner",
     "joins": "Beim Senden wird das, was du geschrieben hast, „{{title}}“ zugeordnet.",
     "stuck": "Soll sich jemand darum kümmern? Hilfe anfordern",
     "context": {
@@ -341,25 +341,43 @@
     "appeal": "Einspruch gegen deine Sperre"
   },
   "ideas": {
-    "title": "Ideen",
-    "lede": "Was sich Leute gewünscht haben und wie es darum steht. Stimm für die, die du willst.",
-    "search": "Ideen suchen",
+    "title": "Vorschläge",
+    "search": "Vorschläge durchsuchen",
+    "sendFeedback": "Feedback senden",
+    "signInToVote": "Zum Abstimmen anmelden",
+    "views": {
+      "label": "Ansicht",
+      "list": "Liste",
+      "roadmap": "Roadmap"
+    },
+    "categoryLabel": "Kategorie",
+    "allCategories": "Alle",
     "sortLabel": "Reihenfolge",
     "sort": {
       "votes": "Meiste Stimmen",
       "newest": "Neueste"
     },
     "statusLabel": "Status",
-    "allStatuses": "Alle",
+    "anyStatus": "Jeder Status",
     "votedByMe": "Von mir gewählt",
-    "none": "Keine Ideen passen.",
+    "none": "Keine Vorschläge passen.",
+    "count_one": "{{count}} Vorschlag",
+    "count_other": "{{count}} Vorschläge",
     "votes_one": "{{count}} Stimme",
     "votes_other": "{{count}} Stimmen",
-    "vote": "Abstimmen",
-    "voted": "Gewählt",
-    "voteFor": "Für {{title}} stimmen",
+    "upvote_one": "{{count}} Stimme. Für {{title}} stimmen",
+    "upvote_other": "{{count}} Stimmen. Für {{title}} stimmen",
+    "upvoted_one": "Abgestimmt. {{count}} Stimme.",
+    "upvoted_other": "Abgestimmt. {{count}} Stimmen.",
+    "upvoteTakenBack_one": "Stimme zurückgenommen. {{count}} Stimme.",
+    "upvoteTakenBack_other": "Stimme zurückgenommen. {{count}} Stimmen.",
+    "closedVotes_one": "{{count}} Stimme, Abstimmung geschlossen",
+    "closedVotes_other": "{{count}} Stimmen, Abstimmung geschlossen",
     "voteError": "Deine Stimme konnte nicht gespeichert werden. Versuch es gleich noch einmal.",
-    "all": "Alle Ideen"
+    "back": "Alle Vorschläge",
+    "addThoughts": "Deine Gedanken ergänzen",
+    "shippedIn": "Erschienen in {{version}}",
+    "shippedTitle": "Umgesetzte Vorschläge"
   },
   "picture": {
     "take": "Bild dieser Seite",

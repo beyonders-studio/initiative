@@ -150,10 +150,11 @@ describe("FeedbackSheet", () => {
     const box = await screen.findByLabelText("What would you like Initiative to do?");
     await user.type(box, "Recurring events should skip holidays");
     await user.click(
-      await screen.findByRole("button", { name: "Vote for Recurring events skip holidays" })
+      await screen.findByRole("button", { name: "12 votes. Upvote Recurring events skip holidays" })
     );
     expect(voteMutate).toHaveBeenCalledWith({ taskId: 7, on: true }, expect.anything());
-    act(() => voteMutate.mock.calls[0][1].onSuccess());
+    act(() => voteMutate.mock.calls[0][1].onSuccess({ votes: 13 }));
+    expect(screen.getByText("Upvoted. 13 votes.")).toBeInTheDocument();
     expect(
       screen.getByText("Sending adds what you wrote to “Recurring events skip holidays”.")
     ).toBeInTheDocument();

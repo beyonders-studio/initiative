@@ -3,16 +3,17 @@ import { type ReactNode, useId, useState } from "react";
 
 import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import type { TaskGrouping } from "@/lib/layouts/taskGroupings";
+import { BoardColumn } from "@/ui/board-column";
 import type { Band } from "@/ui/layouts/grouping";
 import type { LayoutContext } from "@/ui/layouts/tree";
 import { cn } from "@/ui/lib/utils";
 
 import {
   ArchiveDoneButton,
-  CollapsedHeader,
+  ColumnCount,
   type ColumnFill,
-  ExpandedHeader,
   KanbanCards,
+  SCROLL_LOCK,
 } from "./KanbanColumn";
 
 interface KanbanBandsProps {
@@ -71,42 +72,24 @@ export const KanbanBands = ({
           const collapsed = collapsedStatusIds.has(status.id);
           const count = counts[status.id] ?? 0;
           return (
-            <div
+            <BoardColumn
               key={status.id}
-              className={cn(
-                "overflow-hidden rounded-lg border bg-card shadow-sm",
-                collapsed && "text-center",
-                width(status)
-              )}
-            >
-              <div
-                aria-hidden="true"
-                className="h-1 w-full"
-                style={{ backgroundColor: status.color }}
-              />
-              {collapsed ? (
-                <CollapsedHeader
-                  status={status}
-                  taskCount={count}
-                  fill={fillOf(status.id)}
-                  onToggleCollapse={onToggleCollapse}
-                />
-              ) : (
-                <ExpandedHeader
-                  status={status}
-                  taskCount={count}
-                  fill={fillOf(status.id)}
-                  onToggleCollapse={onToggleCollapse}
-                />
-              )}
-              {!collapsed && status.category === "done" && onArchiveDoneTasks ? (
-                <ArchiveDoneButton
-                  statusId={status.id}
-                  onArchiveDoneTasks={onArchiveDoneTasks}
-                  isArchiving={isArchiving}
-                />
-              ) : null}
-            </div>
+              status={status}
+              count={<ColumnCount taskCount={count} fill={fillOf(status.id)} compact={collapsed} />}
+              collapsed={collapsed}
+              onToggleCollapse={() => onToggleCollapse(status.id)}
+              headerProps={SCROLL_LOCK}
+              className={width(status)}
+              footer={
+                status.category === "done" && onArchiveDoneTasks ? (
+                  <ArchiveDoneButton
+                    statusId={status.id}
+                    onArchiveDoneTasks={onArchiveDoneTasks}
+                    isArchiving={isArchiving}
+                  />
+                ) : null
+              }
+            />
           );
         })}
       </div>

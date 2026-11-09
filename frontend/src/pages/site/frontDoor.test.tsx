@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { HttpResponse, http, type JsonBodyType } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildIdea, buildIdeaStatus } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { catalogUrl, portalPricingUrl } from "@/hooks/useBillingCatalog";
@@ -9,6 +10,7 @@ import { CLOUD_ORIGIN } from "@/lib/cloud";
 import { androidApkUrl, DOCS_URL, desktopInstallerUrl, docsUrl, REPO_URL } from "@/lib/links";
 import { TOOLS, toolCamelPlural } from "@/lib/tools";
 
+import intake from "../../../public/locales/en/intake.json";
 import landing from "../../../public/locales/en/landing.json";
 import { DownloadPage } from "./DownloadPage";
 import {
@@ -221,18 +223,26 @@ describe("WelcomePage", () => {
     });
   });
 
-  it("offers Ideas in the header on Initiative Cloud and nowhere else", async () => {
+  it("offers Suggestions in the header on Initiative Cloud and nowhere else", async () => {
     const cloud = renderPage(WelcomePage, {
       ...signedOut,
       server: { getServerOrigin: () => CLOUD_ORIGIN },
     });
-    const ideas = await screen.findAllByRole("link", { name: landing.nav.ideas });
-    expect(ideas[0]).toHaveAttribute("href", "/ideas");
+    const suggestions = await screen.findAllByRole("link", { name: landing.nav.suggestions });
+    expect(suggestions[0]).toHaveAttribute("href", "/suggestions");
+    // The phone's menu offers it too.
+    fireEvent.click(screen.getByRole("button", { name: landing.nav.menu }));
+    expect(
+      within(screen.getAllByRole("navigation", { name: landing.nav.mainAria })[1]).getByRole(
+        "link",
+        { name: landing.nav.suggestions }
+      )
+    ).toHaveAttribute("href", "/suggestions");
     cloud.unmount();
 
     renderHome();
     await screen.findByRole("heading", { level: 1, name: landing.hero.titleAria });
-    expect(screen.queryByRole("link", { name: landing.nav.ideas })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: landing.nav.suggestions })).not.toBeInTheDocument();
   });
 
   it("shows the community directory only where the server runs one", async () => {
@@ -601,6 +611,60 @@ describe("WhatsNewPage", () => {
       `${DOCS_URL}running-a-server/installation/#checking-an-image-is-ours`
     );
     expect(screen.getByRole("heading", { level: 2, name: "Fixed" })).toBeInTheDocument();
+  });
+
+  const renderPost = (origin?: string) =>
+    renderPage(WhatsNewPostPage, {
+      ...signedOut,
+      initialRoute: "/whats-new/$version",
+      routeParams: { version: "0.73.2" },
+      ...(origin ? { server: { getServerOrigin: () => origin } } : {}),
+    });
+
+  it("lists the suggestions that shipped in a release, on Initiative Cloud", async () => {
+    const shipped = buildIdeaStatus({ name: "Shipped", category: "done" });
+    const asked: (string | null)[] = [];
+    server.use(
+      stubChangelog(),
+      http.get("/api/v1/ideas/shipped", ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get("release"));
+        return HttpResponse.json([
+          buildIdea({ title: "Resumable uploads", status: shipped, votes: 12, release: "0.73.2" }),
+        ]);
+      })
+    );
+    renderPost(CLOUD_ORIGIN);
+
+    expect(
+      await screen.findByRole("heading", { level: 2, name: intake.ideas.shippedTitle })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Resumable uploads" })).toHaveAttribute(
+      "href",
+      "/suggestions/2"
+    );
+    expect(screen.getByText("12 votes")).toBeInTheDocument();
+    expect(asked).toEqual(["0.73.2"]);
+  });
+
+  it("adds nothing to a post where none shipped, or off Initiative Cloud", async () => {
+    let asked = 0;
+    server.use(
+      stubChangelog(),
+      http.get("/api/v1/ideas/shipped", () => {
+        asked += 1;
+        return HttpResponse.json([]);
+      })
+    );
+    const cloud = renderPost(CLOUD_ORIGIN);
+    await screen.findByRole("heading", { level: 2, name: "Fixed" });
+    await waitFor(() => expect(asked).toBe(1));
+    expect(screen.queryByText(intake.ideas.shippedTitle)).not.toBeInTheDocument();
+    cloud.unmount();
+
+    renderPost();
+    await screen.findByRole("heading", { level: 2, name: "Fixed" });
+    expect(screen.queryByText(intake.ideas.shippedTitle)).not.toBeInTheDocument();
+    expect(asked).toBe(1);
   });
 });
 

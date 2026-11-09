@@ -146,5 +146,9 @@
     "saved": "Enregistré",
     "failed": "Échec de l'enregistrement",
     "changed": "Cela a changé pendant que vous le modifiiez"
+  },
+  "boardColumn": {
+    "collapse": "Replier {{name}}",
+    "expand": "Développer {{name}}"
   }
 }

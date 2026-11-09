@@ -302,8 +302,6 @@
     "archiveDone": "Archive done tasks",
     "taskCount_one": "{{count}} task",
     "taskCount_other": "{{count}} tasks",
-    "collapse": "Collapse {{name}}",
-    "expand": "Expand {{name}}",
     "fields": {
       "label": "Fields",
       "menuTitle": "Fields on cards",

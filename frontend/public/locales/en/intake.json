@@ -43,7 +43,7 @@
     },
     "ideas": {
       "title": "Ideas",
-      "description": "The ideas everybody can read and vote for, on Initiative Cloud."
+      "description": "What everybody can read and vote for on the Suggestions page, on Initiative Cloud."
     }
   },
   "stream": {
@@ -62,7 +62,7 @@
     "landingStatusDefault": "The project's default",
     "caseTypeLabel": "New cases are",
     "caseTypeDefault": "The project's default type",
-    "ideaTypeLabel": "The type that puts a task on the Ideas page",
+    "ideaTypeLabel": "The type that puts a task on the Suggestions page",
     "ideaTypeNone": "Not chosen: nothing is published",
     "enabledLabel": "Receiving new cases",
     "lastCase": "Last case opened {{when}}.",
@@ -242,7 +242,7 @@
       "joinInto": "Join into another idea",
       "joinIntoHelp": "For a duplicate: its votes and the feedback joined to it move to the other idea.",
       "joinIntoTitle": "Join into “{{title}}”?",
-      "joinIntoBody": "Its votes and the feedback joined to it move to “{{title}}”. It leaves the Ideas page and is archived, and its page opens “{{title}}” instead.",
+      "joinIntoBody": "Its votes and the feedback joined to it move to “{{title}}”. It leaves the Suggestions page and is archived, and its page opens “{{title}}” instead.",
       "joinIntoConfirm": "Join",
       "failed": "Could not change that. Try again in a moment."
     }
@@ -303,8 +303,8 @@
       }
     },
     "contactable": "You can contact me with questions about this",
-    "seeIdeas": "See what others have asked for",
-    "matches": "Ideas like yours",
+    "seeIdeas": "See all suggestions",
+    "matches": "Suggestions like yours",
     "joins": "Sending adds what you wrote to “{{title}}”.",
     "stuck": "Need somebody to sort it out for you? Ask for help",
     "context": {
@@ -341,25 +341,43 @@
     "appeal": "Appeal against your suspension"
   },
   "ideas": {
-    "title": "Ideas",
-    "lede": "What people have asked for, and where each one stands. Vote for the ones you want.",
-    "search": "Search ideas",
+    "title": "Suggestions",
+    "search": "Search suggestions",
+    "sendFeedback": "Send feedback",
+    "signInToVote": "Sign in to vote",
+    "views": {
+      "label": "View",
+      "list": "List",
+      "roadmap": "Roadmap"
+    },
+    "categoryLabel": "Category",
+    "allCategories": "All",
     "sortLabel": "Order",
     "sort": {
       "votes": "Most votes",
       "newest": "Newest"
     },
     "statusLabel": "Status",
-    "allStatuses": "All",
+    "anyStatus": "Any status",
     "votedByMe": "Voted by me",
-    "none": "No ideas match.",
+    "none": "No suggestions match.",
+    "count_one": "{{count}} suggestion",
+    "count_other": "{{count}} suggestions",
     "votes_one": "{{count}} vote",
     "votes_other": "{{count}} votes",
-    "vote": "Vote",
-    "voted": "Voted",
-    "voteFor": "Vote for {{title}}",
+    "upvote_one": "{{count}} vote. Upvote {{title}}",
+    "upvote_other": "{{count}} votes. Upvote {{title}}",
+    "upvoted_one": "Upvoted. {{count}} vote.",
+    "upvoted_other": "Upvoted. {{count}} votes.",
+    "upvoteTakenBack_one": "Upvote taken back. {{count}} vote.",
+    "upvoteTakenBack_other": "Upvote taken back. {{count}} votes.",
+    "closedVotes_one": "{{count}} vote, voting closed",
+    "closedVotes_other": "{{count}} votes, voting closed",
     "voteError": "Could not save your vote. Try again in a moment.",
-    "all": "All ideas"
+    "back": "All suggestions",
+    "addThoughts": "Add your thoughts",
+    "shippedIn": "Shipped in {{version}}",
+    "shippedTitle": "Suggestions that shipped"
   },
   "picture": {
     "take": "Picture this page",

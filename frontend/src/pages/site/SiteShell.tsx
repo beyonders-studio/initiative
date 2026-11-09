@@ -1,7 +1,7 @@
 /**
  * The frame every front-door page sits in: a header that is always there,
  * with the same few places in it (Download, Pricing where plans are sold,
- * Ideas on Initiative Cloud, the docs, signing in and up), and a footer that
+ * Suggestions on Initiative Cloud, the docs, signing in and up), and a footer that
  * lists the rest.
  *
  * On a phone the places fold into a menu under the header, and signing up
@@ -26,7 +26,7 @@ import { cn } from "@/ui/lib/utils";
 import { LANDING_KEYFRAMES } from "./effects";
 import { useFrontDoor } from "./useFrontDoor";
 
-type Place = "download" | "pricing" | "ideas" | "whats-new";
+type Place = "download" | "pricing" | "suggestions" | "whats-new";
 
 const navLink =
   "inline-flex min-h-11 items-center rounded-lg px-3.5 font-medium text-foreground/80 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -40,7 +40,9 @@ const Header = ({ current }: { current?: Place }) => {
   const places: { key: Place; to: string; label: string }[] = [
     { key: "download", to: "/download", label: t("nav.download") },
     ...(showsPricing ? [{ key: "pricing" as const, to: "/pricing", label: t("nav.pricing") }] : []),
-    ...(onCloud ? [{ key: "ideas" as const, to: "/ideas", label: t("nav.ideas") }] : []),
+    ...(onCloud
+      ? [{ key: "suggestions" as const, to: "/suggestions", label: t("nav.suggestions") }]
+      : []),
   ];
 
   return (
@@ -279,9 +281,12 @@ const SkipLink = () => {
   );
 };
 
+/** Whatever takes focus scrolls clear of the sticky header. */
+const CLEAR_HEADER = "html { scroll-padding-top: 5.5rem; }";
+
 export const SiteShell = ({ current, children }: { current?: Place; children: ReactNode }) => (
   <div className="min-h-screen overflow-x-clip bg-background text-foreground">
-    <style>{LANDING_KEYFRAMES}</style>
+    <style>{`${LANDING_KEYFRAMES}${CLEAR_HEADER}`}</style>
     <SkipLink />
     <Header current={current} />
     <main id="landing-main">{children}</main>
