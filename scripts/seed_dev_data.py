@@ -58,6 +58,7 @@ from seed import (
     directory,
     files,
     guilds,
+    ideas,
     initiatives,
     operations,
     posts,
@@ -149,6 +150,9 @@ async def seed() -> None:
         print("  Filing tickets, reports and a hold...")
         filed = await tickets.seed(session, users, seeded["primary"])
         print(f"  {filed} cases waiting in {operations.OPERATIONS_GUILD_NAME}")
+        published = await ideas.seed(session, ops_guild, users)
+        if published:
+            print(f"  {published} ideas published on the Ideas board")
 
         # Last of all: seed_status reads the grants as the sign a seed finished.
         print("\n  Creating PAM access grants...")
