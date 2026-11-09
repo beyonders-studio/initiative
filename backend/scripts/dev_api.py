@@ -23,8 +23,8 @@ DEV_PORTS_SH = BACKEND_DIR.parent / "scripts" / "dev-ports.sh"
 
 #: What dev-ports.sh decides beside the port: a worktree whose branch changes
 #: migrations runs on a database of its own (dev_database_urls.py), with role
-#: names of its own.
-DATABASE_VARIABLES = (
+#: names of its own, and the dev server plays Initiative Cloud.
+DEV_VARIABLES = (
     "DATABASE_URL",
     "DATABASE_URL_APP",
     "DATABASE_URL_ADMIN",
@@ -33,6 +33,7 @@ DATABASE_VARIABLES = (
     "DATABASE_URL_QUERY",
     "GUILD_ROLE_PREFIX",
     "PLATFORM_ROLE_PREFIX",
+    "DEV_AS_CLOUD",
 )
 
 
@@ -42,7 +43,7 @@ def dev_port() -> int:
 
     An explicit DEV_BACKEND_PORT wins, exactly as it does in the shell scripts.
     """
-    names = ("DEV_BACKEND_PORT", *DATABASE_VARIABLES)
+    names = ("DEV_BACKEND_PORT", *DEV_VARIABLES)
     printed = "; ".join(f'printf "%s\\n" "${{{name}:-}}"' for name in names)
     result = subprocess.run(
         ["bash", "-c", f". {shlex.quote(str(DEV_PORTS_SH))} && {{ {printed}; }}"],
@@ -57,7 +58,7 @@ def dev_port() -> int:
     if result.returncode:
         raise SystemExit("dev_api: no database for this checkout — see above.")
     values = dict(zip(names, result.stdout.split("\n")))
-    for name in DATABASE_VARIABLES:
+    for name in DEV_VARIABLES:
         if values.get(name):
             os.environ.setdefault(name, values[name])
     port = values.get("DEV_BACKEND_PORT")

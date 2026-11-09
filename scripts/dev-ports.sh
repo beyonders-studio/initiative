@@ -196,6 +196,10 @@ export VITE_DEV_PROXY_TARGET="${VITE_DEV_PROXY_TARGET:-http://localhost:${DEV_BA
 export VITE_API_URL="${VITE_API_URL:-/api/v1}"
 export VITE_DEV_PORT="$DEV_FRONTEND_PORT"
 
+# The dev backend plays Initiative Cloud, as the Vite dev server does, so
+# feedback and the ideas board, which only Cloud takes, can be tried here.
+export DEV_AS_CLOUD="${DEV_AS_CLOUD:-true}"
+
 # One log per checkout, so two dev environments don't write over each other.
 DEV_BACKEND_LOG="/tmp/initiative-${DEV_CHECKOUT_ID}-backend.log"
 DEV_FRONTEND_LOG="/tmp/initiative-${DEV_CHECKOUT_ID}-frontend.log"
