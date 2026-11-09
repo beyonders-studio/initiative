@@ -327,86 +327,46 @@ async def test_the_wrapper_is_a_no_op_when_there_is_nothing_to_move(session):
     await session.exec(text(block))
 
 
-async def test_nothing_is_said_when_the_connecting_login_owns_its_objects(
-    session, caplog
-):
-    """The ordinary case, and the one a warning must not fire on."""
-    from app.db.bootstrap import _FOREIGN_OWNERS
-    from app.db.public_rls import SHARED_TABLE_REGISTRY
+async def test_nothing_is_said_when_the_connecting_login_owns_its_objects(session):
+    """The ordinary case, and the one a warning must not fire on: the test
+    database was handed to the declared provisioner by conftest's bootstrap,
+    so the handover would move nothing."""
+    from app.db.bootstrap import owners_to_hand_over
 
-    owners = (
-        await session.exec(
-            _FOREIGN_OWNERS.bindparams(
-                owner=login_roles()[0].name,
-                tables=sorted(SHARED_TABLE_REGISTRY),
-            )
-        )
-    ).all()
-    if owners:
-        # Which objects, so an earlier test that left one behind is named.
-        from sqlalchemy import text
-
-        from app.db.guild_migrations import GUILD_OR_TEMPLATE_SCHEMA_REGEX
-
-        found = (
-            await session.exec(
-                text(
-                    "SELECT n.nspname || '.' || c.relname, c.relkind, "
-                    "       pg_get_userbyid(c.relowner) "
-                    "  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
-                    " WHERE c.relkind IN ('r', 'p', 'v', 'm', 'S') "
-                    "   AND c.relowner <> CAST(:owner AS regrole) "
-                    "   AND (n.nspname ~ :schemas "
-                    "        OR (n.nspname = 'public' AND c.relname = ANY(:tables)))"
-                ).bindparams(
-                    owner=login_roles()[0].name,
-                    schemas=GUILD_OR_TEMPLATE_SCHEMA_REGEX,
-                    tables=sorted(SHARED_TABLE_REGISTRY),
-                )
-            )
-        ).all()
-        pytest.fail(
-            "the test database's objects were handed to the declared provisioner "
-            "by conftest's bootstrap, so the signal must find none: "
-            f"{owners}; owned elsewhere: {found}"
-        )
+    owners = await owners_to_hand_over(
+        await session.connection(), login_roles()[0].name
+    )
+    assert not owners, f"the handover would still move objects owned by {owners}"
 
 
 async def test_an_object_owned_elsewhere_is_seen(session):
-    """A table in a guild schema owned by another login is what the signal is
-    looking for."""
+    """A table in a guild schema owned by another login is what the warning is
+    for; one owned by a role the handover keeps as an owner (a reader's view,
+    such as ``entity_presence``) is not."""
     from sqlalchemy import text
 
-    from app.db.bootstrap import _FOREIGN_OWNERS
-    from app.db.public_rls import SHARED_TABLE_REGISTRY
+    from app.db.bootstrap import owners_to_hand_over
     from conftest import RUN_ID
 
     other = f"owner_probe_{RUN_ID}"
+    kept = "app_presence_reader"
+    tables = (f"owner_probe_{RUN_ID}", f"kept_probe_{RUN_ID}")
     await session.exec(text(f'CREATE ROLE "{other}"'))
     try:
         await session.exec(text("CREATE SCHEMA IF NOT EXISTS guild_template"))
-        await session.exec(
-            text(f"CREATE TABLE guild_template.owner_probe_{RUN_ID} (id int)")
+        for table, owner in zip(tables, (other, kept), strict=True):
+            await session.exec(text(f"CREATE TABLE guild_template.{table} (id int)"))
+            await session.exec(
+                text(f'ALTER TABLE guild_template.{table} OWNER TO "{owner}"')
+            )
+        owners = await owners_to_hand_over(
+            await session.connection(), login_roles()[0].name
         )
-        await session.exec(
-            text(f'ALTER TABLE guild_template.owner_probe_{RUN_ID} OWNER TO "{other}"')
-        )
-        owners = [
-            row[0]
-            for row in (
-                await session.exec(
-                    _FOREIGN_OWNERS.bindparams(
-                        owner=login_roles()[0].name,
-                        tables=sorted(SHARED_TABLE_REGISTRY),
-                    )
-                )
-            ).all()
-        ]
         assert other in owners
+        assert kept not in owners
     finally:
-        await session.exec(
-            text(f"DROP TABLE IF EXISTS guild_template.owner_probe_{RUN_ID}")
-        )
+        for table in tables:
+            await session.exec(text(f"DROP TABLE IF EXISTS guild_template.{table}"))
         await session.exec(text(f'DROP ROLE IF EXISTS "{other}"'))
 
 
@@ -469,7 +429,9 @@ async def test_the_handover_claims_every_function_the_outgoing_login_owns(sessio
 
         claimed = {
             label.removeprefix("function ")
-            for label, _stmt in (await session.exec(text(_TRANSFER_STATEMENTS))).all()
+            for label, _stmt, _owner in (
+                await session.exec(text(_TRANSFER_STATEMENTS))
+            ).all()
             if label.startswith("function ")
         }
         owned = {
@@ -547,7 +509,9 @@ async def test_the_handover_leaves_alone_what_a_login_never_held(session):
         )
         labels = [
             label
-            for label, _stmt in (await session.exec(text(_TRANSFER_STATEMENTS))).all()
+            for label, _stmt, _owner in (
+                await session.exec(text(_TRANSFER_STATEMENTS))
+            ).all()
         ]
     finally:
         await session.exec(text(f"DROP FUNCTION IF EXISTS public.{definer}()"))
