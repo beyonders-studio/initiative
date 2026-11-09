@@ -13,12 +13,22 @@ export interface AppEnvironmentPlugin {
    * than this method reject the call.
    */
   storeCountry(): Promise<{ country?: string }>;
+  /**
+   * Hands the store its own review prompt: the App Store's on iOS, Google Play's on a Play
+   * install (any other Android install does nothing). The store decides whether it shows and
+   * never says, so this resolves either way. Native builds older than this method reject.
+   */
+  requestReview(): Promise<void>;
 }
 
 export { PLAY_STORE_INSTALLER } from "@/lib/playStore";
 
 const AppEnvironment = registerPlugin<AppEnvironmentPlugin>("AppEnvironment", {
-  web: () => ({ get: async () => ({}), storeCountry: async () => ({}) }),
+  web: () => ({
+    get: async () => ({}),
+    storeCountry: async () => ({}),
+    requestReview: async () => {},
+  }),
 });
 
 export default AppEnvironment;

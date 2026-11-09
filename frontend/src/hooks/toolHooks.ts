@@ -128,6 +128,7 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { fetchAllPages } from "@/lib/fetchAllPages";
+import { askForStoreReview } from "@/lib/storeReview";
 import { toolCamelPlural } from "@/lib/tools";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -259,7 +260,10 @@ const createHook = <TRead, TCreate>(
     useCommunityMutation<TRead, TCreate>(
       {
         mutationFn: (communityId, data) => endpoints.create(communityId, data),
-        invalidate: () => invalidate(q.toolList(endpoints.tool)),
+        invalidate: () => {
+          askForStoreReview();
+          return invalidate(q.toolList(endpoints.tool));
+        },
         errorKey: failureKey,
       },
       options

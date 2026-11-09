@@ -104,6 +104,9 @@ dependencies {
     // Only getBillingConfigAsync is used; nothing is bought through Play.
     implementation 'com.android.billingclient:billing:8.0.0'
 
+    // The Play Store's own review prompt, asked for after something the person finished.
+    implementation 'com.google.android.play:review:2.0.2'
+
     // Firebase for runtime initialization (push notifications)
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging'

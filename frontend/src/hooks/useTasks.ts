@@ -65,6 +65,7 @@ import { fetchAllPages } from "@/lib/fetchAllPages";
 import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import { withZone } from "@/lib/recurrence";
 import { chipRef } from "@/lib/smartChips";
+import { askForStoreReview } from "@/lib/storeReview";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -111,7 +112,10 @@ export const useCreateTask = (options?: MutationOpts<TaskRead, Parameters<typeof
   useCommunityMutation<TaskRead, Parameters<typeof createTask>[1]>(
     {
       mutationFn: (communityId, data) => createTask(communityId, data),
-      invalidate: () => invalidate(q.allTasks()),
+      invalidate: () => {
+        askForStoreReview();
+        return invalidate(q.allTasks());
+      },
       errorKey: "projects:tasks.createError",
     },
     options
@@ -125,7 +129,10 @@ export const useCreateTaskInCommunity = (
   useApiMutation<TaskRead, { communityId: number; data: Parameters<typeof createTask>[1] }>(
     {
       mutationFn: ({ communityId, data }) => createTask(communityId, data),
-      invalidate: () => invalidate(q.allTasks()),
+      invalidate: () => {
+        askForStoreReview();
+        return invalidate(q.allTasks());
+      },
       errorKey: "projects:tasks.createError",
     },
     options
@@ -216,7 +223,7 @@ export const useUpdateTask = (
             cached?.assignees?.some((assignee) => assignee.id === user.id) ?? false;
           fireTaskCompletionFeedback(user, { isAssigned });
         }
-        return { feedbackFired: true };
+        return { feedbackFired: true, previousCategory: statusChange.from };
       },
       onSuccess: (...args) => {
         const [updated, , context] = args;
@@ -231,6 +238,7 @@ export const useUpdateTask = (
             updated.assignees?.some((assignee) => assignee.id === user.id) ?? false;
           fireTaskCompletionFeedback(user, { isAssigned });
         }
+        if (movedIntoDone) askForStoreReview();
         return onSuccess?.(...args);
       },
     }
@@ -306,6 +314,11 @@ export const useTaskSaveOptions = (
         fireTaskCompletionFeedback(user, { isAssigned });
       }
     },
+    onSaved: (edit) => {
+      if (edit.shows.task_status?.category === "done" && task.task_status.category !== "done") {
+        askForStoreReview();
+      }
+    },
   };
 };
 
@@ -317,11 +330,16 @@ export const useTaskFieldSave = (
   askScope: AskTaskScope,
   /** Runs when an edit is saved, by Save or by Retry. */
   onSaved?: (edit: TaskEdit) => void
-) =>
-  useItemFieldSave(TASK_SAVES, task.id, label, {
-    ...useTaskSaveOptions(task, askScope),
-    onSaved,
+) => {
+  const options = useTaskSaveOptions(task, askScope);
+  return useItemFieldSave(TASK_SAVES, task.id, label, {
+    ...options,
+    onSaved: (edit) => {
+      options.onSaved?.(edit);
+      onSaved?.(edit);
+    },
   });
+};
 
 /**
  * Tick or untick a task from somewhere that is not its project — a file's
@@ -427,6 +445,7 @@ export const useUpdateTaskInCommunity = (
             updated.assignees?.some((assignee) => assignee.id === user.id) ?? false;
           fireTaskCompletionFeedback(user, { isAssigned });
         }
+        if (movedIntoDone) askForStoreReview();
         return onSuccess?.(...args);
       },
     }
@@ -620,6 +639,7 @@ export const useReorderTasks = (options?: MutationOpts<TaskRead[], TaskReorderRe
         if (context?.didTransitionToDone && user) {
           fireTaskCompletionFeedback(user, { isAssigned: context.assignedTransitionToDone });
         }
+        if (context?.didTransitionToDone) askForStoreReview();
         return onSuccess?.(...args);
       },
     }

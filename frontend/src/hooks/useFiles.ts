@@ -37,6 +37,7 @@ import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type ResumableOptions, uploadInPieces } from "@/lib/resumableUpload";
+import { askForStoreReview } from "@/lib/storeReview";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 import type { EditorFileType } from "@/ui/lib/fileTypes";
@@ -183,8 +184,10 @@ export const useCreateFile = (options?: MutationOpts<FileRead, CreateFileInput>)
 
         return newFile;
       },
-      invalidate: (_file, { project_id }) =>
-        invalidate(q.allFiles(), ...(project_id ? [q.project(project_id)] : [])),
+      invalidate: (_file, { project_id }) => {
+        askForStoreReview();
+        return invalidate(q.allFiles(), ...(project_id ? [q.project(project_id)] : []));
+      },
       errorKey: "files:create.createError",
     },
     options
@@ -237,6 +240,7 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
       return newFile;
     },
     onSuccess: (...args) => {
+      askForStoreReview();
       void invalidate(q.allFiles());
       const projectId = args[1].project_id;
       if (projectId) {
