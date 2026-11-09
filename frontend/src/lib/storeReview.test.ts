@@ -6,9 +6,7 @@ import { PLAY_STORE_URL } from "@/lib/links";
 import { getItem, removeItem } from "@/lib/storage";
 
 import {
-  ASKS_PER_YEAR,
   askForStoreReview,
-  DAYS_BETWEEN_ASKS,
   dueForReview,
   noteDayOfUse,
   resetStoreReview,
@@ -48,25 +46,10 @@ afterEach(() => {
 });
 
 describe("dueForReview", () => {
-  const used = { days: 3, lastDay: "2026-11-08", asked: [] as number[] };
-
-  it("waits for three days of use", () => {
-    expect(dueForReview({ ...used, days: 2 }, NOW)).toBe(false);
-    expect(dueForReview(used, NOW)).toBe(true);
-  });
-
-  it("waits between asks", () => {
-    const recent = NOW - (DAYS_BETWEEN_ASKS - 1) * DAY;
-    expect(dueForReview({ ...used, asked: [recent] }, NOW)).toBe(false);
-    expect(dueForReview({ ...used, asked: [NOW - DAYS_BETWEEN_ASKS * DAY] }, NOW)).toBe(true);
-  });
-
-  it("asks no more than the store's yearly limit", () => {
-    const asked = Array.from(
-      { length: ASKS_PER_YEAR },
-      (_, i) => NOW - (DAYS_BETWEEN_ASKS + 1) * DAY - i
-    );
-    expect(dueForReview({ ...used, asked }, NOW)).toBe(false);
+  it("waits for three days of use, then asks once", () => {
+    expect(dueForReview({ days: 2, lastDay: "2026-11-08", asked: false })).toBe(false);
+    expect(dueForReview({ days: 3, lastDay: "2026-11-08", asked: false })).toBe(true);
+    expect(dueForReview({ days: 3, lastDay: "2026-11-08", asked: true })).toBe(false);
   });
 });
 
@@ -92,7 +75,7 @@ describe("askForStoreReview", () => {
     await waitFor(() => expect(environment.requestReview).toHaveBeenCalledTimes(1), {
       timeout: 3000,
     });
-    await waitFor(() => expect(record().asked).toHaveLength(1));
+    await waitFor(() => expect(record().asked).toBe(true));
 
     askForStoreReview();
     expect(environment.requestReview).toHaveBeenCalledTimes(1);
@@ -127,7 +110,7 @@ describe("askForStoreReview", () => {
 
     askForStoreReview();
     await waitFor(() => expect(environment.requestReview).toHaveBeenCalled(), { timeout: 3000 });
-    expect(record().asked).toEqual([]);
+    expect(record().asked).toBe(false);
   });
 });
 

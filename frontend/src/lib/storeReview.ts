@@ -6,12 +6,12 @@
  * app that asks a question first, draws its own prompt, puts the store's prompt
  * behind a button, or offers anything for a rating. The store decides whether
  * its prompt shows and never says whether it did or whether a review was left,
- * so this keeps only when this install asked.
+ * so this keeps only whether this install asked.
  *
- * It asks right after something the person finished (a task done, an item
- * made), once the app has been used on {@link DAYS_BEFORE_ASKING} days, then no
- * sooner than {@link DAYS_BETWEEN_ASKS} days later and no more than
- * {@link ASKS_PER_YEAR} times a year. Only an app a store installed asks: iOS,
+ * It asks once per install, ever: right after something the person finished
+ * (a task done, an item made), once the app has been used on
+ * {@link DAYS_BEFORE_ASKING} days. Our own feedback matters more to us than a
+ * star rating, so it never asks again. Only an app a store installed asks: iOS,
  * and an Android app from Google Play. An APK, the dev app, the desktop app and
  * the web never do.
  */
@@ -27,14 +27,9 @@ import { getItem, setItem } from "@/lib/storage";
 const appEnvironment = () => import("@/plugins/appEnvironment").then((m) => m.default);
 
 const KEY = "initiative-store-review";
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Days the app has been opened on before it first asks. */
 export const DAYS_BEFORE_ASKING = 3;
-/** The shortest wait between two asks. */
-export const DAYS_BETWEEN_ASKS = 120;
-/** The most asks in any 365 days, the App Store's own limit. */
-export const ASKS_PER_YEAR = 3;
 /** How long after the success the prompt comes, so its own feedback lands first. */
 const ASK_DELAY_MS = 1500;
 
@@ -43,11 +38,11 @@ export interface ReviewRecord {
   days: number;
   /** The last of them, as the device's local `YYYY-MM-DD`. */
   lastDay: string | null;
-  /** When this install asked, in epoch milliseconds, newest last. */
-  asked: number[];
+  /** Whether this install has asked. */
+  asked: boolean;
 }
 
-const EMPTY: ReviewRecord = { days: 0, lastDay: null, asked: [] };
+const EMPTY: ReviewRecord = { days: 0, lastDay: null, asked: false };
 
 const read = (): ReviewRecord => {
   try {
@@ -56,9 +51,7 @@ const read = (): ReviewRecord => {
     return {
       days: typeof parsed.days === "number" ? parsed.days : 0,
       lastDay: typeof parsed.lastDay === "string" ? parsed.lastDay : null,
-      asked: Array.isArray(parsed.asked)
-        ? parsed.asked.filter((at): at is number => typeof at === "number")
-        : [],
+      asked: parsed.asked === true,
     };
   } catch {
     return EMPTY;
@@ -85,13 +78,8 @@ export const noteDayOfUse = (now = new Date()): void => {
 };
 
 /** Whether this install may ask now. */
-export const dueForReview = (record: ReviewRecord, now: number): boolean => {
-  if (record.days < DAYS_BEFORE_ASKING) return false;
-  const lastYear = record.asked.filter((at) => now - at < 365 * DAY_MS);
-  if (lastYear.length >= ASKS_PER_YEAR) return false;
-  const last = record.asked.at(-1);
-  return last === undefined || now - last >= DAYS_BETWEEN_ASKS * DAY_MS;
-};
+export const dueForReview = (record: ReviewRecord): boolean =>
+  !record.asked && record.days >= DAYS_BEFORE_ASKING;
 
 /** Whether a store installed this app, which is where a rating goes. */
 const fromStore = async (): Promise<boolean> => {
@@ -111,15 +99,14 @@ let asking = false;
 export const askForStoreReview = (): void => {
   if (asking || !isStorePlatform()) return;
   noteDayOfUse();
-  if (!dueForReview(read(), Date.now())) return;
+  if (!dueForReview(read())) return;
   asking = true;
   void (async () => {
     try {
       if (!(await fromStore())) return;
       await new Promise((resolve) => setTimeout(resolve, ASK_DELAY_MS));
       await (await appEnvironment()).requestReview();
-      const record = read();
-      write({ ...record, asked: [...record.asked, Date.now()].slice(-ASKS_PER_YEAR) });
+      write({ ...read(), asked: true });
     } catch {
       // An app built before the method, or a store that could not be reached:
       // nothing was asked, so nothing is recorded.
