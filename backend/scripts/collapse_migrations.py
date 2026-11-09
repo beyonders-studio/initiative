@@ -17,7 +17,8 @@ release first (``app.db.init_db.check_pre_baseline_db``).
    SQL, and the tests that load a deleted revision.
 5. Build the new chain to ``head`` and compare it with step 3: structure (as
    ``upgrade_from_release.py`` compares it), roles, extensions and every row.
-   A difference puts the tree back and fails.
+   Both run with a role prefix, as the test suite does, so the names the
+   snapshot fills in are held too. A difference puts the tree back and fails.
 
 Each build gets a throwaway Postgres container of its own, because roles are
 cluster-wide. Nothing is committed. Run from ``backend/`` on a branch of its
@@ -62,6 +63,9 @@ RUNNER = "app_provisioner"
 #: Where the platform-role prefix goes in the snapshot; the baseline fills it
 #: in at apply time, as the test suite runs with one.
 PREFIX_MARK = "@@PLATFORM_ROLE_PREFIX@@"
+#: The prefix the proof's builds run with, so the snapshot is held to the
+#: names the old chain gave a prefixed run.
+PROOF_PREFIX = "proof_"
 REVISION_ID = re.compile(r"\d{8}_\d{4}")
 REVISION_FILE = re.compile(r"(\d{8}_\d{4})_\w+(?:\.py)?")
 _TIMESTAMPS = ("timestamp with time zone", "timestamp without time zone", "date")
@@ -134,6 +138,8 @@ def require_frozen(tag: str, cut: str) -> list[Path]:
 class Server:
     container: str
     address: str
+    #: The role prefix the app runs with, as the test suite sets one.
+    prefix: str = ""
 
     def url(self, role: str, password: str, *, driver: str = "") -> str:
         scheme = f"postgresql+{driver}" if driver else "postgresql"
@@ -159,8 +165,8 @@ class Server:
             **base,
             **logins,
             "DATABASE_URL_BOOTSTRAP": self.url(OWNER, OWNER, driver="asyncpg"),
-            "GUILD_ROLE_PREFIX": "",
-            "PLATFORM_ROLE_PREFIX": "",
+            "GUILD_ROLE_PREFIX": self.prefix,
+            "PLATFORM_ROLE_PREFIX": self.prefix,
             "SECRET_KEY": base.get("SECRET_KEY") or secrets.token_hex(32),
         }
 
@@ -428,7 +434,10 @@ def curate(dump: str, prefixed: list[str]) -> tuple[str, list[str]]:
     sql = _SESSION.sub("", "".join(kept))
     if prefixed:
         names = "|".join(sorted(map(re.escape, prefixed), key=len, reverse=True))
-        sql = re.sub(rf"\b(?:{names})\b", lambda m: PREFIX_MARK + m.group(0), sql)
+        # A policy's name carries its role's too, after an underscore.
+        sql = re.sub(
+            rf"(?<![A-Za-z0-9])(?:{names})\b", lambda m: PREFIX_MARK + m.group(0), sql
+        )
     sql = re.sub(r"\n{3,}", "\n\n", sql)
     if named := sorted(name for name in others if name in sql):
         raise SystemExit(f"The snapshot uses what bootstrap installs: {named}")
@@ -791,6 +800,7 @@ def main() -> int:
         shot = snapshot(found, *build(found, cut))
     with server("before") as found:
         print("Building the chain as it stands to head ...", flush=True)
+        found.prefix = PROOF_PREFIX
         build(found, "head")
         want = asyncio.run(_shape(found))
 
@@ -799,6 +809,7 @@ def main() -> int:
     try:
         with server("after") as found:
             print("Building the collapsed chain to head ...", flush=True)
+            found.prefix = PROOF_PREFIX
             build(found, "head")
             got = asyncio.run(_shape(found))
     except BaseException:
