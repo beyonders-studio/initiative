@@ -43,7 +43,7 @@
     },
     "ideas": {
       "title": "Ideas",
-      "description": "Las ideas que todos pueden leer y votar, en Initiative Cloud."
+      "description": "Lo que todos pueden leer y votar en la página de Sugerencias, en Initiative Cloud."
     }
   },
   "stream": {
@@ -62,7 +62,7 @@
     "landingStatusDefault": "El estado por defecto del proyecto",
     "caseTypeLabel": "Los casos nuevos son de tipo",
     "caseTypeDefault": "El tipo por defecto del proyecto",
-    "ideaTypeLabel": "El tipo que lleva una tarea a la página de Ideas",
+    "ideaTypeLabel": "El tipo que lleva una tarea a la página de Sugerencias",
     "ideaTypeNone": "Ninguno: no se publica nada",
     "enabledLabel": "Recibiendo casos nuevos",
     "lastCase": "Último caso abierto el {{when}}.",
@@ -242,7 +242,7 @@
       "joinInto": "Unir a otra idea",
       "joinIntoHelp": "Para un duplicado: sus votos y los comentarios unidos a ella pasan a la otra idea.",
       "joinIntoTitle": "¿Unir a «{{title}}»?",
-      "joinIntoBody": "Sus votos y los comentarios unidos a ella pasan a «{{title}}». Sale de la página de Ideas y se archiva, y su página abre «{{title}}» en su lugar.",
+      "joinIntoBody": "Sus votos y los comentarios unidos a ella pasan a «{{title}}». Sale de la página de Sugerencias y se archiva, y su página abre «{{title}}» en su lugar.",
       "joinIntoConfirm": "Unir",
       "failed": "No se pudo cambiar. Inténtalo de nuevo en un momento."
     }
@@ -303,8 +303,8 @@
       }
     },
     "contactable": "Pueden contactarme si tienen preguntas sobre esto",
-    "seeIdeas": "Mira lo que otros han pedido",
-    "matches": "Ideas como la tuya",
+    "seeIdeas": "Ver todas las sugerencias",
+    "matches": "Sugerencias como la tuya",
     "joins": "Al enviarlo, lo que escribiste se suma a «{{title}}».",
     "stuck": "¿Necesitas que alguien lo resuelva por ti? Pedir ayuda",
     "context": {
@@ -341,25 +341,43 @@
     "appeal": "Apelación contra tu suspensión"
   },
   "ideas": {
-    "title": "Ideas",
-    "lede": "Lo que la gente ha pedido y en qué punto está cada cosa. Vota por las que quieras.",
-    "search": "Buscar ideas",
+    "title": "Sugerencias",
+    "search": "Buscar sugerencias",
+    "sendFeedback": "Enviar comentarios",
+    "signInToVote": "Inicia sesión para votar",
+    "views": {
+      "label": "Vista",
+      "list": "Lista",
+      "roadmap": "Hoja de ruta"
+    },
+    "categoryLabel": "Categoría",
+    "allCategories": "Todas",
     "sortLabel": "Orden",
     "sort": {
       "votes": "Más votadas",
       "newest": "Más recientes"
     },
     "statusLabel": "Estado",
-    "allStatuses": "Todas",
+    "anyStatus": "Cualquier estado",
     "votedByMe": "Votadas por mí",
-    "none": "Ninguna idea coincide.",
+    "none": "Ninguna sugerencia coincide.",
+    "count_one": "{{count}} sugerencia",
+    "count_other": "{{count}} sugerencias",
     "votes_one": "{{count}} voto",
     "votes_other": "{{count}} votos",
-    "vote": "Votar",
-    "voted": "Votada",
-    "voteFor": "Votar por {{title}}",
+    "upvote_one": "{{count}} voto. Votar por {{title}}",
+    "upvote_other": "{{count}} votos. Votar por {{title}}",
+    "upvoted_one": "Voto registrado. {{count}} voto.",
+    "upvoted_other": "Voto registrado. {{count}} votos.",
+    "upvoteTakenBack_one": "Voto retirado. {{count}} voto.",
+    "upvoteTakenBack_other": "Voto retirado. {{count}} votos.",
+    "closedVotes_one": "{{count}} voto, votación cerrada",
+    "closedVotes_other": "{{count}} votos, votación cerrada",
     "voteError": "No se pudo guardar tu voto. Inténtalo de nuevo en un momento.",
-    "all": "Todas las ideas"
+    "back": "Todas las sugerencias",
+    "addThoughts": "Añade tu opinión",
+    "shippedIn": "Publicada en {{version}}",
+    "shippedTitle": "Sugerencias publicadas"
   },
   "picture": {
     "take": "Imagen de esta página",

@@ -146,5 +146,9 @@
     "saved": "Gespeichert",
     "failed": "Nicht gespeichert",
     "changed": "Das wurde geändert, während du es bearbeitet hast"
+  },
+  "boardColumn": {
+    "collapse": "{{name}} einklappen",
+    "expand": "{{name}} ausklappen"
   }
 }

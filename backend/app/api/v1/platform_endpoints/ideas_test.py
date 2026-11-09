@@ -13,8 +13,10 @@ from app.api.v1.platform_endpoints import tickets_test
 from app.api.v1.platform_endpoints.tickets_feedback_test import cloud  # noqa: F401
 from app.core.intake import IntakeStream
 from app.core.messages import IdeaMessages, TaskMessages
+from app.core.version import __version__
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
+from app.models.platform.guild import CommunityRole
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
 from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
@@ -127,7 +129,9 @@ async def test_anybody_reads_the_published_ideas_and_nothing_else(client, board)
     ]
     assert body["items"][0]["votes"] == 0
     assert body["items"][0]["voted"] is False
-    assert {s["category"] for s in body["statuses"]} >= {"todo", "done"}
+    # The statuses the published ideas read as, for filtering by.
+    assert [s["category"] for s in body["statuses"]] == ["todo"]
+    assert "icon" in body["statuses"][0]
 
     one = await client.get(f"{IDEAS}/{board['published'].id}")
     assert one.json()["description"] == "Pick a holiday calendar for a recurring event."
@@ -258,7 +262,7 @@ async def test_voters_hear_when_an_idea_moves(client, session, acting_user, boar
         )
     ).one()
     assert notice.data["task_id"] == board["published"].id
-    assert notice.data["target_path"] == f"/ideas/{board['published'].id}"
+    assert notice.data["target_path"] == f"/suggestions/{board['published'].id}"
 
 
 async def test_a_task_moved_off_the_board_is_nobodys_to_read(
@@ -351,12 +355,38 @@ async def desk(client, session, acting_user, cloud):  # noqa: F811
         )
         assert made.status_code in (200, 201), made.text
         ideas.append(made.json()["id"])
+    await set_rls_context(session, SystemGuild(guild_id))
+    binding = (
+        await session.exec(
+            select(IntakeBinding).where(
+                IntakeBinding.stream == IntakeStream.ideas.value
+            )
+        )
+    ).one()
+    statuses = {
+        status.name: status.id
+        for status in await session.exec(
+            select(TaskStatus).where(TaskStatus.project_id == binding.project_id)
+        )
+    }
+    roles = {
+        "category": binding.category_field_id,
+        "release": binding.release_field_id,
+        "shipped": binding.shipped_status_id,
+    }
+    await set_rls_context(session, Unattributed())
+    # Setting the board up from its blueprint names its fields and its
+    # shipped status on the binding.
+    assert None not in roles.values()
+    assert roles["shipped"] == statuses["Shipped"]
     return {
         "guild_id": guild_id,
         "team": team,
         "tasks": tasks,
         "boards": boards,
         "ideas": ideas,
+        "roles": roles,
+        "statuses": statuses,
     }
 
 
@@ -389,7 +419,7 @@ async def _case(client, desk, task_id: int) -> dict:
     return read.json()
 
 
-async def test_writing_feedback_finds_the_ideas_like_it(client, session, desk):
+async def test_writing_feedback_finds_the_ideas_like_it(client, desk):
     """Close either way round: a long draft finds a short title, and a few
     words find a longer one. A closed idea is not offered."""
     recurring, calendars = desk["ideas"]
@@ -405,20 +435,7 @@ async def test_writing_feedback_finds_the_ideas_like_it(client, session, desk):
     assert calendars in await similar("holiday calendars")
     assert await similar("Dark mode for printing") == []
 
-    await set_rls_context(session, SystemGuild(desk["guild_id"]))
-    done = (
-        await session.exec(
-            select(TaskStatus.id)
-            .where(TaskStatus.project_id == desk["boards"]["ideas"]["project_id"])
-            .where(TaskStatus.category == TaskStatusCategory.done)
-        )
-    ).first()
-    await set_rls_context(session, Unattributed())
-    await client.patch(
-        f"{desk['tasks']}/{calendars}",
-        json={"task_status_id": done},
-        headers=desk["team"],
-    )
+    await _edit(client, desk, calendars, task_status_id=desk["statuses"]["Not planned"])
     assert calendars not in await similar("holiday calendars")
 
 
@@ -534,3 +551,235 @@ async def test_an_idea_joins_another(client, session, acting_user, desk):
         headers=desk["team"],
     )
     assert refused.status_code == 404
+
+
+async def _idea(client, desk, title: str, **body) -> int:
+    made = await client.post(
+        f"{desk['tasks']}/",
+        json={
+            "project_id": desk["boards"]["ideas"]["project_id"],
+            "title": title,
+            "task_type_id": desk["boards"]["ideas"]["task_type_id"],
+            **body,
+        },
+        headers=desk["team"],
+    )
+    assert made.status_code == 201, made.text
+    return made.json()["id"]
+
+
+async def _edit(client, desk, task_id: int, **body) -> None:
+    edited = await client.patch(
+        f"{desk['tasks']}/{task_id}", json=body, headers=desk["team"]
+    )
+    assert edited.status_code == 200, edited.text
+
+
+async def _release(client, desk, task_id: int, release: str | None) -> None:
+    await _edit(
+        client,
+        desk,
+        task_id,
+        properties=[{"property_id": desk["roles"]["release"], "value": release}],
+        merge_properties=True,
+    )
+
+
+async def _public(client, task_id: int) -> dict:
+    read = await client.get(f"{IDEAS}/{task_id}")
+    assert read.status_code == 200, read.text
+    return read.json()
+
+
+async def test_the_board_files_an_idea_under_the_category_its_words_name(client, desk):
+    """Made or reworded while its category is empty, an idea takes the one its
+    title names, else its description; one the team set stands."""
+    recurring, calendars = desk["ideas"]
+    # Made before its words named one: the blueprint's own seed task is not.
+    assert (await _public(client, recurring))["category"] is None
+    assert (await _public(client, calendars))["category"] == "Calendars"
+
+    worded = await _idea(
+        client,
+        desk,
+        "Dark mode everywhere",
+        description="Starting with **wiki** pages and the files they show.",
+    )
+    assert (await _public(client, worded))["category"] == "Wikis"
+
+    # Reworded: the category it has stands.
+    await _edit(client, desk, worded, title="Dark mode for plug-ins")
+    assert (await _public(client, worded))["category"] == "Wikis"
+
+    # Empty, and reworded to name one.
+    await _edit(client, desk, recurring, title="Recurring events in a project")
+    assert (await _public(client, recurring))["category"] == "Projects"
+
+    # Set by the team as it is made: theirs stands.
+    chosen = await _idea(
+        client,
+        desk,
+        "Notifications for a project",
+        properties=[{"property_id": desk["roles"]["category"], "value": "account"}],
+    )
+    assert (await _public(client, chosen))["category"] == "Account"
+
+
+async def test_the_list_counts_and_filters_by_category(client, acting_user, desk):
+    recurring, calendars = desk["ideas"]
+    projects = await _idea(
+        client,
+        desk,
+        "Archive a project",
+        description="Keep it out of the way.\n\nBut **find** it again later.",
+    )
+    voter = await acting_user()
+    await client.put(f"{IDEAS}/{projects}/vote", headers=voter.headers)
+
+    listed = (await client.get(IDEAS)).json()
+    assert listed["categories"] == [
+        {"name": "Projects", "count": 1},
+        {"name": "Calendars", "count": 1},
+    ]
+    summaries = {idea["task_id"]: idea["summary"] for idea in listed["items"]}
+    assert summaries[projects] == "Keep it out of the way."
+    assert summaries[recurring] is None
+
+    only = (await client.get(IDEAS, params={"category": "Projects"})).json()
+    assert [idea["task_id"] for idea in only["items"]] == [projects]
+    # The counts are of what the other filters show, whichever category.
+    assert only["categories"] == listed["categories"]
+    mine = (
+        await client.get(
+            IDEAS,
+            params={"category": "Calendars", "voted": True},
+            headers=voter.headers,
+        )
+    ).json()
+    assert (mine["items"], mine["categories"]) == (
+        [],
+        [{"name": "Projects", "count": 1}],
+    )
+    unknown = (await client.get(IDEAS, params={"category": "Nothing"})).json()
+    assert unknown["items"] == []
+    assert calendars in {i["task_id"] for i in listed["items"]}
+
+
+async def test_a_shipped_idea_reads_as_shipped_only_in_its_release(client, desk):
+    """Before its release is out it reads as the board's last in-progress
+    status; once a later one is out it leaves the list and the roadmap, and its
+    own page still reads it as shipped in its release."""
+    idea, _ = desk["ideas"]
+    statuses, shipped = desk["statuses"], desk["roles"]["shipped"]
+    await _edit(client, desk, idea, task_status_id=shipped)
+
+    def listed(body: dict) -> dict:
+        return {i["task_id"]: i for i in body["items"]}
+
+    def column(roadmap: dict, name: str) -> list[int]:
+        return next(
+            [i["task_id"] for i in c["items"]]
+            for c in roadmap["columns"]
+            if c["status"]["name"] == name
+        )
+
+    for release in (None, "99.0.0"):
+        await _release(client, desk, idea, release)
+        read = await _public(client, idea)
+        assert (read["status"]["id"], read["release"]) == (statuses["Building"], None)
+        assert read["closed"] is False
+        roadmap = (await client.get(f"{IDEAS}/roadmap")).json()
+        assert column(roadmap, "Building") == [idea], release
+        assert column(roadmap, "Shipped") == []
+
+    await _release(client, desk, idea, __version__)
+    read = await _public(client, idea)
+    assert (read["status"]["id"], read["release"]) == (shipped, __version__)
+    assert listed((await client.get(IDEAS)).json())[idea]["release"] == __version__
+    roadmap = (await client.get(f"{IDEAS}/roadmap")).json()
+    assert [c["status"]["name"] for c in roadmap["columns"]] == [
+        "Planned",
+        "Building",
+        "Shipped",
+    ]
+    assert column(roadmap, "Shipped") == [idea]
+    feed = await client.get(f"{IDEAS}/shipped", params={"release": __version__})
+    assert [i["task_id"] for i in feed.json()] == [idea]
+    # Written with a "v", it reads as the version, which What's new is named by.
+    await _release(client, desk, idea, f"v{__version__}")
+    assert (await _public(client, idea))["release"] == __version__
+
+    await _release(client, desk, idea, "0.0.1")
+    assert idea not in listed((await client.get(IDEAS)).json())
+    roadmap = (await client.get(f"{IDEAS}/roadmap")).json()
+    assert idea not in column(roadmap, "Shipped") + column(roadmap, "Building")
+    read = await _public(client, idea)
+    assert (read["status"]["id"], read["release"]) == (shipped, "0.0.1")
+    feed = await client.get(f"{IDEAS}/shipped", params={"release": "v0.0.1"})
+    assert [i["task_id"] for i in feed.json()] == [idea]
+    # Nothing for a release this server is not yet on.
+    feed = await client.get(f"{IDEAS}/shipped", params={"release": "99.0.0"})
+    assert feed.json() == []
+
+
+async def test_a_shipped_idea_stays_readable_on_a_board_with_nothing_in_progress(
+    client, desk
+):
+    """With no in-progress status left, a shipped idea whose release is not out
+    reads as the board's first waiting status, on the list and its own page."""
+    idea, _ = desk["ideas"]
+    statuses = desk["statuses"]
+    project_id = desk["boards"]["ideas"]["project_id"]
+    for name in ("Planned", "Building"):
+        moved = await client.patch(
+            f"/api/v1/c/{desk['guild_id']}/projects/{project_id}"
+            f"/task-statuses/{statuses[name]}",
+            json={"category": "todo"},
+            headers=desk["team"],
+        )
+        assert moved.status_code == 200, moved.text
+    await _edit(client, desk, idea, task_status_id=desk["roles"]["shipped"])
+
+    read = await _public(client, idea)
+    assert (read["status"]["id"], read["closed"]) == (
+        statuses["Under consideration"],
+        False,
+    )
+    assert idea in {i["task_id"] for i in (await client.get(IDEAS)).json()["items"]}
+
+
+async def test_voters_hear_an_idea_shipped_once_its_release_is_out(
+    client, session, acting_user, desk
+):
+    idea, _ = desk["ideas"]
+    await _edit(client, desk, idea, task_status_id=desk["statuses"]["Building"])
+    voter = await acting_user()
+    await client.put(f"{IDEAS}/{idea}/vote", headers=voter.headers)
+
+    await _edit(client, desk, idea, task_status_id=desk["roles"]["shipped"])
+    assert await ticket_notices.notify_filers() == 0
+
+    await _release(client, desk, idea, __version__)
+    assert await ticket_notices.notify_filers() == 1
+    await set_rls_context(session, Unattributed())
+    notice = (
+        await session.exec(
+            select(NoticeOutboxItem)
+            .where(NoticeOutboxItem.user_id == voter.user.id)
+            .where(NoticeOutboxItem.type == NotificationType.idea_updated.value)
+        )
+    ).one()
+    assert notice.data["status"] == "Shipped"
+
+
+async def test_a_task_in_another_community_takes_no_category(client, acting_user, desk):
+    """On Initiative Cloud, every other community's tasks are written as
+    before: only the operations community binds a board."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    made = await client.post(
+        a.g("/tasks/"),
+        json={"project_id": a.project.id, "title": "A project for files"},
+        headers=a.headers,
+    )
+    assert made.status_code == 201, made.text
+    assert made.json()["properties"] == []

@@ -43,7 +43,7 @@
     },
     "ideas": {
       "title": "Idées",
-      "description": "Les idées que tout le monde peut lire et soutenir, sur Initiative Cloud."
+      "description": "Ce que tout le monde peut lire et soutenir sur la page Suggestions, sur Initiative Cloud."
     }
   },
   "stream": {
@@ -62,7 +62,7 @@
     "landingStatusDefault": "Le statut par défaut du projet",
     "caseTypeLabel": "Les nouveaux cas sont de type",
     "caseTypeDefault": "Le type par défaut du projet",
-    "ideaTypeLabel": "Le type qui met une tâche sur la page Idées",
+    "ideaTypeLabel": "Le type qui met une tâche sur la page Suggestions",
     "ideaTypeNone": "Aucun : rien n'est publié",
     "enabledLabel": "Reçoit les nouveaux cas",
     "lastCase": "Dernier cas ouvert le {{when}}.",
@@ -242,7 +242,7 @@
       "joinInto": "Fusionner dans une autre idée",
       "joinIntoHelp": "Pour un doublon : ses votes et les retours qui y sont rattachés passent à l'autre idée.",
       "joinIntoTitle": "Fusionner dans « {{title}} » ?",
-      "joinIntoBody": "Ses votes et les retours qui y sont rattachés passent à « {{title}} ». Elle quitte la page Idées et est archivée, et sa page ouvre « {{title}} » à la place.",
+      "joinIntoBody": "Ses votes et les retours qui y sont rattachés passent à « {{title}} ». Elle quitte la page Suggestions et est archivée, et sa page ouvre « {{title}} » à la place.",
       "joinIntoConfirm": "Fusionner",
       "failed": "Impossible de modifier cela. Réessayez dans un instant."
     }
@@ -303,8 +303,8 @@
       }
     },
     "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
-    "seeIdeas": "Voir ce que d'autres ont demandé",
-    "matches": "Des idées comme la vôtre",
+    "seeIdeas": "Voir toutes les suggestions",
+    "matches": "Des suggestions comme la vôtre",
     "joins": "En l'envoyant, ce que vous avez écrit s'ajoute à « {{title}} ».",
     "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
@@ -341,25 +341,43 @@
     "appeal": "Recours contre votre suspension"
   },
   "ideas": {
-    "title": "Idées",
-    "lede": "Ce que les gens ont demandé, et où en est chaque idée. Votez pour celles que vous voulez.",
-    "search": "Rechercher des idées",
+    "title": "Suggestions",
+    "search": "Rechercher des suggestions",
+    "sendFeedback": "Envoyer un avis",
+    "signInToVote": "Connectez-vous pour voter",
+    "views": {
+      "label": "Vue",
+      "list": "Liste",
+      "roadmap": "Feuille de route"
+    },
+    "categoryLabel": "Catégorie",
+    "allCategories": "Toutes",
     "sortLabel": "Ordre",
     "sort": {
       "votes": "Les plus votées",
       "newest": "Les plus récentes"
     },
     "statusLabel": "Statut",
-    "allStatuses": "Toutes",
+    "anyStatus": "Tous les statuts",
     "votedByMe": "Mes votes",
-    "none": "Aucune idée ne correspond.",
+    "none": "Aucune suggestion ne correspond.",
+    "count_one": "{{count}} suggestion",
+    "count_other": "{{count}} suggestions",
     "votes_one": "{{count}} vote",
     "votes_other": "{{count}} votes",
-    "vote": "Voter",
-    "voted": "Voté",
-    "voteFor": "Voter pour {{title}}",
+    "upvote_one": "{{count}} vote. Voter pour {{title}}",
+    "upvote_other": "{{count}} votes. Voter pour {{title}}",
+    "upvoted_one": "Vote enregistré. {{count}} vote.",
+    "upvoted_other": "Vote enregistré. {{count}} votes.",
+    "upvoteTakenBack_one": "Vote retiré. {{count}} vote.",
+    "upvoteTakenBack_other": "Vote retiré. {{count}} votes.",
+    "closedVotes_one": "{{count}} vote, vote clos",
+    "closedVotes_other": "{{count}} votes, vote clos",
     "voteError": "Impossible d'enregistrer votre vote. Réessayez dans un instant.",
-    "all": "Toutes les idées"
+    "back": "Toutes les suggestions",
+    "addThoughts": "Ajoutez votre avis",
+    "shippedIn": "Livrée dans la version {{version}}",
+    "shippedTitle": "Suggestions livrées"
   },
   "picture": {
     "take": "Image de cette page",

@@ -146,5 +146,9 @@
     "saved": "Saved",
     "failed": "Couldn't save",
     "changed": "This changed while you were editing"
+  },
+  "boardColumn": {
+    "collapse": "Collapse {{name}}",
+    "expand": "Expand {{name}}"
   }
 }

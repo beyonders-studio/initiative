@@ -302,8 +302,6 @@
     "archiveDone": "Archiver les tâches terminées",
     "taskCount_one": "{{count}} tâche",
     "taskCount_other": "{{count}} tâches",
-    "collapse": "Replier {{name}}",
-    "expand": "Développer {{name}}",
     "fields": {
       "label": "Champs",
       "menuTitle": "Champs sur les cartes",

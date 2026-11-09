@@ -302,8 +302,6 @@
     "archiveDone": "Erledigte Aufgaben archivieren",
     "taskCount_one": "{{count}} Aufgabe",
     "taskCount_other": "{{count}} Aufgaben",
-    "collapse": "{{name}} einklappen",
-    "expand": "{{name}} ausklappen",
     "fields": {
       "label": "Felder",
       "menuTitle": "Felder auf Karten",

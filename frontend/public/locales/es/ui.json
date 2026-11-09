@@ -146,5 +146,9 @@
     "saved": "Guardado",
     "failed": "No se pudo guardar",
     "changed": "Esto cambió mientras lo editabas"
+  },
+  "boardColumn": {
+    "collapse": "Contraer {{name}}",
+    "expand": "Expandir {{name}}"
   }
 }

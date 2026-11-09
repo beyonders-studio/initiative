@@ -302,8 +302,6 @@
     "archiveDone": "Archivar tareas terminadas",
     "taskCount_one": "{{count}} tarea",
     "taskCount_other": "{{count}} tareas",
-    "collapse": "Contraer {{name}}",
-    "expand": "Expandir {{name}}",
     "fields": {
       "label": "Campos",
       "menuTitle": "Campos en las tarjetas",

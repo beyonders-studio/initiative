@@ -2,7 +2,9 @@
  * Feedback from any server, on Initiative Cloud: the sheet's form as a page.
  *
  * Other servers open it with the device and page it was sent from in the
- * link's fragment, read here once and taken out of the address. Anybody may
+ * link's fragment, and a suggestion's page with that suggestion as `?idea=`
+ * to add the words to; each is read here once and taken out of the address.
+ * Anybody may
  * write; sending takes an account on Cloud, so somebody signed out is sent to
  * sign in, and what they wrote waits for them in this browser. Pictures are
  * added once signed in.
@@ -10,11 +12,15 @@
  * Only Cloud serves it: anywhere else the address leads home.
  */
 
-import { Navigate, useLocation, useNavigate } from "@tanstack/react-router";
+import { Navigate, useLocation, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type DeviceContext, TicketMode } from "@/api/generated/initiativeAPI.schemas";
+import {
+  type DeviceContext,
+  FeedbackTopic,
+  TicketMode,
+} from "@/api/generated/initiativeAPI.schemas";
 import { SignInFrame } from "@/components/auth/SignInFrame";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { CONTEXT_FIELDS } from "@/components/tickets/DeviceContext";
@@ -25,6 +31,7 @@ import {
   feedbackTicket,
 } from "@/components/tickets/FeedbackForm";
 import { useAuth } from "@/hooks/useAuth";
+import { useIdea } from "@/hooks/useIdeas";
 import { useServer } from "@/hooks/useServer";
 import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
 import { isCloudOrigin } from "@/lib/cloud";
@@ -59,17 +66,36 @@ export const contextFromFragment = (hash: string): DeviceContext | null => {
   return fields.length ? Object.fromEntries(fields) : null;
 };
 
+/** The suggestion `?idea=` names, where it names one. */
+const ideaFromSearch = (value: unknown): number | null => {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
 export const FeedbackPage = () => {
   const { t } = useTranslation("intake");
   const { user } = useAuth();
   const { getServerOrigin } = useServer();
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
+  const ideaParam = (useSearch({ strict: false }) as { idea?: unknown }).idea;
   const [kept] = useState(readKept);
   const [context] = useState(() => kept?.context ?? contextFromFragment(hash));
   const [form, setForm] = useState<FeedbackDraft>(() =>
     kept ? { ...EMPTY_DRAFT, ...kept.draft } : EMPTY_DRAFT
   );
+  // The suggestion the page was opened to add to goes on the draft once it
+  // is read, as one voted for while writing would.
+  const [asked, setAsked] = useState(() => ideaFromSearch(ideaParam));
+  const { data: askedIdea } = useIdea(asked ?? Number.NaN);
+  if (asked !== null && askedIdea) {
+    setAsked(null);
+    setForm((current) => ({
+      ...current,
+      kind: FeedbackTopic.idea,
+      idea: { task_id: askedIdea.task_id, title: askedIdea.title },
+    }));
+  }
   const [sent, setSent] = useState(false);
   const thanks = useRef<HTMLHeadingElement>(null);
   const { data } = useTicketAvailability(null, { enabled: Boolean(user) });
@@ -78,8 +104,8 @@ export const FeedbackPage = () => {
     // Read once: the draft is the page's now, and the address keeps no copy
     // of where it was sent from.
     if (kept) void removeItem(KEPT_KEY);
-    if (hash) void navigate({ to: "/feedback", replace: true });
-  }, [kept, hash, navigate]);
+    if (hash || ideaParam !== undefined) void navigate({ to: "/feedback", replace: true });
+  }, [kept, hash, ideaParam, navigate]);
   useEffect(() => {
     if (sent) thanks.current?.focus();
   }, [sent]);

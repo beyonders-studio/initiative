@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ReactionGroup, ReactionTarget } from "@/api/generated/initiativeAPI.schemas";
+import { ReactionChip } from "@/components/reactions/ReactionChip";
 import { ReactionPicker } from "@/components/reactions/ReactionPicker";
 import { useToggleReaction } from "@/hooks/useReactions";
 import { getUserDisplayName } from "@/lib/userDisplay";
@@ -96,29 +97,20 @@ export const ReactionBar = ({
         {shown.map((group) => (
           <Tooltip key={group.emoji}>
             <TooltipTrigger asChild>
-              <button
-                type="button"
+              <ReactionChip
+                emoji={group.emoji}
+                // One of something is what the emoji already says. The count
+                // appears when it is telling you something the picture does
+                // not -- and the label carries it either way.
+                count={group.count > 1 ? group.count : undefined}
+                pressed={group.reacted}
                 disabled={!canReact || toggle.isPending}
                 onClick={() => react(group.emoji)}
-                aria-pressed={group.reacted}
                 aria-label={t("reactions.chipLabel", {
                   emoji: group.emoji,
                   count: group.count,
                 })}
-                className={cn(
-                  "flex h-7 items-center gap-1 rounded-full border px-2 text-xs transition-colors",
-                  "disabled:cursor-default disabled:opacity-70",
-                  group.reacted
-                    ? "border-primary/40 bg-primary/10 text-foreground"
-                    : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
-                )}
-              >
-                <span className="text-sm leading-none">{group.emoji}</span>
-                {/* One of something is what the emoji already says. The count
-                    appears when it is telling you something the picture does
-                    not -- and the label carries it either way. */}
-                {group.count > 1 ? <span className="tabular-nums">{group.count}</span> : null}
-              </button>
+              />
             </TooltipTrigger>
             <TooltipContent>{reactorList(group)}</TooltipContent>
           </Tooltip>

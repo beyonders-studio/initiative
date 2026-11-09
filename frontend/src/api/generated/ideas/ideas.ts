@@ -24,7 +24,9 @@ import type {
   HTTPValidationError,
   IdeaListRead,
   IdeaRead,
+  IdeaRoadmapRead,
   ListIdeasParams,
+  ListShippedParams,
   SimilarIdeasParams,
 } from "../initiativeAPI.schemas";
 
@@ -49,8 +51,11 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * The published ideas: those whose title holds ``search``, in ``status_id``,
- * or that the reader voted for, as asked; most voted or newest first.
+ * The published ideas: those whose title holds ``search``, that read as
+ * ``status_id``, in the category named ``category``, or that the reader
+ * voted for, as asked; most voted or newest first. With them, the statuses
+ * they read as, and how many of them each category holds, the category
+ * asked for aside.
  * @summary List Ideas
  */
 export const listIdeas = (
@@ -157,6 +162,236 @@ export function useListIdeas<
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListIdeasQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * The board's in-progress statuses in its order, then its shipped
+ * status, each with the published ideas that read as it, most voted
+ * first.
+ * @summary Read Roadmap
+ */
+export const readRoadmap = (options?: SecondParameter<typeof apiMutator>, signal?: AbortSignal) => {
+  return apiMutator<IdeaRoadmapRead>(
+    { url: `/api/v1/ideas/roadmap`, method: "GET", signal },
+    options
+  );
+};
+
+export const getReadRoadmapQueryKey = () => {
+  return [`/api/v1/ideas/roadmap`] as const;
+};
+
+export const getReadRoadmapQueryOptions = <
+  TData = Awaited<ReturnType<typeof readRoadmap>>,
+  TError = ErrorType<HTTPValidationError>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readRoadmap>>, TError, TData>>;
+  request?: SecondParameter<typeof apiMutator>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadRoadmapQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readRoadmap>>> = ({ signal }) =>
+    readRoadmap(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof readRoadmap>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReadRoadmapQueryResult = NonNullable<Awaited<ReturnType<typeof readRoadmap>>>;
+export type ReadRoadmapQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadRoadmap<
+  TData = Awaited<ReturnType<typeof readRoadmap>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readRoadmap>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readRoadmap>>,
+          TError,
+          Awaited<ReturnType<typeof readRoadmap>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadRoadmap<
+  TData = Awaited<ReturnType<typeof readRoadmap>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readRoadmap>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readRoadmap>>,
+          TError,
+          Awaited<ReturnType<typeof readRoadmap>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadRoadmap<
+  TData = Awaited<ReturnType<typeof readRoadmap>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readRoadmap>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Roadmap
+ */
+
+export function useReadRoadmap<
+  TData = Awaited<ReturnType<typeof readRoadmap>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readRoadmap>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadRoadmapQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * The published ideas that shipped in ``release``, most voted first:
+ * none for a release this server is not yet on.
+ * @summary List Shipped
+ */
+export const listShipped = (
+  params: ListShippedParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<IdeaRead[]>(
+    { url: `/api/v1/ideas/shipped`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListShippedQueryKey = (params?: ListShippedParams) => {
+  return [`/api/v1/ideas/shipped`, ...(params ? [params] : [])] as const;
+};
+
+export const getListShippedQueryOptions = <
+  TData = Awaited<ReturnType<typeof listShipped>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListShippedParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShipped>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListShippedQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listShipped>>> = ({ signal }) =>
+    listShipped(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listShipped>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ListShippedQueryResult = NonNullable<Awaited<ReturnType<typeof listShipped>>>;
+export type ListShippedQueryError = ErrorType<HTTPValidationError>;
+
+export function useListShipped<
+  TData = Awaited<ReturnType<typeof listShipped>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListShippedParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShipped>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listShipped>>,
+          TError,
+          Awaited<ReturnType<typeof listShipped>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListShipped<
+  TData = Awaited<ReturnType<typeof listShipped>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListShippedParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShipped>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listShipped>>,
+          TError,
+          Awaited<ReturnType<typeof listShipped>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListShipped<
+  TData = Awaited<ReturnType<typeof listShipped>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListShippedParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShipped>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Shipped
+ */
+
+export function useListShipped<
+  TData = Awaited<ReturnType<typeof listShipped>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  params: ListShippedParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listShipped>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListShippedQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>;

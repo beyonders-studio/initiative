@@ -34,6 +34,13 @@ REQUESTER_REPLIED = "Requester replied"
 #: which keeps a type of the same name, lands as a draft.
 PUBLISHED_TYPE = "Published"
 
+#: The Ideas blueprint's other roles, named on the binding beside the type:
+#: the field holding an idea's category, the one holding the release it
+#: shipped in, and the status that means it shipped.
+CATEGORY_FIELD = "Category"
+RELEASE_FIELD = "Release"
+SHIPPED_STATUS = "Shipped"
+
 
 @cache
 def blueprint_for(stream: IntakeStream) -> ProjectExportEnvelope:

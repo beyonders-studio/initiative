@@ -7221,6 +7221,14 @@ export interface ICalParseResult {
 }
 
 /**
+ * One category, and how many of the ideas the list can show are in it.
+ */
+export interface IdeaCategoryCount {
+  name: string;
+  count: number;
+}
+
+/**
  * The idea on the Ideas board to join a case or another idea to.
  */
 export interface IdeaJoin {
@@ -7234,6 +7242,7 @@ export interface IdeaStatusRead {
   id: number;
   name: string;
   color?: string | null;
+  icon?: string | null;
   category: string;
 }
 
@@ -7249,11 +7258,15 @@ export interface IdeaRead {
   closed: boolean;
   created_at: string;
   updated_at?: string | null;
+  category?: string | null;
+  release?: string | null;
+  summary?: string | null;
   description?: string | null;
 }
 
 /**
- * A page of the published ideas, and every status of the board.
+ * A page of the published ideas, the statuses they read as, and the
+ * categories they are in.
  */
 export interface IdeaListRead {
   total_count: number;
@@ -7263,6 +7276,23 @@ export interface IdeaListRead {
   has_prev: boolean;
   items: IdeaRead[];
   statuses: IdeaStatusRead[];
+  categories: IdeaCategoryCount[];
+}
+
+/**
+ * One status on the roadmap, and the ideas that read as it.
+ */
+export interface IdeaRoadmapColumn {
+  status: IdeaStatusRead;
+  items: IdeaRead[];
+}
+
+/**
+ * The board's in-progress statuses in its order, then its shipped
+ * status.
+ */
+export interface IdeaRoadmapRead {
+  columns: IdeaRoadmapColumn[];
 }
 
 /**
@@ -12988,6 +13018,7 @@ export type GetBundleManifest200 = { [key: string]: unknown };
 export type ListIdeasParams = {
   search?: string | null;
   status_id?: number | null;
+  category?: string | null;
   voted?: boolean;
   sort?: IdeaSort;
   /** @minimum 1 */
@@ -12997,6 +13028,14 @@ export type ListIdeasParams = {
    * @maximum 100
    */
   page_size?: number;
+};
+
+export type ListShippedParams = {
+  /**
+   * @minLength 1
+   * @maxLength 32
+   */
+  release: string;
 };
 
 export type SimilarIdeasParams = {

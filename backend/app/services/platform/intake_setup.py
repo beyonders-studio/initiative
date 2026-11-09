@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException
 from fastapi import status as http_status
+from sqlalchemy import and_, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -40,6 +41,7 @@ from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.intake import IntakeBinding, IntakeCase
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskType
 from app.services.marketplace.registration_lookup import invalidate_registrations
@@ -225,17 +227,26 @@ async def _write_binding(
     task_type_id: int | None = None,
     awaiting_filer_status_id: int | None = None,
     active_status_id: int | None = None,
+    category_field_id: int | None = None,
+    release_field_id: int | None = None,
+    shipped_status_id: int | None = None,
     enabled: bool,
 ) -> IntakeBinding:
     """Create or update the binding row. Routed session; flushes, no commit.
 
     Every named status must belong to the named project; anything else is
     refused here rather than quietly ignored, because the page that sent it
-    showed the owner a list of that project's statuses.
+    showed the owner a list of that project's statuses. The Ideas board's
+    fields are the project's own, found there by name.
     """
     named = {
         s
-        for s in (default_status_id, awaiting_filer_status_id, active_status_id)
+        for s in (
+            default_status_id,
+            awaiting_filer_status_id,
+            active_status_id,
+            shipped_status_id,
+        )
         if s is not None
     }
     if named:
@@ -280,6 +291,9 @@ async def _write_binding(
     binding.task_type_id = task_type_id
     binding.awaiting_filer_status_id = awaiting_filer_status_id
     binding.active_status_id = active_status_id
+    binding.category_field_id = category_field_id
+    binding.release_field_id = release_field_id
+    binding.shipped_status_id = shipped_status_id
     binding.enabled = enabled
     session.add(binding)
     await session.flush()
@@ -328,13 +342,58 @@ async def _ensure_isolation(
         )
 
 
+async def _ideas_roles(
+    session: AsyncSession, stream: IntakeStream, project_id: int
+) -> dict[str, int | None]:
+    """The Ideas board's category and release fields and its shipped status,
+    found in ``project_id`` by the names its blueprint gives them; none for
+    any other stream. However the board was bound, these are named by name:
+    the settings page offers no choice of them."""
+    from app.blueprints.intake import CATEGORY_FIELD, RELEASE_FIELD, SHIPPED_STATUS
+
+    if stream is not IntakeStream.ideas:
+        return {}
+    fields = dict(
+        (
+            await session.exec(
+                select(MetadataDefinition.name, MetadataDefinition.id)
+                .where(MetadataDefinition.project_id == project_id)
+                .where(
+                    or_(
+                        and_(
+                            MetadataDefinition.name == CATEGORY_FIELD,
+                            MetadataDefinition.type == MetadataType.select,
+                        ),
+                        and_(
+                            MetadataDefinition.name == RELEASE_FIELD,
+                            MetadataDefinition.type == MetadataType.text,
+                        ),
+                    )
+                )
+            )
+        ).all()
+    )
+    shipped = (
+        await session.exec(
+            select(TaskStatus.id)
+            .where(TaskStatus.project_id == project_id)
+            .where(TaskStatus.name == SHIPPED_STATUS)
+        )
+    ).first()
+    return {
+        "category_field_id": fields.get(CATEGORY_FIELD),
+        "release_field_id": fields.get(RELEASE_FIELD),
+        "shipped_status_id": shipped,
+    }
+
+
 async def _blueprint_roles(
     session: AsyncSession, stream: IntakeStream, project_id: int
 ) -> dict[str, int | None]:
-    """The statuses and type a project set up from ``stream``'s blueprint
-    plays each role with. No statuses for a stream with no conversation, where
-    nobody is ever waited on; a type only for the Ideas board, whose type is
-    what publishes an idea."""
+    """The statuses, type and fields a project set up from ``stream``'s
+    blueprint plays each role with. No statuses for a stream with no
+    conversation, where nobody is ever waited on; a type and fields only for
+    the Ideas board, whose type is what publishes an idea."""
     from app.blueprints.intake import (
         PUBLISHED_TYPE,
         REQUESTER_REPLIED,
@@ -345,6 +404,7 @@ async def _blueprint_roles(
         "awaiting_filer_status_id": None,
         "active_status_id": None,
         "task_type_id": None,
+        **await _ideas_roles(session, stream, project_id),
     }
     if stream is IntakeStream.ideas:
         roles["task_type_id"] = (
@@ -399,6 +459,7 @@ async def bind(
             task_type_id=task_type_id,
             awaiting_filer_status_id=awaiting_filer_status_id,
             active_status_id=active_status_id,
+            **await _ideas_roles(routed, stream, project_id),
             enabled=enabled,
         )
         await routed.commit()
