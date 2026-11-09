@@ -19,6 +19,7 @@ actions on an item, and :class:`PluginActionResult` is the item's values for
 that plug-in afterwards.
 """
 
+import builtins
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -103,7 +104,9 @@ class PluginDataParam(SanitizedBaseModel):
     type: str
     label: dict[str, str] = {}
     required: bool = False
-    options: list[str] | None = None
+    #: Spelled from builtins: the ``list`` field below would otherwise be what
+    #: a deferred annotation (Python 3.14) reads it as.
+    options: builtins.list[str] | None = None
     #: Where to fill a menu from, for the values only the plug-in can enumerate.
     #: A control is still the consumer's to draw — this says what the values
     #: are, not what to draw for them.
