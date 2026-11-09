@@ -140,6 +140,60 @@ async def test_claim_mapped_role_survives_auto_join(
     assert membership.oidc_provider_id == provider.id
 
 
+async def test_a_closed_community_still_enrols_who_it_takes_on_arrival(
+    session: AsyncSession,
+):
+    """The sync visits only communities that are open, and enrolment in the
+    ones its connections joined on arrival waits for it. A suspended community
+    it passes over still enrols them, as joining it any other way does."""
+    from app.models.platform.guild import CommunityStatus, Guild
+    from app.services.auth.guild_provider_connections import join_on_arrival
+
+    provider = await create_auth_provider(session)
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(
+        session, guild, owner, name="Onboarding", join_policy="open", auto_join=True
+    )
+    await create_guild_provider_connection(
+        session, guild=guild, provider=provider, auto_join=True
+    )
+    newcomer = await create_user(session)
+    guild_id, initiative_id, user_id = guild.id, initiative.id, newcomer.id
+    provider_id = provider.id
+    session.expire_all()
+    closed = (await session.exec(select(Guild).where(Guild.id == guild_id))).one()
+    closed.status = CommunityStatus.suspended.value
+    session.add(closed)
+    await session.commit()
+
+    await set_rls_context(session, Unattributed())
+    arrived = await join_on_arrival(
+        session,
+        provider_id=provider_id,
+        user_id=user_id,
+        claims=_ADMITTED,
+        auto_join=False,
+    )
+    assert arrived == [guild_id]
+    await sync_oidc_assignments(
+        session,
+        user_id=user_id,
+        provider_id=provider_id,
+        claim_values=set(),
+        claims=_ADMITTED,
+        arrived=arrived,
+    )
+    await post_commit.settle(session)
+
+    assert (
+        await _membership(
+            session, guild_id=guild_id, initiative_id=initiative_id, user_id=user_id
+        )
+        is not None
+    )
+
+
 async def _guild_rule(session: AsyncSession, *, provider_id: int, guild_id: int):
     session.add(
         OIDCClaimMapping(

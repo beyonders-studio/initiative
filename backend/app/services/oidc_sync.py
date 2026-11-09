@@ -382,7 +382,10 @@ async def sync_oidc_assignments(
     await session.commit()
 
     # --- Initiative resolution + membership (each guild's half) ---
+    visited: set[int] = set()
+
     async def sync_initiatives(guild_session: AsyncSession, gid: int) -> None:
+        visited.add(gid)
         # Each initiative the matched rules place people in, at the strongest
         # role they name there: a manager role first, then the lowest position.
         keys = provider_placement.placed(initiative_rules.get(gid, ()))
@@ -511,6 +514,16 @@ async def sync_oidc_assignments(
         await each_guild(
             [(Scope.LIVE, sync_initiatives)], name="oidc-sync", only=relevant_guilds
         )
+    # A closed community (suspended or on hold) is not visited above, and its
+    # rules wait for it to reopen; its new members are enrolled in its auto-join
+    # initiatives now, as joining it any other way enrols them.
+    unvisited = sorted(newly_admitted_guilds - visited)
+    for gid in unvisited:
+        guilds_service.enroll_new_member_in_auto_join_initiatives(
+            session, guild_id=gid, user_id=user_id, role=CommunityRole.member
+        )
+    if unvisited:
+        await session.commit()
     return result
 
 
