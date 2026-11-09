@@ -1199,6 +1199,12 @@ class Settings(BaseSettings):
     # resolved address regardless of this setting.
     WEBHOOK_ALLOW_PRIVATE_TARGETS: bool = False
 
+    # Local-dev only: when true and APP_URL is on this machine (localhost,
+    # 127.0.0.1, ::1), the server takes what only Initiative Cloud takes —
+    # feedback and the ideas board — so they can be tried locally. Ignored for
+    # any other APP_URL. scripts/dev-ports.sh turns it on for the dev servers.
+    DEV_AS_CLOUD: bool = False
+
     BEHIND_PROXY: bool = (
         False  # Set True when behind nginx/load balancer to trust X-Forwarded-For
     )
