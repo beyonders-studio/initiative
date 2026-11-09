@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Single sign-on keeps the initiative role a group rule gives.** Where a community's provider connection adds people on arrival, someone placed in an auto-join initiative by a group rule now gets the rule's role there, not a plain member's.
+- **A listed community no longer stops a single sign-on it can't take.** Where its provider connection adds people on arrival, an account whose age answer keeps it out is left out of that community, and the sign-in goes on.
 - **Every passkey button works in the apps.** Signing in, adding a passkey, breaking glass, the billing console and every other passkey prompt open your browser and carry on in the app, with no second sign-in.
 - **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, with what the version asks for first, and a version this server can't run says why.
 - **Create from `[[` works in wiki pages and posts,** asking what kind of thing to make and linking it.

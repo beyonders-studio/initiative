@@ -556,6 +556,7 @@ async def _register_account(
                 guild_id=guild.id,
                 user_id=user.id,
                 role=CommunityRole.member,
+                actor_user_id=user.id,
             )
             await session.commit()
             await post_commit.settle(session)
@@ -1690,16 +1691,22 @@ async def _complete_provider_login(
 
     # What each community makes of this arrival. A connection can say that
     # people it counts as its own join on sight, which is how somebody reaches
-    # a community they have never been invited to.
-    await guild_connections.join_on_arrival(
+    # a community they have never been invited to. Where the claim sync below
+    # runs, it enrols them in auto-join initiatives once its rules have placed
+    # them, so a role a rule gives is not taken by an auto-join row first.
+    syncs_placement = await provider_placement.provider_syncs_placement(
+        system_session, provider_id=provider_row.id
+    )
+    arrived = await guild_connections.join_on_arrival(
         system_session,
         provider_id=provider_row.id,
         user_id=user.id,
         claims=dict(claims or {}),
+        auto_join=not syncs_placement,
     )
     await post_commit.settle(system_session)
-    # It commits and rolls back the communities at capacity, either of which
-    # leaves this copy of the account stale.
+    # It commits and rolls back the communities that refuse them, either of
+    # which leaves this copy of the account stale.
     await system_session.refresh(user)
 
     # OIDC claim-to-role sync (the id_token claims are verified upstream now).
@@ -1707,9 +1714,7 @@ async def _complete_provider_login(
     # connection counts this arrival as one of its own.
     try:
         claim_path = provider_row.role_claim_path
-        if await provider_placement.provider_syncs_placement(
-            system_session, provider_id=provider_row.id
-        ):
+        if syncs_placement:
             claim_values = (
                 extract_claim_values(userinfo or {}, completion.claims, claim_path)
                 if claim_path
@@ -1722,6 +1727,7 @@ async def _complete_provider_login(
                     provider_id=provider_row.id,
                     claim_values=claim_values,
                     claims=claims,
+                    arrived=arrived,
                 )
                 logger.info(
                     "OIDC sync for user %s: +%d/~%d/-%d guilds, +%d/~%d/-%d initiatives",

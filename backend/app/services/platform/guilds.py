@@ -137,6 +137,15 @@ class AgeConfirmationRequiredError(CodedError):
     status_code = 403
 
 
+#: Why :func:`ensure_membership` refuses somebody new. A sign-in that places
+#: people (its rules, auto-join) leaves a refusing community out and carries
+#: on: one community's refusal is never a reason to refuse the sign-in.
+ADMISSION_REFUSALS: tuple[type[CodedError], ...] = (
+    GuildCapacityError,
+    AgeConfirmationRequiredError,
+)
+
+
 class BannerColorError(CodedError):
     """Raised when a banner colour is not a ``#rrggbb`` value."""
 
@@ -356,15 +365,22 @@ async def ensure_membership(
     via: str = "direct",
     invite_id: int | None = None,
     guest_until: datetime | None = None,
+    auto_join: bool = True,
 ) -> GuildMembership:
     """Put ``user_id`` in ``guild_id``, or return the membership they hold.
 
-    ``actor_user_id`` is who brought them in; it defaults to the person joining,
-    which is what every self-service path is. ``via`` names the way in — the
-    value rides the record — and ``invite_id`` says which standing offer was
-    redeemed, where one was. ``guest_until`` makes the new membership a
-    guest's, until then: it takes no seat, so the guest cap applies instead of
-    the member cap, and it joins no initiative on its own.
+    ``actor_user_id`` is who brought them in — the person joining, on a
+    self-service path — and ``None`` where nobody did, as when a sign-in's rules
+    place them. ``via`` names the way in — the value rides the record — and
+    ``invite_id`` says which standing offer was redeemed, where one was.
+    ``guest_until`` makes the new membership a guest's, until then: it takes no
+    seat, so the guest cap applies instead of the member cap, and it joins no
+    initiative on its own. ``auto_join=False``
+    leaves the guild's auto-join initiatives to the caller, for one that places
+    the person in initiatives itself and enrols them afterwards.
+
+    A refusal is one of :data:`ADMISSION_REFUSALS`, raised before anything is
+    written.
     """
     stmt = select(GuildMembership).where(
         GuildMembership.guild_id == guild_id,
@@ -386,8 +402,7 @@ async def ensure_membership(
         return membership
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
-    # blocked. Sign-in sync inserts on a path of its own
-    # (oidc_sync._create_guild_membership) and asks the same cap first.
+    # blocked.
     if guest_until is None:
         await assert_member_capacity(session, guild_id=guild_id)
     else:
@@ -426,7 +441,7 @@ async def ensure_membership(
     await audit_service.record(
         session,
         event_type=AuditEventType.GUILD_MEMBER_ADDED,
-        actor_user_id=actor_user_id if actor_user_id is not None else user_id,
+        actor_user_id=actor_user_id,
         target_user_id=user_id,
         guild_id=guild_id,
         target_type="guild",
@@ -440,7 +455,7 @@ async def ensure_membership(
     account_stream.queue_account_signal(session, user_id, "membership")
     # Nudge billing that this guild's membership changed. No-op unless a
     # hosted deployment configured the outbound billing settings.
-    if guest_until is None:
+    if guest_until is None and auto_join:
         enroll_new_member_in_auto_join_initiatives(
             session, guild_id=guild_id, user_id=user_id, role=role
         )
@@ -2428,6 +2443,7 @@ async def redeem_invite_for_user(
         guild_id=invite.guild_id,
         user_id=user.id,
         role=invite.guest_role or CommunityRole.member,
+        actor_user_id=user.id,
         via="invite",
         invite_id=invite.id,
         guest_until=guest_until,
@@ -2792,6 +2808,7 @@ async def join_community_guild(
         guild_id=guild_id,
         user_id=user.id,
         role=CommunityRole.member,
+        actor_user_id=user.id,
         via="community",
     )
     return guild
