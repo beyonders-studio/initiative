@@ -1,5 +1,5 @@
 import { CLOUD_OPEN, CLOUD_SERVER_URL } from "@/lib/cloud";
-import { CREDENTIAL_KEYS, getItem, removeItem, setItem } from "@/lib/storage";
+import { getItem, removeItem, setItem } from "@/lib/storage";
 
 const SERVER_URL_KEY = "initiative-server-url";
 // The self-hosted address as the person typed it. Kept through disconnecting,
@@ -39,12 +39,7 @@ export function clearStoredServerUrl(): void {
   removeItem(SERVER_URL_KEY);
 }
 
-export function clearStoredToken(): void {
-  removeItem(CREDENTIAL_KEYS.token);
-}
-
 // Clear all app data (for disconnect/logout)
 export function clearAllStorage(): void {
   clearStoredServerUrl();
-  clearStoredToken();
 }

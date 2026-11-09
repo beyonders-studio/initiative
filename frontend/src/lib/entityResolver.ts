@@ -42,7 +42,6 @@ import {
 import {
   collectionRoute,
   eventRoute,
-  initiativeRoute,
   type PARENT_TOOL,
   TOOLS,
   taskRoute,
@@ -236,66 +235,4 @@ export async function resolveEntityPath(
     // Deleted, or the reader can't see it. The caller lands on the community home.
     return null;
   }
-}
-
-/**
- * Rewrite a community-relative path written before tools were addressed inside
- * their initiative onto the `/go` resolver.
- *
- * Notification rows persist their `target_path`, so links minted by an older
- * build are still arriving. This is a data migration for those rows, not a
- * revival of the old routes — nothing renders at these paths any more.
- */
-const LEGACY_TARGETS: Array<[RegExp, (id: string) => string]> = [
-  [/^\/tasks\/(\d+)(\/.*)?$/, (id) => `/go/task/${id}`],
-  [/^\/projects\/(\d+)(\/.*)?$/, (id) => `/go/project/${id}`],
-  [/^\/files\/(\d+)(\/.*)?$/, (id) => `/go/file/${id}`],
-  [/^\/calendar-events\/(\d+)(\/.*)?$/, (id) => `/go/calendar-event/${id}`],
-  // A calendar event's ref type was `event` before every ref type became its
-  // kind's kebab singular.
-  [/^\/go\/event\/(\d+)$/, (id) => `/go/calendar-event/${id}`],
-  [/^\/initiatives\/(\d+)(\/.*)?$/, (id) => initiativeRoute(Number(id))],
-];
-
-/** Community-relative paths that used to name a list page and no longer exist.
- *  (`/initiatives` among them: that list is part of the community home now.) */
-const LEGACY_LISTS = new Set([
-  "/initiatives",
-  "/tasks",
-  "/projects",
-  "/files",
-  "/queues",
-  "/dashboards",
-  "/counter-groups",
-  "/calendars",
-  "/calendar",
-]);
-
-/**
- * App-level (community-less) paths that a notification may still name.
- *
- * `/settings/profile` never existed as a route — your account lives under
- * `/profile`. Notification rows persist the path they were written with, so
- * the ones already sent have to be rewritten on the way out; the server no
- * longer mints it.
- */
-const LEGACY_PLUGIN_TARGETS = new Map([
-  ["/settings/profile", "/profile/account"],
-  ["/settings/account", "/profile/account"],
-]);
-
-/** As {@link normalizeLegacyTarget}, for a path that names no community. */
-export function normalizePluginTarget(path: string): string {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  return LEGACY_PLUGIN_TARGETS.get(normalized) ?? normalized;
-}
-
-export function normalizeLegacyTarget(path: string): string {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  for (const [pattern, build] of LEGACY_TARGETS) {
-    const match = normalized.match(pattern);
-    if (match) return build(match[1]);
-  }
-  if (LEGACY_LISTS.has(normalized)) return "/";
-  return normalized;
 }

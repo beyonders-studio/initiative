@@ -261,6 +261,7 @@ async def test_soft_delete_file_preserves_uploads(session: AsyncSession):
         created_by=user.id,
         created_by_kind=ActorKind.member,
         size_bytes=1234,
+        content_type="image/png",
     )
     session.add(upload)
     await session.commit()
@@ -314,6 +315,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
         created_by=user.id,
         created_by_kind=ActorKind.member,
         size_bytes=1234,
+        content_type="image/png",
     )
     session.add(upload)
     await session.commit()
@@ -539,6 +541,7 @@ async def test_purging_a_uploaded_file_takes_every_version(session: AsyncSession
             created_by=user.id,
             created_by_kind=ActorKind.member,
             size_bytes=10,
+            content_type="image/png",
         )
         for name in names
     )

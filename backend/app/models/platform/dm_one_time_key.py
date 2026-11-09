@@ -65,9 +65,7 @@ class DmOneTimeKey(SQLModel, table=True):
     key_id: str = Field(sa_column=Column(Text, nullable=False))
     public_key: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     #: The publishing device's signature over the key.
-    signature: bytes | None = Field(
-        default=None, sa_column=Column(LargeBinary, nullable=True)
-    )
+    signature: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     fallback: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),

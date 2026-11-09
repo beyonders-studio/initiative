@@ -35,7 +35,6 @@ from app.testing.factories import (
     create_tool_entity,
     grant_role_permission,
     guild_administration,
-    png_bytes,
     route_session_to_guild,
 )
 
@@ -853,7 +852,7 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
     return {
         "type": "initiative-backup",
         "schema_version": 1,
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "exported_at": "2026-07-15T00:00:00+00:00",
         "exported_by_handle": "tester#0001",
         "source_instance_url": None,
@@ -877,6 +876,7 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
         "entries": entries or [],
         "assets": assets or [],
         "skipped": [],
+        "people": [],
     }
 
 
@@ -1210,9 +1210,10 @@ def test_reject_non_flat_asset_keys_unit():
         return BackupManifest(
             type="initiative-backup",
             schema_version=1,
-            app_version="0.0.0-test",
+            app_version="0.78.0-test",
             exported_at="2026-07-15T00:00:00+00:00",
             guild={"id": 1, "name": "g"},
+            people=[],
             include_uploads=True,
             initiatives=[],
             entries=entries or [],
@@ -1278,150 +1279,14 @@ async def test_backup_confirm_include_map_skips_tools(
     assert job["result"]["per_tool"]["counter_group"]["created"] == 0
 
 
-async def test_an_archive_from_before_files_restores_its_documents(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """An archive written while files were documents names them that way: the
-    manifest's tool and switch, the envelope type and the key holding the
-    file's type. A restore reads each as the file it is."""
-    from sqlmodel import select
-
-    from app.core.file_types import FileType
-    from app.models.tenant.file import File
-
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    envelope = {
-        "type": "initiative-document",
-        "schema_version": 1,
-        "document_type": "url",
-        "name": "Old link",
-        "content": {"url": "https://example.com"},
-        "tags": [],
-        "properties": [],
-    }
-    entry = {
-        "path": "initiatives/1-restored/documents/1-old-link.json",
-        "tool": "document",
-        "type": "initiative-document",
-        "schema_version": 1,
-        "entity_id": 1,
-        "title": "Old link",
-        "initiative_id": 1,
-        "tags": [],
-        "properties": [],
-        "asset": None,
-    }
-    manifest = _minimal_manifest(entries=[entry])
-    manifest["initiatives"][0]["tools"] = {"document": "included"}
-    job = await _apply_backup(
-        client,
-        a,
-        _make_backup_zip(manifest, {entry["path"]: json.dumps(envelope).encode()}),
-        monkeypatch,
-        role_session,
-    )
-    assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["file"]["created"] == 1
-
-    await route_session_to_guild(session, a.guild.id)
-    restored = (await session.exec(select(File).where(File.name == "Old link"))).one()
-    assert restored.file_type == FileType.url
-
-
-async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """An archive written while galleries were a tool carries a gallery entry.
-    A restore makes each picture a file of the initiative and gathers the
-    files into a collection named as the gallery was, made as the Gallery
-    shape with each caption its file's Caption."""
-    from sqlmodel import select
-
-    from app.models.tenant.collection import Collection, CollectionFile
-    from app.models.tenant.file import File
-    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
-
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    payload = png_bytes()
-    path = "initiatives/1-restored/galleries/1-old-wall"
-    envelope = {
-        "type": "initiative-gallery",
-        "schema_version": 1,
-        "name": "Old wall",
-        "tags": [],
-        "properties": [],
-        "images": [
-            {
-                "storage_key": "shot.png",
-                "title": "Shot",
-                "caption": "From the pier",
-                "content_type": "image/png",
-                "size_bytes": len(payload),
-                "original_filename": "shot.png",
-            }
-        ],
-    }
-    entry = {
-        "path": f"{path}.json",
-        "tool": "gallery",
-        "type": "initiative-gallery",
-        "schema_version": 1,
-        "entity_id": 1,
-        "title": "Old wall",
-        "initiative_id": 1,
-        "tags": [],
-        "properties": [],
-        "asset": None,
-    }
-    manifest = _minimal_manifest(
-        entries=[entry],
-        assets=[
-            _asset_record(
-                "shot.png",
-                size_bytes=len(payload),
-                content_type="image/png",
-                referenced_by=[path],
-            )
-        ],
-    )
-    manifest["initiatives"][0]["tools"] = {"gallery": "included"}
-    job = await _apply_backup(
-        client,
-        a,
-        _make_backup_zip(
-            manifest,
-            {entry["path"]: json.dumps(envelope).encode(), "assets/shot.png": payload},
-        ),
-        monkeypatch,
-        role_session,
-    )
-    assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["file"]["created"] == 1
-
-    await route_session_to_guild(session, a.guild.id)
-    restored = (
-        await session.exec(select(Collection).where(Collection.name == "Old wall"))
-    ).one()
-    files = (
-        await session.exec(
-            select(File.name, MetadataValue.value_text)
-            .join(CollectionFile, CollectionFile.file_id == File.id)
-            .join(MetadataValue, MetadataValue.entity_id == File.id)
-            .join(
-                MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id
-            )
-            .where(
-                CollectionFile.collection_id == restored.id,
-                MetadataDefinition.collection_id == restored.id,
-                MetadataDefinition.name == "Caption",
-            )
-        )
-    ).all()
-    assert files == [("Shot", "From the pier")]
+async def test_an_archive_from_before_the_floor_is_refused(client, acting_user):
+    """An archive from before 0.78 names tools, kinds and references as they
+    were then, so it is refused rather than half restored."""
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    old = _make_backup_zip({**_minimal_manifest(), "app_version": "0.77.1"})
+    refused = await _upload_backup(client, a, old)
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "IMPORT_ARCHIVE_TOO_OLD"
 
 
 async def test_restored_collections_keep_their_own_files_and_cover(
@@ -2104,9 +1969,10 @@ async def test_backup_asset_restore_guards_actual_bytes_not_declarations(
     manifest = BackupManifest(
         type="initiative-backup",
         schema_version=1,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         exported_at="2026-07-15T00:00:00+00:00",
         guild={"id": 1, "name": "g"},
+        people=[],
         include_uploads=True,
         initiatives=[],
         entries=[],
@@ -2470,7 +2336,7 @@ async def test_envelope_link_out_of_the_file_is_counted(client, acting_user, ses
     envelope = {
         "type": "initiative-project",
         "schema_version": 1,
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "exported_at": "2026-07-15T00:00:00+00:00",
         "project": {"name": "Imported Board"},
         "tags": [],
@@ -2769,7 +2635,7 @@ def _project_envelope_with_comment(author_handle: str, author_name: str) -> dict
     return {
         "type": "initiative-project",
         "schema_version": 1,
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "exported_at": "2026-07-15T00:00:00+00:00",
         "project": {"name": "Imported Board"},
         "tags": [],
@@ -3703,76 +3569,6 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     assert mention["mentionUserId"] is None
     assert mention["mentionName"] == "Bea"
     assert "mentionHandle" not in mention
-
-
-async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
-    client, acting_user, session
-):
-    """A ``[[ ]]`` link in an envelope an older build wrote comes in as the
-    reference to its file it always was, as a restore reads one. A
-    spreadsheet's cells are what was typed, and come in as written."""
-    from sqlmodel import select
-
-    from app.models.tenant.file import File
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    target = await _second_initiative(session, a, files_enabled=True)
-    spec = await create_file(session, target, a.user, name="Spec")
-    envelope = {
-        "type": "initiative-file",
-        "schema_version": 1,
-        "file_type": "lexical",
-        "name": "Minutes",
-        "content": _editor_state(
-            {"type": "wikilink", "documentId": spec.id, "documentTitle": "Spec"}
-        ),
-    }
-
-    resp = await _import_envelope(client, a, envelope, target.id)
-    assert resp.status_code == 201, resp.text
-
-    file = (
-        await session.exec(
-            select(File)
-            .where(File.initiative_id == target.id, File.name == "Minutes")
-            .options(undefer(File.content))
-        )
-    ).one()
-    [node] = file.content["root"]["children"][0]["children"]
-    assert (node["type"], node["entityType"], node["entityId"]) == (
-        "entity-mention",
-        "file",
-        spec.id,
-    )
-
-    cells = {"0:0": "#doc[Spec](7)", "0:1": "#gallery-image[Sample](12)"}
-    resp = await _import_envelope(
-        client,
-        a,
-        {
-            "type": "initiative-file",
-            "schema_version": 1,
-            "file_type": "sheet",
-            "name": "Budget",
-            "content": {
-                "schema_version": 3,
-                "kind": "spreadsheet",
-                "sheets": [{"id": "s1", "name": "Sheet 1", "cells": cells}],
-            },
-        },
-        target.id,
-    )
-    assert resp.status_code == 201, resp.text
-    sheet = (
-        await session.exec(
-            select(File)
-            .where(File.initiative_id == target.id, File.name == "Budget")
-            .options(undefer(File.content))
-        )
-    ).one()
-    assert sheet.content["sheets"][0]["cells"] == cells
 
 
 def _reference_node(entity_type: str, entity_id: int, text: str) -> dict:

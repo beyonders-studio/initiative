@@ -45,8 +45,6 @@ _GID_DROP_ABSENT = 990_110
 _GID_SUPPORT = 990_120
 _GID_READ_FLOOR = 990_121
 _GID_SEAT = 990_122
-_GID_RETIRED_A = 990_123
-_GID_RETIRED_B = 990_124
 _GID_PLUGIN = 990_125
 _GID_PLUGIN_DENIED = 990_126
 # Back-fill sweep (each pair: one provisioned, one only a public row).
@@ -1683,84 +1681,3 @@ async def test_a_provisioned_schema_names_no_community(engine):
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, _GID_NO_GUILD_COLUMN)
-
-
-async def test_retiring_a_function_leaves_the_shared_copy_to_the_boot_step(engine):
-    """A render retires only its own schema's copy of a retired function.
-
-    0.71 kept ``relationship_endpoint_access`` in ``public``, and every guild's
-    policies were bound to that one copy. The render drops retired functions
-    with the search path on ``<guild>, public``, so an unqualified drop in a
-    guild with no local copy reached the shared one and was refused — the
-    other guilds still depended on it — and the back-fill failed for every
-    guild in turn. Here guild B stands in for "every other guild".
-    """
-    from app.db.authorization import RETIRED_GUILD_FUNCTION_SIGNATURES
-    from app.db.guild_ddl import render_retired_functions_ddl
-
-    name, args = RETIRED_GUILD_FUNCTION_SIGNATURES[0]
-    schema_a = guild_schema_name(_GID_RETIRED_A)
-    schema_b = guild_schema_name(_GID_RETIRED_B)
-    shared = f"public.{name}{args}"
-    created_shared = False
-    try:
-        async with engine.begin() as conn:
-            if (
-                await conn.scalar(
-                    text("SELECT to_regprocedure(CAST(:s AS text))"), {"s": shared}
-                )
-                is None
-            ):
-                created_shared = True
-                await conn.exec_driver_sql(
-                    f"CREATE FUNCTION {shared} RETURNS boolean "
-                    "LANGUAGE sql STABLE AS 'SELECT true'"
-                )
-            for schema in (schema_a, schema_b):
-                await conn.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
-                await conn.exec_driver_sql(
-                    f'CREATE TABLE "{schema}".t (kind text, id integer)'
-                )
-            # Guild B's policy is bound to the shared copy, as every guild's
-            # was before this release re-rendered it.
-            await conn.exec_driver_sql(
-                f'ALTER TABLE "{schema_b}".t ENABLE ROW LEVEL SECURITY'
-            )
-            await conn.exec_driver_sql(
-                f'CREATE POLICY p ON "{schema_b}".t USING '
-                f"(public.{name}(kind, id, false))"
-            )
-            # Guild A has a copy of its own, which is the one to retire.
-            await conn.exec_driver_sql(
-                f'CREATE FUNCTION "{schema_a}".{name}{args} RETURNS boolean '
-                "LANGUAGE sql STABLE AS 'SELECT true'"
-            )
-
-        async with engine.begin() as conn:
-            await conn.exec_driver_sql(f'SET search_path TO "{schema_a}", public')
-            await conn.exec_driver_sql(render_retired_functions_ddl())
-            await conn.exec_driver_sql("SET search_path TO public")
-
-        async with engine.connect() as conn:
-            local = await conn.scalar(
-                text("SELECT to_regprocedure(CAST(:s AS text))"),
-                {"s": f'"{schema_a}".{name}{args}'},
-            )
-            still_shared = await conn.scalar(
-                text("SELECT to_regprocedure(CAST(:s AS text))"), {"s": shared}
-            )
-        assert local is None, "the guild's own copy is retired"
-        assert still_shared is not None, "the shared copy is left for the boot step"
-
-        # And a render in a schema with no copy of its own is a no-op, rather
-        # than a drop that reaches the shared one.
-        async with engine.begin() as conn:
-            await conn.exec_driver_sql(f'SET search_path TO "{schema_a}", public')
-            await conn.exec_driver_sql(render_retired_functions_ddl())
-            await conn.exec_driver_sql("SET search_path TO public")
-    finally:
-        async with engine.begin() as conn:
-            for schema in (schema_a, schema_b):
-                await conn.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
-            if created_shared:
-                await conn.exec_driver_sql(f"DROP FUNCTION IF EXISTS {shared}")

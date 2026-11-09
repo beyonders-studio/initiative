@@ -125,8 +125,7 @@ async function keepSession(
 
 /**
  * Open a session with a device on a one-time key claimed from it. The ratchet
- * checks the key's signature against the device's fingerprint key; a device
- * that signs nothing publishes none.
+ * checks the key's signature against the device's fingerprint key.
  */
 export async function openOutboundSession(
   conversationId: string,
@@ -140,7 +139,7 @@ export async function openOutboundSession(
     destination.identityKey,
     destination.fingerprintKey,
     oneTimeKey.public_key,
-    destination.signed ? (oneTimeKey.signature ?? null) : null,
+    oneTimeKey.signature,
     oneTimeKey.fallback ?? false
   );
   await keepSession(conversationId, destination, session.session_id, session.session_pickle);
@@ -216,8 +215,7 @@ export async function readPreKey(
  * Claiming spends a key, so it is asked for only where there is nothing to
  * carry the message yet, and only for those devices. An established
  * conversation therefore costs neither side a prekey, however many messages it
- * carries. A device that signs its keys has its one-time key taken only with
- * the signature on it.
+ * carries. A one-time key is taken only with its signature on it.
  */
 export async function claimKeysFor(
   missing: Destination[],
@@ -235,7 +233,6 @@ export async function claimKeysFor(
   if (ours.length > 0) {
     claims.push(claimOwnSessionKeys({ device_id: ownDeviceId, device_ids: idsOf(ours) }));
   }
-  const signs = new Map(missing.map((destination) => [destination.id, destination.signed]));
   const keys = new Map<string, DmOneTimeKeyUpload>();
   // Settled rather than all: a claim can be refused after the directory was
   // read -- somebody's permission changes in between -- and one refusal must
@@ -246,7 +243,7 @@ export async function claimKeysFor(
     if (settled.status !== "fulfilled") continue;
     for (const device of settled.value.devices) {
       const key = device.one_time_key;
-      if (key && (key.signature || signs.get(device.device_id) === false)) {
+      if (key?.signature) {
         keys.set(device.device_id, key);
       }
     }

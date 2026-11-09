@@ -63,7 +63,8 @@ class FileImporter(NamesPeopleInPassing):
     def count(self, validated: BaseModel) -> int:
         envelope: FileEnvelope = validated  # ty: ignore[invalid-assignment] — validate() returned this model
         if envelope.file_type == FileType.sheet.value:
-            return len((envelope.content or {}).get("cells") or {}) or 1
+            sheets = (envelope.content or {}).get("sheets") or []
+            return sum(len(sheet.get("cells") or {}) for sheet in sheets) or 1
         return 1
 
     async def apply(

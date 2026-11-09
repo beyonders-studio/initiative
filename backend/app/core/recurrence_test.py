@@ -313,20 +313,12 @@ def test_a_repeat_that_skips_years_starts_on_one_of_its_own_days():
     assert series.occurrences == {start: series.start}
 
 
-def test_imports_read_either_shape():
-    """A rule string comes with its shift; the JSON shape older exports carried
-    was picked in a zone, which the importer's stands in for."""
+def test_imports_read_a_rule_and_its_shift():
+    """A rule string comes with its shift; one that doesn't hold up imports as
+    none."""
     assert recurrence.imported(
         "FREQ=WEEKLY;BYDAY=MO", kind="task", start=EAST, tz="Europe/Berlin", shift=1440
     ) == ("RRULE:FREQ=WEEKLY;BYDAY=MO", 1440)
-    legacy = {"frequency": "weekly", "weekdays": ["monday"], "ends": "never"}
-    assert recurrence.imported(legacy, kind="task", start=EAST, tz="Europe/Berlin") == (
-        "RRULE:FREQ=WEEKLY;BYDAY=MO",
-        1440,
-    )
-    assert recurrence.imported(
-        {"frequency": "hourly"}, kind="event", start=EAST, tz=None
-    ) == (None, 0)
     assert recurrence.imported(
         "FREQ=WEEKLY", kind="event", start=EAST, tz=None, shift=1441
     ) == (None, 0)

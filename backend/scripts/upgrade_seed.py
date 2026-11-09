@@ -17,7 +17,6 @@ fixtures do, rather than through a request.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 from datetime import UTC, datetime, timedelta
@@ -30,7 +29,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 import app.models.platform.guild as guild_models
 from app import testing
-from app.models.tenant.task import Task
 from app.testing import (
     TOOL_FACTORIES,
     checklist_items,
@@ -53,8 +51,7 @@ from app.testing import (
 )
 from app.testing.schema_harness import install_guild_routing
 
-# The community role enum was GuildRole before 0.75.
-CommunityRole = getattr(guild_models, "CommunityRole", None) or guild_models.GuildRole
+CommunityRole = guild_models.CommunityRole
 
 
 async def seed(session: AsyncSession) -> None:
@@ -86,20 +83,11 @@ async def seed(session: AsyncSession) -> None:
         checklist=checklist_items("first", "second"),
     )
     definition = await create_property_definition(session, initiative)
-    # A release before property values became one table has one factory per
-    # tool; this one has a single factory for every target.
-    set_value = (
-        getattr(testing, "create_property_value", None)
-        or testing.create_task_property_value
-    )
-    await set_value(session, task, definition, value_text="seeded")
+    await testing.create_property_value(session, task, definition, value_text="seeded")
 
-    # The files tool was the documents tool before 0.75, its factory and the
-    # comment's parent argument named for it.
-    file_kind = "file" if hasattr(testing, "create_file") else "document"
-    file = await getattr(testing, f"create_{file_kind}")(session, initiative, member)
+    file = await testing.create_file(session, initiative, member)
     comment = await create_comment(session, member, task=task)
-    await create_comment(session, owner, **{file_kind: file})
+    await create_comment(session, owner, file=file)
     await create_reaction(session, owner, comment=comment)
 
     await create_tag(session, guild)
@@ -111,14 +99,9 @@ async def seed(session: AsyncSession) -> None:
     await create_calendar_event(session, by_name["calendar"], owner)
     await create_wiki_page(session, by_name["wiki"], owner)
 
-    # Repeats and an all-day event in the shape this release stores, so an
-    # upgrade has them to convert: JSON before RRULE, RRULE lines since.
+    # Repeats and an all-day event, so an upgrade has them to carry.
     monday = datetime(2026, 10, 4, 22, 30, tzinfo=UTC)
-    if hasattr(Task, "recurrence_until"):
-        task_repeat = event_repeat = "RRULE:FREQ=WEEKLY;BYDAY=SU"
-    else:
-        task_repeat = {"frequency": "weekly", "weekdays": ["monday"], "ends": "never"}
-        event_repeat = json.dumps(task_repeat)
+    task_repeat = event_repeat = "RRULE:FREQ=WEEKLY;BYDAY=SU"
     await create_task(session, project, due_date=monday, recurrence=task_repeat)
     await create_calendar_event(
         session,

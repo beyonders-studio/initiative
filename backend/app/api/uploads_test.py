@@ -78,6 +78,7 @@ async def test_upload_accessible_with_auth_header(
             created_by=user.id,
             created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -111,6 +112,7 @@ async def test_a_served_upload_is_cacheable_but_not_indefinitely(
             created_by=user.id,
             created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -168,6 +170,7 @@ async def test_upload_accessible_with_scoped_upload_token(
             created_by=user.id,
             created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -208,6 +211,7 @@ async def test_issue_upload_token_endpoint(
             created_by=user.id,
             created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -296,6 +300,7 @@ async def test_upload_guild_member_can_access_file(
         created_by=user.id,
         created_by_kind=ActorKind.member,
         size_bytes=16,
+        content_type="image/png",
     )
     session.add(upload)
     await session.commit()
@@ -327,6 +332,7 @@ async def test_upload_non_member_cannot_access_file(
             created_by=owner.id,
             created_by_kind=ActorKind.member,
             size_bytes=16,
+            content_type="image/png",
         )
         session.add(upload)
         await session.commit()
@@ -403,8 +409,8 @@ async def test_upload_row_in_guild_schema_is_served(
     await session.exec(
         text(
             f'INSERT INTO "{schema}".uploads'
-            " (filename, created_by, created_by_kind, size_bytes, created_at)"
-            " VALUES (:fn, :uid, 'member', 5, now())"
+            " (filename, created_by, created_by_kind, size_bytes, content_type,"
+            " created_at) VALUES (:fn, :uid, 'member', 5, 'text/plain', now())"
         ),
         params={"fn": "test_guild_schema_row.txt", "uid": user.id},
     )
@@ -511,6 +517,7 @@ async def test_an_upload_is_reached_the_way_the_community_is(
             created_by=user.id,
             created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -603,40 +610,6 @@ async def test_a_served_raster_stays_inline(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/png")
     assert "content-disposition" not in response.headers
-
-
-async def test_a_row_without_a_recorded_type_falls_back_to_its_name(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """Rows written before the type column existed carry no type; their stored
-    name is all there is to go on, and it still decides the same way."""
-    from app.models.tenant.upload import Upload
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    for name in ("legacy.png", "legacy.svg"):
-        _stage_upload(guild.id, name, b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
-        await route_session_to_guild(session, guild.id)
-        session.add(
-            Upload(
-                filename=name,
-                created_by=user.id,
-                created_by_kind=ActorKind.member,
-                size_bytes=16,
-            )
-        )
-    await session.commit()
-    headers = get_auth_headers(user)
-
-    raster = await client.get(f"/uploads/{guild.id}/legacy.png", headers=headers)
-    assert raster.status_code == 200
-    assert "content-disposition" not in raster.headers
-
-    markup = await client.get(f"/uploads/{guild.id}/legacy.svg", headers=headers)
-    assert markup.status_code == 200
-    assert markup.headers["content-disposition"] == "attachment"
-    assert markup.headers["content-security-policy"] == USER_CONTENT_CSP
 
 
 async def test_an_upload_is_reached_through_the_initiative_that_shows_it(

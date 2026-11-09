@@ -29,7 +29,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import false, or_
+from sqlalchemy import false, not_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -37,7 +37,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.encryption import encrypt_token, normalize_email
 from app.core.login_methods import LoginMethod
-from app.core.security import USABLE_HASH_PREFIXES
+from app.core.security import ARGON2_HASH_PREFIX
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.federated_identity import FederatedIdentity
@@ -282,12 +282,7 @@ def _no_usable_password_clause():
     """
     return or_(
         User.hashed_password.is_(None),
-        ~or_(
-            *(
-                User.hashed_password.startswith(prefix)
-                for prefix in USABLE_HASH_PREFIXES
-            )
-        ),
+        not_(User.hashed_password.startswith(ARGON2_HASH_PREFIX)),
     )
 
 

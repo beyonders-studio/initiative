@@ -21,6 +21,11 @@ def _sheet(content: dict, index: int = 0) -> dict:
     return content["sheets"][index]
 
 
+def _workbook(**sheet: Any) -> dict:
+    """A one-sheet workbook as the editor saves it."""
+    return {"schema_version": 3, "kind": "spreadsheet", "sheets": [sheet]}
+
+
 @pytest.fixture
 async def author(acting_user) -> Actor:
     """A guild admin with an initiative to keep spreadsheets in.
@@ -80,12 +85,7 @@ async def test_create_spreadsheet_round_trips_cells(client: AsyncClient, author:
     created = await _create_sheet(
         client,
         author,
-        {
-            "schema_version": 1,
-            "kind": "spreadsheet",
-            "dimensions": {"rows": 100, "cols": 26},
-            "cells": cells,
-        },
+        _workbook(dimensions={"rows": 100, "cols": 26}, cells=cells),
         name="Q2 Numbers",
     )
     assert created.status_code == 201, created.text
@@ -97,20 +97,19 @@ async def test_create_spreadsheet_round_trips_cells(client: AsyncClient, author:
     )
     assert response.status_code == 200
     content = response.json()["content"]
-    # v1 input is upcast to the current schema version on save.
     assert content["schema_version"] == 3
     assert content["kind"] == "spreadsheet"
     assert _sheet(content)["cells"] == cells
 
 
 async def test_patch_spreadsheet_replaces_cells(client: AsyncClient, author: Actor):
-    doc_id = await _stored_id(client, author, {"cells": {"0:0": "before"}})
+    doc_id = await _stored_id(client, author, _workbook(cells={"0:0": "before"}))
 
     # PATCH replaces the content snapshot wholesale (snapshot path).
     patch_response = await client.patch(
         author.g(f"/files/{doc_id}"),
         headers=author.headers,
-        json={"content": {"cells": {"0:0": "after", "5:7": 99}}},
+        json={"content": _workbook(cells={"0:0": "after", "5:7": 99})},
     )
     assert patch_response.status_code == 200, patch_response.text
     cells = _sheet(patch_response.json()["content"])["cells"]
@@ -120,25 +119,28 @@ async def test_patch_spreadsheet_replaces_cells(client: AsyncClient, author: Act
 @pytest.mark.parametrize(
     ("case", "content"),
     [
-        ("a cell holding an object", {"cells": {"0:0": {"nested": "object"}}}),
+        ("a cell holding an object", _workbook(cells={"0:0": {"nested": "object"}})),
         (
             "a schema version we do not speak",
-            {"schema_version": 999, "cells": {"0:0": "ok"}},
+            {"schema_version": 999, "sheets": []},
         ),
+        # The single-sheet shapes older releases wrote are no longer read.
+        (
+            "a version 2 sheet",
+            {"schema_version": 2, "kind": "spreadsheet", "cells": {"0:0": "ok"}},
+        ),
+        ("cells with no sheet to hold them", {"cells": {"0:0": "ok"}}),
         # isinstance(True, int) is True in Python, so the version guard has to
         # refuse a bool rather than read it as the integer 1.
         (
             "a bool where the version goes",
-            {"schema_version": True, "cells": {"0:0": "ok"}},
+            {"schema_version": True, "sheets": []},
         ),
         # Falsy non-dict containers must reach the type guard rather than being
         # coerced to an empty map.
-        ("cells that are not a map", {"cells": []}),
-        ("dimensions that are not a map", {"cells": {}, "dimensions": []}),
-        (
-            "v2 columns that are not a map",
-            {"schema_version": 2, "cells": {}, "columns": []},
-        ),
+        ("cells that are not a map", _workbook(cells=[])),
+        ("dimensions that are not a map", _workbook(cells={}, dimensions=[])),
+        ("columns that are not a map", _workbook(cells={}, columns=[])),
         (
             "v3 sheets that are not a list",
             {"schema_version": 3, "kind": "spreadsheet", "sheets": {}},
@@ -179,14 +181,14 @@ async def test_create_spreadsheet_canonicalizes_cell_keys(
     content = await _stored_content(
         client,
         author,
-        {
-            "cells": {
+        _workbook(
+            cells={
                 "01:2": "padded row",
                 "3:04": "padded col",
                 "0005:0006": "padded both",
                 "7:8": "canonical",
             }
-        },
+        ),
     )
 
     assert _sheet(content)["cells"] == {
@@ -224,57 +226,31 @@ async def test_a_workbook_with_nothing_in_it_opens_on_one_empty_sheet(
     assert _sheet(stored)["frozen"] == {"rows": 0, "cols": 0}
 
 
-async def test_v1_payload_upcasts_to_current(client: AsyncClient, author: Actor):
-    """An explicit v1 payload (no formatting keys) is accepted and saved
-    as the current version with empty formatting structures — existing
-    files keep working without a data migration and never 422."""
-    content = await _stored_content(
-        client,
-        author,
-        {
-            "schema_version": 1,
-            "kind": "spreadsheet",
-            "dimensions": {"rows": 100, "cols": 26},
-            "cells": {"0:0": "kept"},
-        },
-        name="Legacy Sheet",
-    )
-
-    assert content["schema_version"] == 3
-    assert _sheet(content)["cells"] == {"0:0": "kept"}
-    assert _sheet(content)["columns"] == {}
-    assert _sheet(content)["rows"] == {}
-    assert _sheet(content)["cellStyles"] == {}
-    assert _sheet(content)["frozen"] == {"rows": 0, "cols": 0}
-
-
-async def test_v2_formatting_round_trips(client: AsyncClient, author: Actor):
-    """A full v2 payload round-trips: widths, styles, number formats,
+async def test_formatting_round_trips(client: AsyncClient, author: Actor):
+    """A fully formatted sheet round-trips: widths, styles, number formats,
     per-cell overrides, and the frozen-pane hint."""
     content = await _stored_content(
         client,
         author,
-        {
-            "schema_version": 2,
-            "kind": "spreadsheet",
-            "dimensions": {"rows": 100, "cols": 26},
-            "cells": {"0:0": "Revenue", "1:0": 1234.5},
-            "columns": {
+        _workbook(
+            dimensions={"rows": 100, "cols": 26},
+            cells={"0:0": "Revenue", "1:0": 1234.5},
+            columns={
                 "0": {
                     "width": 180,
                     "format": {"type": "currency", "currency": "USD", "decimals": 2},
                     "style": {"bold": True, "align": "right"},
                 }
             },
-            "rows": {"0": {"height": 32, "style": {"bold": True}}},
-            "cellStyles": {
+            rows={"0": {"height": 32, "style": {"bold": True}}},
+            cellStyles={
                 "1:0": {
                     "style": {"fill": "#ffeecc"},
                     "format": {"type": "fixed", "decimals": 1},
                 }
             },
-            "frozen": {"rows": 1, "cols": 1},
-        },
+            frozen={"rows": 1, "cols": 1},
+        ),
         name="Formatted",
     )
 
@@ -296,22 +272,21 @@ async def test_v2_formatting_round_trips(client: AsyncClient, author: Actor):
     assert _sheet(content)["frozen"] == {"rows": 1, "cols": 1}
 
 
-async def test_v2_clamps_sizes_and_frozen(client: AsyncClient, author: Actor):
+async def test_clamps_sizes_and_frozen(client: AsyncClient, author: Actor):
     """Out-of-range widths/heights/decimals/frozen are clamped, not
     rejected."""
     content = await _stored_content(
         client,
         author,
-        {
-            "schema_version": 2,
-            "cells": {},
-            "dimensions": {"rows": 100, "cols": 26},
-            "columns": {
+        _workbook(
+            cells={},
+            dimensions={"rows": 100, "cols": 26},
+            columns={
                 "0": {"width": 99999, "format": {"type": "fixed", "decimals": 99}}
             },
-            "rows": {"0": {"height": 0}},
-            "frozen": {"rows": 50, "cols": -3},
-        },
+            rows={"0": {"height": 0}},
+            frozen={"rows": 50, "cols": -3},
+        ),
         name="Clamp",
     )
 
@@ -321,17 +296,16 @@ async def test_v2_clamps_sizes_and_frozen(client: AsyncClient, author: Actor):
     assert _sheet(content)["frozen"] == {"rows": 8, "cols": 0}
 
 
-async def test_v2_drops_malformed_formatting(client: AsyncClient, author: Actor):
+async def test_drops_malformed_formatting(client: AsyncClient, author: Actor):
     """A bad ``align``, bad hex, and an unknown style key are stripped — the
     file still saves (201, NOT 400) because formatting failures must never
     block the user's actual data."""
     content = await _stored_content(
         client,
         author,
-        {
-            "schema_version": 2,
-            "cells": {"0:0": "data"},
-            "columns": {
+        _workbook(
+            cells={"0:0": "data"},
+            columns={
                 "0": {
                     "style": {
                         "align": "diagonal",
@@ -343,8 +317,8 @@ async def test_v2_drops_malformed_formatting(client: AsyncClient, author: Actor)
                 },
                 "not-an-index": {"width": 100},
             },
-            "cellStyles": {"garbage-key": {"style": {"bold": True}}},
-        },
+            cellStyles={"garbage-key": {"style": {"bold": True}}},
+        ),
         name="Lenient",
     )
 
@@ -353,18 +327,17 @@ async def test_v2_drops_malformed_formatting(client: AsyncClient, author: Actor)
     assert _sheet(content)["cellStyles"] == {}
 
 
-async def test_v2_canonicalizes_formatting_keys(client: AsyncClient, author: Actor):
+async def test_canonicalizes_formatting_keys(client: AsyncClient, author: Actor):
     """Leading-zero index/cell keys collapse to canonical form so they
     survive the JS Y.Map round-trip, exactly like the cell map."""
     content = await _stored_content(
         client,
         author,
-        {
-            "schema_version": 2,
-            "cells": {},
-            "columns": {"007": {"width": 90}},
-            "cellStyles": {"01:02": {"style": {"italic": True}}},
-        },
+        _workbook(
+            cells={},
+            columns={"007": {"width": 90}},
+            cellStyles={"01:02": {"style": {"italic": True}}},
+        ),
         name="Canon",
     )
 
@@ -372,7 +345,7 @@ async def test_v2_canonicalizes_formatting_keys(client: AsyncClient, author: Act
     assert _sheet(content)["cellStyles"] == {"1:2": {"style": {"italic": True}}}
 
 
-async def test_v2_border_round_trips_and_drops_bad_edges(
+async def test_border_round_trips_and_drops_bad_edges(
     client: AsyncClient, author: Actor
 ):
     """Valid border edges round-trip (color lowercased); a bad style
@@ -380,10 +353,9 @@ async def test_v2_border_round_trips_and_drops_bad_edges(
     content = await _stored_content(
         client,
         author,
-        {
-            "schema_version": 2,
-            "cells": {"0:0": "x"},
-            "cellStyles": {
+        _workbook(
+            cells={"0:0": "x"},
+            cellStyles={
                 "0:0": {
                     "style": {
                         "border": {
@@ -395,7 +367,7 @@ async def test_v2_border_round_trips_and_drops_bad_edges(
                     }
                 }
             },
-        },
+        ),
         name="Borders",
     )
 
@@ -404,17 +376,16 @@ async def test_v2_border_round_trips_and_drops_bad_edges(
     }
 
 
-async def test_v2_tier1_style_and_number_options(client: AsyncClient, author: Actor):
+async def test_tier1_style_and_number_options(client: AsyncClient, author: Actor):
     """Underline/strike/valign/fontSize and number-format grouping +
     negatives round-trip; fontSize is clamped, bad valign/negatives are
     dropped without a 400."""
     content = await _stored_content(
         client,
         author,
-        {
-            "schema_version": 2,
-            "cells": {"0:0": -5},
-            "cellStyles": {
+        _workbook(
+            cells={"0:0": -5},
+            cellStyles={
                 "0:0": {
                     "style": {
                         "underline": True,
@@ -438,7 +409,7 @@ async def test_v2_tier1_style_and_number_options(client: AsyncClient, author: Ac
                     }
                 },
             },
-        },
+        ),
         name="Tier1",
     )
 
@@ -503,33 +474,6 @@ async def test_v3_multiple_sheets_round_trip(client: AsyncClient, author: Actor)
     assert _sheet(content, 0)["frozen"] == {"rows": 1, "cols": 0}
     assert _sheet(content, 1)["cells"] == {"0:0": 1, "1:0": 2, "2:0": 3}
     assert _sheet(content, 1)["columns"] == {"0": {"width": 140}}
-
-
-async def test_v2_payload_upcasts_to_single_sheet(client: AsyncClient, author: Actor):
-    """A pre-multi-sheet payload is read as the workbook's one sheet, keeping
-    its cells and formatting — existing files never 422 and never lose
-    data on their next save."""
-    content = await _stored_content(
-        client,
-        author,
-        {
-            "schema_version": 2,
-            "kind": "spreadsheet",
-            "dimensions": {"rows": 100, "cols": 26},
-            "cells": {"0:0": "kept"},
-            "columns": {"0": {"width": 200}},
-            "frozen": {"rows": 1, "cols": 1},
-        },
-        name="Legacy",
-    )
-
-    assert content["schema_version"] == 3
-    assert len(content["sheets"]) == 1
-    assert _sheet(content)["id"] == "s1"
-    assert _sheet(content)["name"] == "Sheet1"
-    assert _sheet(content)["cells"] == {"0:0": "kept"}
-    assert _sheet(content)["columns"] == {"0": {"width": 200}}
-    assert _sheet(content)["frozen"] == {"rows": 1, "cols": 1}
 
 
 async def test_v3_sheet_names_are_sanitized_and_deduplicated(

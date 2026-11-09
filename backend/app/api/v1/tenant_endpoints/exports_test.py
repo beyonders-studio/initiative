@@ -937,16 +937,28 @@ async def test_project_export_job_path_renders_json(
 # ---------------------------------------------------------------------------
 
 _SHEET_CONTENT = {
-    "schema_version": 2,
-    "dimensions": {"rows": 2, "cols": 2},
-    # "=SUM(...)" is the author's own formula and first-class content;
-    # "+not-a-formula" is a plain string that happens to open with a trigger
-    # character, and the app exports it as the text it is.
-    "cells": {"0:0": "Item", "0:1": "=SUM(B2:B9)", "1:0": "+not-a-formula", "1:1": 42},
-    "cellStyles": {"0:0": {"style": {"bold": True, "fill": "#ff0000"}}},
-    "columns": {"0": {"width": 140}},
-    "rows": {},
-    "frozen": {"rows": 1, "cols": 0},
+    "schema_version": 3,
+    "kind": "spreadsheet",
+    "sheets": [
+        {
+            "id": "s1",
+            "name": "Q3",
+            "dimensions": {"rows": 2, "cols": 2},
+            # "=SUM(...)" is the author's own formula and first-class content;
+            # "+not-a-formula" is a plain string that happens to open with a
+            # trigger character, and the app exports it as the text it is.
+            "cells": {
+                "0:0": "Item",
+                "0:1": "=SUM(B2:B9)",
+                "1:0": "+not-a-formula",
+                "1:1": 42,
+            },
+            "cellStyles": {"0:0": {"style": {"bold": True, "fill": "#ff0000"}}},
+            "columns": {"0": {"width": 140}},
+            "rows": {},
+            "frozen": {"rows": 1, "cols": 0},
+        }
+    ],
 }
 
 # One file per type, holding the payload that type stores.
@@ -1183,7 +1195,7 @@ def _workbook_keeps_the_grid_typed(resp: Response, subject: Any) -> None:
     """Sheet name, styling, formulas, literal strings, numbers and frozen panes
     each land as themselves."""
     sheet = _sheet(resp)
-    assert sheet.title == "Budget Q3"  # forbidden ":" stripped
+    assert sheet.title == "Q3"
     assert sheet.cell(row=1, column=1).value == "Item"
     assert sheet.cell(row=1, column=1).font.bold is True
     assert sheet.cell(row=1, column=2).value == "=SUM(B2:B9)"
@@ -1246,10 +1258,19 @@ async def test_file_export_spreadsheet_survives_corrupt_snapshot(
         name="Odd",
         file_type=FileType.sheet,
         content={
-            "schema_version": 2,
-            "dimensions": {"rows": 1, "cols": 1},
-            "cells": {"0:0": "ok", "corrupt": "x", "1:2:3": "y", ":": "z"},
-            "cellStyles": {"0:0": {"style": {"fill": "#fff", "color": "not-a-color"}}},
+            "schema_version": 3,
+            "kind": "spreadsheet",
+            "sheets": [
+                {
+                    "id": "s1",
+                    "name": "Odd",
+                    "dimensions": {"rows": 1, "cols": 1},
+                    "cells": {"0:0": "ok", "corrupt": "x", "1:2:3": "y", ":": "z"},
+                    "cellStyles": {
+                        "0:0": {"style": {"fill": "#fff", "color": "not-a-color"}}
+                    },
+                }
+            ],
         },
     )
     resp = await _export(client, a, "file", ids=[doc.id], format="xlsx")
@@ -1992,7 +2013,11 @@ async def test_bulk_file_selection_exports_as_zip(
         a.user,
         name="Budget",
         file_type=FileType.sheet,
-        content={"schema_version": 2, "cells": {"0:0": "x"}},
+        content={
+            "schema_version": 3,
+            "kind": "spreadsheet",
+            "sheets": [{"id": "s1", "name": "Sheet1", "cells": {"0:0": "x"}}],
+        },
     )
     twin = await create_file(session, a.initiative, a.user, name="Session Notes")
 

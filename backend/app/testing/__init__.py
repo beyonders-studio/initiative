@@ -14,7 +14,6 @@ from app.testing.actor import Actor, guild_url, make_actor
 from app.testing.audit import emitted
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
-    MENTIONING_YJS_STATE,
     NARROWED_CLAIM,
     NARROWED_VALUE,
     TOOL_FACTORIES,
@@ -107,7 +106,6 @@ from app.testing.schema_harness import guild_of, route_session_to_guild
 from app.testing.server import in_request_tasks
 
 __all__ = [
-    "MENTIONING_YJS_STATE",
     "NARROWED_CLAIM",
     "NARROWED_VALUE",
     "TOOL_FACTORIES",

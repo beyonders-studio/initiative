@@ -267,17 +267,6 @@ class TestSurfaceAccess:
             is SurfaceAccess.not_here
         )
 
-    def test_a_surface_pinned_as_admin_only_under_the_earlier_contract(self):
-        """``visibility: "guild_admin"`` on a definition pinned before this
-        contract means ``admin_only`` until the install moves on."""
-        legacy = {**self.PAGE, "visibility": "guild_admin"}
-        assert self._decide(legacy) is SurfaceAccess.refused
-        assert self._decide(legacy, admin=True) is SurfaceAccess.open
-
-    def test_an_earlier_member_surface_follows_the_placement(self):
-        legacy = {**self.PAGE, "visibility": "member"}
-        assert self._decide(legacy) is SurfaceAccess.open
-
 
 def _on_items(*fields: tuple[str, str], parts: tuple[str, ...] = ()) -> dict:
     """A definition declaring fields (key, the kind of item) and task parts."""

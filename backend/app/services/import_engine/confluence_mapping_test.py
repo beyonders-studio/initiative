@@ -34,7 +34,7 @@ def build(pages, users=None, **kw):
         pages=pages,
         users=users or {},
         site_url=SITE,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         **kw,
     )
 

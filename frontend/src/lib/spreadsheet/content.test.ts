@@ -1,37 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_COLS, DEFAULT_ROWS } from "@/lib/spreadsheet/bounds";
-import { parseSpreadsheetContent, SPREADSHEET_SCHEMA_VERSION } from "@/lib/spreadsheet/content";
+import { parseSpreadsheetContent } from "@/lib/spreadsheet/content";
 import fixture from "@/lib/spreadsheet/sheet-schema.fixture.json";
 
-describe("parseSpreadsheetContent — upcast", () => {
-  it("reads a v1 file as the workbook's single sheet", () => {
-    const out = parseSpreadsheetContent({
-      schema_version: 1,
-      kind: "spreadsheet",
-      dimensions: { rows: 100, cols: 26 },
-      cells: { "0:0": "kept" },
-    });
-    expect(out.schema_version).toBe(SPREADSHEET_SCHEMA_VERSION);
-    expect(out.sheets).toHaveLength(1);
-    expect(out.sheets[0].name).toBe("Sheet1");
-    expect(out.sheets[0].cells).toEqual({ "0:0": "kept" });
-  });
-
-  it("carries a v2 file's formatting onto that sheet", () => {
-    const out = parseSpreadsheetContent({
-      schema_version: 2,
-      kind: "spreadsheet",
-      cells: { "0:0": 1 },
-      columns: { "0": { width: 200 } },
-      cellStyles: { "0:0": { style: { bold: true } } },
-      frozen: { rows: 1, cols: 1 },
-    });
-    expect(out.sheets[0].columns).toEqual({ "0": { width: 200 } });
-    expect(out.sheets[0].cellStyles).toEqual({ "0:0": { style: { bold: true } } });
-    expect(out.sheets[0].frozen).toEqual({ rows: 1, cols: 1 });
-  });
-
+describe("parseSpreadsheetContent — junk", () => {
   it("produces a usable workbook from junk", () => {
     for (const junk of [null, undefined, 42, "nope", []]) {
       const out = parseSpreadsheetContent(junk);
@@ -86,10 +59,11 @@ describe("parseSpreadsheetContent — v3", () => {
     expect(out.sheets.map((s) => s.name)).toEqual(["Sheet1", "Sheet2"]);
   });
 
-  it("falls back to the top level when sheets is empty or not a list", () => {
+  it("opens on one empty sheet when sheets is empty or not a list", () => {
     expect(parseSpreadsheetContent({ schema_version: 3, sheets: [] }).sheets).toHaveLength(1);
     const notAList = parseSpreadsheetContent({ sheets: {}, cells: { "0:0": "x" } });
-    expect(notAList.sheets[0].cells).toEqual({ "0:0": "x" });
+    expect(notAList.sheets).toHaveLength(1);
+    expect(notAList.sheets[0].cells).toEqual({});
   });
 
   it("grows a sheet's canvas to cover its furthest cell", () => {

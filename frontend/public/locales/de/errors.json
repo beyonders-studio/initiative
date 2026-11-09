@@ -320,6 +320,7 @@
   "IMPORT_UNKNOWN_TYPE": "Diese Datei ist kein bekannter Initiative-Export.",
   "IMPORT_INVALID_ENVELOPE": "Die Importdatei ist ungültig oder beschädigt.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "Diese Datei stammt aus einer neueren Initiative-Version und kann hier nicht importiert werden.",
+  "IMPORT_ARCHIVE_TOO_OLD": "Diese Sicherung stammt aus einer Initiative-Version vor 0.78 und kann hier nicht mehr wiederhergestellt werden. Stelle sie zuerst unter 0.78 wieder her und sichere dann erneut.",
   "IMPORT_INVALID_PARAMS": "Die Importanfrage war ungültig.",
   "IMPORT_TOO_LARGE": "Dieser Import ist zu groß.",
   "REQUEST_TOO_LARGE": "Das ist zu groß zum Senden.",

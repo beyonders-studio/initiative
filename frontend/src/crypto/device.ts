@@ -8,7 +8,6 @@ import {
   listDevices,
   registerDevice,
   removeDevice,
-  signDevice,
   topUpKeys,
 } from "@/api/generated/direct-messages/direct-messages";
 import type { DmConversationRead, DmDeviceRead } from "@/api/generated/initiativeAPI.schemas";
@@ -91,13 +90,11 @@ async function contextFor(self: number, device: string, listing: Listing): Promi
   };
 }
 
-/** The account this browser's device belongs to, asked of the server once. */
+/** The account this browser's device belongs to, recorded when it was signed in. */
 async function owner(): Promise<number> {
   const stored = await deviceOwner.get();
-  if (stored !== undefined) return stored;
-  const { id } = await readMe();
-  await deviceOwner.set(id);
-  return id;
+  if (stored === undefined) throw new Error("no account is signed in on this device");
+  return stored;
 }
 
 /**
@@ -127,31 +124,6 @@ async function replenish(deviceId: string, held: number): Promise<void> {
 }
 
 /**
- * Sign a device registered before signing, and replace the keys it published
- * with signed ones. The server takes this once; a device it refuses, or a
- * request that fails, is tried again on the next visit.
- */
-async function signItself(self: number, device: string): Promise<DmDeviceRead[] | null> {
-  try {
-    const signed = await withAccount(async (pickle) => {
-      const keys = await ratchet.generateKeys(pickle, KEY_POOL, true);
-      const signature = await ratchet.signDevice(keys.pickle, self);
-      return { next: keys.pickle, value: { keys, signature } };
-    });
-    if (signed === null || signed.keys.fallback_key === null) return null;
-    // The account is written before the keys are published, as a top-up is.
-    const response = await signDevice(device, {
-      signature: signed.signature,
-      fallback_key: signed.keys.fallback_key,
-      one_time_keys: signed.keys.one_time_keys,
-    });
-    return response.devices;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * This browser's device, and the account's other devices alongside it.
  *
  * The two are read together because every caller needs both, and the device
@@ -166,14 +138,8 @@ export async function ensureDeviceContext(): Promise<Context> {
     const listing = await listOwn();
     const known = listing.devices.find((device) => device.id === existing);
     if (known) {
-      const self = await owner();
-      if (!known.signature) {
-        // Signing answers with a newer list; the earlier time still holds for it.
-        const signed = await signItself(self, existing);
-        return contextFor(self, existing, signed ? { ...listing, devices: signed } : listing);
-      }
       await replenish(existing, known.one_time_key_count);
-      return contextFor(self, existing, listing);
+      return contextFor(await owner(), existing, listing);
     }
     // The dead device is named, so only a claim still recording it reopens: a
     // second tab reaching the same conclusion waits for the first instead.

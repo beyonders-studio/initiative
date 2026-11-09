@@ -73,10 +73,7 @@ const current = (saved: StartAnswers | null): StartAnswers | null => {
   return {
     ...freshAnswers(saved.path),
     ...saved,
-    // A copy saved with a single interest named it `category`.
-    categories: asCommunityCategories(
-      saved.categories ?? (saved as { category?: unknown }).category
-    ),
+    categories: asCommunityCategories(saved.categories),
     username: typeof saved.username === "string" ? saved.username : "",
     near: placeFrom(saved.near),
   };

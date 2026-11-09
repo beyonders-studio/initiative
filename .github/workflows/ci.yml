@@ -251,7 +251,7 @@ jobs:
 
           # Upgrading a database a release wrote, by booting the images. A pull
           # request into dev upgrades from the newest release; every
-          # integration push walks each release since WALK_FROM in turn. A
+          # integration push walks each release since the baseline's in turn. A
           # release pull request is walked by Release Candidate, on the image
           # it will publish.
           upgrade() {

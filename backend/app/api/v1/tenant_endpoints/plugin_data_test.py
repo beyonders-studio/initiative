@@ -91,8 +91,6 @@ PUBLIC_ID = "acme.shop"
 #: what every endpoint id has to be.
 ORDERS_SUMMARY = f"plugin.{PUBLIC_ID}.orders-summary"
 REVENUE = f"plugin.{PUBLIC_ID}.revenue"
-#: Pinned before ``admin_only`` existed, under the earlier contract's term.
-LEGACY_REPORT = f"plugin.{PUBLIC_ID}.legacy-report"
 MY_PRS = f"plugin.{PUBLIC_ID}.my-prs"
 REFUND = f"plugin.{PUBLIC_ID}.refund"
 #: The two reads that exist to fill a menu rather than a tile. Which shops
@@ -199,12 +197,6 @@ def _definition() -> dict:
                 "admin_only": True,
                 "cache_ttl_seconds": 0,
                 "returns": [{"key": "tiers", "type": "string", "list": True}],
-            },
-            {
-                "id": LEGACY_REPORT,
-                "direction": "read",
-                "visibility": "guild_admin",
-                "cache_ttl_seconds": 0,
             },
             {
                 "id": LIST_SHOPS,
@@ -510,30 +502,26 @@ class TestGates:
 
 
 class TestAdminOnly:
-    @pytest.mark.parametrize("source", [REVENUE, LEGACY_REPORT])
     async def test_an_admin_only_source_is_open_to_an_admin(
-        self, client, acting_user, session, upstream, source
+        self, client, acting_user, session, upstream
     ):
-        a, plugin, dashboard = await _workspace(session, acting_user, source)
+        a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
 
         response = await client.get(
-            _url(a, plugin, source, dashboard), headers=a.headers
+            _url(a, plugin, REVENUE, dashboard), headers=a.headers
         )
         assert response.status_code == 200, response.text
 
-    @pytest.mark.parametrize("source", [REVENUE, LEGACY_REPORT])
     async def test_an_admin_only_source_is_refused_to_a_member(
-        self, client, acting_user, session, upstream, source
+        self, client, acting_user, session, upstream
     ):
         """Checked against the caller's real guild role, on the pinned
-        definition — including one pinned under the earlier contract's
-        ``visibility: "guild_admin"`` — not against anything the request
-        supplied."""
-        a, plugin, dashboard = await _workspace(session, acting_user, source)
+        definition, not against anything the request supplied."""
+        a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
         member = await _editor(session, acting_user, a, dashboard)
 
         response = await client.get(
-            _url(member, plugin, source, dashboard), headers=member.headers
+            _url(member, plugin, REVENUE, dashboard), headers=member.headers
         )
         assert response.status_code == 403
         assert response.json()["detail"] == PluginDataMessages.ADMIN_ONLY
@@ -981,9 +969,7 @@ class TestWidgetCatalog:
 
         sources = {source["id"]: source for source in entry["endpoints"]}
         assert sources[REVENUE]["admin_only"] is True
-        assert sources[LEGACY_REPORT]["admin_only"] is True
         assert sources[ORDERS_SUMMARY]["admin_only"] is False
-        assert "visibility" not in sources[LEGACY_REPORT]
         assert sources[ORDERS_SUMMARY]["cache_ttl_seconds"] == 60
 
     async def test_a_disabled_install_offers_no_widgets(

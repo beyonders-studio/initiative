@@ -278,7 +278,7 @@ The first-owner pair is read at every start:
 
 | Variables | What they do |
 |---|---|
-| `FIRST_OWNER_EMAIL`, `FIRST_OWNER_PASSWORD` | With both set, a start that finds no account at that address creates one there as the owner, with the address verified and a community of its own. The password skips the usual password checks, so make it a strong one, and remove both once the account exists. Unset, the first person to register becomes the owner. `FIRST_SUPERUSER_EMAIL` and `FIRST_SUPERUSER_PASSWORD` are read as the same two settings. |
+| `FIRST_OWNER_EMAIL`, `FIRST_OWNER_PASSWORD` | With both set, a start that finds no account at that address creates one there as the owner, with the address verified and a community of its own. The password skips the usual password checks, so make it a strong one, and remove both once the account exists. Unset, the first person to register becomes the owner. |
 
 ## Maintenance switches
 
@@ -294,7 +294,6 @@ These exist for Initiative's own development and its test suite. Leave them unse
 |---|---|
 | `GUILD_ROLE_PREFIX`, `PLATFORM_ROLE_PREFIX` | Keeping the test suite's database roles apart from a development database's on one PostgreSQL. Empty, or letters, digits and `_` not starting with a digit. |
 | `WEBHOOK_ALLOW_PRIVATE_TARGETS` | Letting outgoing webhooks reach `http://` and private addresses on a developer's machine |
-| `S3_KMS_KEY_ID` | Nothing at runtime |
 
 ## Settings in the app
 

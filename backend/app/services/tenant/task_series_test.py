@@ -988,31 +988,3 @@ async def test_invalid_import_recurrence_is_a_file_validation_error(
     )
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == "IMPORT_INVALID_ENVELOPE"
-
-
-async def test_legacy_json_repeat_still_imports(hourly_task, session, client):
-    actor, _ = hourly_task
-    envelope = await project_export.build_project_export(
-        session,
-        await get_project_hydrated(session, actor.project.id),
-        exported_by_handle=handle_of(actor.user),
-    )
-    payload = envelope.model_dump(mode="json")
-    payload["tasks"][0].update(
-        {
-            "recurrence": {
-                "frequency": "weekly",
-                "weekdays": ["monday"],
-                "ends": "never",
-            },
-            "recurrence_strategy": "fixed",
-            "recurrence_limit": None,
-        }
-    )
-    response = await client.post(
-        actor.g("/imports/envelope"),
-        headers=actor.headers,
-        json={"initiative_id": actor.initiative.id, "envelope": payload},
-    )
-    assert response.status_code == 201, response.text
-    assert response.json()["result"]["created"]["tasks"] == 1

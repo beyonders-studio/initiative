@@ -55,11 +55,8 @@ class DmDevice(SQLModel, table=True):
     identity_key: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     #: Ed25519. What a safety number is computed over.
     fingerprint_key: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
-    #: The device's Ed25519 signature over its keys and account. NULL for a
-    #: device registered before signing, until it next opens and signs itself.
-    signature: bytes | None = Field(
-        default=None, sa_column=Column(LargeBinary, nullable=True)
-    )
+    #: The device's Ed25519 signature over its keys and account.
+    signature: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     #: The sign-in this key store last collected under, at the live row its
     #: chain has reached. A plain uuid, as ``push_tokens.session_id`` is:
     #: session rows are purged on their own schedule.

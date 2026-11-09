@@ -291,7 +291,7 @@ def _mapped(**kw):
             [{"statuses": [_status("To Do", "new"), _status("Done", "done")]}],
         ),
         issues=kw.pop("issues", [_issue("ACME-1", "One"), _issue("ACME-2", "Two")]),
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         **kw,
     )
 
@@ -715,7 +715,7 @@ def test_comments_survive_into_a_real_envelope():
                 },
             )
         ],
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         include_comments=True,
     ).envelope
     parsed = ProjectExportEnvelope.model_validate(envelope)
@@ -843,7 +843,7 @@ def test_a_project_mapped_a_page_at_a_time_is_the_project_mapped_whole():
         "issue_type_statuses": [
             {"statuses": [_status("To Do", "new"), _status("Done", "done")]}
         ],
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "field_catalog": catalog,
     }
 

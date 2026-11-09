@@ -75,7 +75,7 @@ It's read the same way and you get the same review, though comments stay behind,
 
 ## Put back an Initiative backup
 
-A backup is the file Initiative makes when you export a community or an initiative as an **Importable backup** (see [Export the whole community](running-a-community.md#export-the-whole-community)). It works on this server or another one.
+A backup is the file Initiative makes when you export a community or an initiative as an **Importable backup** (see [Export the whole community](running-a-community.md#export-the-whole-community)). It works on this server or another one, as long as it was made on Initiative 0.78 or later: an older one restores on 0.78 first, and a backup made there then restores here.
 
 1. Open **Community settings** and select **Data**.
 2. Select **Import…**.

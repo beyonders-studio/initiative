@@ -19,7 +19,6 @@ dependencies = [
     "argon2-cffi>=25.1.0,<26",
     "pyotp>=2.9.0,<3",                   # RFC 6238 TOTP arithmetic
     "webauthn>=2.5.0,<4",                # WebAuthn/FIDO2 ceremony verification
-    "bcrypt==5.0.0",
     "pydantic-settings>=2.14.2,<3",
     "python-multipart>=0.0.31,<0.0.34",
     "email-validator>=2.3.0,<3",

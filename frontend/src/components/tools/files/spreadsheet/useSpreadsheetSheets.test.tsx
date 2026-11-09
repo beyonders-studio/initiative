@@ -9,7 +9,7 @@ import { useSpreadsheetSheets } from "./useSpreadsheetSheets";
 import { SHEET_CELLS, sheetContainer, sheetPart, sheetsRoot } from "./workbookDoc";
 
 const content = (cells: Record<string, unknown>) =>
-  parseSpreadsheetContent({ cells: cells as Record<string, string | number> });
+  parseSpreadsheetContent({ sheets: [{ cells: cells as Record<string, string | number> }] });
 
 const cellsOf = (doc: Y.Doc, id: string): Record<string, unknown> =>
   (sheetPart(sheetContainer(doc, id), SHEET_CELLS)?.toJSON() ?? {}) as Record<string, unknown>;

@@ -66,10 +66,12 @@ async def _sign_in(
 
 async def _keep_messages(client: AsyncClient, signed_in, seed: int) -> str:
     """Register a message key store under the session ``signed_in`` opened."""
+    headers = {"Authorization": f"Bearer {signed_in.json()['access_token']}"}
+    me = await client.get("/api/v1/me", headers=headers)
     registered = await client.post(
         "/api/v1/me/dm/devices",
-        json=_registration(seed),
-        headers={"Authorization": f"Bearer {signed_in.json()['access_token']}"},
+        json=_registration(me.json()["id"], seed),
+        headers=headers,
     )
     assert registered.status_code == 201, registered.text
     return registered.json()["device_id"]

@@ -8,19 +8,10 @@
  * ``backend/app/services/tenant/files_spreadsheet.py`` validates the
  * same shape; keep the two in step.
  *
- * Schema versions
- * ---------------
- * * **v1**: ``{schema_version, kind, dimensions, cells}`` — one sheet, no
- *   formatting.
- * * **v2**: adds ``columns`` / ``rows`` / ``cellStyles`` / ``frozen``, still
- *   one sheet.
- * * **v3** (current): ``{schema_version, kind, sheets: [...]}`` — the whole
- *   workbook, each entry carrying what a v2 payload carried plus an ``id``
- *   and a ``name``.
- *
- * {@link parseSpreadsheetContent} accepts all three and always returns v3,
- * so a file written before multi-sheet opens as a one-sheet workbook
- * with no migration step.
+ * The shape is ``{schema_version: 3, kind, sheets: [...]}`` — the whole
+ * workbook, each sheet carrying its ``id``, ``name``, ``dimensions``,
+ * ``cells`` and its formatting (``columns`` / ``rows`` / ``cellStyles`` /
+ * ``frozen``).
  */
 
 import { DEFAULT_COLS, DEFAULT_ROWS, MAX_COLS, MAX_ROWS } from "@/lib/spreadsheet/bounds";
@@ -43,8 +34,8 @@ import {
 
 export const SPREADSHEET_SCHEMA_VERSION = 3;
 
-/** One sheet's persisted content: identity, canvas size, and the same
- *  sparse structures a v2 file stored at its top level. */
+/** One sheet's persisted content: identity, canvas size, cells and
+ *  formatting. */
 export interface SpreadsheetSheetContent {
   id: SheetId;
   name: string;
@@ -101,11 +92,7 @@ const boundsOf = (cells: Record<string, CellValue>): { rows: number; cols: numbe
   return { rows, cols };
 };
 
-/**
- * Read one sheet out of a payload slice — the same call handles a v3
- * ``sheets[i]`` entry and a v1/v2 file's top level, which is exactly
- * the upcast: the old shape *is* a sheet, it just never said so.
- */
+/** Read one ``sheets[i]`` entry of a payload. */
 const parseSheet = (
   raw: unknown,
   fallbackId: SheetId,
@@ -145,8 +132,8 @@ const parseSheet = (
 export const parseSpreadsheetContent = (raw: unknown): SpreadsheetContent => {
   const src = isRecord(raw) ? raw : {};
   const rawSheets = Array.isArray(src.sheets) ? src.sheets.slice(0, MAX_SHEETS) : null;
-  // v1 / v2: the file's top level is the one and only sheet.
-  const entries = rawSheets && rawSheets.length > 0 ? rawSheets : [src];
+  // A workbook with no sheets opens on one empty one.
+  const entries = rawSheets && rawSheets.length > 0 ? rawSheets : [{}];
 
   const seenIds = new Set<SheetId>();
   const names: string[] = [];

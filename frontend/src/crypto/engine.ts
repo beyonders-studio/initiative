@@ -120,15 +120,15 @@ export async function verifyDevice(
 }
 
 /**
- * Open a session with a device. A signed one-time key is checked against the
- * fingerprint key inside the ratchet; `null` is for a device that signs nothing.
+ * Open a session with a device. The one-time key's signature is checked
+ * against the fingerprint key inside the ratchet.
  */
 export async function createOutboundSession(
   pickle: string,
   theirIdentityKey: string,
   theirFingerprintKey: string,
   theirOneTimeKey: string,
-  oneTimeKeySignature: string | null,
+  oneTimeKeySignature: string,
   fallback: boolean
 ): Promise<OutboundSession> {
   await loadRatchet();

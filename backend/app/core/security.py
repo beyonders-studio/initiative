@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Any, Literal
 
-import bcrypt
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -155,13 +154,11 @@ SESSION_COOKIE_NAME = "session_token"
 # smaller exposure than the session cookie).
 REFRESH_COOKIE_NAME = "refresh_token"
 
-# The hash schemes ``verify_password`` below can actually check. A stored value
-# outside this set — the ``'!'`` marker the 0152 downgrade writes, or anything
-# else — never verifies, which makes it the definition of "no usable password"
-# for callers that have to ask about a hash without checking one.
+# The hash scheme ``verify_password`` below can actually check. A stored value
+# outside it — the ``'!'`` marker the 0152 downgrade writes, or anything else —
+# never verifies, which makes it the definition of "no usable password" for
+# callers that have to ask about a hash without checking one.
 ARGON2_HASH_PREFIX = "$argon2"
-BCRYPT_HASH_PREFIXES = ("$2a$", "$2b$", "$2y$")
-USABLE_HASH_PREFIXES = (ARGON2_HASH_PREFIX, *BCRYPT_HASH_PREFIXES)
 
 
 def has_usable_password(hashed: str | None) -> bool:
@@ -171,7 +168,7 @@ def has_usable_password(hashed: str | None) -> bool:
     password *without* checking one — re-authenticating before a change, or
     deciding whether there is anything to re-authenticate against at all.
 
-    A value outside :data:`USABLE_HASH_PREFIXES` never verifies, so it is not a
+    A value not under :data:`ARGON2_HASH_PREFIX` never verifies, so it is not a
     password: NULL and the ``'!'`` marker a 0152 downgrade writes read the same
     here. The one thing it cannot see is an account provisioned before 0152,
     whose throwaway hash is a real argon2 value — that reads as holding a
@@ -179,10 +176,10 @@ def has_usable_password(hashed: str | None) -> bool:
     itself through password reset.
 
     The row-level form of the same question is
-    ``services.auth.identity._no_usable_password_clause``; both read these
-    prefixes, so there is one definition.
+    ``services.auth.identity._no_usable_password_clause``; both read this
+    prefix, so there is one definition.
     """
-    return bool(hashed) and hashed.startswith(USABLE_HASH_PREFIXES)
+    return bool(hashed) and hashed.startswith(ARGON2_HASH_PREFIX)
 
 
 # argon2id with library defaults — OWASP-aligned. Stored hashes embed the
@@ -190,26 +187,9 @@ def has_usable_password(hashed: str | None) -> bool:
 _argon2_hasher = PasswordHasher()
 
 # Sign-in refuses an unknown address, an account without a usable password,
-# and a wrong password through one fixed KDF schedule. Neither hash belongs to
-# an account; they exist only to fill the unused slot in that schedule.
-_SIGN_IN_DUMMY_PASSWORD = "initiative-login-dummy-password"
-_SIGN_IN_DUMMY_ARGON2_HASH = _argon2_hasher.hash(_SIGN_IN_DUMMY_PASSWORD)
-#: Work factor for the stand-in bcrypt hash below.
-#:
-#: Pinned rather than taking `bcrypt.gensalt()`'s default, because this number
-#: decides what an address with no account costs to probe. Every sign-in pays a
-#: bcrypt check so that an unknown address costs the same as a legacy bcrypt
-#: account; that equality holds only while this matches the cost those stored
-#: hashes carry. Adjacent costs are far apart -- measured here, cost 10 verifies
-#: in ~102 ms against ~400 ms for cost 12 -- so inheriting the library default
-#: would let a dependency release move it for every legacy account at once,
-#: on upgrade, with nothing saying so. 12 is that default today; changing it
-#: should be an edit somebody makes on purpose.
-SIGN_IN_BCRYPT_COST = 12
-
-_SIGN_IN_DUMMY_BCRYPT_HASH = bcrypt.hashpw(
-    _SIGN_IN_DUMMY_PASSWORD.encode("utf-8"), bcrypt.gensalt(SIGN_IN_BCRYPT_COST)
-).decode("utf-8")
+# and a wrong password with the same one argon2 check. This hash belongs to no
+# account; it stands in where there is no usable one to check.
+_SIGN_IN_DUMMY_ARGON2_HASH = _argon2_hasher.hash("initiative-login-dummy-password")
 
 
 def get_password_hash(password: str) -> str:
@@ -218,14 +198,11 @@ def get_password_hash(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
-    """Verify a plaintext password against either an argon2id or legacy bcrypt hash.
+    """Verify a plaintext password against an argon2id hash.
 
     A ``None`` hash means the account has no password (SSO-only) — never a
     match, so every caller gets uniform "incorrect credentials" behavior
-    without a separate check. Existing users still have bcrypt hashes from the
-    passlib era; those are verified directly with the bcrypt library. The login
-    flow rehashes them as argon2id on next successful login (see
-    ``password_needs_rehash``).
+    without a separate check.
     """
     if hashed_password is None:
         return False
@@ -235,48 +212,32 @@ def verify_password(plain_password: str, hashed_password: str | None) -> bool:
             return True
         except VerifyMismatchError, VerificationError, InvalidHashError:
             return False
-    if hashed_password.startswith(BCRYPT_HASH_PREFIXES):
-        try:
-            return bcrypt.checkpw(
-                plain_password.encode("utf-8"),
-                hashed_password.encode("utf-8"),
-            )
-        except ValueError:
-            return False
     return False
 
 
 def verify_sign_in_password(plain_password: str, hashed_password: str | None) -> bool:
-    """Verify a sign-in while always paying one Argon2 and one bcrypt check.
+    """Verify a sign-in while always paying one argon2 check.
 
-    The stored credential replaces the dummy for its own scheme. The other
-    scheme still runs, and an absent or unsupported credential uses both
-    dummies. Only a match against the stored credential can authenticate.
+    An absent or unusable credential is checked against a stand-in instead,
+    which can never authenticate: only a match against the stored credential
+    does.
     """
-    is_argon2 = bool(hashed_password and hashed_password.startswith(ARGON2_HASH_PREFIX))
-    is_bcrypt = bool(
-        hashed_password and hashed_password.startswith(BCRYPT_HASH_PREFIXES)
+    usable = has_usable_password(hashed_password)
+    matches = verify_password(
+        plain_password, hashed_password if usable else _SIGN_IN_DUMMY_ARGON2_HASH
     )
-    argon2_hash = hashed_password if is_argon2 else _SIGN_IN_DUMMY_ARGON2_HASH
-    bcrypt_hash = hashed_password if is_bcrypt else _SIGN_IN_DUMMY_BCRYPT_HASH
-
-    argon2_matches = verify_password(plain_password, argon2_hash)
-    bcrypt_matches = verify_password(plain_password, bcrypt_hash)
-
-    return bool((is_argon2 and argon2_matches) or (is_bcrypt and bcrypt_matches))
+    return usable and matches
 
 
 def password_needs_rehash(hashed_password: str | None) -> bool:
     """Return True if the stored hash should be rewritten on next successful login.
 
-    Triggers for legacy bcrypt hashes and for argon2 hashes whose parameters
-    have drifted from the current PasswordHasher defaults. ``None`` (no
-    password set) has nothing to rehash.
+    Triggers for argon2 hashes whose parameters have drifted from the current
+    PasswordHasher defaults. Anything else is no usable password, with nothing
+    to rehash.
     """
-    if hashed_password is None:
+    if hashed_password is None or not hashed_password.startswith(ARGON2_HASH_PREFIX):
         return False
-    if not hashed_password.startswith(ARGON2_HASH_PREFIX):
-        return True
     try:
         return _argon2_hasher.check_needs_rehash(hashed_password)
     except InvalidHashError:
@@ -379,7 +340,7 @@ def decode_session_token(token: str) -> dict[str, Any]:
         token,
         audience=AUTH_ACCESS_AUDIENCE,
         issuer=TOKEN_ISSUER,
-        require=["exp", "sub", "ver", "aud", "iss"],
+        require=["exp", "sub", "ver", "sid", "aud", "iss"],
     )
 
 

@@ -70,10 +70,6 @@ configure_logging()
 
 logger = logging.getLogger(__name__)
 
-#: The same question for a row written before the type column existed: its
-#: stored name is the only thing that describes it.
-NAMED_AS_MARKUP = (".svg", ".html", ".htm")
-
 #: How long a browser may reuse a served upload before asking again.
 #:
 #: A stored blob is immutable, so this is not about staleness — it is how
@@ -625,16 +621,9 @@ async def serve_upload_file(
     }
     # What the file is, as the server recorded it when it was written — so a
     # local blob and an S3 one describe themselves the same way, rather than
-    # each backend answering from what it happens to have. A row from before
-    # the column existed carries nothing; its name is read instead, and the
-    # backend keeps naming the type as it always has.
+    # each backend answering from what it happens to have.
     stored_type = hit[0]
-    inline = (
-        stored_type in INLINE_UPLOAD_TYPES
-        if stored_type is not None
-        else not fname.lower().endswith(NAMED_AS_MARKUP)
-    )
-    if not inline:
+    if stored_type not in INLINE_UPLOAD_TYPES:
         headers["Content-Disposition"] = "attachment"
         headers["Content-Security-Policy"] = USER_CONTENT_CSP
     logger.info("upload_served filename=%s user=%d", filename, current_user.id)

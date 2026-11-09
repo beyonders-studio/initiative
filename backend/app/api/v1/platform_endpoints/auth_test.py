@@ -1041,26 +1041,20 @@ async def test_login_email_case_insensitive(client: AsyncClient, session: AsyncS
     assert "access_token" in data
 
 
-async def test_login_rehashes_legacy_bcrypt_password(
+async def test_login_rehashes_a_password_under_outdated_parameters(
     client: AsyncClient, session: AsyncSession
 ):
-    """A user whose stored hash predates the argon2 migration should still
-    log in successfully, and the hash should be rewritten as argon2id on
-    the way out so the bcrypt verify path eventually disappears for active
-    users.
-    """
-    import bcrypt as _bcrypt
+    """A hash written under weaker argon2 parameters still signs in, and is
+    rewritten under the current ones on the way out."""
+    from argon2 import PasswordHasher
 
-    password = "legacy-bcrypt-password"
-    legacy_hash = _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode(
-        "utf-8"
-    )
-    assert legacy_hash.startswith("$2"), "test setup expected a real bcrypt hash"
+    password = "outdated-parameters-password"
+    outdated = PasswordHasher(time_cost=1, memory_cost=8192).hash(password)
 
     user = await create_user(
         session,
-        email="legacy@example.com",
-        hashed_password=legacy_hash,
+        email="outdated@example.com",
+        hashed_password=outdated,
         status=UserStatus.active,
         email_verified=True,
     )
@@ -1068,19 +1062,18 @@ async def test_login_rehashes_legacy_bcrypt_password(
 
     response = await client.post(
         "/api/v1/auth/token",
-        data={"username": "legacy@example.com", "password": password},
+        data={"username": "outdated@example.com", "password": password},
     )
     assert response.status_code == 200
 
     await session.refresh(user)
-    assert user.hashed_password.startswith("$argon2"), (
-        "expected legacy bcrypt hash to be rewritten as argon2id after a successful login"
-    )
+    assert user.hashed_password != outdated
+    assert not PasswordHasher().check_needs_rehash(user.hashed_password)
 
-    # Second login must verify against the new argon2 hash.
+    # The next sign-in verifies against the new hash.
     response = await client.post(
         "/api/v1/auth/token",
-        data={"username": "legacy@example.com", "password": password},
+        data={"username": "outdated@example.com", "password": password},
     )
     assert response.status_code == 200
 

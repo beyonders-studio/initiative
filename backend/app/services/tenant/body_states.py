@@ -27,7 +27,6 @@ from typing import Any, Protocol
 from pycrdt import Doc, Map
 
 from app.core.file_types import FileType
-from app.core.identity_boundary import MentionForm, without_mention_names
 from app.services import editor_engine
 
 logger = logging.getLogger(__name__)
@@ -108,9 +107,7 @@ class _Lexical:
         return True
 
     async def render(self, state: bytes) -> dict | None:
-        return without_mention_names(
-            await editor_engine.render(state), MentionForm.lexical
-        )
+        return await editor_engine.render(state)
 
     async def apply(self, state: bytes, content: dict) -> bytes:
         return await editor_engine.apply(state, content)
@@ -208,8 +205,7 @@ class _Spreadsheet:
         return await self.apply(b"", workbook)
 
     def holds_body(self, state: bytes) -> bool:
-        doc = _read(state)
-        return any(len(doc.get(key, type=Map)) for key in (_SHEETS, _META, *_PARTS))
+        return len(_read(state).get(_SHEETS, type=Map)) > 0
 
     async def render(self, state: bytes) -> dict | None:
         from app.services.tenant.files import FileContentError
@@ -220,12 +216,7 @@ class _Spreadsheet:
             if isinstance(container, Map):
                 sheets.append(self._sheet(sheet_id, container))
         if not sheets:
-            # Written before a workbook held several sheets: its maps sit at
-            # the top of the file, and are the one sheet.
-            legacy = {key: doc.get(key, type=Map) for key in (_META, *_PARTS)}
-            if not any(len(part) for part in legacy.values()):
-                return None
-            sheets.append(self._sheet(None, legacy))
+            return None
         # Tab order, ties broken by id, as the editor lists them.
         sheets.sort(key=lambda sheet: (sheet[0], sheet[1]))
         try:
@@ -241,7 +232,7 @@ class _Spreadsheet:
             return None
 
     @staticmethod
-    def _sheet(sheet_id: str | None, container: Any) -> tuple[Any, str, dict]:
+    def _sheet(sheet_id: str, container: Map) -> tuple[Any, str, dict]:
         def part(key: str) -> dict:
             value = container.get(key)
             return dict(value.items()) if isinstance(value, Map) else {}
@@ -270,12 +261,11 @@ class _Spreadsheet:
                 for index, value in part(key).items()
                 if isinstance(value, dict)
             }
-        if sheet_id is not None:
-            sheet["id"] = sheet_id
+        sheet["id"] = sheet_id
         if meta.get("hidden") is True:
             sheet["hidden"] = True
         position = order if isinstance(order, (int, float)) else float("inf")
-        return position, sheet_id or "", sheet
+        return position, sheet_id, sheet
 
     async def apply(self, state: bytes, content: dict) -> bytes:
         def write(doc: Doc) -> None:
@@ -299,12 +289,6 @@ class _Spreadsheet:
                 _sync(container[_META], meta)
                 for key in _PARTS:
                     _sync(container[key], sheet[key])
-            # A file from before several sheets keeps its maps at the
-            # top; the workbook now holds them.
-            for key in (_META, *_PARTS):
-                legacy = doc.get(key, type=Map)
-                for entry in list(legacy.keys()):
-                    del legacy[entry]
 
         return _written(state, write)
 

@@ -918,7 +918,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             # Same: the transport is reached on the authenticated platform-tier
             # path, never before a session is routed.
             app_user=None,
-            # UPDATE is column-scoped to last_seen_at, session_id and signature,
+            # UPDATE is column-scoped to last_seen_at and session_id,
             # so it lives in the column ACL, not here; so is the system engine's
             # UPDATE of session_id, which follows a key store across renewals.
             platform_base=frozenset({SELECT, INSERT, DELETE}),

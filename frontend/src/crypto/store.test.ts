@@ -108,7 +108,7 @@ describe("the message log", () => {
 
 describe("acting on a message already said", () => {
   const mine = { id: "m", body: "mine", at: "2026-01-01T00:00:00Z", mine: true };
-  const theirs = { id: "t", body: "theirs", at: "2026-01-01T00:00:00Z", mine: false };
+  const theirs = { id: "t", body: "theirs", at: "2026-01-01T00:00:00Z", mine: false, author: 7 };
 
   beforeEach(async () => {
     await messageLog.append("conv", mine);
@@ -194,9 +194,9 @@ describe("acting on a message already said", () => {
     expect(stored.find((entry) => entry.id === "b1")?.body).toBe("bob meant this");
   });
 
-  it("still lets a pair edit where neither side records an author", async () => {
-    // A thread from before a message carried one, on a session opened before a
-    // session carried one. Two people, so the side already answers it.
+  it("lets the other side act only with an author to hold it to", async () => {
+    // Their side always names who said it; an envelope that names nobody, or a
+    // message that does, acts on nothing.
     await messageLog.append("old", {
       id: "o1",
       body: "said once",
@@ -205,8 +205,11 @@ describe("acting on a message already said", () => {
     });
 
     expect(
-      await messageLog.applyEdit("old", "o1", "said twice", "2026-01-02T00:00:00Z", "theirs", 1)
-    ).toBe(true);
+      await messageLog.applyEdit("old", "o1", "said twice", "2026-01-02T00:00:00Z", "theirs", 1, 7)
+    ).toBe(false);
+    expect(
+      await messageLog.applyEdit("conv", "t", "said twice", "2026-01-02T00:00:00Z", "theirs", 1)
+    ).toBe(false);
   });
 
   it("keeps the newest edit whichever order two arrive in", async () => {
@@ -244,7 +247,9 @@ describe("acting on a message already said", () => {
 
   it("lets each side take back only what it said", async () => {
     expect(await messageLog.applyRemove("conv", "t", "mine", "2026-01-02T00:00:00Z")).toBe(false);
-    expect(await messageLog.applyRemove("conv", "t", "theirs", "2026-01-02T00:00:00Z")).toBe(true);
+    expect(await messageLog.applyRemove("conv", "t", "theirs", "2026-01-02T00:00:00Z", 7)).toBe(
+      true
+    );
 
     // The entry stays, so a thread does not close over the gap.
     const stored = await messageLog.get("conv");
@@ -253,6 +258,7 @@ describe("acting on a message already said", () => {
       id: "t",
       at: "2026-01-01T00:00:00Z",
       mine: false,
+      author: 7,
       replyTo: undefined,
       body: "",
       removedAt: "2026-01-02T00:00:00Z",
@@ -261,18 +267,18 @@ describe("acting on a message already said", () => {
 
   it("takes the reactions and the receipt with it", async () => {
     await messageLog.applyReaction("conv", "t", "👍", true, "mine");
-    await messageLog.applyRemove("conv", "t", "theirs", "2026-01-02T00:00:00Z");
+    await messageLog.applyRemove("conv", "t", "theirs", "2026-01-02T00:00:00Z", 7);
 
     const stored = await messageLog.get("conv");
     expect(stored[1].reactions).toBeUndefined();
   });
 
   it("leaves nothing to land on a message already taken back", async () => {
-    await messageLog.applyRemove("conv", "t", "theirs", "2026-01-02T00:00:00Z");
+    await messageLog.applyRemove("conv", "t", "theirs", "2026-01-02T00:00:00Z", 7);
 
     expect(await messageLog.applyReaction("conv", "t", "👍", true, "mine")).toBe(false);
     expect(
-      await messageLog.applyEdit("conv", "t", "back again", "2026-01-03T00:00:00Z", "theirs", 1)
+      await messageLog.applyEdit("conv", "t", "back again", "2026-01-03T00:00:00Z", "theirs", 1, 7)
     ).toBe(false);
   });
 });
@@ -436,18 +442,6 @@ describe("the device-registration claim", () => {
     expect(await deviceId.get()).toBeUndefined();
     expect(await messageLog.get("conv")).toEqual([]);
     expect(await deviceClaim.take()).not.toBeNull();
-  });
-
-  it("empties a store from before claims were recorded, by its device id", async () => {
-    await deviceId.set("device-1");
-    await messageLog.append("conv", { id: "a", body: "only here", at: "", mine: false });
-
-    await deviceClaim.invalidate("device-2");
-    expect(await deviceId.get()).toBe("device-1");
-
-    await deviceClaim.invalidate("device-1");
-    expect(await deviceId.get()).toBeUndefined();
-    expect(await messageLog.get("conv")).toEqual([]);
   });
 
   it("leaves a claim somebody is already registering under alone", async () => {

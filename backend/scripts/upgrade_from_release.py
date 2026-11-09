@@ -58,18 +58,18 @@ Usage, from ``backend/`` with ``SECRET_KEY`` set, as each boot reads it::
 
     docker build -t initiative:local --build-arg VERSION=$(cat ../VERSION) ..
     python scripts/upgrade_from_release.py --image initiative:local \\
-        --from v0.73.1 \\
+        --from v0.77.1 \\
         --server postgresql://initiative:initiative@localhost:5432 \\
         --fresh-server postgresql://initiative:initiative@localhost:5433
 
-``--from`` defaults to the newest release tag. ``--walk`` starts at
-:data:`WALK_FROM` and boots every release after it, less :data:`WITHDRAWN`.
+``--from`` defaults to the newest release tag. ``--walk`` starts at the release
+the migration chain's baseline was cut at, the oldest a database may come from,
+and boots every release after it, less :data:`WITHDRAWN`.
 
 ``--one-url`` runs every boot, of each release and of the current tree, with a
 single ``DATABASE_URL`` naming the database owner, as ``docker-compose.example.yml``
 does: the app derives its three logins from it. Without it, each boot is given
-the three logins and the owner URL explicitly. The walk then starts at
-:data:`ONE_URL_FROM`, the first release that could run that way.
+the three logins and the owner URL explicitly.
 """
 
 from __future__ import annotations
@@ -142,26 +142,10 @@ LOGINS = {
 }
 
 
-#: Where ``--walk`` starts: the oldest release whose test factories hold
-#: everything ``upgrade_seed.py`` makes.
-WALK_FROM = "v0.70.0"
-
-#: The first release that derives its logins from one owner ``DATABASE_URL``.
-ONE_URL_FROM = "v0.72.0"
-
 #: Releases withdrawn after they shipped, and the release that replaced them.
 #: A walk steps over each one, as the deployments it stopped did: what it
 #: shipped is fixed, so booting it would only fail again.
 WITHDRAWN = {
-    # Its image is no longer published: an upgrade with OIDC claim rules
-    # stopped at startup.
-    "v0.70.0": "v0.70.1",
-    # Its image is no longer published: it would not start where a shared
-    # calendar had been trashed.
-    "v0.71.1": "v0.71.2",
-    # Its bootstrap withheld the TEMPORARY privilege a 0414 backfill needs
-    # (issue #2152); v0.73.1 grants it.
-    "v0.73.0": "v0.73.1",
     # Never published: its build walked from its own tag, whose image did not
     # exist yet.
     "v0.75.1": "v0.75.2",
@@ -170,6 +154,16 @@ WITHDRAWN = {
 
 #: Every database setting a boot may be given; each boot gets only its own.
 _DATABASE_SETTINGS = (*LOGINS, "DATABASE_URL_BOOTSTRAP")
+
+
+def _floor() -> str:
+    """The release the migration chain starts at: the current tree refuses a
+    database from before it, so nothing older is supported."""
+    for path in (BACKEND / "alembic" / "versions").glob("*_baseline.py"):
+        found = re.search(r'^release = "(v[\d.]+)"$', path.read_text(), re.MULTILINE)
+        if found:
+            return found.group(1)
+    raise SystemExit("No baseline revision names the release it was cut at.")
 
 
 def _environment(server: str, *, one_url: bool) -> dict[str, str]:
@@ -890,14 +884,9 @@ def _boot(
     env: dict[str, str],
     *,
     setup: Setup | None = None,
-    bootstrap: bool = False,
 ) -> None:
     """Start ``image`` as a deployment does, wait until it answers, check what
-    it serves when it is this tree's (``setup``), and stop it.
-
-    Releases before 0.72 did not run the bootstrap when they started (their
-    CI ran it as a step of its own), so they are given it first. It changes
-    nothing where it has already run."""
+    it serves when it is this tree's (``setup``), and stop it."""
     given = {"APP_URL": APP_URL}
     if setup is not None:
         given |= {
@@ -919,16 +908,6 @@ def _boot(
         pass
     else:
         _fail(f"Something already answers on {SERVED_AT}; stop it first", [])
-    if bootstrap:
-        _docker(
-            "--rm",
-            image,
-            "python",
-            "-m",
-            "app.db.bootstrap",
-            env=env,
-            image_env=image_env,
-        )
     name = f"upgrade-from-release-{os.getpid()}"
     _docker("-d", "--name", name, image, env=env, image_env=image_env)
     try:
@@ -960,10 +939,9 @@ def _boot_keeping_rows(
     env: dict[str, str],
     *,
     setup: Setup | None = None,
-    bootstrap: bool = False,
 ) -> None:
     before = asyncio.run(_row_counts(server))
-    _boot(image, env, setup=setup, bootstrap=bootstrap)
+    _boot(image, env, setup=setup)
     lost = _lost(before, asyncio.run(_row_counts(server)))
     if lost:
         _fail(f"Booting {label} lost rows it held", lost)
@@ -974,7 +952,7 @@ def main() -> None:
     parser.add_argument(
         "--from",
         dest="start",
-        help=f"release tag to upgrade from (newest; {WALK_FROM} with --walk)",
+        help="release tag to upgrade from (newest; the baseline's with --walk)",
     )
     parser.add_argument(
         "--walk",
@@ -1001,10 +979,10 @@ def main() -> None:
     args = parser.parse_args()
 
     tags = _release_tags()
-    walk_from = ONE_URL_FROM if args.one_url else WALK_FROM
-    start = args.start or (walk_from if args.walk else tags[-1])
-    if args.one_url and tags.index(start) < tags.index(ONE_URL_FROM):
-        parser.error(f"{start} predates one-URL setups; the first is {ONE_URL_FROM}")
+    floor = _floor()
+    start = args.start or (floor if args.walk else tags[-1])
+    if tags.index(start) < tags.index(floor):
+        parser.error(f"{start} is older than {floor}, where the migrations start")
     releases = (
         [tag for tag in tags[tags.index(start) :] if tag not in WITHDRAWN]
         if args.walk
@@ -1023,7 +1001,6 @@ def main() -> None:
             args.server,
             _release_image(tag),
             upgraded_env,
-            bootstrap=tags.index(tag) < tags.index(ONE_URL_FROM),
         )
         if index == 0:
             # The seed is written against the release's own test factories,

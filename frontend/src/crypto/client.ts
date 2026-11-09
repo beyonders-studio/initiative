@@ -122,7 +122,7 @@ export const ratchet = {
     theirIdentityKey: string,
     theirFingerprintKey: string,
     theirOneTimeKey: string,
-    oneTimeKeySignature: string | null,
+    oneTimeKeySignature: string,
     fallback: boolean
   ) =>
     call<OutboundSession>(

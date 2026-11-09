@@ -669,10 +669,6 @@ def frozen_write_triggers(table: str) -> list[str]:
             )
     doomed = freeze_leg(table, "DELETE", alias="OLD")
     if doomed is None:
-        # A schema provisioned before the table was let go still has one.
-        out.append(
-            f"DROP TRIGGER IF EXISTS tr_{table}_frozen_ancestor_delete ON {table}"
-        )
         return out
     out.append(
         f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_ancestor_delete "

@@ -164,10 +164,8 @@ class BackupManifest(SanitizedBaseModel):
     entries: list[ManifestEntry]
     assets: list[ManifestAsset]
     skipped: list[ManifestSkipped]
-    # Everyone the archive quotes. Absent in a backup taken before it was
-    # inventoried, which reads as "nobody to ask about" and leaves those
-    # comments to the exact-handle match.
-    people: list[ManifestPerson] = []
+    # Everyone the archive quotes.
+    people: list[ManifestPerson]
 
 
 class BackupToolEstimate(SanitizedBaseModel):

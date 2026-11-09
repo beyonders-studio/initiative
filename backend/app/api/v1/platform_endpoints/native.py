@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 
 from app.core.config import API_V1_STR
 from app.core.messages import NativeMessages
-from app.core.version import __version__, get_min_native_version
+from app.core.version import __version__
 
 router = APIRouter()
 
@@ -26,7 +26,6 @@ router = APIRouter()
 # flow is only exercised against a built image.
 _OTA_DIR = Path(__file__).resolve().parents[4] / "ota"
 _BUNDLE_PATH = _OTA_DIR / "bundle.zip"
-_CHECKSUM_PATH = _OTA_DIR / "bundle.sha256"
 _STATEMENT_PATH = _OTA_DIR / "statement.json"
 _SIGNATURE_PATH = _OTA_DIR / "statement.sig"
 
@@ -35,27 +34,20 @@ _SIGNATURE_PATH = _OTA_DIR / "statement.sig"
 def get_bundle_manifest() -> dict[str, object]:
     """Describe the OTA bundle this backend serves.
 
-    Returns the bundle ``version`` (equal to the app version), a ``url`` the client joins to
-    its server origin to download the zip, the ``checksum`` (sha256 hex) the updater verifies,
-    and ``minNativeVersion`` — the minimum native app (APK/IPA) version the bundle requires.
-    The client refuses the update (and prompts to update from the store) when its installed
-    native app version is older.
-
-    A release image also carries ``statement`` — the same facts as JSON — and its
+    Returns the bundle ``version`` (equal to the app version) and a ``url`` the client
+    joins to its server origin to download the zip. A release image also carries
+    ``statement`` — the bundle's version, sha256 digest and app floors as JSON — and its
     ``signature``, made with the project's release key when the image was built. The app
     installs only a bundle whose statement verifies against a key it was built with, and
-    reads the version, digest and native floor from the statement. The loose fields stay
-    for app bundles from before the statement existed.
+    refuses one whose floor is above its installed app (prompting a store update).
     """
-    if not _BUNDLE_PATH.is_file() or not _CHECKSUM_PATH.is_file():
+    if not _BUNDLE_PATH.is_file():
         raise HTTPException(
             status_code=404, detail=NativeMessages.OTA_BUNDLE_NOT_AVAILABLE
         )
     manifest: dict[str, object] = {
         "version": __version__,
         "url": f"{API_V1_STR}/native/bundle/download",
-        "checksum": _CHECKSUM_PATH.read_text().strip(),
-        "minNativeVersion": get_min_native_version(),
     }
     if _STATEMENT_PATH.is_file() and _SIGNATURE_PATH.is_file():
         manifest["statement"] = _STATEMENT_PATH.read_text()

@@ -47,7 +47,6 @@ import { readRange } from "@/lib/spreadsheet/range";
 import { documentExtension } from "@/ui/editor/document-extension";
 import { MarkdownShortcutsExtension } from "@/ui/editor/extensions/markdown-shortcuts-extension";
 import { COLLAB_EXCLUDED_PROPERTIES } from "@/ui/editor/nodes/image-node";
-import { registerLegacyNodes } from "@/ui/editor/nodes/legacy-nodes";
 
 /** The id the browser's `CollaborationPlugin` binds under. */
 const ROOT_ID = "main";
@@ -136,10 +135,6 @@ function withEditor<T>(clientId: number | null, use: (editor: LexicalEditor, doc
   }
 }
 
-/** Rewrite the legacy nodes a document holds as current content, as the
- * browser's editor does when it opens one. */
-const modernize = (editor: LexicalEditor) => registerLegacyNodes(editor)();
-
 /**
  * A document's Yjs state, from its editor JSON, or with one empty paragraph
  * when it has none — what the browser's editor starts a new document with.
@@ -150,7 +145,6 @@ function bootstrap(json: string | null, clientId: number): string {
       editor.update(() => $getRoot().append($createParagraphNode()), { discrete: true });
     } else {
       editor.setEditorState(editor.parseEditorState(json), { tag: "history-merge" });
-      modernize(editor);
     }
     return toHex(encodeStateAsUpdate(doc));
   });
@@ -165,7 +159,6 @@ function load(editor: LexicalEditor, doc: Doc, state: string) {
 function render(state: string): string {
   return withEditor(null, (editor, doc) => {
     load(editor, doc, state);
-    modernize(editor);
     return JSON.stringify(editor.getEditorState().toJSON());
   });
 }
@@ -339,7 +332,6 @@ function apply(state: string, json: string, clientId: number): string {
     editor.update(() => $reconcileChildren($getRoot(), was.children ?? [], next.children ?? []), {
       discrete: true,
     });
-    modernize(editor);
     return toHex(encodeStateAsUpdate(doc, before));
   });
 }
@@ -375,7 +367,6 @@ function fromMarkdown(text: string, plain: boolean): string {
       },
       { discrete: true }
     );
-    modernize(editor);
     return JSON.stringify(editor.getEditorState().toJSON());
   });
 }

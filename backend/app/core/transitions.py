@@ -19,8 +19,5 @@ class Transition:
     grace: timedelta
 
 
-#: Devices registered before their keys were signed sign themselves the next
-#: time they open. After this, an unsigned registration is refused.
-DM_SIGNED_DEVICES = Transition("dm_signed_devices", timedelta(days=30))
-
-TRANSITIONS: tuple[Transition, ...] = (DM_SIGNED_DEVICES,)
+#: The transitions this release is counting down. Empty is the normal state.
+TRANSITIONS: tuple[Transition, ...] = ()

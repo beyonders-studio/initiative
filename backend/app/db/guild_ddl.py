@@ -45,7 +45,6 @@ from app.db.authorization import (
     IN_POLICY,
     POLICY_SEAT,
     POLICY_SETTINGS_ADMIN,
-    RETIRED_GUILD_FUNCTION_SIGNATURES,
     STANDING,
     plugin_refused,
     plugin_scope,
@@ -376,8 +375,6 @@ def _managed_block(table: str, initiative_expr: str) -> str:
     lines = [
         f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
-        # The shape before this one: an allow-all for every command.
-        f"DROP POLICY IF EXISTS guild_level_open ON {table};",
         f"DROP POLICY IF EXISTS managed_select ON {table};",
         f"CREATE POLICY managed_select ON {table} AS PERMISSIVE FOR SELECT",
         "  USING (true);",
@@ -558,9 +555,6 @@ def _freeze_policies(table: str) -> list[str]:
             continue
         lines.append(f"CREATE POLICY {name} ON {table} AS RESTRICTIVE FOR {command}")
         lines.append(f"  WITH CHECK (NOT {leg});")
-    # Earlier shapes carried these; drop them wherever one was left.
-    lines.append(f"DROP POLICY IF EXISTS frozen_ancestor_update ON {table};")
-    lines.append(f"DROP POLICY IF EXISTS frozen_ancestor_delete ON {table};")
     return lines
 
 
@@ -1867,30 +1861,6 @@ _FREEZE_SECTION = """\
 -- ==========================================================================="""
 
 
-def render_retired_functions_ddl() -> str:
-    """Drop the functions an earlier render put in the schema and this one no
-    longer calls. Last in the script, after every policy that named one has
-    been re-created without it.
-
-    Only the copy in the schema being rendered. The script runs with the
-    search path set to ``<schema>, public``, so an unqualified name with no
-    local copy resolves to ``public`` — and a release that kept the function
-    there (0.71 did) has every other guild's policies still bound to that
-    copy. Dropping it from one guild's render fails that guild, and then the
-    next, so no guild is ever re-rendered. The shared copy is retired once, at
-    boot, after every guild has stopped using it
-    (``ensure_public_copies_dropped``).
-    """
-    drops = " ".join(
-        f"IF to_regprocedure(format('%I.{name}{args}', current_schema())) "
-        "IS NOT NULL THEN "
-        f"EXECUTE format('DROP FUNCTION %I.{name}{args}', current_schema()); "
-        "END IF;"
-        for name, args in RETIRED_GUILD_FUNCTION_SIGNATURES
-    )
-    return f"DO $retire$ BEGIN {drops} END $retire$;"
-
-
 def render_guild_rls_ddl() -> str:
     from app.db.guest_access import render_guest_rls_ddl
     from app.db.holds import render_holds_ddl
@@ -1994,7 +1964,7 @@ def render_guild_rls_ddl() -> str:
         for trigger in frozen_write_triggers(table)
     ]
     out += "\n\n" + _FREEZE_SECTION + "\n" + "\n".join(guards)
-    return out + "\n\n" + render_retired_functions_ddl() + "\n"
+    return out + "\n"
 
 
 # ============================================================================

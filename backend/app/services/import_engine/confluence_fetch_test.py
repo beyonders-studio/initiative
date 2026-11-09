@@ -158,7 +158,7 @@ async def _bundle(**kw):
             CREDENTIAL,
             space_keys=kw.pop("space_keys", ["DOCS"]),
             guild_id=1,
-            app_version="0.0.0-test",
+            app_version="0.78.0-test",
             store=writer.put_asset,
             **kw,
         )
@@ -170,7 +170,7 @@ async def _bundle(**kw):
             guild_id=1,
             guild_name="acme.atlassian.net",
             target_initiative_id=42,
-            app_version="0.0.0-test",
+            app_version="0.78.0-test",
             site_url=CREDENTIAL.site_url,
         ).read_bytes()
     return bundle, fetched.report

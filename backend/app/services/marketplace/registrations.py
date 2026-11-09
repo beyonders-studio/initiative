@@ -1324,10 +1324,6 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
     ``enabled`` is not reconciled: turning a registration off is an operator
     action, and a restart must not reverse it.
 
-    An entry naming ``grants`` is read without it, and the pass logs that it
-    was: the field is no longer part of a registration, and a file written for
-    an earlier release still boots.
-
     A malformed file or an unreadable path costs that file, and a refused entry
     costs that entry, and nothing else — the caller keeps booting.
     """
@@ -1359,12 +1355,6 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
             )
             skipped += 1
             continue
-        if "grants" in entry:
-            logger.warning(
-                "plug-in services: entry %r names grants, which a registration no "
-                "longer has; the field is ignored",
-                public_id,
-            )
         if public_id in seen:
             logger.warning(
                 "plug-in services: %r appears more than once in %s — later entry skipped",

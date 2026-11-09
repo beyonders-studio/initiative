@@ -61,7 +61,6 @@
     "@lexical/code": "^0.53.0",
     "@lexical/code-prism": "^0.53.0",
     "@lexical/extension": "^0.53.0",
-    "@lexical/hashtag": "^0.53.0",
     "@lexical/history": "^0.53.0",
     "@lexical/link": "^0.53.0",
     "@lexical/list": "^0.53.0",

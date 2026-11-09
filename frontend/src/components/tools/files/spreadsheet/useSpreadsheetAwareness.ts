@@ -27,9 +27,8 @@ interface SpreadsheetAwarenessUser {
 }
 
 interface SpreadsheetAwarenessSelection {
-  /** The sheet the peer made this selection on. Absent from a client
-   *  that predates multi-sheet; treated as "wherever you're looking". */
-  sheetId?: SheetId;
+  /** The sheet the peer made this selection on. */
+  sheetId: SheetId;
   row: number;
   col: number;
   color: string;
@@ -48,7 +47,7 @@ interface UseSpreadsheetAwarenessArgs {
   user: { id: number; name: string } | null;
   selected: { row: number; col: number };
   /** The sheet on screen: scopes both what is published and which peer
-   *  selections are rendered. */
+   *  selections are rendered. Nothing is published until there is one. */
   sheetId: SheetId | null;
   /** Master switch: when false, the hook neither publishes nor
    *  subscribes (collab disabled or provider not yet ready). */
@@ -86,16 +85,14 @@ export const useSpreadsheetAwareness = ({
   // see peer rings, just don't broadcast their own. Throttled to once
   // per requestAnimationFrame would be overkill: selection changes are
   // rare (clicks / arrow keys) so a plain effect suffices.
-  const lastPublishedRef = useRef<{ sheetId: SheetId | null; row: number; col: number } | null>(
-    null
-  );
+  const lastPublishedRef = useRef<{ sheetId: SheetId; row: number; col: number } | null>(null);
   useEffect(() => {
     if (!canPublish || !awareness || !user) return;
     awareness.setLocalStateField(USER_KEY, { id: user.id, name: user.name });
   }, [canPublish, awareness, user]);
 
   useEffect(() => {
-    if (!canPublish || !awareness || !user) return;
+    if (!canPublish || !awareness || !user || sheetId === null) return;
     const last = lastPublishedRef.current;
     if (
       last &&
@@ -107,7 +104,7 @@ export const useSpreadsheetAwareness = ({
     }
     lastPublishedRef.current = { sheetId, row: selected.row, col: selected.col };
     awareness.setLocalStateField(SELECTION_KEY, {
-      sheetId: sheetId ?? undefined,
+      sheetId,
       row: selected.row,
       col: selected.col,
       color: getUserColorHsl(user.id),
@@ -162,9 +159,8 @@ export const useSpreadsheetAwareness = ({
     // is the bug to avoid right now.
     const m = new Map<string, SpreadsheetPeer>();
     for (const peer of peers) {
-      // Only peers on this sheet. A selection with no sheet came from a
-      // pre-multi-sheet client, which only ever had one.
-      if (peer.selection.sheetId !== undefined && peer.selection.sheetId !== sheetId) continue;
+      // Only peers on this sheet.
+      if (peer.selection.sheetId !== sheetId) continue;
       const key = `${peer.selection.row}:${peer.selection.col}`;
       const existing = m.get(key);
       if (!existing || peer.selection.updatedAt > existing.selection.updatedAt) {

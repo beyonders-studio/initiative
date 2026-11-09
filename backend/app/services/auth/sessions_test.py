@@ -403,6 +403,7 @@ async def test_purge_removes_dead_sessions_and_keeps_live_ones(session):
             user_id=user.id,
             identity_key=b"i",
             fingerprint_key=b"f",
+            signature=b"s",
             session_id=issued.session.id,
         )
         for name, issued in {

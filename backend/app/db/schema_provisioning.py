@@ -739,15 +739,13 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         # No shared floor: a query reads its own community and nothing in
         # ``public`` but the routed community's members. ``USAGE`` on
         # ``public`` names that view and the types the gates take, and holds
-        # no table. The floor it once inherited is revoked, for the schemas
-        # provisioned while it did.
+        # no table.
         f'GRANT USAGE ON SCHEMA "{schema}" TO "{query_role}"',
         (
             f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
             f'GRANT SELECT ON TABLES TO "{query_role}"'
         ),
         f'GRANT SELECT ON ALL TABLES IN SCHEMA "{schema}" TO "{query_role}"',
-        f'REVOKE app_guild_base_ro FROM "{query_role}"',
         f'GRANT USAGE ON SCHEMA public TO "{query_role}"',
         f'GRANT SELECT ON public.current_guild_members TO "{query_role}"',
         (

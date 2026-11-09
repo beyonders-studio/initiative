@@ -948,50 +948,9 @@ def _nearest_alike(
 # Imports
 # ---------------------------------------------------------------------------
 
-_LEGACY_POSITIONS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "last": -1}
-
-
-def from_legacy(data: dict, *, zone: tzinfo, all_day: bool = False) -> str | None:
-    """A repeat in the JSON shape exports carried before RRULE, as the rule its
-    days were picked in (``zone``). None when it names no frequency."""
-    freq = str(data.get("frequency") or "").upper()
-    if freq not in ("DAILY", "WEEKLY", "MONTHLY", "YEARLY"):
-        return None
-
-    def code(day: object) -> str:
-        return str(day)[:2].upper()  # "monday" and the older "MO" alike
-
-    rule: dict[str, list] = {"FREQ": [freq]}
-    if (interval := int(data.get("interval") or 1)) > 1:
-        rule["INTERVAL"] = [interval]
-    if freq == "WEEKLY" and data.get("weekdays"):
-        rule["BYDAY"] = [code(d) for d in data["weekdays"] if code(d) in _WEEKDAYS]
-    if freq in ("MONTHLY", "YEARLY"):
-        if data.get("monthly_mode") == "weekday" and data.get("weekday"):
-            position = _LEGACY_POSITIONS.get(data.get("weekday_position") or "first", 1)
-            rule["BYDAY"] = [f"{position}{code(data['weekday'])}"]
-        elif day := data.get("day_of_month"):
-            # A day a short month lacks fell on that month's last day.
-            rule["BYMONTHDAY"] = [day] if day <= 28 else list(range(28, day + 1))
-            if day > 28:
-                rule["BYSETPOS"] = [-1]
-        if freq == "YEARLY" and data.get("month"):
-            rule["BYMONTH"] = [int(data["month"])]
-    if data.get("ends") == "after_occurrences" and data.get("end_after_occurrences"):
-        rule["COUNT"] = [int(data["end_after_occurrences"])]
-    elif data.get("ends") == "on_date" and data.get("end_date"):
-        # The last day as the form showed it: the date the value is written with.
-        last = datetime.fromisoformat(str(data["end_date"])).date()
-        rule["UNTIL"] = [
-            last
-            if all_day
-            else datetime.combine(last, _END_OF_DAY, zone).astimezone(UTC)
-        ]
-    return Recurrence(rule).to_lines()
-
 
 def imported(
-    value: str | dict | None,
+    value: str | None,
     *,
     kind: RecurrenceKind,
     start: datetime | None,
@@ -1000,18 +959,10 @@ def imported(
     all_day: bool = False,
 ) -> tuple[str | None, int]:
     """A repeat read from an import and its shift: a rule string comes with
-    its ``shift``, and the JSON shape exports carried before RRULE was picked in
-    a zone the export doesn't name, which ``tz`` (the importer's) stands in
-    for. A repeat that doesn't hold up imports as none."""
+    its ``shift``. A repeat that doesn't hold up imports as none."""
     try:
         if not -_MAX_SHIFT <= shift <= _MAX_SHIFT:
             raise ValueError("A shift is at most a day.")
-        if isinstance(value, dict):
-            zone = resolve_zone(None if all_day else tz)
-            legacy = from_legacy(value, zone=zone, all_day=all_day)
-            if legacy is None:
-                return None, 0
-            return stored(legacy, start, None if all_day else tz, kind=kind)
         return (normalize(value, kind=kind), shift) if value else (None, 0)
     except ValueError, TypeError:
         return None, 0

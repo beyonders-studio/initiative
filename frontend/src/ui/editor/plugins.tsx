@@ -32,7 +32,6 @@ import { YouTubePlugin } from "@/ui/editor/plugins/embeds/youtube-plugin";
 import { EmojiPickerPlugin } from "@/ui/editor/plugins/emoji-picker-plugin";
 import { FloatingLinkEditorPlugin } from "@/ui/editor/plugins/floating-link-editor-plugin";
 import { FloatingTextFormatToolbarPlugin } from "@/ui/editor/plugins/floating-text-format-plugin";
-import { LegacyNodesPlugin } from "@/ui/editor/plugins/legacy-nodes-plugin";
 import { MermaidPreviewPlugin } from "@/ui/editor/plugins/mermaid-preview-plugin";
 import { AlignmentPickerPlugin } from "@/ui/editor/plugins/picker/alignment-picker-plugin";
 import { BulletedListPickerPlugin } from "@/ui/editor/plugins/picker/bulleted-list-picker-plugin";
@@ -359,7 +358,6 @@ export function Plugins({
         {!readOnly && <CalloutActionMenuPlugin anchorElem={floatingAnchorElem} />}
         {!readOnly && <TabIndentationPlugin />}
 
-        <LegacyNodesPlugin />
         {/* Ungated: a reader needs the diagram more than a writer does. */}
         <MermaidPreviewPlugin />
         {plugins?.(floatingAnchorElem)}

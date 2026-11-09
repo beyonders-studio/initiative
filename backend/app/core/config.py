@@ -12,7 +12,6 @@ from typing import Annotated
 from urllib.parse import urlsplit
 
 from pydantic import (
-    AliasChoices,
     BeforeValidator,
     EmailStr,
     Field,
@@ -935,9 +934,6 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY_ID: str | None = None
     S3_SECRET_ACCESS_KEY: str | None = None
     S3_USE_PATH_STYLE: bool = False
-    # Read only by migration 0137's one-time seed, which has shipped and cannot
-    # change. Nothing at runtime reads it.
-    S3_KMS_KEY_ID: str | None = None
     # Migration safety net: while cutting a deployment over from "local" to "s3",
     # set true so a read that misses in S3 falls back to the local filesystem
     # (serves blobs not yet copied by the backfill). Turn off once the backfill is
@@ -1004,18 +1000,9 @@ class Settings(BaseSettings):
     # so this does nothing there whatever it is set to.
     EXPORT_PRESIGNED_DOWNLOADS: bool = False
     # First/bootstrap user — becomes the platform `owner` tier (there is no
-    # superuser concept). The legacy FIRST_SUPERUSER_* env names are accepted
-    # as aliases so existing deployments keep working.
-    FIRST_OWNER_EMAIL: EmailStr | None = Field(
-        default=None,
-        validation_alias=AliasChoices("FIRST_OWNER_EMAIL", "FIRST_SUPERUSER_EMAIL"),
-    )
-    FIRST_OWNER_PASSWORD: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "FIRST_OWNER_PASSWORD", "FIRST_SUPERUSER_PASSWORD"
-        ),
-    )
+    # superuser concept).
+    FIRST_OWNER_EMAIL: EmailStr | None = None
+    FIRST_OWNER_PASSWORD: str | None = None
     DISABLE_GUILD_CREATION: bool = False
     # Runs this deployment as the product demo.
     DEMO_MODE: bool = False
