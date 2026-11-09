@@ -11,12 +11,7 @@ import type { NavigateFn } from "@tanstack/react-router";
 import { type NotificationRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { openAnnouncement } from "@/components/announcements/AnnouncementCenter";
 import { communityPath } from "@/lib/communityUrl";
-import {
-  entityRefTypeFor,
-  isSearchEntityType,
-  normalizeLegacyTarget,
-  normalizePluginTarget,
-} from "@/lib/entityResolver";
+import { entityRefTypeFor, isSearchEntityType } from "@/lib/entityResolver";
 import { downloadExportArtifact } from "@/lib/exportDownload";
 import { storeSellingNow } from "@/lib/storeSelling";
 import { entityRefRoute, toolKebabSingular } from "@/lib/tools";
@@ -27,13 +22,10 @@ import { formatDate } from "@/ui/lib/formatDate";
  *  phone's store has answered (`@/lib/storeSelling`). */
 const sellsHere = (): boolean => storeSellingNow() === true;
 
-// Build community-scoped URL directly. Notification rows persist their
-// target_path, so one written before tools moved inside their initiative is
-// mapped onto the `/go` resolver on the way out.
-const buildCommunityPath = (communityId: number, targetPath: string): string => {
-  const normalized = targetPath.startsWith("/") ? targetPath : `/${targetPath}`;
-  return communityPath(communityId, normalizeLegacyTarget(normalized));
-};
+const asPath = (path: string): string => (path.startsWith("/") ? path : `/${path}`);
+
+const buildCommunityPath = (communityId: number, targetPath: string): string =>
+  communityPath(communityId, asPath(targetPath));
 
 export const resolveSmartLink = (notification: NotificationRead): string | null => {
   const data = notification.data || {};
@@ -55,9 +47,7 @@ export const resolveSmartLink = (notification: NotificationRead): string | null 
     // list is about the person rather than any one community, so the server
     // sends no `community_id` with those. The mobile tap handler has always
     // treated a bare `target_path` as an app-level route; this matches it.
-    return communityId !== null
-      ? buildCommunityPath(communityId, targetPath)
-      : normalizePluginTarget(targetPath);
+    return communityId !== null ? buildCommunityPath(communityId, targetPath) : asPath(targetPath);
   }
 
   if (typeof data.smart_link === "string" && data.smart_link) {
@@ -200,8 +190,7 @@ const MAX_SHOWN_REACTION_EMOJI = 3;
 
 // A reaction notification rolls up every reaction to the same comment, so the
 // line names the most recent reactor, how many others joined them, and the
-// emoji used. Rows written before the rollup carry their one reaction in the
-// top-level `emoji`/`reactor_name` fields, which read here as a rollup of one.
+// emoji used.
 const reactionSummary = (
   data: Record<string, unknown>
 ): { reactorName: string | null; emoji: string; others: number } => {
@@ -219,19 +208,12 @@ const reactionSummary = (
     .filter((value): value is string => value !== null);
 
   const reactorName = text(data.reactor_name) ?? names[names.length - 1] ?? null;
-  const latestEmoji = text(data.emoji);
-  if (emoji.length === 0 && latestEmoji) {
-    emoji.push(latestEmoji);
-  }
 
   // `reactor_count` counts everyone the line has rolled up, including people
   // whose reactions have since rolled off the detail it keeps — counting the
-  // names here would understate the crowd on a busy comment. Rows written
-  // before the roster existed only ever had the names, so they use those.
+  // names here would understate the crowd on a busy comment.
   const rostered = Number(data.reactor_count);
-  const others = Number.isFinite(rostered)
-    ? Math.max(rostered - 1, 0)
-    : new Set(names.filter((name) => name !== reactorName)).size;
+  const others = Number.isFinite(rostered) ? Math.max(rostered - 1, 0) : 0;
 
   return {
     reactorName,
@@ -240,9 +222,6 @@ const reactionSummary = (
   };
 };
 
-// A comment notification rolls up every comment on the same thing, so the line
-// names who and how many rather than repeating per comment. Rows written before
-// the rollup carry only ``commenter_name``, which reads here as a rollup of one.
 /** What a subscription line can say happened, as the feed names it. */
 const SUBSCRIPTION_VERBS = [
   "created",
@@ -255,6 +234,8 @@ const SUBSCRIPTION_VERBS = [
   "reacted",
 ] as const;
 
+// A comment notification rolls up every comment on the same thing, so the line
+// names who and how many rather than repeating per comment.
 export const commentSummary = (
   data: Record<string, unknown>
 ): { name: string; others: number; count: number } => {
@@ -264,9 +245,7 @@ export const commentSummary = (
   const names = roster
     .map((entry) => (typeof entry?.name === "string" ? entry.name : null))
     .filter((name): name is string => name !== null);
-  const latest = names[names.length - 1] ?? null;
-  const name =
-    latest ?? (typeof data.commenter_name === "string" ? data.commenter_name : "Someone");
+  const name = names[names.length - 1] ?? "Someone";
   // `commenter_count` is everyone the line stands for, including people whose
   // entry has rolled off the roster it carries.
   const people = Number(data.commenter_count);

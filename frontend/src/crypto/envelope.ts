@@ -202,13 +202,14 @@ export const KINDS = {
 
   edit: kind({
     parse: (raw: Raw) =>
-      typeof raw.targetId === "string" && typeof raw.body === "string"
+      typeof raw.targetId === "string" &&
+      typeof raw.body === "string" &&
+      typeof raw.rev === "number"
         ? {
             targetId: raw.targetId,
             at: typeof raw.at === "string" ? raw.at : "",
             body: raw.body,
-            // An edit from before revisions existed is the first one.
-            rev: typeof raw.rev === "number" ? raw.rev : 1,
+            rev: raw.rev,
           }
         : null,
     from: "any",

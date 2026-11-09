@@ -11,10 +11,6 @@ const hasLocalStorage = typeof localStorage !== "undefined";
  * settings and server address and signs in again.
  */
 export const CREDENTIAL_KEYS = {
-  // Legacy: where the app once kept a long-lived device token. Read by nothing;
-  // kept so sign-in can delete what an older version left behind.
-  token: "initiative-token",
-  isDeviceToken: "initiative-is-device-token",
   refreshToken: "initiative-refresh-token",
   offlineSession: "initiative-offline-session",
   pendingSignIn: "initiative-pending-sign-in",
@@ -67,14 +63,6 @@ export async function initStorage(): Promise<void> {
   const credentials = await readGroup(CREDENTIALS_GROUP);
   for (const [key, value] of [...defaults, ...credentials]) {
     if (value !== null) cache.set(key, value);
-  }
-  // A credential kept before it had a group of its own moves there once.
-  for (const [key, value] of defaults) {
-    if (!credentialKeys.has(key)) continue;
-    if (value !== null && !credentials.some(([held]) => held === key)) {
-      await inGroup(CREDENTIALS_GROUP, () => Preferences.set({ key, value }));
-    }
-    await inGroup(DEFAULT_GROUP, () => Preferences.remove({ key }));
   }
 }
 

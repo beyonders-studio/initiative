@@ -6163,7 +6163,7 @@ export interface DmDeviceRead {
   id: string;
   identity_key: string;
   fingerprint_key: string;
-  signature: string | null;
+  signature: string;
   label: string | null;
   created_at: string;
   last_seen_at: string;
@@ -6181,7 +6181,11 @@ export interface DmOneTimeKeyUpload {
    * @maxLength 44
    */
   public_key: string;
-  signature?: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 88
+   */
+  signature: string;
   fallback?: boolean;
 }
 
@@ -6196,17 +6200,6 @@ export interface DmDeviceRegistration {
    * @maxLength 44
    */
   fingerprint_key: string;
-  signature?: string | null;
-  fallback_key: DmOneTimeKeyUpload;
-  /** @maxItems 100 */
-  one_time_keys?: DmOneTimeKeyUpload[];
-}
-
-/**
- * A device registered before signing, signing itself: its signature, and a
- * signed fallback and pool to replace the unsigned ones.
- */
-export interface DmDeviceSignature {
   /**
    * @minLength 1
    * @maxLength 88
@@ -6322,7 +6315,7 @@ export interface DmSessionKey {
   device_id: string;
   identity_key: string;
   fingerprint_key: string;
-  signature?: string | null;
+  signature: string;
   one_time_key?: DmOneTimeKeyUpload | null;
 }
 

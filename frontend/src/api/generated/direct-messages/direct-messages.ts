@@ -34,7 +34,6 @@ import type {
   DmConversationRead,
   DmConversationsResponse,
   DmDeviceRegistration,
-  DmDeviceSignature,
   DmDevicesResponse,
   DmGroupCreate,
   DmOneTimeKeyBatch,
@@ -1933,94 +1932,6 @@ export function useListDevices<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-/**
- * Sign a device registered before signing, once, and replace the keys it
- * published with signed ones.
- * @summary Sign Device
- */
-export const signDevice = (
-  deviceId: string,
-  dmDeviceSignature: BodyType<DmDeviceSignature>,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<DmDevicesResponse>(
-    {
-      url: `/api/v1/me/dm/devices/${deviceId}/signature`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: dmDeviceSignature,
-      signal,
-    },
-    options
-  );
-};
-
-export const getSignDeviceMutationKey = () => ["signDevice"] as const;
-
-export const getSignDeviceMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof signDevice>>,
-    TError,
-    SignDeviceMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof apiMutator>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof signDevice>>,
-  TError,
-  SignDeviceMutationVariables,
-  TContext
-> => {
-  const mutationKey = getSignDeviceMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof signDevice>>,
-    SignDeviceMutationVariables
-  > = (props) => {
-    const { deviceId, data } = props ?? {};
-
-    return signDevice(deviceId, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type SignDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof signDevice>>>;
-export type SignDeviceMutationBody = BodyType<DmDeviceSignature>;
-export type SignDeviceMutationError = ErrorType<HTTPValidationError>;
-export type SignDeviceMutationVariables = { deviceId: string; data: BodyType<DmDeviceSignature> };
-
-/**
- * @summary Sign Device
- */
-export const useSignDevice = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof signDevice>>,
-      TError,
-      SignDeviceMutationVariables,
-      TContext
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseMutationResult<
-  Awaited<ReturnType<typeof signDevice>>,
-  TError,
-  SignDeviceMutationVariables,
-  TContext
-> => {
-  return useMutation(getSignDeviceMutationOptions(options), queryClient);
-};
 /**
  * Stop encrypted messaging on one device, without signing it out.
  *

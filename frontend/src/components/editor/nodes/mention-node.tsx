@@ -66,12 +66,7 @@ export class MentionNode extends DecoratorNode<JSX.Element> {
   }
 
   static importJSON(serializedNode: SerializedMentionNode): MentionNode {
-    // `text` is what a document written before this was a decorator carries,
-    // and it is the same string either way. Only an id-less mention keeps it.
-    return $createMentionNode(
-      serializedNode.mentionName ?? serializedNode.text ?? "",
-      serializedNode.mentionUserId ?? null
-    );
+    return $createMentionNode(serializedNode.mentionName, serializedNode.mentionUserId ?? null);
   }
 
   /** `mentionName` is kept only without an id: a person with an account is

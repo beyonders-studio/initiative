@@ -57,8 +57,6 @@ let servedServer: string | null = null;
  *
  * Each account on this device keeps its own store, so signing in as somebody
  * else and back again finds the first account's messages where it left them.
- * The store from before that keeps serving the account that wrote it, and a
- * store from before the server was recorded takes the first one it is served on.
  */
 export function serveAccount(server: string, userId: number): void {
   const account = `${server}\n${userId}`;
@@ -85,17 +83,19 @@ export function serveAccount(server: string, userId: number): void {
   ownerSettled.catch(() => undefined);
 }
 
-/** The first store if it is this account's or nobody's yet, else the account's own. */
+/**
+ * The first store if it records this account on this server, or records nobody
+ * because nobody has signed in on this browser yet; else the account's own.
+ */
 async function databaseFor(server: string, userId: number): Promise<string> {
   const first = await connect(DB_NAME);
   const [owner, ownerServer] = await Promise.all([
     get<number>(first, DEVICE_OWNER),
     get<string>(first, DEVICE_SERVER),
   ]);
-  const someoneElse =
-    (owner !== undefined && owner !== userId) ||
-    (ownerServer !== undefined && ownerServer !== server);
-  return someoneElse ? `${DB_NAME}:${userId}@${server}` : DB_NAME;
+  const unclaimed = owner === undefined && ownerServer === undefined;
+  const ours = owner === userId && ownerServer === server;
+  return unclaimed || ours ? DB_NAME : `${DB_NAME}:${userId}@${server}`;
 }
 
 function get<T>(db: IDBDatabase, key: string): Promise<T | undefined> {
@@ -412,11 +412,9 @@ export const deviceClaim = {
    * are theirs, and a fresh device can ask them for its history.
    *
    * Only a settled claim naming that exact device is reopened, and the store is
-   * emptied in the same transaction. A store from before claims were recorded
-   * has the device id alone, which is read in the same transaction instead. One
-   * already being registered under is left alone: two tabs noticing the same
-   * removal still produce one device between them, and neither empties the
-   * other's new one.
+   * emptied in the same transaction. One already being registered under is left
+   * alone: two tabs noticing the same removal still produce one device between
+   * them, and neither empties the other's new one.
    */
   invalidate: async (deviceId: string): Promise<void> => {
     const db = await open();
@@ -424,20 +422,15 @@ export const deviceClaim = {
       const transaction = db.transaction(STORE, "readwrite");
       const store = transaction.objectStore(STORE);
       const claim = store.get(DEVICE_CLAIM);
-      const recorded = store.get(DEVICE_ID);
       let emptied = false;
-      recorded.onsuccess = () => {
+      claim.onsuccess = () => {
         const current = claim.result as DeviceClaim | undefined;
-        const named = current
-          ? current.status === "ready" && current.deviceId === deviceId
-          : recorded.result === deviceId;
-        if (!named) return;
+        if (current?.status !== "ready" || current.deviceId !== deviceId) return;
         store.clear();
         store.put({ status: "claiming", at: 0, token: "" } satisfies DeviceClaim, DEVICE_CLAIM);
         emptied = true;
       };
       claim.onerror = () => reject(claim.error);
-      recorded.onerror = () => reject(recorded.error);
       transaction.oncomplete = () => resolve(emptied);
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error);
@@ -496,22 +489,6 @@ export const deviceOwner = {
 };
 
 /**
- * When this browser first checked device signatures, in epoch milliseconds.
- *
- * A device registered before signing existed carries none until its owner next
- * opens the app. The grace for those is counted from here, so it is the same
- * window for every device this browser meets.
- */
-export const signingSince = {
-  mark: async (): Promise<number> =>
-    (
-      await update<number>("signing-since", (current) =>
-        current === undefined ? Date.now() : undefined
-      )
-    ).value as number,
-};
-
-/**
  * The last message this device has looked at, per conversation, by its id.
  *
  * Kept here rather than on the server for the same reason the log is: nobody
@@ -567,10 +544,7 @@ export interface StoredMessage {
   body: string;
   at: string;
   mine: boolean;
-  /**
-   * Which account said it. Absent on this account's own, and on anything
-   * stored before a thread could hold more than two people.
-   */
+  /** Which account said it. Absent on this account's own. */
   author?: number;
   receipt?: ReceiptState;
   /** The message this one answers, by the name both sides know it under. */
@@ -616,14 +590,15 @@ const LOG_PREFIX = "log:";
  * it while "theirs" meant one person; on a roster it means several, and an edit
  * or a removal is a claim about a message's author rather than about its side.
  *
- * Authors are compared only where both are known. A thread whose messages
- * predate this, or a session opened before it, has no author to compare — and
- * every one of those is a pair, where the side already answers the question.
+ * This account's own messages, and its own devices' sessions, name no author:
+ * a log does not name the person keeping it, so on that side the side is the
+ * answer. Everybody else's carry the author their session recorded, and an
+ * envelope from them acts only on a message with the same one.
  */
 const mayActOn = (entry: StoredMessage, from: Side, author?: number): boolean => {
   if (entry.mine !== (from === "mine")) return false;
-  if (entry.author === undefined || author === undefined) return true;
-  return entry.author === author;
+  if (from === "theirs") return author !== undefined && entry.author === author;
+  return entry.author === undefined || author === undefined || entry.author === author;
 };
 
 export const messageLog = {
@@ -1307,9 +1282,7 @@ export const sessionOrigin = {
  * envelope arrived on stops being enough to say who sent it. A session is with
  * exactly one device, which belongs to exactly one account, and that is settled
  * the moment the session is opened -- an ordinary message arriving on it later
- * names no sender.
- *
- * Absent on sessions opened before this was recorded, which are all pairwise.
+ * names no sender. Absent on this account's own sessions.
  */
 export const sessionAuthor = {
   get: (id: string) => read<number>("session-author:" + id),

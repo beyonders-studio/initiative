@@ -320,6 +320,7 @@
   "IMPORT_UNKNOWN_TYPE": "This file isn't a recognized Initiative export.",
   "IMPORT_INVALID_ENVELOPE": "The import file is invalid or corrupted.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "This file was exported by a newer version of Initiative and can't be imported here.",
+  "IMPORT_ARCHIVE_TOO_OLD": "This backup was made by a version of Initiative before 0.78, which this one no longer restores. Restore it on 0.78 first, then back up again.",
   "IMPORT_INVALID_PARAMS": "The import request was invalid.",
   "IMPORT_TOO_LARGE": "This import is too large.",
   "REQUEST_TOO_LARGE": "That is too large to send.",

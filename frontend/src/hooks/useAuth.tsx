@@ -60,7 +60,6 @@ import {
 import { stepUpWithPasskey as presentPasskeyForStepUp } from "@/lib/passkeys";
 import { forgetPushOnThisDevice } from "@/lib/pushRegistration";
 import { queryClient } from "@/lib/queryClient";
-import { CREDENTIAL_KEYS, removeItem } from "@/lib/storage";
 import { clearUploadToken } from "@/lib/uploadToken";
 import { prefetchViewPreferences } from "@/lib/viewPreferences";
 
@@ -175,12 +174,6 @@ const forgetAccountData = () => {
   void queryClient.cancelQueries();
   queryClient.clear();
   void purgeOfflineCache();
-};
-
-/** Delete the long-lived device token an older version of the app kept, unread. */
-const forgetLegacyDeviceToken = () => {
-  removeItem(CREDENTIAL_KEYS.token);
-  removeItem(CREDENTIAL_KEYS.isDeviceToken);
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -312,7 +305,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!isNative) return;
     let cancelled = false;
-    forgetLegacyDeviceToken();
 
     const restore = async () => {
       if (!readRefreshToken()) return;
@@ -577,7 +569,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTokenState(null);
     setAuthToken(null);
     clearUploadToken();
-    forgetLegacyDeviceToken();
     clearRefreshToken();
     forgetSessionActivity();
     forgetAccountData();

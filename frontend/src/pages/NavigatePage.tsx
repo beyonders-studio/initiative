@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { communityPath, isCommunityScopedPath } from "@/lib/communityUrl";
-import { normalizeLegacyTarget } from "@/lib/entityResolver";
 import { Button } from "@/ui/button";
 
 const normalizeTarget = (raw: string): string => {
@@ -14,10 +13,7 @@ const normalizeTarget = (raw: string): string => {
   if (!decoded) {
     return "/";
   }
-  const path = decoded.startsWith("/") ? decoded : `/${decoded}`;
-  // Smart links minted before tools were addressed inside their initiative are
-  // still arriving from stored notification rows; map them onto the resolver.
-  return normalizeLegacyTarget(path);
+  return decoded.startsWith("/") ? decoded : `/${decoded}`;
 };
 
 export const NavigatePage = () => {

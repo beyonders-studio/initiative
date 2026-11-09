@@ -320,6 +320,7 @@
   "IMPORT_UNKNOWN_TYPE": "Ce fichier n'est pas un export Initiative reconnu.",
   "IMPORT_INVALID_ENVELOPE": "Le fichier d'import est invalide ou corrompu.",
   "IMPORT_SCHEMA_VERSION_UNSUPPORTED": "Ce fichier provient d'une version plus récente d'Initiative et ne peut pas être importé ici.",
+  "IMPORT_ARCHIVE_TOO_OLD": "Cette sauvegarde provient d'une version d'Initiative antérieure à 0.78, que celle-ci ne restaure plus. Restaurez-la d'abord sous 0.78, puis sauvegardez à nouveau.",
   "IMPORT_INVALID_PARAMS": "La demande d'import était invalide.",
   "IMPORT_TOO_LARGE": "Cet import est trop volumineux.",
   "REQUEST_TOO_LARGE": "C'est trop volumineux pour être envoyé.",

@@ -38,7 +38,6 @@ import { MarkdownShortcutsExtension } from "@/ui/editor/extensions/markdown-shor
 import { StatusExtension } from "@/ui/editor/extensions/status-extension";
 import { TweetNode } from "@/ui/editor/nodes/embeds/tweet-node";
 import { YouTubeNode } from "@/ui/editor/nodes/embeds/youtube-node";
-import { LEGACY_NODES } from "@/ui/editor/nodes/legacy-nodes";
 import { editorTheme } from "@/ui/editor/themes/editor-theme";
 import { validateUrl } from "@/ui/editor/utils/url";
 
@@ -84,15 +83,7 @@ export function documentExtension({
   return defineExtension({
     name: "@initiative/document-editor",
     namespace: "Editor",
-    nodes: [
-      OverflowNode,
-      TableNode,
-      TableCellNode,
-      TableRowNode,
-      TweetNode,
-      YouTubeNode,
-      ...LEGACY_NODES,
-    ],
+    nodes: [OverflowNode, TableNode, TableCellNode, TableRowNode, TweetNode, YouTubeNode],
     theme: editorTheme,
     editable,
     onError,

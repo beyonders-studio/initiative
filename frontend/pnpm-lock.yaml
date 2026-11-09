@@ -283,9 +283,6 @@ importers:
       '@lexical/extension':
         specifier: ^0.53.0
         version: 0.53.0(typescript@7.0.2)
-      '@lexical/hashtag':
-        specifier: ^0.53.0
-        version: 0.53.0(typescript@7.0.2)
       '@lexical/history':
         specifier: ^0.53.0
         version: 0.53.0(typescript@7.0.2)

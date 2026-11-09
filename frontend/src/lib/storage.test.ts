@@ -33,26 +33,28 @@ vi.mock("@capacitor/preferences", () => ({ Preferences: groups.Preferences }));
 import { CREDENTIAL_KEYS, getItem, initStorage, setItem } from "./storage";
 
 describe("native storage", () => {
-  it("keeps credentials in their own group, and moves ones kept before it", async () => {
+  it("keeps credentials in their own group, and reads both groups back", async () => {
     groups.stores.set(
       "CapacitorStorage",
-      new Map([
-        ["initiative-server-url", "http://192.168.1.20:8173/api/v1"],
-        [CREDENTIAL_KEYS.token, "device-token"],
-      ])
+      new Map([["initiative-server-url", "http://192.168.1.20:8173/api/v1"]])
+    );
+    groups.stores.set(
+      "InitiativeCredentials",
+      new Map([[CREDENTIAL_KEYS.offlineSession, "session"]])
     );
 
     await initStorage();
     await setItem(CREDENTIAL_KEYS.refreshToken, "rt-1");
     await setItem("initiative-theme", "dark");
 
-    expect(getItem(CREDENTIAL_KEYS.token)).toBe("device-token");
+    expect(getItem("initiative-server-url")).toBe("http://192.168.1.20:8173/api/v1");
+    expect(getItem(CREDENTIAL_KEYS.offlineSession)).toBe("session");
     expect(Object.fromEntries(groups.stores.get("CapacitorStorage") ?? [])).toEqual({
       "initiative-server-url": "http://192.168.1.20:8173/api/v1",
       "initiative-theme": "dark",
     });
     expect(Object.fromEntries(groups.stores.get("InitiativeCredentials") ?? [])).toEqual({
-      [CREDENTIAL_KEYS.token]: "device-token",
+      [CREDENTIAL_KEYS.offlineSession]: "session",
       [CREDENTIAL_KEYS.refreshToken]: "rt-1",
     });
   });

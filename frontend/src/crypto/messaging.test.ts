@@ -29,7 +29,6 @@ const api = vi.hoisted(() => ({
   registerDevice: vi.fn(),
   removeDevice: vi.fn(),
   topUpKeys: vi.fn(),
-  signDevice: vi.fn(),
   readMe: vi.fn(),
   sendVerification: vi.fn(),
   collectVerification: vi.fn(),
@@ -47,7 +46,6 @@ vi.mock("@/api/generated/direct-messages/direct-messages", () => ({
   registerDevice: (body: unknown) => api.registerDevice(body),
   removeDevice: (id: string) => api.removeDevice(id),
   topUpKeys: (body: unknown) => api.topUpKeys(body),
-  signDevice: (id: string, body: unknown) => api.signDevice(id, body),
   sendVerification: (body: unknown) => api.sendVerification(body),
   collectVerification: (params: unknown) => api.collectVerification(params),
 }));
@@ -173,6 +171,7 @@ import {
   approvedDevices,
   deviceClaim,
   deviceId,
+  deviceOwner,
   forgetDevice,
   historyAsk,
   messageLog,
@@ -186,7 +185,12 @@ import {
 // phone is the established device holding the history.
 const OURS = { id: "device-1", identity_key: "mine", created_at: "2026-09-01T00:00:00Z" };
 const OUR_PHONE = { id: "device-2", identity_key: "phone", created_at: "2026-08-01T00:00:00Z" };
-const THEIRS = { device_id: "device-9", identity_key: "theirs", fingerprint_key: "fp" };
+const THEIRS = {
+  device_id: "device-9",
+  identity_key: "theirs",
+  fingerprint_key: "fp",
+  signature: "signed:7",
+};
 
 const ownDevice = (
   device: { id: string; identity_key: string; created_at?: string; signature?: string | null },
@@ -227,6 +231,8 @@ beforeEach(async () => {
   await forgetDevice();
   spent.clear();
   vi.clearAllMocks();
+  // Signing in records the account before anything reads the store.
+  await deviceOwner.set(1);
   // A device that is already registered: the registration path has its own
   // tests, and every case here starts after it.
   await deviceId.set(OURS.id);
@@ -238,7 +244,7 @@ beforeEach(async () => {
   api.readDirectory.mockResolvedValue({ user_id: 7, devices: [THEIRS] });
   api.claimSessionKeys.mockResolvedValue({
     user_id: 7,
-    devices: [{ ...THEIRS, one_time_key: { key_id: "k", public_key: "pk" } }],
+    devices: [{ ...THEIRS, one_time_key: ONE_TIME_KEY }],
   });
   api.claimOwnSessionKeys.mockResolvedValue({ user_id: 1, devices: [keyFor(OUR_PHONE)] });
   api.listConversations.mockResolvedValue({
@@ -441,14 +447,19 @@ describe("collecting", () => {
   it("encrypts one copy per device across a whole roster", async () => {
     // Three people, one device each, plus this account's other tab. There is no
     // group key: a roster costs one copy per destination device.
-    const CAROL = { device_id: "device-c", identity_key: "carol", fingerprint_key: "fp" };
+    const CAROL = {
+      device_id: "device-c",
+      identity_key: "carol",
+      fingerprint_key: "fp",
+      signature: "signed:9",
+    };
     api.readDirectory.mockImplementation(async (userId: number) =>
       userId === 9 ? { user_id: 9, devices: [CAROL] } : { user_id: 7, devices: [THEIRS] }
     );
     api.claimSessionKeys.mockImplementation(async (userId: number) =>
       userId === 9
-        ? { user_id: 9, devices: [{ ...CAROL, one_time_key: { key_id: "k", public_key: "pk" } }] }
-        : { user_id: 7, devices: [{ ...THEIRS, one_time_key: { key_id: "k", public_key: "pk" } }] }
+        ? { user_id: 9, devices: [{ ...CAROL, one_time_key: ONE_TIME_KEY }] }
+        : { user_id: 7, devices: [{ ...THEIRS, one_time_key: ONE_TIME_KEY }] }
     );
 
     await sendText("conv-1", [7, 9], "for both of you");
@@ -855,6 +866,7 @@ describe("history between this account's own devices", () => {
 
   it("asks the account's other devices once, and not again", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
 
@@ -870,6 +882,7 @@ describe("history between this account's own devices", () => {
     // The newest conversation can be an invitation nobody has answered, and the
     // server takes nothing sent into one of those.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     api.listConversations.mockResolvedValue({
@@ -901,6 +914,7 @@ describe("history between this account's own devices", () => {
     // own-device envelope worth waking a phone for — it says "worth waking" and
     // never what for, since the server cannot read it either way.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
 
@@ -919,6 +933,7 @@ describe("history between this account's own devices", () => {
     // asked rang each phone once per device on the account.
     const tablet = { id: "device-3", identity_key: "tablet", created_at: "2026-08-15T00:00:00Z" };
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     api.listDevices.mockResolvedValue({
@@ -952,6 +967,7 @@ describe("history between this account's own devices", () => {
 
   it("does not ask when this device already has the messages", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await messageLog.append("conv-1", {
@@ -973,6 +989,7 @@ describe("history between this account's own devices", () => {
 
   it("says it is waiting while its ask is unanswered", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
 
@@ -985,6 +1002,7 @@ describe("history between this account's own devices", () => {
 
   it("asks again after a first attempt that never got out", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     // The other device has no prekey to open a session with, so the first
@@ -1009,6 +1027,7 @@ describe("history between this account's own devices", () => {
 
   it("does not ask when it is the only device on the account", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     api.listDevices.mockResolvedValue({ devices: [ownDevice(OURS)] });
@@ -1025,6 +1044,7 @@ describe("history between this account's own devices", () => {
     // the whole time it was alone, so the moment the second appeared both were
     // eligible and each asked the other for history the other did not have.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OUR_PHONE.id);
     await accountPickle.set("account");
     api.listDevices.mockResolvedValue({ devices: [ownDevice(OUR_PHONE), ownDevice(OURS)] });
@@ -1045,6 +1065,7 @@ describe("history between this account's own devices", () => {
     // account's first device is the source of its history, which is an answer,
     // not a postponement.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OUR_PHONE.id);
     await accountPickle.set("account");
     api.listDevices.mockResolvedValue({ devices: [ownDevice(OUR_PHONE)] });
@@ -1073,12 +1094,16 @@ describe("history between this account's own devices", () => {
     });
 
     await forgetDevice();
+
+    await deviceOwner.set(1);
     await deviceId.set(elder.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
     const fromElder = sentEnvelopes().filter((e) => e.kind === "history-request");
 
     await forgetDevice();
+
+    await deviceOwner.set(1);
     await deviceId.set(junior.id);
     await accountPickle.set("account");
     api.sendMessages.mockClear();
@@ -1093,6 +1118,7 @@ describe("history between this account's own devices", () => {
 
   it("stops saying it is waiting once the notice has had its day", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1112,6 +1138,7 @@ describe("history between this account's own devices", () => {
 
   it("stops saying it is waiting once somebody puts the notice away", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1131,6 +1158,7 @@ describe("history between this account's own devices", () => {
     // somebody who hid the banner, walked to their laptop and approved it would
     // have their history arrive and be thrown away.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1170,6 +1198,7 @@ describe("history between this account's own devices", () => {
     // Two tabs: one answers while the other still has the banner up. A plain
     // write would resurrect an ask that has just been closed.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1182,6 +1211,7 @@ describe("history between this account's own devices", () => {
 
   it("still takes the history a late answer brings", async () => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1499,6 +1529,7 @@ describe("history between this account's own devices", () => {
    */
   const askThenAnswer = async (chunk: Record<string, unknown>, seed?: () => Promise<void>) => {
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1547,6 +1578,7 @@ describe("history between this account's own devices", () => {
     // An answer names the question. One that names nothing this device asked is
     // not an answer to it.
     await forgetDevice();
+    await deviceOwner.set(1);
     await deviceId.set(OURS.id);
     await accountPickle.set("account");
     await collect({ receipts: false });
@@ -1710,7 +1742,12 @@ describe("history between this account's own devices", () => {
 
 describe("catching up on a group joined late", () => {
   /** A second member, so it can be told which of them was asked. */
-  const SAM = { device_id: "device-8", identity_key: "sam", fingerprint_key: "fp" };
+  const SAM = {
+    device_id: "device-8",
+    identity_key: "sam",
+    fingerprint_key: "fp",
+    signature: "signed:9",
+  };
 
   const asGroup = () => {
     api.listConversations.mockResolvedValue({
@@ -1731,7 +1768,12 @@ describe("catching up on a group joined late", () => {
       const device = userId === 9 ? SAM : THEIRS;
       return {
         user_id: userId,
-        devices: [{ ...device, one_time_key: { key_id: `k${userId}`, public_key: `pk${userId}` } }],
+        devices: [
+          {
+            ...device,
+            one_time_key: { key_id: `k${userId}`, public_key: `pk${userId}`, signature: "otk" },
+          },
+        ],
       };
     });
   };
@@ -1929,6 +1971,7 @@ describe("sending", () => {
       device_id: "replacement",
       identity_key: "new-key",
       fingerprint_key: "fp",
+      signature: "signed:7",
     };
     api.readDirectory.mockResolvedValue({ user_id: 7, devices: [REPLACEMENT] });
     api.claimSessionKeys.mockResolvedValue({
@@ -1990,25 +2033,6 @@ describe("sending", () => {
       THEIRS.device_id,
       OUR_PHONE.id,
     ]);
-  });
-
-  it("addresses a device that never signed only through the grace, and again once it signs", async () => {
-    await sendText("conv-1", [7], "within the grace");
-    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 31 * 24 * 60 * 60 * 1000);
-    try {
-      await expect(sendText("conv-1", [7], "after it")).rejects.toBeInstanceOf(
-        RecipientHasNoDeviceError
-      );
-      api.readDirectory.mockResolvedValue({
-        user_id: 7,
-        devices: [{ ...THEIRS, signature: "signed:7" }],
-      });
-      await sendText("conv-1", [7], "signed since");
-      // The same keys, now signed, are the same device: nothing to confirm.
-      expect(await peerKeyChanges.all()).toEqual([]);
-    } finally {
-      clock.mockRestore();
-    }
   });
 
   it("spends a prekey opening a conversation and none keeping it going", async () => {
@@ -2118,25 +2142,6 @@ describe("registering", () => {
       })
     );
     expect(await historyAsk.get()).toBe("eligible");
-  });
-
-  it("signs a device registered before signing, once, with a fresh signed pool", async () => {
-    api.listDevices.mockResolvedValue({
-      devices: [ownDevice({ ...OURS, signature: null }), ownDevice(OUR_PHONE)],
-    });
-    api.signDevice.mockResolvedValue({ devices: [ownDevice(OURS), ownDevice(OUR_PHONE)] });
-
-    await ensureDevice();
-    api.listDevices.mockResolvedValue({ devices: [ownDevice(OURS), ownDevice(OUR_PHONE)] });
-    await ensureDevice();
-
-    expect(api.signDevice).toHaveBeenCalledTimes(1);
-    expect(api.signDevice).toHaveBeenCalledWith(OURS.id, {
-      signature: "signed:1",
-      fallback_key: expect.objectContaining({ signature: "fallback-signed" }),
-      one_time_keys: expect.any(Array),
-    });
-    expect(api.signDevice.mock.calls[0][1].one_time_keys).toHaveLength(50);
   });
 
   it("settles the question against the browser it registers into", async () => {

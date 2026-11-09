@@ -370,27 +370,4 @@ describe("NotificationBell reaction notifications", () => {
 
     expect(await screen.findByText(/@u40 and 39 others reacted/i)).toBeInTheDocument();
   });
-
-  it("reads a pre-rollup notification as the single reaction it named", async () => {
-    mockInbox([
-      buildNotification({
-        type: "comment_reaction" as NotificationType,
-        data: {
-          community_id: 1,
-          target_type: "comment",
-          target_id: 7,
-          target_path: "/go/task/3",
-          context_title: "Ship the thing",
-          emoji: "👍",
-          reactor_name: "@bob",
-          reactor_id: 2,
-        },
-      }),
-    ]);
-    await openBell();
-
-    expect(
-      await screen.findByText(/@bob reacted 👍 to your comment on Ship the thing/i)
-    ).toBeInTheDocument();
-  });
 });

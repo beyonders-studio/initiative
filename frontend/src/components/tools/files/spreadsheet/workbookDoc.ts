@@ -19,11 +19,6 @@
  * One top-level type means undo/redo needs a single scope entry: a
  * ``Y.UndoManager`` tracks any nested type whose parent chain reaches a
  * scoped one, so sheets added later are covered without re-registering.
- *
- * Files written before multi-sheet kept those five maps at the *top*
- * level. {@link ensureWorkbook} folds such a doc into sheet one on first
- * open (see {@link migrateLegacyLayout}), which matters because a live
- * ``yjs_state`` blob can be ahead of the JSON snapshot.
  */
 
 import * as Y from "yjs";
@@ -140,37 +135,6 @@ export const readSheetOrder = (doc: Y.Doc | null): SheetMeta[] => {
   return out.map(({ id, name, hidden }) => (hidden ? { id, name, hidden } : { id, name }));
 };
 
-/** The top-level map names a pre-multi-sheet file used. */
-const LEGACY_KEYS = [SHEET_CELLS, SHEET_COLUMNS, SHEET_ROWS, SHEET_CELLSTYLES, SHEET_META] as const;
-
-const legacyHasContent = (doc: Y.Doc): boolean =>
-  LEGACY_KEYS.some((key) => doc.getMap(key).size > 0);
-
-/**
- * Fold a pre-multi-sheet doc's top-level maps into sheet one, preserving
- * whatever the live Yjs state holds (which can be newer than the JSON
- * snapshot the editor was handed). Must run inside a ``doc.transact``.
- *
- * The legacy maps are emptied afterwards: they're unreachable once the
- * editor reads through sheet containers, and leaving a second copy of every
- * cell in the file would double its synced size forever.
- */
-const migrateLegacyLayout = (doc: Y.Doc, name: string): void => {
-  const container = ensureSheetContainer(doc, DEFAULT_SHEET_ID);
-  for (const key of LEGACY_KEYS) {
-    const legacy = doc.getMap(key);
-    const target = sheetPart(container, key);
-    if (!target) continue;
-    legacy.forEach((value, mapKey) => {
-      target.set(mapKey, value);
-    });
-    for (const mapKey of Array.from(legacy.keys())) legacy.delete(mapKey);
-  }
-  const meta = sheetPart(container, SHEET_META);
-  if (meta && typeof meta.get(META_NAME) !== "string") meta.set(META_NAME, name);
-  if (meta && typeof meta.get(META_ORDER) !== "number") meta.set(META_ORDER, 0);
-};
-
 /**
  * Make sure ``doc`` holds a workbook, seeding it from ``content`` when it
  * doesn't. Safe to call on every render: it returns immediately once the
@@ -189,10 +153,6 @@ export const ensureWorkbook = (doc: Y.Doc | null, content: SpreadsheetContent): 
     // Re-check inside the transaction: another effect on this tick may have
     // seeded already.
     if (sheetsRoot(doc).size > 0) return;
-    if (legacyHasContent(doc)) {
-      migrateLegacyLayout(doc, content.sheets[0]?.name ?? "Sheet1");
-      return;
-    }
     content.sheets.forEach((sheet, index) => {
       seedSheet(doc, sheet, index);
     });

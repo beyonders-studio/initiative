@@ -164,14 +164,6 @@ describe("notificationLink — a target_path without a community", () => {
     );
   });
 
-  it("rewrites the route that never existed", () => {
-    // Rows already written carry `/settings/profile`, which is not a page.
-    // The server stopped minting it; these are the ones already sent.
-    expect(notificationLink(notice("username_changed", { target_path: "/settings/profile" }))).toBe(
-      "/profile/account"
-    );
-  });
-
   it("keeps scoping a path that does name a community", () => {
     expect(
       notificationLink(notice("post_published", { community_id: 7, target_path: "/posts/3" }))
@@ -352,7 +344,15 @@ describe("notificationText — cases", () => {
 
   it("counts the replies on a case nobody has taken", () => {
     expect(
-      notificationText(notice("case_replied", { task_id: 4, commenter_name: "asker" }), t)
+      notificationText(
+        notice("case_replied", {
+          task_id: 4,
+          commenters: [{ name: "asker" }],
+          commenter_count: 1,
+          comment_count: 1,
+        }),
+        t
+      )
     ).toContain("notifications.caseReplied");
     expect(
       notificationText(
