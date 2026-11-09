@@ -158,8 +158,8 @@ class Server:
             if not k.startswith("DATABASE_URL") and not k.endswith("_ROLE_PREFIX")
         }
         logins = {
-            name: self.url(role, role, driver="asyncpg")
-            for name, role in release_check.LOGINS.items()
+            setting: self.url(role, role, driver="asyncpg")
+            for setting, role in release_check.LOGINS.items()
         }
         return {
             **base,
@@ -445,14 +445,17 @@ def curate(dump: str, prefixed: list[str]) -> tuple[str, list[str]]:
     return sql.strip() + "\n", used
 
 
-def write_baseline(tag: str, cut: str, shot: Snapshot) -> list[Path]:
+def write_baseline(tag: str, cut: str, shot: Snapshot, written: list[Path]) -> None:
+    """Write the baseline revision and its SQL, each recorded in ``written``
+    before it is."""
     sql_path = BASELINE_SQL / f"schema_{cut[9:]}.sql"
+    py_path = VERSIONS / f"{cut}_baseline.py"
+    written += [py_path, sql_path]
     sql_path.write_text(
         f"-- The schema the chain built at {tag} (revision {cut}), for\n"
         f"-- versions/{cut}_baseline.py. Written by scripts/collapse_migrations.py;\n"
         f"-- never edited. {PREFIX_MARK} is the platform-role prefix.\n\n" + shot.sql
     )
-    py_path = VERSIONS / f"{cut}_baseline.py"
     about = textwrap.fill(
         f"Every revision up to {cut} was collapsed into this one by "
         "``scripts/collapse_migrations.py``. A database stamped at it or later "
@@ -476,7 +479,6 @@ def write_baseline(tag: str, cut: str, shot: Snapshot) -> list[Path]:
             opclasses=repr(tuple(shot.opclasses)),
         )
     )
-    return [py_path, sql_path]
 
 
 def _literal(rows: list[tuple]) -> str:
@@ -511,6 +513,7 @@ release = "{tag}"
 
 _SQL = Path(__file__).resolve().parents[1] / "baseline" / "{sql}"
 _MARK = "{mark}"
+
 
 #: Each group role: its name and whether it inherits.
 _ROLES = {roles}
@@ -708,10 +711,11 @@ def unlist(path: Path, cut: str) -> bool:
     return bool(drop)
 
 
-def retire(cut: str, replaced: list[Path]) -> dict[str, list[Path]]:
-    """Delete the revisions, the old baseline's SQL and what loads them."""
-    done: dict[str, list[Path]] = {"deleted": [], "edited": []}
+def retire(cut: str, replaced: list[Path], done: dict[str, list[Path]]) -> None:
+    """Delete the revisions, the old baseline's SQL and what loads them, each
+    path recorded in ``done["touched"]`` before it changes."""
     for path in [*replaced, *BASELINE_SQL.glob("*.sql")]:
+        done["touched"].append(path)
         path.unlink()
         done["deleted"].append(path)
     code = [
@@ -721,6 +725,7 @@ def retire(cut: str, replaced: list[Path]) -> dict[str, list[Path]]:
         if "__pycache__" not in path.parts
     ]
     for path in code:
+        done["touched"].append(path)
         if path.name.endswith("_test.py"):
             outcome = prune_test(path, cut)
             if outcome:
@@ -729,14 +734,13 @@ def retire(cut: str, replaced: list[Path]) -> dict[str, list[Path]]:
                     continue
         if unlist(path, cut) and path not in done["edited"]:
             done["edited"].append(path)
-    return done
 
 
 def restore(written: list[Path], done: dict[str, list[Path]]) -> None:
     """Put back what the collapse wrote, deleted and edited."""
     for path in written:
         path.unlink(missing_ok=True)
-    _git("checkout", "HEAD", "--", *(str(p) for p in done["deleted"] + done["edited"]))
+    _git("checkout", "HEAD", "--", *(str(p) for p in done["touched"]))
 
 
 def tidy(paths: list[Path]) -> None:
@@ -804,9 +808,11 @@ def main() -> int:
         build(found, "head")
         want = asyncio.run(_shape(found))
 
-    done = retire(cut, replaced)
-    written = write_baseline(args.release, cut, shot)
+    done: dict[str, list[Path]] = {"touched": [], "deleted": [], "edited": []}
+    written: list[Path] = []
     try:
+        retire(cut, replaced, done)
+        write_baseline(args.release, cut, shot, written)
         with server("after") as found:
             print("Building the collapsed chain to head ...", flush=True)
             found.prefix = PROOF_PREFIX
