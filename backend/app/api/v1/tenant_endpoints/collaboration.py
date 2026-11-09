@@ -105,7 +105,7 @@ class _Editing:
             resource_access.authorize(
                 self.spec.tool, resolved.governing, user, context=context
             )
-        except (HTTPException, CodedError):
+        except HTTPException, CodedError:
             return None
         writes = permissions_service.allows(
             resolved.governing, permissions_service.Action.edit

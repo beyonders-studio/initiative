@@ -1013,5 +1013,5 @@ def imported(
                 return None, 0
             return stored(legacy, start, None if all_day else tz, kind=kind)
         return (normalize(value, kind=kind), shift) if value else (None, 0)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None, 0

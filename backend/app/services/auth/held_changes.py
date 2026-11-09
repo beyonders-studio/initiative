@@ -409,7 +409,7 @@ async def apply(
                 raise ChangeLapsed()
         else:
             raise ChangeLapsed()
-    except (addresses.AddressError, ChangeLapsed):
+    except addresses.AddressError, ChangeLapsed:
         await session.rollback()
         await cancel(session, user_id=user_id, hold_id=hold_id, via="lapsed")
         await session.commit()

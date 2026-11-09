@@ -150,7 +150,7 @@ async def _notify_about_event(
     event: CalendarEvent,
     *,
     key: str,
-    actor: "User | notifications_service.PluginAuthor",
+    actor: User | notifications_service.PluginAuthor,
     role: str,
     data: dict[str, Any] | None = None,
     values: dict[str, str] | None = None,

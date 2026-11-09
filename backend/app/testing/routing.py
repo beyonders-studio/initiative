@@ -119,7 +119,7 @@ async def route_system(session: AsyncSession, *, guild_id: int) -> None:
 
 
 @asynccontextmanager
-async def platform_session(user: User) -> AsyncGenerator[AsyncSession, None]:
+async def platform_session(user: User) -> AsyncGenerator[AsyncSession]:
     """A request-path session on the platform context ``user``'s requests run
     in, as ``UserSessionDep`` hands one to a ``/me/*`` route: work across
     communities made on it reads each one from its own cohort."""
@@ -135,7 +135,7 @@ async def platform_session(user: User) -> AsyncGenerator[AsyncSession, None]:
 @asynccontextmanager
 async def as_role(
     session: AsyncSession, role: str, user_id: int
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[None]:
     """Run the block as the Postgres ``role`` with ``user_id`` as the current
     user, on the session's connection, then return to the login role.
 

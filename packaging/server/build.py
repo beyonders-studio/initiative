@@ -16,6 +16,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 PACKAGE = "initiative-server"
+#: The Python the server runs everywhere: the image, CI and both packages.
+PYTHON_MINOR = "3.14"
+#: The CPython the Debian package carries, since Debian 13's own is 3.13. uv
+#: installs it from its pinned, checksummed python-build-standalone builds.
+BUNDLED_PYTHON = "3.14.6"
+#: Where the Debian package puts it.
+BUNDLED_ROOT = Path("/usr/lib/initiative/python")
 
 
 def run(
@@ -80,7 +87,9 @@ def validate_assets(
     # trust root; packaging preserves the signed bytes and never re-signs them.
 
 
-def native_target(kind: str) -> tuple[str, str]:
+def native_target(kind: str) -> str:
+    """The distribution's Python, which runs the build tools; on Alpine it is
+    also the server's."""
     release = dict(
         line.split("=", 1)
         for line in Path("/etc/os-release").read_text().splitlines()
@@ -95,7 +104,27 @@ def native_target(kind: str) -> tuple[str, str]:
         raise ValueError(f"Build {kind} natively on {expected[0]} {expected[1]}")
     python = f"/usr/bin/python{expected[2]}"
     run([python, "-c", "import sys; assert sys.version_info >= (3, 12)"])
-    return python, expected[2]
+    return python
+
+
+def bundle_python(tools: Path, root: Path, work: Path) -> Path:
+    """Install :data:`BUNDLED_PYTHON` into the package at :data:`BUNDLED_ROOT`;
+    the path of its interpreter in the stage."""
+    downloads = work / "python"
+    run(
+        [str(tools / "bin/uv"), "python", "install", BUNDLED_PYTHON, "--no-bin"],
+        env={
+            **os.environ,
+            "UV_PYTHON_INSTALL_DIR": str(downloads),
+            "UV_PYTHON_DOWNLOADS": "manual",
+        },
+    )
+    (installed,) = downloads.glob(f"cpython-{BUNDLED_PYTHON}-linux-*")
+    target = root / BUNDLED_ROOT.relative_to("/usr/lib/initiative")
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(installed, target, symlinks=True)
+    return target / "bin" / f"python{PYTHON_MINOR}"
 
 
 def copy_file(source: Path, destination: Path, mode: int = 0o644) -> None:
@@ -119,7 +148,7 @@ def stage_application_source(root: Path) -> None:
 
 
 def stage_payload(
-    stage: Path, assets: Path, channel: str, python: str, abi: str, work: Path
+    stage: Path, assets: Path, channel: str, python: str, kind: str, work: Path
 ) -> None:
     root = stage / "usr/lib/initiative"
     root.mkdir(parents=True, exist_ok=True)
@@ -147,7 +176,8 @@ def stage_payload(
     for name in ("pyproject.toml", "uv.lock", ".env.example"):
         copy_file(REPO / "backend" / name, doc / name)
     # Build tools stay outside the package. Install uv from the same hash-pinned
-    # requirements as the image build; never download a replacement interpreter.
+    # requirements as the image build; the only interpreter it downloads is the
+    # one the Debian package carries.
     tools = work / "tools"
     run([python, "-m", "venv", str(tools)])
     run(
@@ -163,6 +193,13 @@ def stage_payload(
             str(REPO / "backend/uv-requirements.txt"),
         ]
     )
+    # Alpine's own Python is 3.14 and is the server's; Debian's is 3.13, so
+    # the Debian package carries its own.
+    if kind == "deb":
+        server_python = bundle_python(tools, root, work)
+        installed_python = BUNDLED_ROOT / "bin" / f"python{PYTHON_MINOR}"
+    else:
+        server_python = installed_python = Path(python)
     env = {
         **os.environ,
         "UV_PROJECT_ENVIRONMENT": str(root / ".venv"),
@@ -173,7 +210,7 @@ def stage_payload(
         "MAKEFLAGS": os.environ.get("MAKEFLAGS", "-j2"),
     }
     # --locked checks pyproject consistency; --frozen alone would accept stale
-    # metadata. Exporting the system interpreter overrides backend/.python-version.
+    # metadata. Naming the server's interpreter overrides backend/.python-version.
     run(
         [
             str(tools / "bin/uv"),
@@ -182,8 +219,7 @@ def stage_payload(
             "--no-dev",
             "--no-editable",
             "--python",
-            python,
-            "--no-managed-python",
+            str(server_python),
             "--project",
             str(REPO / "backend"),
         ],
@@ -191,13 +227,15 @@ def stage_payload(
     )
     venv = root / ".venv"
     # Console/activation scripts embed the staging path. Use module entry points
-    # and system Python symlinks instead; worker sys.executable remains installed.
+    # and symlinks to the installed interpreter instead; worker sys.executable
+    # remains installed.
     shutil.rmtree(venv / "bin")
     (venv / "bin").mkdir()
-    for name in ("python", "python3", f"python{abi}"):
-        (venv / "bin" / name).symlink_to(python)
+    for name in ("python", "python3", f"python{PYTHON_MINOR}"):
+        (venv / "bin" / name).symlink_to(installed_python)
     (venv / "pyvenv.cfg").write_text(
-        f"home = /usr/bin\ninclude-system-site-packages = false\nversion = {abi}\n"
+        f"home = {installed_python.parent}\ninclude-system-site-packages = false\n"
+        f"version = {PYTHON_MINOR}\n"
     )
     for path in venv.rglob("__pycache__"):
         shutil.rmtree(path)
@@ -216,7 +254,7 @@ def deb_package(stage: Path, output: Path, version: str, revision: int) -> None:
         f"Package: {PACKAGE}\nVersion: {version}-{revision}\nArchitecture: {arch}\n"
         "Maintainer: Beyonders Studio <jordan@morels.me>\n"
         "Section: web\nPriority: optional\n"
-        "Depends: python3 (>= 3.13), python3 (<< 3.14), python3.13, adduser, init-system-helpers, "
+        "Depends: libc6, adduser, init-system-helpers, "
         "libmagic1t64, libstdc++6, libgcc-s1, ca-certificates\n"
         "Homepage: https://github.com/beyonders-studio/initiative\n"
         "Description: Initiative server with bundled web application\n"
@@ -337,14 +375,14 @@ def main() -> None:
         (REPO / "MIN_DESKTOP_VERSION").read_text().strip(),
         args.channel,
     )
-    python, abi = native_target(args.kind)
+    python = native_target(args.kind)
     output.mkdir(parents=True, exist_ok=True)
 
     def build(work: Path) -> None:
         stage = work / "payload"
         if stage.exists():
             shutil.rmtree(stage)
-        stage_payload(stage, assets, args.channel, python, abi, work)
+        stage_payload(stage, assets, args.channel, python, args.kind, work)
         if args.kind == "deb":
             deb_package(stage, output, version, args.revision)
         else:

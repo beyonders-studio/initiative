@@ -101,7 +101,7 @@ class WikiAdapter(ToolExportAdapter):
                         session, user, guild_id, linked.id, access=access
                     )
                 )
-            except (HTTPException, CodedError):
+            except HTTPException, CodedError:
                 # Not theirs to export: it stays out of the download.
                 continue
         return wiki, pages, files

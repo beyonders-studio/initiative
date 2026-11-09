@@ -101,6 +101,6 @@ async def redeem(
         return None
     try:
         data = json.loads(decrypt_field(code, SALT_NATIVE_HANDOFF))
-    except (InvalidToken, UnicodeDecodeError, ValueError):
+    except InvalidToken, UnicodeDecodeError, ValueError:
         return None
     return Handoff(**data)

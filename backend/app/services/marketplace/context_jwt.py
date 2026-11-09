@@ -116,7 +116,7 @@ def is_platform_key(private_pem: str) -> bool:
         key = serialization.load_pem_private_key(
             private_pem.encode("utf-8"), password=None
         )
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
     return isinstance(key, ed25519.Ed25519PrivateKey)
 

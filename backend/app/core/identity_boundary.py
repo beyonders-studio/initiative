@@ -190,7 +190,7 @@ _SLOT: ContextVar[_Slot | None] = ContextVar("identity_boundary", default=None)
 
 
 @contextmanager
-def boundary_scope() -> Generator[_Slot, None, None]:
+def boundary_scope() -> Generator[_Slot]:
     """Open a request's slot for the rest of the request, and close it after."""
     slot = _Slot()
     token = _SLOT.set(slot)

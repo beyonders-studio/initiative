@@ -262,7 +262,7 @@ def _plugin_value(value: Any, postgres: str) -> Any:
     if postgres == "timestamptz":
         try:
             datetime.fromisoformat(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         return value
     return value if isinstance(value, str) else json.dumps(value)

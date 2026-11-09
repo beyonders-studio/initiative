@@ -117,7 +117,7 @@ async def _admit_file(
         initiative = await resource_access.prepare_create(
             session, Tool.file, int(metadata["initiative_id"]), user, guild_context
         )
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST)
     return initiative.id
 
@@ -146,7 +146,7 @@ async def _admit_atlassian_export(
     import_engine.require_writable(guild_context)
     try:
         initiative_id = int(metadata["initiative_id"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST)
     initiative = await atlassian_job.export_initiative(
         session,
@@ -223,7 +223,7 @@ def _metadata(header: str | None) -> dict[str, str]:
         key, _, value = pair.strip().partition(" ")
         try:
             pairs[key] = base64.b64decode(value, validate=True).decode("utf-8")
-        except (binascii.Error, UnicodeDecodeError):
+        except binascii.Error, UnicodeDecodeError:
             raise _refuse(
                 status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST
             )
@@ -531,7 +531,7 @@ async def patch(
             arrived, pending = pending, None
             try:
                 chunk = arrived.result()
-            except (StopAsyncIteration, ClientDisconnect):
+            except StopAsyncIteration, ClientDisconnect:
                 break
             if len(chunk) > length - state["stored"] - len(buffer):
                 raise _refuse(

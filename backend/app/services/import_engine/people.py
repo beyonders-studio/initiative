@@ -87,7 +87,7 @@ async def resolve_people_map(
             continue
         try:
             wanted[handle_key(source_handle)] = int(user_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     if not wanted:
         return PeopleMap()

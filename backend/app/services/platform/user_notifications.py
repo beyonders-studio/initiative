@@ -19,7 +19,7 @@ from app.services.platform import (
 def _int_or_none(value: object) -> int | None:
     try:
         return int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

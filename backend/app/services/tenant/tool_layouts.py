@@ -975,7 +975,7 @@ async def restore_layouts(
                         }
                     ),
                 )
-        except (HTTPException, CodedError, ValidationError):
+        except HTTPException, CodedError, ValidationError:
             continue
         restored.add((kind, task_type_id))
         session.add(
@@ -1235,7 +1235,7 @@ def _rewrite(
             target,
             write.model_validate({"kind": row.kind, **typed, "definition": definition}),
         )
-    except (HTTPException, CodedError, ValidationError):
+    except HTTPException, CodedError, ValidationError:
         return
     row.definition = definition
     row.updated_at = datetime.now(UTC)

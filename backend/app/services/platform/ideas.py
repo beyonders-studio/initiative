@@ -116,7 +116,7 @@ def board_open() -> bool:
 
 
 @asynccontextmanager
-async def _as_reader(user: User | None) -> AsyncGenerator[AsyncSession | None, None]:
+async def _as_reader(user: User | None) -> AsyncGenerator[AsyncSession | None]:
     """A request session routed as ``user``, or nobody signed in, reading the
     published ideas; ``None`` where there is no board to read."""
     from app.api.deps import FilerAccessError, establish_ideas_access

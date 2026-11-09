@@ -94,7 +94,7 @@ def _cell(row: dict[str, str], name: str) -> str:
 def _int(value: str, default: int) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 

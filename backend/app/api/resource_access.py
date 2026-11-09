@@ -539,7 +539,7 @@ async def may_change(
     for a read that reports it."""
     try:
         await require_may_change(session, row, None, context, action=action)
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         return False
     return True
 

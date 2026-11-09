@@ -82,7 +82,7 @@ async def _seat_session(installed: Any, role_session: Any) -> Any:
 
 
 @contextmanager
-def _counting() -> Generator[list[str], None, None]:
+def _counting() -> Generator[list[str]]:
     """Every statement any engine runs meanwhile, in order."""
     statements: list[str] = []
 
@@ -520,9 +520,7 @@ def test_every_marked_route_names_scopes_in_the_vocabulary():
 
 
 @contextmanager
-def _handler_start(
-    monkeypatch: Any, statements: list[str]
-) -> Generator[list[int], None, None]:
+def _handler_start(monkeypatch: Any, statements: list[str]) -> Generator[list[int]]:
     """Record how many statements had run when the route's own code began."""
     seen: list[int] = []
     original = actor_route._enter

@@ -86,7 +86,7 @@ def _assignee_ids(op: FilterOp, value: Any, ctx: FieldContext) -> Any:
         else:
             try:
                 user_ids.append(int(aid))
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=TaskMessages.INVALID_ASSIGNEE_ID,
@@ -115,7 +115,7 @@ def _property_values(op: FilterOp, value: Any, ctx: FieldContext) -> Any:
         return None
     try:
         pid = int(value.get("property_id"))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     defn = ctx.property_definitions.get(pid)
     if defn is None:

@@ -132,7 +132,7 @@ def _parse_clock(raw: Any) -> time | None:
     try:
         hour, minute = raw.split(":", 1)
         return time(hour=int(hour), minute=int(minute))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 

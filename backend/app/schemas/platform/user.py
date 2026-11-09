@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import (
     AliasChoices,
@@ -222,7 +222,7 @@ class UserCommunityRead(UserIdentity):
 
     status: UserStatus
     created_at: datetime
-    initiative_roles: list["UserInitiativeRole"] = Field(default_factory=list)
+    initiative_roles: list[UserInitiativeRole] = Field(default_factory=list)
 
 
 class UserCommunityMember(UserCommunityRead):
@@ -276,7 +276,7 @@ class UserSummary(UserIdentity, PersonShape):
 
     display_name: str | None = None
     #: Every profile has one, empty until its owner puts something on.
-    profile_decorations: "ProfileDecorations" = Field(
+    profile_decorations: ProfileDecorations = Field(
         default_factory=lambda: ProfileDecorations()
     )
     #: The rung this member holds in the guild this was read under. Absent
@@ -385,7 +385,7 @@ class ProfileDecorations(SanitizedBaseModel):
         return [validate_tint(colour) for colour in value]
 
     @model_validator(mode="after")
-    def _tint_only_what_takes_it(self) -> "ProfileDecorations":
+    def _tint_only_what_takes_it(self) -> ProfileDecorations:
         """Keep the stored colours honest about the frame they are for.
 
         A colour on a frame that cannot take one would be state nothing reads
@@ -409,7 +409,7 @@ class ProfileDecorations(SanitizedBaseModel):
         return value
 
     @model_validator(mode="after")
-    def _year_only_what_takes_it(self) -> "ProfileDecorations":
+    def _year_only_what_takes_it(self) -> ProfileDecorations:
         """Drop a year nothing worn would draw, the way a stray tint is dropped."""
         if self.grad_year is None:
             return self
@@ -709,7 +709,7 @@ class UserRead(SanitizedBaseModel):
     #: can adopt it instead of asking again. Null where it has never answered,
     #: which is different from having answered and allowed nothing. Populated
     #: by ``/me``; null elsewhere.
-    cookie_consent: Optional["CookieConsentRead"] = None
+    cookie_consent: CookieConsentRead | None = None
     status: UserStatus
     #: Both resolved from ``user_emails`` by whoever builds this shape (see
     #: ``services.platform.users.to_read``) — the ``users`` row carries neither.
@@ -765,7 +765,7 @@ class UserRead(SanitizedBaseModel):
     #: communities. Never a suspended account or a demo visitor. Populated
     #: with the fields above.
     can_create_communities: bool = False
-    initiative_roles: list["UserInitiativeRole"] = Field(default_factory=list)
+    initiative_roles: list[UserInitiativeRole] = Field(default_factory=list)
 
     @computed_field(return_type=list[Capability])  # type: ignore[misc]
     @property
@@ -936,7 +936,7 @@ class UserSelfUpdate(SanitizedBaseModel):
         return value
 
     @model_validator(mode="after")
-    def _password_alone(self) -> "UserSelfUpdate":
+    def _password_alone(self) -> UserSelfUpdate:
         # A new password is written on a commit of its own, so it travels with
         # nothing but the one it replaces.
         if self.password and self.model_fields_set - {"password", "current_password"}:

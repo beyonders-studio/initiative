@@ -38,7 +38,7 @@ If you prefer not to use VS Code tasks, you can start each service by hand.
 
 #### Prerequisites
 
-- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
+- Python 3.14 and [uv](https://docs.astral.sh/uv/)
 - Node.js 26.12.1+ with pnpm
 - PostgreSQL 17
 

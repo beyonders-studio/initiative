@@ -447,7 +447,7 @@ class _Run:
         if response.content:
             try:
                 body = json.loads(response.content)
-            except (UnicodeDecodeError, json.JSONDecodeError):
+            except UnicodeDecodeError, json.JSONDecodeError:
                 body = response.text
         return _Answer(
             status=response.status_code,

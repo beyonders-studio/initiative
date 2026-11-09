@@ -159,7 +159,7 @@ def _repeat(source: dict[str, Any]) -> tuple[str | None, bool]:
     try:
         mode = int(source.get("repeat_mode") or 0)
         seconds = int(source.get("repeat_after") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None, False
     if mode == _REPEAT_MONTHLY:
         return "RRULE:FREQ=MONTHLY", False

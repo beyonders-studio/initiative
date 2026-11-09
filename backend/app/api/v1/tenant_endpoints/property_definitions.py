@@ -202,7 +202,7 @@ async def _editable_projects(
             resource_access.authorize(
                 Tool.project, project, context=guild_context, access="write"
             )
-        except (HTTPException, CodedError):
+        except HTTPException, CodedError:
             continue
         editable[int(project.id or 0)] = project.name
     return editable

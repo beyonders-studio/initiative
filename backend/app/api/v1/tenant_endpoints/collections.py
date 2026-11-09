@@ -341,7 +341,7 @@ async def add_collection_files(
         await required_fields.refuse_missing(
             session, guild_context, *files, collection_id=collection.id
         )
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         await session.rollback()
         raise
     await session.commit()
@@ -410,7 +410,7 @@ async def set_collection_file_metadata(
             collection_id=collection.id,
         )
         await required_fields.refuse_emptied(session, required)
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         await session.rollback()
         raise
     await session.commit()

@@ -508,13 +508,13 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _scanner_has_its_token(self) -> "Settings":
+    def _scanner_has_its_token(self) -> Settings:
         if self.UPLOAD_SCANNER_URL and not self.UPLOAD_SCANNER_TOKEN:
             raise ValueError("UPLOAD_SCANNER_URL needs UPLOAD_SCANNER_TOKEN")
         return self
 
     @model_validator(mode="after")
-    def _kms_root_names_its_key(self) -> "Settings":
+    def _kms_root_names_its_key(self) -> Settings:
         if self.STORAGE_ENCRYPTION == "gcp_kms" and not self.STORAGE_ENCRYPTION_KMS_KEY:
             raise ValueError(
                 'STORAGE_ENCRYPTION="gcp_kms" needs STORAGE_ENCRYPTION_KMS_KEY: '
@@ -587,7 +587,7 @@ class Settings(BaseSettings):
     _database_logins_derived: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
-    def _resolve_database_logins(self) -> "Settings":
+    def _resolve_database_logins(self) -> Settings:
         has_plugin, has_admin = (
             bool(self.DATABASE_URL_APP),
             bool(self.DATABASE_URL_ADMIN),

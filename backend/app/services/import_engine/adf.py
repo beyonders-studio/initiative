@@ -474,6 +474,6 @@ def _iso_date(timestamp: Any) -> str:
 
     try:
         millis = int(timestamp)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return ""
     return datetime.fromtimestamp(millis / 1000, tz=UTC).date().isoformat()

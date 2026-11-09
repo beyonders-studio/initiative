@@ -387,9 +387,9 @@ class ToolListSpec:
     model: Any
     response_model: Any
     #: (req) -> eager loads for the page query
-    loader_options: Callable[["ListRequest"], list]
+    loader_options: Callable[[ListRequest], list]
     #: (req) -> ORDER BY when the request asks for no sort
-    default_order: Callable[["ListRequest"], list]
+    default_order: Callable[[ListRequest], list]
     #: async (spec, req, rows) -> the response's ``items``
     serialize: Callable[..., Awaitable[list]]
     params: tuple[ListParam, ...]
@@ -410,7 +410,7 @@ class ToolListSpec:
     #: Sort fields this tool offers beyond the shared three.
     extra_sort_fields: dict[str, Any] | None = None
     #: (req) -> statement transform applied before ORDER BY reads it.
-    refine: Callable[["ListRequest"], Callable[[Any], Any]] | None = None
+    refine: Callable[[ListRequest], Callable[[Any], Any]] | None = None
     #: The views the tool's page shows one at a time, each as the list
     #: parameters that select it. Every count is a count of one of these lists.
     views: Mapping[str, Mapping[str, Any]] = field(

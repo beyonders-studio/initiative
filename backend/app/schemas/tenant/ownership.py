@@ -72,7 +72,7 @@ class OwnershipTransferRequest(SanitizedBaseModel):
     new_owner_plugin_id: int | None = None
 
     @model_validator(mode="after")
-    def exactly_one_recipient(self) -> "OwnershipTransferRequest":
+    def exactly_one_recipient(self) -> OwnershipTransferRequest:
         if (self.new_owner_id is None) == (self.new_owner_plugin_id is None):
             raise ValueError("Exactly one of new_owner_id or new_owner_plugin_id")
         return self

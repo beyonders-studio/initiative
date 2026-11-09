@@ -25,7 +25,7 @@ def _names_a_column(table, name: str) -> bool:
     """Whether ``name`` is a column of ``table``, or one through a pointer."""
     try:
         _column(table, name)
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         return False
     return True
 
