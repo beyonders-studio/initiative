@@ -18,7 +18,7 @@ cd "$ROOT"
 OASDIFF=docker.io/tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac
 ACCEPTED=backend/api-breaking-changes.md
 # The oldest release this check compares with.
-FLOOR=v0.76.0
+FLOOR=v0.78.0
 
 release="${1:-$(gh release view --json tagName -q .tagName)}"
 if [ "$(printf '%s\n' "$FLOOR" "$release" | sort -V | head -n1)" != "$FLOOR" ]; then
