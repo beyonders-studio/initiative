@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens it in an editor, where you hide or number any part. Help and feedback hide people's names, avatars and contact details for you, and a report pictures what you're reporting as it opens.
 - **Ideas, on Initiative Cloud.** The **Ideas** page, in the site's header, shows the ideas the team publishes from feedback. Anybody can read them; sign in to vote for the ones you want and hear each time one moves along. Writing an idea shows the ones like it, and voting for one joins what you send to it.
 - **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` joins a plug-in's rows to tasks, spreadsheets and other plug-ins, and a tile's **Build** tab offers it as **Plug-in data**. Existing plug-in tiles are rewritten to use it, and follow **Run dashboard as**.
+- **The phone apps ask for a rating, now and then.** After you've used the app on three days, the App Store or Google Play shows its own rating prompt once you finish a task or make something, no more than every four months. Installed from Google Play, **Rate us on Google Play** in your account menu opens the store page any time. Needs the newest app.
 - **Drop a file on an import.** Importing a backup, another app's export, an .ics calendar or a registry bundle takes a file dropped on its box.
 
 ### Changed

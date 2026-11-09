@@ -9,6 +9,7 @@ import {
   MessageSquareHeart,
   Settings,
   ShieldCheck,
+  Star,
   UserCog,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -27,8 +28,10 @@ import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
 import { UserHandle } from "@/components/user/UserHandle";
+import { openExternal } from "@/lib/openExternal";
 import { presenceLabelKey } from "@/lib/presence";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
+import { useStoreListing } from "@/lib/storeReview";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import {
@@ -67,6 +70,7 @@ export const SidebarUserFooter = ({
 }: SidebarUserFooterProps) => {
   const { t } = useTranslation(["nav", "profiles", "common"]);
   const feedback = useFeedback();
+  const storeListing = useStoreListing();
   // The desktop app's title bar carries the update while it is drawn.
   const titleBarShown = useTitleBarHeight() > 0;
   // A fly-out needs a hover to open it and room beside the menu to land in.
@@ -311,6 +315,11 @@ export const SidebarUserFooter = ({
                       {feedback.offered ? (
                         <DropdownMenuItem onSelect={feedback.open}>
                           <MessageSquareHeart className="h-4 w-4" /> {t("sendFeedback")}
+                        </DropdownMenuItem>
+                      ) : null}
+                      {storeListing ? (
+                        <DropdownMenuItem onSelect={() => openExternal(storeListing)}>
+                          <Star className="h-4 w-4" /> {t("rateApp")}
                         </DropdownMenuItem>
                       ) : null}
                       {isMobile ? (

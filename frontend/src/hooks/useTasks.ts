@@ -65,6 +65,7 @@ import { fetchAllPages } from "@/lib/fetchAllPages";
 import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import { withZone } from "@/lib/recurrence";
 import { chipRef } from "@/lib/smartChips";
+import { askForStoreReview } from "@/lib/storeReview";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -111,7 +112,10 @@ export const useCreateTask = (options?: MutationOpts<TaskRead, Parameters<typeof
   useCommunityMutation<TaskRead, Parameters<typeof createTask>[1]>(
     {
       mutationFn: (communityId, data) => createTask(communityId, data),
-      invalidate: () => invalidate(q.allTasks()),
+      invalidate: () => {
+        askForStoreReview();
+        return invalidate(q.allTasks());
+      },
       errorKey: "projects:tasks.createError",
     },
     options
@@ -125,7 +129,10 @@ export const useCreateTaskInCommunity = (
   useApiMutation<TaskRead, { communityId: number; data: Parameters<typeof createTask>[1] }>(
     {
       mutationFn: ({ communityId, data }) => createTask(communityId, data),
-      invalidate: () => invalidate(q.allTasks()),
+      invalidate: () => {
+        askForStoreReview();
+        return invalidate(q.allTasks());
+      },
       errorKey: "projects:tasks.createError",
     },
     options

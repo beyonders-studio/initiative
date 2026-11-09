@@ -5,6 +5,7 @@
 import { Capacitor } from "@capacitor/core";
 
 import popSoundUrl from "@/assets/pop.wav";
+import { askForStoreReview } from "@/lib/storeReview";
 
 export const TASK_COMPLETION_VISUAL_FEEDBACK_VALUES = [
   "none",
@@ -128,6 +129,8 @@ interface UserPrefsLike {
  *   to celebrate (caller is responsible for the transition + initiator
  *   gating; this helper just dispatches).
  *
+ * - The store's review prompt, when this phone is due one (`storeReview`).
+ *
  * Both audio/haptic prefs check `!== false` so a missing/null field defaults
  * to enabled (matching the backend's `server_default="true"`).
  */
@@ -141,6 +144,7 @@ export const fireTaskCompletionFeedback = (
   }
   if (prefs.task_completion_audio_feedback !== false) playTaskCompletionSound();
   if (prefs.task_completion_haptic_feedback !== false) triggerTaskCompletionHaptic();
+  askForStoreReview();
 };
 
 // Last user-pointer position (viewport pixels). Updated by the global listener
