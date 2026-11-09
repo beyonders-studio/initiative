@@ -1,7 +1,8 @@
 /**
  * The frame every front-door page sits in: a header that is always there,
  * with the same few places in it (Download, Pricing where plans are sold,
- * the docs, signing in and up), and a footer that lists the rest.
+ * Ideas on Initiative Cloud, the docs, signing in and up), and a footer that
+ * lists the rest.
  *
  * On a phone the places fold into a menu under the header, and signing up
  * stays beside it as the one button.
@@ -15,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { LogoIcon } from "@/components/icons/LogoIcon";
 import { ModeToggle } from "@/components/navigation/ModeToggle";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
+import { useServer } from "@/hooks/useServer";
+import { isCloudOrigin } from "@/lib/cloud";
 import { reopenConsent } from "@/lib/consent";
 import { DOCS_URL, docsUrl, REPO_URL } from "@/lib/links";
 import { Button } from "@/ui/button";
@@ -23,7 +26,7 @@ import { cn } from "@/ui/lib/utils";
 import { LANDING_KEYFRAMES } from "./effects";
 import { useFrontDoor } from "./useFrontDoor";
 
-type Place = "download" | "pricing" | "whats-new";
+type Place = "download" | "pricing" | "ideas" | "whats-new";
 
 const navLink =
   "inline-flex min-h-11 items-center rounded-lg px-3.5 font-medium text-foreground/80 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -31,11 +34,13 @@ const navLink =
 const Header = ({ current }: { current?: Place }) => {
   const { t } = useTranslation("landing");
   const { registrationOpen, showsPricing } = useFrontDoor();
+  const onCloud = isCloudOrigin(useServer().getServerOrigin());
   const [open, setOpen] = useState(false);
 
   const places: { key: Place; to: string; label: string }[] = [
     { key: "download", to: "/download", label: t("nav.download") },
     ...(showsPricing ? [{ key: "pricing" as const, to: "/pricing", label: t("nav.pricing") }] : []),
+    ...(onCloud ? [{ key: "ideas" as const, to: "/ideas", label: t("nav.ideas") }] : []),
   ];
 
   return (
