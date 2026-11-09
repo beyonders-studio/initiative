@@ -1635,10 +1635,10 @@ async def test_privileged_database_url_refuses_to_start(monkeypatch, attributes,
 async def test_privileged_derived_provisioner_names_the_role_to_fix(monkeypatch):
     """With DATABASE_URL as the owner the app made app_provisioner itself, so
     the remedy is the role, not the connection settings."""
-    from app.core.config import settings
+    from app.core.config import Settings
 
     _fake_provisioning_engine(monkeypatch, rolsuper=True)
-    monkeypatch.setattr(settings, "_database_logins_derived", True)
+    monkeypatch.setattr(Settings, "database_logins_derived", True)
 
     with pytest.raises(SystemExit) as exit_info:
         await schema_provisioning.reject_privileged_database_url()
