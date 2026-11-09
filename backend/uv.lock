@@ -1025,7 +1025,7 @@ requires-dist = [
     { name = "redis", specifier = ">=5" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "slowapi", specifier = ">=0.1.9,<0.2" },
-    { name = "sqlalchemy", specifier = ">=2.0.49,<3" },
+    { name = "sqlalchemy", specifier = ">=2.1,<3" },
     { name = "sqlmodel", specifier = ">=0.0.38,<0.0.49" },
     { name = "tuf", specifier = ">=7.0.1" },
     { name = "typst", specifier = ">=0.15.0" },
