@@ -235,8 +235,8 @@ class _Board:
     category_field_id: int | None = None
     release_field_id: int | None = None
     shipped_status_id: int | None = None
-    #: The board's last in-progress status, which a shipped idea reads as
-    #: until its release is out.
+    #: The board's last in-progress status, or its first waiting one where it
+    #: has none, which a shipped idea reads as until its release is out.
     building_status_id: int | None = None
     #: The category field's options, as ``(value, label)``, in order.
     options: tuple[tuple[str, str], ...] = ()
@@ -271,17 +271,32 @@ def _options(raw: Any) -> tuple[tuple[str, str], ...]:
 async def _board(session: AsyncSession) -> _Board:
     """The Ideas binding's roles, as ``session`` reads them; empty where the
     board is not bound."""
-    building = (
-        select(TaskStatus.id)
-        .where(TaskStatus.project_id == IntakeBinding.project_id)
-        # As text: the ideas role decodes no enum type.
-        .where(
-            cast(TaskStatus.category, String) == TaskStatusCategory.in_progress.value
+
+    def first(category: TaskStatusCategory, *order: Any) -> Any:
+        return (
+            select(TaskStatus.id)
+            .where(TaskStatus.project_id == IntakeBinding.project_id)
+            # As text: the ideas role decodes no enum type.
+            .where(cast(TaskStatus.category, String) == category.value)
+            .order_by(*order)
+            .limit(1)
+            .correlate(IntakeBinding)
+            .scalar_subquery()
         )
-        .order_by(TaskStatus.position.desc(), TaskStatus.id.desc())  # type: ignore[union-attr]
-        .limit(1)
-        .correlate(IntakeBinding)
-        .scalar_subquery()
+
+    # The last in-progress status, or, on a board with none, the first status
+    # still waiting, so a shipped idea whose release is not out stays readable.
+    building = func.coalesce(
+        first(
+            TaskStatusCategory.in_progress,
+            TaskStatus.position.desc(),  # type: ignore[union-attr]
+            TaskStatus.id.desc(),  # type: ignore[union-attr]
+        ),
+        first(
+            TaskStatusCategory.todo,
+            TaskStatus.position.asc(),  # type: ignore[union-attr]
+            TaskStatus.id.asc(),  # type: ignore[union-attr]
+        ),
     )
     options = (
         select(MetadataDefinition.options)
@@ -543,7 +558,7 @@ def _read(row: Any, board: _Board) -> IdeaRead:
         created_at=row.created_at,
         updated_at=row.updated_at,
         category=board.label(row.category_value),
-        release=row.release,
+        release=_version(row.release) if row.release else None,
         summary=description_excerpt(row.summary_head, SUMMARY_CHARS, first_block=True),
         description=row.description,
     )

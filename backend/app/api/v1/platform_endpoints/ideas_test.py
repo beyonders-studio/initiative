@@ -705,6 +705,9 @@ async def test_a_shipped_idea_reads_as_shipped_only_in_its_release(client, desk)
     assert column(roadmap, "Shipped") == [idea]
     feed = await client.get(f"{IDEAS}/shipped", params={"release": __version__})
     assert [i["task_id"] for i in feed.json()] == [idea]
+    # Written with a "v", it reads as the version, which What's new is named by.
+    await _release(client, desk, idea, f"v{__version__}")
+    assert (await _public(client, idea))["release"] == __version__
 
     await _release(client, desk, idea, "0.0.1")
     assert idea not in listed((await client.get(IDEAS)).json())
@@ -717,6 +720,32 @@ async def test_a_shipped_idea_reads_as_shipped_only_in_its_release(client, desk)
     # Nothing for a release this server is not yet on.
     feed = await client.get(f"{IDEAS}/shipped", params={"release": "99.0.0"})
     assert feed.json() == []
+
+
+async def test_a_shipped_idea_stays_readable_on_a_board_with_nothing_in_progress(
+    client, desk
+):
+    """With no in-progress status left, a shipped idea whose release is not out
+    reads as the board's first waiting status, on the list and its own page."""
+    idea, _ = desk["ideas"]
+    statuses = desk["statuses"]
+    project_id = desk["boards"]["ideas"]["project_id"]
+    for name in ("Planned", "Building"):
+        moved = await client.patch(
+            f"/api/v1/c/{desk['guild_id']}/projects/{project_id}"
+            f"/task-statuses/{statuses[name]}",
+            json={"category": "todo"},
+            headers=desk["team"],
+        )
+        assert moved.status_code == 200, moved.text
+    await _edit(client, desk, idea, task_status_id=desk["roles"]["shipped"])
+
+    read = await _public(client, idea)
+    assert (read["status"]["id"], read["closed"]) == (
+        statuses["Under consideration"],
+        False,
+    )
+    assert idea in {i["task_id"] for i in (await client.get(IDEAS)).json()["items"]}
 
 
 async def test_voters_hear_an_idea_shipped_once_its_release_is_out(
