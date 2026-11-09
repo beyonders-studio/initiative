@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { cleanup, configure } from "@testing-library/react";
+import { toast as robotToast } from "robot-toast";
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
 import { resetStoreSelling } from "@/lib/storeSelling";
@@ -302,6 +303,10 @@ afterEach(async () => {
   // Unmounting can still send a request (a field saving as it loses focus):
   // one tick lets this test's handlers answer it, not the next test's.
   cleanup();
+  // Toasts live on document.body, outside the tree cleanup() unmounts, and
+  // leave only once their exit animation ends.
+  robotToast.closeAll();
+  for (const wrapper of document.querySelectorAll(".robot-toast-wrapper")) wrapper.remove();
   await new Promise((resolve) => realSetTimeout(resolve, 0));
   server.resetHandlers();
   localStorage.clear();
