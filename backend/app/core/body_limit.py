@@ -163,7 +163,7 @@ def _bound_for(scope, headers: Headers) -> tuple[int, str]:
 def _content_length(headers: Headers) -> int | None:
     try:
         return int(headers["content-length"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         return None
 
 

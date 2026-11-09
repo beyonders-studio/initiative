@@ -64,6 +64,6 @@ def start(arguments: list[str]) -> Callable[[dict[str, Any]], dict[str, Any]]:
         import resource
 
         resource.setrlimit(resource.RLIMIT_AS, (address_space, address_space))
-    except (ImportError, ValueError, OSError):
+    except ImportError, ValueError, OSError:
         pass
     return lambda request: answer(request, edge)

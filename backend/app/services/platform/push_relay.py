@@ -188,7 +188,7 @@ async def _register(client: httpx2.AsyncClient) -> tuple[str, str] | None:
     try:
         body = response.json()
         server_id, key = body["server_id"], body["server_key"]
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         logger.error("push relay: registration answered without a credential")
         return None
     if not (
@@ -300,7 +300,7 @@ async def _fetch_android_config(client: httpx2.AsyncClient) -> AndroidConfig | N
             api_key=str(body["api_key"]),
             sender_id=str(body["sender_id"]),
         )
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         logger.error("push relay: the Android settings were not readable")
         return None
 

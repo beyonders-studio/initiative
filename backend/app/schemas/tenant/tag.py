@@ -117,7 +117,7 @@ class TagBulkEditRequest(SanitizedBaseModel):
     remove_tag_ids: list[int] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
-    def require_an_operation(self) -> "TagBulkEditRequest":
+    def require_an_operation(self) -> TagBulkEditRequest:
         if not self.add_tag_ids and not self.remove_tag_ids:
             raise ValueError("add_tag_ids or remove_tag_ids must be non-empty")
         return self

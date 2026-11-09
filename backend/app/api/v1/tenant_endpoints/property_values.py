@@ -109,7 +109,7 @@ async def set_properties(
             steps=payload.steps,
         )
         await required_fields.refuse_emptied(session, required)
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         await session.rollback()
         raise
     await session.commit()

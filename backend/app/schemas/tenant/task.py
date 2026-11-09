@@ -152,7 +152,7 @@ class TaskCreate(TaskBase, PropertiesOnCreate):
     parent_task_id: int | None = None
 
     @model_validator(mode="after")
-    def _valid_recurrence(self) -> "TaskCreate":
+    def _valid_recurrence(self) -> TaskCreate:
         validate_task_recurrence(
             rule=self.recurrence,
             strategy=self.recurrence_strategy,
@@ -212,7 +212,7 @@ class TaskUpdate(PropertiesOnUpdate):
     _required = reject_null("title", "priority")
 
     @model_validator(mode="after")
-    def _one_way_to_change_assignees(self) -> "TaskUpdate":
+    def _one_way_to_change_assignees(self) -> TaskUpdate:
         if self.assignee_ids is not None and (
             self.add_assignee_ids is not None or self.remove_assignee_ids is not None
         ):

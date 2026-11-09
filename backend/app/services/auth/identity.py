@@ -611,7 +611,7 @@ async def _provision(
         return IdentityResolution(
             outcome=ResolutionOutcome.PROVISIONED, user=user, identity=identity
         )
-    except (IntegrityError, _AddressTaken):
+    except IntegrityError, _AddressTaken:
         # Lost a JIT race with a concurrent login. A conflicting unique insert
         # blocks until the other transaction commits, so by the time we're here
         # the winner is committed and visible; the savepoint has already discarded

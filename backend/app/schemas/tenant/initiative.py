@@ -365,7 +365,7 @@ class InitiativeJoinRequestRead(SanitizedBaseModel):
 
 
 def community_holds_role(
-    role: "InitiativeRoleModel", defaults: InitiativeDefaultsRead
+    role: InitiativeRoleModel, defaults: InitiativeDefaultsRead
 ) -> bool:
     """Whether what the community set for members holds for ``role``: the
     built-in member role, and while the community keeps initiatives to their
@@ -376,7 +376,7 @@ def community_holds_role(
 
 
 def serialize_role(
-    role: "InitiativeRoleModel",
+    role: InitiativeRoleModel,
     member_count: int = 0,
     *,
     defaults: InitiativeDefaultsRead | None = None,
@@ -424,7 +424,7 @@ class InitiativeSummary(SanitizedBaseModel):
     color: str | None = None
 
 
-def initiative_can(initiative: "Initiative") -> InitiativeCan:
+def initiative_can(initiative: Initiative) -> InitiativeCan:
     """What the caller may do in ``initiative``, as the schema's
     ``initiative_actions`` answered it in the SELECT that loaded the row."""
     held = set(initiative.actions or ())
@@ -438,7 +438,7 @@ def initiative_can(initiative: "Initiative") -> InitiativeCan:
 
 
 def serialize_initiative(
-    initiative: "Initiative", *, context: "ActorContext"
+    initiative: Initiative, *, context: ActorContext
 ) -> InitiativeRead:
     """The initiative as a route answers with it. ``actions``, ``member_count``
     and ``role_display_name`` are deferred on the model, so whoever loads the
@@ -469,7 +469,7 @@ def serialize_initiative(
 
 
 def serialize_initiative_member(
-    membership: "InitiativeMember",
+    membership: InitiativeMember,
     presence: Presence = Presence.offline,
     guest_until: datetime | None = None,
 ) -> InitiativeMemberRead:

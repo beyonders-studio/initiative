@@ -10,7 +10,7 @@ from app.services import captcha_config
 
 
 @contextmanager
-def captcha_switched_on() -> Generator[None, None, None]:
+def captcha_switched_on() -> Generator[None]:
     """Resolve the captcha configuration as hCaptcha for the duration.
 
     The provider and its keys live on the settings row, behind a process-wide

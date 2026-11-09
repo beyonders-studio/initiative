@@ -214,7 +214,7 @@ async def _ready(found: Server, seconds: int = 60) -> None:
         try:
             await (await asyncpg.connect(found.owner)).close()
             return
-        except (OSError, asyncpg.PostgresError):
+        except OSError, asyncpg.PostgresError:
             if time.monotonic() > deadline:
                 raise
             await asyncio.sleep(1)

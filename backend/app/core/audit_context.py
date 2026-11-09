@@ -204,9 +204,7 @@ def current() -> RequestContext | None:
 
 
 @contextmanager
-def job(
-    name: str, *, guild_id: int | None = None
-) -> Generator[RequestContext, None, None]:
+def job(name: str, *, guild_id: int | None = None) -> Generator[RequestContext]:
     """Name one unit of background work — a worker's pass, a data job — for
     the lines written while it runs, as a request is named for its own.
 
@@ -222,7 +220,7 @@ def job(
 
 
 @contextmanager
-def visiting(guild_id: int) -> Generator[None, None, None]:
+def visiting(guild_id: int) -> Generator[None]:
     """Name the community a sweep is visiting, for the lines written there.
 
     A copy of the pass's context rather than a change to it: a pass visits

@@ -67,7 +67,7 @@ def _moved_id(kind: str, old: Any, moved: Moved) -> int | None:
         return None
     try:
         return moved.get(kind, {}).get(int(old))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

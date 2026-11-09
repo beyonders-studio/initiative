@@ -254,7 +254,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
 @asynccontextmanager
 async def roster_session(
     session: AsyncSession, *, whole: bool = False
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """Where the routed community's roster is read for ``session``'s request.
 
     The request's own session for a person, so a row it has just made is seen.

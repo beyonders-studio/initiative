@@ -286,7 +286,7 @@ def _optional_int(params: dict, key: str) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         from app.core.messages import ExportMessages
         from app.services.export.engine import ExportError
 

@@ -29,7 +29,7 @@ from app.models.platform.guild import CommunityRole
 
 
 @contextmanager
-def _statements(session: AsyncSession) -> Generator[list[str], None, None]:
+def _statements(session: AsyncSession) -> Generator[list[str]]:
     """Every statement ``session`` sends while the block runs."""
     seen: list[str] = []
     engine = session.sync_session.get_bind()

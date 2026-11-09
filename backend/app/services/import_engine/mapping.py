@@ -120,7 +120,7 @@ def repeat_fields(
         )
         if not rolling and recurrence.parse(text).rule.get("FREQ") == ["HOURLY"]:
             return {}
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return {}
     return {
         "recurrence": text,

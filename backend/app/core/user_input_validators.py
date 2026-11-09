@@ -21,7 +21,7 @@ def resolve_zone(value: str | None) -> ZoneInfo:
     must not fail the work that reads it."""
     try:
         return ZoneInfo(value or "UTC")
-    except (KeyError, ValueError, OSError):
+    except KeyError, ValueError, OSError:
         return ZoneInfo("UTC")
 
 
@@ -60,7 +60,7 @@ def normalize_reminder_minutes(value: int | str | None) -> int | None:
         return None
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=UserMessages.INVALID_REMINDER_MINUTES,
@@ -98,7 +98,7 @@ def normalize_week_starts_on(value: int | str | None) -> int | None:
         return None
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=UserMessages.INVALID_WEEK_START,

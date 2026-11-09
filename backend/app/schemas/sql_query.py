@@ -125,7 +125,7 @@ class QueryFilterGroupSpec(SanitizedBaseModel):
     """
 
     logic: Literal["and", "or"] = "and"
-    conditions: list["QueryFilterNode"] = Field(max_length=20)
+    conditions: list[QueryFilterNode] = Field(max_length=20)
 
 
 #: One line of a filter: a comparison, or a bracket around more of them. The

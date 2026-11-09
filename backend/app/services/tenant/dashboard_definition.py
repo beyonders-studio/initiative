@@ -771,7 +771,7 @@ def _free_value(kind: OptionKind, value: Any) -> str | None:
             _fail(DashboardMessages.WIDGET_OPTION_INVALID)
         try:
             number = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             _fail(DashboardMessages.WIDGET_OPTION_INVALID)
             raise AssertionError  # unreachable; _fail raises
         if not math.isfinite(number):

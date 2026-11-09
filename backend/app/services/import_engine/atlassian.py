@@ -148,7 +148,7 @@ def _retry_after_seconds(response: httpx2.Response) -> float | None:
     except ValueError:
         try:
             when = parsedate_to_datetime(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if when.tzinfo is None:
             when = when.replace(tzinfo=UTC)
@@ -248,7 +248,7 @@ def normalize_site_url(raw: str) -> str:
 
 
 @asynccontextmanager
-async def _deadline(seconds: float, path: str) -> AsyncGenerator[None, None]:
+async def _deadline(seconds: float, path: str) -> AsyncGenerator[None]:
     """Run the block within ``seconds``, or end it as the site being
     unreachable."""
     try:
@@ -365,7 +365,7 @@ async def _follow(
         raise ImportEngineError(ImportEngineMessages.IMPORT_TOO_LARGE)
     except WebhookTargetUrlPrivateError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_PRIVATE_HOST)
-    except (WebhookTargetUrlError, httpx2.TimeoutException, httpx2.TransportError):
+    except WebhookTargetUrlError, httpx2.TimeoutException, httpx2.TransportError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
 
 
@@ -447,7 +447,7 @@ async def _request(
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_PRIVATE_HOST)
     except WebhookTargetUrlError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
-    except (httpx2.TimeoutException, httpx2.TransportError):
+    except httpx2.TimeoutException, httpx2.TransportError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
     return response
 

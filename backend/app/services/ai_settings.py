@@ -294,7 +294,7 @@ async def _validate_connection_base_url(
         return
     try:
         await assert_target_url_is_public_async(base_url)
-    except (WebhookTargetUrlError, WebhookTargetUrlPrivateError):
+    except WebhookTargetUrlError, WebhookTargetUrlPrivateError:
         raise HTTPException(status_code=400, detail=AIMessages.INVALID_BASE_URL)
 
 

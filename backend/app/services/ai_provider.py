@@ -394,7 +394,7 @@ async def _send(
 
 
 @contextmanager
-def _slot(guild_id: int | None) -> Generator[None, None, None]:
+def _slot(guild_id: int | None) -> Generator[None]:
     """Hold one of the community's open requests, or refuse when it has
     none left."""
     if guild_id is None:
@@ -421,7 +421,7 @@ async def _sent(
     try:
         try:
             text, used = await send(target, job, prompt, schema)
-        except (anthropic.BadRequestError, openai.BadRequestError):
+        except anthropic.BadRequestError, openai.BadRequestError:
             if schema is None:
                 raise
             # A model that takes no schema still answers one the prompt asks

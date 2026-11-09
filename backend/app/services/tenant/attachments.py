@@ -250,7 +250,7 @@ def _like(filename: str) -> str:
 
 
 @asynccontextmanager
-async def guild_wide(guild_id: int) -> AsyncGenerator[Any, None]:
+async def guild_wide(guild_id: int) -> AsyncGenerator[Any]:
     """A system session from the guild's cohort, routed into it: every upload
     it stores, whoever can read which."""
     from app.db import cohorts

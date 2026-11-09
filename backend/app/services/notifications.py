@@ -1452,7 +1452,7 @@ def _rolled_up_count(data: Mapping[str, Any]) -> int:
     past :data:`MAX_ROLLED_UP_REACTIONS`."""
     try:
         count = int(data.get("count") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         count = 0
     return count or len(_rolled_up_reactions(data))
 

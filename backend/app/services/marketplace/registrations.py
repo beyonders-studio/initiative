@@ -1256,7 +1256,7 @@ def configured_facts(public_id: str) -> DeploymentFacts | None:
         return None
     try:
         entries = _load_entries(Path(configured))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     for entry in entries:
         if str(entry.get("public_id", "")).strip().lower() != public_id:

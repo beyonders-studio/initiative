@@ -171,7 +171,7 @@ def _mem_total_mb() -> int | None:
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_xdist_auto_num_workers(config: "pytest.Config") -> int | None:
+def pytest_xdist_auto_num_workers(config: pytest.Config) -> int | None:
     if os.environ.get("PYTEST_XDIST_AUTO_NUM_WORKERS"):
         return None  # explicit override; let xdist's own hook answer
     if hasattr(os, "sched_getaffinity"):
@@ -451,7 +451,7 @@ async def _test_db_is_at_head() -> bool:
             port=_app_db.port or 5432,
             database=TEST_DB_NAME,
         )
-    except (asyncpg.InvalidCatalogNameError, OSError):
+    except asyncpg.InvalidCatalogNameError, OSError:
         return False
     try:
         rows = await conn.fetch("SELECT version_num FROM alembic_version")
@@ -915,7 +915,7 @@ async def _schema_test_harness(engine, _worker_engines, monkeypatch, request):
 
 
 @pytest.fixture(scope="function")
-async def session(engine) -> AsyncGenerator[AsyncSession, None]:
+async def session(engine) -> AsyncGenerator[AsyncSession]:
     """
     Create a fresh database session for each test.
 
@@ -1052,7 +1052,7 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient]:
     """Async HTTP client whose REQUEST path runs as the REAL ``app_user`` login
     role (RLS-enforced), not the Postgres superuser.
 
@@ -1135,7 +1135,7 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     @asynccontextmanager
     async def _override(
         login: str, connection: HTTPConnection
-    ) -> AsyncGenerator[AsyncSession, None]:
+    ) -> AsyncGenerator[AsyncSession]:
         await _publish_setup_state()
         reused = await _served_session(login, served_guild_id(connection))
         # Production gets a FRESH session (empty info) per request; this reused
@@ -1160,13 +1160,13 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     # for the event loop to close later on the same connection.
     async def override_get_session(
         connection: HTTPConnection,
-    ) -> AsyncGenerator[AsyncSession, None]:
+    ) -> AsyncGenerator[AsyncSession]:
         async with _override("app_user", connection) as reused:
             yield reused
 
     async def override_get_system_session(
         connection: HTTPConnection,
-    ) -> AsyncGenerator[AsyncSession, None]:
+    ) -> AsyncGenerator[AsyncSession]:
         async with _override("app_admin", connection) as reused:
             yield reused
 

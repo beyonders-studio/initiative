@@ -1543,7 +1543,7 @@ def _coerce_filter_scalar(property_type: MetadataType, raw: Any) -> Any:
         if isinstance(raw, str):
             return raw
         return str(raw)
-    except (InvalidOperation, ValueError, TypeError):
+    except InvalidOperation, ValueError, TypeError:
         return None
 
 
@@ -1719,7 +1719,7 @@ def build_single_property_clause(
 
 def build_property_filter_clauses(
     target: str,
-    conditions: Sequence["ParsedPropertyFilter"],
+    conditions: Sequence[ParsedPropertyFilter],
     defs_map: dict[int, MetadataDefinition],
 ) -> list[Any]:
     """The WHERE-clause list for a set of parsed property filters on
@@ -2871,8 +2871,7 @@ async def _as_install(
         AsyncSession,
         Callable[[], Awaitable[InstallContext]],
         Callable[[], Awaitable[Any]],
-    ],
-    None,
+    ]
 ]:
     """A session of its own routed as the install, through the install seam
     with the scopes the install holds (:func:`guild_plugins.install_scopes`):

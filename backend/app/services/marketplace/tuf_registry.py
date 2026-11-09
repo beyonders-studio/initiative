@@ -666,7 +666,7 @@ class VerifiedRepository:
         """Whether the client's own delegation search finds ``path``."""
         try:
             return self._updater.get_targetinfo(path) is not None
-        except (tuf_errors.RepositoryError, tuf_errors.DownloadError):
+        except tuf_errors.RepositoryError, tuf_errors.DownloadError:
             return False
 
     def fetch_target(self, path: str, max_bytes: int) -> bytes:

@@ -517,7 +517,7 @@ async def _payload(
     upload_id: str | None,
     purpose: str,
     initiative_id: int | None,
-) -> AsyncGenerator[tuple[Path | BinaryIO, str | None], None]:
+) -> AsyncGenerator[tuple[Path | BinaryIO, str | None]]:
     """An import's zip for the block, with its key in the community's storage
     when it is already there: sent with the request as ``file`` and copied to
     a local file, or taken from the resumable upload ``upload_id`` and read

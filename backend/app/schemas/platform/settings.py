@@ -359,7 +359,7 @@ class CommunityClaimRulesResponse(SanitizedBaseModel):
     reporting_provider_ids: list[int] = Field(default_factory=list)
     #: The platform's rules that name this community, shown so a community
     #: always sees who is placed in it. Read-only here.
-    provider_rules: list["ProviderPlacementRuleRead"] = Field(default_factory=list)
+    provider_rules: list[ProviderPlacementRuleRead] = Field(default_factory=list)
     #: Whether the deployment applies its rules to every community they name.
     placement_everywhere: bool = False
 

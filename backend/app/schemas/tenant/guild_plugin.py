@@ -607,7 +607,7 @@ class CommunityPluginMembersResponse(PageMeta):
 def serialize_guild_plugin(
     plugin: Any,
     *,
-    context: "GuildContext",
+    context: GuildContext,
     install_state: InstallState | None = None,
     avatar_url: str | None = None,
     placements: Sequence[Any] = (),
@@ -754,7 +754,7 @@ def serialize_connection(
 def serialize_guild_plugin_detail(
     plugin: Any,
     *,
-    context: "GuildContext",
+    context: GuildContext,
     member_rows: dict[str, Any],
     install_state: InstallState | None = None,
     avatar_url: str | None = None,

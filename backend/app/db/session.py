@@ -229,7 +229,7 @@ def served_guild_id(connection: HTTPConnection) -> int | None:
 
 async def get_session(
     connection: HTTPConnection,
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     # No checkout reset: context is transaction-local (set_config is_local +
     # SET LOCAL semantics), so a pooled connection carries NO role/GUC/
     # search_path state between transactions — there is nothing to clear.
@@ -245,7 +245,7 @@ async def get_session(
 
 async def get_system_session(
     connection: HTTPConnection,
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """Get a session on the system engine (background jobs, bootstrapping,
     platform lifecycle). ``app_admin`` is the standard Postgres trusted-batch
     actor — BYPASSRLS, bounded by enumerated per-table GRANTs (0129); guild
@@ -787,7 +787,7 @@ def _missing_database_error() -> RuntimeError:
 
 
 @asynccontextmanager
-async def migration_lock() -> AsyncGenerator[AsyncConnection, None]:
+async def migration_lock() -> AsyncGenerator[AsyncConnection]:
     """Take the database's migration lock for the duration of the block.
 
     Alembic runs in-process at startup, so instances sharing a database take

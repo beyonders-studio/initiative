@@ -46,7 +46,7 @@ class ApiKeyCreateRequest(SanitizedBaseModel):
     resource_id: int | None = None
 
     @model_validator(mode="after")
-    def _one_resource(self) -> "ApiKeyCreateRequest":
+    def _one_resource(self) -> ApiKeyCreateRequest:
         if self.resource_type is None and self.resource_id is None:
             return self
         if (

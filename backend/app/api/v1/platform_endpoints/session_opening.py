@@ -582,7 +582,7 @@ def mint_for(
 @asynccontextmanager
 async def session_store(
     system_session: AsyncSession, *, user_id: int
-) -> AsyncGenerator[None, None]:
+) -> AsyncGenerator[None]:
     """Commit a session and everything staged beside it, or none of it.
 
     A sign-in *is* the session. If it cannot be written the request says so

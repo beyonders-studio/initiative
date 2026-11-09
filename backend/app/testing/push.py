@@ -10,7 +10,7 @@ from app.services.platform import push_config
 
 
 @contextmanager
-def push_switched_on() -> Generator[None, None, None]:
+def push_switched_on() -> Generator[None]:
     """Resolve the push configuration as enabled for the duration.
 
     The switch lives on the settings row, behind a process-wide snapshot, so

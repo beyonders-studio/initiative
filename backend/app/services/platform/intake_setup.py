@@ -80,7 +80,7 @@ class BindingView:
 
 
 @asynccontextmanager
-async def _route(guild_id: int) -> AsyncGenerator[AsyncSession, None]:
+async def _route(guild_id: int) -> AsyncGenerator[AsyncSession]:
     """A system session from the guild's cohort, routed into its schema. The
     caller commits what it writes."""
     async with cohorts.system_session(guild_id) as session:

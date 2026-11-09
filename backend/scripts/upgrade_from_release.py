@@ -577,7 +577,7 @@ def _explicit_logins(name: str) -> dict[str, str]:
 @contextlib.contextmanager
 def _explicit_logins_services(
     servers: dict[str, str],
-) -> Generator[ssl.SSLContext, None, None]:
+) -> Generator[ssl.SSLContext]:
     """Run what the explicit-logins deployment runs beside the image, and stop
     it after: PgBouncer in transaction mode, with a database for each of
     ``servers`` (a name and an owner URL) and one for each of its cohorts;

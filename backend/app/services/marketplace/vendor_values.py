@@ -272,7 +272,7 @@ def _decrypt_all(stored: Mapping[str, Any], *, public_id: str) -> dict[str, str]
             continue
         try:
             values[key] = decrypt_field(ciphertext, SALT_PLUGIN_VENDOR)
-        except (InvalidToken, UnicodeDecodeError):
+        except InvalidToken, UnicodeDecodeError:
             logger.warning(
                 "plug-in services: %r vendor value %r does not decrypt", public_id, key
             )

@@ -241,7 +241,7 @@ async def clear_mark(
 @asynccontextmanager
 async def _own_row(
     session: AsyncSession, user_id: int, kind: str, entity_id: int
-) -> AsyncGenerator[PersonalItem | None, None]:
+) -> AsyncGenerator[PersonalItem | None]:
     """The reader's row on an item, locked, to let go of something on it: run
     as the platform and limited to that row, so it comes off something they can
     no longer open. Kept if it still holds anything, deleted if not."""

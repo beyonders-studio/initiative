@@ -416,7 +416,7 @@ async def _insert_task(
                 entity_id=task.id,
                 tag_ids=task_in.tag_ids,
             )
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         await session.rollback()
         raise
 
@@ -952,7 +952,7 @@ async def _apply_update(
             await task_hierarchy.set_parent(
                 session, task, parent_task_id, user_id=guild_context.user_id
             )
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         await session.rollback()
         raise
     retyped: list[Task] = []
