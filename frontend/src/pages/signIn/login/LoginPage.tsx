@@ -552,7 +552,10 @@ const SignInCard = () => {
               <Link
                 className="text-primary underline-offset-4 hover:underline"
                 to="/start"
-                search={inviteCodeParam ? { invite_code: inviteCodeParam } : {}}
+                search={{
+                  ...(inviteCodeParam ? { invite_code: inviteCodeParam } : {}),
+                  ...(searchParams.next ? { next: searchParams.next } : {}),
+                }}
               >
                 {t("login.register")}
               </Link>

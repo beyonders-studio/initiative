@@ -38,6 +38,7 @@ import { Route as ServerRequiredAuthenticatedUserStatsRouteImport } from './rout
 import { Route as ServerRequiredAccountNotMeRouteImport } from './routes/_serverRequired/account.not-me'
 import { Route as ServerRequiredInviteCodeRouteImport } from './routes/_serverRequired/invite.$code'
 import { Route as ServerRequiredLegalSlugRouteImport } from './routes/_serverRequired/legal.$slug'
+import { Route as ServerRequiredOauthAuthorizeRouteImport } from './routes/_serverRequired/oauth.authorize'
 import { Route as ServerRequiredOidcCallbackRouteImport } from './routes/_serverRequired/oidc.callback'
 import { Route as ServerRequiredSuggestionsIndexRouteImport } from './routes/_serverRequired/suggestions.index'
 import { Route as ServerRequiredSuggestionsTaskIdRouteImport } from './routes/_serverRequired/suggestions.$taskId'
@@ -352,6 +353,12 @@ const ServerRequiredLegalSlugRoute = ServerRequiredLegalSlugRouteImport.update({
   path: '/legal/$slug',
   getParentRoute: () => ServerRequiredRoute,
 } as any)
+const ServerRequiredOauthAuthorizeRoute =
+  ServerRequiredOauthAuthorizeRouteImport.update({
+    id: '/oauth/authorize',
+    path: '/oauth/authorize',
+    getParentRoute: () => ServerRequiredRoute,
+  } as any)
 const ServerRequiredOidcCallbackRoute =
   ServerRequiredOidcCallbackRouteImport.update({
     id: '/oidc/callback',
@@ -1557,6 +1564,7 @@ export interface FileRoutesByFullPath {
   '/account/not-me': typeof ServerRequiredAccountNotMeRoute
   '/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/legal/$slug': typeof ServerRequiredLegalSlugRoute
+  '/oauth/authorize': typeof ServerRequiredOauthAuthorizeRoute
   '/oidc/callback': typeof ServerRequiredOidcCallbackRoute
   '/suggestions/$taskId': typeof ServerRequiredSuggestionsTaskIdRoute
   '/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
@@ -1737,6 +1745,7 @@ export interface FileRoutesByTo {
   '/account/not-me': typeof ServerRequiredAccountNotMeRoute
   '/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/legal/$slug': typeof ServerRequiredLegalSlugRoute
+  '/oauth/authorize': typeof ServerRequiredOauthAuthorizeRoute
   '/oidc/callback': typeof ServerRequiredOidcCallbackRoute
   '/suggestions/$taskId': typeof ServerRequiredSuggestionsTaskIdRoute
   '/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
@@ -1904,6 +1913,7 @@ export interface FileRoutesById {
   '/_serverRequired/account/not-me': typeof ServerRequiredAccountNotMeRoute
   '/_serverRequired/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/_serverRequired/legal/$slug': typeof ServerRequiredLegalSlugRoute
+  '/_serverRequired/oauth/authorize': typeof ServerRequiredOauthAuthorizeRoute
   '/_serverRequired/oidc/callback': typeof ServerRequiredOidcCallbackRoute
   '/_serverRequired/suggestions/$taskId': typeof ServerRequiredSuggestionsTaskIdRoute
   '/_serverRequired/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
@@ -2088,6 +2098,7 @@ export interface FileRouteTypes {
     | '/account/not-me'
     | '/invite/$code'
     | '/legal/$slug'
+    | '/oauth/authorize'
     | '/oidc/callback'
     | '/suggestions/$taskId'
     | '/whats-new/$version'
@@ -2268,6 +2279,7 @@ export interface FileRouteTypes {
     | '/account/not-me'
     | '/invite/$code'
     | '/legal/$slug'
+    | '/oauth/authorize'
     | '/oidc/callback'
     | '/suggestions/$taskId'
     | '/whats-new/$version'
@@ -2434,6 +2446,7 @@ export interface FileRouteTypes {
     | '/_serverRequired/account/not-me'
     | '/_serverRequired/invite/$code'
     | '/_serverRequired/legal/$slug'
+    | '/_serverRequired/oauth/authorize'
     | '/_serverRequired/oidc/callback'
     | '/_serverRequired/suggestions/$taskId'
     | '/_serverRequired/whats-new/$version'
@@ -2797,6 +2810,13 @@ declare module '@tanstack/react-router' {
       path: '/legal/$slug'
       fullPath: '/legal/$slug'
       preLoaderRoute: typeof ServerRequiredLegalSlugRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/oauth/authorize': {
+      id: '/_serverRequired/oauth/authorize'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize'
+      preLoaderRoute: typeof ServerRequiredOauthAuthorizeRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
     '/_serverRequired/oidc/callback': {
@@ -4572,6 +4592,7 @@ interface ServerRequiredRouteChildren {
   ServerRequiredAccountNotMeRoute: typeof ServerRequiredAccountNotMeRoute
   ServerRequiredInviteCodeRoute: typeof ServerRequiredInviteCodeRoute
   ServerRequiredLegalSlugRoute: typeof ServerRequiredLegalSlugRoute
+  ServerRequiredOauthAuthorizeRoute: typeof ServerRequiredOauthAuthorizeRoute
   ServerRequiredOidcCallbackRoute: typeof ServerRequiredOidcCallbackRoute
   ServerRequiredSuggestionsTaskIdRoute: typeof ServerRequiredSuggestionsTaskIdRoute
   ServerRequiredWhatsNewVersionRoute: typeof ServerRequiredWhatsNewVersionRoute
@@ -4597,6 +4618,7 @@ const ServerRequiredRouteChildren: ServerRequiredRouteChildren = {
   ServerRequiredAccountNotMeRoute: ServerRequiredAccountNotMeRoute,
   ServerRequiredInviteCodeRoute: ServerRequiredInviteCodeRoute,
   ServerRequiredLegalSlugRoute: ServerRequiredLegalSlugRoute,
+  ServerRequiredOauthAuthorizeRoute: ServerRequiredOauthAuthorizeRoute,
   ServerRequiredOidcCallbackRoute: ServerRequiredOidcCallbackRoute,
   ServerRequiredSuggestionsTaskIdRoute: ServerRequiredSuggestionsTaskIdRoute,
   ServerRequiredWhatsNewVersionRoute: ServerRequiredWhatsNewVersionRoute,

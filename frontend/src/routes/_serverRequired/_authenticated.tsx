@@ -11,10 +11,8 @@ import { Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type PersonalItemRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { AcceptTerms } from "@/components/account/AcceptTerms";
 import { AccountTimeOut } from "@/components/account/AccountTimeOut";
-import { ChooseHandle } from "@/components/account/ChooseHandle";
-import { ConfirmBirthdate } from "@/components/account/ConfirmBirthdate";
+import { owedAccountStep } from "@/components/account/owedAccountStep";
 import { ActivityDrawer } from "@/components/activity/ActivityDrawer";
 import { AnnouncementCenter } from "@/components/announcements/AnnouncementCenter";
 import { DemoBannerOrTabs } from "@/components/banners/DemoBanner";
@@ -172,26 +170,8 @@ function AppLayout() {
   const clearRecent = useClearRecentView();
   const clearRecents = useClearRecentViews();
 
-  // An account that was handed its handle rather than picking one chooses
-  // here, before anything else: it is how everyone else will see them.
-  if (!loading && user && !user.username_chosen) {
-    return <ChooseHandle />;
-  }
-
-  // Never agreed to this deployment's terms, on a deployment that has some.
-  // Signing up through the form is the agreement and is recorded there, so
-  // this is the way in that had no form: an account an identity provider
-  // provisioned on first sign-in.
-  if (!loading && user && user.legal_acceptance_required) {
-    return <AcceptTerms />;
-  }
-
-  // No date of birth on file, on a deployment that checks age. Asked once of
-  // every account — plug-ins can have a minimum age that differs by country —
-  // and never again once answered. The server says when it is owed.
-  if (!loading && user && user.birthdate_required) {
-    return <ConfirmBirthdate />;
-  }
+  const owed = loading ? null : owedAccountStep(user);
+  if (owed) return owed;
 
   // Now we can have conditional returns
   // Show loading state while auth or community membership is being determined

@@ -274,14 +274,17 @@ describe("what the account is made with", () => {
   });
 });
 
-it("sends /register to /start with its invite", async () => {
+it("sends /register to /start with its invite and where to land after", async () => {
+  const next = "/oauth/authorize?client_id=acme.hoard&state=s";
   const router = createRouter({
     routeTree,
     context: buildRouterContext(),
-    history: createMemoryHistory({ initialEntries: ["/register?invite_code=abc123"] }),
+    history: createMemoryHistory({
+      initialEntries: [`/register?invite_code=abc123&next=${encodeURIComponent(next)}`],
+    }),
   });
   await router.load();
 
   await waitFor(() => expect(router.state.location.pathname).toBe("/start"));
-  expect(router.state.location.search).toEqual({ invite_code: "abc123" });
+  expect(router.state.location.search).toEqual({ invite_code: "abc123", next });
 });
