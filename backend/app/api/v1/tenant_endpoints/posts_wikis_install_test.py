@@ -431,6 +431,17 @@ async def test_uploads_pictures_into_a_collection_with_the_files_scopes(
     assert refused.status_code == 403, refused.text
     assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
+    # Binning it dates it by the community's retention, the one setting an
+    # install reads.
+    binned = await client.delete(
+        guild_url(guild_id, f"/collections/{collection_id}"), headers=headers
+    )
+    assert binned.status_code == 204, binned.text
+    gone = await client.get(
+        guild_url(guild_id, f"/collections/{collection_id}"), headers=headers
+    )
+    assert gone.status_code == 404, gone.text
+
 
 async def test_pins_the_posts_it_may_write(client, session, acting_user, role_session):
     await lift_person_and_guild_ids(session)

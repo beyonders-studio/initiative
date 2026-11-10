@@ -561,7 +561,8 @@ async def strip_template_registry_objects(conn: AsyncConnection) -> int:
 #: consent and what their initiative roles permit; the sharing gate reads the
 #: grant rows; a notification about what the install did names it; a task
 #: written for a member is held to its board's column limits, which its
-#: project's board layout holds. No route addresses any of them for a plug-in.
+#: project's board layout holds; a row it bins is kept for the community's
+#: retention. No route addresses any of them for a plug-in.
 PLUGIN_ROLE_MACHINERY_READS: dict[str, tuple[str, ...]] = {
     "guild_plugins": (
         "id",
@@ -581,6 +582,10 @@ PLUGIN_ROLE_MACHINERY_READS: dict[str, tuple[str, ...]] = {
         "revoked_at",
     ),
     "initiative_rules": ("initiative_id", "initiative_role_id", "key", "enabled"),
+    # The community's trash retention, which dates a row an install bins
+    # (``soft_delete.trash``), and the row's id, which tells "no settings row
+    # yet" from "keep it forever".
+    "guild_settings": ("id", "retention_days"),
     "resource_grants": (),
     "tool_layouts": ("initiative_id", "tool", "tool_id", "kind", "definition"),
 }

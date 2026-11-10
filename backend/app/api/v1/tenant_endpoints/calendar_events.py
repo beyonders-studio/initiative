@@ -978,7 +978,14 @@ async def skip_occurrence(
     back. Requires write access on the calendar."""
     series = await _repeating_or_404(session, event_id)
     at = occurrences_service.require_occurrence(series, body.start)
-    cancel_ids = await _attending(session, [series.id])
+    # Whose attendees hear of it: the date's own row's, or the series'.
+    own = [
+        override.id
+        for override in await occurrences_service.overrides(session, series)
+        if override.original_start is not None
+        and override.original_start.astimezone(UTC) == at
+    ]
+    cancel_ids = await _attending(session, own or [series.id])
     await occurrences_service.skip(
         session,
         series,
