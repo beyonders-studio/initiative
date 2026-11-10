@@ -24,6 +24,7 @@ import type {
   CalendarEventCreate,
   CalendarEventRSVPUpdate,
   CalendarEventRead,
+  CalendarEventSummary,
   CalendarEventUpdate,
   DeleteCalendarEventParams,
   DuplicateCalendarEventParams,
@@ -32,6 +33,7 @@ import type {
   ICalImportResult,
   ICalParseRequest,
   ICalParseResult,
+  ListCalendarEventsParams,
   OccurrenceRequest,
   ReadCalendarEventParams,
   SetAttendeesParams,
@@ -589,6 +591,148 @@ export const useDeleteCalendarEvent = <TError = ErrorType<HTTPValidationError>, 
   return useMutation(getDeleteCalendarEventMutationOptions(options), queryClient);
 };
 /**
+ * The events starting in the window, by start: a repeating one once for
+ * each of its occurrences there, ``original_start`` naming it, and one
+ * moved on its own at its new time. The calendar's entries list draws the
+ * same events beside tasks and projects for a person; this is the events
+ * alone, for an installed plug-in too.
+ *
+ * ``start_after``/``start_before`` are required; the window may span at most
+ * ``MAX_CALENDAR_WINDOW``. ``calendar_ids`` and ``initiative_id`` narrow it.
+ * @summary List Calendar Events
+ */
+export const listCalendarEvents = (
+  communityId: number,
+  params: ListCalendarEventsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CalendarEventSummary[]>(
+    { url: `/api/v1/c/${communityId}/calendar-events/`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListCalendarEventsQueryKey = (
+  communityId: number,
+  params?: ListCalendarEventsParams
+) => {
+  return [`/api/v1/c/${communityId}/calendar-events/`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCalendarEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCalendarEventsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalendarEvents>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCalendarEventsQueryKey(communityId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCalendarEvents>>> = ({ signal }) =>
+    listCalendarEvents(communityId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCalendarEvents>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCalendarEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCalendarEvents>>
+>;
+export type ListCalendarEventsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCalendarEvents<
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCalendarEventsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalendarEvents>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCalendarEvents>>,
+          TError,
+          Awaited<ReturnType<typeof listCalendarEvents>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCalendarEvents<
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCalendarEventsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCalendarEvents>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCalendarEvents>>,
+          TError,
+          Awaited<ReturnType<typeof listCalendarEvents>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCalendarEvents<
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCalendarEventsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalendarEvents>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Calendar Events
+ */
+
+export function useListCalendarEvents<
+  TData = Awaited<ReturnType<typeof listCalendarEvents>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCalendarEventsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCalendarEvents>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCalendarEventsQueryOptions(communityId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Create a calendar event. Requires write access on the calendar.
  *
  * The attendees it names are invited by whoever created it: the person, or
@@ -971,6 +1115,100 @@ export const useDetachOccurrence = <TError = ErrorType<HTTPValidationError>, TCo
   TContext
 > => {
   return useMutation(getDetachOccurrenceMutationOptions(options), queryClient);
+};
+/**
+ * Skip the series' occurrence at ``start``, as deleting just that one
+ * does: its attendees hear it is cancelled, and restoring it brings it
+ * back. Requires write access on the calendar.
+ * @summary Skip Occurrence
+ */
+export const skipOccurrence = (
+  communityId: number,
+  eventId: number,
+  occurrenceRequest: BodyType<OccurrenceRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CalendarEventRead>(
+    {
+      url: `/api/v1/c/${communityId}/calendar-events/${eventId}/occurrences/skip`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: occurrenceRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSkipOccurrenceMutationKey = () => ["skipOccurrence"] as const;
+
+export const getSkipOccurrenceMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof skipOccurrence>>,
+    TError,
+    SkipOccurrenceMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof skipOccurrence>>,
+  TError,
+  SkipOccurrenceMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSkipOccurrenceMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof skipOccurrence>>,
+    SkipOccurrenceMutationVariables
+  > = (props) => {
+    const { communityId, eventId, data } = props ?? {};
+
+    return skipOccurrence(communityId, eventId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SkipOccurrenceMutationResult = NonNullable<Awaited<ReturnType<typeof skipOccurrence>>>;
+export type SkipOccurrenceMutationBody = BodyType<OccurrenceRequest>;
+export type SkipOccurrenceMutationError = ErrorType<HTTPValidationError>;
+export type SkipOccurrenceMutationVariables = {
+  communityId: number;
+  eventId: number;
+  data: BodyType<OccurrenceRequest>;
+};
+
+/**
+ * @summary Skip Occurrence
+ */
+export const useSkipOccurrence = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof skipOccurrence>>,
+      TError,
+      SkipOccurrenceMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof skipOccurrence>>,
+  TError,
+  SkipOccurrenceMutationVariables,
+  TContext
+> => {
+  return useMutation(getSkipOccurrenceMutationOptions(options), queryClient);
 };
 /**
  * Bring back a skipped occurrence of the series.

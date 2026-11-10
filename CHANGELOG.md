@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Plug-ins can list a calendar's events and skip one date of a repeating event.** A plug-in reads the events in a span of days, each date of a repeating one included, and can skip a date as you can, which tells its attendees; Automations uses both.
 - **Ban and time out members.** Removing someone can ban them too: no invite, the directory or single sign-on lets them back in until the ban is lifted under **Settings → Users → Banned**. **Time out…** on a member, from **Members** or **Settings → Users**, lets them read the community but not post, comment, react or change anything for an hour, a day, a week or until a date you pick. It ends by itself.
 - **A listed community can ask people to ask.** Choose **Listed: ask to join** in Community settings: the community stays in the directory, its card says **Ask to join** with room for a note, and admins approve or turn people down on the **Users** tab. Admins hear when someone asks, and the person hears the answer. In the API, a community's `is_community` is now `join_policy` (`private`, `request` or `open`).
 - **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens it in an editor, where you hide or number any part. Help and feedback hide people's names, avatars and contact details for you, and a report pictures what you're reporting as it opens.

@@ -253,7 +253,7 @@ async def _exec_events(session, stmt) -> list[CalendarEvent]:
 
 async def guild_calendar_event_conditions(
     session: AsyncSession,
-    current_user: User,
+    current_user: User | None,
     guild_context: GuildContext,
     *,
     initiative_id: int | None = None,
@@ -314,7 +314,7 @@ async def guild_calendar_event_conditions(
         permissions_service.listing_scope_clause(
             Tool.calendar,
             CalendarEvent.calendar_id,
-            current_user.id,
+            current_user.id if current_user is not None else None,
             context=guild_context,
             initiative_id=initiative_id,
         )
@@ -325,7 +325,7 @@ async def guild_calendar_event_conditions(
 
 async def query_guild_calendar_events(
     session: AsyncSession,
-    current_user: User,
+    current_user: User | None,
     guild_context: GuildContext,
     **filters: Any,
 ) -> list[CalendarEvent]:

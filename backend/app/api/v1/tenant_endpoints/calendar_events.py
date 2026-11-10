@@ -45,9 +45,11 @@ from app.schemas.tenant.calendar_event import (
     CalendarEventCreate,
     CalendarEventRead,
     CalendarEventRSVPUpdate,
+    CalendarEventSummary,
     CalendarEventUpdate,
     OccurrenceRequest,
     serialize_calendar_event,
+    serialize_calendar_event_summary,
 )
 from app.schemas.tenant.ical import (
     ICalImportError,
@@ -352,6 +354,52 @@ async def read_calendar_event(
         event,
         context=guild_context,
         occurrence=occurrence if event.recurrence else None,
+    )
+
+
+@router.get("/", response_model=list[CalendarEventSummary])
+async def list_calendar_events(
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: CalendarsRead,
+    window: CalendarWindowDep,
+    initiative_id: int | None = Query(default=None),
+    calendar_ids: list[int] | None = Query(default=None),
+    tz: str | None = Query(default=None),
+) -> list[CalendarEventSummary]:
+    """The events starting in the window, by start: a repeating one once for
+    each of its occurrences there, ``original_start`` naming it, and one
+    moved on its own at its new time. The calendar's entries list draws the
+    same events beside tasks and projects for a person; this is the events
+    alone, for an installed plug-in too.
+
+    ``start_after``/``start_before`` are required; the window may span at most
+    ``MAX_CALENDAR_WINDOW``. ``calendar_ids`` and ``initiative_id`` narrow it."""
+    events = await events_service.query_guild_calendar_events(
+        session,
+        current_user,
+        guild_context,
+        initiative_id=initiative_id,
+        calendar_ids=calendar_ids,
+        start_after=window.start_after,
+        start_before=window.start_before,
+        tz=tz,
+    )
+    return events_service.occurrences(
+        [
+            serialize_calendar_event_summary(
+                event,
+                user_id=current_user.id if current_user is not None else None,
+                context=guild_context,
+            )
+            for event in events
+        ],
+        window.start_after,
+        window.start_before,
+        tz,
+        await occurrences_service.changed_starts(
+            session, [event.id for event in events if event.recurrence]
+        ),
     )
 
 
@@ -772,27 +820,10 @@ async def delete_calendar_event(
             told_ids.append(event.id)
     else:
         told_ids = [told.id]
-    # A declined attendee already isn't attending, so skip the cancellation
-    # notice for them (consistent with update/reminder notifications).
-    cancel_ids: list[int | None] = [
-        user_id
-        for user_id, answer in (
-            await occurrences_service.attendees_of(session, told_ids)
-        ).items()
-        if answer != RSVPStatus.declined
-    ]
+    cancel_ids = await _attending(session, told_ids)
 
     async def tell(when: datetime | None = None) -> None:
-        await _notify_about_event(
-            session,
-            NotificationType.event_cancelled,
-            cancel_ids,
-            event,
-            key="event.cancelled",
-            actor=current_user,
-            role="canceller",
-            at=when,
-        )
+        await _tell_cancelled(session, event, cancel_ids, current_user, when)
 
     if event.recurrence and scope == "this":
         at = occurrences_service.require_occurrence(event, at)
@@ -816,6 +847,40 @@ async def delete_calendar_event(
         deleted_by_user_id=current_user.id,
     )
     await session.commit()
+
+
+async def _attending(session: AsyncSession, told_ids: list[int]) -> list[int | None]:
+    """Everyone attending the rows ``told_ids``, read before they go. A
+    declined attendee already isn't attending, so is not told it is cancelled
+    (as for updates and reminders)."""
+    return [
+        user_id
+        for user_id, answer in (
+            await occurrences_service.attendees_of(session, told_ids)
+        ).items()
+        if answer != RSVPStatus.declined
+    ]
+
+
+async def _tell_cancelled(
+    session: AsyncSession,
+    event: CalendarEvent,
+    cancel_ids: list[int | None],
+    actor: User | notifications_service.PluginAuthor,
+    at: datetime | None = None,
+) -> None:
+    """Tell ``cancel_ids`` that ``event``, or its occurrence at ``at``, is
+    cancelled."""
+    await _notify_about_event(
+        session,
+        NotificationType.event_cancelled,
+        cancel_ids,
+        event,
+        key="event.cancelled",
+        actor=actor,
+        role="canceller",
+        at=at,
+    )
 
 
 async def _scoped_list_target(
@@ -898,6 +963,38 @@ async def detach_occurrence(
     series = await _repeating_or_404(session, event_id)
     event = await occurrences_service.detach(session, series, body.start)
     return await _event_committed(session, event.id, context=guild_context)
+
+
+@router.post("/{event_id}/occurrences/skip", response_model=CalendarEventRead)
+async def skip_occurrence(
+    event_id: int,
+    body: OccurrenceRequest,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: CalendarsWrite,
+) -> CalendarEventRead:
+    """Skip the series' occurrence at ``start``, as deleting just that one
+    does: its attendees hear it is cancelled, and restoring it brings it
+    back. Requires write access on the calendar."""
+    series = await _repeating_or_404(session, event_id)
+    at = occurrences_service.require_occurrence(series, body.start)
+    cancel_ids = await _attending(session, [series.id])
+    await occurrences_service.skip(
+        session,
+        series,
+        at,
+        deleted_by=current_user.id if current_user is not None else None,
+    )
+    await _tell_cancelled(
+        session,
+        series,
+        cancel_ids,
+        await notifications_service.author_of(session, guild_context, current_user),
+        at,
+    )
+    series.updated_at = datetime.now(UTC)
+    session.add(series)
+    return await _event_committed(session, series.id, context=guild_context)
 
 
 @router.post("/{event_id}/occurrences/restore", response_model=CalendarEventRead)
