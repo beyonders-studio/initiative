@@ -1778,7 +1778,8 @@ class TestVendorWebhooks:
         The second's connect of 42 is refused, storing nothing, until the
         registration shares routes, and then goes through. A delivery for 42
         is queued in each of the two, and each one's visit forwards it on a
-        lifecycle token naming that install; a redelivery forwards nothing."""
+        lifecycle token naming that install. A redelivery forwards nothing,
+        under its own id or another."""
         seats = [
             await acting_user(guild_role=CommunityRole.superadmin) for _ in range(3)
         ]
@@ -1837,6 +1838,12 @@ class TestVendorWebhooks:
         assert "x-hub-signature-256" not in call["headers"]
 
         again = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert again.status_code == 202
+        replayed, renamed = vendor.webhook(
+            {"action": "opened", "installation": {"id": 42}}, delivery="delivery-2"
+        )
+        assert replayed == body
+        again = await client.post(HOOK_ROUTE, content=replayed, headers=renamed)
         assert again.status_code == 202
         for seat in seats[:2]:
             await _delivered(session, seat.guild.id)
