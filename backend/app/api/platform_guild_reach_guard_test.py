@@ -161,6 +161,11 @@ _ALLOWED: dict[tuple[str, str], str] = {
     ),
     # --- The caller's own community, behind its settings gate -------------
     # --- Joining and creating ----------------------------------------------
+    (f"{_ENDPOINTS}/community_join_requests.py", "ask_to_join_community"): (
+        "queues a join request's notice for the people in the community who "
+        "answer it; the asker is not a member, so the seam has no standing "
+        "to route them by"
+    ),
     (f"{_SERVICES}/guilds.py", "provision_new_guild"): (
         "seeds a community just created, for the create endpoint, registration "
         "and first boot"
