@@ -293,13 +293,32 @@
     "updateError": "Oberflächeneinstellungen konnten nicht aktualisiert werden",
     "themeDescriptions": {
       "kobold": "Das klassische Initiative-Design in tiefen Indigotönen.",
-      "displacer": "Beruhigendes Pastelldesign nach dem Vorbild von Catppuccin (Latte/Macchiato).",
-      "strahd": "Dunkles Gothic-Design mit violetten Akzenten (Dracula/Alucard).",
+      "catppuccin": "Beruhigende Pastelltöne: Latte im hellen Modus, Frappé, Macchiato oder Mocha im dunklen.",
+      "dracula": "Violette Akzente: Alucard im hellen Modus, Dracula im dunklen.",
       "unicorn": "Neon-Regenbogen im ganzen Spektrum – laut und stolz.",
       "darkKnight": "AMOLED-Schwarz mit dunkelroten und gelben Akzenten.",
       "orc": "Erdiges Grün mit leuchtend orkhautgrünen Akzenten. ORK ORK ORK!",
-      "aboleth": "Dunkler Unterschlupf nach dem Vorbild von Monokai, mit leuchtenden biolumineszenten Akzenten."
+      "monokai": "Leuchtende Akzente in Limette, Cyan, Violett, Orange und Pink auf warmen Neutraltönen.",
+      "nord": "Arktisches Blau und frostiges Grau: Snow Storm im hellen Modus, Polar Night im dunklen.",
+      "elemental": "Metallischer Glanz in der ganzen App, im Element deiner Wahl."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Kupfer",
+        "silver": "Silber",
+        "gold": "Gold",
+        "roseGold": "Roségold",
+        "lapis": "Lapislazuli",
+        "cobalt": "Kobalt",
+        "emerald": "Smaragd",
+        "garnet": "Granat",
+        "amethyst": "Amethyst",
+        "obsidian": "Obsidian"
+      }
+    },
+    "themeVariantGroup": "Varianten von {{theme}}",
+    "useVariantForDark": "{{variant}} für den dunklen Modus verwenden",
+    "useVariant": "{{variant}} verwenden",
     "taskCompletionVisualFeedback": {
       "label": "Effekt beim Abschließen einer Aufgabe",
       "description": "Ein bisschen Spaß, wenn du eine dir zugewiesene Aufgabe abschließt.",

@@ -293,13 +293,32 @@
     "updateError": "No se pudieron actualizar las preferencias de interfaz",
     "themeDescriptions": {
       "kobold": "El tema clásico de Initiative, en tonos índigo intensos.",
-      "displacer": "Tema pastel relajante inspirado en Catppuccin (Latte/Macchiato).",
-      "strahd": "Tema gótico oscuro con acentos morados (Dracula/Alucard).",
+      "catppuccin": "Pasteles relajantes: Latte en modo claro, y Frappé, Macchiato o Mocha en oscuro.",
+      "dracula": "Acentos morados: Alucard en modo claro, Dracula en oscuro.",
       "unicorn": "Arcoíris de neón de espectro completo, llamativo y orgulloso.",
       "darkKnight": "Tema negro AMOLED con acentos rojo oscuro y amarillo.",
       "orc": "Tema verde terroso con acentos del verde intenso de la piel de orco. ¡ORCO ORCO ORCO!",
-      "aboleth": "Guarida oscura inspirada en Monokai, con vivos acentos bioluminiscentes."
+      "monokai": "Vivos acentos lima, cian, morado, naranja y rosa sobre neutros cálidos.",
+      "nord": "Azules árticos y grises helados: Snow Storm en modo claro, Polar Night en oscuro.",
+      "elemental": "Un brillo metálico en toda la aplicación, en el elemento que elijas."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Cobre",
+        "silver": "Plata",
+        "gold": "Oro",
+        "roseGold": "Oro rosa",
+        "lapis": "Lapislázuli",
+        "cobalt": "Cobalto",
+        "emerald": "Esmeralda",
+        "garnet": "Granate",
+        "amethyst": "Amatista",
+        "obsidian": "Obsidiana"
+      }
+    },
+    "themeVariantGroup": "Variantes de {{theme}}",
+    "useVariantForDark": "Usar {{variant}} en modo oscuro",
+    "useVariant": "Usar {{variant}}",
     "taskCompletionVisualFeedback": {
       "label": "Comentarios al completar tarea",
       "description": "Un toque de diversión cuando terminas una tarea asignada a ti.",
