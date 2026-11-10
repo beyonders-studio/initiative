@@ -2913,8 +2913,10 @@ class TestDeclarativePlugins:
         plugin = await _declarative_install(session, seat, config=_connected("42"))
 
         async def deliver(serial: int, action: str, installation: int = 42) -> tuple:
+            # Each delivery is its own event, with a body of its own: one
+            # whose body the install already has is not queued again.
             body, headers = vendor.webhook(
-                {"action": action, "installation": {"id": installation}},
+                {"action": action, "installation": {"id": installation}, "n": serial},
                 delivery=f"delivery-{serial}",
             )
             headers["X-GitHub-Event"] = "installation"
