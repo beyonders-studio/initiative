@@ -1024,15 +1024,26 @@ async def update_community_plugin_config(
 
     Only guild-scoped connections are settable here. A per-member one is that
     member's to make, and the fields a plug-in marks ``managed`` come from its
-    ``after_connect`` hook when a flow completes rather than through a form.
+    ``after_connect`` hook rather than through a form.
+
+    A connection that declares ``after_connect`` beside its fields is saved on
+    its own, once the plug-in has checked what was typed: refused
+    (``COMMUNITY_PLUGIN_CONNECTION_REFUSED``), or not answered
+    (``COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED``), nothing is stored.
     """
-    # Both configuration maps are rewritten whole below, so the row is taken
-    # first — a flow completing is doing the same thing to the same values.
-    plugin = await _load(session, plugin_id, for_update=True)
-    await guild_plugins_service.apply_static_config(
-        session, plugin, payload.values, actor_user_id=current_user.id
-    )
-    await session.commit()
+    plugin = await _load(session, plugin_id)
+    typed = await flows_service.typed_to_check(session, plugin, payload.values)
+    if typed is not None:
+        await flows_service.check_typed(session, typed, actor_user_id=current_user.id)
+    else:
+        # Both configuration maps are rewritten whole below, so the row is taken
+        # first — a flow completing is doing the same thing to the same values.
+        plugin = await _load(session, plugin_id, for_update=True)
+        await guild_plugins_service.apply_static_config(
+            session, plugin, payload.values, actor_user_id=current_user.id
+        )
+        await session.commit()
+    plugin = await _load(session, plugin_id)
     await session.refresh(plugin)
     return await _detail(session, plugin, guild_context, current_user.id, viewer)
 

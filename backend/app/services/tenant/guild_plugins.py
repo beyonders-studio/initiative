@@ -118,6 +118,7 @@ __all__ = [
     "placements_by_install",
     "plugin_artifacts",
     "plugin_callers",
+    "record_config_change",
     "set_granted_scopes",
     "set_placed_initiatives",
     "set_placement_roles",
@@ -639,7 +640,7 @@ async def apply_static_config(
     """
     config = dict(plugin.config or {})
     secrets = await load_secrets(session, plugin)
-    before = _config_fields(config, secrets)
+    before = (dict(config), dict(secrets))
 
     for connection_id, submitted in values.items():
         connection = plugin_config_service.connection_by_id(
@@ -674,11 +675,32 @@ async def apply_static_config(
     plugin.config = config
     await store_secrets(session, plugin, secrets)
     _unverified(plugin)
-    # Which fields hold something different now, by name. A configuration value
-    # is the plug-in's credential to the vendor, so none of it reaches the record.
-    moved = audit_service.changed_fields(before, _config_fields(config, secrets))[
-        "changed"
-    ]
+    await record_config_change(
+        session,
+        plugin,
+        before=before,
+        after=(config, secrets),
+        connection_ids=values,
+        actor_user_id=actor_user_id,
+    )
+
+
+async def record_config_change(
+    session: AsyncSession,
+    plugin: GuildPlugin,
+    *,
+    before: tuple[dict, dict],
+    after: tuple[dict, dict],
+    connection_ids: Iterable[str],
+    actor_user_id: int,
+) -> None:
+    """Record which configuration fields hold something different now, by
+    name, from the ``(config, secrets)`` maps before and after. A configuration
+    value is the plug-in's credential to the vendor, so none of it reaches the
+    record."""
+    moved = audit_service.changed_fields(
+        _config_fields(*before), _config_fields(*after)
+    )["changed"]
     if moved:
         await audit_service.record(
             session,
@@ -690,7 +712,7 @@ async def apply_static_config(
             detail={
                 "area": "config",
                 "changed": moved,
-                "connection_ids": sorted(values),
+                "connection_ids": sorted(connection_ids),
             },
         )
 

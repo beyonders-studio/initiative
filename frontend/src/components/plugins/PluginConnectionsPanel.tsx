@@ -227,6 +227,13 @@ function CommunityConnection({
               {t("plugins:connections.communityFlowExplainer")}
             </p>
           )}
+          {connection.account_label && (
+            // The account the plug-in checked what was typed against.
+            <span className="flex items-center gap-1.5 text-sm">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
+              {t("plugins:connections.connectedAs", { account: connection.account_label })}
+            </span>
+          )}
           {recorded.length > 0 && (
             <dl className="grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]">
               {recorded.map((field) => (
