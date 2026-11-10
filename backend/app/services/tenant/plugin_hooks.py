@@ -30,12 +30,11 @@ the vendor. :func:`receive` takes each delivery through four steps:
    waits, a little longer each time; a mapping that cannot succeed is logged.
    Either way the id and the body's digest stay remembered for 24 hours.
 
-A listing whose ``webhooks.verify.secret`` names a field of the routed
-connection (``{<key>}``) rather than a vendor value skips step 1: after step 2
-the delivery is checked under each matched install's own secret, as the
-version it is pinned to names it, and queued only for those it verifies for.
-One that nothing matches, or that no matched install's secret verifies, is
-refused (401).
+Each matched install is also checked under the secret the version it is
+pinned to names, before it is queued: the vendor value, or its routed
+connection's own field (``{<key>}``). A listing whose current version names a
+connection's field skips step 1, and refuses (401) a delivery that nothing
+matches or that no matched install's secret verifies.
 
 The index row that routes a delivery is written only when a community's
 connect stored the routed value, which the plug-in's ``after_connect`` hook
@@ -253,15 +252,15 @@ async def _queue(
     headers: Mapping[str, str],
     body: bytes,
     body_digest: bytes,
-    by_connection: bool,
+    vendor: Mapping[str, str],
 ) -> bool:
     """Queue a delivery for an install it is owed to: as it is pinned, the
-    install is on, the registration's, and routes by the value the delivery
-    was found by. ``by_connection``, it is also owed only when the secret of
-    the connection it routes by verifies it, as the pinned version names it.
-    One whose id or body is already there, or that the install has had, is
-    left as it is. Whether it was owed. One system session routed into the
-    community, whose write arms the delivery sweep."""
+    install is on, the registration's, routes by the value the delivery was
+    found by, and the secret its pinned version names verifies it, one of
+    ``vendor`` or its routed connection's own. One whose id or body is
+    already there, or that the install has had, is left as it is. Whether it
+    was owed. One system session routed into the community, whose write arms
+    the delivery sweep."""
     async with cohorts.system_session(install.guild_id) as session:
         await set_rls_context(session, SystemGuild(install.guild_id))
         plugin = (
@@ -283,22 +282,22 @@ async def _queue(
             or _route_value(pinned["route"], headers, body) != indexed
         ):
             return False
-        if by_connection:
-            key = _connection_secret_key(pinned["verify"])
+        key = _connection_secret_key(pinned["verify"])
+        if key is None:
+            secret = vendor.get(str(pinned["verify"]["secret"])[len("{vendor.") : -1])
+        else:
             sealed = (
                 (await guild_plugins_service.load_secrets(session, plugin))
                 .get(pinned["route"]["connection"], {})
                 .get(key)
-                if key is not None
-                else None
             )
             secret = (
                 decrypt_field(sealed, SALT_PLUGIN_CONFIG)
                 if isinstance(sealed, str)
                 else None
             )
-            if not secret or not _verified(pinned["verify"], secret, headers, body):
-                return False
+        if not secret or not _verified(pinned["verify"], secret, headers, body):
+            return False
         now = datetime.now(UTC)
         await session.exec(
             pg_insert(PluginHookDelivery)
@@ -621,10 +620,10 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     if webhooks is None:
         return 404
     verify = webhooks["verify"]
+    vendor = await load_vendor_values(public_id)
     by_connection = _connection_secret_key(verify) is not None
     if not by_connection:
-        key = str(verify["secret"])[len("{vendor.") : -1]
-        secret = (await load_vendor_values(public_id)).get(key)
+        secret = vendor.get(str(verify["secret"])[len("{vendor.") : -1])
         if not secret or not _verified(verify, secret, headers, body):
             metrics.plugin_hook_deliveries.labels(outcome="refused").inc()
             return 401
@@ -654,7 +653,7 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
             headers=headers,
             body=body,
             body_digest=body_digest,
-            by_connection=by_connection,
+            vendor=vendor,
         )
         for install in installs
     ]

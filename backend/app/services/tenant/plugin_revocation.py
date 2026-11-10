@@ -262,22 +262,25 @@ async def queue_install_revocations(
 
 async def queue_values_revocation(
     session: Any,
-    plugin: GuildPlugin,
-    connection_id: str,
     *,
+    plugin_id: int,
+    listing_uid: str,
+    definition: Mapping[str, Any],
+    connection_id: str,
     config: Mapping[str, Any],
     secrets: Mapping[str, Any],
     reason: str,
 ) -> None:
-    """Record an intent for values of one of ``plugin``'s community
-    connections that the plug-in checked and that are not kept."""
+    """Record an intent for values of an install's community connection that
+    the plug-in checked against ``definition`` and that are not kept. Needs
+    no install row: the install may be gone."""
     await _queue(
         session,
         _intent_for(
             guild_id=routed_guild_id(session),
-            plugin_id=plugin.id,
-            listing_uid=plugin.listing_uid,
-            definition=plugin.definition,
+            plugin_id=plugin_id,
+            listing_uid=listing_uid,
+            definition=definition,
             connection_id=connection_id,
             config=config,
             secrets=secrets,

@@ -1964,8 +1964,8 @@ SHOP = {
     "fields": [
         {"key": "url", "type": "url", "label": {"en": "Address"}, "required": True},
         {"key": "key", "type": "secret", "label": {"en": "Key"}, "required": True},
-        _field("store_id"),
-        {**_field("hook_secret"), "type": "secret"},
+        {**_field("store_id"), "required": True},
+        {**_field("hook_secret"), "type": "secret", "required": True},
     ],
     "after_connect": True,
 }
@@ -2071,6 +2071,114 @@ class TestCheckedTypedConnection:
         assert taken.status_code == 202, taken.text
         await _delivered(session, seat.guild.id)
         assert [name for name, _, _ in vendor.hooks] == ["after_connect", "webhook"]
+
+    async def test_an_install_is_checked_under_the_secret_its_version_names(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """The listing now signs with each shop's own secret, but this install
+        is pinned to a version that signs with the vendor value: its
+        deliveries are checked under that, and only that."""
+        pinned = {
+            **SHOP_DEFINITION,
+            "webhooks": {
+                **SHOP_DEFINITION["webhooks"],
+                "verify": {
+                    **SHOP_DEFINITION["webhooks"]["verify"],
+                    "secret": "{vendor.webhook_secret}",
+                },
+            },
+        }
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, pinned)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        saved = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert saved.status_code == 200, saved.text
+
+        body, headers = _shop_delivery("hook-secret-1")
+        refused = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert refused.status_code == 401
+        body, headers = _shop_delivery(VENDOR_VALUES["webhook_secret"])
+        taken = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert taken.status_code == 202, taken.text
+        assert len(await _deliveries(session, seat.guild.id)) == 1
+
+    async def test_a_shop_disconnected_while_it_is_checked_stays_disconnected(
+        self, client: AsyncClient, acting_user, session, vendor, shop, monkeypatch
+    ):
+        """A save whose connection changed while the plug-in checked stores
+        nothing, and the values it checked are revoked."""
+        from app.services import sweep_timers
+
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        first = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert first.status_code == 200, first.text
+
+        checking = plugin_connection_flows.after_connect
+
+        async def disconnecting(**kwargs):
+            answer = await checking(**kwargs)
+            gone = await client.delete(
+                seat.g(f"/plugins/{plugin.id}/connections/shop"), headers=seat.headers
+            )
+            assert gone.status_code == 204, gone.text
+            return answer
+
+        monkeypatch.setattr(plugin_connection_flows, "after_connect", disconnecting)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
+        second = await self._save(client, seat, plugin, {"key": "ck_2"})
+
+        assert second.status_code == 409
+        assert second.json()["detail"] == GuildPluginMessages.CONNECTION_NOT_CHECKED
+        stored = await _reload(session, seat.guild.id, plugin.id)
+        assert not stored.config and not stored.secret_fields
+        await post_commit.settle_all()
+        await sweep_timers.process_due_timers(outward=True)
+        revoked = [call["values"] for name, call, _ in vendor.hooks if name == "revoke"]
+        assert sorted(values["key"] for values in revoked) == ["ck_1", "ck_2"]
+
+    async def test_a_shop_another_community_holds_is_not_kept(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """Only one community connects a shop; the second's checked values are
+        revoked, so the plug-in removes what it made for them."""
+        from app.services import sweep_timers
+
+        first, second = [
+            await acting_user(guild_role=CommunityRole.superadmin) for _ in range(2)
+        ]
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        plugins = [
+            await _install(session, seat, SHOP_DEFINITION) for seat in (first, second)
+        ]
+        kept = await self._save(
+            client, first, plugins[0], {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert kept.status_code == 200, kept.text
+
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
+        taken = await self._save(
+            client, second, plugins[1], {"url": "https://shop.example", "key": "ck_2"}
+        )
+
+        assert taken.status_code == 409
+        assert taken.json()["detail"] == GuildPluginMessages.CONNECTION_TAKEN
+        stored = await _reload(session, second.guild.id, plugins[1].id)
+        assert not stored.config and not stored.secret_fields
+        await post_commit.settle_all()
+        await sweep_timers.process_due_timers(outward=True)
+        [revoked] = [call for name, call, _ in vendor.hooks if name == "revoke"]
+        assert revoked["values"] == {
+            "url": "https://shop.example",
+            "key": "ck_2",
+            "store_id": "s-42",
+            "hook_secret": "hook-secret-2",
+        }
 
     async def test_a_refused_shop_stores_nothing(
         self, client: AsyncClient, acting_user, session, vendor, shop

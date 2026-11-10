@@ -1236,11 +1236,7 @@ async def complete_callback(
 def _managed_only(connection: Mapping[str, Any], values: Mapping[str, Any]) -> dict:
     """Values for declared managed fields; anything else the hook sent is
     dropped."""
-    managed = {
-        field.get("key")
-        for field in connection.get("fields") or []
-        if isinstance(field, dict) and field.get("managed") is True
-    }
+    managed = _managed_keys(connection)
     return {key: value for key, value in values.items() if key in managed}
 
 
@@ -1386,9 +1382,14 @@ class TypedConnection:
     fields alone, the secrets sealed. Empty, the save clears it."""
 
     install_id: int
+    listing_uid: str
+    #: The pinned definition the values were checked against.
+    definition: dict[str, Any]
     connection_id: str
     config: dict[str, Any]
     secrets: dict[str, Any]
+    #: What the connection held when the save read it, both maps.
+    held: tuple[dict[str, Any], dict[str, Any]]
     #: The plug-in's registration, which is asked; absent for a clear.
     registration: registration_lookup.RegistrationSnapshot | None
 
@@ -1396,17 +1397,36 @@ class TypedConnection:
     def cleared(self) -> bool:
         return not self.config and not self.secrets
 
+    @property
+    def connection(self) -> dict[str, Any]:
+        connection = plugin_config_service.connection_by_id(
+            self.definition, self.connection_id
+        )
+        assert connection is not None
+        return connection
+
+
+def _managed_keys(connection: Mapping[str, Any]) -> set[str]:
+    return {
+        field.get("key")
+        for field in connection.get("fields") or []
+        if isinstance(field, dict) and field.get("managed") is True
+    }
+
 
 def _typed_only(
     connection: Mapping[str, Any], values: Mapping[str, Any] | None
 ) -> dict[str, Any]:
     """A stored map's typed fields: no managed values, no reserved keys."""
-    managed = {
-        field.get("key")
-        for field in connection.get("fields") or []
-        if isinstance(field, dict) and field.get("managed") is True
-    }
+    managed = _managed_keys(connection)
     return {k: v for k, v in without_tokens(values).items() if k not in managed}
+
+
+def _held(
+    config: Mapping[str, Any] | None, secrets: Mapping[str, Any] | None, key: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """What one connection holds, in both maps."""
+    return dict((config or {}).get(key) or {}), dict((secrets or {}).get(key) or {})
 
 
 async def typed_to_check(
@@ -1418,7 +1438,8 @@ async def typed_to_check(
     would hold once saved, or ``None`` when the save names none. Such a
     connection is saved on its own. Raises
     :class:`~app.services.tenant.plugin_config.PluginConfigError` for values
-    refused before the plug-in is asked."""
+    refused before the plug-in is asked; a managed field the plug-in has not
+    answered yet is not one of them."""
     checked = [
         connection_id
         for connection_id in values
@@ -1437,18 +1458,35 @@ async def typed_to_check(
         plugin.definition, connection_id
     )
     assert connection is not None
+    managed = _managed_keys(connection)
+    if managed & set(values[connection_id]):
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONFIG_MANAGED_FIELD
+        )
     stored = await guild_plugins_service.load_secrets(session, plugin)
+    held = _held(plugin.config, stored, connection_id)
+    typed_fields = {
+        **connection,
+        "fields": [
+            field
+            for field in connection.get("fields") or []
+            if isinstance(field, dict) and field.get("key") not in managed
+        ],
+    }
     config, secrets = plugin_config_service.apply_connection_values(
-        connection,
+        typed_fields,
         values[connection_id],
-        current=_typed_only(connection, (plugin.config or {}).get(connection_id)),
-        current_secrets=_typed_only(connection, stored.get(connection_id)),
+        current=_typed_only(connection, held[0]),
+        current_secrets=_typed_only(connection, held[1]),
     )
     typed = TypedConnection(
         install_id=plugin.id,
+        listing_uid=plugin.listing_uid,
+        definition=dict(plugin.definition or {}),
         connection_id=connection_id,
         config=config,
         secrets=secrets,
+        held=held,
         registration=None,
     )
     if typed.cleared:
@@ -1470,10 +1508,11 @@ async def check_typed(
 
     A clear ends the connection. Otherwise the plug-in's ``after_connect`` is
     sent the typed values, secrets opened, with no transaction open. Refused,
-    nothing is stored. Answered, the route its values give the install's
-    webhooks is claimed, and the typed values are stored with the managed
-    values and account label it answered; the connection they replace is
-    revoked. Values it checked that are not stored are revoked too. Raises
+    nothing is stored. Answered, and the connection still holds what the save
+    read, the route its values give the install's webhooks is claimed, and the
+    typed values are stored with the managed values and account label it
+    answered; the connection they replace is revoked. Values it checked that
+    are not stored, whatever the reason, are revoked too. Raises
     :class:`~app.services.tenant.plugin_config.PluginConfigError` for anything
     not stored."""
     guild_id = routed_guild_id(session)
@@ -1530,17 +1569,7 @@ async def check_typed(
         raise plugin_config_service.PluginConfigError(
             GuildPluginMessages.CONNECTION_REFUSED, status_code=422
         )
-
-    plugin = await guild_plugins_service.lock_install(session, typed.install_id)
-    connection = plugin_config_service.connection_by_id(
-        plugin.definition if plugin else None, typed.connection_id
-    )
-    if plugin is None or not plugin_config_service.checks_typed_values(connection):
-        # Uninstalled, or moved to a version that does not check it, meanwhile.
-        raise plugin_config_service.PluginConfigError(
-            GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=409
-        )
-    assert connection is not None
+    connection = typed.connection
     try:
         config, secrets = plugin_config_service.apply_connection_values(
             connection,
@@ -1559,6 +1588,27 @@ async def check_typed(
         ) from exc
     if answer.account_label:
         config[plugin_config_service.ACCOUNT_LABEL] = answer.account_label
+
+    plugin = await guild_plugins_service.lock_install(session, typed.install_id)
+    all_secrets = (
+        await guild_plugins_service.load_secrets(session, plugin)
+        if plugin is not None
+        else {}
+    )
+    if (
+        plugin is None
+        or plugin_config_service.connection_by_id(
+            plugin.definition, typed.connection_id
+        )
+        != connection
+        or _held(plugin.config, all_secrets, typed.connection_id) != typed.held
+    ):
+        # Uninstalled, moved to another version, or saved or cleared by
+        # somebody else while the plug-in checked.
+        await _not_kept(session, typed, config, secrets)
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=409
+        )
     entries = _replace_entry(plugin.config, typed.connection_id, config)
     if not await plugin_installs.claim(
         guild_id, plugin, plugin_installs.hook_route(plugin.definition, entries)
@@ -1568,11 +1618,8 @@ async def check_typed(
             GuildPluginMessages.CONNECTION_TAKEN, status_code=409
         )
     try:
-        all_secrets = await guild_plugins_service.load_secrets(session, plugin)
         before = (dict(plugin.config or {}), dict(all_secrets))
-        if (plugin.config or {}).get(typed.connection_id) or all_secrets.get(
-            typed.connection_id
-        ):
+        if any(typed.held):
             await queue_install_revocations(
                 session,
                 plugin,
@@ -1602,6 +1649,7 @@ async def check_typed(
     except Exception:
         await session.rollback()
         await _arm_index_sweep(session)
+        await _not_kept(session, typed, config, secrets)
         raise
 
 
@@ -1612,17 +1660,19 @@ async def _not_kept(
     secrets: Mapping[str, Any],
 ) -> None:
     """Revoke values the plug-in checked that are not stored, so it can
-    remove what it made with them."""
-    plugin = await guild_plugins_service.lock_install(session, typed.install_id)
-    if plugin is not None:
-        await queue_values_revocation(
-            session,
-            plugin,
-            typed.connection_id,
-            config=config,
-            secrets=secrets,
-            reason="not_kept",
-        )
+    remove what it made with them. Read as the definition they were checked
+    against, so it holds whatever became of the install meanwhile."""
+    await session.rollback()
+    await queue_values_revocation(
+        session,
+        plugin_id=typed.install_id,
+        listing_uid=typed.listing_uid,
+        definition=typed.definition,
+        connection_id=typed.connection_id,
+        config=config,
+        secrets=secrets,
+        reason="not_kept",
+    )
     await session.commit()
 
 
