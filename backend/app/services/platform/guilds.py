@@ -433,7 +433,10 @@ async def ensure_membership(
             session.add(membership)
             await session.flush()
         return membership
-    # Whoever the community has banned stays out, by every way in.
+    # Whoever the community has banned stays out, by every way in. Asked under
+    # the lock a removal takes, so a ban and a join made together settle in
+    # order: the join waits for the ban, or the removal removes the join.
+    await lock_guild_seats(session, guild_id)
     await _refuse_banned(session, guild_id=guild_id, user_id=user_id)
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
@@ -2987,8 +2990,9 @@ async def lock_guild_seats(session: AsyncSession, guild_id: int) -> None:
     on the other's row.
 
     Every path that can empty the seat, or impose a requirement on it, takes
-    this first, so they order rather than interleave. Held to the end of the
-    transaction; the caller does not release it.
+    this first, so they order rather than interleave. So does every join, before
+    it asks for a ban, so a removal that bans orders against it too. Held to
+    the end of the transaction; the caller does not release it.
     """
     await advisory_lock(session, LockNamespace.GUILD_SEATS, guild_id)
 

@@ -77,7 +77,9 @@ export const RemoveCommunityMemberDialog = ({
       loadingLabel={t("removeMember.removing")}
       isLoading={remove.isPending}
       destructive
-      onConfirm={() => {
+      onConfirm={(event) => {
+        // Stays open until it is done, so a failure keeps the ban box as set.
+        event.preventDefault();
         if (userId !== null) remove.mutate({ id: userId, ban });
       }}
     >

@@ -59,7 +59,9 @@ export const TimeOutMemberDialog = ({ open, onOpenChange, member }: TimeOutMembe
       loadingLabel={t("timeOut.confirming")}
       isLoading={timeOut.isPending}
       confirmDisabled={length === "custom" && !fromLocalDateTimeInput(until)}
-      onConfirm={() => {
+      onConfirm={(event) => {
+        // Stays open until it is saved, so a failure keeps what was chosen.
+        event.preventDefault();
         const end = endsAt();
         if (member && end) timeOut.mutate({ userId: member.id, endsAt: end });
       }}
