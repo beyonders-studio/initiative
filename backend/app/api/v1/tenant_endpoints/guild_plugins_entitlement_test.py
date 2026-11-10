@@ -117,25 +117,22 @@ def billing(monkeypatch):
     Billing.status = 200
     Billing.delay = 0.0
 
-    class Client:
-        def __init__(self, **_kwargs):
-            pass
+    async def answer(request: httpx2.Request) -> httpx2.Response:
+        Billing.sent.append((str(request.url), json.loads(request.content)))
+        if Billing.delay:
+            await asyncio.sleep(Billing.delay)
+        if Billing.answer is None:
+            return httpx2.Response(204)
+        return httpx2.Response(Billing.status, json=Billing.answer)
 
-        async def __aenter__(self):
-            return self
+    real = httpx2.AsyncClient
 
-        async def __aexit__(self, *_exc):
-            return False
+    def client(**kwargs):
+        # A real client on a mock transport, so a streamed read is answered
+        # the same as a plain one.
+        return real(**kwargs, transport=httpx2.MockTransport(answer))
 
-        async def post(self, url, *, content, headers):
-            Billing.sent.append((url, json.loads(content)))
-            if Billing.delay:
-                await asyncio.sleep(Billing.delay)
-            if Billing.answer is None:
-                return httpx2.Response(204)
-            return httpx2.Response(Billing.status, json=Billing.answer)
-
-    monkeypatch.setattr(billing_ping.httpx2, "AsyncClient", Client)
+    monkeypatch.setattr(billing_ping.httpx2, "AsyncClient", client)
     return Billing
 
 
