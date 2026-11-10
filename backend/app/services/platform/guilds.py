@@ -9,7 +9,8 @@ from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import ColumnElement, case, exists, func, or_, text
+from sqlalchemy import ColumnElement, Text, any_, case, exists, func, or_, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import aliased
 from sqlmodel import col, delete, select
@@ -43,7 +44,10 @@ from app.models.platform.guild import (
     GUILD_ADMIN_ROLES,
     LIVE_STATUS_VALUES,
     UNLISTED_STATUSES,
+    AdminSurface,
     CommunityCategory,
+    CommunityJoinPolicy,
+    CommunityJoinRequest,
     CommunityRole,
     CommunityStatus,
     Guild,
@@ -54,6 +58,7 @@ from app.models.platform.guild import (
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserStatus
+from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
 from app.models.tenant.guild_setting import GuildSetting
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -119,6 +124,12 @@ class CommunityJoinError(CodedError):
     """Raised when a guild cannot be joined from the community directory."""
 
     status_code = 404
+
+
+class CommunityJoinRequestError(CodedError):
+    """Raised when a community's join policy does not take this way in."""
+
+    status_code = 409
 
 
 class CommunityListingError(CodedError):
@@ -1289,7 +1300,7 @@ async def update_guild(
     description: str | None = None,
     retention_days: int | None = None,
     retention_days_provided: bool = False,
-    is_community: bool | None = None,
+    join_policy: CommunityJoinPolicy | None = None,
     categories: Sequence[str] | None = None,
     categories_provided: bool = False,
     has_adult_content: bool | None = None,
@@ -1337,20 +1348,21 @@ async def update_guild(
         if guild.location != normalized_location:
             guild.location = normalized_location
             updated = True
-    # An explicit ``null`` is meaningless for a boolean opt-in (mirroring
-    # ``auth_options`` below), so null and omitted alike are a no-op.
-    if is_community is not None and guild.is_community != is_community:
+    # An explicit ``null`` is a no-op (mirroring ``auth_options`` below).
+    if join_policy is not None and guild.join_policy != join_policy.value:
+        was_listed = guild.listed
+        guild.join_policy = join_policy.value
+        updated = True
         # Only the way in is gated. Un-listing is always available — a guild
         # that opted in while the directory was running must still be able to
         # opt back out after an owner switches it off.
-        if is_community:
+        if guild.listed and not was_listed:
             await assert_community_directory_enabled(session)
-        guild.is_community = is_community
-        updated = True
         # Listing a community — or taking it back off the shelf — changes what
         # is asked of everybody already in it, none of whom did anything. The
         # one fan-out this channel has, and it is addressed to the roster.
-        await signal_members_present(session, guild_id=guild.id)
+        if guild.listed != was_listed:
+            await signal_members_present(session, guild_id=guild.id)
     if categories_provided:
         normalized = normalize_categories(categories)
         if guild.categories != normalized:
@@ -1369,7 +1381,7 @@ async def update_guild(
     # already-listed guild has to fail for the same reason as one that lists a
     # guild with none. Two of the three rules are also database CHECKs; this is
     # what turns them into an error a person can read.
-    if guild.is_community:
+    if guild.listed:
         await _assert_listable(session, guild)
     if updated:
         guild.updated_at = datetime.now(UTC)
@@ -2539,7 +2551,7 @@ def community_listing_filters() -> list:
     """
     cap = rules.community_rule_sql(Guild.id, "max_users")
     return [
-        Guild.is_community.is_(True),
+        Guild.listed,
         Guild.status == CommunityStatus.active.value,
         # No cap is unlimited, hence the explicit null leg.
         or_(cap.is_(None), cap >= MIN_COMMUNITY_SEATS),
@@ -2689,8 +2701,9 @@ async def list_community_guilds(
     near: NearPlace | None = None,
     page: int = 1,
     page_size: int = 24,
-) -> tuple[list[tuple[Guild, int, bool]], int]:
-    """The community directory: (guild, member_count, already_member) + total.
+) -> tuple[list[tuple[Guild, int, bool, bool]], int]:
+    """The community directory: (guild, member_count, already_member,
+    request_pending) + total.
 
     Which guilds appear is not this function's decision — it is
     ``community_listing_filters()``, so the directory, the join it authorizes,
@@ -2732,6 +2745,10 @@ async def list_community_guilds(
         .correlate(Guild)
         .scalar_subquery()
     )
+    request_pending = exists().where(
+        CommunityJoinRequest.guild_id == Guild.id,
+        CommunityJoinRequest.user_id == user_id,
+    )
 
     filters = community_listing_filters()
     if categories:
@@ -2751,7 +2768,7 @@ async def list_community_guilds(
         filters.append(or_(*matches))
 
     count_statement = select(func.count()).select_from(Guild)
-    statement = select(Guild, member_count, already_member > 0)
+    statement = select(Guild, member_count, already_member > 0, request_pending)
     for condition in filters:
         statement = statement.where(condition)
         count_statement = count_statement.where(condition)
@@ -2765,9 +2782,10 @@ async def list_community_guilds(
         ordering[:0] = proximity_order(near)
     statement = statement.order_by(*ordering)
     rows = (await session.exec(apply_pagination(statement, page, page_size))).all()
-    return [(guild, int(count), bool(joined)) for guild, count, joined in rows], int(
-        total
-    )
+    return [
+        (guild, int(count), bool(joined), bool(requested))
+        for guild, count, joined, requested in rows
+    ], int(total)
 
 
 async def join_community_guild(
@@ -2797,6 +2815,10 @@ async def join_community_guild(
     # joined by asking for it directly either.
     if not await is_listed_in_directory(session, guild_id=guild_id):
         raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_A_COMMUNITY)
+    if guild.join_policy == CommunityJoinPolicy.request.value and not (
+        await get_membership(session, guild_id=guild_id, user_id=user.id)
+    ):
+        raise CommunityJoinRequestError(GuildMessages.COMMUNITY_JOIN_BY_REQUEST)
     # Asked before the seat is taken, so the box is what joins rather than
     # something checked once they are already in.
     await assert_age_confirmed(session, user=user)
@@ -2812,6 +2834,94 @@ async def join_community_guild(
         via="community",
     )
     return guild
+
+
+async def ask_to_join(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    user: User,
+    message: str | None,
+) -> tuple[Guild, CommunityJoinRequest, bool]:
+    """Ask to join a listed ``request`` community: the join's checks, then a
+    request its admins answer rather than a membership.
+
+    Asked again while one waits, it returns that one (``False``: nothing new
+    to tell anybody). On the system engine, as the join is.
+    """
+    await assert_community_directory_enabled(session)
+    try:
+        guild = await get_guild(session, guild_id=guild_id)
+    except ValueError as exc:
+        raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_FOUND) from exc
+    if not await is_listed_in_directory(session, guild_id=guild_id):
+        raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_A_COMMUNITY)
+    if guild.join_policy != CommunityJoinPolicy.request.value:
+        raise CommunityJoinRequestError(GuildMessages.COMMUNITY_JOIN_NOT_BY_REQUEST)
+    await _refuse_ended_guest(session, guild_id=guild_id, user_id=user.id)
+    if await get_membership(session, guild_id=guild_id, user_id=user.id):
+        raise CommunityJoinRequestError(GuildMessages.COMMUNITY_ALREADY_A_MEMBER)
+    await assert_age_confirmed(session, user=user)
+    # A full community says so now, rather than when an admin says yes.
+    await assert_member_capacity(session, guild_id=guild_id)
+    inserted = (
+        await session.exec(
+            pg_insert(CommunityJoinRequest)
+            .values(
+                guild_id=guild_id,
+                user_id=user.id,
+                message=message,
+                created_at=datetime.now(UTC),
+            )
+            .on_conflict_do_nothing(index_elements=["guild_id", "user_id"])
+            .returning(col(CommunityJoinRequest.id))
+        )
+    ).first()
+    request = (
+        await session.exec(
+            select(CommunityJoinRequest).where(
+                CommunityJoinRequest.guild_id == guild_id,
+                CommunityJoinRequest.user_id == user.id,
+            )
+        )
+    ).one()
+    return guild, request, inserted is not None
+
+
+async def join_request_answerer_ids(
+    session: AsyncSession, *, guild_id: int
+) -> list[int]:
+    """Who answers ``guild_id``'s requests to join: the holders of its members
+    surface, as the standing computes it (a custom role given during this
+    membership, on its rung, decides; otherwise the admin rungs hold every
+    surface). On a session routed into the community."""
+    role = aliased(CustomRole)
+    given = aliased(CustomRoleMember)
+    rows = await session.exec(
+        select(GuildMembership.user_id)
+        .outerjoin(
+            given,
+            (given.user_id == GuildMembership.user_id)
+            & (col(given.assigned_at) >= GuildMembership.joined_at),
+        )
+        .outerjoin(
+            role,
+            (role.id == given.role_id)
+            & (role.base_rung == col(GuildMembership.role).cast(Text)),
+        )
+        .where(
+            GuildMembership.guild_id == guild_id,
+            case(
+                (
+                    col(role.id).is_not(None),
+                    AdminSurface.members.value == any_(col(role.surfaces)),
+                ),
+                else_=col(GuildMembership.role).in_(GUILD_ADMIN_ROLES),
+            ),
+        )
+        .order_by(col(GuildMembership.user_id))
+    )
+    return list(rows.all())
 
 
 async def describe_invite_code(

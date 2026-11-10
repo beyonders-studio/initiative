@@ -238,6 +238,31 @@
       "textBody": "Your request to join {{initiativeName}} was declined. {{link}}"
     }
   },
+  "communityJoinRequest": {
+    "requested": {
+      "subject": "Request to join {{communityName}}",
+      "title": "New join request",
+      "buttonLabel": "Review the request",
+      "body": "<strong>{{requester}}</strong> asked to join <strong>{{communityName}}</strong>.",
+      "note": "They wrote: <em>{{message}}</em>",
+      "noteText": "They wrote: {{message}}",
+      "textBody": "{{requester}} asked to join {{communityName}}. Review it at {{link}}."
+    },
+    "approved": {
+      "subject": "You've joined {{communityName}}",
+      "title": "Join request approved",
+      "buttonLabel": "Open the community",
+      "body": "Your request to join <strong>{{communityName}}</strong> was approved — you're a member now.",
+      "textBody": "Your request to join {{communityName}} was approved — you're a member now. {{link}}"
+    },
+    "denied": {
+      "subject": "Request to join {{communityName}} declined",
+      "title": "Join request declined",
+      "buttonLabel": "Browse communities",
+      "body": "Your request to join <strong>{{communityName}}</strong> was declined.",
+      "textBody": "Your request to join {{communityName}} was declined. {{link}}"
+    }
+  },
   "reaction": {
     "subject": "New reactions to your posts",
     "title": "Reaction summary",

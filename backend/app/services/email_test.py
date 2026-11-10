@@ -99,10 +99,11 @@ async def test_join_request_email_renders_and_escapes_the_note(session, monkeypa
 
     monkeypatch.setattr(email_service, "send_email", fake_send_email)
 
-    pieces = email_service.initiative_join_request_pieces(
+    pieces = email_service.join_request_pieces(
         manager,
+        of="initiative",
         event="requested",
-        initiative_name="Parser Guild",
+        name="Parser Guild",
         requester="Ada Lovelace",
         message=EVIL_NAME,
     )
@@ -137,14 +138,16 @@ async def test_join_request_email_renders_and_escapes_the_note(session, monkeypa
 
 
 @pytest.mark.parametrize(
-    ("event", "subject"),
+    ("of", "event", "subject"),
     [
-        ("approved", "You've joined Parser Guild"),
-        ("denied", "Request to join Parser Guild declined"),
+        ("initiative", "approved", "You've joined Parser Guild"),
+        ("initiative", "denied", "Request to join Parser Guild declined"),
+        ("community", "approved", "You've joined Parser Guild"),
+        ("community", "denied", "Request to join Parser Guild declined"),
     ],
 )
 async def test_join_request_outcome_emails_render(
-    session, monkeypatch, event: str, subject: str
+    session, monkeypatch, of, event: str, subject: str
 ):
     """The requester's copy resolves for both outcomes, and omits the note line
     entirely when there is nothing to quote."""
@@ -159,10 +162,8 @@ async def test_join_request_outcome_emails_render(
 
     monkeypatch.setattr(email_service, "send_email", fake_send_email)
 
-    pieces = email_service.initiative_join_request_pieces(
-        requester,
-        event=event,
-        initiative_name="Parser Guild",
+    pieces = email_service.join_request_pieces(
+        requester, of=of, event=event, name="Parser Guild"
     )
     pieces = replace(
         pieces, link="https://app.example/navigate?community_id=1&target=%2Fi"
@@ -173,7 +174,7 @@ async def test_join_request_outcome_emails_render(
     captured.update(subject=pieces.subject, html_body=html_body, text_body=text_body)
 
     assert captured["subject"] == subject
-    assert "initiativeJoinRequest." not in captured["html_body"]
+    assert f"{of}JoinRequest." not in captured["html_body"]
     assert "Parser Guild" in captured["html_body"]
     assert "They wrote" not in captured["html_body"]
 

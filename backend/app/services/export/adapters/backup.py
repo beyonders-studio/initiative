@@ -70,6 +70,7 @@ from app.core.tools import (
 )
 from app.core.user_display import handle_of
 from app.core.user_input_validators import resolve_zone
+from app.models.platform.guild import CommunityJoinPolicy
 from app.models.platform.user import User
 from app.services.export import delivery
 from app.services.export import limits as export_limits
@@ -442,7 +443,7 @@ async def _build_scope(
                 id=guild_id,
                 name=guild.name if guild else "",
                 description=guild.description if guild else None,
-                is_community=bool(guild.is_community) if guild else False,
+                join_policy=guild.join_policy if guild else CommunityJoinPolicy.private,
             ),
             include_uploads=_include_uploads(params),
             initiatives=[

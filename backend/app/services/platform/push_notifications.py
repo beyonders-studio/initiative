@@ -52,6 +52,10 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.initiative_join_requested: "initiative_added",
     NotificationType.initiative_join_approved: "initiative_added",
     NotificationType.initiative_join_denied: "initiative_added",
+    # And a community's, one level up.
+    NotificationType.community_join_requested: "initiative_added",
+    NotificationType.community_join_approved: "initiative_added",
+    NotificationType.community_join_denied: "initiative_added",
     # Asking for something in an initiative is the same kind of news, one
     # level down.
     NotificationType.share_requested: "initiative_added",

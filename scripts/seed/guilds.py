@@ -13,6 +13,7 @@ from app.db.session import set_rls_context
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.guild import (
     CommunityCategory,
+    CommunityJoinPolicy,
     CommunityRole,
     Guild,
     GuildMembership,
@@ -239,7 +240,7 @@ async def list_in_directory(
     refuses a listed guild missing either. Writes
     ``public.guilds``, so the session must not be routed into a guild schema.
     """
-    guild.is_community = True
+    guild.join_policy = CommunityJoinPolicy.open.value
     guild.categories = guilds_service.normalize_categories(
         [c.value for c in categories]
     )

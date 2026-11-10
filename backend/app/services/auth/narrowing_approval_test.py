@@ -185,7 +185,7 @@ async def test_a_community_that_refuses_an_arrival_leaves_the_sign_in_alone(
     row = await _connection(session, auto_join=True)
     guild = await session.get(Guild, row.guild_id)
     assert guild is not None
-    guild.is_community = True
+    guild.join_policy = "open"
     guild.categories = ["other"]
     guild.has_adult_content = False
     session.add(guild)

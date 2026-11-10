@@ -661,7 +661,7 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     owner = await create_user(session)
     guild = await create_guild(session, creator=owner)
     if listed:
-        guild.is_community = True
+        guild.join_policy = "open"
         guild.categories = ["other"]
         guild.has_adult_content = False
         session.add(guild)

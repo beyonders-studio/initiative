@@ -113,7 +113,7 @@ async def _set_banner(client: AsyncClient, guild_id: int, headers: dict) -> dict
 
 
 async def _list_as_community(session: AsyncSession, guild: Guild) -> Guild:
-    guild.is_community = True
+    guild.join_policy = "open"
     guild.categories = ["other"]
     guild.has_adult_content = False
     session.add(guild)
@@ -372,7 +372,7 @@ async def test_un_listing_a_guild_stops_serving_its_card(
     url = await _card_url(session, a.guild.id)
     assert (await client.get(url, headers=headers)).status_code == 200
 
-    a.guild.is_community = False
+    a.guild.join_policy = "private"
     session.add(a.guild)
     await session.commit()
 

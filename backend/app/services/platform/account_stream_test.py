@@ -7,7 +7,7 @@ reaching a socket.
 
 import pytest
 
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import CommunityJoinPolicy, CommunityRole
 from app.services.platform import account_stream, rules, user_stream
 from app.services.platform import guilds as guilds_service
 from app.testing import create_guild, create_guild_membership, create_user
@@ -180,7 +180,7 @@ async def test_listing_a_community_pokes_every_member(
         description=None,
         retention_days=None,
         retention_days_provided=False,
-        is_community=True,
+        join_policy=CommunityJoinPolicy.open,
         categories=["other"],
         categories_provided=True,
         has_adult_content=False,
