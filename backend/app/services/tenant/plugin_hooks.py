@@ -14,8 +14,9 @@ the vendor. :func:`receive` takes each delivery through four steps:
    is answered 202 and nothing is stored.
 3. For each matched install, read as the version it is pinned to, the delivery
    is queued in its community (``plugin_hook_deliveries``) by the vendor's
-   delivery id, with its body and the vendor's ``x-`` headers; a copy already
-   there, or one the install has had in the last 24 hours, is left as it is.
+   delivery id and the SHA-256 of its body, with the body and the vendor's
+   ``x-`` headers; a delivery whose id or body is already there, or one the
+   install has had in the last 24 hours, is left as it is.
    The write arms the community's delivery sweep, and the vendor is answered
    202. Whether the install is on is the install row's answer, read here,
    not the index's, which a sweep brings up to date.
@@ -27,7 +28,7 @@ the vendor. :func:`receive` takes each delivery through four steps:
    event goes to the outbox as a container's emission does, and the state to
    the install's configuration state. Work that may succeed if tried again
    waits, a little longer each time; a mapping that cannot succeed is logged.
-   Either way the id stays remembered for 24 hours.
+   Either way the id and the body's digest stay remembered for 24 hours.
 
 The index row that routes a delivery is written only when a community's
 connect stored the routed value, which the plug-in's ``after_connect`` hook
@@ -99,7 +100,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["DELIVERY_TTL", "expire_deliveries", "next_due", "receive", "run_due"]
 
-#: How long a delivery id is remembered once its work is done.
+#: How long a delivery's id and digest are remembered once its work is done.
 DELIVERY_TTL = timedelta(hours=24)
 #: How long a visit holds a delivery while it is mapped or forwarded; one
 #: whose visit stopped without finishing is taken again after it.
@@ -232,12 +233,13 @@ async def _queue(
     *,
     headers: Mapping[str, str],
     body: bytes,
+    body_digest: bytes,
 ) -> None:
     """Queue a delivery for an install it is owed to: as it is pinned, the
     install is on, the registration's, and routes by the value the delivery
-    was found by. A copy already there, or one the install has had, is left
-    as it is. One system session routed into the community, whose write arms
-    the delivery sweep."""
+    was found by. One whose id or body is already there, or that the install
+    has had, is left as it is. One system session routed into the community,
+    whose write arms the delivery sweep."""
     async with cohorts.system_session(install.guild_id) as session:
         await set_rls_context(session, SystemGuild(install.guild_id))
         plugin = (
@@ -268,6 +270,7 @@ async def _queue(
                 expires_at=now + DELIVERY_TTL,
                 received_at=now,
                 body=body,
+                body_digest=body_digest,
                 headers=_vendor_headers(headers, str(pinned["verify"]["header"])),
                 route=install.route,
             )
@@ -277,7 +280,7 @@ async def _queue(
 
 
 async def expire_deliveries(session: AsyncSession, expiring: Expiring) -> None:
-    """Forget the delivery ids whose 24 hours have run out. One still waiting
+    """Forget the deliveries whose 24 hours have run out. One still waiting
     for its work is kept, however long it has waited."""
     await session.exec(
         delete(PluginHookDelivery).where(  # type: ignore[arg-type]
@@ -341,8 +344,8 @@ async def _claim(session: AsyncSession) -> Row | None:
 
 async def _settle(session: AsyncSession, row: Row, *, done: bool) -> None:
     """Settle a held delivery, committing it with whatever its work staged
-    on ``session``. Done, its body goes and its id stays remembered for
-    :data:`DELIVERY_TTL` from now; otherwise it waits :data:`RETRY_AFTER`,
+    on ``session``. Done, its body goes and its id and digest stay remembered
+    for :data:`DELIVERY_TTL` from now; otherwise it waits :data:`RETRY_AFTER`,
     doubled for each failure, and is given up after :data:`ATTEMPTS`."""
     attempts = row.attempts if done else row.attempts + 1
     if not done and attempts >= ATTEMPTS:
@@ -382,8 +385,8 @@ async def run_due(session: AsyncSession, guild_id: int) -> datetime | None:
     routed into it, as the version each install is pinned to, and answer
     when the next comes due. A delivery whose install is gone, off, no
     longer the registration's, or no longer routing by the value it came by
-    (the community connected another installation since) is dropped, its id
-    remembered. What a delivery emits and sets is committed with its
+    (the community connected another installation since) is dropped, its id and
+    digest remembered. What a delivery emits and sets is committed with its
     settlement, so a visit that stops leaves it waiting whole."""
     live = {
         registration.listing_uid: registration
@@ -601,7 +604,15 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     delivery_id = headers.get(str(webhooks["dedup"]).lower(), "")
     if not delivery_id or len(delivery_id) > DELIVERY_ID_MAX_LENGTH:
         return 400
+    body_digest = hashlib.sha256(body).digest()
     for install in installs:
-        await _queue(install, registration, delivery_id, headers=headers, body=body)
+        await _queue(
+            install,
+            registration,
+            delivery_id,
+            headers=headers,
+            body=body,
+            body_digest=body_digest,
+        )
     metrics.plugin_hook_deliveries.labels(outcome="queued").inc()
     return 202
