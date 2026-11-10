@@ -231,8 +231,11 @@ class CommunityRead(CommunityBase):
     # True when content writes are frozen (read_only lifecycle status). Unlike
     # ``status`` this IS serialized to every member: writes fail at the
     # database role level regardless, so the UI must be able to drop its write
-    # affordances — the flag discloses the effect, not the reason.
+    # affordances — the flag discloses the effect, not the reason. Also True
+    # while the caller is timed out here.
     content_read_only: bool = False
+    #: When the caller's own timeout here ends; ``None`` while they have none.
+    timed_out_until: datetime | None = None
     # ADMIN-ONLY, and only for a suspended guild: who the closed entry tells
     # them to contact — the deployment's moderation contact, else its general
     # one (``app.services.platform.intake.contact_for``). ``None`` when neither

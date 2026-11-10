@@ -109,6 +109,7 @@ from app.services.auth.credentials import (
 from app.services.membership import live_membership_clause
 from app.services.platform import access_grants as access_grants_service
 from app.services.platform import auth_posture, guild_entitlements, rules
+from app.services.platform import member_moderation as moderation_service
 from app.services.tenant import plugin_age
 from app.services.tenant.plugin_age import AgeViewer
 
@@ -686,7 +687,7 @@ async def _enforce_guild_api_access(
 
 async def _read_membership_gate(
     session: AsyncSession, guild_id: int, user_id: int
-) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool] | None:
+) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool, bool] | None:
     """The two rows the gate needs about a member, in one query.
 
     ``guild_memberships`` and ``guilds`` both live in ``public`` and are both
@@ -694,7 +695,8 @@ async def _read_membership_gate(
     was two trips for one answer. Two of the deployment's rules ride along for
     the same reason — what it asks of an account is decided in the same breath
     as what the community asks of the session, and a read of its own would be a
-    round trip on every guild request there is.
+    round trip on every guild request there is. So does whether the member is
+    timed out, which decides the role the request routes into.
 
     Each row still comes back under its own policies — an outer join to a row
     the session may not read yields NULL, exactly as its own SELECT would have.
@@ -708,6 +710,7 @@ async def _read_membership_gate(
                 Guild,
                 rules.platform_rule_sql("second_factor_requirement"),
                 rules.platform_rule_sql("community_age_gate_enabled"),
+                moderation_service.live_timeout_end(),
             )
             .select_from(GuildMembership)
             .outerjoin(Guild, Guild.id == GuildMembership.guild_id)
@@ -720,10 +723,16 @@ async def _read_membership_gate(
     ).one_or_none()
     if row is None:
         return None
-    membership, guild, asked, age_gate_on = row
+    membership, guild, asked, age_gate_on, timed_out_until = row
     if guild is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
-    return membership, guild, asked_of_an_account(asked), bool(age_gate_on)
+    return (
+        membership,
+        guild,
+        asked_of_an_account(asked),
+        bool(age_gate_on),
+        timed_out_until is not None,
+    )
 
 
 async def _read_grant_gate(
@@ -850,7 +859,7 @@ async def _load_guild_context(
                 None if settings_grant is None else settings_grant.access_level
             ),
         )
-    membership, guild, asked, age_gate_on = gate
+    membership, guild, asked, age_gate_on, timed_out = gate
     # Membership access respects the guild's lifecycle status: the statuses
     # that serve members are named, and every other one is refused, on every
     # surface. A suspended community is in time out — its administrators are
@@ -895,8 +904,11 @@ async def _load_guild_context(
         guild_id=guild_id,
         membership=membership,
         guild_role=membership.role.value,
+        # The community's content is frozen, or this member is timed out: the
+        # same hold, which the standing statement computes from the same rows.
         content_read_only=(
-            not for_settings and guild.status == CommunityStatus.read_only.value
+            not for_settings
+            and (guild.status == CommunityStatus.read_only.value or timed_out)
         ),
     )
 

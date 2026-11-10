@@ -119,8 +119,10 @@ from app.schemas.platform.user import (
     AccountDeletionResponse,
     AccountTimeOutRead,
     AgeConfirmation,
+    CommunityBanRead,
     CommunityRosterMember,
     CommunityRosterResponse,
+    CommunityTimeoutWrite,
     CookieConsentRead,
     CookieConsentUpdate,
     DecorationPack,
@@ -157,14 +159,21 @@ from app.services import sweep_timers
 from app.services.auth import addresses, held_changes
 from app.services.content_sockets import sockets as content_sockets
 from app.services.cross_guild import member_guild_ids
+from app.services.platform import (
+    account_stream,
+    auth_posture,
+    csv_export,
+    presence,
+    rules,
+)
 from app.services.platform import api_keys as api_keys_service
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import auth_posture, csv_export, presence, rules
 from app.services.platform import cookie_consent as cookie_consent_service
 from app.services.platform import guild_images as images_service
 from app.services.platform import guilds as guilds_service
 from app.services.platform import intake as intake_service
 from app.services.platform import legal as legal_service
+from app.services.platform import member_moderation as moderation_service
 from app.services.platform import profile_decorations as profile_decorations_service
 from app.services.platform import user_avatars as user_avatars_service
 from app.services.platform import user_tokens as user_tokens_service
@@ -340,6 +349,9 @@ async def list_users(
                 applied=False,
             ),
             GuildMembership.guest_until,
+            # Read under the table's policies: every member's for the roster's
+            # holders, the reader's own for anyone else.
+            moderation_service.live_timeout_end(),
         ),
         guild_id=guild_context.guild_id,
     )
@@ -373,9 +385,11 @@ async def list_users(
         display_name,
         api_keys_allowed,
         guest_until,
+        timed_out_until,
     ) in rows:
         member = UserCommunityMember.model_validate(user)
         member.guest_until = guest_until
+        member.timed_out_until = timed_out_until
         member.community_role = guild_role.value
         member.oidc_managed = oidc_provider_id is not None
         member.display_name = display_name
@@ -1988,8 +2002,13 @@ async def remove_member(
     system_session: SystemSessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
     guild_context: MembersContext,
+    ban: bool = Query(
+        default=False,
+        description="Also keep them out: no invite, directory join or sign-in "
+        "rule lets them back in until the ban is lifted.",
+    ),
 ) -> None:
-    """Remove a member from this guild.
+    """Remove a member from this guild, and with ``ban``, keep them out.
 
     Ends their memberships and the access those carried. It does not move
     ownership: content they own stays recorded as theirs and stops being
@@ -2042,10 +2061,122 @@ async def remove_member(
         user_id=user_id,
         actor_user_id=current_admin.id,
     )
+    if ban:
+        await moderation_service.ban(
+            session,
+            guild_id=guild_context.guild_id,
+            user_id=user_id,
+            actor_user_id=current_admin.id,
+        )
     await session.commit()
     # Kicked from the guild — drop the user's live content streams immediately
     # (guild-level access change), consistent with the other removal paths.
     await content_sockets.revoke_user(guild_context.guild_id, user_id)
+
+
+@guild_router.get("/bans", response_model=list[CommunityBanRead])
+async def list_bans(
+    session: SessionDep,
+    guild_context: MembersContext,
+) -> list[CommunityBanRead]:
+    """Everybody this community has banned, the most recent first."""
+    return [
+        CommunityBanRead(user=UserSummary.model_validate(person), banned_at=banned_at)
+        for person, banned_at in await moderation_service.list_bans(
+            session, guild_id=guild_context.guild_id
+        )
+    ]
+
+
+@guild_router.delete("/bans/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def lift_ban(
+    user_id: int,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_user)],
+    guild_context: MembersContext,
+) -> None:
+    """Lift a ban. They can be invited or join again; nothing puts them back."""
+    await moderation_service.unban(
+        session,
+        guild_id=guild_context.guild_id,
+        user_id=user_id,
+        actor_user_id=current_admin.id,
+    )
+    await session.commit()
+
+
+async def _timeout_target(
+    session: AsyncSession, guild_context: GuildContext, user_id: int
+) -> None:
+    """Refuse a timeout for anyone but a member or guest of this community."""
+    membership = (
+        await session.exec(
+            select(GuildMembership).where(
+                GuildMembership.user_id == user_id,
+                GuildMembership.guild_id == guild_context.guild_id,
+            )
+        )
+    ).one_or_none()
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=UserMessages.NOT_IN_GUILD
+        )
+    if membership.role in GUILD_ADMIN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.TIMEOUT_NOT_FOR_ADMINS,
+        )
+
+
+async def _timeout_changed(session: AsyncSession, guild_id: int, user_id: int) -> None:
+    """Commit, then have the person's tabs and live connections pick it up."""
+    account_stream.queue_account_signal(session, user_id, "membership")
+    await session.commit()
+    await content_sockets.revoke_user(guild_id, user_id)
+
+
+@guild_router.put("/{user_id}/timeout", status_code=status.HTTP_204_NO_CONTENT)
+async def time_out_member(
+    user_id: int,
+    payload: CommunityTimeoutWrite,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_user)],
+    guild_context: MembersContext,
+) -> None:
+    """Hold a member's content here read-only until ``ends_at``: they still
+    read the community, and change nothing in it. Replaces a timeout they
+    have."""
+    if payload.ends_at <= datetime.now(UTC):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=GuildMessages.TIMEOUT_MUST_END_LATER,
+        )
+    await _timeout_target(session, guild_context, user_id)
+    await moderation_service.time_out(
+        session,
+        guild_id=guild_context.guild_id,
+        user_id=user_id,
+        ends_at=payload.ends_at,
+        actor_user_id=current_admin.id,
+    )
+    await _timeout_changed(session, guild_context.guild_id, user_id)
+
+
+@guild_router.delete("/{user_id}/timeout", status_code=status.HTTP_204_NO_CONTENT)
+async def lift_member_timeout(
+    user_id: int,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_user)],
+    guild_context: MembersContext,
+) -> None:
+    """End a member's timeout early."""
+    await moderation_service.lift_timeout(
+        session,
+        guild_id=guild_context.guild_id,
+        user_id=user_id,
+        actor_user_id=current_admin.id,
+    )
+    await _timeout_changed(session, guild_context.guild_id, user_id)
 
 
 # --- profile pictures --------------------------------------------------------

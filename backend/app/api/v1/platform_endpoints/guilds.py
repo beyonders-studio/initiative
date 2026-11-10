@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import (
@@ -118,6 +119,7 @@ from app.services.platform import auth_posture, billing_ping, guild_entitlements
 from app.services.platform import guild_images as images_service
 from app.services.platform import guilds as guilds_service
 from app.services.platform import intake as intake_service
+from app.services.platform import member_moderation as moderation_service
 from app.services.platform.identity_refs import billing_refs
 from app.services.tenant import plugin_connections as plugin_connections_service
 from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
@@ -193,6 +195,7 @@ def _serialize_guild(
     can: CommunityCan,
     images: dict[GuildImageVariant, str] | None = None,
     closed_contact: str | None = None,
+    timed_out_until: datetime | None = None,
 ) -> CommunityRead:
     """Build one entry of the caller's own guild list.
 
@@ -255,8 +258,13 @@ def _serialize_guild(
         status=CommunityStatus(guild.status) if is_admin else None,
         # Every member learns the *effect* of a read_only hold (their writes
         # already fail at the DB role level) so the UI can drop write
-        # affordances — without disclosing the status itself.
-        content_read_only=(guild.status == CommunityStatus.read_only.value),
+        # affordances — without disclosing the status itself. A timeout of
+        # their own holds them the same way, and they are told until when.
+        content_read_only=(
+            guild.status == CommunityStatus.read_only.value
+            or timed_out_until is not None
+        ),
+        timed_out_until=timed_out_until,
         contact_email=(
             closed_contact
             if is_admin and guild.status == CommunityStatus.suspended.value
@@ -361,6 +369,15 @@ async def _guild_read(
         images=await images_service.image_urls_for(
             system_session, guild.id, *GuildImageVariant
         ),
+        timed_out_until=(
+            (
+                await moderation_service.live_timeouts(
+                    system_session, user_id=membership.user_id, guild_ids=[guild.id]
+                )
+            ).get(guild.id)
+            if membership is not None
+            else None
+        ),
     )
 
 
@@ -430,6 +447,11 @@ async def list_communities(
             if membership.role.reaches(CommunityRole.admin)
         ],
     )
+    timeouts = await moderation_service.live_timeouts(
+        session,
+        user_id=current_user.id,
+        guild_ids=[guild.id for guild, *_ in memberships],
+    )
     payloads: list[CommunityRead] = []
     for (
         guild,
@@ -453,6 +475,7 @@ async def list_communities(
                 plan=plans.get(guild.id),
                 images=images.get(guild.id),
                 closed_contact=closed_contact,
+                timed_out_until=timeouts.get(guild.id),
             )
         )
     return payloads

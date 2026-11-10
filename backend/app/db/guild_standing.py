@@ -76,6 +76,7 @@ from app.models.platform.identity_ref import (
     IdentityPurpose,
     ref_prefix,
 )
+from app.models.platform.member_moderation import live_timeout_sql
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
     registration_live_sql,
@@ -380,8 +381,14 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
         AND NOT r.enabled
     ), '')""",
     gucs.GUILD_AUTH_OK: """   (SELECT public.guild_auth_satisfied()::text)""",
+    # The community's content is frozen, or this member is timed out in it.
     gucs.CONTENT_HOLD: f"""COALESCE((
-      SELECT (g.status = '{CommunityStatus.read_only.value}')::text
+      SELECT (g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
+        SELECT 1 FROM my_row r
+        JOIN public.member_moderation mm
+          ON mm.guild_id = g.id AND mm.user_id = {gucs.USER_ID}
+        WHERE {live_timeout_sql("mm")}
+      ))::text
       FROM public.guilds g
       WHERE g.id = {gucs.GUILD_ID}
     ), 'false')""",
@@ -466,6 +473,14 @@ ISSUABLE_SCOPES_SQL = (
     "@> jsonb_build_array(s))"
 )
 
+#: The install's content is held read-only, over the guild row ``g``: the
+#: community's is frozen, or the member a member token acts for is timed out.
+_INSTALL_HOLD = f"""(g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
+        SELECT 1 FROM public.member_moderation mm
+        WHERE mm.guild_id = g.id AND mm.user_id = {gucs.USER_ID}
+          AND {live_timeout_sql("mm")}
+      ))"""
+
 
 #: What the install statement writes: each key and its expression.
 _INSTALL_STANDING: dict[gucs.Guc, str] = {
@@ -542,7 +557,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     ), '')""",
     gucs.GUILD_AUTH_OK: """   (SELECT EXISTS (SELECT 1 FROM install))::text""",
     gucs.CONTENT_HOLD: f"""COALESCE((
-      SELECT (g.status = '{CommunityStatus.read_only.value}')::text
+      SELECT ({_INSTALL_HOLD})::text
       FROM public.guilds g
       WHERE g.id = {gucs.GUILD_ID}
     ), 'false')""",
@@ -621,7 +636,7 @@ consent AS (
 ),
 install AS (
   SELECT a.id, {ISSUABLE_SCOPES_SQL} AS granted_scopes,
-         g.status = '{CommunityStatus.read_only.value}' AS read_only
+         {_INSTALL_HOLD} AS read_only
   FROM guild_plugins a
   JOIN public.guilds g ON g.id = {gucs.GUILD_ID}
   WHERE a.id = {gucs.INSTALL_ID}

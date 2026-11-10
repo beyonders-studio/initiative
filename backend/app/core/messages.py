@@ -255,6 +255,12 @@ class GuildMessages:
     NOT_A_GUEST = "NOT_A_GUEST"
     GUEST_TIME_ENDED = "GUEST_TIME_ENDED"
     GUEST_GRANT_NOT_FOUND = "GUEST_GRANT_NOT_FOUND"
+    # The community banned this person; no way in admits them until it is lifted.
+    BANNED_FROM_COMMUNITY = "BANNED_FROM_COMMUNITY"
+    # A timeout is for members and guests: an administrator keeps the settings
+    # surface, where it could be lifted again.
+    TIMEOUT_NOT_FOR_ADMINS = "TIMEOUT_NOT_FOR_ADMINS"
+    TIMEOUT_MUST_END_LATER = "TIMEOUT_MUST_END_LATER"
     # Asked to join a guild that is not listed in the community directory (or
     # is no longer active). Reported as a 404 — an unlisted guild has published
     # nothing, its existence at a given id included.

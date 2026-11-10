@@ -52,6 +52,7 @@ from app.models.platform.guild import (
     restore_status_choices,
 )
 from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.member_moderation import MemberModeration, ModerationKind
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserStatus
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
@@ -137,12 +138,19 @@ class AgeConfirmationRequiredError(CodedError):
     status_code = 403
 
 
+class BannedError(CodedError):
+    """The community has banned this person."""
+
+    status_code = 403
+
+
 #: Why :func:`ensure_membership` refuses somebody new. A sign-in that places
 #: people (its rules, auto-join) leaves a refusing community out and carries
 #: on: one community's refusal is never a reason to refuse the sign-in.
 ADMISSION_REFUSALS: tuple[type[CodedError], ...] = (
     GuildCapacityError,
     AgeConfirmationRequiredError,
+    BannedError,
 )
 
 
@@ -400,6 +408,17 @@ async def ensure_membership(
             session.add(membership)
             await session.flush()
         return membership
+    # Whoever the community has banned stays out, by every way in.
+    if (
+        await session.exec(
+            select(MemberModeration.user_id).where(
+                MemberModeration.guild_id == guild_id,
+                MemberModeration.user_id == user_id,
+                MemberModeration.kind == ModerationKind.ban,
+            )
+        )
+    ).first() is not None:
+        raise BannedError(GuildMessages.BANNED_FROM_COMMUNITY)
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
     # blocked.
