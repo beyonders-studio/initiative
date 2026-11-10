@@ -86,17 +86,29 @@ The location shows on your front page and on your community's card, exactly as t
 
 ## List your community in the directory { #listing-your-community-admins }
 
-A listed community appears in the [community directory](communities.md#finding-a-community-to-join), where anyone signed in on your server can find it and join without an invite. Admins can list their community, on servers that run a directory.
+A listed community appears in the [community directory](communities.md#finding-a-community-to-join), where anyone signed in on your server can find it. Admins can list their community, on servers that run a directory, and choose whether people join straight away or ask first.
 
 1. Open Community settings and select **Community**.
-2. Under **Community directory**, turn on **List this community**.
+2. Under **Community directory**, set **Who can join**:
+    - **Listed: anyone can join** lets people in with one click.
+    - **Listed: ask to join** has them send a request, which an admin approves.
 3. Under **Pick at least one category**, tick the subjects your community is about.
 4. Read the list, then tick **This community contains no adult content**.
 5. Select **List this community**.
 
-Your community shows up in the directory straight away, under the categories you picked. Change them later under **Categories** in the same place. Turn **List this community** off to unlist it, and nothing else changes.
+Your community shows up in the directory straight away, under the categories you picked. Change them later under **Categories** in the same place. Switch between the two listed choices whenever you like; set **Who can join** to **Invite only** to unlist it, and nothing else changes. Invite links work whichever you choose.
 
 That tick is a promise, and keeping it is the admins' job: a community that stops meeting it is taken out of the directory. Two other things keep a community out: a member limit of one person, since nobody else could ever join, and a member who has told Initiative they're under 16.
+
+### Answer requests to join { #answer-requests-to-join }
+
+A community set to **Listed: ask to join** collects requests. Admins, and anyone whose custom role includes **Members**, get a notification when someone asks.
+
+1. Open Community settings and select **Users**.
+2. Under **Requests to join**, read who's asking and the note they left.
+3. Select **Approve** to make them a member, or **Deny** to turn them down.
+
+They get a notification with your answer. Someone turned down can ask again. A request your community has no room for stays in the list until it does.
 
 ### Give newcomers somewhere to land
 

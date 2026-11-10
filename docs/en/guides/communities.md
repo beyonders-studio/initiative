@@ -81,7 +81,7 @@ The community's icon appears on your rail. If its admins picked an initiative to
 
 ## Find a community to join { #finding-a-community-to-join }
 
-Some communities list themselves in the **community directory**, where anyone signed in can find them and join without an invite. You'll find **Join a community** at the bottom of the rail, just under the **+**, on servers that run a directory. No button means your server doesn't run one, so every community there is invite-only. Whoever runs the server decides that (see [Configuration](../running-a-server/configuration.md)).
+Some communities list themselves in the **community directory**, where anyone signed in can find them and join without an invite, or ask to. You'll find **Join a community** at the bottom of the rail, just under the **+**, on servers that run a directory. No button means your server doesn't run one, so every community there is invite-only. Whoever runs the server decides that (see [Configuration](../running-a-server/configuration.md)).
 
 1. Select **Join a community** at the bottom of the rail.
 2. Type in **Search communities**, or pick a category in the sidebar.
@@ -89,6 +89,8 @@ Some communities list themselves in the **community directory**, where anyone si
 4. If you're asked your date of birth, enter it and select **Confirm and join**.
 
 You're a member straight away, with no approval to wait for, and the app takes you inside. A community you're already in says **Open** on its card instead.
+
+Some cards say **Ask to join** instead: that community's admins approve each new member. Select it, write a note saying who you are and why you'd like to join, then select **Send request**. The note is often all the admins have to go on. The card says **Requested** until they answer, and you get a notification when they do. Changed your mind? Select **Withdraw**.
 
 Search covers names and places, so "Seattle" finds communities in Seattle, and typing a country's name finds everything in that country, in whatever language you type it. What you searched and which category you picked are part of the page's address, so a filtered directory is a link you can send somebody.
 
