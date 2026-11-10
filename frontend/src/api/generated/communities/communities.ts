@@ -3670,7 +3670,10 @@ export function useListCommunityJoinRequests<
 
 /**
  * Let the asker in as a member. A refusal on the way in (the community is
- * full, the asker under age) leaves the request where it was.
+ * full, the asker under age) leaves the request where it was. Somebody who
+ * came in as a guest while they waited becomes a member, as making a guest
+ * one does. The claim and the notice commit together, once the membership
+ * has.
  * @summary Approve Community Join Request
  */
 export const approveCommunityJoinRequest = (
