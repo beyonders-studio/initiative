@@ -29,7 +29,9 @@ import type {
   ApiKeyCreateResponse,
   ApiKeyListResponse,
   BodyUploadMyAvatar,
+  CommunityBanRead,
   CommunityRosterResponse,
+  CommunityTimeoutWrite,
   CookieConsentRead,
   CookieConsentUpdate,
   DecorationPack,
@@ -47,6 +49,7 @@ import type {
   OwnedDecorationsResponse,
   OwnershipTransferRequest,
   OwnershipTransferResponse,
+  RemoveMemberParams,
   SearchUsersParams,
   UserCommunityMemberListResponse,
   UserEmailChange,
@@ -1359,7 +1362,7 @@ export const useTransferOwnership = <TError = ErrorType<HTTPValidationError>, TC
   return useMutation(getTransferOwnershipMutationOptions(options), queryClient);
 };
 /**
- * Remove a member from this guild.
+ * Remove a member from this guild, and with ``ban``, keep them out.
  *
  * Ends their memberships and the access those carried. It does not move
  * ownership: content they own stays recorded as theirs and stops being
@@ -1370,11 +1373,12 @@ export const useTransferOwnership = <TError = ErrorType<HTTPValidationError>, TC
 export const removeMember = (
   communityId: number,
   userId: number,
+  params?: RemoveMemberParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
   return apiMutator<void>(
-    { url: `/api/v1/c/${communityId}/users/${userId}`, method: "DELETE", signal },
+    { url: `/api/v1/c/${communityId}/users/${userId}`, method: "DELETE", params, signal },
     options
   );
 };
@@ -1409,9 +1413,9 @@ export const getRemoveMemberMutationOptions = <
     Awaited<ReturnType<typeof removeMember>>,
     RemoveMemberMutationVariables
   > = (props) => {
-    const { communityId, userId } = props ?? {};
+    const { communityId, userId, params } = props ?? {};
 
-    return removeMember(communityId, userId, requestOptions);
+    return removeMember(communityId, userId, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -1420,7 +1424,11 @@ export const getRemoveMemberMutationOptions = <
 export type RemoveMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeMember>>>;
 
 export type RemoveMemberMutationError = ErrorType<HTTPValidationError>;
-export type RemoveMemberMutationVariables = { communityId: number; userId: number };
+export type RemoveMemberMutationVariables = {
+  communityId: number;
+  userId: number;
+  params?: RemoveMemberParams;
+};
 
 /**
  * @summary Remove Member
@@ -1443,6 +1451,386 @@ export const useRemoveMember = <TError = ErrorType<HTTPValidationError>, TContex
   TContext
 > => {
   return useMutation(getRemoveMemberMutationOptions(options), queryClient);
+};
+/**
+ * Everybody this community has banned, the most recent first.
+ * @summary List Bans
+ */
+export const listBans = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommunityBanRead[]>(
+    { url: `/api/v1/c/${communityId}/users/bans`, method: "GET", signal },
+    options
+  );
+};
+
+export const getListBansQueryKey = (communityId: number) => {
+  return [`/api/v1/c/${communityId}/users/bans`] as const;
+};
+
+export const getListBansQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBans>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBans>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBansQueryKey(communityId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBans>>> = ({ signal }) =>
+    listBans(communityId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listBans>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListBansQueryResult = NonNullable<Awaited<ReturnType<typeof listBans>>>;
+export type ListBansQueryError = ErrorType<HTTPValidationError>;
+
+export function useListBans<
+  TData = Awaited<ReturnType<typeof listBans>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBans>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listBans>>,
+          TError,
+          Awaited<ReturnType<typeof listBans>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListBans<
+  TData = Awaited<ReturnType<typeof listBans>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBans>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listBans>>,
+          TError,
+          Awaited<ReturnType<typeof listBans>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListBans<
+  TData = Awaited<ReturnType<typeof listBans>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBans>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Bans
+ */
+
+export function useListBans<
+  TData = Awaited<ReturnType<typeof listBans>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBans>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListBansQueryOptions(communityId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Lift a ban. They can be invited or join again; nothing puts them back.
+ * @summary Lift Ban
+ */
+export const liftBan = (
+  communityId: number,
+  userId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/users/bans/${userId}`, method: "DELETE", signal },
+    options
+  );
+};
+
+export const getLiftBanMutationKey = () => ["liftBan"] as const;
+
+export const getLiftBanMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof liftBan>>,
+    TError,
+    LiftBanMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof liftBan>>,
+  TError,
+  LiftBanMutationVariables,
+  TContext
+> => {
+  const mutationKey = getLiftBanMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof liftBan>>,
+    LiftBanMutationVariables
+  > = (props) => {
+    const { communityId, userId } = props ?? {};
+
+    return liftBan(communityId, userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LiftBanMutationResult = NonNullable<Awaited<ReturnType<typeof liftBan>>>;
+
+export type LiftBanMutationError = ErrorType<HTTPValidationError>;
+export type LiftBanMutationVariables = { communityId: number; userId: number };
+
+/**
+ * @summary Lift Ban
+ */
+export const useLiftBan = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof liftBan>>,
+      TError,
+      LiftBanMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof liftBan>>,
+  TError,
+  LiftBanMutationVariables,
+  TContext
+> => {
+  return useMutation(getLiftBanMutationOptions(options), queryClient);
+};
+/**
+ * Hold a member's content here read-only until ``ends_at``: they still
+ * read the community, and change nothing in it. Replaces a timeout they
+ * have.
+ * @summary Time Out Member
+ */
+export const timeOutMember = (
+  communityId: number,
+  userId: number,
+  communityTimeoutWrite: BodyType<CommunityTimeoutWrite>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/users/${userId}/timeout`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: communityTimeoutWrite,
+      signal,
+    },
+    options
+  );
+};
+
+export const getTimeOutMemberMutationKey = () => ["timeOutMember"] as const;
+
+export const getTimeOutMemberMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof timeOutMember>>,
+    TError,
+    TimeOutMemberMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof timeOutMember>>,
+  TError,
+  TimeOutMemberMutationVariables,
+  TContext
+> => {
+  const mutationKey = getTimeOutMemberMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof timeOutMember>>,
+    TimeOutMemberMutationVariables
+  > = (props) => {
+    const { communityId, userId, data } = props ?? {};
+
+    return timeOutMember(communityId, userId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TimeOutMemberMutationResult = NonNullable<Awaited<ReturnType<typeof timeOutMember>>>;
+export type TimeOutMemberMutationBody = BodyType<CommunityTimeoutWrite>;
+export type TimeOutMemberMutationError = ErrorType<HTTPValidationError>;
+export type TimeOutMemberMutationVariables = {
+  communityId: number;
+  userId: number;
+  data: BodyType<CommunityTimeoutWrite>;
+};
+
+/**
+ * @summary Time Out Member
+ */
+export const useTimeOutMember = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof timeOutMember>>,
+      TError,
+      TimeOutMemberMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof timeOutMember>>,
+  TError,
+  TimeOutMemberMutationVariables,
+  TContext
+> => {
+  return useMutation(getTimeOutMemberMutationOptions(options), queryClient);
+};
+/**
+ * End a member's timeout early.
+ * @summary Lift Member Timeout
+ */
+export const liftMemberTimeout = (
+  communityId: number,
+  userId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/users/${userId}/timeout`, method: "DELETE", signal },
+    options
+  );
+};
+
+export const getLiftMemberTimeoutMutationKey = () => ["liftMemberTimeout"] as const;
+
+export const getLiftMemberTimeoutMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof liftMemberTimeout>>,
+    TError,
+    LiftMemberTimeoutMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof liftMemberTimeout>>,
+  TError,
+  LiftMemberTimeoutMutationVariables,
+  TContext
+> => {
+  const mutationKey = getLiftMemberTimeoutMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof liftMemberTimeout>>,
+    LiftMemberTimeoutMutationVariables
+  > = (props) => {
+    const { communityId, userId } = props ?? {};
+
+    return liftMemberTimeout(communityId, userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LiftMemberTimeoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof liftMemberTimeout>>
+>;
+
+export type LiftMemberTimeoutMutationError = ErrorType<HTTPValidationError>;
+export type LiftMemberTimeoutMutationVariables = { communityId: number; userId: number };
+
+/**
+ * @summary Lift Member Timeout
+ */
+export const useLiftMemberTimeout = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof liftMemberTimeout>>,
+      TError,
+      LiftMemberTimeoutMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof liftMemberTimeout>>,
+  TError,
+  LiftMemberTimeoutMutationVariables,
+  TContext
+> => {
+  return useMutation(getLiftMemberTimeoutMutationOptions(options), queryClient);
 };
 /**
  * Serve the picture a member of this community uploaded.

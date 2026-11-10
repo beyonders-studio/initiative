@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import type { PaginationState } from "@tanstack/react-table";
-import { IdCard, UserMinus, UserPlus, UsersRound } from "lucide-react";
+import { IdCard, Timer, UserMinus, UserPlus, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,7 @@ import { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
 import { InviteMembersDialog } from "@/components/communities/InviteMembersDialog";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
+import { TimeOutMemberDialog } from "@/components/communities/TimeOutMemberDialog";
 import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
@@ -104,6 +105,7 @@ export const MembersPage = () => {
   // Who is being named: yourself, or a member whose name you keep.
   const [naming, setNaming] = useState<UserSummary | "self" | null>(null);
   const [removing, setRemoving] = useState<UserSummary | null>(null);
+  const [timingOut, setTimingOut] = useState<{ id: number; name: string } | null>(null);
   const [inviting, setInviting] = useState(false);
 
   const held = useHeldSurfaces();
@@ -340,6 +342,18 @@ export const MembersPage = () => {
                       <IdCard className="h-4 w-4" />
                       {t("displayName.adminAction")}
                     </DropdownMenuItem>
+                    {/* Timeouts are for members and guests; an administrator
+                        keeps the settings, where it could be lifted again. */}
+                    {isAdminRole(rung) ? null : (
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          setTimingOut({ id: member.id, name: getUserDisplayName(member) })
+                        }
+                      >
+                        <Timer className="h-4 w-4" />
+                        {t("timeOut.action")}
+                      </DropdownMenuItem>
+                    )}
                     {reaches ? (
                       <DropdownMenuItem
                         className="text-destructive"
@@ -450,6 +464,11 @@ export const MembersPage = () => {
         onOpenChange={(open) => !open && setRemoving(null)}
         userId={removing?.id ?? null}
         email={removing ? getUserDisplayName(removing) : ""}
+      />
+      <TimeOutMemberDialog
+        open={timingOut !== null}
+        onOpenChange={(open) => !open && setTimingOut(null)}
+        member={timingOut}
       />
       {inviting ? <InviteMembersDialog open onOpenChange={setInviting} /> : null}
     </div>

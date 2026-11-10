@@ -51,7 +51,11 @@
     "removing": "Eliminando…",
     "removed": "{{email}} eliminado",
     "failedToRemove": "No se pudo eliminar al miembro. Inténtalo de nuevo.",
-    "ownershipReleased": "Todo lo que posee queda sin propietario. Puedes reclamarlo cuando quieras desde la lista de contenido sin propietario."
+    "ownershipReleased": "Todo lo que posee queda sin propietario. Puedes reclamarlo cuando quieras desde la lista de contenido sin propietario.",
+    "ban": "Expulsar también",
+    "banHint": "No podrán volver por invitación, el directorio ni el inicio de sesión único hasta que se levante la expulsión.",
+    "banButton": "Quitar y expulsar",
+    "banned": "{{email}} expulsado"
   },
   "invite": {
     "title": "Unirse a {{communityName}}",
@@ -674,5 +678,35 @@
     "makeMember": "Hacer miembro",
     "madeMember": "Ahora es miembro.",
     "makeMemberError": "No se pudo hacer miembro."
+  },
+  "timeOut": {
+    "action": "Silenciar…",
+    "title": "Silenciar a {{name}}",
+    "description": "Podrá seguir leyendo esta comunidad, pero no publicar, comentar, reaccionar ni cambiar nada hasta que termine.",
+    "lengthLabel": "Durante",
+    "length": {
+      "hour": "1 hora",
+      "day": "1 día",
+      "week": "1 semana",
+      "custom": "Hasta una fecha"
+    },
+    "untilLabel": "Hasta",
+    "confirm": "Silenciar",
+    "confirming": "Silenciando…",
+    "done": "{{name}} está silenciado hasta {{time}}",
+    "error": "No se pudo silenciar. Inténtalo de nuevo.",
+    "lift": "Quitar silencio",
+    "lifted": "Silencio quitado",
+    "liftError": "No se pudo quitar el silencio. Inténtalo de nuevo.",
+    "badge": "Silenciado hasta {{time}}",
+    "banner": "Estás silenciado en {{community}} hasta {{time}}. Puedes leer, pero no cambiar nada."
+  },
+  "bans": {
+    "title": "Expulsados",
+    "description": "Personas que no pueden volver a esta comunidad hasta que se levante su expulsión.",
+    "since": "Expulsado el {{date}}",
+    "lift": "Levantar expulsión",
+    "lifted": "Expulsión de {{name}} levantada",
+    "liftError": "No se pudo levantar la expulsión. Inténtalo de nuevo."
   }
 }

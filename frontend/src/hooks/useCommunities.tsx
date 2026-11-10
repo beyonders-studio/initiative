@@ -159,6 +159,8 @@ const grantEntry = (grant: AccessGrantRead, settingsGrant?: AccessGrantRead): Co
   // PAM/break-glass overrides the lifecycle status — a grantee's writability
   // comes from the grant level, never from the community being frozen.
   content_read_only: false,
+  // A timeout is a member's; a grantee is not one.
+  timed_out_until: null,
   // Only a closed community names who to contact, and a grant is never closed.
   contact_email: null,
   // Admin-only entitlements; a grantee acts as a member here, so they're absent.

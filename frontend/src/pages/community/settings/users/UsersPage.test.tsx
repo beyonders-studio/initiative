@@ -12,12 +12,13 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildCommunity, buildUserCommunityMember } from "@/__tests__/factories";
+import { buildCommunity, buildUserCommunityMember, buildUserSummary } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type {
   CommunityAuthOption,
+  CommunityBanRead,
   CommunityInviteRead,
   CommunityRead,
   UserCommunityMember,
@@ -28,6 +29,7 @@ const state = vi.hoisted(() => ({
   members: [] as UserCommunityMember[],
   authOptions: [] as CommunityAuthOption[],
   invites: [] as CommunityInviteRead[],
+  bans: [] as CommunityBanRead[],
 }));
 vi.mock("@/hooks/useAppConfig", () => ({ useAppConfig: () => ({ billing: state.billing }) }));
 
@@ -46,7 +48,13 @@ vi.mock("@/api/generated/communities/communities", () => ({
 }));
 
 const setApiAccess = vi.hoisted(() => vi.fn());
+const liftBan = vi.hoisted(() => vi.fn());
+const liftTimeout = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/useUsers", () => ({
+  useCommunityBans: () => ({ data: state.bans }),
+  useLiftBan: () => ({ mutate: liftBan, isPending: false }),
+  useLiftMemberTimeout: () => ({ mutate: liftTimeout, isPending: false }),
+  useTimeOutMember: () => ({ mutate: vi.fn(), isPending: false }),
   USER_ID_LOOKUP_MAX: 100,
   useUsers: () => ({
     data: {
@@ -80,6 +88,7 @@ import { UsersPage } from "./UsersPage";
 beforeEach(() => {
   state.invites = [];
   state.members = [];
+  state.bans = [];
 });
 
 // The page's last render, whose reads are waited on before clicking into a
@@ -327,5 +336,45 @@ describe("UsersPage custom roles", () => {
     await waitFor(() =>
       expect(assigned).toEqual([{ userId: String(member.id), body: { role_id: 3 } }])
     );
+  });
+});
+
+describe("UsersPage bans and timeouts", () => {
+  beforeEach(() => {
+    state.billing = null;
+    state.authOptions = [];
+    liftBan.mockReset();
+    liftTimeout.mockReset();
+  });
+
+  it("lists who the community has banned, and lifts a ban", async () => {
+    const banned = buildUserSummary({ username: "troll" });
+    state.bans = [{ user: banned, banned_at: "2026-11-01T12:00:00Z" }];
+    setup({ role: "admin" });
+
+    expect(await screen.findByText("Banned")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Lift ban" }));
+    expect(liftBan).toHaveBeenCalledWith({ userId: banned.id });
+  });
+
+  it("says nothing about bans while there are none", async () => {
+    setup({ role: "admin" });
+
+    await screen.findByRole("table");
+    expect(screen.queryByRole("button", { name: "Lift ban" })).not.toBeInTheDocument();
+  });
+
+  it("shows a member's timeout and lifts it", async () => {
+    state.members = [
+      buildUserCommunityMember({ display_name: "Ada", timed_out_until: "2099-01-01T00:00:00Z" }),
+    ];
+    const member = state.members[0];
+    setup({ role: "admin" });
+
+    expect(await screen.findByText(/timed out until/i)).toBeInTheDocument();
+    await settled();
+    await userEvent.click(screen.getByRole("button", { name: /actions for/i }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Lift timeout" }));
+    expect(liftTimeout).toHaveBeenCalledWith({ userId: member.id });
   });
 });

@@ -33,8 +33,12 @@ import {
   getListUsersQueryKey,
   getSearchUsersQueryOptions,
   installDecorationPack,
+  liftBan,
+  liftMemberTimeout,
   removeDecorationPack,
+  timeOutMember,
   updateMe,
+  useListBans,
   useListDecorationPacks,
   useListMyDecorations,
   useListUsers,
@@ -477,6 +481,46 @@ export const useMakeGuestAMember = (options?: MutationOpts<void, GuestVars>) => 
     options
   );
 };
+
+/** Everybody the active community has banned, the most recent first. */
+export const useCommunityBans = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useListBans(useActiveCommunityId(), { query: { enabled } });
+
+type MemberVars = { userId: number };
+
+/** Lift a ban, so they can be invited or join again. */
+export const useLiftBan = (options?: MutationOpts<void, MemberVars>) =>
+  useCommunityMutation<void, MemberVars>(
+    {
+      mutationFn: (communityId, { userId }) => liftBan(communityId, userId),
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:bans.liftError",
+    },
+    options
+  );
+
+/** Hold a member's content read-only until `endsAt`. Replaces a timeout they have. */
+export const useTimeOutMember = (options?: MutationOpts<void, MemberVars & { endsAt: Date }>) =>
+  useCommunityMutation<void, MemberVars & { endsAt: Date }>(
+    {
+      mutationFn: (communityId, { userId, endsAt }) =>
+        timeOutMember(communityId, userId, { ends_at: endsAt.toISOString() }),
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:timeOut.error",
+    },
+    options
+  );
+
+/** End a member's timeout early. */
+export const useLiftMemberTimeout = (options?: MutationOpts<void, MemberVars>) =>
+  useCommunityMutation<void, MemberVars>(
+    {
+      mutationFn: (communityId, { userId }) => liftMemberTimeout(communityId, userId),
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:timeOut.liftError",
+    },
+    options
+  );
 
 type SetDisplayNameVars = { communityId: number; userId?: number; displayName: string | null };
 

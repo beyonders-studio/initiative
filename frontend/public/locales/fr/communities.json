@@ -51,7 +51,11 @@
     "removing": "Retrait en cours…",
     "removed": "{{email}} retiré",
     "failedToRemove": "Échec du retrait du membre. Veuillez réessayer.",
-    "ownershipReleased": "Tout ce qui lui appartient devient sans propriétaire. Vous pouvez le récupérer à tout moment depuis la liste du contenu sans propriétaire."
+    "ownershipReleased": "Tout ce qui lui appartient devient sans propriétaire. Vous pouvez le récupérer à tout moment depuis la liste du contenu sans propriétaire.",
+    "ban": "Le bannir aussi",
+    "banHint": "Il ne pourra revenir ni par invitation, ni par l’annuaire, ni par l’authentification unique tant que le bannissement n’est pas levé.",
+    "banButton": "Retirer et bannir",
+    "banned": "{{email}} banni"
   },
   "invite": {
     "title": "Rejoindre {{communityName}}",
@@ -674,5 +678,35 @@
     "makeMember": "Rendre membre",
     "madeMember": "Cette personne est maintenant membre.",
     "makeMemberError": "Impossible de rendre cette personne membre."
+  },
+  "timeOut": {
+    "action": "Mettre en sourdine…",
+    "title": "Mettre {{name}} en sourdine",
+    "description": "Il peut toujours lire cette communauté, mais ne peut rien publier, commenter, réagir ni modifier jusqu’à la fin.",
+    "lengthLabel": "Pendant",
+    "length": {
+      "hour": "1 heure",
+      "day": "1 jour",
+      "week": "1 semaine",
+      "custom": "Jusqu’à une date"
+    },
+    "untilLabel": "Jusqu’au",
+    "confirm": "Mettre en sourdine",
+    "confirming": "Mise en sourdine…",
+    "done": "{{name}} est en sourdine jusqu’au {{time}}",
+    "error": "Impossible de le mettre en sourdine. Réessayez.",
+    "lift": "Lever la sourdine",
+    "lifted": "Sourdine levée",
+    "liftError": "Impossible de lever la sourdine. Réessayez.",
+    "badge": "En sourdine jusqu’au {{time}}",
+    "banner": "Vous êtes en sourdine dans {{community}} jusqu’au {{time}}. Vous pouvez lire, mais rien modifier."
+  },
+  "bans": {
+    "title": "Bannis",
+    "description": "Les personnes qui ne peuvent pas revenir dans cette communauté tant que leur bannissement n’est pas levé.",
+    "since": "Banni le {{date}}",
+    "lift": "Lever le bannissement",
+    "lifted": "Bannissement de {{name}} levé",
+    "liftError": "Impossible de lever le bannissement. Réessayez."
   }
 }

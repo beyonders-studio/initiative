@@ -853,5 +853,8 @@
   "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Esa persona no es miembro de esta comunidad.",
   "CUSTOM_ROLE_SET_BY_DEPLOYMENT": "Quien gestiona este servidor define este rol, así que no se puede cambiar ni eliminar aquí.",
   "CUSTOM_ROLE_NAME_RESERVED": "Quien gestiona este servidor ya tiene un rol con ese nombre. Elige otro.",
-  "VIEW_KEPT_IN_THE_COMMUNITY": "Vuelve a cargar la aplicación para conservar esta vista."
+  "VIEW_KEPT_IN_THE_COMMUNITY": "Vuelve a cargar la aplicación para conservar esta vista.",
+  "BANNED_FROM_COMMUNITY": "No puedes unirte a esta comunidad.",
+  "TIMEOUT_NOT_FOR_ADMINS": "No se puede silenciar a los administradores. Cambia primero su rol.",
+  "TIMEOUT_MUST_END_LATER": "Elige una hora de fin en el futuro."
 }

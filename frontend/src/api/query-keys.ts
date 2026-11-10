@@ -427,10 +427,15 @@ const operatorUsers = (): Spec => ({ personalPrefix: ["/api/v1/operator"] });
 // membership *mutations* go through the platform `/api/v1/communities/{id}/members/…`
 // path. It must stay in the community bucket. The member search rides along: the
 // pickers read each person's community role from it. So does the sidebar's people
-// roster.
+// roster, and the community's bans, which a removal can add to.
 
 const communityMembers = (): Spec => ({
-  communityExact: ["/api/v1/users/", "/api/v1/users/search", "/api/v1/users/roster"],
+  communityExact: [
+    "/api/v1/users/",
+    "/api/v1/users/search",
+    "/api/v1/users/roster",
+    "/api/v1/users/bans",
+  ],
 });
 
 // ── Communities (personal / platform) ─────────────────────────────────────────────
