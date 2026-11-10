@@ -173,18 +173,35 @@ async def guild_plan_summary(guild_id: int) -> PlanSummary | None:
         if guild_ref is None:
             return PlanSummary()
         url, body, headers = build_plan_summary_query(guild_ref)
-        async with httpx2.AsyncClient(
-            timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
-        ) as client:
-            response = await client.post(url, content=body, headers=headers)
-        if (
-            response.status_code != 200
-            or len(response.content) > _PLAN_SUMMARY_MAX_BYTES
-        ):
+        answer = await _read_capped(url, body, headers, _PLAN_SUMMARY_MAX_BYTES)
+        if answer is None:
             return None
-        return PlanSummary.model_validate_json(response.content)
+        return PlanSummary.model_validate_json(answer)
     except Exception:
         return None
+
+
+async def _read_capped(
+    url: str, body: bytes, headers: dict[str, str], cap: int
+) -> bytes | None:
+    """POST a signed read to billing and return its body, or ``None`` for an
+    answer other than 200 or one longer than ``cap`` bytes. The body is
+    streamed and reading stops past the cap, so an oversized reply is never
+    held whole."""
+    async with (
+        httpx2.AsyncClient(
+            timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
+        ) as client,
+        client.stream("POST", url, content=body, headers=headers) as response,
+    ):
+        if response.status_code != 200:
+            return None
+        read = bytearray()
+        async for chunk in response.aiter_bytes():
+            read += chunk
+            if len(read) > cap:
+                return None
+        return bytes(read)
 
 
 async def guild_payment_failed(guild_id: int) -> bool:
@@ -238,16 +255,10 @@ async def _ask_uninstall_notice(
     url, body, headers = build_uninstall_notice_query(
         guild_ref, listing_uid=listing_uid, locale=locale
     )
-    async with httpx2.AsyncClient(
-        timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
-    ) as client:
-        response = await client.post(url, content=body, headers=headers)
-    if (
-        response.status_code != 200
-        or len(response.content) > _UNINSTALL_NOTICE_MAX_BYTES
-    ):
+    answer = await _read_capped(url, body, headers, _UNINSTALL_NOTICE_MAX_BYTES)
+    if answer is None:
         return None
-    return UninstallNotice.model_validate_json(response.content)
+    return UninstallNotice.model_validate_json(answer)
 
 
 async def plugin_uninstall_notice(
@@ -327,14 +338,11 @@ async def _ask_plugin_offer(
     url, body, headers = build_plugin_offer_query(
         guild_ref, listing_uid=listing_uid, locale=locale
     )
-    async with httpx2.AsyncClient(
-        timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
-    ) as client:
-        response = await client.post(url, content=body, headers=headers)
     # 404 is billing saying it doesn't sell the listing as an app of its own.
-    if response.status_code != 200 or len(response.content) > _PLUGIN_OFFER_MAX_BYTES:
+    answer = await _read_capped(url, body, headers, _PLUGIN_OFFER_MAX_BYTES)
+    if answer is None:
         return None
-    return PluginOffer.model_validate_json(response.content)
+    return PluginOffer.model_validate_json(answer)
 
 
 async def plugin_offer(
