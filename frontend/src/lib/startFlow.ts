@@ -17,7 +17,7 @@ import type { CommunityEntry } from "@/hooks/useCommunities";
 import { asCommunityCategories } from "@/lib/communityCategories";
 import { EMPTY_PLACE, type Place, placeFrom } from "@/lib/directoryNear";
 import { getItem, removeItem, setItem } from "@/lib/storage";
-import { browserTimezone } from "@/lib/timezones";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 export type StartPath = "invite" | "join" | "personal" | "shared";
 

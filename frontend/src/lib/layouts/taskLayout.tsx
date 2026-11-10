@@ -25,7 +25,6 @@ import {
 import { CommentSection } from "@/components/comments/CommentSection";
 import { usePersonMention } from "@/components/comments/usePersonMention";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TagsField } from "@/components/tags/TagsField";
 import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
 import { PART_MARK, SmartTitleParts } from "@/components/tasks/SmartTitleParts";
@@ -55,13 +54,6 @@ import { instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useSearchMembers } from "@/hooks/useUsers";
 import { dateRangeBounds } from "@/lib/dateRange";
 import { toast } from "@/lib/mascotToast";
-import {
-  fromStored,
-  isHourlyRule,
-  isValidTaskRecurrence,
-  rulePayload,
-  type TaskRecurrenceValue,
-} from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
 import { type Applied, NOTHING_APPLIED, readingEdit } from "@/lib/smartTaskTitle";
 import { PRIORITY_ORDER } from "@/lib/sorting";
@@ -103,6 +95,14 @@ import { dateTimePattern } from "@/ui/lib/timeFormat";
 import { useDateLocale } from "@/ui/lib/useDateLocale";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { MemberPicker } from "@/ui/member-picker";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
+import {
+  fromStored,
+  isHourlyRule,
+  isValidTaskRecurrence,
+  rulePayload,
+  type TaskRecurrenceValue,
+} from "@/ui/recurrence/recurrence";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 

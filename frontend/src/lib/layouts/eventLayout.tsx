@@ -22,7 +22,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { isRepeating, utcDateKey } from "@/components/calendar/eventCalendarEntry";
 import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TagsField } from "@/components/tags/TagsField";
 import {
   EventDateTimeFields,
@@ -43,13 +42,6 @@ import { itemSaves } from "@/hooks/useFieldSave";
 import { useSearchMembers } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
-import {
-  allDayReference,
-  fromStored,
-  type RecurrenceRule,
-  rulePayload,
-  summarizeStored,
-} from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
 import { eventRoute } from "@/lib/tools";
 import { getUserDisplayName, toMember } from "@/lib/userDisplay";
@@ -74,6 +66,14 @@ import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
 import { MemberPicker } from "@/ui/member-picker";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
+import {
+  allDayReference,
+  fromStored,
+  type RecurrenceRule,
+  rulePayload,
+  summarizeStored,
+} from "@/ui/recurrence/recurrence";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 

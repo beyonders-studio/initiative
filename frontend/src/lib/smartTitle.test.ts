@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { buildTaskType } from "@/__tests__/factories";
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
 import { HINTS } from "@/components/tasks/SmartTitleHints";
-import { fromStored, isValidTaskRecurrence, shiftFor, toRRule } from "@/lib/recurrence";
+import { fromStored, isValidTaskRecurrence, shiftFor, toRRule } from "@/ui/recurrence/recurrence";
 
 import {
   handlesIn,

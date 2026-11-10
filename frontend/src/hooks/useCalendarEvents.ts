@@ -37,9 +37,9 @@ import {
   useItemFieldSave,
   useShownWithPending,
 } from "@/hooks/useFieldSave";
-import { withZone } from "@/lib/recurrence";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import { withZone } from "@/ui/recurrence/recurrence";
 
 /**
  * One event. `occurrence` names one occurrence of a repeating event, whose

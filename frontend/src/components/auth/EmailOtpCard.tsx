@@ -27,11 +27,11 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { browserTimezone } from "@/lib/timezones";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 type Step = "address" | "code" | "handle";
 

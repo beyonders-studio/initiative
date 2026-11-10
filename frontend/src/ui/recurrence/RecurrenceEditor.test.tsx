@@ -7,7 +7,7 @@
  * server beneath it.
  */
 
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { useState } from "react";
@@ -15,13 +15,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
 import {
   createRecurrenceFromPreset,
   fromStored,
   type RecurrenceRule,
   type TaskRecurrenceValue,
-} from "@/lib/recurrence";
+} from "@/ui/recurrence/recurrence";
 
 const renderEditor = (value: RecurrenceRule | "custom" | null, referenceDate?: string) =>
   renderWithProviders(
@@ -231,6 +231,31 @@ describe("hourly completion repeat", () => {
     expect(
       screen.queryByRole("option", { name: "Hourly (after completion)" })
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Every hour" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Maximum per day (optional)")).not.toBeInTheDocument();
+  });
+});
+
+const ScheduleEditor = () => {
+  const [rule, setRule] = useState<RecurrenceRule | null>(null);
+  return <RecurrenceEditor kind="event" value={rule} onChange={setRule} hourly />;
+};
+
+describe("hourly schedule", () => {
+  it("repeats every so many hours on a schedule, for a caller that offers it", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ScheduleEditor />);
+    await user.click(await screen.findByRole("combobox", { name: "Repeat" }));
+    await user.click(await screen.findByRole("option", { name: "Every hour" }));
+    expect(screen.getByText("Repeats every hour")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Repeat" }));
+    await user.click(await screen.findByRole("option", { name: "Custom…" }));
+    expect(screen.getByRole("combobox", { name: "Frequency" })).toHaveTextContent("Hourly");
+    fireEvent.change(screen.getByLabelText("Repeat every"), { target: { value: "4" } });
+
+    expect(screen.getByText("Repeats every 4 hours")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Maximum per day (optional)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Repeat strategy" })).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { Link, useBlocker } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 
 import { isOwnOrigin } from "@/api/client";
+import { previewRecurrence } from "@/api/generated/recurrence/recurrence";
 import { toast } from "@/lib/mascotToast";
 import { canCapturePhoto, capturePhoto } from "@/lib/nativeCamera";
 import { openExternal } from "@/lib/openExternal";
@@ -27,8 +28,8 @@ const useRouterBlocker = (when: () => boolean): Blocker => {
  * Hand the UI kit what it takes from Initiative: the mascot's toasts, the
  * phone's camera, the router's links and blocker, the phone's browser sheet,
  * the device's storage, the emoji data this app serves, the spelling
- * dictionary, the origins that are its own and how a person a field names is
- * drawn.
+ * dictionary, the origins that are its own, how a person a field names is
+ * drawn and the server's preview of a repeat's dates.
  *
  * Each is called through when the kit uses it rather than read here, so the
  * host holds nothing a module would have to hand over at boot.
@@ -64,4 +65,5 @@ export const connectKit = (): void =>
       ...toMember(person),
       name: getUserDisplayName(person, `#${person.id}`),
     }),
+    previewRecurrence: (request) => previewRecurrence(request),
   });
