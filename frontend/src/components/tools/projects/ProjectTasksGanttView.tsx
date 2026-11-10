@@ -57,7 +57,6 @@ import {
   wholesOf,
 } from "@/lib/gantt";
 import { taskFields } from "@/lib/layouts/tasks";
-import { browserTimezone } from "@/lib/timezones";
 import { taskRoute } from "@/lib/tools";
 import {
   type AxisTick,
@@ -80,6 +79,7 @@ import {
 } from "@/ui/dropdown-menu";
 import { boardBands } from "@/ui/layouts/grouping";
 import { dateTimeFormat } from "@/ui/lib/intl";
+import { browserTimezone } from "@/ui/lib/timezones";
 import { cn } from "@/ui/lib/utils";
 import { Toggle } from "@/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";

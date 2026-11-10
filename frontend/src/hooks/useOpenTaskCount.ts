@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import type { ListMyTasksParams } from "@/api/generated/initiativeAPI.schemas";
 import { useListMyTasks } from "@/api/generated/tasks/tasks";
-import { browserTimezone } from "@/lib/timezones";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 const OPEN = ["backlog", "todo", "in_progress"];
 

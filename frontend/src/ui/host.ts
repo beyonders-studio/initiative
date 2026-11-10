@@ -1,5 +1,9 @@
 import { type ComponentType, createElement, type ReactNode, useSyncExternalStore } from "react";
 
+import type {
+  RecurrencePreview,
+  RecurrencePreviewRequest,
+} from "@/api/generated/initiativeAPI.schemas";
 import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
 import type { Member } from "@/ui/member-picker";
 import type { UserValue } from "@/ui/properties/propertyHelpers";
@@ -13,7 +17,7 @@ import type { UserValue } from "@/ui/properties/propertyHelpers";
  * is set once, at boot, with `setHost`: how to show a notice, take a picture,
  * link to a page, hold a move away from one, open another site, keep a
  * preference, find the emoji data, load the spelling dictionary, recognise the
- * app's own origin and draw a person a field names.
+ * app's own origin, draw a person a field names and preview a repeat's dates.
  */
 
 export type TimeFormatPreference = "system" | "12" | "24";
@@ -95,6 +99,9 @@ export interface Host {
   /** How a person a field's value names is drawn: their name, picture and
    *  initials, from the person as the server reads them back. */
   member: (person: UserValue) => Member;
+  /** The next starts of a repeat, from the engine the app's calendar uses;
+   *  the editor shows none when unset. */
+  previewRecurrence?: (request: RecurrencePreviewRequest) => Promise<RecurrencePreview>;
 }
 
 const kept = new Map<string, string>();

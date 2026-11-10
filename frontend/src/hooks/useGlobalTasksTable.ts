@@ -20,7 +20,7 @@ import {
   taskSpecConditions,
   taskTableSorting,
 } from "@/lib/filters/taskFilters";
-import { browserTimezone } from "@/lib/timezones";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 const SORT_DEFAULTS: SortField[] = [
   { field: "date_group", dir: "asc" },

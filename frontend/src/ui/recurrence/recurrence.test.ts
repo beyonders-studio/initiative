@@ -14,7 +14,7 @@ import {
   type RecurrenceRule,
   summarizeStored,
   toRRule,
-} from "@/lib/recurrence";
+} from "@/ui/recurrence/recurrence";
 
 const rule = (overrides: Partial<RecurrenceRule>): RecurrenceRule => ({
   frequency: "weekly",
@@ -137,7 +137,7 @@ describe("every shape the editor builds", () => {
     >[3];
     expect(
       summarizeStored("RRULE:FREQ=MONTHLY;BYMONTHDAY=-1", START, { shift: 1440 }, t)
-    ).toContain("dates:recurrenceSummary.onLastDay");
+    ).toContain("ui:recurrence.summary.onLastDay");
     expect(
       summarizeStored(
         "RRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1",
@@ -145,7 +145,7 @@ describe("every shape the editor builds", () => {
         { shift: 1440 },
         t
       )
-    ).toContain("dates:recurrenceSummary.onFirstWorkDay");
+    ).toContain("ui:recurrence.summary.onFirstWorkDay");
   });
 
   it("reads an all-day event's days as they are, and a year's last work day as custom", () => {
@@ -201,7 +201,7 @@ describe("fromStored", () => {
     expect(fromStored("RRULE:FREQ=WEEKLY\nEXDATE:20261012T223000Z", START)).toBe("custom");
     const t = ((key: string) => key) as Parameters<typeof summarizeStored>[3];
     expect(summarizeStored("RRULE:FREQ=HOURLY", START, undefined, t)).toBe(
-      "dates:recurrenceSummary.custom"
+      "ui:recurrence.summary.custom"
     );
   });
 });
@@ -225,8 +225,8 @@ describe("hourly completion repeat", () => {
       { strategy: "rolling", limit: 3 },
       translate
     );
-    expect(limited).toContain("dates:recurrenceSummary.afterCompletion");
-    expect(limited).toContain("dates:recurrenceSummary.dailyLimit");
+    expect(limited).toContain("ui:recurrence.summary.afterCompletion");
+    expect(limited).toContain("ui:recurrence.summary.dailyLimit");
     expect(
       summarizeStored(
         "RRULE:FREQ=HOURLY;INTERVAL=4",
@@ -234,10 +234,10 @@ describe("hourly completion repeat", () => {
         { strategy: "rolling", limit: null },
         translate
       )
-    ).not.toContain("dates:recurrenceSummary.dailyLimit");
+    ).not.toContain("ui:recurrence.summary.dailyLimit");
     expect(
       summarizeStored("RRULE:FREQ=HOURLY", START, { strategy: "rolling" }, translate)
-    ).not.toBe("dates:recurrenceSummary.custom");
+    ).not.toBe("ui:recurrence.summary.custom");
   });
 
   it("accepts no maximum or any integer maximum from 1 to 24 without promising a daily count", () => {

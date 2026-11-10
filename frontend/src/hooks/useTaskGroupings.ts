@@ -23,10 +23,10 @@ import { useListTaskGroups } from "@/api/generated/tasks/tasks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import { BOARD_COLUMNS, groupingName, taskGroups } from "@/lib/layouts/taskGroupings";
-import { browserTimezone } from "@/lib/timezones";
 import type { TranslateFn } from "@/types/i18n";
 import type { FieldDef } from "@/ui/layouts/fields";
 import { activeGrouping, groupables, offeredGroupings } from "@/ui/layouts/grouping";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 /** What a project's tasks can be grouped by: the catalog's fields that group,
  *  and the project's properties that do. */

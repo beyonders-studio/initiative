@@ -203,10 +203,12 @@
       "assist": { "enabled": false }
     },
     {
-      // Allow direct React Query imports in api, hooks, and bootstrap files
+      // Allow direct React Query imports in api, hooks, the UI kit's one query
+      // hook, and bootstrap files
       "includes": [
         "src/api/**",
         "src/hooks/**",
+        "src/ui/recurrence/useRecurrencePreview.ts",
         "src/lib/queryClient.ts",
         "src/main.tsx",
         "src/router.tsx",

@@ -13,9 +13,7 @@ import type {
   TaskTypeRead,
   TaskTypeStartingValues,
 } from "@/api/generated/initiativeAPI.schemas";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
-import { fromStored, type TaskRecurrenceValue, toRRule } from "@/lib/recurrence";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { Button } from "@/ui/button";
 import {
@@ -28,6 +26,8 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
+import { fromStored, type TaskRecurrenceValue, toRRule } from "@/ui/recurrence/recurrence";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 

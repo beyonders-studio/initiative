@@ -8,11 +8,11 @@ import { useImportIcalEvents, useParseIcalFile } from "@/hooks/useCalendarEvents
 import { useCalendarsList } from "@/hooks/useCalendars";
 import { useWizard } from "@/hooks/useWizard";
 import { toast } from "@/lib/mascotToast";
-import { browserTimezone } from "@/lib/timezones";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { FileDropArea } from "@/ui/file-drop";
+import { browserTimezone } from "@/ui/lib/timezones";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { WizardDialog } from "@/ui/wizard-dialog";
 

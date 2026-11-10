@@ -100,7 +100,6 @@ import {
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { CALENDAR_PRESETS } from "@/lib/layouts/events";
 import { getProjectColor } from "@/lib/projectColor";
-import { browserTimezone } from "@/lib/timezones";
 import { eventRoute, taskRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
@@ -116,6 +115,7 @@ import { useWeekStart } from "@/ui/host";
 import { Label } from "@/ui/label";
 import { listLayouts } from "@/ui/layouts/layoutSet";
 import { type Preset, presetName, presetsOf } from "@/ui/layouts/presets";
+import { browserTimezone } from "@/ui/lib/timezones";
 import { CalendarPageSkeleton, CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PropertyFilter, type PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 import { Switch } from "@/ui/switch";
