@@ -597,7 +597,80 @@ class TestConnections:
         with pytest.raises(ListingDefinitionError, match=problem):
             _normalize(vendor=VENDOR, connections=connections, webhooks=webhooks)
 
-    @pytest.mark.parametrize("key", ["access_token", "removed_at"])
+    @staticmethod
+    def _shop() -> tuple[list[dict], dict]:
+        """A shop an admin types in, which the plug-in checks, signing its
+        webhooks with a secret of its own."""
+        connections = [
+            {
+                "id": "shop",
+                "scope": "static",
+                "label": _label(),
+                "fields": [
+                    {"key": "url", "type": "url", "label": _label(), "required": True},
+                    {"key": "key", "type": "secret", "label": _label()},
+                    _managed("store_id"),
+                    {**_managed("hook_secret"), "type": "secret"},
+                ],
+                "after_connect": True,
+            },
+            {
+                "id": "workspace",
+                "scope": "static",
+                "label": _label(),
+                "flow": FLOW,
+                "fields": [_managed()],
+            },
+        ]
+        webhooks = {
+            "verify": {
+                "scheme": "hmac_sha256",
+                "header": "X-Shop-Signature",
+                "encoding": "base64",
+                "secret": "{hook_secret}",
+            },
+            "dedup": "X-Shop-Delivery",
+            "route": {
+                "header": "x-shop-store",
+                "connection": "shop",
+                "field": "store_id",
+            },
+        }
+        return connections, webhooks
+
+    def test_a_typed_connection_the_plugin_checks_signs_its_own_webhooks(self):
+        connections, webhooks = self._shop()
+        kept = _normalize(vendor=VENDOR, connections=connections, webhooks=webhooks)
+        assert kept["connections"][0]["after_connect"] is True
+        assert "after_connect" not in kept["connections"][1]
+        assert kept["webhooks"]["verify"]["secret"] == "{hook_secret}"
+
+    @pytest.mark.parametrize(
+        ("change", "problem"),
+        [
+            (lambda c, w: w["verify"].update(secret="{key}"), "verify.secret"),
+            (lambda c, w: w["verify"].update(secret="{store_id}"), "verify.secret"),
+            (lambda c, w: w["verify"].update(secret="{owner}"), "verify.secret"),
+            (lambda c, w: c[0].pop("after_connect"), "which it does not call"),
+            (lambda c, w: c[1].update(after_connect=True), "a flow names its own"),
+            (lambda c, w: c[0].update(after_connect="yes"), "true or false"),
+        ],
+        ids=[
+            "a typed secret",
+            "a managed value that is not a secret",
+            "another connection's field",
+            "managed fields nothing fills",
+            "beside a flow",
+            "not a boolean",
+        ],
+    )
+    def test_a_connection_secret_comes_from_its_after_connect(self, change, problem):
+        connections, webhooks = self._shop()
+        change(connections, webhooks)
+        with pytest.raises(ListingDefinitionError, match=problem):
+            _normalize(vendor=VENDOR, connections=connections, webhooks=webhooks)
+
+    @pytest.mark.parametrize("key", ["access_token", "removed_at", "account_label"])
     def test_a_field_may_not_take_a_reserved_key(self, key: str):
         with pytest.raises(ListingDefinitionError, match="is reserved for"):
             _normalize(
@@ -683,6 +756,7 @@ class TestConnections:
                             "label": _label("Token"),
                         }
                     ],
+                    "after_connect": True,
                     "unexpected": "dropped",
                 }
             ]
@@ -701,6 +775,7 @@ class TestConnections:
                         "managed": True,
                     }
                 ],
+                "after_connect": True,
                 "access_hint": {"api": "Storefront API", "scopes": ["read_items"]},
             }
         ]

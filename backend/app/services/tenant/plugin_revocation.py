@@ -14,6 +14,11 @@ it too, the way the connection's manifest says (``flow.revoke``):
   revocation the plug-in knows how to ask for;
 * absent — the tokens are deleted and nothing is sent.
 
+A typed connection whose values the plug-in's ``after_connect`` checked has no
+flow and no grant, but the plug-in may have made things at the vendor with
+them. When it is cleared or replaced, or values it checked are not kept, the
+plug-in's revoke hook is sent the values it held.
+
 Three properties this module keeps:
 
 * **A revocation to the plug-in rides its hook queue.** One whose flow says
@@ -58,7 +63,11 @@ from app.services.marketplace.registration_lookup import (
     is_declarative,
     service_public_id,
 )
-from app.services.tenant.plugin_config import RESERVED_TOKEN_KEYS, without_tokens
+from app.services.tenant.plugin_config import (
+    RESERVED_TOKEN_KEYS,
+    checks_typed_values,
+    without_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +77,7 @@ __all__ = [
     "dispatch_revocations",
     "queue_install_revocations",
     "queue_revocations_for_rows",
+    "queue_values_revocation",
 ]
 
 _STEP_KEY = "plugin_credential_revocations"
@@ -108,6 +118,10 @@ class RevocationIntent:
     sealed_tokens: dict[str, str] = field(default_factory=dict)
     #: When the stored access token lapses, from the connection's values.
     expires_at: int | None = None
+    #: A typed connection the plug-in's ``after_connect`` checked: its secret
+    #: values as they were stored, still sealed, sent with ``fields``.
+    checked: bool = False
+    sealed_values: dict[str, str] = field(default_factory=dict)
 
 
 def _intent_for(
@@ -130,6 +144,7 @@ def _intent_for(
             connection = entry
             break
     flow = (connection or {}).get("flow")
+    checked = checks_typed_values(connection)
     return RevocationIntent(
         guild_id=guild_id,
         plugin_id=plugin_id,
@@ -153,6 +168,14 @@ def _intent_for(
             and not isinstance(expiry, bool)
             else None
         ),
+        checked=checked,
+        sealed_values={
+            key: value
+            for key, value in without_tokens(secrets).items()
+            if isinstance(value, str)
+        }
+        if checked
+        else {},
     )
 
 
@@ -171,12 +194,10 @@ def _to_the_plugin(intent: RevocationIntent) -> bool:
     """Whether an intent goes to the plug-in itself (its revoke hook), and so
     rides the community-hook queue, rather than to a vendor after the
     commit."""
-    return (
-        (intent.flow or {}).get("revoke") == "hook"
-        and bool(intent.sealed_tokens)
-        and not intent.declarative
-        and bool(intent.public_id)
-    )
+    held = (
+        (intent.flow or {}).get("revoke") == "hook" and bool(intent.sealed_tokens)
+    ) or (intent.checked and bool(intent.fields or intent.sealed_values))
+    return held and not intent.declarative and bool(intent.public_id)
 
 
 async def _queue(session: Any, intent: RevocationIntent) -> None:
@@ -197,6 +218,8 @@ async def _queue(session: Any, intent: RevocationIntent) -> None:
         body={
             "connection": intent.connection_id,
             "sealed_tokens": dict(intent.sealed_tokens),
+            "fields": dict(intent.fields) if intent.checked else {},
+            "sealed_values": dict(intent.sealed_values),
         },
     )
 
@@ -235,6 +258,35 @@ async def queue_install_revocations(
                 reason=reason,
             ),
         )
+
+
+async def queue_values_revocation(
+    session: Any,
+    *,
+    plugin_id: int,
+    listing_uid: str,
+    definition: Mapping[str, Any],
+    connection_id: str,
+    config: Mapping[str, Any],
+    secrets: Mapping[str, Any],
+    reason: str,
+) -> None:
+    """Record an intent for values of an install's community connection that
+    the plug-in checked against ``definition`` and that are not kept. Needs
+    no install row: the install may be gone."""
+    await _queue(
+        session,
+        _intent_for(
+            guild_id=routed_guild_id(session),
+            plugin_id=plugin_id,
+            listing_uid=listing_uid,
+            definition=definition,
+            connection_id=connection_id,
+            config=config,
+            secrets=secrets,
+            reason=reason,
+        ),
+    )
 
 
 async def queue_revocations_for_rows(

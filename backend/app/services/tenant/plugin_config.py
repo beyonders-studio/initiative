@@ -12,8 +12,9 @@ Two custody rules run through everything here:
   field are encrypted per key and stored; a read reports only whether a value is
   present. Nothing in the API returns one, to anybody.
 * **Managed keys are not typed at all.** A field the manifest marks ``managed``
-  is written by the plug-in itself when it completes a vendor flow, so this path
-  refuses one rather than letting a form overwrite it.
+  is written from the plug-in's ``after_connect`` answer, when a vendor flow
+  completes or when a typed connection that declares ``after_connect`` is
+  saved, so this path refuses one rather than letting a form overwrite it.
 
 A guild-wide connection is not always typed. One that declares a ``flow`` is
 established by Initiative instead
@@ -52,6 +53,7 @@ from app.core.messages import GuildPluginMessages
 from app.services.marketplace.manifest_values import is_unique_setting_value
 
 __all__ = [
+    "ACCOUNT_LABEL",
     "CONFIG_STATES",
     "MAX_CONFIG_VALUE_LENGTH",
     "MAX_SECRET_VALUE_LENGTH",
@@ -60,6 +62,7 @@ __all__ = [
     "ConfigState",
     "PluginConfigError",
     "apply_connection_values",
+    "checks_typed_values",
     "config_state",
     "connection_by_id",
     "connection_id_for_ref",
@@ -93,11 +96,23 @@ CONFIG_STATES: frozenset[str] = frozenset({"unverified", "ok", "invalid"})
 #: plain map until the connection is read ``ok`` or connected again.
 REMOVED_AT = "removed_at"
 
+#: The account the plug-in's ``after_connect`` said a typed connection's values
+#: belong to, kept in its plain map.
+ACCOUNT_LABEL = "account_label"
+
 #: Where a connection's flow keeps its tokens, beside its declared fields: the
 #: two tokens sealed in the secrets map, the two expiry times (epoch seconds)
-#: in the plain map. :data:`REMOVED_AT` is kept in the plain map the same way.
+#: in the plain map. :data:`REMOVED_AT` and :data:`ACCOUNT_LABEL` are kept in
+#: the plain map the same way.
 RESERVED_TOKEN_KEYS: frozenset[str] = frozenset(
-    {"access_token", "refresh_token", "expires_at", "refresh_expires_at", REMOVED_AT}
+    {
+        "access_token",
+        "refresh_token",
+        "expires_at",
+        "refresh_expires_at",
+        REMOVED_AT,
+        ACCOUNT_LABEL,
+    }
 )
 
 #: Long enough that a handle is never guessed, short enough to sit in a URL the
@@ -187,6 +202,18 @@ def runs_vendor_flow(connection: dict[str, Any] | None) -> bool:
     whole guild are the same flow run by different people.
     """
     return bool(connection) and isinstance(connection.get("flow"), dict)
+
+
+def checks_typed_values(connection: Mapping[str, Any] | None) -> bool:
+    """Whether the plug-in's ``after_connect`` checks what an admin types into
+    this connection before it is stored: a guild-wide connection without a
+    flow that declares ``after_connect``."""
+    return (
+        bool(connection)
+        and connection.get("scope") == "static"
+        and not isinstance(connection.get("flow"), dict)
+        and connection.get("after_connect") is True
+    )
 
 
 # --- the handle a guild-wide flow is joined by -------------------------------
@@ -414,12 +441,16 @@ def prune_to_definition(
     those values bought it.
     """
     # A connection with a flow keeps its tokens and its removal mark too, under
-    # the reserved keys.
+    # the reserved keys, and a checked typed one its account.
     declared: dict[str, set[str]] = {
         connection["id"]: {
             field["key"] for field in _fields(connection) if "key" in field
         }
-        | (RESERVED_TOKEN_KEYS if runs_vendor_flow(connection) else set())
+        | (
+            RESERVED_TOKEN_KEYS
+            if runs_vendor_flow(connection) or checks_typed_values(connection)
+            else set()
+        )
         for connection in definition_connections(definition)
         if isinstance(connection.get("id"), str)
     }

@@ -149,6 +149,7 @@ def maximal_manifest() -> dict:
                 "fields": [
                     {"key": "token", "type": "secret", "label": {"en": "Token"}}
                 ],
+                "after_connect": True,
             },
         ],
         "webhooks": {
@@ -695,7 +696,7 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
     value_node, text = stack["children"]
     return [
         ("manifest", {**published, **declarative}),
-        ("connection", {**connection, **workspace}),
+        ("connection", {**connection, **other, **workspace}),
         ("connectionField", connection["fields"][0]),
         ("connectionFlow", connection["flow"]),
         ("connectionToken", connection["token"]),

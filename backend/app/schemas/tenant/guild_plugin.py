@@ -746,7 +746,14 @@ def serialize_connection(
         ),
         runs_flow=plugin_config_service.runs_vendor_flow(connection),
         status=member_row.status if member_row is not None else None,
-        account_label=member_row.account_label if member_row is not None else None,
+        account_label=(
+            member_row.account_label
+            if member_row is not None
+            # The account the plug-in checked a guild-wide connection against.
+            else stored_config.get(plugin_config_service.ACCOUNT_LABEL)
+            if readable
+            else None
+        ),
         blocked=member_row is not None and member_row.blocked_at is not None,
     )
 
