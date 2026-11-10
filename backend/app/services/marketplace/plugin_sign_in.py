@@ -352,12 +352,12 @@ class Place:
 
 
 async def _install(
-    routed: AsyncSession, registration: RegistrationSnapshot
+    session: AsyncSession, registration: RegistrationSnapshot
 ) -> GuildPlugin | None:
     """This community's install of the plug-in, when it is the plug-in's own
     and live here."""
     plugin = (
-        await routed.exec(
+        await session.exec(
             select(GuildPlugin).where(
                 GuildPlugin.listing_uid == registration.listing_uid
             )
@@ -367,7 +367,7 @@ async def _install(
         plugin is None
         or not plugin.enabled
         or not owns_install(plugin, registration)
-        or not registration.live_in(require_guild_context(routed).guild_id)
+        or not registration.live_in(require_guild_context(session).guild_id)
     ):
         return None
     return plugin
@@ -380,13 +380,13 @@ def _page_of(plugin: GuildPlugin) -> str | None:
 
 
 async def _initiative_names(
-    routed: AsyncSession, user_id: int, initiative_ids: tuple[int, ...]
+    session: AsyncSession, user_id: int, initiative_ids: tuple[int, ...]
 ) -> dict[int, str]:
     """The names of those initiatives the person can reach, as the handoff's
     own route reads them."""
     if not initiative_ids:
         return {}
-    rows = await routed.exec(
+    rows = await session.exec(
         select(Initiative.id, Initiative.name).where(
             col(Initiative.id).in_(initiative_ids),
             initiative_scope_clause(user_id, Initiative.id),
