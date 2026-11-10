@@ -451,12 +451,16 @@ class CommunityPluginListingRef(SanitizedBaseModel):
 class CommunityPluginEntitlementRead(SanitizedBaseModel):
     """What the entitlement statement held for an install's listing says, as
     the plug-in's page reads it: whether it entitles the community, and why
-    not when it says (``term_full``: the deployment's term has no seat free)."""
+    not when it says (``term_full``: the deployment's term has no seat free).
+    Inactive for any other reason, its plan has ended."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     active: bool
     reason: str | None = None
+    #: Where the seat gets it again, for an inactive statement that is not
+    #: ``term_full``: a page of the billing portal, opened with a handoff.
+    action_url: str | None = None
 
 
 class CommunityPluginDetail(CommunityPluginRead):

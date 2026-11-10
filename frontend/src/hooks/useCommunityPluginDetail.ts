@@ -40,8 +40,16 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 
+/** An install whose entitlement is inactive is read again whenever this tab
+ *  comes back, however fresh: the way to get it back is the billing portal,
+ *  in another tab, and the statement that does arrives seconds after. */
 export const useCommunityPluginDetail = (pluginId: number) =>
-  useGetCommunityPlugin(useActiveCommunityId(), pluginId);
+  useGetCommunityPlugin(useActiveCommunityId(), pluginId, {
+    query: {
+      refetchOnWindowFocus: (query) =>
+        query.state.data?.entitlement?.active === false ? "always" : true,
+    },
+  });
 
 /** Community admins only; the server refuses everyone else. */
 /** One page of the members who connected to the plug-in or answered it. */

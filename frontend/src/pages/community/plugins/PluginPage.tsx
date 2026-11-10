@@ -12,6 +12,7 @@ import {
   createInitiativePluginHandoff,
 } from "@/api/generated/plugins/plugins";
 import { ReportButton } from "@/components/moderation/ReportButton";
+import { PluginPlanEnded } from "@/components/plugins/PluginOffer";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
@@ -387,6 +388,9 @@ export function PluginPage({ pluginId, initiativeId }: CommunityPluginPageProps)
 
   return (
     <div className="flex h-full flex-col">
+      {/* Its plan has ended: said above the plug-in, which still opens and
+          decides itself what still works. */}
+      <PluginPlanEnded plugin={plugin} className="m-2 shrink-0" />
       {(pages.length > 1 || reportable) && (
         <div className="flex shrink-0 items-center gap-1 border-b px-2">
           {pages.length > 1 &&

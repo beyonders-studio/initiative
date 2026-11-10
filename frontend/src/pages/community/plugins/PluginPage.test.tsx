@@ -21,14 +21,38 @@ const mint = vi.fn();
 
 // Whether this host may sell here, as `useBillingPortal` decides it.
 const sale = vi.hoisted(() => ({ canSell: false }));
-const portal = vi.hoisted(() => ({ open: null as unknown as ReturnType<typeof vi.fn> }));
+const portal = vi.hoisted(() => ({
+  open: null as unknown as ReturnType<typeof vi.fn>,
+  address: null as unknown as ReturnType<typeof vi.fn>,
+}));
 vi.mock("@/hooks/useBillingPortal", () => ({
   useBillingPortal: () => ({
     billing: { url: "https://billing.example.com" },
     canSell: sale.canSell,
+    openAddress: portal.address,
     openPortal: portal.open,
     sellsNow: async () => sale.canSell,
   }),
+}));
+
+// The listing behind the install, as its page reads it: how billing sells it
+// here, and whether it was asked at all.
+const shelf = vi.hoisted(() => ({
+  unavailable: null as {
+    reason: string;
+    action_url: string | null;
+    offer: Record<string, unknown> | null;
+  } | null,
+  asked: [] as boolean[],
+}));
+vi.mock("@/hooks/useMarketplace", () => ({
+  useMarketplaceListingByUid: (_uid: string, options?: { enabled?: boolean }) => {
+    shelf.asked.push(options?.enabled ?? true);
+    return {
+      data: options?.enabled === false ? undefined : { unavailable: shelf.unavailable },
+      isLoading: false,
+    };
+  },
 }));
 
 // Who is reading: the seat, or a member who can't open the billing portal.
@@ -59,7 +83,8 @@ const ADMIN_ACCESS = [
 let surfaceAccess = ADMIN_ACCESS;
 
 /** The statement held for the install's listing, as the detail read reports it. */
-let entitlement: { active: boolean; reason: string | null } | null = null;
+let entitlement: { active: boolean; reason: string | null; action_url?: string | null } | null =
+  null;
 
 /** The catalog listing behind the install, as the detail read reports it. */
 type ListingRef = { id: number; source: string; publisher: string; first_party: boolean } | null;
@@ -117,6 +142,9 @@ let frameWindow: { postMessage: ReturnType<typeof vi.fn> };
 beforeEach(() => {
   mint.mockReset();
   portal.open = vi.fn();
+  portal.address = vi.fn();
+  shelf.unavailable = null;
+  shelf.asked = [];
   reader.seat = true;
   entitlement = null;
   sale.canSell = false;
@@ -466,5 +494,84 @@ describe("a plug-in the deployment's term has no seat free for", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request" })).toBeNull();
     expect(mint).not.toHaveBeenCalled();
+  });
+});
+
+describe("a plug-in whose plan has ended", () => {
+  const ACTION = "https://billing.example.com/manage?app=AUTOMATIONS001";
+  const plans = {
+    charge: "subscription",
+    way: "buy",
+    upgrade: false,
+    lines: [{ id: "small", name: "Small", display: "$12/mo" }],
+  };
+
+  beforeEach(() => {
+    entitlement = { active: false, reason: null, action_url: ACTION };
+    sale.canSell = true;
+    mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
+  });
+
+  it("still opens, says so above it, and offers the seat a plan", async () => {
+    shelf.unavailable = { reason: "entitlement_required", action_url: ACTION, offer: plans };
+    const user = userEvent.setup();
+    const { PluginPage } = await import("./PluginPage");
+    renderPage(() => <PluginPage pluginId={1} />);
+
+    await screen.findByTitle("Automations");
+    expect(screen.getByText("This plug-in's plan has ended.")).toBeInTheDocument();
+    expect(mint).toHaveBeenCalled();
+    expect(screen.getByText("Small")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Choose a plan" }));
+    expect(portal.address).toHaveBeenCalledWith(3, ACTION);
+  });
+
+  it("leads the seat to the plans when its plan sells none", async () => {
+    shelf.unavailable = {
+      reason: "entitlement_required",
+      action_url: ACTION,
+      offer: { ...plans, way: "none", upgrade: true },
+    };
+    const { PluginPage } = await import("./PluginPage");
+    renderPage(() => <PluginPage pluginId={1} />);
+
+    await screen.findByTitle("Automations");
+    expect(
+      screen.getByText(
+        "Your community's plan doesn't include paid plug-ins. Plans that do are on the plans page."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "See plans" })).toBeInTheDocument();
+  });
+
+  it("without an answer from billing, sends the seat where the install says", async () => {
+    shelf.unavailable = { reason: "entitlement_required", action_url: null, offer: null };
+    const user = userEvent.setup();
+    const { PluginPage } = await import("./PluginPage");
+    renderPage(() => <PluginPage pluginId={1} />);
+
+    await screen.findByTitle("Automations");
+    await user.click(screen.getByRole("button", { name: "See options" }));
+    expect(portal.address).toHaveBeenCalledWith(3, ACTION);
+  });
+
+  it("tells a member it ended, with nothing to press and nothing asked", async () => {
+    reader.seat = false;
+    const { PluginPage } = await import("./PluginPage");
+    renderPage(() => <PluginPage pluginId={1} />);
+
+    await screen.findByTitle("Automations");
+    expect(screen.getByText("This plug-in's plan has ended.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /See options|Choose a plan/ })).toBeNull();
+    expect(shelf.asked.every((enabled) => !enabled)).toBe(true);
+  });
+
+  it("says nothing while its plan is running", async () => {
+    entitlement = { active: true, reason: null, action_url: null };
+    const { PluginPage } = await import("./PluginPage");
+    renderPage(() => <PluginPage pluginId={1} />);
+
+    await screen.findByTitle("Automations");
+    expect(screen.queryByText("This plug-in's plan has ended.")).toBeNull();
   });
 });

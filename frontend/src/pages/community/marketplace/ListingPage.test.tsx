@@ -31,7 +31,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import type { MarketplaceListingDetail } from "@/api/generated/initiativeAPI.schemas";
+import type { ListingOffer, MarketplaceListingDetail } from "@/api/generated/initiativeAPI.schemas";
 import { formatDate } from "@/ui/lib/formatDate";
 
 import { ListingPage } from "./ListingPage";
@@ -43,12 +43,13 @@ let installedUids: string[] = [];
 let installsState: "ready" | "loading" | "error" = "ready";
 
 const openPortal = vi.fn();
+const openAddress = vi.fn();
 let portal: { url: string } | null = null;
 vi.mock("@/hooks/useBillingPortal", () => ({
   useBillingPortal: () => ({
     billing: portal,
     canSell: portal !== null,
-    openAddress: vi.fn(),
+    openAddress,
     openPortal,
   }),
 }));
@@ -108,6 +109,7 @@ const backHref = () =>
 
 beforeEach(() => {
   openPortal.mockReset();
+  openAddress.mockReset();
   portal = null;
   listing = pluginListing();
   failed = false;
@@ -386,7 +388,7 @@ describe("a plug-in this community cannot add yet", () => {
   it("says why instead of offering the button", async () => {
     listing = {
       ...pluginListing(),
-      unavailable: { reason: "entitlement_required", action_url: null },
+      unavailable: { reason: "entitlement_required", action_url: null, offer: null },
     };
     renderPage(ListingPage);
     await screen.findByRole("heading", { name: "Community calendar" });
@@ -410,7 +412,7 @@ describe("a plug-in this community cannot add yet", () => {
 describe("a plug-in the deployment's term has no seat free for", () => {
   const full = () => ({
     ...pluginListing(),
-    unavailable: { reason: "term_full" as const, action_url: null },
+    unavailable: { reason: "term_full" as const, action_url: null, offer: null },
   });
 
   it("offers the seat a request in the billing portal, in place of the button", async () => {
@@ -440,5 +442,125 @@ describe("a plug-in the deployment's term has no seat free for", () => {
     expect(screen.getByText("Ask your community's admins to request it.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request" })).toBeNull();
     expect(openPortal).not.toHaveBeenCalled();
+  });
+});
+
+describe("how billing sells a plug-in this community cannot add yet", () => {
+  const ACTION = "https://billing.example.com/manage?app=GLDCAL00000001";
+  const offered = (offer: ListingOffer | null) => ({
+    ...pluginListing(),
+    unavailable: { reason: "entitlement_required" as const, action_url: ACTION, offer },
+  });
+  const plans: ListingOffer = {
+    charge: "subscription",
+    way: "buy",
+    upgrade: false,
+    lines: [
+      { id: "small", name: "Small", display: "$12/mo" },
+      { id: "large", name: "Large", display: null },
+    ],
+  };
+
+  beforeEach(() => {
+    portal = { url: "https://billing.example.com" };
+  });
+
+  it("lists the plans and lets the seat choose one in the portal", async () => {
+    listing = offered(plans);
+    const user = userEvent.setup();
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    expect(screen.getByText("Small")).toBeInTheDocument();
+    expect(screen.getByText("· $12/mo", { exact: false })).toBeInTheDocument();
+    // A plan with no price where the deployment takes no payments is named alone.
+    expect(screen.getByText("Large").parentElement?.textContent).toBe("Large");
+    expect(screen.queryByText(/has to be set up for your community/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Add to community/ })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Choose a plan" }));
+    expect(openAddress).toHaveBeenCalledWith(1, ACTION);
+  });
+
+  it("buys an item sold once", async () => {
+    listing = offered({
+      ...plans,
+      charge: "one_time",
+      lines: [{ id: "pack", name: "Pack", display: "$30" }],
+    });
+    const user = userEvent.setup();
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    await user.click(screen.getByRole("button", { name: "Buy" }));
+    expect(openAddress).toHaveBeenCalledWith(1, ACTION);
+    expect(screen.queryByRole("button", { name: "Choose a plan" })).toBeNull();
+  });
+
+  it("tells anyone else who can add it, with no button", async () => {
+    listing = offered(plans);
+    communityRole = "member";
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    expect(screen.getByText("Small")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ask your community's superadmin to add this plug-in.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Choose a plan" })).toBeNull();
+  });
+
+  it("leads the seat to the plans when a plan above sells it", async () => {
+    listing = offered({ ...plans, way: "none", upgrade: true });
+    const user = userEvent.setup();
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    expect(
+      screen.getByText(
+        "Your community's plan doesn't include paid plug-ins. Plans that do are on the plans page."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Choose a plan" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "See plans" }));
+    expect(openAddress).toHaveBeenCalledWith(1, ACTION);
+  });
+
+  it("says when it isn't offered here at all, with nothing to press", async () => {
+    listing = offered({ ...plans, way: "none", upgrade: false });
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    expect(screen.getByText("This plug-in isn't offered for this community.")).toBeInTheDocument();
+    expect(screen.queryByText("Small")).toBeNull();
+    for (const name of ["Choose a plan", "Buy", "See plans", "See options"]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+  });
+
+  it("without an answer from billing, keeps the way it was", async () => {
+    listing = offered(null);
+    const user = userEvent.setup();
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    expect(
+      screen.getByText("This plug-in has to be set up for your community before it can be added.")
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "See options" }));
+    expect(openAddress).toHaveBeenCalledWith(1, ACTION);
+  });
+
+  it("says an installed plug-in's plan has ended, and how to get it again", async () => {
+    listing = offered(plans);
+    installedUids = ["GLDCAL00000001"];
+    const user = userEvent.setup();
+    renderPage(ListingPage);
+    await screen.findByRole("heading", { name: "Community calendar" });
+
+    expect(screen.getByText("Installed")).toBeInTheDocument();
+    expect(screen.getByText("This plug-in's plan has ended.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Choose a plan" }));
+    expect(openAddress).toHaveBeenCalledWith(1, ACTION);
   });
 });

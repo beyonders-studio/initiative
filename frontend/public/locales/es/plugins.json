@@ -75,6 +75,14 @@
       "community": "En toda la comunidad, los administradores lo tienen. Elige en la pantalla de Roles de la comunidad qué roles de administrador personalizados lo conservan."
     }
   },
+  "offer": {
+    "choosePlan": "Elegir un plan",
+    "buy": "Comprar",
+    "seePlans": "Ver planes",
+    "notOnPlan": "El plan de tu comunidad no incluye complementos de pago. Los planes que sí los incluyen están en la página de planes.",
+    "notOffered": "Este complemento no se ofrece para esta comunidad.",
+    "planEnded": "El plan de este complemento ha terminado."
+  },
   "connections": {
     "none": "Este complemento no pide nada que configurar.",
     "communityScope": "Credencial de la comunidad",

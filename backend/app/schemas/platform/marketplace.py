@@ -76,6 +76,52 @@ class ListingUnavailableReason(str, Enum):
     term_full = "term_full"
 
 
+class ListingOfferCharge(str, Enum):
+    """How a paid plug-in is charged for, as billing sells it."""
+
+    #: One of ``lines`` at a time, renewing.
+    subscription = "subscription"
+    #: Any of ``lines``, each paid once.
+    one_time = "one_time"
+
+
+class ListingOfferWay(str, Enum):
+    """How the asking community gets a paid plug-in on the plan it is on."""
+
+    #: The seat buys it in the billing portal.
+    buy = "buy"
+    #: Not on this plan; ``upgrade`` says whether a plan above sells it.
+    none = "none"
+
+
+class ListingOfferLine(SanitizedBaseModel):
+    """One plan or item a paid plug-in is sold as, worded by billing."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    id: str
+    name: str
+    #: Its price as billing words it; ``None`` where the deployment takes no
+    #: payments.
+    display: str | None = None
+
+
+class ListingOffer(SanitizedBaseModel):
+    """How the asking community gets a paid plug-in, as this deployment's
+    billing answered it in the reader's language. Shown, never reasoned
+    about: the deployment's catalog terms decide it, on billing's side."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    charge: ListingOfferCharge
+    way: ListingOfferWay
+    #: ``way`` is ``none``, and a plan above, which the community can get
+    #: onto, sells paid plug-ins.
+    upgrade: bool = False
+    #: Plans for a subscription, items for a one-time charge.
+    lines: list[ListingOfferLine] = []
+
+
 class ListingUnavailable(SanitizedBaseModel):
     """A listing the asking community is shown and cannot install yet."""
 
@@ -85,6 +131,11 @@ class ListingUnavailable(SanitizedBaseModel):
     #: Where the community can do something about it, when this deployment
     #: has somewhere: a page of its billing portal, opened with a handoff.
     action_url: str | None = None
+    #: How billing sells it to this community, for ``entitlement_required``
+    #: on a listing's own page; ``None`` where billing has no answer (none
+    #: configured, unreachable, or the listing isn't sold as an app of its
+    #: own) and on every browse card.
+    offer: ListingOffer | None = None
 
 
 class MarketplaceListingSummary(SanitizedBaseModel):
