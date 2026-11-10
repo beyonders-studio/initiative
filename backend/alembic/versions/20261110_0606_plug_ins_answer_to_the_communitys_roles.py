@@ -23,8 +23,8 @@ that said true inside an initiative names a permission members do not hold,
 ``admin_only``, which the definition declares; at the community level only
 the admin rung opened a page already, and still does.
 
-Revision ID: 20261110_0605
-Revises: 20261110_0604
+Revision ID: 20261110_0606
+Revises: 20261110_0605
 Create Date: 2026-11-10
 """
 
@@ -37,8 +37,8 @@ from alembic import op
 
 from app.db.guild_migrations import guild_schema_names, run_for_each_guild_schema
 
-revision = "20261110_0605"
-down_revision = "20261110_0604"
+revision = "20261110_0606"
+down_revision = "20261110_0605"
 branch_labels = None
 depends_on = None
 

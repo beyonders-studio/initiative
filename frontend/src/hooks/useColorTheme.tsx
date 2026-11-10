@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
-import { DEFAULT_THEME, getTheme, THEMES, type ThemeColors } from "@/lib/themes";
+import { DEFAULT_THEME, resolveThemeChoice, type ThemeColors } from "@/lib/themes";
 
 /**
  * Maps ThemeColors properties to CSS variable names.
@@ -43,18 +43,21 @@ const CSS_VAR_MAP: Record<keyof ThemeColors, string> = {
  * A color theme's tokens as CSS custom properties (`--background` →
  * `oklch(…)`), for one resolved mode. What {@link useColorTheme} applies to
  * this document, and what a plug-in's page is handed so it can wear the same
- * palette (see `CommunityPluginPage`).
+ * palette (see `CommunityPluginPage`). `colorThemeId` is the stored choice,
+ * `<theme>` or `<theme>.<variant>`. A theme with a finish adds `--metal`, the
+ * color its sheen is tinted with.
  */
 export const themeCssVariables = (
   colorThemeId: string,
   resolvedTheme: "light" | "dark"
 ): Record<string, string> => {
-  const theme = getTheme(colorThemeId) ?? THEMES[DEFAULT_THEME];
-  const colors = resolvedTheme === "dark" ? theme.dark : theme.light;
+  const choice = resolveThemeChoice(colorThemeId);
+  const colors = resolvedTheme === "dark" ? choice.dark : choice.light;
   const variables: Record<string, string> = {};
   for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
     variables[cssVar] = `oklch(${colors[key as keyof ThemeColors]})`;
   }
+  if (choice.theme.finish) variables["--metal"] = `oklch(${colors.ring})`;
   return variables;
 };
 
@@ -111,8 +114,17 @@ export const useColorTheme = () => {
 
   useEffect(() => {
     const root = document.documentElement;
-    for (const [cssVar, value] of Object.entries(themeCssVariables(colorThemeId, resolvedTheme))) {
+    const variables = themeCssVariables(colorThemeId, resolvedTheme);
+    for (const [cssVar, value] of Object.entries(variables)) {
       root.style.setProperty(cssVar, value);
+    }
+    // The finish, which styles.css lays over the palette, goes with its theme.
+    const { finish } = resolveThemeChoice(colorThemeId).theme;
+    if (finish) {
+      root.dataset.colorFinish = finish;
+    } else {
+      delete root.dataset.colorFinish;
+      root.style.removeProperty("--metal");
     }
   }, [colorThemeId, resolvedTheme]);
 };

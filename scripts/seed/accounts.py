@@ -25,30 +25,30 @@ from app.services.platform.usernames import allocate_from_seed
 #: seat is held in every community this run creates, on the member tier, which
 #: keeps the two axes separable.
 USERS: list[tuple] = [
-    ("user1@example.com", "Dungeon Master", "America/New_York", "strahd"),
+    ("user1@example.com", "Dungeon Master", "America/New_York", "dracula"),
     ("user2@example.com", "Thorn Ironforge", "America/Chicago", "kobold"),
-    ("user3@example.com", "Elara Moonwhisper", "Europe/London", "displacer"),
-    ("user4@example.com", "Vex Shadowstep", "America/Los_Angeles", "strahd"),
+    ("user3@example.com", "Elara Moonwhisper", "Europe/London", "catppuccin"),
+    ("user4@example.com", "Vex Shadowstep", "America/Los_Angeles", "dracula"),
     ("user5@example.com", "Seraphina Dawnlight", "Europe/Berlin", "kobold"),
-    ("user6@example.com", "Finley Goldtongue", "Asia/Tokyo", "displacer"),
+    ("user6@example.com", "Finley Goldtongue", "Asia/Tokyo", "catppuccin"),
     ("user7@example.com", "Kael Windrunner", "Australia/Sydney", "kobold"),
-    ("user8@example.com", "Aurelia Brightshield", "America/Denver", "strahd"),
+    ("user8@example.com", "Aurelia Brightshield", "America/Denver", "dracula"),
     ("admin1@example.com", "Guildmaster Aldric", "America/New_York", "kobold"),
-    ("admin2@example.com", "Overseer Nova", "America/Los_Angeles", "displacer"),
-    ("admin3@example.com", "Harbormaster Marisol", "Europe/Lisbon", "strahd"),
+    ("admin2@example.com", "Overseer Nova", "America/Los_Angeles", "catppuccin"),
+    ("admin3@example.com", "Harbormaster Marisol", "Europe/Lisbon", "dracula"),
     ("admin4@example.com", "Archivist Okoro", "Africa/Lagos", "kobold"),
     ("owner@example.com", "Platform Owner", "UTC", "kobold", UserRole.owner),
-    ("operator@example.com", "Platform Operator", "UTC", "strahd", UserRole.operator),
+    ("operator@example.com", "Platform Operator", "UTC", "dracula", UserRole.operator),
     (
         "moderator@example.com",
         "Platform Moderator",
         "UTC",
-        "displacer",
+        "catppuccin",
         UserRole.moderator,
     ),
     ("support@example.com", "Platform Support", "UTC", "kobold", UserRole.support),
-    ("member@example.com", "Platform Member", "UTC", "strahd", UserRole.member),
-    ("superadmin@example.com", "Community Superadmin", "UTC", "displacer"),
+    ("member@example.com", "Platform Member", "UTC", "dracula", UserRole.member),
+    ("superadmin@example.com", "Community Superadmin", "UTC", "catppuccin"),
 ]
 
 #: Seeded accounts whose week starts on Monday; everyone else keeps Sunday.

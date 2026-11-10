@@ -1,4 +1,4 @@
-"""Migration 20261110_0605: a placement's roles become each role's answer for
+"""Migration 20261110_0606: a placement's roles become each role's answer for
 the plug-in's ``use``, and a stored ``admin_only`` becomes a permission members
 do not hold. Loaded by path; one community's schema is taken back to the
 earlier shape, given roles the earlier way, and brought forward again."""
@@ -20,7 +20,7 @@ from app.testing import (
     route_session_to_guild,
 )
 
-migration = _load("20261110_0605_plug_ins_answer_to_the_communitys_roles.py")
+migration = _load("20261110_0606_plug_ins_answer_to_the_communitys_roles.py")
 
 
 @pytest.mark.fresh_guild_schema

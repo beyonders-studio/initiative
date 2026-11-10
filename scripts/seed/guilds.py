@@ -232,15 +232,19 @@ async def enable_directory(session: AsyncSession) -> None:
 
 
 async def list_in_directory(
-    session: AsyncSession, guild: Guild, *, categories: list[CommunityCategory]
+    session: AsyncSession,
+    guild: Guild,
+    *,
+    categories: list[CommunityCategory],
+    join_policy: CommunityJoinPolicy = CommunityJoinPolicy.open,
 ) -> None:
-    """Opt a community into the directory.
+    """Opt a community into the directory, open to anyone or asking first.
 
     A listing is the shelves plus the 18+ declaration together — the database
     refuses a listed guild missing either. Writes
     ``public.guilds``, so the session must not be routed into a guild schema.
     """
-    guild.join_policy = CommunityJoinPolicy.open.value
+    guild.join_policy = join_policy.value
     guild.categories = guilds_service.normalize_categories(
         [c.value for c in categories]
     )

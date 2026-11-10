@@ -83,6 +83,140 @@
     radial-gradient(ellipse 60% 40% at 10% 60%, oklch(0.4 0.18 300 / 0.25), transparent);
 }
 
+/* The metallic finish (the Elemental theme). useColorTheme.tsx sets
+   `data-color-finish` on the root and `--metal`, the chosen metal's color, and
+   the rules below polish what the palette draws: borders catch the light
+   along their length, whatever is filled with the accent is polished, and a
+   glint crosses a primary button under the pointer. The sidebar alone carries
+   a sheen across its face; other surfaces keep their flat fill. Every token's
+   color, and its contrast, stays as the palette sets it. Event themes, below,
+   win where both dress a button. */
+html[data-color-finish="metallic"] {
+  --sheen-high: 16%;
+  --sheen-low: 7%;
+  --sheen-surface: linear-gradient(
+    135deg,
+    color-mix(in oklch, white var(--sheen-high), transparent) 0%,
+    transparent 30%,
+    color-mix(in oklch, var(--metal) 12%, transparent) 55%,
+    color-mix(in oklch, white var(--sheen-low), transparent) 68%,
+    transparent 85%
+  );
+  --sheen-border: linear-gradient(
+    135deg,
+    var(--metal) 0%,
+    var(--border) 35%,
+    color-mix(in oklch, var(--metal) 50%, white) 50%,
+    var(--border) 65%,
+    var(--metal) 100%
+  );
+  --sheen-polish: linear-gradient(
+    180deg,
+    color-mix(in oklch, white 30%, transparent) 0%,
+    color-mix(in oklch, white 6%, transparent) 48%,
+    transparent 52%,
+    color-mix(in oklch, black 12%, transparent) 100%
+  );
+  --sheen-glint: linear-gradient(
+    110deg,
+    transparent 35%,
+    color-mix(in oklch, white 38%, transparent) 50%,
+    transparent 65%
+  );
+}
+
+/* A bordered surface draws its border in metal: its own fill over the padding
+   box, the sheen over the border box, showing only through the transparent
+   border. A surface that changes its fill on hover keeps its plain border, so
+   the hover still shows, and a field or anything focused keeps its own, so
+   its focus border still shows. */
+html[data-color-finish="metallic"] .bg-card {
+  --sheen-fill: var(--card);
+}
+html[data-color-finish="metallic"] .bg-popover {
+  --sheen-fill: var(--popover);
+}
+html[data-color-finish="metallic"] .bg-background {
+  --sheen-fill: var(--background);
+}
+html[data-color-finish="metallic"] .bg-sidebar {
+  --sheen-fill: var(--sidebar);
+  --sheen-over: var(--sheen-surface);
+  background-image: var(--sheen-surface);
+}
+
+html.dark[data-color-finish="metallic"] {
+  --sheen-high: 8%;
+  --sheen-low: 4%;
+}
+
+html[data-color-finish="metallic"]
+  :is(.bg-card, .bg-popover, .bg-background, .bg-sidebar):is(
+    .border,
+    .border-x,
+    .border-y,
+    .border-t,
+    .border-r,
+    .border-b,
+    .border-l
+  ):not([class*="hover:bg-"], input, textarea, select, :focus) {
+  border-color: transparent;
+  background:
+    var(--sheen-over, none) padding-box,
+    linear-gradient(var(--sheen-fill), var(--sheen-fill)) padding-box,
+    var(--sheen-border) border-box;
+}
+
+html[data-color-finish="metallic"]
+  :is(.bg-primary, [role="switch"][data-state="checked"], [role="checkbox"][data-state="checked"]) {
+  background-image: var(--sheen-polish);
+}
+
+html[data-color-finish="metallic"] [data-slot="button"].bg-primary {
+  background-image: var(--sheen-polish), var(--sheen-glint);
+  background-size:
+    100% 100%,
+    300% 100%;
+  background-position:
+    0 0,
+    100% 0;
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 35%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, black 18%, transparent);
+  transition:
+    background-position 0.7s ease,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+
+html[data-color-finish="metallic"] [data-slot="button"].bg-primary:hover {
+  background-position:
+    0 0,
+    0% 0;
+}
+
+/* The wordmark in polished metal, while no event dresses it. */
+:where(html[data-color-finish="metallic"]:not([data-event-theme])) .event-wordmark {
+  background-image: linear-gradient(
+    100deg,
+    var(--metal) 0%,
+    color-mix(in oklch, var(--metal) 40%, white) 45%,
+    var(--metal) 55%,
+    color-mix(in oklch, var(--metal) 70%, black) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-color-finish="metallic"] [data-slot="button"].bg-primary {
+    transition: none;
+  }
+}
+
 /* Event themes. useEventTheme.tsx sets `data-event-theme` on the root while
    an event runs; each event below picks what its wordmark and primary-button
    border wear (`--event-wordmark`, `--event-border`), and the shared rules

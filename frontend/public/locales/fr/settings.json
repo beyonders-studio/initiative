@@ -293,13 +293,32 @@
     "updateError": "Impossible de mettre à jour les préférences d'interface",
     "themeDescriptions": {
       "kobold": "Le thème classique d'Initiative, aux tons indigo profonds.",
-      "displacer": "Thème pastel apaisant inspiré de Catppuccin (Latte/Macchiato).",
-      "strahd": "Thème gothique sombre aux accents violets (Dracula/Alucard).",
+      "catppuccin": "Pastels apaisants : Latte en mode clair, et Frappé, Macchiato ou Mocha en mode sombre.",
+      "dracula": "Accents violets : Alucard en mode clair, Dracula en mode sombre.",
       "unicorn": "Arc-en-ciel néon sur tout le spectre — haut en couleur et fier de l'être.",
       "darkKnight": "Thème noir AMOLED aux accents rouge foncé et jaunes.",
       "orc": "Thème vert terreux aux accents vert vif de peau d'orc. ORC ORC ORC !",
-      "aboleth": "Antre sombre inspiré de Monokai, aux vifs accents bioluminescents."
+      "monokai": "Vifs accents citron vert, cyan, violet, orange et rose sur des neutres chauds.",
+      "nord": "Bleus arctiques et gris givrés : Snow Storm en mode clair, Polar Night en mode sombre.",
+      "elemental": "Un éclat métallique dans toute l'application, dans l'élément de votre choix."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Cuivre",
+        "silver": "Argent",
+        "gold": "Or",
+        "roseGold": "Or rose",
+        "lapis": "Lapis-lazuli",
+        "cobalt": "Cobalt",
+        "emerald": "Émeraude",
+        "garnet": "Grenat",
+        "amethyst": "Améthyste",
+        "obsidian": "Obsidienne"
+      }
+    },
+    "themeVariantGroup": "Variantes de {{theme}}",
+    "useVariantForDark": "Utiliser {{variant}} en mode sombre",
+    "useVariant": "Utiliser {{variant}}",
     "taskCompletionVisualFeedback": {
       "label": "Effet à la fin d'une tâche",
       "description": "Un peu de fun quand vous terminez une tâche qui vous était assignée.",
