@@ -1156,7 +1156,7 @@
         },
         "permission": {
           "$ref": "#/$defs/identifier",
-          "description": "Read and write only. The initiative permission a reader holds, in the initiative it is read in, to read or call this through a widget, an action or a form: one this manifest declares at the initiative level, or 'use'. Absent: whoever can see where it is used. An endpoint naming one is not offered to other plug-ins."
+          "description": "Read and write only. The initiative permission a reader holds, in the initiative it is read in, to read or call this through a widget, an action or a form: one this manifest declares at the initiative level, or 'use'. Absent: whoever can see where it is used. Another plug-in calling it for a member is held to that member's permission, the one named or 'use', where its token is confined to an initiative or else in one this plug-in is placed in; one calling it as the community, to what the community granted it."
         },
         "public": {
           "type": "boolean",
