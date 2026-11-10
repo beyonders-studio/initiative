@@ -865,7 +865,7 @@ async def _apply_update(
                 task,
                 user_timezone=current_user.timezone
                 if current_user is not None
-                else None,
+                else picked_in,
                 due_sent="due_date" in update_data,
                 rule_changed=bool(
                     {"recurrence", "recurrence_limit"}.intersection(update_data)
@@ -977,9 +977,9 @@ async def _apply_update(
         task,
         previous_status_category=previous_status_category,
         now=now,
-        # An installed plug-in has no zone of its own; a rolling recurrence it
-        # completes counts days in UTC.
-        user_timezone=current_user.timezone if current_user is not None else None,
+        # An installed plug-in has no zone of its own: a rolling recurrence it
+        # completes counts days in the zone its edit names, or UTC.
+        user_timezone=current_user.timezone if current_user is not None else picked_in,
     )
 
     let_go: set[str] = set()

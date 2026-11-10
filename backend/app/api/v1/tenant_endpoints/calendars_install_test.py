@@ -126,6 +126,42 @@ async def test_reads_the_calendars_and_events_open_to_its_initiative(
     assert still_a.status_code == 200, still_a.text
 
 
+async def test_a_repeating_event_reads_its_next_start(
+    client, session, acting_user, role_session
+):
+    """What a plug-in asking "is it soon?" needs of a weekly meeting: the start
+    still to come, not the series' first."""
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=["calendars:read"]
+    )
+    await _switch_on(session, installed.placed)
+    calendar = await create_calendar(session, installed.placed, installed.seat.user)
+    first = datetime.now(UTC).replace(microsecond=0) - timedelta(days=20)
+    weekly = await create_calendar_event(
+        session,
+        calendar,
+        installed.seat.user,
+        start_at=first,
+        end_at=first + timedelta(hours=1),
+        recurrence="RRULE:FREQ=WEEKLY",
+    )
+    once = await create_calendar_event(session, calendar, installed.seat.user)
+    headers = install_headers(installed, ["calendars:read"])
+
+    read = await client.get(
+        guild_url(installed.guild.id, f"/calendar-events/{weekly.id}"), headers=headers
+    )
+    assert read.status_code == 200, read.text
+    assert datetime.fromisoformat(read.json()["next_start"]) == first + timedelta(
+        days=21
+    )
+
+    single = await client.get(
+        guild_url(installed.guild.id, f"/calendar-events/{once.id}"), headers=headers
+    )
+    assert single.json()["next_start"] is None
+
+
 async def test_changing_anything_needs_the_write_scope(
     client, session, acting_user, role_session
 ):

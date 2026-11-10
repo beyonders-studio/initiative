@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import (
@@ -223,6 +223,9 @@ class CalendarEventRead(CalendarEventFields):
     #: A series' skipped starts and extra starts.
     skipped_starts: list[datetime] = Field(default_factory=list)
     extra_starts: list[datetime] = Field(default_factory=list)
+    #: A repeating event's first start at or after this read, or its last once
+    #: the series has ended; None for an event that does not repeat.
+    next_start: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -303,4 +306,9 @@ def serialize_calendar_event(
         overridden_fields=list(event.overridden_fields or []),
         skipped_starts=skipped,
         extra_starts=extra,
+        next_start=recurrence.upcoming(
+            event.recurrence, event.start_at, event.recurrence_shift, datetime.now(UTC)
+        )
+        if event.recurrence
+        else None,
     )

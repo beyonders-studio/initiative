@@ -704,4 +704,5 @@ export const blankEvent = (
   overridden_fields: [],
   skipped_starts: [],
   extra_starts: [],
+  next_start: null,
 });

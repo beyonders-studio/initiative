@@ -191,7 +191,9 @@ class TaskUpdate(PropertiesOnUpdate):
     due_date: datetime | None = None
     recurrence: TaskRule | None = None
     #: The zone ``recurrence``'s days were picked in, and ``recurrence_shift``
-    #: is taken from it. Omitted, the rule's days are UTC days.
+    #: is taken from it. Omitted, the rule's days are UTC days. An installed
+    #: plug-in has no zone of its own, so for one this is also the zone a
+    #: rolling repeat it completes counts its days in.
     tz: str | None = Field(default=None, max_length=64)
     recurrence_strategy: RecurrenceStrategy | None = None
     recurrence_limit: int | None = Field(default=None, ge=1, le=24, strict=True)
