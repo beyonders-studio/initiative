@@ -288,7 +288,7 @@ async def test_a_guild_admins_member_token_administers_nothing(
     with pytest.raises(DBAPIError, match="permission denied"):
         await s.exec(
             text(
-                f'SELECT count(*) FROM "{guild_schema_name(installed.guild.id)}"'
+                f'SELECT * FROM "{guild_schema_name(installed.guild.id)}"'
                 ".guild_settings"
             )
         )

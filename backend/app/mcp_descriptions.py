@@ -246,6 +246,13 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "`conditions`, and add projects or poll closings with "
         "`include_projects`/`include_polls`."
     ),
+    "list_calendar_events": (
+        "The events alone, no tasks, starting between `start_after` and "
+        "`start_before`: a repeating one once for each occurrence there, named "
+        "by its `original_start`. Narrow with `initiative_id` or "
+        "`calendar_ids`; `tz` says which days the window covers for all-day "
+        "events."
+    ),
     "list_my_calendar_entries": (
         "The caller's events and assigned tasks across every community between "
         "`start_after` and `start_before`. Narrow with `community_ids`."

@@ -312,7 +312,7 @@ async def test_it_cannot_create_a_project(client, session, acting_user, role_ses
     assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
-async def test_the_role_refuses_guild_settings_outright(
+async def test_the_role_refuses_the_communitys_settings(
     session, acting_user, role_session
 ):
     installed = await install_plugin(
@@ -327,7 +327,7 @@ async def test_the_role_refuses_guild_settings_outright(
         scopes=["files:read"],
     )
     with pytest.raises(DBAPIError, match="permission denied"):
-        await s.exec(text("SELECT count(*) FROM guild_settings"))
+        await s.exec(text("SELECT * FROM guild_settings"))
 
 
 # ---------------------------------------------------------------------------
