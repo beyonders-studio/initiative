@@ -1,7 +1,9 @@
 import type { RecurrenceStrategy } from "@/api/generated/initiativeAPI.schemas";
-import { browserTimezone } from "@/lib/timezones";
-import type { TranslateFn } from "@/types/i18n";
 import { dateTimeFormat, listFormat } from "@/ui/lib/intl";
+import { browserTimezone } from "@/ui/lib/timezones";
+
+/** An i18next `t`: a repeat's words are the `ui` namespace's `recurrence.*`. */
+export type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** The task's rule, completion strategy and optional daily maximum change together. */
 export type TaskRecurrenceValue = {
@@ -98,7 +100,7 @@ const WEEKDAY_ORDER = Object.fromEntries(
   WEEKDAYS.map((item, index) => [item.value, index])
 ) as Record<RecurrenceWeekday, number>;
 
-/** The `dates:recurrenceSummary.*` unit keys for each frequency. */
+/** The `ui:recurrence.summary.*` unit keys for each frequency. */
 const FREQUENCY_LABELS: Record<RecurrenceFrequency, { singular: string; plural: string }> = {
   hourly: { singular: "hour", plural: "hours" },
   daily: { singular: "day", plural: "days" },
@@ -243,9 +245,9 @@ export const detectRecurrencePreset = (rule: RecurrenceRule | null): RecurrenceP
   return "custom";
 };
 
-const formatWeekdayList = (weekdays: RecurrenceWeekday[], t: TranslateFn) =>
+const formatWeekdayList = (weekdays: RecurrenceWeekday[], t: Translate) =>
   formatList(
-    sortWeekdays(weekdays).map((day) => t(`dates:weekdays.${day}`)),
+    sortWeekdays(weekdays).map((day) => t(`ui:recurrence.weekdays.${day}`)),
     "conjunction"
   );
 
@@ -266,7 +268,7 @@ const formatList = (labels: string[], type: "conjunction" | "disjunction" = "con
   }
 };
 
-const formatEnding = (rule: RecurrenceRule, t: TranslateFn) => {
+const formatEnding = (rule: RecurrenceRule, t: Translate) => {
   if (rule.ends === "on_date" && rule.end_date) {
     // Parse date-only string as local date to avoid timezone issues
     const match = rule.end_date.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -274,43 +276,43 @@ const formatEnding = (rule: RecurrenceRule, t: TranslateFn) => {
       ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
       : new Date(rule.end_date);
     if (!Number.isNaN(date.getTime())) {
-      return t("dates:recurrenceSummary.untilDate", { date: dateTimeFormat().format(date) });
+      return t("ui:recurrence.summary.untilDate", { date: dateTimeFormat().format(date) });
     }
   }
   if (rule.ends === "after_occurrences" && typeof rule.end_after_occurrences === "number") {
-    return t("dates:recurrenceSummary.forOccurrences", { count: rule.end_after_occurrences });
+    return t("ui:recurrence.summary.forOccurrences", { count: rule.end_after_occurrences });
   }
   return "";
 };
 
 const WORK_DAYS: RecurrenceWeekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 
-const describeMonthlyDetail = (rule: RecurrenceRule, t: TranslateFn) => {
+const describeMonthlyDetail = (rule: RecurrenceRule, t: Translate) => {
   switch (rule.monthly_mode) {
     case "day_of_month": {
       const days = sortMonthDays(rule.month_days);
       if (!days.length) return "";
       if (days.length === 1) {
         return days[0] === -1
-          ? t("dates:recurrenceSummary.onLastDay")
-          : t("dates:recurrenceSummary.onDay", { day: days[0] });
+          ? t("ui:recurrence.summary.onLastDay")
+          : t("ui:recurrence.summary.onDay", { day: days[0] });
       }
-      return t("dates:recurrenceSummary.onDays", {
+      return t("ui:recurrence.summary.onDays", {
         days: formatList(
-          days.map((day) => (day === -1 ? t("dates:recurrenceSummary.lastDayItem") : String(day)))
+          days.map((day) => (day === -1 ? t("ui:recurrence.summary.lastDayItem") : String(day)))
         ),
       });
     }
     case "weekday":
       return rule.weekday_position && rule.weekday
-        ? t("dates:recurrenceSummary.onPositionWeekday", {
-            position: t(`dates:positions.${rule.weekday_position}`),
-            weekday: t(`dates:weekdays.${rule.weekday}`),
+        ? t("ui:recurrence.summary.onPositionWeekday", {
+            position: t(`ui:recurrence.summary.positions.${rule.weekday_position}`),
+            weekday: t(`ui:recurrence.weekdays.${rule.weekday}`),
           })
         : "";
     case "weekdays":
       return rule.weekdays.length
-        ? t("dates:recurrenceSummary.onEveryWeekdays", {
+        ? t("ui:recurrence.summary.onEveryWeekdays", {
             weekdays: formatWeekdayList(rule.weekdays, t),
           })
         : "";
@@ -320,14 +322,14 @@ const describeMonthlyDetail = (rule: RecurrenceRule, t: TranslateFn) => {
       const first = rule.set_position === "first";
       if (workDays) {
         return t(
-          first ? "dates:recurrenceSummary.onFirstWorkDay" : "dates:recurrenceSummary.onLastWorkDay"
+          first ? "ui:recurrence.summary.onFirstWorkDay" : "ui:recurrence.summary.onLastWorkDay"
         );
       }
       const weekdays = formatList(
-        sortWeekdays(rule.weekdays).map((day) => t(`dates:weekdays.${day}`)),
+        sortWeekdays(rule.weekdays).map((day) => t(`ui:recurrence.weekdays.${day}`)),
         "disjunction"
       );
-      return t(first ? "dates:recurrenceSummary.onFirstOf" : "dates:recurrenceSummary.onLastOf", {
+      return t(first ? "ui:recurrence.summary.onFirstOf" : "ui:recurrence.summary.onLastOf", {
         weekdays,
       });
     }
@@ -345,29 +347,29 @@ export const summarizeRecurrence = (
         limit?: number | null;
       }
     | undefined,
-  t: TranslateFn
+  t: Translate
 ): string => {
   if (!rule) {
-    return t("dates:recurrenceSummary.doesNotRepeat");
+    return t("ui:recurrence.summary.doesNotRepeat");
   }
 
   const frequencyLabel = FREQUENCY_LABELS[rule.frequency];
   const unit =
     rule.interval === 1
-      ? t(`dates:recurrenceSummary.${frequencyLabel.singular}`)
-      : t(`dates:recurrenceSummary.${frequencyLabel.plural}`);
+      ? t(`ui:recurrence.summary.${frequencyLabel.singular}`)
+      : t(`ui:recurrence.summary.${frequencyLabel.plural}`);
   const schedule =
     rule.frequency === "hourly" && rule.interval === 1
-      ? t("dates:recurrenceSummary.everyHour")
+      ? t("ui:recurrence.summary.everyHour")
       : rule.interval === 1
-        ? t("dates:recurrenceSummary.everySingular", { unit })
-        : t("dates:recurrenceSummary.everyPlural", { count: rule.interval, unit });
+        ? t("ui:recurrence.summary.everySingular", { unit })
+        : t("ui:recurrence.summary.everyPlural", { count: rule.interval, unit });
 
   let detail = "";
   switch (rule.frequency) {
     case "weekly":
       if (rule.weekdays.length) {
-        detail = t("dates:recurrenceSummary.onWeekdays", {
+        detail = t("ui:recurrence.summary.onWeekdays", {
           weekdays: formatWeekdayList(rule.weekdays, t),
         });
       }
@@ -381,15 +383,17 @@ export const summarizeRecurrence = (
         : options?.referenceDate
           ? [getReferenceDate(options.referenceDate).getMonth() + 1]
           : [];
-      const monthName = formatList(months.map((month) => t(`dates:months.${month}`)));
+      const monthName = formatList(
+        months.map((month) => t(`ui:recurrence.summary.monthNames.${month}`))
+      );
       const monthlyDetail = describeMonthlyDetail(rule, t);
       if (monthName && monthlyDetail) {
-        detail = t("dates:recurrenceSummary.detailOfMonth", {
+        detail = t("ui:recurrence.summary.detailOfMonth", {
           detail: monthlyDetail,
           month: monthName,
         });
       } else if (monthName) {
-        detail = t("dates:recurrenceSummary.inMonth", { month: monthName });
+        detail = t("ui:recurrence.summary.inMonth", { month: monthName });
       } else {
         detail = monthlyDetail;
       }
@@ -399,11 +403,11 @@ export const summarizeRecurrence = (
       detail = "";
   }
 
-  const parts = [t("dates:recurrenceSummary.repeats", { schedule })];
+  const parts = [t("ui:recurrence.summary.repeats", { schedule })];
   if (options?.strategy === "rolling") {
-    parts.push(`(${t("dates:recurrenceSummary.afterCompletion")})`);
+    parts.push(`(${t("ui:recurrence.summary.afterCompletion")})`);
     if (rule.frequency === "hourly" && options.limit != null) {
-      parts.push(t("dates:recurrenceSummary.dailyLimit", { count: options.limit }));
+      parts.push(t("ui:recurrence.summary.dailyLimit", { count: options.limit }));
     }
   }
   if (detail) {
@@ -850,7 +854,7 @@ export const summarizeStored = (
         limit?: number | null;
       }
     | undefined,
-  t: TranslateFn
+  t: Translate
 ): string => {
   const rule = fromStored(
     stored,
@@ -859,7 +863,7 @@ export const summarizeStored = (
     options?.allDay,
     options?.strategy === "rolling"
   );
-  if (rule === "custom") return t("dates:recurrenceSummary.custom");
+  if (rule === "custom") return t("ui:recurrence.summary.custom");
   return summarizeRecurrence(
     rule,
     {

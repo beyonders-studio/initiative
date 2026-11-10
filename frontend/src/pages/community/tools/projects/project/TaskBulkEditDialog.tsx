@@ -9,18 +9,11 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearchMembers } from "@/hooks/useUsers";
 import { useListedMissingAsType } from "@/lib/layouts/taskLayout";
-import {
-  isHourlyRule,
-  isValidTaskRecurrence,
-  rulePayload,
-  type TaskRecurrenceValue,
-} from "@/lib/recurrence";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import { DateTimePicker } from "@/ui/date-time-picker";
@@ -34,6 +27,13 @@ import {
 import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { MemberPicker } from "@/ui/member-picker";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
+import {
+  isHourlyRule,
+  isValidTaskRecurrence,
+  rulePayload,
+  type TaskRecurrenceValue,
+} from "@/ui/recurrence/recurrence";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** The type option that takes a picked type back: the tasks keep theirs. */

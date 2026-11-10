@@ -5,7 +5,14 @@ import type {
   RecurrencePreviewRequest,
   RecurrenceStrategy,
 } from "@/api/generated/initiativeAPI.schemas";
-import { useRecurrencePreview } from "@/hooks/useRecurrencePreview";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { browserTimezone } from "@/ui/lib/timezones";
+import { cn } from "@/ui/lib/utils";
 import {
   createRecurrenceFromPreset,
   detectRecurrencePreset,
@@ -22,28 +29,14 @@ import {
   summarizeRecurrence,
   type TaskRecurrenceValue,
   type TaskWeekPosition,
+  type Translate,
   toRRule,
   WEEKDAYS,
   withFrequency,
   withMonthlyMode,
-} from "@/lib/recurrence";
-import { browserTimezone } from "@/lib/timezones";
-import type { TranslateFn } from "@/types/i18n";
-import { DateTimePicker } from "@/ui/date-time-picker";
-import { Field } from "@/ui/field";
-import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
-import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
-import { dateTimeFormat } from "@/ui/lib/intl";
-import { cn } from "@/ui/lib/utils";
+} from "@/ui/recurrence/recurrence";
+import { useRecurrencePreview } from "@/ui/recurrence/useRecurrencePreview";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-
-const hourlyQuickOption = (
-  kind: "task" | "event",
-  enabled: boolean,
-  label: string
-): { value: "hourly"; label: string }[] =>
-  kind === "task" && enabled ? [{ value: "hourly", label }] : [];
 
 const POSITION_KEYS: Record<TaskWeekPosition, string> = {
   first: "recurrence.positionFirst",
@@ -82,6 +75,9 @@ type RecurrenceEditorProps = {
   hasDueDate?: boolean;
   /** Tasks update rule, strategy and daily maximum in one edit. */
   onTaskChange?: (value: TaskRecurrenceValue) => void;
+  /** Not a task's: offers repeating by the hour, on a schedule. A task's hours
+   *  count from its completion instead. */
+  hourly?: boolean;
   disabled?: boolean;
 };
 
@@ -142,12 +138,13 @@ export const RecurrenceEditor = ({
   limit = null,
   hasDueDate = true,
   onTaskChange,
+  hourly = false,
   disabled = false,
 }: RecurrenceEditorProps) => {
-  const { t, i18n } = useTranslation(["projects", "dates"]);
+  const { t, i18n } = useTranslation("ui");
   const rule = value === "custom" ? null : value;
-  const hourly = kind === "task" && strategy === "rolling" && isHourlyRule(value);
-  const limitInvalid = hourly && !isValidTaskRecurrence({ rule: value, strategy, limit });
+  const hourlyTask = kind === "task" && strategy === "rolling" && isHourlyRule(value);
+  const limitInvalid = hourlyTask && !isValidTaskRecurrence({ rule: value, strategy, limit });
   const changeStrategy = (next: RecurrenceStrategy) => {
     if (onTaskChange) {
       const nextRule =
@@ -195,15 +192,21 @@ export const RecurrenceEditor = ({
       onChange(rule ?? createRecurrenceFromPreset("daily", referenceDate));
       return;
     }
-    setBuilding(next === "hourly");
+    setBuilding(next === "hourly" && kind === "task");
     onChange(createRecurrenceFromPreset(next, referenceDate));
   };
 
+  // A task repeats by the hour after its completion; another repeat, on a
+  // schedule, where its caller offers it.
+  const hourlyLabel =
+    kind === "task"
+      ? onTaskChange && t("recurrence.hourlyAfterCompletion")
+      : hourly && t("recurrence.everyHour");
   const quickOptions = useMemo(
     (): { value: RecurrencePreset; label: string }[] => [
       { value: "none", label: t("recurrence.doesNotRepeat") },
       { value: "daily", label: t("recurrence.daily") },
-      ...hourlyQuickOption(kind, Boolean(onTaskChange), t("recurrence.hourlyAfterCompletion")),
+      ...(hourlyLabel ? [{ value: "hourly" as const, label: hourlyLabel }] : []),
       { value: "weekdays", label: t("recurrence.everyWeekday") },
       {
         value: "weekly",
@@ -221,12 +224,12 @@ export const RecurrenceEditor = ({
       },
       { value: "custom", label: t("recurrence.custom") },
     ],
-    [anchor, i18n.language, kind, onTaskChange, t]
+    [anchor, hourlyLabel, i18n.language, t]
   );
 
   const monthName = (month: number) =>
     dateTimeFormat(i18n.language, { month: "short" }).format(new Date(2026, month - 1, 1));
-  const weekdayName = (day: RecurrenceWeekday) => t(`dates:weekdaysShort.${day}` as never);
+  const weekdayName = (day: RecurrenceWeekday) => t(`recurrence.weekdaysShort.${day}` as never);
 
   // The next dates, from the rule as it would be saved, or the stored one.
   const previewing = strategy !== "rolling" && referenceDate;
@@ -255,9 +258,9 @@ export const RecurrenceEditor = ({
   const summary = limitInvalid
     ? null
     : value === "custom"
-      ? t("dates:recurrenceSummary.custom")
+      ? t("recurrence.summary.custom")
       : rule
-        ? summarizeRecurrence(rule, { referenceDate, strategy, limit }, t as TranslateFn)
+        ? summarizeRecurrence(rule, { referenceDate, strategy, limit }, t as Translate)
         : null;
 
   return (
@@ -311,7 +314,7 @@ export const RecurrenceEditor = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {kind === "task" && strategy === "rolling" && onTaskChange ? (
+                  {(kind === "task" ? strategy === "rolling" && onTaskChange : hourly) ? (
                     <SelectItem value="hourly">{t("recurrence.frequencyHourly")}</SelectItem>
                   ) : null}
                   <SelectItem value="daily">{t("recurrence.frequencyDaily")}</SelectItem>
@@ -434,7 +437,7 @@ export const RecurrenceEditor = ({
                     <SelectContent>
                       {WEEKDAYS.map((weekday) => (
                         <SelectItem key={weekday.value} value={weekday.value}>
-                          {t(`dates:weekdays.${weekday.value}` as never)}
+                          {t(`recurrence.weekdays.${weekday.value}` as never)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -526,7 +529,7 @@ export const RecurrenceEditor = ({
         </div>
       ) : null}
 
-      {hourly ? (
+      {hourlyTask ? (
         <Field
           label={t("recurrence.dailyLimit")}
           hint={t("recurrence.hourlyCompletionHelp")}

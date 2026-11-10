@@ -7,8 +7,12 @@ import {
   buildTaskType,
 } from "@/__tests__/factories";
 import type { TaskRead } from "@/api/generated/initiativeAPI.schemas";
-import { createRecurrenceFromPreset, type RecurrenceRule, shiftFor } from "@/lib/recurrence";
 import type { TitlePerson, TitleReading } from "@/lib/smartTitle";
+import {
+  createRecurrenceFromPreset,
+  type RecurrenceRule,
+  shiftFor,
+} from "@/ui/recurrence/recurrence";
 
 import { NOTHING_APPLIED, readingCreate, readingEdit } from "./smartTaskTitle";
 

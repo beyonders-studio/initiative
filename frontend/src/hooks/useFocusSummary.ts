@@ -11,7 +11,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { useListMyTasks } from "@/api/generated/tasks/tasks";
 import { useViewPreference } from "@/hooks/useViewPreference";
-import { browserTimezone } from "@/lib/timezones";
+import { browserTimezone } from "@/ui/lib/timezones";
 import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
 
 /** A pinned task, addressed by community because task ids collide across communities. */

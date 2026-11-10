@@ -12,7 +12,6 @@ import { TaskDescriptionHoverCard } from "@/components/tools/projects/TaskDescri
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
 import { taskColumnId } from "@/lib/layouts/tasks";
-import { summarizeStored } from "@/lib/recurrence";
 import {
   dateSortingFn,
   firstName,
@@ -29,6 +28,7 @@ import { Checkbox } from "@/ui/checkbox";
 import { type FieldColumnOptions, fieldColumn } from "@/ui/layouts/columns";
 import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import type { AppColumnDef } from "@/ui/lib/table";
+import { summarizeStored } from "@/ui/recurrence/recurrence";
 import { SortHeader } from "@/ui/sort-icon";
 
 import { TaskChecklistProgress } from "./TaskChecklistProgress";

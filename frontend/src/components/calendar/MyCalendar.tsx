@@ -50,11 +50,11 @@ import {
   EMPTY_CALENDAR_VIEW_FILTERS,
 } from "@/lib/filters/calendarFilters";
 import { getProjectColor } from "@/lib/projectColor";
-import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, toolSettingsRoute } from "@/lib/tools";
 import { Combobox } from "@/ui/combobox";
 import { useWeekStart } from "@/ui/host";
 import { Label } from "@/ui/label";
+import { browserTimezone } from "@/ui/lib/timezones";
 import { CalendarGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where one person's view of their calendar is kept. What an older release

@@ -27,14 +27,14 @@ import {
 } from "date-fns";
 
 import type { TagSummary, TaskPriority, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
+import { dateTimeFormat } from "@/ui/lib/intl";
 import {
   createRecurrenceFromPreset,
   isValidTaskRecurrence,
   type RecurrenceRule,
   type RecurrenceWeekday,
   WEEKDAYS,
-} from "@/lib/recurrence";
-import { dateTimeFormat } from "@/ui/lib/intl";
+} from "@/ui/recurrence/recurrence";
 
 // ── The words ───────────────────────────────────────────────────────────────
 

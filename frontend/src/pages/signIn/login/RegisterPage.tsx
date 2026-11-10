@@ -8,8 +8,8 @@ import { SignInFrame } from "@/components/auth/SignInFrame";
 import { RecoveryCodesPanel } from "@/components/settings/RecoveryCodesPanel";
 import { AccountStep } from "@/components/start/AccountStep";
 import { useSignUp } from "@/components/start/useSignUp";
-import { browserTimezone } from "@/lib/timezones";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 /**
  * The first account on a fresh deployment, which becomes its owner. Everyone

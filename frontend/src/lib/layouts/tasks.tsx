@@ -34,7 +34,6 @@ import {
   tableSortFields,
   taskTableSorting,
 } from "@/lib/filters/taskFilters";
-import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
 import { entityRefRoute } from "@/lib/tools";
 import { Badge } from "@/ui/badge";
@@ -53,6 +52,7 @@ import type { PresetKind } from "@/ui/layouts/presets";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { cn } from "@/ui/lib/utils";
 import { listedValue } from "@/ui/properties/propertyHelpers";
+import { summarizeStored } from "@/ui/recurrence/recurrence";
 
 // A table's title cell carries what the card shows as fields of their own,
 // where the table has no column for it.
