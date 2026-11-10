@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import (
@@ -223,9 +223,13 @@ class CalendarEventRead(CalendarEventFields):
     #: A series' skipped starts and extra starts.
     skipped_starts: list[datetime] = Field(default_factory=list)
     extra_starts: list[datetime] = Field(default_factory=list)
-    #: A repeating event's first start at or after this read, or its last once
-    #: the series has ended; None for an event that does not repeat.
+    #: When a repeating event next starts: its first event at or after this
+    #: read, one moved on its own at its new time. None for an event that does
+    #: not repeat, and once none is still to come.
     next_start: datetime | None = None
+    #: That event by its start in the series, which ``occurrence`` takes to
+    #: name it.
+    next_occurrence: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +284,11 @@ def serialize_calendar_event(
     context: ActorContext,
     user_id: int | None = None,
     answers: Mapping[int, RSVPStatus],
+    upcoming: tuple[datetime, datetime] | None = None,
 ) -> CalendarEventRead:
     """``answers`` are what was answered to the event, or to the one
-    occurrence shown; someone with none is still to answer."""
+    occurrence shown; someone with none is still to answer. ``upcoming`` is a
+    repeating event's next event, as ``(start, occurrence)``."""
     skipped, extra = (
         recurrence.exception_starts(
             event.recurrence, event.start_at, event.recurrence_shift
@@ -306,9 +312,6 @@ def serialize_calendar_event(
         overridden_fields=list(event.overridden_fields or []),
         skipped_starts=skipped,
         extra_starts=extra,
-        next_start=recurrence.upcoming(
-            event.recurrence, event.start_at, event.recurrence_shift, datetime.now(UTC)
-        )
-        if event.recurrence
-        else None,
+        next_start=upcoming[0] if upcoming else None,
+        next_occurrence=upcoming[1] if upcoming else None,
     )

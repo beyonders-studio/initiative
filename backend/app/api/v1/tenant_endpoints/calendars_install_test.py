@@ -129,8 +129,9 @@ async def test_reads_the_calendars_and_events_open_to_its_initiative(
 async def test_a_repeating_event_reads_its_next_start(
     client, session, acting_user, role_session
 ):
-    """What a plug-in asking "is it soon?" needs of a weekly meeting: the start
-    still to come, not the series' first."""
+    """What a plug-in asking "is it soon?" needs of a weekly meeting: the event
+    still to come, not the series' first, and how to name it to change it. A
+    meeting moved on its own starts at its new time."""
     installed = await install_plugin(
         session, acting_user, role_session, granted=["calendars:read"]
     )
@@ -148,18 +149,34 @@ async def test_a_repeating_event_reads_its_next_start(
     once = await create_calendar_event(session, calendar, installed.seat.user)
     headers = install_headers(installed, ["calendars:read"])
 
-    read = await client.get(
-        guild_url(installed.guild.id, f"/calendar-events/{weekly.id}"), headers=headers
-    )
-    assert read.status_code == 200, read.text
-    assert datetime.fromisoformat(read.json()["next_start"]) == first + timedelta(
-        days=21
-    )
+    def read(event_id: int):
+        return client.get(
+            guild_url(installed.guild.id, f"/calendar-events/{event_id}"),
+            headers=headers,
+        )
 
-    single = await client.get(
-        guild_url(installed.guild.id, f"/calendar-events/{once.id}"), headers=headers
+    body = (await read(weekly.id)).json()
+    due = first + timedelta(days=21)
+    assert datetime.fromisoformat(body["next_start"]) == due
+    assert datetime.fromisoformat(body["next_occurrence"]) == due
+
+    # The next meeting moved two days later on its own: it starts then, and is
+    # still the one its original start names.
+    await create_calendar_event(
+        session,
+        calendar,
+        installed.seat.user,
+        series_id=weekly.id,
+        original_start=due,
+        start_at=due + timedelta(days=2),
+        end_at=due + timedelta(days=2, hours=1),
     )
-    assert single.json()["next_start"] is None
+    body = (await read(weekly.id)).json()
+    assert datetime.fromisoformat(body["next_start"]) == due + timedelta(days=2)
+    assert datetime.fromisoformat(body["next_occurrence"]) == due
+
+    single = (await read(once.id)).json()
+    assert single["next_start"] is None and single["next_occurrence"] is None
 
 
 async def test_changing_anything_needs_the_write_scope(

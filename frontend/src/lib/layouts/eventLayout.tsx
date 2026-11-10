@@ -705,4 +705,5 @@ export const blankEvent = (
   skipped_starts: [],
   extra_starts: [],
   next_start: null,
+  next_occurrence: null,
 });
