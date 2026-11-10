@@ -75,6 +75,14 @@
     "termFullRequest": "Demander",
     "termFullAskAdmins": "Demandez aux administrateurs de votre communauté d'en faire la demande."
   },
+  "offer": {
+    "choosePlan": "Choisir une offre",
+    "buy": "Acheter",
+    "seePlans": "Voir les offres",
+    "notOnPlan": "L'offre de votre communauté n'inclut pas de plug-ins payants. Les offres qui en incluent sont sur la page des offres.",
+    "notOffered": "Ce plug-in n'est pas proposé pour cette communauté.",
+    "planEnded": "L'offre de ce plug-in a pris fin."
+  },
   "connections": {
     "none": "Ce plug-in ne demande aucune configuration.",
     "communityScope": "Identifiant de la communauté",

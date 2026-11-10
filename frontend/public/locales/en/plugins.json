@@ -75,6 +75,14 @@
     "termFullRequest": "Request",
     "termFullAskAdmins": "Ask your community's admins to request it."
   },
+  "offer": {
+    "choosePlan": "Choose a plan",
+    "buy": "Buy",
+    "seePlans": "See plans",
+    "notOnPlan": "Your community's plan doesn't include paid plug-ins. Plans that do are on the plans page.",
+    "notOffered": "This plug-in isn't offered for this community.",
+    "planEnded": "This plug-in's plan has ended."
+  },
   "connections": {
     "none": "This plug-in asks for nothing to be set up.",
     "communityScope": "Community credential",

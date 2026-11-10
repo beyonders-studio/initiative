@@ -75,6 +75,14 @@
     "termFullRequest": "Anfragen",
     "termFullAskAdmins": "Bitte die Admins eurer Community, es anzufragen."
   },
+  "offer": {
+    "choosePlan": "Plan auswählen",
+    "buy": "Kaufen",
+    "seePlans": "Pläne ansehen",
+    "notOnPlan": "Der Plan eurer Community enthält keine kostenpflichtigen Plug-ins. Pläne, die sie enthalten, findet ihr auf der Planseite.",
+    "notOffered": "Dieses Plug-in wird für diese Community nicht angeboten.",
+    "planEnded": "Der Plan für dieses Plug-in ist ausgelaufen."
+  },
   "connections": {
     "none": "Dieses Plug-in verlangt keine Einrichtung.",
     "communityScope": "Zugangsdaten der Community",

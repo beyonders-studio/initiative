@@ -264,3 +264,92 @@ async def test_a_failing_ping_never_raises(billing_configured, monkeypatch):
 
     _answering(monkeypatch, _down)
     await billing_ping.nudge()
+
+
+_OFFER = {
+    "charge": "subscription",
+    "way": "buy",
+    "upgrade": False,
+    "lines": [
+        {"id": "hoard-small", "name": "Small", "display": "$12/mo"},
+        {"id": "hoard-large", "name": "Large", "display": None},
+    ],
+}
+
+
+async def test_plugin_offer_sends_the_ref_listing_and_locale_signed(
+    billing_configured, known_ref, monkeypatch
+):
+    seen = _answering(monkeypatch, lambda r: httpx2.Response(200, json=_OFFER))
+    offer = await billing_ping.plugin_offer(7, listing_uid="hoard", locale="de")
+    assert offer is not None
+    assert offer.model_dump(mode="json") == _OFFER
+    (request,) = seen
+    assert request.method == "POST"
+    assert str(request.url) == "https://billing.internal/api/v1/plugin-offer"
+    assert json.loads(request.content) == {
+        "community_ref": "gbil_known",
+        "listing_uid": "hoard",
+        "locale": "de",
+    }
+    _verify(request, audience=envelope.TO_BILLING_READS)
+
+
+async def test_plugin_offer_unconfigured_makes_no_call(monkeypatch, known_ref):
+    seen = _answering(monkeypatch, lambda r: httpx2.Response(200, json=_OFFER))
+    assert await billing_ping.plugin_offer(7, listing_uid="hoard", locale="en") is None
+    assert seen == []
+
+
+async def test_plugin_offer_without_a_ref_asks_nothing(
+    session, billing_configured, monkeypatch
+):
+    guild = await create_guild(session)
+    await session.commit()
+    seen = _answering(monkeypatch, lambda r: httpx2.Response(200, json=_OFFER))
+    assert (
+        await billing_ping.plugin_offer(guild.id, listing_uid="hoard", locale="en")
+        is None
+    )
+    assert seen == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        # A listing billing doesn't sell as an app of its own.
+        httpx2.Response(404, json={"detail": "OFFER_UNKNOWN_LISTING"}),
+        httpx2.Response(500, json=_OFFER),
+        httpx2.Response(302, headers={"Location": "https://elsewhere"}),
+        httpx2.Response(200, json={**_OFFER, "way": "maybe"}),
+        httpx2.Response(200, json={**_OFFER, "charge": "weekly"}),
+        httpx2.Response(200, json={**_OFFER, "upgrade": "yes"}),
+        httpx2.Response(200, json={**_OFFER, "lines": [{"id": "x"}]}),
+        httpx2.Response(200, json={**_OFFER, "lines": [{"id": "x", "name": 3}]}),
+        httpx2.Response(200, json={**_OFFER, "pad": "x" * 9000}),
+        httpx2.Response(200, content=b"not json"),
+    ],
+)
+async def test_plugin_offer_anything_but_an_answer_is_none(
+    billing_configured, known_ref, monkeypatch, response
+):
+    _answering(monkeypatch, lambda r: response)
+    assert await billing_ping.plugin_offer(7, listing_uid="hoard", locale="en") is None
+
+
+async def test_plugin_offer_ignores_fields_it_does_not_know(
+    billing_configured, known_ref, monkeypatch
+):
+    _answering(monkeypatch, lambda r: httpx2.Response(200, json={**_OFFER, "later": 1}))
+    offer = await billing_ping.plugin_offer(7, listing_uid="hoard", locale="en")
+    assert offer is not None and offer.way == "buy"
+
+
+async def test_plugin_offer_unreachable_is_none(
+    billing_configured, known_ref, monkeypatch
+):
+    def _down(request):
+        raise httpx2.ConnectError("down")
+
+    _answering(monkeypatch, _down)
+    assert await billing_ping.plugin_offer(7, listing_uid="hoard", locale="en") is None

@@ -46,6 +46,7 @@ from app.db.session import routed_guild_id
 from app.models.platform.marketplace import MarketplaceListing
 from app.schemas.platform.marketplace import (
     ListingKind,
+    ListingOffer,
     ListingSource,
     ListingStartFrom,
     ListingUnavailable,
@@ -86,6 +87,7 @@ from app.services.marketplace.tool_listings import (
     listing_example,
 )
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import billing_ping
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 
@@ -93,6 +95,11 @@ router = APIRouter()
 
 
 MAX_PAGE_SIZE = 100
+
+#: The reader's language, which billing words an offer in.
+LocaleQuery = Annotated[
+    str, Query(max_length=35, pattern=r"^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$")
+]
 
 
 def _unavailable(
@@ -162,13 +169,27 @@ async def list_marketplace_listings(
     )
 
 
-async def _detail(session, listing: MarketplaceListing) -> MarketplaceListingDetail:
+async def _offer(guild_id: int, uid: str, locale: str) -> ListingOffer | None:
+    """How billing sells listing ``uid`` to this community, in ``locale``, or
+    ``None`` when it has no answer. Shown as given: nothing here reasons
+    about it."""
+    offer = await billing_ping.plugin_offer(guild_id, listing_uid=uid, locale=locale)
+    return ListingOffer.model_validate(offer.model_dump()) if offer else None
+
+
+async def _detail(
+    session, listing: MarketplaceListing, locale: str
+) -> MarketplaceListingDetail:
     """A listing's page, or the answer the shelf gives by leaving it out.
 
     Two things put a listing out of reach, and both read as *not found* here
     because both are already true of the shelf: a plug-in whose service this
     deployment does not run, and a dashboard whose plug-in this guild has not
     installed.
+
+    A listing that wants an entitlement this community lacks, whether it is
+    not installed yet or installed with its statement inactive, carries how
+    billing sells it here, asked for this response only in ``locale``.
     """
     latest = await catalog_service.get_listing_version(
         session, listing.latest_version_id
@@ -190,6 +211,11 @@ async def _detail(session, listing: MarketplaceListing) -> MarketplaceListingDet
         listing.uid,
         await plugin_entitlements.gated_listings(guild_id, [listing]),
     )
+    if (
+        summary.unavailable is not None
+        and summary.unavailable.reason == ListingUnavailableReason.entitlement_required
+    ):
+        summary.unavailable.offer = await _offer(guild_id, listing.uid, locale)
     definition = dict(latest.definition) if latest else {}
     # What the install dialog asks the seat about, from the version it would
     # install and the registration's ceiling. Empty for anything not a plug-in.
@@ -245,6 +271,7 @@ async def resolve_marketplace_listing(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
+    locale: LocaleQuery = "en",
 ) -> MarketplaceListingDetail:
     """The listing a code names.
 
@@ -260,7 +287,7 @@ async def resolve_marketplace_listing(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MarketplaceMessages.LISTING_NOT_FOUND,
         )
-    return await _detail(session, listing)
+    return await _detail(session, listing, locale)
 
 
 @router.get("/listings/{public_id}", response_model=MarketplaceListingDetail)
@@ -269,6 +296,7 @@ async def read_marketplace_listing(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
+    locale: LocaleQuery = "en",
 ) -> MarketplaceListingDetail:
     """One listing, with what it would install and every version it has."""
     listing = await catalog_service.get_listing(session, public_id)
@@ -277,7 +305,7 @@ async def read_marketplace_listing(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MarketplaceMessages.LISTING_NOT_FOUND,
         )
-    return await _detail(session, listing)
+    return await _detail(session, listing, locale)
 
 
 @router.post(

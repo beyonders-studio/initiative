@@ -1,13 +1,13 @@
 """Initiative's two kinds of request to the external billing service: the
-ping, and its three reads.
+ping, and its reads.
 
 * **The ping** says the change log moved, and nothing else: billing reads the
   log itself (``app.services.platform.billing_changes``). It's sent once per
   committed change row per process, collapsed, fire-and-forget with a tight
   timeout, and a lost one costs latency only, since billing also pulls on a
   schedule.
-* **The reads** (plan summary, uninstall notice) are queries that change
-  nothing on billing's side: Initiative never writes to billing.
+* **The reads** (plan summary, uninstall notice, plug-in offer) are queries
+  that change nothing on billing's side: Initiative never writes to billing.
 
 Each request carries the v2 envelope (``app.services.platform.billing_envelope``),
 signed with Initiative's handoff key (``HANDOFF_SIGNING_PRIVATE_KEY_PEM``),
@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 PING_PATH = "/api/v1/pings"
 PLAN_SUMMARY_PATH = "/api/v1/plan-summary"
 UNINSTALL_NOTICE_PATH = "/api/v1/plugin-uninstall-notice"
+PLUGIN_OFFER_PATH = "/api/v1/plugin-offer"
 
 # httpx defaults to no total deadline; keep the whole attempt short — the
 # ping is advisory and must never hold resources behind a slow billing pod.
@@ -49,6 +50,9 @@ _PLAN_SUMMARY_MAX_BYTES = 1024
 #: The whole answer to an uninstall-notice read, before it is shown verbatim.
 UNINSTALL_NOTICE_SECONDS = 2.0
 _UNINSTALL_NOTICE_MAX_BYTES = 4096
+#: The whole answer to a plug-in offer read, before the listing page shows it.
+PLUGIN_OFFER_SECONDS = 2.0
+_PLUGIN_OFFER_MAX_BYTES = 8192
 
 
 def billing_ping_enabled() -> bool:
@@ -262,6 +266,93 @@ async def plugin_uninstall_notice(
         return await asyncio.wait_for(
             _ask_uninstall_notice(guild_id, listing_uid, locale),
             timeout=UNINSTALL_NOTICE_SECONDS,
+        )
+    except Exception:
+        return None
+
+
+class PluginOfferLine(BaseModel):
+    """One plan (a subscription) or item (a one-time charge) the plug-in is
+    sold as, worded by billing in the reader's language."""
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=120)
+    #: Its price as the deployment's catalog words it ("$12/mo"); ``None``
+    #: where the deployment takes no payments.
+    display: str | None = Field(default=None, max_length=64)
+
+
+class PluginOffer(BaseModel):
+    """How a community gets one paid plug-in, as billing answered it.
+
+    The deployment's catalog terms decide all of it, on billing's side; this
+    deployment shows it and decides nothing from it. Read for one response
+    and kept nowhere. Fields billing adds later are ignored; a field that is
+    here and malformed refuses the whole answer.
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True)
+
+    charge: Literal["subscription", "one_time"]
+    #: How this community gets it on the plan it is on.
+    way: Literal["buy", "none"]
+    #: ``way`` is ``none``, and a plan above, which the community can get
+    #: onto, sells paid plug-ins.
+    upgrade: bool = False
+    lines: list[PluginOfferLine] = Field(default_factory=list, max_length=20)
+
+
+def build_plugin_offer_query(
+    guild_ref: str, *, listing_uid: str, locale: str
+) -> tuple[str, bytes, dict[str, str]]:
+    return _signed_post(
+        PLUGIN_OFFER_PATH,
+        {"community_ref": guild_ref, "listing_uid": listing_uid, "locale": locale},
+        audience=envelope.TO_BILLING_READS,
+    )
+
+
+async def _ask_plugin_offer(
+    guild_id: int, listing_uid: str, locale: str
+) -> PluginOffer | None:
+    guild_ref = await existing_ref(
+        entity_type=IdentityEntity.guild,
+        entity_id=guild_id,
+        purpose=IdentityPurpose.billing,
+    )
+    if guild_ref is None:
+        return None
+    url, body, headers = build_plugin_offer_query(
+        guild_ref, listing_uid=listing_uid, locale=locale
+    )
+    async with httpx2.AsyncClient(
+        timeout=_PLAN_SUMMARY_TIMEOUT, follow_redirects=False
+    ) as client:
+        response = await client.post(url, content=body, headers=headers)
+    # 404 is billing saying it doesn't sell the listing as an app of its own.
+    if response.status_code != 200 or len(response.content) > _PLUGIN_OFFER_MAX_BYTES:
+        return None
+    return PluginOffer.model_validate_json(response.content)
+
+
+async def plugin_offer(
+    guild_id: int, *, listing_uid: str, locale: str
+) -> PluginOffer | None:
+    """Ask billing how ``guild_id`` gets the paid plug-in ``listing_uid``, or
+    ``None`` when it cannot say within :data:`PLUGIN_OFFER_SECONDS`.
+
+    A read that changes nothing on billing's side. ``None`` is also the answer
+    for a listing billing doesn't sell as an app of its own, for a guild
+    billing holds no reference for, and on a deployment with no billing.
+    """
+    if not billing_ping_enabled():
+        return None
+    try:
+        return await asyncio.wait_for(
+            _ask_plugin_offer(guild_id, listing_uid, locale),
+            timeout=PLUGIN_OFFER_SECONDS,
         )
     except Exception:
         return None

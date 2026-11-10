@@ -4201,10 +4201,12 @@ export interface CommunityPluginListingRef {
  * What the entitlement statement held for an install's listing says, as
  * the plug-in's page reads it: whether it entitles the community, and why
  * not when it says (``term_full``: the deployment's term has no seat free).
+ * Inactive for any other reason, its plan has ended.
  */
 export interface CommunityPluginEntitlementRead {
   active: boolean;
   reason: string | null;
+  action_url: string | null;
 }
 
 /**
@@ -8186,6 +8188,47 @@ export interface ListingMediaRead {
 }
 
 /**
+ * How a paid plug-in is charged for, as billing sells it.
+ */
+export type ListingOfferCharge = (typeof ListingOfferCharge)[keyof typeof ListingOfferCharge];
+
+export const ListingOfferCharge = {
+  subscription: "subscription",
+  one_time: "one_time",
+} as const;
+
+/**
+ * How the asking community gets a paid plug-in on the plan it is on.
+ */
+export type ListingOfferWay = (typeof ListingOfferWay)[keyof typeof ListingOfferWay];
+
+export const ListingOfferWay = {
+  buy: "buy",
+  none: "none",
+} as const;
+
+/**
+ * One plan or item a paid plug-in is sold as, worded by billing.
+ */
+export interface ListingOfferLine {
+  id: string;
+  name: string;
+  display: string | null;
+}
+
+/**
+ * How the asking community gets a paid plug-in, as this deployment's
+ * billing answered it in the reader's language. Shown, never reasoned
+ * about: the deployment's catalog terms decide it, on billing's side.
+ */
+export interface ListingOffer {
+  charge: ListingOfferCharge;
+  way: ListingOfferWay;
+  upgrade: boolean;
+  lines: ListingOfferLine[];
+}
+
+/**
  * What an install copies: the listing itself, or its example.
  */
 export type ListingStartFrom = (typeof ListingStartFrom)[keyof typeof ListingStartFrom];
@@ -8212,6 +8255,7 @@ export const ListingUnavailableReason = {
 export interface ListingUnavailable {
   reason: ListingUnavailableReason;
   action_url: string | null;
+  offer: ListingOffer | null;
 }
 
 export type ListingUploadRequestManifest = { [key: string]: unknown };
@@ -14325,6 +14369,22 @@ export type ListMarketplaceListingsParams = {
    * @maximum 100
    */
   page_size?: number;
+};
+
+export type ResolveMarketplaceListingParams = {
+  /**
+   * @maxLength 35
+   * @pattern ^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$
+   */
+  locale?: string;
+};
+
+export type ReadMarketplaceListingParams = {
+  /**
+   * @maxLength 35
+   * @pattern ^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$
+   */
+  locale?: string;
 };
 
 export type ListRelationshipsParams = {

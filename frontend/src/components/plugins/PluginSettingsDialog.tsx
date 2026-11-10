@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import { PluginConnectionsPanel } from "@/components/plugins/PluginConnectionsPanel";
 import { PluginConsentRequests } from "@/components/plugins/PluginConsentRequests";
 import { PluginMembersPanel } from "@/components/plugins/PluginMembersPanel";
+import { PluginPlanEnded } from "@/components/plugins/PluginOffer";
 import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -81,6 +82,7 @@ export function PluginSettingsDialog({
           </SkeletonRegion>
         ) : (
           <div className="space-y-6">
+            <PluginPlanEnded plugin={plugin} />
             {/* Yours first. A plug-in that acts as people asks everybody, admins
                 included — a community admin's own name is not something their role
                 answers for. */}

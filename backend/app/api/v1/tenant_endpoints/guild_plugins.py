@@ -392,9 +392,18 @@ async def _entitlement(
     statement = await plugin_entitlements.read_statement(guild_id, listing_uid)
     if statement is None:
         return None
+    active = plugin_entitlements.statement_active(statement.values)
+    reason = plugin_entitlements.statement_reason(statement.values)
     return CommunityPluginEntitlementRead(
-        active=plugin_entitlements.statement_active(statement.values),
-        reason=plugin_entitlements.statement_reason(statement.values),
+        active=active,
+        reason=reason,
+        # Where the seat gets it again; a full term's way on is a request,
+        # which the page makes on its own.
+        action_url=(
+            plugin_entitlements.action_url(listing_uid)
+            if not active and reason != plugin_entitlements.REASON_TERM_FULL
+            else None
+        ),
     )
 
 

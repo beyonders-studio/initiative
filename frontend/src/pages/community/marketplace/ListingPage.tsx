@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import { ReportButton } from "@/components/moderation/ReportButton";
+import { PluginOffer } from "@/components/plugins/PluginOffer";
 import { DashboardCanvas } from "@/components/tools/dashboards/DashboardCanvas";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -95,9 +96,11 @@ export function ListingPage() {
   // Adding a plug-in is the superadmin's consent, so only the seat is offered it.
   const holdsTheSeat = Boolean(activeCommunity?.can.seat);
   // A listing this community cannot install yet says why, and where the seat
-  // can do something about it.
+  // can do something about it: how billing sells it here, when it says. The
+  // seat buys it in another tab; coming back reads the listing again
+  // (`useMarketplaceListing`), and the button is enabled once it installs.
   const unavailable = listing?.unavailable ?? null;
-  const { billing, canSell, openAddress, openPortal } = useBillingPortal();
+  const { billing, openPortal } = useBillingPortal();
   const actionUrl = unavailable?.action_url ?? null;
   // The deployment's term has no seat free for this community: the way on is
   // a request to its owners, which the seat makes in the billing portal.
@@ -253,21 +256,21 @@ export function ListingPage() {
                   </span>
                 )}
               </div>
-            ) : unavailable && !isInstalled ? (
-              <div className="flex max-w-xs flex-col items-end gap-1 text-right">
-                <span className="text-muted-foreground text-xs">
-                  {t("plugins:install.entitlementRequired")}
-                </span>
-                {holdsTheSeat && canSell && actionUrl && activeCommunity && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void openAddress(activeCommunity.id, actionUrl)}
-                  >
-                    {t("plugins:install.entitlementAction")}
-                  </Button>
+            ) : unavailable && !termFull ? (
+              <>
+                {/* Installed, and the entitlement it was added on has ended. */}
+                {isInstalled && (
+                  <span className="text-muted-foreground text-xs">
+                    {t("plugins:offer.planEnded")}
+                  </span>
                 )}
-              </div>
+                <PluginOffer
+                  offer={unavailable.offer}
+                  actionUrl={actionUrl}
+                  fallback={isInstalled ? undefined : t("plugins:install.entitlementRequired")}
+                  align="end"
+                />
+              </>
             ) : isPlugin && pluginInstalls.isError ? (
               <span className="text-muted-foreground text-xs">
                 {t("plugins:install.unknownState")}
