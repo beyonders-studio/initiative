@@ -12,6 +12,8 @@ any initiative and reaching into none. Its ``initiative_id`` is NULL, so
 anything derived from an initiative has nothing to derive from and refuses.
 """
 
+from typing import cast
+
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -104,4 +106,4 @@ async def list_calendar_ids_for_export(
         .where(*conditions)
         .order_by(Calendar.name.asc(), Calendar.id.asc())
     )
-    return list(await session.exec(statement))
+    return cast(list[int], list(await session.exec(statement)))
