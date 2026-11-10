@@ -13,7 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.schema_provisioning import provision_guild
 from app.db.session import set_rls_context
-from app.models.platform.guild import CommunityCategory, Guild
+from app.models.platform.guild import CommunityCategory, CommunityJoinPolicy, Guild
 from app.models.platform.user import User
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -26,8 +26,9 @@ from seed.common import Community
 #: to be worth arriving at. The first initiative is everybody's; only the
 #: admin is in the second, so everyone else meets it the way a visitor does,
 #: and the two carry different join policies so "Join" and "Request to join"
-#: are both reachable. One community auto-joins its arrivals. The music shelf
-#: is deliberately left empty, so "nothing on this shelf" is reachable too.
+#: are both reachable. One community auto-joins its arrivals, and one asks
+#: people to ask, so its card says "Ask to join". The music shelf is
+#: deliberately left empty, so "nothing on this shelf" is reachable too.
 DIRECTORY: list[dict] = [
     {
         "name": "The Cartographers' Table",
@@ -266,6 +267,7 @@ DIRECTORY: list[dict] = [
         "admin": "Thorn Ironforge",
         "members": ["Platform Operator", "Platform Moderator"],
         "photo": "campus",
+        "join_policy": CommunityJoinPolicy.request,
         "initiatives": [
             {
                 "name": "Roundtable",
@@ -331,7 +333,12 @@ async def _community(
         description=spec["description"],
         creator=users[spec["admin"]],
     )
-    await guilds.list_in_directory(session, guild, categories=spec["categories"])
+    await guilds.list_in_directory(
+        session,
+        guild,
+        categories=spec["categories"],
+        join_policy=spec.get("join_policy", CommunityJoinPolicy.open),
+    )
     await guilds.set_images(session, guild, spec["photo"])
     await session.commit()
     guilds.expunge_guild_scoped(session)

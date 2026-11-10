@@ -9,74 +9,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Plug-ins can list a calendar's events and skip one date of a repeating event.** A plug-in reads the events in a span of days, each date of a repeating one included, and can skip a date as you can, which tells its attendees; Automations uses both.
-- **Ban and time out members.** Removing someone can ban them too: no invite, the directory or single sign-on lets them back in until the ban is lifted under **Settings → Users → Banned**. **Time out…** on a member, from **Members** or **Settings → Users**, lets them read the community but not post, comment, react or change anything for an hour, a day, a week or until a date you pick. It ends by itself.
-- **A listed community can ask people to ask.** Choose **Listed: ask to join** in Community settings: the community stays in the directory, its card says **Ask to join** with room for a note, and admins approve or turn people down on the **Users** tab. Admins hear when someone asks, and the person hears the answer. In the API, a community's `is_community` is now `join_policy` (`private`, `request` or `open`).
-- **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens it in an editor, where you hide or number any part. Help and feedback hide people's names, avatars and contact details for you, and a report pictures what you're reporting as it opens.
-- **Suggestions, on Initiative Cloud.** The **Suggestions** page, in the site's header, lists what the team has written up from feedback, by category, with a roadmap of what's coming. Anybody can read it; sign in to vote, and you'll hear each time one you voted for moves. Each release's **What's new** post lists the suggestions it shipped. Writing feedback shows the suggestions like it, and voting for one joins what you send to it.
-- **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` joins a plug-in's rows to tasks, spreadsheets and other plug-ins, and a tile's **Build** tab offers it as **Plug-in data**. Existing plug-in tiles are rewritten to use it, and follow **Run dashboard as**.
-- **The phone apps ask for a rating, once.** After you've used the app on three days, the App Store or Google Play shows its own rating prompt the next time you finish a task or make something, and the app never asks again. Installed from Google Play, **Rate us on Google Play** in your account menu opens the store page any time. Needs the newest app.
+- **Ban and time out members.** Removing someone can ban them until you lift it under **Settings → Users → Banned**. **Time out…** on a member lets them read but not post, comment or react, for an hour, a day, a week or until a date you pick.
+
+  ![The Time out dialog on a member, offering 1 hour, 1 day, 1 week or until a date](docs/images/releases/time-out-member.webp)
+
+- **Nord and Elemental color themes.** Elemental lays a metallic sheen over the app in one of ten elements, from copper and gold to emerald and obsidian, and Catppuccin's dark mode comes in Frappé, Macchiato or Mocha. Pick one under **My Settings → Interface**.
+
+  ![The Elemental theme's tile in the picker, with Gold chosen from a row of ten element swatches](docs/images/releases/elemental-theme.webp)
+  ![A community's Members page in Elemental Gold, with metal borders and a sheen across the sidebar](docs/images/releases/elemental-members.webp)
+
+- **Communities people ask to join.** Choose **Listed: ask to join** in Community settings: people ask from the directory with a note, and admins approve or turn them down on the **Users** tab. In the API, a community's `is_community` is now `join_policy` (`private`, `request` or `open`).
+
+  ![A community's card in the directory with an Ask to join button](docs/images/releases/ask-to-join-card.webp)
+  ![The Ask to join dialog with a note to the community's admins](docs/images/releases/ask-to-join-note.webp)
+
+- **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens an editor to hide or number any part. Help and feedback hide people's names, avatars and contact details for you.
+- **Suggestions and a roadmap on Initiative Cloud.** The **Suggestions** page, in the site's header, lists what the team has written up from feedback, with a roadmap of what's coming. Sign in to vote, and hear each time one you voted for moves.
 - **Drop a file on an import.** Importing a backup, another app's export, an .ics calendar or a registry bundle takes a file dropped on its box.
+- **The phone apps ask for a rating once.** After three days of use, the App Store or Google Play shows its prompt once, after you finish something; from Google Play, **Rate us on Google Play** is in your account menu. Needs the newest app.
+- **Plug-ins list and skip calendar events.** A plug-in reads a calendar's events over a span of days, each date of a repeating one included, and can skip one date, which tells its attendees. Automations uses both.
+- **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` joins a plug-in's rows to tasks and spreadsheets, and a tile's **Build** tab offers it as **Plug-in data**. Existing plug-in tiles are rewritten to use it, and follow **Run dashboard as**.
 
 ### Changed
 
-- **An Update button stays until you update.** Once a newer version's prompt is closed, **Update** waits beside the bell, or in the desktop app's title bar. The version number and **What's new** moved to the foot of **My Settings**.
-- **Help leads with the user guide.** **Help**, in your account menu and the command palette, searches the guide from inside the app, starting with answers for the page you're on. Where your server takes help requests, **Ask the team** starts one from your search; the separate documentation and lifebuoy icons are gone.
-- **Event themes replace the Pride choice.** The app dresses up while an event runs: Pride in June, snow and candy canes through Christmas, gold for the new year. One switch under **My Settings → Interface → This device** turns them off; none can stay on all year.
-- **Send feedback reaches the team that makes Initiative.** It starts from what you want to say (an idea, something's not right, a compliment), docks beside the page and keeps your draft. **Server operators:** on a server other than Initiative Cloud it opens Cloud's feedback page in the browser and the server sends nothing; switch it off under **Settings → Platform → Intake**. A Feedback board set up on a server stops receiving, and its cases stay as tasks.
-- **Server operators: a server on a release before 0.75.0 updates through 0.75 first.** The database changes up to 0.75.0 are now one step, so such a server starts 0.75.2 once, then this release. Its start-up message says so, naming the release.
-- **Server operators: `FIRST_SUPERUSER_EMAIL` and `FIRST_SUPERUSER_PASSWORD` are no longer read.** Use `FIRST_OWNER_EMAIL` and `FIRST_OWNER_PASSWORD`, their names since 0.54. `S3_KMS_KEY_ID`, which nothing read, is gone too.
-- **Accounts that haven't signed in with a password since 0.44 sign in another way once.** Their passwords were stored in an old form that's no longer read. **Forgot password** sets a new one (it needs email set up on the server), and a passkey or single sign-on still works.
+- **Old passwords need resetting.** An account that hasn't signed in with a password since 0.44 sets a new one with **Forgot password** (it needs email set up on the server), or signs in with a passkey or single sign-on.
 - **Backups made before 0.78 no longer restore.** Restore one on 0.78 first, then back up again.
-- **A message device that never signed its keys is removed.** Devices on the app since 0.73 already have. One left over registers again the next time it opens, without the messages it held.
-- **Server operators: Initiative runs on Python 3.14 everywhere.** The image and both server packages use it; the Debian package carries its own, since Debian 13's is 3.13, and its fixes come with Initiative's releases.
-- **The desktop app has its own title bar,** with the app's name, **Help** and **Update** in place of the File, Edit, View and Window menus. It still drags and maximizes the window.
-- **Search forgives typos.** The command palette, the icon picker and every list you pick from find a name through a wrong, swapped or extra letter, or with its words in any order. A table's filter stays exact.
-- **Announcements you close stay in your notifications,** as a read line that opens them again, in place of the **Past announcements** page.
-- **Lists you tick several in work from the keyboard.** Filters, tags, options and other multi-pickers take the arrow keys and Enter, stay open while you tick, and have a search box with **Select all** and **Clear all**.
-- **On a phone, a drag to reorder starts after a short press and hold,** so a swipe over a page tree or list scrolls instead.
-- **A project's task table scrolls with the page,** with its column headings held at the top. Long collections scroll smoothly too.
-- **Lists, pages and panels show their shape while they load,** and anything that fails to load says so, with **Try again**.
-- **Attach files from inside the box you write in.** Help requests, feedback, reports and ticket replies have a paperclip in the text box; drop or paste a picture to attach it, and see it as a thumbnail.
-- **What a plug-in makes names the plug-in.** Tasks, posts, comments and trash entries a plug-in or Initiative itself makes say so, rather than naming nobody. Existing items keep a person's name, and a plug-in's is recovered where its install is on record.
-- **Dialogs look and behave alike.** Every dialog and side panel has one surface and blurred backdrop, with long content scrolling between a title and buttons that stay in view. Save, Create and Delete show a spinner and can't be pressed twice, every create dialog has **Cancel**, and bulk deletes ask in the app, not the browser.
-- **Fields and switches look and read the same everywhere.** Every field shares one box and focus ring, is outlined red when invalid, and focuses or flips from its label. A screen reader reads a field's hint and error with it.
+- **Unsigned message devices are removed.** A device that never signed its keys (any on the app since 0.73 has) registers again the next time it opens, without the messages it held.
+- **Help leads with the user guide.** **Help**, in your account menu and the command palette, searches the guide, starting with the page you're on. Where your server takes requests, **Ask the team** starts one; the documentation and lifebuoy icons are gone.
+- **Update waits beside the bell.** Once you close a new version's prompt, **Update** stays beside the bell, or in the desktop app's title bar. The version number and **What's new** moved to the foot of **My Settings**.
+- **Event themes replace the Pride choice.** The app dresses up for Pride in June, through Christmas and for the new year. One switch under **My Settings → Interface → This device** turns them off.
+- **Themes go by their real names.** Displacer is **Catppuccin**, Strahd **Dracula** and Aboleth **Monokai**, and you keep yours under its new name.
+- **Closed announcements stay in notifications.** A closed announcement leaves a read line in your notifications that opens it again, in place of the **Past announcements** page.
+- **The desktop app's own title bar.** It shows the app's name, **Help** and **Update** in place of the File, Edit, View and Window menus, and still drags and maximizes the window.
+- **Feedback goes to Initiative's team.** **Send feedback** starts from what you want to say, docks beside the page and keeps your draft. **Server operators:** off Initiative Cloud it opens Cloud's feedback page and your server sends nothing; switch it off under **Settings → Platform → Intake**. A Feedback board on your server stops receiving, and its cases stay as tasks.
+- **Search forgives typos.** The command palette, the icon picker and every list you pick from find a name through a wrong, swapped or extra letter, or words in any order. A table's filter stays exact.
+- **Attach files in the text box.** Help requests, feedback, reports and ticket replies have a paperclip in the text box; drop or paste a picture to attach it as a thumbnail.
+- **Multi-select pickers work from the keyboard.** Filters, tags and options take the arrow keys and Enter, stay open while you tick, and have a search box with **Select all** and **Clear all**.
+- **Press and hold to reorder on phones.** A drag starts after a short hold, so a swipe over a page tree or list scrolls it.
+- **Task tables scroll with the page.** A project's task table keeps its column headings at the top as you scroll, and long collections scroll smoothly.
+- **Loading shows the page's shape.** Lists, pages and panels show their outline while they load, and anything that fails to load says so, with **Try again**.
+- **Dialogs look and behave alike.** Every dialog and side panel keeps its title and buttons in view, and Save, Create and Delete show a spinner and can't be pressed twice. Every create dialog has **Cancel**, and bulk deletes ask in the app.
+- **Fields look and read alike.** Every field shares one box and focus ring, is outlined red when invalid, and focuses from its label. A screen reader reads a field's hint and error with it.
+- **Tool cards look alike.** Every tool's cards lift under the pointer, and a name cut short shows in full when you point at it.
+- **Sideways rows scroll alike.** From collections above a file list to an item's links, drag, swipe or use the arrow buttons.
 - **One colour picker everywhere.** A spreadsheet's colours and a profile decoration's colours open the app's own picker, starting on the current colour.
-- **Rows that scroll sideways work the same everywhere,** from collections above a file list to an item's links: drag, swipe or use the arrow buttons.
-- **Every tool's cards look alike,** lifting under the pointer, and a name cut short shows in full when you point at it.
-- **Light or dark is in My Settings too,** under **Interface → This device**.
-- **A report thanks you in place,** in its dialog, with an address to write to where the server gives one.
-- **Each AI connection has its own on/off switch** on its row under **Integrations**. A community's **Allow AI features** switch moved to the **Security** tab, and turning AI off turns its connections off until AI is back on.
-- **A community's Security tab shows its rules at a glance.** Each sign-in rule shows what it asks, and **Change** says how many members don't meet a new rule before it saves. Providers and group rules edit in place, and server-decided settings say **Set by your server**.
-- **Rules for every initiative read as sentences.** **Settings › Initiatives** lists your community's rules one line per tool, and **Add a rule** names the initiatives it changes before you save. An initiative's settings show a community-set value with a lock.
-- **The initiatives table shows who runs each one,** how people join it, and archived initiatives in their own view, with Archive and Delete in each row's menu.
-- **Platform settings show each rule's current setting.** On **Security** and **Community**, each rule states its value and **Change** opens a dialog; requiring a second factor says how many accounts it will ask before it saves.
-- **Secure connections out of the server trust the machine's own certificates,** so a certificate authority your organisation installs on the host is trusted. `SSL_CERT_FILE` and `SSL_CERT_DIR` still point it elsewhere.
+- **Light or dark in My Settings.** Choose it under **My Settings → Interface → This device**, as well as from your account menu.
+- **Reports thank you in place.** After you send a report, its dialog thanks you, with an address to write to where the server gives one.
+- **Items name the plug-in that made them.** Tasks, posts, comments and trash entries a plug-in or Initiative itself makes say so. Existing items are credited to their plug-in where its install is on record.
+- **On/off switches for AI connections.** Each connection's row under **Integrations** has its own switch. A community's **Allow AI features** moved to the **Security** tab, and turning AI off turns its connections off until it's back on.
+- **Community security rules at a glance.** Each sign-in rule on the **Security** tab shows what it asks, and **Change** says how many members don't meet a new rule before it saves. Settings your server decides say **Set by your server**.
+- **Initiative rules read as sentences.** **Settings › Initiatives** lists your community's rules one line per tool, and **Add a rule** names the initiatives it changes before you save. An initiative's settings show a community-set value with a lock.
+- **A fuller initiatives table.** It shows who runs each initiative and how people join, with archived ones in their own view and Archive and Delete in each row's menu.
+- **Platform settings show each rule's value.** On **Security** and **Community**, each rule states its setting and **Change** opens a dialog; requiring a second factor says how many accounts it will ask.
+- **Server operators: update through 0.75 first.** A server on a release before 0.75.0 starts 0.75.2 once, then this release; its start-up message says so.
+- **Server operators: old first-owner variables are gone.** Use `FIRST_OWNER_EMAIL` and `FIRST_OWNER_PASSWORD` in place of `FIRST_SUPERUSER_EMAIL` and `FIRST_SUPERUSER_PASSWORD`. `S3_KMS_KEY_ID`, which nothing read, is gone too.
+- **Server operators: Python 3.14 everywhere.** The image and both server packages use it; the Debian package carries its own, updated with Initiative's releases, since Debian 13's is 3.13.
+- **Server operators: the host's certificates are trusted.** Connections out of the server trust a certificate authority installed on the machine. `SSL_CERT_FILE` and `SSL_CERT_DIR` still point elsewhere.
 
 ### Fixed
 
-- **A task that repeats after it is completed, completed by a plug-in, comes back on the right day.** A plug-in names the zone it counts days in when it completes one, and Automations names the automation's; the next due date had counted UTC days, a day early or late west of UTC. A plug-in reading a repeating event is told when it next starts, as well as when the series began.
-- **Single sign-on keeps the initiative role a group rule gives.** Where a community's provider connection adds people on arrival, someone placed in an auto-join initiative by a group rule now gets the rule's role there, not a plain member's.
-- **A listed community no longer stops a single sign-on it can't take.** Where its provider connection adds people on arrival, an account whose age answer keeps it out is left out of that community, and the sign-in goes on.
-- **Every passkey button works in the apps.** Signing in, adding a passkey, breaking glass, the billing console and every other passkey prompt open your browser and carry on in the app, with no second sign-in.
-- **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, with what the version asks for first, and a version this server can't run says why.
-- **Create from `[[` works in wiki pages and posts,** asking what kind of thing to make and linking it.
-- **The storage page gives the S3 move in the order that works.** Save S3 with **Serve missing objects from local** on, then **Start backfill**, which waits until S3 is saved.
-- **Posts from X and Reddit show where you put them,** in a document, on a whiteboard or as a link file, on the web and in the apps.
-- **Tabs past the edge of a narrow window can be reached with a mouse,** by a thin scrollbar under them.
-- **Messages fit the screen.** The conversation fills the page and scrolls on its own, on phones too, with the message box always in view. The encryption note is a shield beside the person's name.
-- **Cmd/Ctrl+B and Cmd/Ctrl+K do one thing in a document:** bold, and make a link.
-- **The arrow keys move through what `[[` offers,** as they do for `@` and `#`.
-- **A plug-in's widgets are offered as soon as it is installed** or upgraded.
-- **Descriptions say what actually happens.** Support and Moderator descriptions, moving a task's status, break glass, community AI, the cookie notice and the group-message encryption note are corrected, and dataset names show.
-- **Confirmations, pickers and tables speak your language,** down to Cancel, placeholders, filters and screen-reader labels.
-- **An error shows once,** and pinning, reordering projects or tasks, and closing tabs say when they fail.
-- **A collection's grid and timeline, and posts, keep your place** when you switch to one partway down the page.
-- **The members table drops page sizes that did nothing.** It shows 25 members a page.
-- **Closing a confirmation puts you back on the button that opened it.**
-- **Progress bars tell a screen reader how far along they are.**
-- **Widgets stay clear while you customize Home,** with their name and buttons on a solid background.
-- **A task type's page layout is named for its type** in the layout editor.
+- **Repeating tasks a plug-in completes land on the right day.** A task that repeats after completion counts its next due date in the plug-in's or automation's time zone, not UTC. A plug-in reading a repeating event is told when it next starts.
+- **Group rules give their initiative role.** Where a provider connection adds people on arrival, someone a group rule places in an auto-join initiative gets the rule's role there, not a plain member's.
+- **The S3 move in the order that works.** On the storage page, save S3 with **Serve missing objects from local** on, then **Start backfill**, which waits until S3 is saved.
+- **Single sign-on goes on past an age limit.** Where a listed community's provider connection adds people on arrival, an account its age answer keeps out is left out of it, and the sign-in goes on.
+- **Passkeys work in the apps.** Signing in, adding a passkey, breaking glass, the billing console and every other passkey prompt open your browser and carry on in the app, with no second sign-in.
+- **Plug-in updates that ask for access.** Its row in **Settings › Integrations** shows **Update waiting** with what the version asks for, and a version this server can't run says why.
+- **Create from `[[` in wikis and posts.** It asks what kind of thing to make, and links it.
+- **Posts from X and Reddit show.** In a document, on a whiteboard or as a link file, on the web and in the apps.
+- **New plug-in widgets appear at once.** A plug-in's widgets are offered as soon as it's installed or upgraded.
+- **Hidden tabs scroll into reach.** Tabs past the edge of a narrow window scroll with a thin scrollbar under them.
+- **Every color theme's text reads clearly.** Muted text, error text and focus rings in Kobold, Catppuccin, Dracula, Unicorn, Dark Knight, ORC and Monokai meet the WCAG AA contrast standard.
+- **Messages fit the screen.** A conversation fills the page and scrolls on its own, phones included, with the message box always in view. The encryption note is a shield beside the person's name.
+- **Descriptions say what actually happens.** The Support and Moderator roles, moving a task's status, break glass, community AI, the cookie notice and the group-message encryption note read correctly, and dataset names show.
+- **More of the app is translated.** Confirmations, pickers and tables speak your language, down to Cancel, placeholders, filters and screen-reader labels.
+- **Errors show once.** Pinning, reordering projects or tasks, and closing tabs say when they fail.
+- **Switching views keeps your place.** A collection's grid and timeline, and posts, keep your place when you switch to one partway down the page.
+- **Cmd/Ctrl+B and K in documents.** Each does one thing: bold, and make a link.
+- **Arrow keys move through `[[`.** As they do for `@` and `#`.
+- **Focus returns after a confirmation.** Closing one puts you back on the button that opened it.
+- **Screen readers read progress bars.** They say how far along they are.
+- **Members table shows 25 a page.** The page sizes that did nothing are gone.
+- **Widgets stay clear while customizing.** On Home, their name and buttons sit on a solid background.
+- **Task type layouts carry their name.** In the layout editor, a task type's page layout is named for its type.
 
 ## [0.78.0] - 2026-11-06
 
