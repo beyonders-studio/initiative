@@ -56,6 +56,7 @@ from app.models.platform.guild import (
     restore_status_choices,
 )
 from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.member_moderation import MemberModeration, ModerationKind
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserStatus
 from app.models.tenant.custom_role import CustomRole, CustomRoleMember
@@ -148,12 +149,19 @@ class AgeConfirmationRequiredError(CodedError):
     status_code = 403
 
 
+class BannedError(CodedError):
+    """The community has banned this person."""
+
+    status_code = 403
+
+
 #: Why :func:`ensure_membership` refuses somebody new. A sign-in that places
 #: people (its rules, auto-join) leaves a refusing community out and carries
 #: on: one community's refusal is never a reason to refuse the sign-in.
 ADMISSION_REFUSALS: tuple[type[CodedError], ...] = (
     GuildCapacityError,
     AgeConfirmationRequiredError,
+    BannedError,
 )
 
 
@@ -364,6 +372,20 @@ async def get_administration(
     return administration
 
 
+async def _refuse_banned(session: AsyncSession, *, guild_id: int, user_id: int) -> None:
+    """Refuse somebody the community has banned."""
+    if (
+        await session.exec(
+            select(MemberModeration.user_id).where(
+                MemberModeration.guild_id == guild_id,
+                MemberModeration.user_id == user_id,
+                MemberModeration.kind == ModerationKind.ban,
+            )
+        )
+    ).first() is not None:
+        raise BannedError(GuildMessages.BANNED_FROM_COMMUNITY)
+
+
 async def ensure_membership(
     session: AsyncSession,
     *,
@@ -411,6 +433,11 @@ async def ensure_membership(
             session.add(membership)
             await session.flush()
         return membership
+    # Whoever the community has banned stays out, by every way in. Asked under
+    # the lock a removal takes, so a ban and a join made together settle in
+    # order: the join waits for the ban, or the removal removes the join.
+    await lock_guild_seats(session, guild_id)
+    await _refuse_banned(session, guild_id=guild_id, user_id=user_id)
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
     # blocked.
@@ -2858,6 +2885,8 @@ async def ask_to_join(
         raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_A_COMMUNITY)
     if guild.join_policy != CommunityJoinPolicy.request.value:
         raise CommunityJoinRequestError(GuildMessages.COMMUNITY_JOIN_NOT_BY_REQUEST)
+    # Nobody the community banned puts a request in front of its admins.
+    await _refuse_banned(session, guild_id=guild_id, user_id=user.id)
     await _refuse_ended_guest(session, guild_id=guild_id, user_id=user.id)
     if await get_membership(session, guild_id=guild_id, user_id=user.id):
         raise CommunityJoinRequestError(GuildMessages.COMMUNITY_ALREADY_A_MEMBER)
@@ -2961,8 +2990,9 @@ async def lock_guild_seats(session: AsyncSession, guild_id: int) -> None:
     on the other's row.
 
     Every path that can empty the seat, or impose a requirement on it, takes
-    this first, so they order rather than interleave. Held to the end of the
-    transaction; the caller does not release it.
+    this first, so they order rather than interleave. So does every join, before
+    it asks for a ban, so a removal that bans orders against it too. Held to
+    the end of the transaction; the caller does not release it.
     """
     await advisory_lock(session, LockNamespace.GUILD_SEATS, guild_id)
 

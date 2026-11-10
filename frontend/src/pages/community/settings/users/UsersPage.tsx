@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Download, HandCoins, IdCard, RefreshCcw, UserMinus } from "lucide-react";
+import { Download, HandCoins, IdCard, RefreshCcw, Timer, TimerOff, UserMinus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,6 +10,7 @@ import { useListUnownedContent } from "@/api/generated/users/users";
 import { MemberInvites } from "@/components/communities/CommunityInvites";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
+import { TimeOutMemberDialog } from "@/components/communities/TimeOutMemberDialog";
 import { JoinRequestQueue } from "@/components/members/JoinRequestQueue";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/user/UserHandle";
@@ -27,7 +28,10 @@ import {
 import { useServerTableState } from "@/hooks/useServerTableState";
 import {
   useAnswerCommunityJoinRequest,
+  useCommunityBans,
   useExportCommunityUsersCsv,
+  useLiftBan,
+  useLiftMemberTimeout,
   useSetMemberApiAccess,
   useUpdateCommunityMembership,
   useUsers,
@@ -36,9 +40,11 @@ import { toast } from "@/lib/mascotToast";
 import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import { toolCamelPlural } from "@/lib/tools";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { DataTable } from "@/ui/data-table";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { FormSkeleton, SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
@@ -90,6 +96,56 @@ const UnownedContentCard = ({ onClaim }: UnownedContentCardProps) => {
           </Button>
         </>
       )}
+    </SettingsSection>
+  );
+};
+
+/**
+ * Who this community has banned. Shown once there is anybody, or when the list
+ * could not be read, so a failure never passes for nobody; lifting a ban lets
+ * them be invited or join again, and puts nobody back.
+ */
+const BansCard = () => {
+  const { t } = useTranslation("communities");
+  const query = useCommunityBans();
+  const bans = query.data ?? [];
+  const liftBan = useLiftBan({
+    onSuccess: (_data, { userId }) => {
+      const lifted = bans.find((ban) => ban.user.id === userId);
+      toast.success(t("bans.lifted", { name: lifted ? getUserDisplayName(lifted.user) : "" }));
+    },
+  });
+  if (query.isError) {
+    return (
+      <SettingsSection title={t("bans.title")} description={t("bans.description")}>
+        <StatusMessage onRetry={query.refetch} />
+      </SettingsSection>
+    );
+  }
+  if (bans.length === 0) return null;
+  return (
+    <SettingsSection title={t("bans.title")} description={t("bans.description")}>
+      <ul className="divide-y">
+        {bans.map((ban) => (
+          <li key={ban.user.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <div className="flex flex-col">
+              <UserHandle user={ban.user} />
+              <span className="text-muted-foreground text-xs">
+                {t("bans.since", { date: formatDate(ban.banned_at) })}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={liftBan.isPending}
+              onClick={() => liftBan.mutate({ userId: ban.user.id })}
+            >
+              {t("bans.lift")}
+            </Button>
+          </li>
+        ))}
+      </ul>
     </SettingsSection>
   );
 };
@@ -150,6 +206,10 @@ export const UsersPage = () => {
   const [transferTarget, setTransferTarget] = useState<{
     member: UserCommunityMember | null;
   } | null>(null);
+  const [timingOut, setTimingOut] = useState<{ id: number; name: string } | null>(null);
+  const liftTimeout = useLiftMemberTimeout({
+    onSuccess: () => toast.success(t("timeOut.lifted")),
+  });
 
   // Searched and paged on the server: the table only ever holds the page on
   // screen.
@@ -240,13 +300,20 @@ export const UsersPage = () => {
       header: t("users.handleColumn"),
       // The handle is what identifies someone, so it is also what opens them.
       cell: ({ row }) => (
-        <Link
-          to="/u/$handle"
-          params={{ handle: getUrlHandle(row.original) }}
-          className="text-sm hover:underline"
-        >
-          <UserHandle user={row.original} />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/u/$handle"
+            params={{ handle: getUrlHandle(row.original) }}
+            className="text-sm hover:underline"
+          >
+            <UserHandle user={row.original} />
+          </Link>
+          {row.original.timed_out_until ? (
+            <Badge variant="secondary">
+              {t("timeOut.badge", { time: formatDateTime(row.original.timed_out_until) })}
+            </Badge>
+          ) : null}
+        </div>
       ),
     },
     ...(showsNames
@@ -428,6 +495,10 @@ export const UsersPage = () => {
             cell: ({ row }) => {
               const communityMember = row.original;
               const isSelf = communityMember.id === user?.id;
+              // Timeouts are for members and guests: an administrator keeps the
+              // settings, where it could be lifted again.
+              const timesOut =
+                held.writes && !isSelf && !isAdminRole(communityMember.community_role);
               return (
                 <RowActionsMenu subject={getUserDisplayName(communityMember)}>
                   <DropdownMenuItem onSelect={() => exportUserCsv(communityMember)}>
@@ -442,6 +513,27 @@ export const UsersPage = () => {
                     <HandCoins className="h-4 w-4" />
                     {t("transferOwnership.action")}
                   </DropdownMenuItem>
+                  {timesOut && communityMember.timed_out_until ? (
+                    <DropdownMenuItem
+                      onSelect={() => liftTimeout.mutate({ userId: communityMember.id })}
+                    >
+                      <TimerOff className="h-4 w-4" />
+                      {t("timeOut.lift")}
+                    </DropdownMenuItem>
+                  ) : null}
+                  {timesOut && !communityMember.timed_out_until ? (
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        setTimingOut({
+                          id: communityMember.id,
+                          name: getUserDisplayName(communityMember),
+                        })
+                      }
+                    >
+                      <Timer className="h-4 w-4" />
+                      {t("timeOut.action")}
+                    </DropdownMenuItem>
+                  ) : null}
                   {/* Removing somebody from the community is the destructive one, and
                 the only one you cannot aim at yourself. */}
                   <DropdownMenuSeparator />
@@ -532,9 +624,17 @@ export const UsersPage = () => {
         />
       </SettingsSection>
 
+      {managesMembers ? <BansCard /> : null}
+
       {managesMembers ? (
         <UnownedContentCard onClaim={() => setTransferTarget({ member: null })} />
       ) : null}
+
+      <TimeOutMemberDialog
+        open={timingOut !== null}
+        onOpenChange={(open) => !open && setTimingOut(null)}
+        member={timingOut}
+      />
 
       <RemoveCommunityMemberDialog
         open={deleteUserConfirm !== null}

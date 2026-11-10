@@ -3319,6 +3319,42 @@ export interface CommunityAuthSettingsUpdate {
 }
 
 /**
+ * Slim user projection for typeahead and picker surfaces.
+ *
+ * What it keeps is what it takes to *draw* a person and say where they stand
+ * in the guild being read: the handle, the avatar, what they have put around
+ * it, and their guild role. A decoration is an id naming a catalog entry and
+ * a role is one word, so all of it is short, and none of it costs a query
+ * beyond the one already being run.
+ *
+ * What it drops is the account's own business and anything that would cost
+ * another round trip: no address, no platform tier, no ``initiative_roles``
+ * (an N+1 enrichment on the full roster), no timestamps. The payload is
+ * bounded by pagination on the endpoints that serve it.
+ *
+ * ``profile_decorations`` is quoted and the model rebuilt below, because the
+ * catalog shape it names is declared further down this file.
+ */
+export interface UserSummary {
+  id: number;
+  username: string;
+  discriminator: number;
+  avatar_url: string | null;
+  status: UserStatus;
+  display_name: string | null;
+  profile_decorations: ProfileDecorationsOutput;
+  community_role: string | null;
+}
+
+/**
+ * Somebody the community has banned, and since when.
+ */
+export interface CommunityBanRead {
+  user: UserSummary;
+  banned_at: string;
+}
+
+/**
  * A guild's banner, whole — the picture and the look around it.
  *
  * ``image_url`` is where to fetch the artwork, never the bytes: a banner is
@@ -4493,6 +4529,7 @@ export interface CommunityRead {
   tier_name: string | null;
   status: CommunityStatus | null;
   content_read_only: boolean;
+  timed_out_until: string | null;
   contact_email: string | null;
   auth_options: CommunityAuthOption[] | null;
   closed_surfaces: string[] | null;
@@ -4642,6 +4679,13 @@ export interface CommunityTaskBreakdown {
   community_name: string;
   /** Number of completed tasks in this guild */
   completed_count: number;
+}
+
+/**
+ * When a timeout ends, with its offset: an instant, not a wall-clock time.
+ */
+export interface CommunityTimeoutWrite {
+  ends_at: string;
 }
 
 export interface CommunityUpdate {
@@ -7496,34 +7540,6 @@ export interface InitiativeDirectoryEntry {
  */
 export interface InitiativeJoinRequestCreate {
   message?: string | null;
-}
-
-/**
- * Slim user projection for typeahead and picker surfaces.
- *
- * What it keeps is what it takes to *draw* a person and say where they stand
- * in the guild being read: the handle, the avatar, what they have put around
- * it, and their guild role. A decoration is an id naming a catalog entry and
- * a role is one word, so all of it is short, and none of it costs a query
- * beyond the one already being run.
- *
- * What it drops is the account's own business and anything that would cost
- * another round trip: no address, no platform tier, no ``initiative_roles``
- * (an N+1 enrichment on the full roster), no timestamps. The payload is
- * bounded by pagination on the endpoints that serve it.
- *
- * ``profile_decorations`` is quoted and the model rebuilt below, because the
- * catalog shape it names is declared further down this file.
- */
-export interface UserSummary {
-  id: number;
-  username: string;
-  discriminator: number;
-  avatar_url: string | null;
-  status: UserStatus;
-  display_name: string | null;
-  profile_decorations: ProfileDecorationsOutput;
-  community_role: string | null;
 }
 
 /**
@@ -12136,6 +12152,7 @@ export interface UserCommunityMember {
   display_name: string | null;
   api_keys_allowed: boolean | null;
   guest_until: string | null;
+  timed_out_until: string | null;
 }
 
 /**
@@ -14402,6 +14419,11 @@ export type ListRosterParams = {
 
 export type ExportUsersCsvParams = {
   user_id?: number[] | null;
+};
+
+export type RemoveMemberParams = {
+  /** Also keep them out: no invite, directory join or sign-in rule lets them back in until the ban is lifted. */
+  ban?: boolean;
 };
 
 export type ListPersonalItemsParams = {

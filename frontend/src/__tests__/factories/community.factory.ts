@@ -69,6 +69,7 @@ export function buildCommunity(overrides: Partial<CommunityRead> = {}): Communit
     tier_name: null,
     status: null,
     content_read_only: false,
+    timed_out_until: null,
     contact_email: null,
     auth_options: null,
     closed_surfaces: null,

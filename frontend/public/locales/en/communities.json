@@ -51,7 +51,11 @@
     "removing": "Removing…",
     "removed": "Removed {{email}}",
     "failedToRemove": "Failed to remove member. Please try again.",
-    "ownershipReleased": "Anything they own becomes unowned. You can claim it any time from the unowned content list below."
+    "ownershipReleased": "Anything they own becomes unowned. You can claim it any time from the unowned content list below.",
+    "ban": "Ban them too",
+    "banHint": "They can't rejoin by invite, the directory or single sign-on until the ban is lifted.",
+    "banButton": "Remove and ban",
+    "banned": "Banned {{email}}"
   },
   "invite": {
     "title": "Join {{communityName}}",
@@ -696,5 +700,35 @@
     "makeMember": "Make member",
     "madeMember": "They're a member now.",
     "makeMemberError": "Could not make them a member."
+  },
+  "timeOut": {
+    "action": "Time out…",
+    "title": "Time out {{name}}",
+    "description": "They can still read this community, but can't post, comment, react or change anything until the timeout ends.",
+    "lengthLabel": "For",
+    "length": {
+      "hour": "1 hour",
+      "day": "1 day",
+      "week": "1 week",
+      "custom": "Until a date"
+    },
+    "untilLabel": "Until",
+    "confirm": "Time out",
+    "confirming": "Timing out…",
+    "done": "{{name}} is timed out until {{time}}",
+    "error": "Couldn't time them out. Try again.",
+    "lift": "Lift timeout",
+    "lifted": "Timeout lifted",
+    "liftError": "Couldn't lift the timeout. Try again.",
+    "badge": "Timed out until {{time}}",
+    "banner": "You're timed out in {{community}} until {{time}}. You can read, but can't change anything."
+  },
+  "bans": {
+    "title": "Banned",
+    "description": "People who can't rejoin this community until their ban is lifted.",
+    "since": "Banned {{date}}",
+    "lift": "Lift ban",
+    "lifted": "Lifted the ban on {{name}}",
+    "liftError": "Couldn't lift the ban. Try again."
   }
 }

@@ -504,6 +504,27 @@ async def test_a_request_community_lets_people_in_only_once_an_admin_says_yes(
     assert len(await _notified(session, asker.user.id, outcome)) == 1
 
 
+async def test_somebody_banned_cannot_ask(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A ban keeps a request out of the admins' queue, as it keeps the person
+    out of the community."""
+    guild, admin = await _a_request_community(session, acting_user)
+    member = await acting_user(guild_role=CommunityRole.member, guild=guild)
+    banned = await client.delete(
+        admin.g(f"/users/{member.user.id}?ban=true"), headers=admin.headers
+    )
+    assert banned.status_code == 204, banned.text
+
+    asked = await client.post(
+        f"/api/v1/communities/directory/{guild.id}/join-requests",
+        json={},
+        headers=member.headers,
+    )
+    assert asked.status_code == 403, asked.text
+    assert asked.json()["detail"] == "BANNED_FROM_COMMUNITY"
+
+
 async def test_only_the_communitys_roster_holders_reach_its_requests(
     client: AsyncClient, session: AsyncSession, acting_user
 ):

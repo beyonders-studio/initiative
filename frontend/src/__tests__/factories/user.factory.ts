@@ -228,6 +228,7 @@ export function buildUserCommunityMember(
     created_at: "2026-01-15T00:00:00.000Z",
     initiative_roles: [],
     guest_until: null,
+    timed_out_until: null,
     ...overrides,
   };
 }

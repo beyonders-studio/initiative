@@ -51,7 +51,11 @@
     "removing": "Wird entfernt…",
     "removed": "{{email}} entfernt",
     "failedToRemove": "Mitglied konnte nicht entfernt werden. Bitte versuche es erneut.",
-    "ownershipReleased": "Alles, was ihnen gehört, wird herrenlos. Du kannst es jederzeit aus der Liste herrenloser Inhalte unten übernehmen."
+    "ownershipReleased": "Alles, was ihnen gehört, wird herrenlos. Du kannst es jederzeit aus der Liste herrenloser Inhalte unten übernehmen.",
+    "ban": "Auch sperren",
+    "banHint": "Sie können weder per Einladung, über das Verzeichnis noch per Single Sign-on wieder beitreten, bis die Sperre aufgehoben ist.",
+    "banButton": "Entfernen und sperren",
+    "banned": "{{email}} gesperrt"
   },
   "invite": {
     "title": "{{communityName}} beitreten",
@@ -696,5 +700,35 @@
     "makeMember": "Zum Mitglied machen",
     "madeMember": "Die Person ist jetzt Mitglied.",
     "makeMemberError": "Die Person konnte nicht zum Mitglied gemacht werden."
+  },
+  "timeOut": {
+    "action": "Stummschalten…",
+    "title": "{{name}} stummschalten",
+    "description": "Sie können diese Community weiterhin lesen, aber bis zum Ende nichts posten, kommentieren, reagieren oder ändern.",
+    "lengthLabel": "Für",
+    "length": {
+      "hour": "1 Stunde",
+      "day": "1 Tag",
+      "week": "1 Woche",
+      "custom": "Bis zu einem Datum"
+    },
+    "untilLabel": "Bis",
+    "confirm": "Stummschalten",
+    "confirming": "Wird stummgeschaltet…",
+    "done": "{{name}} ist stummgeschaltet bis {{time}}",
+    "error": "Stummschalten fehlgeschlagen. Versuche es erneut.",
+    "lift": "Stummschaltung aufheben",
+    "lifted": "Stummschaltung aufgehoben",
+    "liftError": "Die Stummschaltung konnte nicht aufgehoben werden. Versuche es erneut.",
+    "badge": "Stummgeschaltet bis {{time}}",
+    "banner": "Du bist in {{community}} stummgeschaltet bis {{time}}. Du kannst lesen, aber nichts ändern."
+  },
+  "bans": {
+    "title": "Gesperrt",
+    "description": "Personen, die dieser Community nicht wieder beitreten können, bis ihre Sperre aufgehoben ist.",
+    "since": "Gesperrt am {{date}}",
+    "lift": "Sperre aufheben",
+    "lifted": "Sperre für {{name}} aufgehoben",
+    "liftError": "Die Sperre konnte nicht aufgehoben werden. Versuche es erneut."
   }
 }

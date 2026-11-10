@@ -1358,6 +1358,70 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             guest_base=frozenset({SELECT}),
         ),
     ),
+    # Bans and timeouts, one row per person per community. Joining reads it on
+    # the system engine; the community's roster holders keep it; the person's
+    # own standing and membership lookup read their own row.
+    "member_moderation": SharedTable(
+        rls=TableRls(
+            policies=(
+                Policy(
+                    "member_moderation_admin_select",
+                    SELECT,
+                    ("app_guild_base", "app_guild_base_ro"),
+                    using=routed_admin("guild_id", AdminSurface.members),
+                ),
+                Policy(
+                    "member_moderation_admin_insert",
+                    INSERT,
+                    ("app_guild_base",),
+                    check=routed_admin_write("guild_id", AdminSurface.members),
+                ),
+                Policy(
+                    "member_moderation_admin_update",
+                    UPDATE,
+                    ("app_guild_base",),
+                    using=routed_admin_write("guild_id", AdminSurface.members),
+                ),
+                Policy(
+                    "member_moderation_admin_delete",
+                    DELETE,
+                    ("app_guild_base",),
+                    using=routed_admin_write("guild_id", AdminSurface.members),
+                ),
+                # The routed person's own row, for their standing: a member's,
+                # a guest's, and a member token's acting for them.
+                Policy(
+                    "member_moderation_own_routed",
+                    SELECT,
+                    (
+                        "app_guild_base",
+                        "app_guild_base_ro",
+                        "guest_base",
+                        "plugin_install_base",
+                    ),
+                    using=routed_and_own("guild_id", "user_id"),
+                ),
+                # Their own rows before routing: the membership lookup (on the
+                # login) and the communities list (on the platform floor).
+                Policy(
+                    "member_moderation_own",
+                    SELECT,
+                    ("app_user", "platform_base"),
+                    using=own_row("user_id"),
+                ),
+            ),
+        ),
+        grants=Grants(
+            # Joining asks it (``ensure_membership``); a row goes with its
+            # community or its account by the foreign keys' cascade.
+            app_admin=frozenset({SELECT}),
+            app_user=frozenset({SELECT}),
+            app_guild_base=DML,
+            platform_base=frozenset({SELECT}),
+            plugin_install_base=frozenset({SELECT}),
+            guest_base=frozenset({SELECT}),
+        ),
+    ),
     # Which of the platform's providers a community signs in through, and the tenant it
     # narrows one to. Read at sign-in on the system engine.
     "guild_provider_connections": SharedTable(

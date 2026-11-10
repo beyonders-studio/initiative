@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import (
     AliasChoices,
+    AwareDatetime,
     ConfigDict,
     EmailStr,
     Field,
@@ -248,6 +249,9 @@ class UserCommunityMember(UserCommunityRead):
     api_keys_allowed: bool | None = None
     #: When a guest's time ends; ``None`` for a member.
     guest_until: datetime | None = None
+    #: When this member's timeout ends; ``None`` while they have none. Only the
+    #: roster's holders are told anyone else's.
+    timed_out_until: datetime | None = None
 
 
 class UserCommunityMemberListResponse(PageMeta):
@@ -982,3 +986,16 @@ class AccountDeletionResponse(SanitizedBaseModel):
     success: bool
     action: str
     message: str
+
+
+class CommunityBanRead(SanitizedBaseModel):
+    """Somebody the community has banned, and since when."""
+
+    user: UserSummary
+    banned_at: datetime
+
+
+class CommunityTimeoutWrite(SanitizedBaseModel):
+    """When a timeout ends, with its offset: an instant, not a wall-clock time."""
+
+    ends_at: AwareDatetime
