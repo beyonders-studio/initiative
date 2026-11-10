@@ -54,6 +54,7 @@ from app.services.marketplace import plugin_refs
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import plugin_channels as channels_service
+from app.services.tenant.initiatives import create_custom_role
 from app.testing import (
     create_calendar,
     create_calendar_event,
@@ -1215,6 +1216,22 @@ async def _shown_board(
     return installed, member, task
 
 
+async def _viewer(session: AsyncSession, acting_user, installed):
+    """A reader in the placed initiative whose role is no manager's and was
+    not given the install's ``use``."""
+    await route_session_to_guild(session, installed.guild.id)
+    await create_custom_role(
+        session, initiative_id=installed.placed.id, name="viewer", display_name="Viewer"
+    )
+    await session.commit()
+    return await acting_user(
+        guild_role=CommunityRole.member,
+        guild=installed.guild,
+        initiative=installed.placed,
+        initiative_role="viewer",
+    )
+
+
 def _shown(rows: list[MetadataValue]) -> dict[str, bool]:
     return {
         str(row.definition.key): row.entity_type in row.definition.shown_on
@@ -1322,8 +1339,9 @@ class TestShownValues:
     async def test_values_reach_whom_the_plugins_actions_would(
         self, client: AsyncClient, session: AsyncSession, acting_user, role_session
     ):
-        """The install on, placed in the task's initiative with a role the
-        reader holds (or the reader its admin), and the reader old enough."""
+        """The install on, placed in the task's initiative, the reader's role
+        given its ``use`` (or the reader a manager there, or its admin), and
+        the reader old enough."""
         installed, member, task = await _shown_board(
             client, session, acting_user, role_session
         )
@@ -1333,6 +1351,7 @@ class TestShownValues:
             initiative=installed.placed,
             initiative_role="project_manager",
         )
+        viewer = await _viewer(session, acting_user, installed)
         shown = [(installed.plugin.id, "github.issue", 123)]
 
         async def drawn(actor=member) -> list:
@@ -1351,7 +1370,8 @@ class TestShownValues:
 
         assert await drawn() == shown
         assert await drawn(installed.seat) == shown
-        assert await drawn(manager) == [], "a role the placement does not allow"
+        assert await drawn(manager) == shown
+        assert await drawn(viewer) == [], "a role not given the install's use"
 
         await change(
             definition={**installed.plugin.definition, "minimum_age": {"default": 16}}
@@ -1449,12 +1469,7 @@ class TestShownValues:
         project = await session.get(Project, task.project_id)
         assert project is not None
         other = await create_task(session, project)
-        manager = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=installed.guild,
-            initiative=installed.placed,
-            initiative_role="project_manager",
-        )
+        viewer = await _viewer(session, acting_user, installed)
         issue = f"plugin:{installed.plugin.id}:github.issue"
         listing = f"plugin:{installed.plugin.id}:{PULLS}"
 
@@ -1481,7 +1496,7 @@ class TestShownValues:
         assert await listed("gt", 200) == set()
         assert await listed("is_null", True) == {other.id}
         assert await listed("is_null", False) == {task.id}
-        assert await listed("eq", 123, manager) == {task.id, other.id}
+        assert await listed("eq", 123, viewer) == {task.id, other.id}
         assert await listed("eq", pulls[0]["url"], field=listing) == {task.id}
         assert await listed("eq", "merged", field=listing, facet="status") == {task.id}
         assert await listed("in_", ["open"], field=listing, facet="status") == set()

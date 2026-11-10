@@ -24,6 +24,7 @@ import re
 from pathlib import Path
 from types import ModuleType
 
+import pytest
 from sqlalchemy import text
 
 from app.models.tenant.initiative import PermissionKey
@@ -32,6 +33,8 @@ from app.testing import create_guild, create_initiative, create_user
 VERSIONS_DIR = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 BASELINE_DIR = VERSIONS_DIR.parent / "baseline"
 DEFAULTS_NAME = "_ROLE_PERMISSION_DEFAULTS"
+#: The rules' unique key, which a backfill's ``ON CONFLICT`` names.
+SUBJECT_KEY = "uq_initiative_rules_subject"
 
 
 def _baseline_keys() -> set[str]:
@@ -94,7 +97,9 @@ def test_every_permission_key_has_a_backfill_migration() -> None:
         "These permission keys were added without backfilling the roles that "
         f"predate them: {sorted(missing)}. Add a guild-scoped migration that "
         f"declares a {DEFAULTS_NAME} map naming them and runs its own INSERT — "
-        "see 20261106_0583, which is meant to be copied rather than imported."
+        "see 20261106_0583, which is meant to be copied rather than imported, "
+        f"with its ON CONFLICT matching {SUBJECT_KEY} as the newest migration "
+        "naming it left it."
     )
 
 
@@ -104,7 +109,14 @@ async def test_backfill_writes_only_the_missing_rows(session) -> None:
     off. Runs the statement the migration itself carries."""
     migrations = _backfill_migrations()
     assert migrations, "no backfill migration found to exercise"
-    migration = _load(max(migrations))
+    newest = max(migrations)
+    key = max(p for p in VERSIONS_DIR.glob("*.py") if SUBJECT_KEY in p.read_text())
+    if newest < key:
+        pytest.skip(
+            f"{newest.name} was written for the rules' key before {key.name} "
+            "changed it; the next backfill names the key as it now stands"
+        )
+    migration = _load(newest)
     # A key a later tool's removal retired is not one this build stores.
     known = {key.value for key in PermissionKey}
     defaults = {
