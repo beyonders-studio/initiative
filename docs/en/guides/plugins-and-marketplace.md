@@ -77,7 +77,7 @@ Adding a plug-in asks up to four things, and every answer can be changed later f
 |---|---|
 | **What it can reach** | What it may read, or read and change: projects, files, comments, tags, metadata, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked **This server doesn't allow it** stays off whatever you tick. |
 | **Where it works** | **Every current initiative**, or **Only the initiatives I choose**. It reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. |
-| **Who can open it there** | For a plug-in with a page or fields inside initiatives: which roles see them. Moderators start ticked, and community admins can always open it. |
+| **Who can use it** | What the plug-in lets your community decide, like using it at all or seeing prices, and where each is changed: inside initiatives on each one's Roles screen, across the community on its Roles screen. Each says whether members start with it. Nothing to answer here. |
 | **Plug-ins that can use it** | Only when plug-ins you already have ask to use this one. Each starts ticked. |
 
 Some plug-ins work through another one, the way a plug-in that files bug reports might open them through a code-hosting plug-in. You're asked about that when the second plug-in arrives, so a community without the code-hosting plug-in is never asked whether anything may use it. Remove that plug-in and the permission goes with it; add it back and you're asked again.
@@ -99,7 +99,7 @@ Ticking one lets the plug-in use that standing when it needs to, not all the tim
 
 ## Use a plug-in
 
-Plug-ins are in the **Plug-ins** section of the community's sidebar. Select one to open its page. One with a page inside initiatives also shows up under each initiative it works in, for the roles that may open it. A plug-in that adds things elsewhere, like widgets or fields, has nothing to open, so it waits under the **2 more** (or however many) line at the bottom of the section.
+Plug-ins are in the **Plug-ins** section of the community's sidebar. Select one to open its page. One with a page inside initiatives also shows up under each initiative it works in, for the roles that use it there. A plug-in that adds things elsewhere, like widgets or fields, has nothing to open, so it waits under the **2 more** (or however many) line at the bottom of the section.
 
 Point at a plug-in in the sidebar and a gear appears beside its name. That opens its settings, showing the parts that are yours to decide.
 
@@ -134,7 +134,7 @@ Some plug-ins add to things you already work with: an invoice number on a task, 
 | **Sections** | A small panel on the item's page, made of the plug-in's fields and buttons. |
 | **Actions** | A button in a section, an entry in the item's menu, or a button beside one entry in a list, that asks the plug-in to do something with this item. Some check with you first, or ask a question or two, like which repository. |
 
-The plug-in keeps those values in Initiative, so they show and filter without waiting on it. They follow what the superadmin agreed to: a plug-in only marks items it may read, and only in the initiatives it works in, for the roles that may open it there. A few actions belong to community admins alone.
+The plug-in keeps those values in Initiative, so they show and filter without waiting on it. They follow what the superadmin agreed to: a plug-in only marks items it may read, and only in the initiatives it works in, for the roles that use it there. A plug-in can keep some of its values and actions to a permission of their own, which each initiative gives to the roles it chooses.
 
 Whoever looks after the initiative's layouts can move a plug-in's fields and sections, or take them off, in [Edit layouts](layouts.md). One taken off stays off, updates included.
 

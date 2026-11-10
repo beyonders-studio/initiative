@@ -42,12 +42,16 @@ Tools the initiative has switched off are listed under **Turned off for this ini
 
 So a "Volunteer" might view projects and files and create nothing, while a "Coordinator" creates everything.
 
+### Plug-ins on a role { #plug-ins-on-a-role }
+
+Each [plug-in](../guides/plugins-and-marketplace.md) that works in the initiative adds switches of its own to every role: **Use** for the plug-in itself, and any part it lets you hand out separately, such as seeing prices. A role starts the way the plug-in suggests, which for most is off. Managers and community admins hold every one, so the manager cards don't list them. Turn one on for a role to let its holders open the plug-in's page, see its fields and run its actions in this initiative.
+
 ## Set what members can do
 
 The initiative's managers and community admins can change roles.
 
 1. Open the initiative's **Initiative settings** and select **Roles**.
-2. On the **Member** card, turn **View** and **Create** on or off for each tool.
+2. On the **Member** card, turn **View** and **Create** on or off for each tool, and each plug-in's switches below them.
 
 Each switch saves as you flip it, and it applies to everyone on the Member role straight away. A switch showing **On** or **Off** with a lock was set by your community for every initiative (see [Set the rules for every initiative](#set-the-rules-for-every-initiative)).
 
@@ -98,12 +102,11 @@ Some communities want every initiative to work the same way: posts switched on e
 
 1. Open **Community settings** and select **Initiatives**.
 2. Under **Rules for every initiative**, select **Add a rule**.
-3. Choose the **Tool**.
-4. Answer **Is … turned on?**: **Each initiative decides**, **On in every initiative** or **Off in every initiative**.
-5. Answer **Can members view …?**: **Each initiative decides**, **Yes, in every initiative** or **No, only managers**.
-6. Answer **Can members create …?** the same way.
-7. Read **Who it changes today**, which lists the initiatives the rule would change.
-8. Select **Save rule**.
+3. Choose the **Tool or plug-in**.
+4. For a tool, answer **Is … turned on?**: **Each initiative decides**, **On in every initiative** or **Off in every initiative**. Then answer **Can members view …?**: **Each initiative decides**, **Yes, in every initiative** or **No, only managers**, and **Can members create …?** the same way.
+5. For a plug-in, answer **Do members have …?** the same way, for each switch it adds.
+6. Read **Who it changes today**, which lists the initiatives the rule would change.
+7. Select **Save rule**.
 
 Every initiative takes the rule at once, archived ones included. Their managers see the switches set the way the community said, with a lock, and can't change them. To change a rule later, select **Edit** beside it. The trash can beside it removes the rule, which hands those questions back to each initiative, with whatever each one had set before.
 

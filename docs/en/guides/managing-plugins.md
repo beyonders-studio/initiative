@@ -50,17 +50,17 @@ Each credential shows which service it's for and what it may do there, so you ca
 
 A line marked **This server doesn't allow it** stays off whatever you tick. The two standing lines, **Act as a moderator in the initiatives it's placed in** and **Act as an admin across your whole community**, start unticked; see [what they mean](plugins-and-marketplace.md#letting-a-plug-in-act-as-a-moderator-or-an-admin).
 
-## Change where a plug-in works, and who can open it
+## Change where a plug-in works
 
-A plug-in reads and changes things only in the initiatives it works in, and shows its page and fields there only to the roles you pick.
+A plug-in reads and changes things only in the initiatives it works in.
 
 1. Open the plug-in's settings.
 2. Under **Where this plug-in works**, pick **Every current initiative** or **Only the initiatives I choose**.
 3. If you're choosing, tick the initiatives.
-4. To change who can open it in one, select the button beside that initiative (it says **Community admins only**, or how many roles).
-5. Under **Who can open it here**, tick the roles.
 
-Each change saves straight away. Community admins can always open it. With no initiatives chosen, the plug-in reaches nothing inside initiatives at all.
+Each change saves straight away. With no initiatives chosen, the plug-in reaches nothing inside initiatives at all.
+
+Who uses it in each initiative is that initiative's call, the way its tools are: **Roles** beside an initiative opens its Roles screen, where its managers decide (see [Plug-ins on a role](../sharing/initiative-roles.md#plug-ins-on-a-role)). Its managers and community admins can always use it there. What a plug-in adds to Community settings follows the [custom roles](running-a-community.md#custom-roles) your admins hold.
 
 ## See who has connected, and stop them
 
