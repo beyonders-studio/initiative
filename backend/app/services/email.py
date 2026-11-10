@@ -1396,26 +1396,28 @@ def access_grant_pieces(
     )
 
 
-def initiative_join_request_pieces(
+def join_request_pieces(
     user: User,
     *,
+    of: Literal["initiative", "community"],
     event: str,
-    initiative_name: str,
+    name: str,
     requester: str | None = None,
     message: str | None = None,
 ) -> EmailPieces:
-    """One initiative join-request lifecycle event.
+    """One join-request lifecycle event, for an initiative or a community.
 
     ``event`` is one of ``requested`` | ``approved`` | ``denied``. ``requester``
-    and ``message`` belong to ``requested`` only — that one goes to the
-    initiative's managers and carries what they need to decide; the other two go
-    to the requester and carry the outcome.
+    and ``message`` belong to ``requested`` only — that one goes to whoever
+    answers and carries what they need to decide; the other two go to the
+    requester and carry the outcome.
 
     No link: these are guild-scoped, so the notice they ride on fills in its
     guild-aware smart link.
     """
     locale = _user_locale(user)
-    base = f"initiativeJoinRequest.{event}"
+    base = f"{of}JoinRequest.{event}"
+    named = {f"{of}Name": name}
     # The requester's note is their own free text. email_t escapes interpolated
     # values in the `email` namespace, so it lands in the HTML part as literal
     # text; the line is omitted entirely when they wrote nothing, rather than
@@ -1426,19 +1428,9 @@ def initiative_join_request_pieces(
         else ""
     )
     return EmailPieces(
-        subject=email_t(
-            f"{base}.subject",
-            locale=locale,
-            initiativeName=initiative_name,
-            escape=False,
-        ),
+        subject=email_t(f"{base}.subject", locale=locale, escape=False, **named),
         headline=email_t(f"{base}.title", locale=locale),
-        body=email_t(
-            f"{base}.body",
-            locale=locale,
-            initiativeName=initiative_name,
-            requester=requester or "",
-        )
+        body=email_t(f"{base}.body", locale=locale, requester=requester or "", **named)
         + note,
         link_label=email_t(f"{base}.buttonLabel", locale=locale),
     )

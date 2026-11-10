@@ -876,7 +876,7 @@ async def _load_guild_context(
     if (
         not for_settings
         and current_user.age_confirmed_at is None
-        and guild.is_community
+        and guild.listed
         and age_gate_on
     ):
         raise GuildAccessError(

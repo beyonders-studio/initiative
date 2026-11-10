@@ -32,7 +32,13 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.demo import accounts
 from app.models.platform.demo import DemoSandbox, LinkState
-from app.models.platform.guild import CommunityRole, CommunityStatus, Guild, GuildInvite
+from app.models.platform.guild import (
+    CommunityJoinPolicy,
+    CommunityRole,
+    CommunityStatus,
+    Guild,
+    GuildInvite,
+)
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
@@ -270,7 +276,7 @@ async def _list(session: AsyncSession, guild: Guild, card: DemoDirectoryCard) ->
     """Put the community in the directory with ``card``, and the directory
     on. Staged."""
     await rules.put(session, "community_directory_enabled", True)
-    guild.is_community = True
+    guild.join_policy = CommunityJoinPolicy.open.value
     guild.categories = guilds_service.normalize_categories(
         [category.value for category in card.categories]
     )

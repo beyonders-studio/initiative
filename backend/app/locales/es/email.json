@@ -238,6 +238,31 @@
       "textBody": "Tu solicitud para unirte a {{initiativeName}} fue rechazada. {{link}}"
     }
   },
+  "communityJoinRequest": {
+    "requested": {
+      "subject": "Solicitud para unirse a {{communityName}}",
+      "title": "Nueva solicitud de ingreso",
+      "buttonLabel": "Revisar la solicitud",
+      "body": "<strong>{{requester}}</strong> pidió unirse a <strong>{{communityName}}</strong>.",
+      "note": "Escribió: <em>{{message}}</em>",
+      "noteText": "Escribió: {{message}}",
+      "textBody": "{{requester}} pidió unirse a {{communityName}}. Revísalo en {{link}}."
+    },
+    "approved": {
+      "subject": "Ya eres miembro de {{communityName}}",
+      "title": "Solicitud de ingreso aprobada",
+      "buttonLabel": "Abrir la comunidad",
+      "body": "Tu solicitud para unirte a <strong>{{communityName}}</strong> fue aprobada: ya eres miembro.",
+      "textBody": "Tu solicitud para unirte a {{communityName}} fue aprobada: ya eres miembro. {{link}}"
+    },
+    "denied": {
+      "subject": "Solicitud para unirse a {{communityName}} rechazada",
+      "title": "Solicitud de ingreso rechazada",
+      "buttonLabel": "Explorar comunidades",
+      "body": "Tu solicitud para unirte a <strong>{{communityName}}</strong> fue rechazada.",
+      "textBody": "Tu solicitud para unirte a {{communityName}} fue rechazada. {{link}}"
+    }
+  },
   "reaction": {
     "subject": "Nuevas reacciones a tus publicaciones",
     "title": "Resumen de reacciones",

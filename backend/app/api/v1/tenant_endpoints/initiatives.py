@@ -561,8 +561,8 @@ async def _resolve_join_request(
             # denial the community's front page, which is as far as they go.
             "target_path": f"/i/{initiative.id}" if approved else "/",
         },
-        email=lambda reader: email_service.initiative_join_request_pieces(
-            reader, event=outcome, initiative_name=initiative.name
+        email=lambda reader: email_service.join_request_pieces(
+            reader, of="initiative", event=outcome, name=initiative.name
         ),
         email_names_line=False,
     )
@@ -657,10 +657,11 @@ async def create_join_request(
                 "target_path": f"/i/{initiative.id}/settings/members",
             },
             actor=current_user,
-            email=lambda reader: email_service.initiative_join_request_pieces(
+            email=lambda reader: email_service.join_request_pieces(
                 reader,
+                of="initiative",
                 event="requested",
-                initiative_name=initiative.name,
+                name=initiative.name,
                 requester=requester,
                 message=payload.message,
             ),

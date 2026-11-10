@@ -15,7 +15,7 @@
  * them as database CHECKs). What the UI adds is that they are asked *before*
  * the request rather than reported after it: the publish dialog collects the
  * categories and the content certification together, and a community whose seat
- * limit leaves no room to join is told so instead of being offered a toggle
+ * limit leaves no room to join is told so instead of being offered a choice
  * that can only fail.
  *
  * The 18+ question is asked there and nowhere else. It is a directory question,
@@ -29,6 +29,7 @@ import { useTranslation } from "react-i18next";
 import { updateCommunity } from "@/api/generated/communities/communities";
 import {
   type CommunityCategory,
+  CommunityJoinPolicy,
   type CommunityUpdate,
   SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -40,7 +41,7 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { cn } from "@/ui/lib/utils";
-import { Switch } from "@/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { CommunityAutoJoinPrompt } from "./CommunityAutoJoinPrompt";
 import { PublishCommunityDialog } from "./PublishCommunityDialog";
@@ -53,7 +54,8 @@ export const CommunityDiscoveryPanel = () => {
   const { t } = useTranslation(["communities", "common"]);
   const { activeCommunity, refreshCommunities, updateCommunityInState } = useCommunities();
   const { communityDirectoryEnabled } = useAppConfig();
-  const [publishing, setPublishing] = useState(false);
+  // The listed policy waiting on the publish dialog, while it is open.
+  const [publishing, setPublishing] = useState<CommunityJoinPolicy | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const save = useCommunityMutation(
@@ -84,21 +86,21 @@ export const CommunityDiscoveryPanel = () => {
     return null;
   }
 
-  const listed = activeCommunity.is_community;
+  const listed = activeCommunity.join_policy !== CommunityJoinPolicy.private;
   // null is unlimited. Only an operator sets this, so an admin who hits it is
   // told who to ask rather than offered a control they cannot satisfy.
   const seatLimited =
     activeCommunity.max_users != null && activeCommunity.max_users < MIN_COMMUNITY_SEATS;
 
   // Listing is a publication, so it goes through the dialog that collects the
-  // categories and the certification. Un-listing publishes nothing and asks
-  // nothing — it takes effect on the click.
-  const handleToggle = (next: boolean) => {
-    if (next) {
-      setPublishing(true);
+  // categories and the certification. Un-listing, or changing how a listed
+  // community lets people in, publishes nothing new — it takes effect at once.
+  const handlePolicy = (next: CommunityJoinPolicy) => {
+    if (!listed && next !== CommunityJoinPolicy.private) {
+      setPublishing(next);
       return;
     }
-    save.mutate({ is_community: false });
+    save.mutate({ join_policy: next });
   };
 
   const toggleCategory = (category: CommunityCategory) => {
@@ -115,10 +117,10 @@ export const CommunityDiscoveryPanel = () => {
         description={t("communities:settings.discoveryDescription")}
       >
         <SettingsRow
-          label={t("communities:settings.discoveryToggleLabel")}
+          label={t("communities:settings.discoveryPolicyLabel")}
           below={
             <>
-              {/* Why the toggle is unavailable, rather than an inert control. */}
+              {/* Why the choice is unavailable, rather than an inert control. */}
               {!listed && seatLimited ? (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="text-muted-foreground text-sm">
@@ -169,11 +171,22 @@ export const CommunityDiscoveryPanel = () => {
             </>
           }
         >
-          <Switch
-            checked={listed}
+          <Select
+            value={activeCommunity.join_policy}
             disabled={save.isPending || (!listed && seatLimited)}
-            onCheckedChange={handleToggle}
-          />
+            onValueChange={(next) => handlePolicy(next as CommunityJoinPolicy)}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(["private", "open", "request"] as const).map((policy) => (
+                <SelectItem key={policy} value={policy}>
+                  {t(`communities:settings.discoveryPolicy.${policy}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </SettingsRow>
 
         {error ? <p className="text-destructive text-sm">{error}</p> : null}
@@ -181,20 +194,20 @@ export const CommunityDiscoveryPanel = () => {
       </SettingsSection>
 
       <PublishCommunityDialog
-        open={publishing}
+        open={publishing !== null}
         saving={save.isPending}
         initialCategories={activeCommunity.categories}
-        onCancel={() => setPublishing(false)}
+        onCancel={() => setPublishing(null)}
         onConfirm={(categories) =>
           save.mutate(
             {
-              is_community: true,
+              join_policy: publishing ?? CommunityJoinPolicy.open,
               categories,
               // Ticking the certification is what answers the 18+ question — the
               // only path to "no", from unanswered or from a previous "yes".
               has_adult_content: false,
             },
-            { onSuccess: () => setPublishing(false) }
+            { onSuccess: () => setPublishing(null) }
           )
         }
       />

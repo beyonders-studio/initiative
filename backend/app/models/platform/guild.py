@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.sql import text
 from sqlmodel import Enum as SQLEnum
@@ -162,6 +163,23 @@ UNLISTED_STATUSES: frozenset[CommunityStatus] = frozenset(
 LIVE_STATUS_VALUES: frozenset[str] = frozenset(s.value for s in LIVE_STATUSES)
 
 
+class CommunityJoinPolicy(str, Enum):
+    """How somebody who is not in a community comes to join it.
+
+    The same three words as ``InitiativeJoinPolicy``. An invite and a sign-in
+    rule bring people into a community whatever its policy.
+
+    - ``private``: not in the directory; invite only. The default.
+    - ``request``: listed; somebody asks and an admin answers
+      (``community_join_requests``).
+    - ``open``: listed; anyone signed in joins.
+    """
+
+    private = "private"
+    request = "request"
+    open = "open"
+
+
 class CommunityCategory(str, Enum):
     """A subject a guild can file itself under in the community directory.
 
@@ -247,7 +265,9 @@ DEFAULT_BANNER: dict[str, str] = {
 class Guild(SQLModel, table=True):
     __tablename__ = "guilds"
     __allow_unmapped__ = True
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True, ignored_types=(hybrid_property,)
+    )
     __table_args__ = (
         # The community directory's only query shape: listed guilds, optionally
         # narrowed to one category. Partial on the opt-in so the index stays
@@ -256,7 +276,11 @@ class Guild(SQLModel, table=True):
             "ix_guilds_community_categories",
             "categories",
             postgresql_using="gin",
-            postgresql_where=text("is_community"),
+            postgresql_where=text("join_policy <> 'private'"),
+        ),
+        CheckConstraint(
+            "join_policy IN ('private', 'request', 'open')",
+            name="ck_guilds_join_policy",
         ),
     )
 
@@ -317,13 +341,13 @@ class Guild(SQLModel, table=True):
     status_before_suspension: str | None = Field(
         default=None, sa_column=Column(String(16), nullable=True)
     )
-    # Community directory opt-in. False means the guild is reachable only by
-    # invite; True publishes its name, description, icon, categories, and roster
-    # size to the signed-in directory and lets anyone join without one. Set by
-    # the guild's own admins, alongside the identity columns above.
-    is_community: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    # How somebody comes to join (see CommunityJoinPolicy). Anything but
+    # ``private`` is the community-directory opt-in: it publishes the name,
+    # description, icon, categories and roster size to the signed-in directory.
+    # Set by the guild's own admins, alongside the identity columns above.
+    join_policy: str = Field(
+        default="private",
+        sa_column=Column(String(16), nullable=False, server_default="private"),
     )
     # Which shelves the guild files itself under (see CommunityCategory). A listed
     # guild must be on at least one — a card nobody can find by browsing is not
@@ -345,6 +369,12 @@ class Guild(SQLModel, table=True):
     has_adult_content: bool | None = Field(
         default=None, sa_column=Column(Boolean, nullable=True)
     )
+
+    @hybrid_property
+    def listed(self) -> bool:
+        """Whether the guild opted into the directory, in Python and in SQL."""
+        return self.join_policy != CommunityJoinPolicy.private.value
+
     # The operator-set caps, plan label, and sign-in entitlement — everything
     # this row is NOT. See GuildAdministration for why they live apart.
     administration: Optional["GuildAdministration"] = Relationship(
@@ -628,3 +658,46 @@ class GuildInvite(SQLModel, table=True):
         return decrypt_field(self.invitee_email_encrypted, SALT_EMAIL)
 
     guild: Guild | None = Relationship()
+
+
+class CommunityJoinRequest(SQLModel, table=True):
+    """Somebody asking to join a ``request`` community, while nobody has answered.
+
+    In ``public`` because the asker is in no community to route into, and the
+    directory shows them their own requests across communities. Answering or
+    withdrawing deletes the row; the audit stream records each answer. A
+    request outlives a change of policy, as an initiative's does: the admins
+    can still answer it.
+    """
+
+    __tablename__ = "community_join_requests"
+    __table_args__ = (
+        Index(
+            "uq_community_join_requests_guild_user",
+            "guild_id",
+            "user_id",
+            unique=True,
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    guild_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("guilds.id", ondelete="CASCADE"), nullable=False
+        )
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    # The asker's note to the community's admins: often the only way they can
+    # say who they are.
+    message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

@@ -441,6 +441,10 @@ const communityInvites = (communityId: number): Spec => ({
   personalExact: [`/api/v1/communities/${communityId}/invites`],
 });
 
+const communityJoinRequests = (communityId: number): Spec => ({
+  personalExact: [`/api/v1/communities/${communityId}/join-requests`],
+});
+
 // ── Custom roles (community) ─────────────────────────────────────────────────────
 // The community's roles, who holds which, and what the reader holds: one prefix,
 // since a change to any of them can change the others.
@@ -706,6 +710,7 @@ export const q = {
   communityAIConnections,
   communityContent,
   communityInvites,
+  communityJoinRequests,
   communityMembers,
   ignoredAccounts,
   initiative,

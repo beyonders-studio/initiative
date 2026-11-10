@@ -166,7 +166,7 @@ const grantEntry = (grant: AccessGrantRead, settingsGrant?: AccessGrantRead): Co
   closed_surfaces: null,
   // A grant reaches one named community directly; the directory is not how the
   // grantee got here, and this synthetic entry is never listed in it.
-  is_community: false,
+  join_policy: "private",
   categories: [],
   // Community-admin territory, and a grantee acts as a member — so, unanswered.
   has_adult_content: null,

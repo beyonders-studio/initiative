@@ -52,6 +52,7 @@ from app.db.query import paginated_query
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform import user_profile_view
+from app.models.platform.guild import CommunityJoinPolicy
 from app.models.platform.user import User
 from app.models.tenant.moderation import ModerationReport, ModerationReportReporter
 from app.models.tenant.search_entry import SearchEntry
@@ -523,7 +524,9 @@ async def _platform_target_visible(
     relation = public_relation(PLATFORM_TARGET_RELATION[target])
     stmt = sa_select(relation.c["id"]).where(relation.c["id"] == target_id)
     if target is PlatformReportTarget.directory_listing:
-        stmt = stmt.where(relation.c["is_community"].is_(True))
+        stmt = stmt.where(
+            relation.c["join_policy"] != CommunityJoinPolicy.private.value
+        )
     return (await reporter_session.exec(stmt)).first() is not None
 
 

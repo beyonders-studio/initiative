@@ -389,5 +389,18 @@
       "this": "this collection",
       "plural": "collections"
     }
+  },
+  "joinRequests": {
+    "messageLabel": "Message (optional)",
+    "messagePlaceholder": "Say why you'd like to join…",
+    "send": "Send request",
+    "sending": "Sending…",
+    "queueTitle": "Requests to join",
+    "noMessage": "No message",
+    "unknownRequester": "Someone",
+    "priorDenials_one": "Denied {{count}} time before",
+    "priorDenials_other": "Denied {{count}} times before",
+    "approve": "Approve",
+    "deny": "Deny"
   }
 }

@@ -190,7 +190,7 @@ async def test_members_and_the_directory_read_the_location(
         location={"text": "Seattle, WA", "country": "US"},
     )
     member = await acting_user(guild_role=CommunityRole.member, guild=guild)
-    guild.is_community = True
+    guild.join_policy = "open"
     guild.categories = ["other"]
     guild.has_adult_content = False
     session.add(guild)
@@ -215,7 +215,7 @@ async def test_members_and_the_directory_read_the_location(
 
 async def _listed_at(session: AsyncSession, name: str, location: dict | None):
     guild = await create_guild(session, name=name, location=location)
-    guild.is_community = True
+    guild.join_policy = "open"
     guild.categories = ["other"]
     guild.has_adult_content = False
     session.add(guild)

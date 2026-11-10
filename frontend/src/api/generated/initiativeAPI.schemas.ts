@@ -3732,6 +3732,44 @@ export interface CommunityInviteStatus {
 }
 
 /**
+ * How somebody who is not in a community comes to join it.
+ *
+ * The same three words as ``InitiativeJoinPolicy``. An invite and a sign-in
+ * rule bring people into a community whatever its policy.
+ *
+ * - ``private``: not in the directory; invite only. The default.
+ * - ``request``: listed; somebody asks and an admin answers
+ *   (``community_join_requests``).
+ * - ``open``: listed; anyone signed in joins.
+ */
+export type CommunityJoinPolicy = (typeof CommunityJoinPolicy)[keyof typeof CommunityJoinPolicy];
+
+export const CommunityJoinPolicy = {
+  private: "private",
+  request: "request",
+  open: "open",
+} as const;
+
+/**
+ * Asking a ``request`` community to let the caller in.
+ */
+export interface CommunityJoinRequestCreate {
+  message?: string | null;
+}
+
+/**
+ * One request in a community's queue: who is asking, what they wrote and
+ * when. The asker is not a member, so they are drawn from their public
+ * profile rather than the community's roster.
+ */
+export interface CommunityJoinRequestRead {
+  id: number;
+  user: UserIdentity;
+  message: string | null;
+  created_at: string;
+}
+
+/**
  * Where a community is, in its admin's own words.
  *
  * ``text`` is the place as it was typed and as it is shown: a country alone
@@ -4458,7 +4496,7 @@ export interface CommunityRead {
   contact_email: string | null;
   auth_options: CommunityAuthOption[] | null;
   closed_surfaces: string[] | null;
-  is_community: boolean;
+  join_policy: CommunityJoinPolicy;
   categories: CommunityCategory[];
   has_adult_content: boolean | null;
   banner: CommunityBannerRead;
@@ -4610,7 +4648,7 @@ export interface CommunityUpdate {
   name?: string | null;
   description?: string | null;
   retention_days?: number | null;
-  is_community?: boolean | null;
+  join_policy?: CommunityJoinPolicy | null;
   categories?: CommunityCategory[] | null;
   banner?: CommunityBannerWrite | null;
   location?: CommunityLocationInput | null;
@@ -6087,8 +6125,9 @@ export interface DirectMessageSettingsUpdate {
  * Deliberately not a :class:`CommunityRead`: the reader is a stranger, so this
  * carries only what the guild published by opting in — its identity, its
  * shelves, and how many people are already there. No membership fields (they
- * have none), no lifecycle status, no administration. ``already_member`` is
- * about the *caller*, and only says whether the Join button applies to them.
+ * have none), no lifecycle status, no administration. ``already_member`` and
+ * ``request_pending`` are about the *caller*: which button applies to them,
+ * beside the ``join_policy`` that says whether it joins or asks.
  *
  * ``online_count`` is how many of those people have the guild open right now.
  * It is a live reading rather than a stored one, taken from the process
@@ -6104,6 +6143,8 @@ export interface DirectoryCommunityRead {
   member_count: number;
   online_count: number;
   already_member: boolean;
+  join_policy: CommunityJoinPolicy;
+  request_pending: boolean;
   banner: CommunityBannerRead;
   location: CommunityLocationOutput | null;
 }
@@ -8683,6 +8724,9 @@ export const NotificationType = {
   initiative_join_requested: "initiative_join_requested",
   initiative_join_approved: "initiative_join_approved",
   initiative_join_denied: "initiative_join_denied",
+  community_join_requested: "community_join_requested",
+  community_join_approved: "community_join_approved",
+  community_join_denied: "community_join_denied",
   share_requested: "share_requested",
   share_granted: "share_granted",
   share_declined: "share_declined",

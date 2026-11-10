@@ -42,6 +42,8 @@ const directory = vi.fn();
 vi.mock("@/hooks/useCommunityDirectory", () => ({
   useDirectoryCommunities: (params: unknown) => directory(params),
   useJoinDirectoryCommunity: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useAskToJoinDirectoryCommunity: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useWithdrawDirectoryJoinRequest: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const community: DirectoryCommunityRead = {
@@ -55,6 +57,8 @@ const community: DirectoryCommunityRead = {
   member_count: 12,
   online_count: 0,
   already_member: false,
+  join_policy: "open",
+  request_pending: false,
 };
 
 const DIRECTORY_ROUTE_ID = "/_serverRequired/_authenticated/communities";

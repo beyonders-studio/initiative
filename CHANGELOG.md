@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A listed community can ask people to ask.** Choose **Listed: ask to join** in Community settings: the community stays in the directory, its card says **Ask to join** with room for a note, and admins approve or turn people down on the **Users** tab. Admins hear when someone asks, and the person hears the answer. In the API, a community's `is_community` is now `join_policy` (`private`, `request` or `open`).
 - **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens it in an editor, where you hide or number any part. Help and feedback hide people's names, avatars and contact details for you, and a report pictures what you're reporting as it opens.
 - **Suggestions, on Initiative Cloud.** The **Suggestions** page, in the site's header, lists what the team has written up from feedback, by category, with a roadmap of what's coming. Anybody can read it; sign in to vote, and you'll hear each time one you voted for moves. Each release's **What's new** post lists the suggestions it shipped. Writing feedback shows the suggestions like it, and voting for one joins what you send to it.
 - **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` joins a plug-in's rows to tasks, spreadsheets and other plug-ins, and a tile's **Build** tab offers it as **Plug-in data**. Existing plug-in tiles are rewritten to use it, and follow **Run dashboard as**.

@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildCommunity,
   buildInitiative,
+  buildInitiativeJoinRequest,
   buildInitiativeMember,
   buildInitiativeRole,
   buildPage,
@@ -23,6 +24,7 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { InitiativeMemberRead, InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
+import { queryClient } from "@/lib/queryClient";
 
 vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
@@ -82,16 +84,20 @@ function stubInitiative(
 const managerMembership = () =>
   buildInitiativeMember({ user: buildUserSummary({ id: MANAGER_ID }), is_manager: true });
 
-const renderMembers = (role: "admin" | "member" = "admin") =>
+/** `appClient` mounts against the app's own query client — the one the
+ *  invalidation helpers address — so a re-read after an answer is observable. */
+const renderMembers = (role: "admin" | "member" = "admin", { appClient = false } = {}) =>
   renderPage(MembersPage, {
     auth: { user: buildUser({ id: MANAGER_ID }) },
     communities: { activeCommunityId: 1, activeCommunity: buildCommunity({ id: 1, role }) },
     initialRoute: "/c/$communityId/i/$initiativeId/settings/members",
     routeParams: { communityId: "1", initiativeId: String(INITIATIVE_ID) },
+    ...(appClient ? { queryClient } : {}),
   });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  queryClient.clear();
 });
 
 describe("MembersPage", () => {
@@ -337,6 +343,58 @@ describe("MembersPage", () => {
           "Auto-join is only available for initiatives anyone can join"
         )
       );
+    });
+  });
+
+  describe("requests to join", () => {
+    const ada = buildUserSummary({ id: 43, display_name: "Ada Lovelace" });
+
+    /** One request waiting until it is answered, and a record of the answers. */
+    function stubQueue() {
+      const answered: string[] = [];
+      server.use(
+        communityHttp.get("/initiatives/:id/join-requests", () =>
+          HttpResponse.json(
+            answered.length ? [] : [buildInitiativeJoinRequest({ id: 11, user: ada })]
+          )
+        ),
+        ...(["approve", "deny"] as const).map((verb) =>
+          communityHttp.post(`/initiatives/:id/join-requests/:requestId/${verb}`, ({ params }) => {
+            answered.push(`${verb}:${params.requestId}`);
+            return HttpResponse.json(
+              buildInitiativeJoinRequest({
+                id: 11,
+                user: ada,
+                status: verb === "approve" ? "approved" : "denied",
+              })
+            );
+          })
+        )
+      );
+      return answered;
+    }
+
+    it("approves a request, says who joined, and drops the row", async () => {
+      stubInitiative();
+      const answered = stubQueue();
+
+      renderMembers("admin", { appClient: true });
+      await userEvent.click(await screen.findByRole("button", { name: /Approve/ }));
+
+      await waitFor(() => expect(answered).toEqual(["approve:11"]));
+      expect(toast.success).toHaveBeenCalledWith("Ada Lovelace joined the initiative.");
+      await waitFor(() => expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument());
+    });
+
+    it("denies a request without letting anyone in", async () => {
+      stubInitiative();
+      const answered = stubQueue();
+
+      renderMembers();
+      await userEvent.click(await screen.findByRole("button", { name: /Deny/ }));
+
+      await waitFor(() => expect(answered).toEqual(["deny:11"]));
+      expect(toast.success).toHaveBeenCalledWith("Ada Lovelace's request was denied.");
     });
   });
 });

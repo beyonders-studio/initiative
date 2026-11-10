@@ -36,6 +36,8 @@ import type {
   CommunityInviteCreated,
   CommunityInviteRead,
   CommunityInviteStatus,
+  CommunityJoinRequestCreate,
+  CommunityJoinRequestRead,
   CommunityMembershipUpdate,
   CommunityOrderUpdate,
   CommunityPaymentIssueRead,
@@ -3350,4 +3352,507 @@ export const useLeaveCommunity = <TError = ErrorType<HTTPValidationError>, TCont
   TContext
 > => {
   return useMutation(getLeaveCommunityMutationOptions(options), queryClient);
+};
+/**
+ * Ask a listed ``request`` community to let the caller in. Asking again
+ * while a request waits changes nothing.
+ * @summary Ask To Join Community
+ */
+export const askToJoinCommunity = (
+  communityId: number,
+  communityJoinRequestCreate: BodyType<CommunityJoinRequestCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/communities/directory/${communityId}/join-requests`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: communityJoinRequestCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getAskToJoinCommunityMutationKey = () => ["askToJoinCommunity"] as const;
+
+export const getAskToJoinCommunityMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof askToJoinCommunity>>,
+    TError,
+    AskToJoinCommunityMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof askToJoinCommunity>>,
+  TError,
+  AskToJoinCommunityMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAskToJoinCommunityMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof askToJoinCommunity>>,
+    AskToJoinCommunityMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return askToJoinCommunity(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AskToJoinCommunityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof askToJoinCommunity>>
+>;
+export type AskToJoinCommunityMutationBody = BodyType<CommunityJoinRequestCreate>;
+export type AskToJoinCommunityMutationError = ErrorType<HTTPValidationError>;
+export type AskToJoinCommunityMutationVariables = {
+  communityId: number;
+  data: BodyType<CommunityJoinRequestCreate>;
+};
+
+/**
+ * @summary Ask To Join Community
+ */
+export const useAskToJoinCommunity = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof askToJoinCommunity>>,
+      TError,
+      AskToJoinCommunityMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof askToJoinCommunity>>,
+  TError,
+  AskToJoinCommunityMutationVariables,
+  TContext
+> => {
+  return useMutation(getAskToJoinCommunityMutationOptions(options), queryClient);
+};
+/**
+ * Take back the caller's own request. Nothing to take back is not an
+ * error.
+ * @summary Withdraw Community Join Request
+ */
+export const withdrawCommunityJoinRequest = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/communities/directory/${communityId}/join-requests`, method: "DELETE", signal },
+    options
+  );
+};
+
+export const getWithdrawCommunityJoinRequestMutationKey = () =>
+  ["withdrawCommunityJoinRequest"] as const;
+
+export const getWithdrawCommunityJoinRequestMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof withdrawCommunityJoinRequest>>,
+    TError,
+    WithdrawCommunityJoinRequestMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof withdrawCommunityJoinRequest>>,
+  TError,
+  WithdrawCommunityJoinRequestMutationVariables,
+  TContext
+> => {
+  const mutationKey = getWithdrawCommunityJoinRequestMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof withdrawCommunityJoinRequest>>,
+    WithdrawCommunityJoinRequestMutationVariables
+  > = (props) => {
+    const { communityId } = props ?? {};
+
+    return withdrawCommunityJoinRequest(communityId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type WithdrawCommunityJoinRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof withdrawCommunityJoinRequest>>
+>;
+
+export type WithdrawCommunityJoinRequestMutationError = ErrorType<HTTPValidationError>;
+export type WithdrawCommunityJoinRequestMutationVariables = { communityId: number };
+
+/**
+ * @summary Withdraw Community Join Request
+ */
+export const useWithdrawCommunityJoinRequest = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof withdrawCommunityJoinRequest>>,
+      TError,
+      WithdrawCommunityJoinRequestMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof withdrawCommunityJoinRequest>>,
+  TError,
+  WithdrawCommunityJoinRequestMutationVariables,
+  TContext
+> => {
+  return useMutation(getWithdrawCommunityJoinRequestMutationOptions(options), queryClient);
+};
+/**
+ * Who is asking to join, oldest first.
+ * @summary List Community Join Requests
+ */
+export const listCommunityJoinRequests = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommunityJoinRequestRead[]>(
+    { url: `/api/v1/communities/${communityId}/join-requests`, method: "GET", signal },
+    options
+  );
+};
+
+export const getListCommunityJoinRequestsQueryKey = (communityId: number) => {
+  return [`/api/v1/communities/${communityId}/join-requests`] as const;
+};
+
+export const getListCommunityJoinRequestsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCommunityJoinRequests>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCommunityJoinRequestsQueryKey(communityId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCommunityJoinRequests>>> = ({
+    signal,
+  }) => listCommunityJoinRequests(communityId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCommunityJoinRequests>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCommunityJoinRequestsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCommunityJoinRequests>>
+>;
+export type ListCommunityJoinRequestsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCommunityJoinRequests<
+  TData = Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCommunityJoinRequests>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+          TError,
+          Awaited<ReturnType<typeof listCommunityJoinRequests>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCommunityJoinRequests<
+  TData = Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCommunityJoinRequests>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+          TError,
+          Awaited<ReturnType<typeof listCommunityJoinRequests>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCommunityJoinRequests<
+  TData = Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCommunityJoinRequests>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Community Join Requests
+ */
+
+export function useListCommunityJoinRequests<
+  TData = Awaited<ReturnType<typeof listCommunityJoinRequests>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCommunityJoinRequests>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCommunityJoinRequestsQueryOptions(communityId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Let the asker in as a member. A refusal on the way in (the community is
+ * full, the asker under age) leaves the request where it was. Somebody who
+ * came in as a guest while they waited becomes a member, as making a guest
+ * one does. The claim and the notice commit together, once the membership
+ * has.
+ * @summary Approve Community Join Request
+ */
+export const approveCommunityJoinRequest = (
+  communityId: number,
+  requestId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/communities/${communityId}/join-requests/${requestId}/approve`,
+      method: "POST",
+      signal,
+    },
+    options
+  );
+};
+
+export const getApproveCommunityJoinRequestMutationKey = () =>
+  ["approveCommunityJoinRequest"] as const;
+
+export const getApproveCommunityJoinRequestMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof approveCommunityJoinRequest>>,
+    TError,
+    ApproveCommunityJoinRequestMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof approveCommunityJoinRequest>>,
+  TError,
+  ApproveCommunityJoinRequestMutationVariables,
+  TContext
+> => {
+  const mutationKey = getApproveCommunityJoinRequestMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof approveCommunityJoinRequest>>,
+    ApproveCommunityJoinRequestMutationVariables
+  > = (props) => {
+    const { communityId, requestId } = props ?? {};
+
+    return approveCommunityJoinRequest(communityId, requestId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ApproveCommunityJoinRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof approveCommunityJoinRequest>>
+>;
+
+export type ApproveCommunityJoinRequestMutationError = ErrorType<HTTPValidationError>;
+export type ApproveCommunityJoinRequestMutationVariables = {
+  communityId: number;
+  requestId: number;
+};
+
+/**
+ * @summary Approve Community Join Request
+ */
+export const useApproveCommunityJoinRequest = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof approveCommunityJoinRequest>>,
+      TError,
+      ApproveCommunityJoinRequestMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof approveCommunityJoinRequest>>,
+  TError,
+  ApproveCommunityJoinRequestMutationVariables,
+  TContext
+> => {
+  return useMutation(getApproveCommunityJoinRequestMutationOptions(options), queryClient);
+};
+/**
+ * Turn the asker down. They may ask again.
+ * @summary Deny Community Join Request
+ */
+export const denyCommunityJoinRequest = (
+  communityId: number,
+  requestId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/communities/${communityId}/join-requests/${requestId}/deny`,
+      method: "POST",
+      signal,
+    },
+    options
+  );
+};
+
+export const getDenyCommunityJoinRequestMutationKey = () => ["denyCommunityJoinRequest"] as const;
+
+export const getDenyCommunityJoinRequestMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof denyCommunityJoinRequest>>,
+    TError,
+    DenyCommunityJoinRequestMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof denyCommunityJoinRequest>>,
+  TError,
+  DenyCommunityJoinRequestMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDenyCommunityJoinRequestMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof denyCommunityJoinRequest>>,
+    DenyCommunityJoinRequestMutationVariables
+  > = (props) => {
+    const { communityId, requestId } = props ?? {};
+
+    return denyCommunityJoinRequest(communityId, requestId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DenyCommunityJoinRequestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof denyCommunityJoinRequest>>
+>;
+
+export type DenyCommunityJoinRequestMutationError = ErrorType<HTTPValidationError>;
+export type DenyCommunityJoinRequestMutationVariables = { communityId: number; requestId: number };
+
+/**
+ * @summary Deny Community Join Request
+ */
+export const useDenyCommunityJoinRequest = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof denyCommunityJoinRequest>>,
+      TError,
+      DenyCommunityJoinRequestMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof denyCommunityJoinRequest>>,
+  TError,
+  DenyCommunityJoinRequestMutationVariables,
+  TContext
+> => {
+  return useMutation(getDenyCommunityJoinRequestMutationOptions(options), queryClient);
 };
