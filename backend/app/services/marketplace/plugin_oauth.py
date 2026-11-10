@@ -101,6 +101,7 @@ __all__ = [
     "OAuthError",
     "issue_token",
     "list_installations",
+    "spend_jti",
     "token_endpoint_url",
     "verify_client_assertion",
     "verify_member_assertion",
@@ -333,17 +334,36 @@ async def _verify_signed_assertion(
     if not isinstance(jti, str) or not jti or len(jti) > ASSERTION_JTI_MAX_LENGTH:
         raise fail("the assertion's jti is not usable")
 
-    # One statement: the registration is read fresh (the snapshot may be up to
-    # a minute old) and the jti recorded against it. No row back means the
-    # registration is no longer live, or the jti has been spent.
+    if not await spend_jti(
+        session,
+        public_id=issuer,
+        jti=jti,
+        expires_at=datetime.fromtimestamp(expires_at, tz=UTC),
+        channel="plugin_member_assertion" if member else "plugin_assertion",
+    ):
+        raise fail("the assertion was already used")
+    return snapshot, dict(claims)
+
+
+async def spend_jti(
+    session: AsyncSession,
+    *,
+    public_id: str,
+    jti: str,
+    expires_at: datetime,
+    channel: str,
+) -> bool:
+    """Record ``jti`` as spent by the plug-in ``public_id``, and commit.
+
+    One statement: the registration is read fresh (the snapshot may be up to a
+    minute old) and the jti recorded against it. False when the registration
+    is no longer live or the jti was already spent, which is audited as a
+    replay on ``channel``.
+    """
     spent = (
         await session.exec(
             text(_BURN_JTI_SQL),
-            params={
-                "jti": jti,
-                "expires_at": datetime.fromtimestamp(expires_at, tz=UTC),
-                "public_id": issuer,
-            },
+            params={"jti": jti, "expires_at": expires_at, "public_id": public_id},
         )
     ).first()
     await session.commit()
@@ -351,13 +371,10 @@ async def _verify_signed_assertion(
         audit_service.emit(
             event_type=AuditEventType.SECURITY_REPLAY_REJECTED,
             actor_user_id=None,
-            detail={
-                "channel": "plugin_member_assertion" if member else "plugin_assertion",
-                "install": issuer,
-            },
+            detail={"channel": channel, "install": public_id},
         )
-        raise fail("the assertion was already used")
-    return snapshot, dict(claims)
+        return False
+    return True
 
 
 # --- grants -------------------------------------------------------------------

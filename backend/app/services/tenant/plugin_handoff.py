@@ -72,7 +72,6 @@ from app.core.security import (
     sign_eddsa,
 )
 from app.db.guild_standing import GuildContext
-from app.db.session import routed_guild_id
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import plugin_refs, registration_lookup
 from app.services.marketplace.community_status import community_status
@@ -90,9 +89,12 @@ from app.services.tenant.plugin_age import AgeViewer
 __all__ = [
     "PLUGIN_PAGE_HANDOFF_LIFETIME",
     "PageHandoff",
+    "authorize_surface",
     "mint_page_handoff",
     "page_by_id",
     "require_live_registration",
+    "signing_material",
+    "surface_claims",
 ]
 
 #: Single source for the handoff's lifetime, so the response advertises exactly
@@ -162,7 +164,7 @@ async def require_live_registration(
     return registration
 
 
-async def mint_page_handoff(
+async def authorize_surface(
     session: AsyncSession,
     plugin: GuildPlugin,
     *,
@@ -170,8 +172,9 @@ async def mint_page_handoff(
     context: GuildContext,
     initiative_id: int | None,
     viewer: AgeViewer,
-) -> PageHandoff:
-    """Authorize the caller for one surface, then mint its handoff.
+) -> tuple[dict[str, Any], registration_lookup.RegistrationSnapshot]:
+    """Whether the caller may open one surface here, or a refusal; answered
+    with the page the manifest declares and the registration behind it.
 
     ``initiative_id`` is where the surface was opened, and it is the only thing
     that says so — the scope is derived from it rather than passed alongside,
@@ -182,7 +185,9 @@ async def mint_page_handoff(
     Who may open it is :func:`~app.services.tenant.guild_plugins.surface_access`,
     the same decision the plug-in read reports to the client, measured on the
     viewer's standing (``context``) and their age where they are (``viewer``).
-    An initiative handoff reads the placement's roles in one query.
+    An initiative surface reads the placement's roles in one query. The page
+    handoff and Sign in with Initiative both ask it, so both doors make one
+    decision.
     """
     if not plugin.enabled:
         raise HTTPException(
@@ -227,20 +232,37 @@ async def mint_page_handoff(
             detail=_refusal(page, initiative_id=initiative_id),
         )
 
-    registration = await require_live_registration(plugin, context.guild_id)
+    return page, await require_live_registration(plugin, context.guild_id)
 
+
+def signing_material() -> tuple[str, str | None]:
+    """The plug-in platform's signing key, or a 503 naming what is missing.
+
+    The keypair is required and has no fallback, so an unconfigured
+    deployment fails closed rather than minting something no plug-in can
+    verify.
+    """
     try:
-        key, kid = resolve_plugin_platform_signing_material()
+        return resolve_plugin_platform_signing_material()
     except PluginPlatformSigningNotConfiguredError as exc:
-        # The plug-in platform's keypair is required and has no fallback, so an
-        # unconfigured deployment fails closed and says which setting is
-        # missing rather than minting something no plug-in can verify.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=PluginServiceMessages.SIGNING_NOT_CONFIGURED,
         ) from exc
 
-    guild_id = routed_guild_id(session)
+
+async def surface_claims(
+    plugin: GuildPlugin,
+    registration: registration_lookup.RegistrationSnapshot,
+    *,
+    surface_id: str,
+    context: GuildContext,
+    initiative_id: int | None,
+) -> dict[str, Any]:
+    """What a plug-in is told about the person opening one of its surfaces,
+    which :func:`authorize_surface` admitted: the claims beside each token's
+    envelope (see the module docstring)."""
+    guild_id = context.guild_id
     try:
         subject = await plugin_refs.ensure_plugin_ref(
             guild_id=guild_id,
@@ -255,7 +277,61 @@ async def mint_page_handoff(
             status_code=status.HTTP_409_CONFLICT,
             detail=GuildPluginMessages.ERASE_PENDING,
         ) from exc
-    standing = await community_status(guild_id)
+    claims: dict[str, Any] = {
+        # The reference this plug-in knows the member by in this community
+        # (OIDC Core §8.1 pairwise), never the row id: it is stable for the
+        # plug-in here, across a reinstall, and unrelated to what any other
+        # sector holds for the same person.
+        "sub": subject,
+        # The guild by reference, for the same reason as the member above: an
+        # index names a row to us, not an entity to somebody else.
+        "community_ref": guild_ref,
+        "plugin_install_id": plugin.id,
+        # Where the community stands now, which every token carries.
+        "community_status": await community_status(guild_id),
+        "surface_id": surface_id,
+        # The viewer's community role, from the standing the access decision
+        # was measured on, so a plug-in need not ask for it separately.
+        "community_admin": bool(context.is_admin),
+    }
+    # Absent guild-wide rather than null, so "which initiative is this?" has one
+    # answer instead of two shapes that both mean none.
+    if initiative_id is not None:
+        claims["initiative_id"] = initiative_id
+        claims["initiative_moderator"] = (
+            initiative_id in context.manager_initiatives
+            and initiative_id in context.override_initiatives
+        )
+    return claims
+
+
+async def mint_page_handoff(
+    session: AsyncSession,
+    plugin: GuildPlugin,
+    *,
+    surface_id: str,
+    context: GuildContext,
+    initiative_id: int | None,
+    viewer: AgeViewer,
+) -> PageHandoff:
+    """Authorize the caller for one surface (:func:`authorize_surface`), then
+    mint its handoff."""
+    page, registration = await authorize_surface(
+        session,
+        plugin,
+        surface_id=surface_id,
+        context=context,
+        initiative_id=initiative_id,
+        viewer=viewer,
+    )
+    key, kid = signing_material()
+    claims = await surface_claims(
+        plugin,
+        registration,
+        surface_id=surface_id,
+        context=context,
+        initiative_id=initiative_id,
+    )
 
     now = datetime.now(UTC)
     audience = plugin_platform_audience(registration.public_id)
@@ -263,34 +339,12 @@ async def mint_page_handoff(
         # One-shot marker: the plug-in blocklists a handoff once it has exchanged
         # it, so a captured token is not replayable inside its short window.
         "jti": str(uuid.uuid4()),
-        # The reference this plug-in knows the member by in this community
-        # (OIDC Core §8.1 pairwise), never the row id: it is stable for the
-        # plug-in here, across a reinstall, and unrelated to what any other
-        # sector holds for the same person.
-        "sub": subject,
         "aud": audience,
         "iss": TOKEN_ISSUER,
         "iat": int(now.timestamp()),
         "exp": now + PLUGIN_PAGE_HANDOFF_LIFETIME,
-        # The guild by reference, for the same reason as the member above: an
-        # index names a row to us, not an entity to somebody else.
-        "community_ref": guild_ref,
-        "plugin_install_id": plugin.id,
-        # Where the community stands now, which every token carries.
-        "community_status": standing,
-        "surface_id": surface_id,
-        # The viewer's community role, from the standing the access decision
-        # above was measured on, so a plug-in need not ask for it separately.
-        "community_admin": bool(context.is_admin),
+        **claims,
     }
-    # Absent guild-wide rather than null, so "which initiative is this?" has one
-    # answer instead of two shapes that both mean none.
-    if initiative_id is not None:
-        payload["initiative_id"] = initiative_id
-        payload["initiative_moderator"] = (
-            initiative_id in context.manager_initiatives
-            and initiative_id in context.override_initiatives
-        )
     token = sign_eddsa(payload, key, kid, typ=PLUGIN_HANDOFF_TOKEN_TYPE)
 
     return PageHandoff(

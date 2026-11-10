@@ -52,6 +52,12 @@ SALT_BIRTHDATE = b"birthdate"  # stored value, do not change
 # token lives ten minutes and is never stored, so a key rotation ends the ones
 # in flight and their plug-ins ask again.
 SALT_PLUGIN_ACCESS_TOKEN = b"app-access-token"  # stored value, do not change
+# A Sign in with Initiative authorization code, on its way through the person's
+# browser to the plug-in that asked. Transient: it lives a minute and is spent once.
+SALT_PLUGIN_SIGN_IN_CODE = b"app-sign-in-code"  # stored value, do not change
+# A Sign in with Initiative refresh token, held by the plug-in's server. Never
+# stored here: it names a sign-in whose session row says whether it stands.
+SALT_PLUGIN_SIGN_IN_REFRESH = b"app-sign-in-refresh"  # stored value, do not change
 # Where a page of a plug-in's installs ends, handed to the plug-in to ask for the next
 # one. Transient: never stored.
 SALT_PLUGIN_INSTALLS_CURSOR = b"app-installs-cursor"  # stored value, do not change

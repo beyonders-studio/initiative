@@ -260,6 +260,7 @@ def maximal_manifest() -> dict:
                 "requires": {"all_of": ["other"]},
             }
         ],
+        "sign_in": {"page": "panel", "return_path": "/signed-in"},
         "fields": [
             {
                 "key": "demo.link",
@@ -796,10 +797,12 @@ def test_nothing_is_stored_that_the_contract_does_not_declare(nodes):
 
 
 def test_every_service_field_survives_a_publish(published):
-    """``service`` is written inline rather than as a named object, so the
-    inventory above does not reach it; its fields are measured here."""
-    declared = contract.manifest_schema()["properties"]["service"]["properties"]
-    assert set(declared) == set(published["service"])
+    """``service`` and ``sign_in`` are written inline rather than as named
+    objects, so the inventory above does not reach them; their fields are
+    measured here."""
+    properties = contract.manifest_schema()["properties"]
+    assert set(properties["service"]["properties"]) == set(published["service"])
+    assert set(properties["sign_in"]["properties"]) == set(published["sign_in"])
     assert published["service"]["scopes"] == [
         "comments:read",
         "plugins:acme.github",

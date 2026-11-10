@@ -138,8 +138,9 @@ def is_valid_provider_slug(value: str) -> bool:
 
 
 # Post-login return paths must stay inside the SPA: a single-slash-rooted
-# relative path with no scheme, host, or backslash forms.
-NEXT_PATH_MAX_LENGTH = 512
+# relative path with no scheme, host, or backslash forms. Long enough for a
+# plug-in's authorize request, which comes back to its page with its query.
+NEXT_PATH_MAX_LENGTH = 2048
 
 
 def is_safe_next_path(value: str) -> bool:

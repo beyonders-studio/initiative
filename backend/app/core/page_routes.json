@@ -134,6 +134,7 @@
   "/my-tools",
   "/navigate",
   "/notifications",
+  "/oauth/authorize",
   "/oidc/callback",
   "/plugins/connected",
   "/pricing",

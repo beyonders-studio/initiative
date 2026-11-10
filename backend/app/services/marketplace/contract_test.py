@@ -991,3 +991,42 @@ def test_a_min_plugin_api_is_kept_as_declared(validator):
     assert list(validator.iter_errors(manifest)) == []
     stored = normalize_listing_definition("plugin", manifest)
     assert stored["min_plugin_api"] == "4.2"
+
+
+def _signing_in(sign_in: object) -> dict:
+    return _manifest(
+        features=["pages"],
+        pages=[{"id": "inventory", "path": "/inventory", "name": {"en": "Inventory"}}],
+        sign_in=sign_in,
+    )
+
+
+def test_a_sign_in_is_kept_as_declared(validator):
+    manifest = _signing_in({"page": "inventory", "return_path": "/signed-in"})
+    assert list(validator.iter_errors(manifest)) == []
+    stored = normalize_listing_definition("plugin", manifest)
+    assert stored["sign_in"] == {"page": "inventory", "return_path": "/signed-in"}
+
+
+@pytest.mark.parametrize(
+    "sign_in",
+    [
+        {"page": "inventory", "return_path": "https://elsewhere.test/back"},
+        {"page": "inventory"},
+        {"return_path": "/signed-in"},
+        "inventory",
+    ],
+)
+def test_a_sign_in_names_a_page_and_a_path(sign_in, validator):
+    """Both halves, and a path rather than an address: the address is the
+    registration's to give."""
+    manifest = _signing_in(sign_in)
+    assert list(validator.iter_errors(manifest)) != []
+    with pytest.raises(ValueError):
+        platform_accepts(manifest)
+
+
+def test_a_sign_in_names_one_of_the_plugins_own_pages():
+    """The schema cannot say which pages exist; the platform does."""
+    with pytest.raises(ValueError, match="sign_in"):
+        platform_accepts(_signing_in({"page": "elsewhere", "return_path": "/back"}))
