@@ -150,6 +150,7 @@ _TRASH_READ_PREDICATE = (
     "deleted_at IS NULL"
     f" OR {IN_POLICY.system_or_admin}"
     f" OR (deleted_by_kind = 'member' AND deleted_by = {gucs.USER_ID.once})"
+    f" OR (deleted_by_kind = 'plugin' AND deleted_by = {IN_POLICY.install_id})"
 )
 
 #: Who put a row in the trash, as ``created_by`` names who made it: the

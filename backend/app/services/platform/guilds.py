@@ -1553,19 +1553,19 @@ async def get_guild_retention_days(session: AsyncSession) -> int | None:
     """Return the trash retention period in days of the guild the session is
     routed to, or None for "never auto-purge".
 
-    Selecting the full row (not the column) is intentional: NULL in
+    Selecting a row (the id beside the column) is intentional: NULL in
     ``retention_days`` is the user's explicit "never" choice, and we must
     distinguish it from "no guild_settings row yet" (which would be a
     setup gap, fall back to the 90-day default). A bare column select
     collapses both to None and silently re-enables auto-purge for guilds
-    that opted out.
+    that opted out. Those two columns are all an installed plug-in may read
+    of the settings, so a row it bins is dated by the same answer.
     """
-    stmt = select(GuildSetting).limit(1)
-    result = await session.exec(stmt)
-    row = result.one_or_none()
+    stmt = select(GuildSetting.id, GuildSetting.retention_days).limit(1)
+    row = (await session.exec(stmt)).one_or_none()
     if row is None:
         return 90
-    return row.retention_days
+    return row[1]
 
 
 def _hash_code(code: str) -> str:

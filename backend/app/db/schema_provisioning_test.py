@@ -352,9 +352,11 @@ async def test_the_plugin_role_holds_only_what_a_plugin_reaches(engine):
             await drop_guild_schema(conn, gid)
 
 
-async def test_the_plugin_role_is_refused_the_communitys_settings(engine):
-    """A session assuming ``guild_<id>_plugin`` cannot read ``guild_settings``."""
+async def test_the_plugin_role_reads_only_the_settings_retention(engine):
+    """A session assuming ``guild_<id>_plugin`` reads the community's trash
+    retention, which dates a row it bins, and nothing else of its settings."""
     gid = _GID_PLUGIN_DENIED
+    schema = guild_schema_name(gid)
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, gid)
@@ -362,12 +364,11 @@ async def test_the_plugin_role_is_refused_the_communitys_settings(engine):
             await conn.exec_driver_sql(
                 f'SET ROLE "{guild_role_name(gid, GuildRoleKind.plugin)}"'
             )
+            await conn.execute(
+                text(f'SELECT id, retention_days FROM "{schema}".guild_settings')
+            )
             with pytest.raises(ProgrammingError) as exc:
-                await conn.scalar(
-                    text(
-                        f'SELECT count(*) FROM "{guild_schema_name(gid)}".guild_settings'
-                    )
-                )
+                await conn.execute(text(f'SELECT * FROM "{schema}".guild_settings'))
             assert "permission denied" in str(exc.value).lower()
             await conn.rollback()
             await conn.exec_driver_sql("RESET ROLE")

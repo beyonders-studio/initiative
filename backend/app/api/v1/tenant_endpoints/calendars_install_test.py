@@ -179,6 +179,190 @@ async def test_a_repeating_event_reads_its_next_start(
     assert single["next_start"] is None and single["next_occurrence"] is None
 
 
+async def test_lists_the_events_in_a_window_with_each_repeat_once_a_date(
+    client, session, acting_user, role_session
+):
+    """Each occurrence of a weekly meeting in the window, named by its start in
+    the series, one moved on its own at its new time, and only what the install
+    may read."""
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=["calendars:read"]
+    )
+    await _switch_on(session, installed.placed, installed.unplaced)
+    seat = installed.seat.user
+    in_a = await create_calendar(session, installed.placed, seat, name="A")
+    in_b = await create_calendar(session, installed.unplaced, seat, name="B")
+    first = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
+    weekly = await create_calendar_event(
+        session,
+        in_a,
+        seat,
+        title="Standup",
+        start_at=first,
+        end_at=first + timedelta(hours=1),
+        recurrence="RRULE:FREQ=WEEKLY",
+    )
+    await create_calendar_event(
+        session,
+        in_a,
+        seat,
+        series_id=weekly.id,
+        original_start=first + timedelta(days=7),
+        start_at=first + timedelta(days=9),
+        end_at=first + timedelta(days=9, hours=1),
+    )
+    await create_calendar_event(session, in_b, seat, title="Elsewhere", start_at=first)
+    headers = install_headers(installed, ["calendars:read"])
+
+    listed = await client.get(
+        guild_url(installed.guild.id, "/calendar-events/"),
+        headers=headers,
+        params={
+            "start_after": datetime.now(UTC).isoformat(),
+            "start_before": (first + timedelta(days=15)).isoformat(),
+        },
+    )
+    assert listed.status_code == 200, listed.text
+    starts = [
+        (
+            datetime.fromisoformat(row["start_at"]),
+            row["original_start"] and datetime.fromisoformat(row["original_start"]),
+        )
+        for row in listed.json()
+    ]
+    assert starts == [
+        (first, first),
+        (first + timedelta(days=9), first + timedelta(days=7)),
+        (first + timedelta(days=14), first + timedelta(days=14)),
+    ]
+
+
+async def test_skips_one_date_of_a_repeating_event(
+    client, session, acting_user, role_session
+):
+    """As deleting just that date does: restoring it brings it back."""
+    granted = ["calendars:read", "calendars:write"]
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=granted
+    )
+    await _switch_on(session, installed.placed)
+    headers = install_headers(installed, granted)
+    gid = installed.guild.id
+    calendar = await client.post(
+        guild_url(gid, "/calendars/"),
+        headers=headers,
+        json={"name": "Its own", "initiative_id": installed.placed.id},
+    )
+    assert calendar.status_code == 201, calendar.text
+    first = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
+    weekly = await client.post(
+        guild_url(gid, "/calendar-events/"),
+        headers=headers,
+        json={
+            "calendar_id": calendar.json()["id"],
+            "title": "Standup",
+            "start_at": first.isoformat(),
+            "end_at": (first + timedelta(hours=1)).isoformat(),
+            "recurrence": "RRULE:FREQ=WEEKLY",
+        },
+    )
+    assert weekly.status_code == 201, weekly.text
+    url = guild_url(gid, f"/calendar-events/{weekly.json()['id']}/occurrences/skip")
+
+    read_only = install_headers(installed, ["calendars:read"])
+    refused = await client.post(
+        url, headers=read_only, json={"start": first.isoformat()}
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
+
+    skipped = await client.post(url, headers=headers, json={"start": first.isoformat()})
+    assert skipped.status_code == 200, skipped.text
+    assert [datetime.fromisoformat(s) for s in skipped.json()["skipped_starts"]] == [
+        first
+    ]
+    assert datetime.fromisoformat(skipped.json()["next_start"]) == first + timedelta(
+        days=7
+    )
+
+    not_a_date = await client.post(
+        url, headers=headers, json={"start": (first + timedelta(hours=3)).isoformat()}
+    )
+    assert not_a_date.status_code == 422, not_a_date.text
+
+    restored = await client.post(
+        guild_url(gid, f"/calendar-events/{weekly.json()['id']}/occurrences/restore"),
+        headers=headers,
+        json={"start": first.isoformat()},
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["skipped_starts"] == []
+
+
+async def test_skipping_a_date_with_its_own_guests_tells_them(
+    client, session, acting_user, role_session
+):
+    """A date with a row of its own has its own attendees: they hear it is
+    cancelled, and the series' do not."""
+    granted = ["calendars:read", "calendars:write"]
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=granted
+    )
+    await _switch_on(session, installed.placed)
+    headers = install_headers(installed, granted)
+    gid = installed.guild.id
+    created = await client.post(
+        guild_url(gid, "/calendars/"),
+        headers=headers,
+        json={"name": "Its own", "initiative_id": installed.placed.id},
+    )
+    # Open to the initiative, so its attendees can read what they are named on.
+    await route_session_to_guild(session, gid)
+    calendar = await session.get(Calendar, created.json()["id"])
+    assert calendar is not None
+    await create_resource_grant(session, calendar, all_initiative_members=True)
+    regular = await _member_of_a(acting_user, installed)
+    guest = await _member_of_a(acting_user, installed)
+    first = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
+    weekly = await create_calendar_event(
+        session,
+        calendar,
+        installed.seat.user,
+        start_at=first,
+        end_at=first + timedelta(hours=1),
+        recurrence="RRULE:FREQ=WEEKLY",
+        attendees=[regular.user],
+    )
+    second = first + timedelta(days=7)
+    await create_calendar_event(
+        session,
+        calendar,
+        installed.seat.user,
+        series_id=weekly.id,
+        original_start=second,
+        start_at=second,
+        end_at=second + timedelta(hours=1),
+        attendees=[guest.user],
+    )
+
+    skipped = await client.post(
+        guild_url(gid, f"/calendar-events/{weekly.id}/occurrences/skip"),
+        headers=headers,
+        json={"start": second.isoformat()},
+    )
+    assert skipped.status_code == 200, skipped.text
+
+    await drain_notices()
+    told = (
+        await session.exec(
+            select(Notification.user_id).where(
+                Notification.type == NotificationType.event_cancelled
+            )
+        )
+    ).all()
+    assert told == [guest.user.id]
+
+
 async def test_changing_anything_needs_the_write_scope(
     client, session, acting_user, role_session
 ):

@@ -14272,6 +14272,14 @@ export const DeleteCalendarEventScope = {
   all: "all",
 } as const;
 
+export type ListCalendarEventsParams = {
+  initiative_id?: number | null;
+  calendar_ids?: number[] | null;
+  tz?: string | null;
+  start_after: string;
+  start_before: string;
+};
+
 export type DuplicateCalendarEventParams = {
   /** One date of a repeating event, copied as an event of its own. */
   occurrence?: string | null;
