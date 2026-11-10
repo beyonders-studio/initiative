@@ -47,7 +47,7 @@ const renderPrompt = () =>
   renderWithProviders(<CommunityAutoJoinPrompt />, {
     communities: {
       activeCommunityId: 1,
-      activeCommunity: buildCommunity({ id: 1, role: "admin", is_community: true }),
+      activeCommunity: buildCommunity({ id: 1, role: "admin", join_policy: "open" }),
     },
   });
 

@@ -113,8 +113,13 @@
     "retentionAfter_other": "Eliminar definitivamente tras <days/> días",
     "retentionUpdatedSuccessfully": "Retención actualizada.",
     "discoveryTitle": "Directorio de comunidades",
-    "discoveryDescription": "Una comunidad publicada aparece en el directorio, donde cualquier persona con la sesión iniciada puede encontrarla y unirse sin invitación.",
-    "discoveryToggleLabel": "Publicar esta comunidad",
+    "discoveryDescription": "Una comunidad publicada aparece en el directorio, donde cualquier persona con la sesión iniciada puede encontrarla y unirse o solicitar unirse.",
+    "discoveryPolicyLabel": "Quién puede unirse",
+    "discoveryPolicy": {
+      "private": "Solo con invitación",
+      "open": "Publicada: cualquiera puede unirse",
+      "request": "Publicada: solicitar unirse"
+    },
     "discoveryCategoriesLabel": "Categorías",
     "discoveryCategoriesHint": "Elige los temas que describen esta comunidad. Determinan en qué categorías aparece.",
     "discoveryCapacityBlocked": "Esta comunidad solo tiene sitio para una persona, así que nadie podría unirse desde el directorio. Pide a tu operador de plataforma que suba el límite de miembros.",
@@ -213,7 +218,11 @@
     "apiAccessColumn": "Acceso por API",
     "apiAccessLabel": "Claves de API personales de {{name}}",
     "apiAccessSaved": "Acceso por API guardado",
-    "apiAccessError": "No se pudo guardar el acceso por API"
+    "apiAccessError": "No se pudo guardar el acceso por API",
+    "joinRequestsDescription": "Personas que pidieron unirse a esta comunidad. Aprobar las añade como miembros.",
+    "joinRequestApproved": "{{name}} se unió a la comunidad.",
+    "joinRequestDenied": "Se rechazó la solicitud de {{name}}.",
+    "joinRequestError": "No se puede responder a esta solicitud en este momento."
   },
   "notMember": {
     "title": "Comunidad no disponible",
@@ -265,6 +274,9 @@
     "initiativeJoinRequested": "{{requester}} ha solicitado unirse a {{initiativeName}}.",
     "initiativeJoinApproved": "Tu solicitud para unirte a {{initiativeName}} fue aprobada.",
     "initiativeJoinDenied": "Tu solicitud para unirte a {{initiativeName}} fue rechazada.",
+    "communityJoinRequested": "{{requester}} ha solicitado unirse a {{community}}.",
+    "communityJoinApproved": "Tu solicitud para unirte a {{community}} fue aprobada.",
+    "communityJoinDenied": "Tu solicitud para unirte a {{community}} fue rechazada.",
     "shareRequested": {
       "read_one": "{{requester}} pide ver {{title}}.",
       "read_other": "{{requester}} pide ver {{count}} archivos.",
@@ -390,7 +402,8 @@
       "project": "Un proyecto",
       "projectIn": "un proyecto",
       "task": "Una tarea",
-      "taskObject": "tu tarea"
+      "taskObject": "tu tarea",
+      "community": "una comunidad"
     },
     "moderationRemoved": "Un moderador retiró algo que escribiste: {{reason}}",
     "moderationRemovedLegal": "Algo que escribiste se retiró por motivos legales",
@@ -566,6 +579,15 @@
     "open": "Abrir",
     "joinedToast": "Te has unido a {{community}}.",
     "joinFailed": "No se ha podido unir a esa comunidad.",
+    "askToJoin": "Solicitar unirse",
+    "requested": "Solicitada",
+    "withdraw": "Retirar",
+    "askTitle": "Solicitar unirse a {{community}}",
+    "askDescription": "Un administrador de esta comunidad leerá tu solicitud. Recibirás una notificación cuando responda.",
+    "askHint": "Puede que los administradores no te conozcan y que esta nota sea todo lo que tengan. Cuenta quién eres y por qué te gustaría unirte.",
+    "askedToast": "Se envió tu solicitud para unirte a {{community}}.",
+    "askFailed": "No se ha podido enviar esta solicitud.",
+    "withdrawFailed": "No se ha podido retirar esta solicitud.",
     "noDescription": "Todavía no hay descripción.",
     "resultCount_one": "{{count}} comunidad",
     "resultCount_other": "{{count}} comunidades",
@@ -579,7 +601,7 @@
     "disabledDescription": "Esta instalación no ofrece un directorio de comunidades. Un propietario de la plataforma puede activarlo en la configuración de la plataforma.",
     "publish": {
       "title": "Publicar esta comunidad en el directorio",
-      "description": "Cualquier persona con la sesión iniciada podrá encontrar esta comunidad y unirse sin invitación.",
+      "description": "Cualquier persona con la sesión iniciada podrá encontrar esta comunidad en el directorio.",
       "categoriesLabel": "Elige al menos una categoría",
       "categoriesHint": "Determinan dónde aparece la comunidad cuando la gente explora.",
       "certifyLabel": "Esta comunidad no contiene contenido para adultos",

@@ -389,5 +389,18 @@
       "this": "diese Sammlung",
       "plural": "Sammlungen"
     }
+  },
+  "joinRequests": {
+    "messageLabel": "Nachricht (optional)",
+    "messagePlaceholder": "Sag, warum du beitreten möchtest…",
+    "send": "Anfrage senden",
+    "sending": "Wird gesendet…",
+    "queueTitle": "Beitrittsanfragen",
+    "noMessage": "Keine Nachricht",
+    "unknownRequester": "Jemand",
+    "priorDenials_one": "Zuvor {{count}}-mal abgelehnt",
+    "priorDenials_other": "Zuvor {{count}}-mal abgelehnt",
+    "approve": "Zusagen",
+    "deny": "Ablehnen"
   }
 }

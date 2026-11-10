@@ -1,25 +1,26 @@
 /**
- * Who has knocked on this initiative, and what the manager does about it.
+ * Who has knocked on an initiative or a community, and what its managers do
+ * about it.
  *
- * It sits in the members tab because that is what it is: the same act as adding
+ * It sits beside the roster because that is what it is: the same act as adding
  * someone to the roster by hand, only asked for first. Approving writes the
  * ordinary membership row every join path ends at, so the person appears in the
- * table above it; denying leaves nothing behind but the history — and a denied
- * requester may ask again, which is why a repeat is marked rather than hidden.
+ * table beside it; denying leaves nothing behind but the history — and a denied
+ * requester may ask again, which is why a repeat is marked rather than hidden,
+ * where the page knows of one.
  *
- * The list itself is manager-only on the server; this renders only where the
- * roster is managed, so the two agree.
+ * Each page reads its own queue and answers it with its own hooks; this draws
+ * the rows. The list itself is managers-only on the server, and each page
+ * renders this only where the roster is managed, so the two agree.
  */
 
 import { Check, Clock, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { InitiativeJoinRequestRead } from "@/api/generated/initiativeAPI.schemas";
-import { JoinRequestStatus } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { useInitiativeJoinRequests, useResolveJoinRequest } from "@/hooks/useInitiatives";
-import { toast } from "@/lib/mascotToast";
 import {
+  type AvatarSourceUser,
+  type DisplayableUser,
   getAvatarSrc,
   getInitialsForUser,
   getUserDisplayName,
@@ -31,38 +32,43 @@ import { Button } from "@/ui/button";
 import { RelativeTime } from "@/ui/relative-time";
 import { StatusMessage } from "@/ui/status-message";
 
-export interface InitiativeJoinRequestQueueProps {
-  initiativeId: number;
+export interface JoinRequestRow {
+  id: number;
+  user: DisplayableUser & AvatarSourceUser & { id: number };
+  message: string | null;
+  created_at: string;
+  /** How often this requester was turned down before, where the page knows. */
+  prior_denials?: number;
 }
 
-export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinRequestQueueProps) => {
-  const { t } = useTranslation("initiatives");
+export interface JoinRequestQueueProps {
+  description: string;
+  /** The page's read of its queue. */
+  queue: { data?: JoinRequestRow[]; isPending: boolean; isError: boolean; refetch: () => unknown };
+  /** The request being answered, while one is. */
+  answeringId: number | undefined;
+  onAnswer: (request: JoinRequestRow, approved: boolean) => void;
+}
 
-  const queueQuery = useInitiativeJoinRequests(initiativeId);
-  const requests = queueQuery.data ?? [];
-
-  const resolveRequest = useResolveJoinRequest({
-    onSuccess: (request) => {
-      const name = getUserDisplayName(request.user, t("joinRequests.unknownRequester"));
-      toast.success(
-        request.status === JoinRequestStatus.approved
-          ? t("joinRequests.approved", { name })
-          : t("joinRequests.denied", { name })
-      );
-    },
-  });
-  const resolvingId = resolveRequest.isPending ? resolveRequest.variables?.requestId : undefined;
+export const JoinRequestQueue = ({
+  description,
+  queue,
+  answeringId,
+  onAnswer,
+}: JoinRequestQueueProps) => {
+  const { t } = useTranslation("common");
+  const requests = queue.data ?? [];
+  const answering = answeringId !== undefined;
 
   // An empty queue is the normal state of a healthy door — it earns a line, not
   // a card of its own, and never appears while the first read is in flight.
-  if (queueQuery.isPending || (requests.length === 0 && !queueQuery.isError)) {
+  if (queue.isPending || (requests.length === 0 && !queue.isError)) {
     return null;
   }
 
-  const renderRequest = (request: InitiativeJoinRequestRead) => {
+  const renderRequest = (request: JoinRequestRow) => {
     const displayName = getUserDisplayName(request.user, t("joinRequests.unknownRequester"));
     const avatarSrc = getAvatarSrc(request.user);
-    const isResolving = resolvingId === request.id;
 
     return (
       <li key={request.id} className="flex flex-col gap-3 border-b p-4 last:border-b-0 sm:p-4">
@@ -85,9 +91,9 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
                 date={request.created_at}
                 className="shrink-0 text-muted-foreground text-xs"
               />
-              {/* Design §13: a denied requester may ask again, so the manager
-                  reading this row is told they have answered it before. */}
-              {request.prior_denials > 0 ? (
+              {/* A denied requester may ask again, so the manager reading this
+                  row is told they have answered it before. */}
+              {request.prior_denials ? (
                 <Badge variant="outline" className="gap-1 font-normal text-xs">
                   <Clock className="h-3 w-3" aria-hidden="true" />
                   {t("joinRequests.priorDenials", { count: request.prior_denials })}
@@ -107,21 +113,17 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
           <Button
             variant="outline"
             size="sm"
-            disabled={resolveRequest.isPending}
-            onClick={() =>
-              resolveRequest.mutate({ initiativeId, requestId: request.id, approved: false })
-            }
+            disabled={answering}
+            onClick={() => onAnswer(request, false)}
           >
             <X className="h-4 w-4" />
             {t("joinRequests.deny")}
           </Button>
           <Button
             size="sm"
-            disabled={resolveRequest.isPending}
-            pending={isResolving}
-            onClick={() =>
-              resolveRequest.mutate({ initiativeId, requestId: request.id, approved: true })
-            }
+            disabled={answering}
+            pending={answeringId === request.id}
+            onClick={() => onAnswer(request, true)}
           >
             <Check className="h-4 w-4" />
             {t("joinRequests.approve")}
@@ -139,11 +141,11 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
           {requests.length > 0 ? <Badge variant="secondary">{requests.length}</Badge> : null}
         </span>
       }
-      description={t("joinRequests.queueDescription")}
+      description={description}
       contentClassName="p-0"
     >
-      {queueQuery.isError ? (
-        <StatusMessage onRetry={queueQuery.refetch} />
+      {queue.isError ? (
+        <StatusMessage onRetry={queue.refetch} />
       ) : (
         <ul className="divide-y">{requests.map(renderRequest)}</ul>
       )}

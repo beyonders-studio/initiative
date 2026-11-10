@@ -4,7 +4,8 @@
  * Platform-level, like the marketplace: one shared surface with no community in the
  * request, so entries are keyed on what was asked for and nothing else. Joining
  * changes which communities the caller belongs to, so the mutation refreshes the
- * community switcher as well as the directory it was invoked from.
+ * community switcher as well as the directory it was invoked from. Asking to join,
+ * and withdrawing the ask, change only the caller's own card.
  */
 
 import {
@@ -15,9 +16,11 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  askToJoinCommunity,
   getListDirectoryCommunitiesQueryKey,
   joinDirectoryCommunity,
   listDirectoryCommunities,
+  withdrawCommunityJoinRequest,
 } from "@/api/generated/communities/communities";
 import type {
   CommunityRead,
@@ -61,16 +64,29 @@ export const useDirectoryCommunities = (
     ...options,
   });
 
-export const useJoinDirectoryCommunity = () => {
+// The bare path is a prefix of every filter combination: a card that was
+// `already_member: false`, or `request_pending: false`, no longer is, on any page.
+const useRefreshDirectory = () => {
   const queryClient = useQueryClient();
-  return useMutation<CommunityRead, unknown, number>({
-    mutationFn: (communityId: number) => joinDirectoryCommunity(communityId),
-    // The bare path is a prefix of every filter combination: a card that was
-    // `already_member: false` no longer is, on any page.
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: getListDirectoryCommunitiesQueryKey(),
-      });
-    },
-  });
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: getListDirectoryCommunitiesQueryKey() });
+  };
 };
+
+export const useJoinDirectoryCommunity = () =>
+  useMutation<CommunityRead, unknown, number>({
+    mutationFn: (communityId: number) => joinDirectoryCommunity(communityId),
+    onSuccess: useRefreshDirectory(),
+  });
+
+export const useAskToJoinDirectoryCommunity = () =>
+  useMutation<void, unknown, { communityId: number; message: string | null }>({
+    mutationFn: ({ communityId, message }) => askToJoinCommunity(communityId, { message }),
+    onSuccess: useRefreshDirectory(),
+  });
+
+export const useWithdrawDirectoryJoinRequest = () =>
+  useMutation<void, unknown, number>({
+    mutationFn: (communityId: number) => withdrawCommunityJoinRequest(communityId),
+    onSuccess: useRefreshDirectory(),
+  });
