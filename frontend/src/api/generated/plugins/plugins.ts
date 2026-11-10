@@ -1975,7 +1975,12 @@ export function useReadUninstallNotice<
  *
  * Only guild-scoped connections are settable here. A per-member one is that
  * member's to make, and the fields a plug-in marks ``managed`` come from its
- * ``after_connect`` hook when a flow completes rather than through a form.
+ * ``after_connect`` hook rather than through a form.
+ *
+ * A connection that declares ``after_connect`` beside its fields is saved on
+ * its own, once the plug-in has checked what was typed: refused
+ * (``COMMUNITY_PLUGIN_CONNECTION_REFUSED``), or not answered
+ * (``COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED``), nothing is stored.
  * @summary Update Community Plugin Config
  */
 export const updateCommunityPluginConfig = (

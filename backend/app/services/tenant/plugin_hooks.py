@@ -30,6 +30,13 @@ the vendor. :func:`receive` takes each delivery through four steps:
    waits, a little longer each time; a mapping that cannot succeed is logged.
    Either way the id and the body's digest stay remembered for 24 hours.
 
+A listing whose ``webhooks.verify.secret`` names a field of the routed
+connection (``{<key>}``) rather than a vendor value skips step 1: after step 2
+the delivery is checked under each matched install's own secret, as the
+version it is pinned to names it, and queued only for those it verifies for.
+One that nothing matches, or that no matched install's secret verifies, is
+refused (401).
+
 The index row that routes a delivery is written only when a community's
 connect stored the routed value, which the plug-in's ``after_connect`` hook
 checked at the vendor.
@@ -52,6 +59,7 @@ from sqlalchemy.engine import Row
 from sqlmodel import col, delete, select
 
 from app.core import metrics
+from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field
 from app.db import cohorts
 from app.db import session as db_session
 from app.db.request_context import SystemGuild
@@ -226,6 +234,17 @@ async def _routed(
     return [found[key] for key in sorted(found)]
 
 
+def _connection_secret_key(verify: Mapping[str, Any]) -> str | None:
+    """The routed connection's field a ``webhooks.verify`` checks a delivery
+    under, or ``None`` when it names a vendor value."""
+    secret = str(verify.get("secret") or "")
+    if secret.startswith("{vendor.") or not (
+        secret.startswith("{") and secret.endswith("}")
+    ):
+        return None
+    return secret[1:-1]
+
+
 async def _queue(
     install: plugin_installs.IndexedInstall,
     registration: RegistrationSnapshot,
@@ -234,12 +253,15 @@ async def _queue(
     headers: Mapping[str, str],
     body: bytes,
     body_digest: bytes,
-) -> None:
+    by_connection: bool,
+) -> bool:
     """Queue a delivery for an install it is owed to: as it is pinned, the
     install is on, the registration's, and routes by the value the delivery
-    was found by. One whose id or body is already there, or that the install
-    has had, is left as it is. One system session routed into the community,
-    whose write arms the delivery sweep."""
+    was found by. ``by_connection``, it is also owed only when the secret of
+    the connection it routes by verifies it, as the pinned version names it.
+    One whose id or body is already there, or that the install has had, is
+    left as it is. Whether it was owed. One system session routed into the
+    community, whose write arms the delivery sweep."""
     async with cohorts.system_session(install.guild_id) as session:
         await set_rls_context(session, SystemGuild(install.guild_id))
         plugin = (
@@ -252,7 +274,7 @@ async def _queue(
             or not plugin.enabled
             or not owns_install(plugin, registration)
         ):
-            return
+            return False
         pinned = (plugin.definition or {}).get("webhooks")
         indexed = plugin_installs.hook_route(plugin.definition, plugin.config)
         if (
@@ -260,7 +282,23 @@ async def _queue(
             or indexed is None
             or _route_value(pinned["route"], headers, body) != indexed
         ):
-            return
+            return False
+        if by_connection:
+            key = _connection_secret_key(pinned["verify"])
+            sealed = (
+                (await guild_plugins_service.load_secrets(session, plugin))
+                .get(pinned["route"]["connection"], {})
+                .get(key)
+                if key is not None
+                else None
+            )
+            secret = (
+                decrypt_field(sealed, SALT_PLUGIN_CONFIG)
+                if isinstance(sealed, str)
+                else None
+            )
+            if not secret or not _verified(pinned["verify"], secret, headers, body):
+                return False
         now = datetime.now(UTC)
         await session.exec(
             pg_insert(PluginHookDelivery)
@@ -277,6 +315,7 @@ async def _queue(
             .on_conflict_do_nothing()
         )
         await session.commit()
+    return True
 
 
 async def expire_deliveries(session: AsyncSession, expiring: Expiring) -> None:
@@ -582,12 +621,17 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     if webhooks is None:
         return 404
     verify = webhooks["verify"]
-    key = str(verify["secret"])[len("{vendor.") : -1]
-    secret = (await load_vendor_values(public_id)).get(key)
-    if not secret or not _verified(verify, secret, headers, body):
-        metrics.plugin_hook_deliveries.labels(outcome="refused").inc()
-        return 401
+    by_connection = _connection_secret_key(verify) is not None
+    if not by_connection:
+        key = str(verify["secret"])[len("{vendor.") : -1]
+        secret = (await load_vendor_values(public_id)).get(key)
+        if not secret or not _verified(verify, secret, headers, body):
+            metrics.plugin_hook_deliveries.labels(outcome="refused").inc()
+            return 401
 
+    delivery_id = headers.get(str(webhooks["dedup"]).lower(), "")
+    if not delivery_id or len(delivery_id) > DELIVERY_ID_MAX_LENGTH:
+        return 400
     specs = await _route_specs(registration.listing_uid)
     current = _route_spec(webhooks["route"])
     if current is not None:
@@ -597,15 +641,12 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
         for install in await _routed(registration.listing_uid, specs, headers, body)
         if registration.serves(install.guild_id)
     ]
-    if not installs:
+    if not installs and not by_connection:
         metrics.plugin_hook_deliveries.labels(outcome="unroutable").inc()
         return 202
 
-    delivery_id = headers.get(str(webhooks["dedup"]).lower(), "")
-    if not delivery_id or len(delivery_id) > DELIVERY_ID_MAX_LENGTH:
-        return 400
     body_digest = hashlib.sha256(body).digest()
-    for install in installs:
+    owed = [
         await _queue(
             install,
             registration,
@@ -613,6 +654,12 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
             headers=headers,
             body=body,
             body_digest=body_digest,
+            by_connection=by_connection,
         )
+        for install in installs
+    ]
+    if by_connection and not any(owed):
+        metrics.plugin_hook_deliveries.labels(outcome="refused").inc()
+        return 401
     metrics.plugin_hook_deliveries.labels(outcome="queued").inc()
     return 202

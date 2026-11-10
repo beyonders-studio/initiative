@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -1558,6 +1560,7 @@ class TestRevocation:
             "connection": "hooked",
             "access_token": "gho_stored",
             "refresh_token": "ghr_stored",
+            "values": {},
         }
         claims = jwt.decode(
             authorization.removeprefix("Bearer "),
@@ -1620,6 +1623,7 @@ class TestRevocation:
             "connection": "hooked",
             "access_token": "gho_stored",
             "refresh_token": "ghr_stored",
+            "values": {},
         }
         revoke = (await rows())[0]
         assert revoke.done_at is not None and revoke.body == {}
@@ -1945,6 +1949,189 @@ class TestVendorWebhooks:
         assert response.status_code == 204, response.text
         assert await _indexed(session, a.guild.id, plugin.id) is None
         assert await _runs(session, a.guild.id) == {}
+
+
+# ---------------------------------------------------------------------------
+# A typed connection the plug-in checks
+# ---------------------------------------------------------------------------
+
+#: A shop an admin types in. The plug-in checks it, makes the shop's webhooks
+#: and answers the shop's id and the webhooks' secret, which signs them.
+SHOP = {
+    "id": "shop",
+    "scope": "static",
+    "label": {"en": "Shop"},
+    "fields": [
+        {"key": "url", "type": "url", "label": {"en": "Address"}, "required": True},
+        {"key": "key", "type": "secret", "label": {"en": "Key"}, "required": True},
+        _field("store_id"),
+        {**_field("hook_secret"), "type": "secret"},
+    ],
+    "after_connect": True,
+}
+
+SHOP_DEFINITION = {
+    **DEFINITION,
+    "connections": [SHOP],
+    "webhooks": {
+        "verify": {
+            "scheme": "hmac_sha256",
+            "header": "X-Shop-Signature",
+            "encoding": "base64",
+            "secret": "{hook_secret}",
+        },
+        "dedup": "X-Shop-Delivery",
+        "route": {"header": "X-Shop-Store", "connection": "shop", "field": "store_id"},
+    },
+}
+
+
+def _checked(store_id: str, hook_secret: str) -> dict:
+    """What the plug-in answers once it has checked a shop."""
+    return {
+        "values": {"store_id": store_id, "hook_secret": hook_secret},
+        "account_label": "Acme shop",
+    }
+
+
+def _shop_delivery(
+    secret: str, *, store: str = "s-42", delivery: str = "d-1"
+) -> tuple[bytes, dict[str, str]]:
+    body = b'{"id": 7}'
+    signature = base64.b64encode(
+        hmac.new(secret.encode(), body, hashlib.sha256).digest()
+    ).decode()
+    return body, {
+        "Content-Type": "application/json",
+        "X-Shop-Signature": signature,
+        "X-Shop-Delivery": delivery,
+        "X-Shop-Store": store,
+    }
+
+
+class TestCheckedTypedConnection:
+    @pytest.fixture
+    async def shop(self, session: AsyncSession, registration):
+        return await create_marketplace_listing(
+            session,
+            uid=LISTING_UID,
+            public_id=PUBLIC_ID,
+            kind="plugin",
+            definition=SHOP_DEFINITION,
+        )
+
+    async def _save(self, client: AsyncClient, seat, plugin, values: dict):
+        return await client.put(
+            seat.g(f"/plugins/{plugin.id}/config"),
+            json={"values": {"shop": values}},
+            headers=seat.headers,
+        )
+
+    async def test_a_checked_shop_is_stored_and_signs_its_own_webhooks(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """The plug-in is sent what was typed and answers the shop's id, its
+        webhooks' secret and its account; all of it is stored and the shop's
+        id routes. A delivery is checked under that secret alone: one signed
+        with anything else, or naming a shop nobody connected, is refused."""
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+
+        response = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+
+        assert response.status_code == 200, response.text
+        [connection] = response.json()["connections"]
+        assert connection["account_label"] == "Acme shop"
+        assert connection["values"] == {
+            "url": "https://shop.example",
+            "store_id": "s-42",
+        }
+        assert all(connection["has_value"].values())
+        [(name, call, _)] = vendor.hooks
+        assert name == "after_connect"
+        assert (call["actor"], call["access_token"]) == ("installation", None)
+        assert call["values"] == {"url": "https://shop.example", "key": "ck_1"}
+        assert (await _reload(session, seat.guild.id, plugin.id)).config_state == "ok"
+        assert (await _indexed(session, seat.guild.id, plugin.id)).hook_route == "s-42"
+
+        for secret, store in [
+            (VENDOR_VALUES["webhook_secret"], "s-42"),
+            ("hook-secret-1", "s-99"),
+        ]:
+            body, headers = _shop_delivery(secret, store=store)
+            refused = await client.post(HOOK_ROUTE, content=body, headers=headers)
+            assert refused.status_code == 401
+        assert await _deliveries(session, seat.guild.id) == []
+
+        body, headers = _shop_delivery("hook-secret-1")
+        taken = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert taken.status_code == 202, taken.text
+        await _delivered(session, seat.guild.id)
+        assert [name for name, _, _ in vendor.hooks] == ["after_connect", "webhook"]
+
+    async def test_a_refused_shop_stores_nothing(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = {"refuse": True}
+
+        response = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == GuildPluginMessages.CONNECTION_REFUSED
+        stored = await _reload(session, seat.guild.id, plugin.id)
+        assert not stored.config and not stored.secret_fields
+
+    async def test_replacing_or_clearing_a_shop_revokes_what_it_held(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """Saving again checks the merged values and revokes the shop they
+        replace; clearing revokes the rest. Each revocation is sent the values
+        the shop held, its secrets included."""
+        from app.services import sweep_timers
+
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        first = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert first.status_code == 200, first.text
+
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
+        second = await self._save(client, seat, plugin, {"key": "ck_2"})
+        assert second.status_code == 200, second.text
+        assert vendor.hooks[-1][1]["values"] == {
+            "url": "https://shop.example",
+            "key": "ck_2",
+        }
+        cleared = await client.delete(
+            seat.g(f"/plugins/{plugin.id}/connections/shop"), headers=seat.headers
+        )
+        assert cleared.status_code == 204, cleared.text
+        await post_commit.settle_all()
+        await sweep_timers.process_due_timers(outward=True)
+
+        revoked = [call for name, call, _ in vendor.hooks if name == "revoke"]
+        assert [call["values"] for call in revoked] == [
+            {
+                "url": "https://shop.example",
+                "key": key,
+                "store_id": "s-42",
+                "hook_secret": hook_secret,
+            }
+            for key, hook_secret in [
+                ("ck_1", "hook-secret-1"),
+                ("ck_2", "hook-secret-2"),
+            ]
+        ]
+        assert (await _indexed(session, seat.guild.id, plugin.id)).hook_route is None
 
 
 # ---------------------------------------------------------------------------

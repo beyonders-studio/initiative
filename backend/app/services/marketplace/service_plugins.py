@@ -1023,8 +1023,9 @@ def _connection(
             fail(f"{what}: two fields share the key {field['key']!r}")
         if field["key"] in RESERVED_TOKEN_KEYS:
             fail(
-                f"{what}: {field['key']!r} is reserved for a flow's tokens and"
-                " the vendor's report that the connection was removed"
+                f"{what}: {field['key']!r} is reserved for a flow's tokens, the"
+                " vendor's report that the connection was removed and the"
+                " account its after_connect checked"
             )
         seen.add(field["key"])
         fields.append(field)
@@ -1067,6 +1068,27 @@ def _connection(
                 "which the flow does not call"
             )
         cleaned["flow"] = flow
+
+    after_connect = connection.get("after_connect", False)
+    if not isinstance(after_connect, bool):
+        fail(f"{what}: after_connect is true or false")
+    if after_connect:
+        if flow_raw is not None or scope != "static":
+            fail(
+                f"{what}: after_connect beside the fields is for a static "
+                "connection without a flow; a flow names its own"
+            )
+        if declarative:
+            fail(
+                f"{what}: a declarative plug-in has no after_connect hook to check "
+                "what an admin types"
+            )
+        cleaned["after_connect"] = True
+    elif flow_raw is None and any(field.get("managed") is True for field in fields):
+        fail(
+            f"{what}: its managed values come from the after_connect hook, "
+            "which it does not call"
+        )
 
     token_raw = connection.get("token")
     if token_raw is not None:
@@ -1122,19 +1144,6 @@ def _webhooks(
     encoding = verify.get("encoding")
     if encoding not in WEBHOOK_ENCODINGS:
         fail(f"service plug-in: webhooks.verify: unknown encoding {encoding!r}")
-    secret = verify.get("secret")
-    key = (
-        secret[len("{vendor.") : -1]
-        if isinstance(secret, str)
-        and secret.startswith("{vendor.")
-        and secret.endswith("}")
-        else None
-    )
-    if key not in vendor_keys:
-        fail(
-            "service plug-in: webhooks.verify.secret must be one value the vendor "
-            "block declares, written '{vendor.<key>}'"
-        )
 
     def header(value: Any, what: str) -> str:
         return _drawn_from(
@@ -1147,7 +1156,6 @@ def _webhooks(
             verify.get("header"), "service plug-in: webhooks.verify.header"
         ),
         "encoding": encoding,
-        "secret": secret,
     }
     prefix = clean_text(
         verify.get("prefix"),
@@ -1178,6 +1186,34 @@ def _webhooks(
             f"service plug-in: webhooks.route names {field!r}, which is not a field of "
             f"the connection {connection_id!r}"
         )
+    # The secret is one vendor value, or a secret the routed connection's
+    # after_connect answered.
+    secret = verify.get("secret")
+    name = (
+        secret[1:-1]
+        if isinstance(secret, str)
+        and secret.startswith("{")
+        and secret.endswith("}")
+        and "{" not in secret[1:-1]
+        and "}" not in secret[1:-1]
+        else None
+    )
+    if name is not None and name.startswith("vendor."):
+        held = name[len("vendor.") :] in vendor_keys
+    else:
+        held = any(
+            entry["key"] == name
+            and entry.get("managed") is True
+            and entry["type"] == "secret"
+            for entry in connection["fields"]
+        )
+    if not held:
+        fail(
+            "service plug-in: webhooks.verify.secret must be one value the vendor "
+            "block declares, written '{vendor.<key>}', or a managed secret field of "
+            "the routed connection, written '{<key>}'"
+        )
+    cleaned_verify["secret"] = secret
     # Exactly one of a body path and a header carries the routed value.
     if (route.get("path") is None) == (route.get("header") is None):
         fail("service plug-in: webhooks.route names exactly one of 'path' and 'header'")

@@ -131,6 +131,12 @@ describe("a community credential that is typed", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect" })).not.toBeInTheDocument();
   });
+
+  it("names the account the plug-in checked it against", async () => {
+    render({ ...typed, satisfied: true, account_label: "Acme shop" });
+
+    expect(await screen.findByText("Connected as Acme shop")).toBeInTheDocument();
+  });
 });
 
 describe("a member's own account", () => {

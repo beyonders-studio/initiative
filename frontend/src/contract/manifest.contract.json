@@ -426,7 +426,7 @@
         "managed": {
           "type": "boolean",
           "default": false,
-          "description": "Returned by the plug-in's after_connect hook when a flow finishes; it is not typed into the settings form."
+          "description": "Returned by the plug-in's after_connect hook, when a flow finishes or when an admin saves a connection that declares 'after_connect'; it is not typed into the settings form."
         }
       },
       "if": {
@@ -721,11 +721,16 @@
           "items": {
             "ref": "connectionField"
           },
-          "description": "Without a 'flow', what an admin types. With one, only the values the plug-in's after_connect hook returns, and every field is 'managed'. The tokens a flow obtains are held apart from these, under reserved keys the plug-in never declares."
+          "description": "Without a 'flow', what an admin types, and the managed values its 'after_connect' returns. With one, only the values the plug-in's after_connect hook returns, and every field is 'managed'. The tokens a flow obtains are held apart from these, under reserved keys the plug-in never declares."
         },
         "flow": {
           "ref": "connectionFlow",
           "description": "How the connection is established. Initiative runs it: the redirect, the code exchange, refreshing and revoking. The plug-in never holds the vendor client's secret or a refresh token."
+        },
+        "after_connect": {
+          "type": "boolean",
+          "default": false,
+          "description": "Static connections without a 'flow', container plug-ins only. True: when an admin saves the connection, Initiative sends what they typed to the plug-in's after_connect hook before storing anything, and stores it with the managed values and account label the hook answers; when the hook refuses, nothing is stored. When the connection is cleared or replaced, Initiative sends the plug-in's revoke hook with the values it held, so it can remove what it made at the vendor."
         },
         "token": {
           "ref": "connectionToken",
@@ -887,7 +892,7 @@
     },
     "webhooks": {
       "type": "object",
-      "description": "The vendor's webhooks, received by Initiative at one address per plug-in on the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, finds the communities it belongs to by a value in its body, and forwards it to the plug-in's webhook hook once for each. A container plug-in's hook receives each delivery; a declarative plug-in maps it with 'events' and 'status' instead.",
+      "description": "The vendor's webhooks, received by Initiative at one address per plug-in on the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, by its id or its body, finds the communities it belongs to by a value in its body, and forwards it to the plug-in's webhook hook once for each. A container plug-in's hook receives each delivery; a declarative plug-in maps it with 'events' and 'status' instead.",
       "required": [
         "verify",
         "dedup",
@@ -903,7 +908,7 @@
           "maxLength": "identifierLength",
           "patternFrom": "headerName",
           "patternForm": "plus",
-          "description": "The header carrying the vendor's id for one delivery, such as 'X-GitHub-Delivery'. A delivery with an id already forwarded to a community is not forwarded to it again."
+          "description": "The header carrying the vendor's id for one delivery, such as 'X-GitHub-Delivery'. A delivery with an id already forwarded to a community, or with the body of one, is not forwarded to it again."
         },
         "route": {
           "ref": "webhookRoute"
@@ -930,7 +935,7 @@
     },
     "webhookVerify": {
       "type": "object",
-      "description": "How a delivery's signature is checked: an HMAC over the raw body under a vendor value.",
+      "description": "How a delivery's signature is checked: an HMAC over the raw body, under a vendor value or under the routed connection's own secret.",
       "required": [
         "scheme",
         "header",
@@ -962,7 +967,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": "urlLength",
-          "description": "The signing secret, as one vendor value: '{vendor.<key>}'."
+          "description": "The signing secret: one vendor value, written '{vendor.<key>}', which signs every community's deliveries; or a managed 'secret' field of the connection 'route' names, written '{<key>}', which that connection's after_connect hook returned. With a connection's secret, a delivery is routed first and checked under the secret of each connection its route value names; one that none of them verifies is refused."
         }
       }
     },

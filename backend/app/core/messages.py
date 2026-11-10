@@ -1506,6 +1506,17 @@ class GuildPluginMessages:
     CONNECTION_NOT_STATIC = "COMMUNITY_PLUGIN_CONNECTION_NOT_STATIC"
     #: A guild admin has stopped this member connecting this one.
     CONNECTION_BLOCKED = "COMMUNITY_PLUGIN_CONNECTION_BLOCKED"
+    #: The plug-in checked what was typed into the connection and refused it;
+    #: nothing was stored.
+    CONNECTION_REFUSED = "COMMUNITY_PLUGIN_CONNECTION_REFUSED"
+    #: The plug-in could not be asked to check what was typed into the
+    #: connection, or answered something that cannot be stored; nothing was.
+    CONNECTION_NOT_CHECKED = "COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED"
+    #: Another community holds the account the plug-in checked these values
+    #: against; nothing was stored.
+    CONNECTION_TAKEN = "COMMUNITY_PLUGIN_CONNECTION_TAKEN"
+    #: A connection the plug-in checks is saved on its own, not beside others.
+    CONNECTION_CHECKED_ALONE = "COMMUNITY_PLUGIN_CONNECTION_CHECKED_ALONE"
     #: The plug-in is installed but turned off, so nothing flows through it.
     DISABLED = "COMMUNITY_PLUGIN_DISABLED"
     #: The connection's flow needs values this deployment's operator has not

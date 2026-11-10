@@ -26,6 +26,11 @@ Three things happen here and nowhere else:
   in a connection's stored values under reserved keys; :func:`refresh_tokens`
   renews one; :func:`mint_jwt_bearer` mints a token for a connection that
   declares a ``jwt_bearer`` token, and caches it.
+* **A typed connection the plug-in checks.** A guild-wide connection without
+  a flow that declares ``after_connect`` is checked before it is stored:
+  :func:`typed_to_check` reads what a save would hold, and :func:`check_typed`
+  asks the plug-in's ``after_connect`` with no transaction open, then stores
+  what was typed with the managed values and account label it answered.
 * **Hooks.** :func:`call_hook` calls the plug-in at ``POST {base}/v1/hooks/{name}``
   with a ``lifecycle`` context token naming the install and the hook. Only
   :mod:`app.services.marketplace.community_hooks` calls it, under one lock per
@@ -46,7 +51,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
@@ -66,7 +71,7 @@ from app.core.security import PluginPlatformSigningNotConfiguredError
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.request_context import SystemGuild, Unattributed
-from app.db.session import set_rls_context
+from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.access_grant import AccessLevel
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
@@ -117,6 +122,10 @@ from app.services.tenant.plugin_config import (
     mint_connection_ref,
     token_of,
     without_tokens,
+)
+from app.services.tenant.plugin_revocation import (
+    queue_install_revocations,
+    queue_values_revocation,
 )
 from app.services.webhook_target_url import (
     WebhookTargetUrlError,
@@ -887,9 +896,13 @@ async def after_connect(
     install_id: int,
     connection_id: str,
     actor: str,
-    access_token: str,
+    access_token: str | None,
     params: Mapping[str, str],
+    values: Mapping[str, Any] | None = None,
 ) -> AfterConnect:
+    """Ask the plug-in's ``after_connect`` about a connection: with the
+    ``access_token`` a flow just obtained, or with the ``values`` an admin
+    typed into a connection without a flow."""
     # Sent through the one door every hook goes through (community_hooks).
     from app.services.marketplace import community_hooks
 
@@ -903,6 +916,7 @@ async def after_connect(
             "connection": connection_id,
             "actor": actor,
             "access_token": access_token,
+            "values": dict(values or {}),
             "params": dict(params),
         },
     )
@@ -1338,12 +1352,7 @@ async def _store_community(
         # The route was claimed for values that were not stored: the index
         # sweep writes the row again from what the community holds.
         await session.rollback()
-        await session.exec(
-            text("SELECT arm_timer(:kind, now())").bindparams(
-                kind=plugin_installs.INDEX_SWEEP
-            )
-        )
-        await session.commit()
+        await _arm_index_sweep(session)
         raise
     return "connected"
 
@@ -1355,6 +1364,266 @@ def _replace_entry(
     if values:
         kept[connection_id] = dict(values)
     return kept
+
+
+async def _arm_index_sweep(session: AsyncSession) -> None:
+    """Have the index sweep write the install's row again from what the
+    community holds, after a route was claimed for values not stored."""
+    await session.exec(
+        text("SELECT arm_timer(:kind, now())").bindparams(
+            kind=plugin_installs.INDEX_SWEEP
+        )
+    )
+    await session.commit()
+
+
+# --- a typed connection the plug-in checks ------------------------------------
+
+
+@dataclass(frozen=True)
+class TypedConnection:
+    """What a save would hold in a connection the plug-in checks: its typed
+    fields alone, the secrets sealed. Empty, the save clears it."""
+
+    install_id: int
+    connection_id: str
+    config: dict[str, Any]
+    secrets: dict[str, Any]
+    #: The plug-in's registration, which is asked; absent for a clear.
+    registration: registration_lookup.RegistrationSnapshot | None
+
+    @property
+    def cleared(self) -> bool:
+        return not self.config and not self.secrets
+
+
+def _typed_only(
+    connection: Mapping[str, Any], values: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """A stored map's typed fields: no managed values, no reserved keys."""
+    managed = {
+        field.get("key")
+        for field in connection.get("fields") or []
+        if isinstance(field, dict) and field.get("managed") is True
+    }
+    return {k: v for k, v in without_tokens(values).items() if k not in managed}
+
+
+async def typed_to_check(
+    session: AsyncSession,
+    plugin: GuildPlugin,
+    values: Mapping[str, Mapping[str, Any]],
+) -> TypedConnection | None:
+    """The connection a save names that the plug-in checks, with what it
+    would hold once saved, or ``None`` when the save names none. Such a
+    connection is saved on its own. Raises
+    :class:`~app.services.tenant.plugin_config.PluginConfigError` for values
+    refused before the plug-in is asked."""
+    checked = [
+        connection_id
+        for connection_id in values
+        if plugin_config_service.checks_typed_values(
+            plugin_config_service.connection_by_id(plugin.definition, connection_id)
+        )
+    ]
+    if not checked:
+        return None
+    if len(values) > 1:
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_CHECKED_ALONE
+        )
+    [connection_id] = checked
+    connection = plugin_config_service.connection_by_id(
+        plugin.definition, connection_id
+    )
+    assert connection is not None
+    stored = await guild_plugins_service.load_secrets(session, plugin)
+    config, secrets = plugin_config_service.apply_connection_values(
+        connection,
+        values[connection_id],
+        current=_typed_only(connection, (plugin.config or {}).get(connection_id)),
+        current_secrets=_typed_only(connection, stored.get(connection_id)),
+    )
+    typed = TypedConnection(
+        install_id=plugin.id,
+        connection_id=connection_id,
+        config=config,
+        secrets=secrets,
+        registration=None,
+    )
+    if typed.cleared:
+        return typed
+    registration = await registration_lookup.registration_for_definition(
+        plugin.definition, listing_uid=plugin.listing_uid
+    )
+    if registration is None or not registration.live_in(routed_guild_id(session)):
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=502
+        )
+    return replace(typed, registration=registration)
+
+
+async def check_typed(
+    session: AsyncSession, typed: TypedConnection, *, actor_user_id: int
+) -> None:
+    """Save a connection the plug-in checks, on the seat's ``session``.
+
+    A clear ends the connection. Otherwise the plug-in's ``after_connect`` is
+    sent the typed values, secrets opened, with no transaction open. Refused,
+    nothing is stored. Answered, the route its values give the install's
+    webhooks is claimed, and the typed values are stored with the managed
+    values and account label it answered; the connection they replace is
+    revoked. Values it checked that are not stored are revoked too. Raises
+    :class:`~app.services.tenant.plugin_config.PluginConfigError` for anything
+    not stored."""
+    guild_id = routed_guild_id(session)
+    if typed.cleared:
+        plugin = await guild_plugins_service.lock_install(session, typed.install_id)
+        if plugin is not None:
+            before = (
+                dict(plugin.config or {}),
+                await guild_plugins_service.load_secrets(session, plugin),
+            )
+            await guild_plugins_service.clear_static_connection(
+                session, plugin, typed.connection_id
+            )
+            await guild_plugins_service.record_config_change(
+                session,
+                plugin,
+                before=before,
+                after=(
+                    dict(plugin.config or {}),
+                    await guild_plugins_service.load_secrets(session, plugin),
+                ),
+                connection_ids=[typed.connection_id],
+                actor_user_id=actor_user_id,
+            )
+        await session.commit()
+        return
+    registration = typed.registration
+    assert registration is not None
+    typed_values = {
+        **typed.config,
+        **plugin_config_service.decrypt_connection_secrets(typed.secrets),
+    }
+    # Nothing is held while the plug-in checks.
+    await session.commit()
+    try:
+        answer = await after_connect(
+            public_id=registration.public_id,
+            base_url=registration.base_url,
+            guild_id=guild_id,
+            install_id=typed.install_id,
+            connection_id=typed.connection_id,
+            actor="installation",
+            access_token=None,
+            params={},
+            values=typed_values,
+        )
+    except HookError as exc:
+        logger.warning("plug-in connection: after_connect failed (%s)", exc)
+        await _not_kept(session, typed, typed.config, typed.secrets)
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=502
+        ) from exc
+    if answer.refused:
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_REFUSED, status_code=422
+        )
+
+    plugin = await guild_plugins_service.lock_install(session, typed.install_id)
+    connection = plugin_config_service.connection_by_id(
+        plugin.definition if plugin else None, typed.connection_id
+    )
+    if plugin is None or not plugin_config_service.checks_typed_values(connection):
+        # Uninstalled, or moved to a version that does not check it, meanwhile.
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=409
+        )
+    assert connection is not None
+    try:
+        config, secrets = plugin_config_service.apply_connection_values(
+            connection,
+            _managed_only(connection, answer.values),
+            current=typed.config,
+            current_secrets=typed.secrets,
+            allow_managed=True,
+        )
+    except plugin_config_service.PluginConfigError as exc:
+        logger.warning(
+            "plug-in connection: after_connect values refused (%s)", exc.code
+        )
+        await _not_kept(session, typed, typed.config, typed.secrets)
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_NOT_CHECKED, status_code=502
+        ) from exc
+    if answer.account_label:
+        config[plugin_config_service.ACCOUNT_LABEL] = answer.account_label
+    entries = _replace_entry(plugin.config, typed.connection_id, config)
+    if not await plugin_installs.claim(
+        guild_id, plugin, plugin_installs.hook_route(plugin.definition, entries)
+    ):
+        await _not_kept(session, typed, config, secrets)
+        raise plugin_config_service.PluginConfigError(
+            GuildPluginMessages.CONNECTION_TAKEN, status_code=409
+        )
+    try:
+        all_secrets = await guild_plugins_service.load_secrets(session, plugin)
+        before = (dict(plugin.config or {}), dict(all_secrets))
+        if (plugin.config or {}).get(typed.connection_id) or all_secrets.get(
+            typed.connection_id
+        ):
+            await queue_install_revocations(
+                session,
+                plugin,
+                [typed.connection_id],
+                secrets=all_secrets,
+                reason="replaced",
+            )
+        stored_secrets = _replace_entry(all_secrets, typed.connection_id, secrets)
+        plugin.config = entries
+        if token_of(connection) is not None:
+            plugin_config_service.guild_connection_ref(plugin, typed.connection_id)
+        # The plug-in's answer is its verdict on what it checked.
+        plugin.config_state = "ok"
+        plugin.config_state_detail = None
+        plugin.updated_at = datetime.now(UTC)
+        session.add(plugin)
+        await guild_plugins_service.store_secrets(session, plugin, stored_secrets)
+        await guild_plugins_service.record_config_change(
+            session,
+            plugin,
+            before=before,
+            after=(entries, stored_secrets),
+            connection_ids=[typed.connection_id],
+            actor_user_id=actor_user_id,
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        await _arm_index_sweep(session)
+        raise
+
+
+async def _not_kept(
+    session: AsyncSession,
+    typed: TypedConnection,
+    config: Mapping[str, Any],
+    secrets: Mapping[str, Any],
+) -> None:
+    """Revoke values the plug-in checked that are not stored, so it can
+    remove what it made with them."""
+    plugin = await guild_plugins_service.lock_install(session, typed.install_id)
+    if plugin is not None:
+        await queue_values_revocation(
+            session,
+            plugin,
+            typed.connection_id,
+            config=config,
+            secrets=secrets,
+            reason="not_kept",
+        )
+    await session.commit()
 
 
 # --- a token for a plug-in ------------------------------------------------------
