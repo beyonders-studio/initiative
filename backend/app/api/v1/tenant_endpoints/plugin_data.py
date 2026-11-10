@@ -21,7 +21,8 @@ and that is what makes the gates run **before** anything else:
   only somebody who may change its widgets previews one;
 * the dashboard has to actually bind this endpoint, so holding one dashboard is
   not a key to every endpoint a plug-in offers;
-* an endpoint marked ``admin_only`` is then read by the guild's admins alone.
+* an endpoint naming a permission is then read by those who hold it in the
+  dashboard's initiative.
 
 Only after all of that does the service layer look at the response cache, which
 is why the cache is a cache of *responses* rather than of decisions.
@@ -82,7 +83,7 @@ from app.services import audit as audit_service
 from app.services.marketplace import plugin_actions
 from app.services.marketplace import plugin_data as plugin_data_service
 from app.services.marketplace.registration_lookup import registration_for_definition
-from app.services.marketplace.service_plugins import is_admin_only, plugin_widget_type
+from app.services.marketplace.service_plugins import plugin_widget_type
 from app.services.tenant import plugin_age, view_as
 
 
@@ -200,7 +201,7 @@ async def read_plugin_widget_catalog(
         endpoints = [
             PluginEndpointRead(
                 id=endpoint["id"],
-                admin_only=is_admin_only(endpoint),
+                permission=endpoint.get("permission"),
                 cache_ttl_seconds=endpoint.get("cache_ttl_seconds") or 0,
                 params=endpoint.get("params") or [],
                 returns=endpoint.get("returns") or [],
@@ -308,7 +309,7 @@ async def read_plugin_data(
         endpoint_id=endpoint_id,
         raw_params=params,
         user_id=current_user.id,
-        is_guild_admin=guild_context.is_admin,
+        initiative_id=dashboard.initiative_id,
         as_installation=view_as.runs_as_initiative(dashboard),
     )
     return PluginDataResponse(
@@ -374,6 +375,16 @@ async def read_plugin_param_options(
             )
         ),
     ] = None,
+    initiative_id: Annotated[
+        int | None,
+        Query(
+            description=(
+                "The initiative the form is filled in: the dashboard's, or the "
+                "item's an action runs on. An endpoint naming a permission "
+                "answers only where the caller holds it."
+            )
+        ),
+    ] = None,
 ) -> PluginParamOptionsResponse:
     """The values one of an endpoint's parameters permits.
 
@@ -415,7 +426,7 @@ async def read_plugin_param_options(
         param_key=param,
         raw_params=params,
         user_id=current_user.id,
-        is_guild_admin=guild_context.is_admin,
+        initiative_id=initiative_id,
     )
 
     return PluginParamOptionsResponse(

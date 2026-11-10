@@ -16,7 +16,7 @@ from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import GuildMessages, InitiativeMessages
+from app.core.messages import GuildMessages, GuildPluginMessages, InitiativeMessages
 from app.core.notification_categories import NotificationCategory
 from app.core.tools import Tool
 from app.models.platform.access_grant import AccessGrant
@@ -34,8 +34,10 @@ from app.services import email as email_service
 from app.services.content_sockets import sockets as content_sockets
 from app.services.platform import email_outbox
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant.guild_plugins import set_placed_initiatives
 from app.services.tenant.initiative_tools import tool_on_sql
 from app.testing import (
+    create_guild_plugin,
     create_resource_grant,
     create_tool_entity,
     drain_notices,
@@ -2519,7 +2521,12 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         "member_permissions": {"posts_enabled": True},
         "custom_roles": False,
     }
-    no_own = {"own_tools": {}, "own_member_permissions": {}}
+    no_own = {
+        "own_tools": {},
+        "own_member_permissions": {},
+        "own_plugin_member_permissions": [],
+        "plugin_member_permissions": [],
+    }
     made = await client.patch(defaults_url, headers=admin.headers, json=set_)
     assert made.status_code == 200, made.text
     assert made.json() == {**set_, **no_own}
@@ -2604,3 +2611,103 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         )
     )
     assert on == initiative_id
+
+
+async def test_a_role_holds_a_plug_in_s_permissions_as_it_holds_a_tool_s(
+    client: AsyncClient, acting_user, session: AsyncSession
+):
+    """Each placed plug-in's initiative permissions are answered on the roles
+    page: a manager holds every one, any other role takes the plug-in's
+    default until its own answer says otherwise, and what the community sets
+    for members stands over that. What the member's role holds is what opens
+    the plug-in for them."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    initiative_id = admin.initiative.id
+    plugin = await create_guild_plugin(
+        session,
+        admin.guild,
+        admin.user,
+        definition={
+            "pages": [{"id": "board", "path": "/b", "scopes": ["initiative"]}],
+            "permissions": [
+                {"id": "prices", "level": "initiative", "name": {}, "members": True}
+            ],
+        },
+    )
+    await route_session_to_guild(session, admin.guild.id)
+    await set_placed_initiatives(session, plugin, {initiative_id})
+    await session.commit()
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
+    )
+    roles_url = admin.g(f"/initiatives/{initiative_id}/roles")
+    defaults_url = admin.g("/initiatives/defaults")
+
+    async def answers(name: str) -> dict[str, bool]:
+        roles = (await client.get(roles_url, headers=admin.headers)).json()
+        role = next(r for r in roles if r["name"] == name)
+        return {a["permission"]: a["enabled"] for a in role["plugin_permissions"]}
+
+    async def opens() -> list[int]:
+        listed = (
+            await client.get(member.g("/plugins/"), headers=member.headers)
+        ).json()
+        [item] = listed["items"]
+        [board] = item["surface_access"]
+        return board["openable_initiatives"]
+
+    assert await answers("moderator") == {"use": True, "prices": True}
+    assert await answers("member") == {"use": False, "prices": True}
+    assert await opens() == []
+
+    roles = (await client.get(roles_url, headers=admin.headers)).json()
+    member_role = next(r for r in roles if r["name"] == "member")
+    role_url = f"{roles_url}/{member_role['id']}"
+    use = {"install_id": plugin.id, "permission": "use", "enabled": True}
+    changed = await client.patch(
+        role_url, headers=admin.headers, json={"plugin_permissions": [use]}
+    )
+    assert changed.status_code == 200, changed.text
+    assert await answers("member") == {"use": True, "prices": True}
+    assert await opens() == [initiative_id]
+    # What a rule set for every initiative would change: where the members'
+    # own role holds each one.
+    own = (await client.get(defaults_url, headers=admin.headers)).json()
+    assert own["own_plugin_member_permissions"] == [
+        {"install_id": plugin.id, "permission": p, "initiative_ids": [initiative_id]}
+        for p in ("use", "prices")
+    ]
+    unknown = await client.patch(
+        role_url,
+        headers=admin.headers,
+        json={"plugin_permissions": [{**use, "permission": "costs"}]},
+    )
+    assert unknown.status_code == 422
+    assert unknown.json()["detail"] == GuildPluginMessages.PERMISSION_UNKNOWN
+
+    # The community sets members' answer for every initiative.
+    off = {**use, "enabled": False}
+    made = await client.patch(
+        defaults_url, headers=admin.headers, json={"plugin_member_permissions": [off]}
+    )
+    assert made.status_code == 200, made.text
+    assert made.json()["plugin_member_permissions"] == [off]
+    assert await answers("member") == {"use": False, "prices": True}
+    assert await opens() == []
+    refused = await client.patch(
+        role_url, headers=admin.headers, json={"plugin_permissions": [use]}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == InitiativeMessages.SET_BY_COMMUNITY
+
+    # Handed back, the role's own answer applies again.
+    cleared = await client.patch(
+        defaults_url,
+        headers=admin.headers,
+        json={"plugin_member_permissions": [{**use, "enabled": None}]},
+    )
+    assert cleared.json()["plugin_member_permissions"] == []
+    assert await opens() == [initiative_id]

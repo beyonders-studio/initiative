@@ -581,7 +581,13 @@ PLUGIN_ROLE_MACHINERY_READS: dict[str, tuple[str, ...]] = {
         "granted_access",
         "revoked_at",
     ),
-    "initiative_rules": ("initiative_id", "initiative_role_id", "key", "enabled"),
+    "initiative_rules": (
+        "initiative_id",
+        "initiative_role_id",
+        "key",
+        "enabled",
+        "install_id",
+    ),
     # The community's trash retention, which dates a row an install bins
     # (``soft_delete.trash``), and the row's id, which tells "no settings row
     # yet" from "keep it forever".

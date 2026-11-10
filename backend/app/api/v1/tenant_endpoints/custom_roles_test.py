@@ -5,6 +5,7 @@ from app.core.messages import CustomRoleMessages, GuildMessages
 from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
 from app.models.platform.guild import CommunityRole
 from app.services.platform import rules
+from app.testing import create_guild_plugin
 
 
 async def _make(client, actor, **role) -> int:
@@ -35,7 +36,7 @@ async def test_a_member_role_opens_the_surfaces_it_names(client, acting_user):
     )
     assert (await _give(client, admin, member.user.id, doors)).status_code == 204
     held = await client.get(member.g("/custom-roles/held"), headers=member.headers)
-    assert held.json() == {"surfaces": ["invites"]}
+    assert held.json() == {"surfaces": ["invites"], "plugin_permissions": []}
     holders = await client.get(
         member.g("/custom-roles/holders"), headers=member.headers
     )
@@ -81,14 +82,51 @@ async def test_a_name_another_role_has_is_a_conflict(client, acting_user):
         assert response.json()["detail"] == CustomRoleMessages.CUSTOM_ROLE_NAME_TAKEN
 
 
-async def test_a_narrowed_admin_hands_out_no_more_than_it_holds(client, acting_user):
+async def test_a_narrowed_admin_hands_out_no_more_than_it_holds(
+    client, acting_user, session
+):
     admin = await acting_user(guild_role=CommunityRole.admin)
     narrowed = await acting_user(guild_role=CommunityRole.admin, guild=admin.guild)
     member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    plugin = await create_guild_plugin(
+        session,
+        admin.guild,
+        admin.user,
+        definition={
+            "permissions": [{"id": "console", "level": "community", "name": {}}]
+        },
+    )
+    console = [{"install_id": plugin.id, "permission": "console"}]
     roster = await _make(
         client, admin, name="Roster", base_rung="admin", surfaces=["members", "roles"]
     )
     assert (await _give(client, admin, narrowed.user.id, roster)).status_code == 204
+    held = await client.get(narrowed.g("/custom-roles/held"), headers=narrowed.headers)
+    assert held.json()["plugin_permissions"] == []
+
+    async def make(actor, rung: str, permissions) -> int:
+        made = await client.post(
+            actor.g("/custom-roles/"),
+            headers=actor.headers,
+            json={
+                "name": f"{rung} {len(permissions)}",
+                "base_rung": rung,
+                "plugin_permissions": permissions,
+            },
+        )
+        return made.status_code
+
+    # A plug-in's community permission is kept by a role on the admin rung,
+    # one the plug-in declares, given by somebody who holds it.
+    assert await make(narrowed, "admin", console) == 403
+    assert await make(admin, "member", console) == 400
+    assert await make(admin, "admin", [{**console[0], "permission": "x"}]) == 422
+    assert await make(admin, "admin", console) == 201
+    listed = await client.get(admin.g("/custom-roles/"), headers=admin.headers)
+    assert {r["name"]: r["plugin_permissions"] for r in listed.json()} == {
+        "Roster": [],
+        "admin 1": console,
+    }
 
     beyond = await client.post(
         narrowed.g("/custom-roles/"),

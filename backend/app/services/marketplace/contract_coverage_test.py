@@ -7,7 +7,7 @@ contract declares a field, the normalizer does not read it, and the field is
 dropped on publish.
 
 It matters because several of them are not descriptions — they are restrictions
-an author is asking this build to enforce. ``admin_only``, ``requires``,
+an author is asking this build to enforce. ``permission``, ``requires``,
 ``actors`` and ``connection.scope`` all narrow who or what reaches something,
 and a narrowing that is dropped does not fail loudly at the moment it is lost.
 
@@ -216,7 +216,7 @@ def maximal_manifest() -> dict:
                 "actors": ["member", "installation"],
                 "requires": {"all_of": ["vendor"]},
                 "cache_ttl_seconds": 60,
-                "admin_only": True,
+                "permission": "prices",
                 "public": True,
             },
             {
@@ -256,12 +256,22 @@ def maximal_manifest() -> dict:
                 "path": "/panel",
                 "name": {"en": "Panel"},
                 "scopes": ["community", "initiative"],
-                "admin_only": True,
+                "permission": "settings",
                 "capabilities": ["camera"],
                 "requires": {"all_of": ["other"]},
             }
         ],
         "sign_in": {"page": "panel", "return_path": "/signed-in"},
+        "permissions": [
+            {
+                "id": "prices",
+                "name": {"en": "Prices"},
+                "level": "initiative",
+                "members": True,
+            },
+            {"id": "settings", "name": {"en": "Settings"}, "level": "initiative"},
+            {"id": "settings", "name": {"en": "Settings"}, "level": "community"},
+        ],
         "fields": [
             {
                 "key": "demo.link",
@@ -279,6 +289,7 @@ def maximal_manifest() -> dict:
                         },
                     }
                 },
+                "permission": "prices",
                 "requires": {"all_of": ["vendor"]},
             },
             {
@@ -307,7 +318,7 @@ def maximal_manifest() -> dict:
                 "on": ["task"],
                 "confirm": {"en": "Make a new link?"},
                 "menu": True,
-                "admin_only": True,
+                "permission": "prices",
                 "requires": {"any_of": ["vendor"]},
             }
         ],
@@ -318,6 +329,7 @@ def maximal_manifest() -> dict:
                 "name": {"en": "Demo"},
                 "on": ["task"],
                 "description": {"en": "The task's demo"},
+                "permission": "use",
                 "requires": {"all_of": ["other"]},
                 "tree": {
                     "type": "section",
@@ -764,6 +776,9 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("stateFacet", published["fields"][0]["states"]["status"]),
         ("stateValue", published["fields"][0]["states"]["status"]["values"]["open"]),
         ("setting", published["settings"][0]),
+        # Members start with an initiative permission or not; a community one
+        # says nothing of it.
+        ("permission", published["permissions"][0]),
         # Only a declarative plug-in's action carries a write.
         ("action", {**published["actions"][0], **declarative["actions"][0]}),
         ("part", part),
@@ -852,7 +867,7 @@ def test_an_emitting_endpoint_keeps_what_describes_it(published):
         "requires",
         "cache_ttl_seconds",
         "actors",
-        "admin_only",
+        "permission",
         "public",
     ):
         assert caller_side not in emitted

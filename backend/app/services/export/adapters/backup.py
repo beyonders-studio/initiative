@@ -1080,7 +1080,8 @@ class _ScopeBuilder:
         if roles:
             rows = await self.session.exec(
                 select(InitiativeRule).where(
-                    InitiativeRule.initiative_role_id.in_([r.id for r in roles])
+                    InitiativeRule.initiative_role_id.in_([r.id for r in roles]),
+                    InitiativeRule.install_id.is_(None),
                 )
             )
             for permission in rows:

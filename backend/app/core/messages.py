@@ -1553,19 +1553,17 @@ class GuildPluginMessages:
     SERVICE_NOT_REGISTERED = "COMMUNITY_PLUGIN_SERVICE_NOT_REGISTERED"
     #: The pinned definition declares no surface under that id.
     SURFACE_NOT_FOUND = "COMMUNITY_PLUGIN_SURFACE_NOT_FOUND"
-    #: The surface is opened at the community level, or is marked
-    #: ``admin_only``, and the caller is not a guild admin.
-    SURFACE_ADMIN_ONLY = "COMMUNITY_PLUGIN_SURFACE_ADMIN_ONLY"
-    #: The surface was opened in an initiative the plug-in is placed in, and the
-    #: caller holds none of the roles that placement allows.
-    SURFACE_ROLE_NOT_ALLOWED = "COMMUNITY_PLUGIN_SURFACE_ROLE_NOT_ALLOWED"
+    #: The surface is here, and the caller does not hold the permission it
+    #: names, where it was opened.
+    SURFACE_PERMISSION_REQUIRED = "COMMUNITY_PLUGIN_SURFACE_PERMISSION_REQUIRED"
+    #: A role's answer names a permission the install does not declare at that
+    #: level, or an install that is not this community's.
+    PERMISSION_UNKNOWN = "COMMUNITY_PLUGIN_PERMISSION_UNKNOWN"
     #: The viewer is younger than the plug-in's minimum age where they are, or
     #: has no date of birth on file to say otherwise.
     AGE_RESTRICTED = "COMMUNITY_PLUGIN_AGE_RESTRICTED"
     #: The placement sent names an initiative that is not one of this guild's.
     PLACEMENT_INVALID = "COMMUNITY_PLUGIN_PLACEMENT_INVALID"
-    #: The placement names a role that is not one of its initiative's.
-    PLACEMENT_ROLE_INVALID = "COMMUNITY_PLUGIN_PLACEMENT_ROLE_INVALID"
     #: A scope granted to an install that its manifest does not request.
     SCOPE_NOT_REQUESTED = "COMMUNITY_PLUGIN_SCOPE_NOT_REQUESTED"
     #: A scope granted to an install beyond what this deployment allows the plug-in.
@@ -1724,8 +1722,9 @@ class PluginDataMessages:
     #: The install names no such data source, or the pinned definition is not a
     #: service plug-in's at all.
     ENDPOINT_NOT_FOUND = "PLUGIN_DATA_ENDPOINT_NOT_FOUND"
-    #: The endpoint is marked ``admin_only`` and the caller is not a guild admin.
-    ADMIN_ONLY = "PLUGIN_DATA_ADMIN_ONLY"
+    #: The endpoint names a permission the caller does not hold in the
+    #: initiative it is read in.
+    PERMISSION_REQUIRED = "PLUGIN_DATA_PERMISSION_REQUIRED"
     #: The source declares no such parameter, so there is nothing to fill in.
     PARAM_NOT_FOUND = "PLUGIN_DATA_PARAM_NOT_FOUND"
     #: The install is turned off in this guild.

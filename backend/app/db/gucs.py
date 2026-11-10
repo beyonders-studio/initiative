@@ -252,6 +252,17 @@ COMMUNITY_TOOLS = Guc("app.community_tools", Kind.NAMES, standing=True)
 #: (``app.models.platform.guild.AdminSurface``): a custom role's, or else
 #: every one for the admin rung and none below it.
 HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
+#: The installed plug-ins' community permissions the reader holds here, as
+#: ``"<install id>:<permission>"``: those a custom role on the admin rung
+#: keeps, or ``*``, every one, for the admin rung with no custom role.
+HELD_PLUGIN_PERMISSIONS = Guc(
+    "app.held_plugin_permissions", Kind.NAMES, standing=True, read_once=True
+)
+#: ``"<initiative id>:<install id>:<permission>"`` where the reader's role in
+#: that initiative holds one of a plug-in's permissions by a rule, its own or
+#: what the community set for members; and where such a rule says no.
+PLUGIN_GRANTS = Guc("app.plugin_grants", Kind.NAMES, standing=True)
+PLUGIN_DENIES = Guc("app.plugin_denies", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam

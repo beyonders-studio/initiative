@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import AliasChoices, ConfigDict, Field, create_model
 
@@ -109,6 +110,36 @@ class InitiativeUpdate(_InitiativeToolSwitchesPatch):
 
 
 # Role schemas
+class PluginPermissionRule(SanitizedBaseModel):
+    """An answer for one installed plug-in's initiative permission: a role's,
+    or what members hold in every initiative."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    install_id: int
+    permission: str = Field(min_length=1, max_length=64)
+    enabled: bool
+
+
+class PluginPermissionInitiatives(SanitizedBaseModel):
+    """One plug-in's initiative permission, and initiatives that answer it."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    install_id: int
+    permission: str
+    initiative_ids: list[int] = Field(default_factory=list)
+
+
+class PluginPermissionDefault(SanitizedBaseModel):
+    """What members hold of one plug-in's initiative permission in every
+    initiative; ``null`` hands it back to each initiative."""
+
+    install_id: int
+    permission: str = Field(min_length=1, max_length=64)
+    enabled: bool | None
+
+
 class InitiativeRoleRead(SanitizedBaseModel):
     """Role definition with permissions."""
 
@@ -126,6 +157,9 @@ class InitiativeRoleRead(SanitizedBaseModel):
     override_share_restrictions: bool = False
     position: int
     permissions: dict[PermissionKey, bool] = Field(default_factory=dict)
+    #: What the role holds of each initiative permission of each plug-in
+    #: placed in the initiative.
+    plugin_permissions: list[PluginPermissionRule] = Field(default_factory=list)
     member_count: int = 0
 
 
@@ -144,6 +178,11 @@ class InitiativeRoleUpdate(SanitizedBaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     is_manager: bool | None = None
     permissions: dict[PermissionKey, bool] | None = None
+    #: Answers for plug-ins' initiative permissions, each kept as the role's
+    #: own. One left out is left as it is.
+    plugin_permissions: list[PluginPermissionRule] | None = Field(
+        default=None, max_length=1000
+    )
 
 
 class InitiativeDefaultsRead(SanitizedBaseModel):
@@ -156,6 +195,8 @@ class InitiativeDefaultsRead(SanitizedBaseModel):
     tools: dict[Tool, bool] = Field(default_factory=dict)
     #: What the built-in member role may do, by permission, where it set it.
     member_permissions: dict[PermissionKey, bool] = Field(default_factory=dict)
+    #: What members hold of plug-ins' initiative permissions, where it set it.
+    plugin_member_permissions: list[PluginPermissionRule] = Field(default_factory=list)
     #: Whether managers may add roles of their own.
     custom_roles: bool = True
     #: For a community admin: the live initiatives whose own switch has each
@@ -164,6 +205,12 @@ class InitiativeDefaultsRead(SanitizedBaseModel):
     #: For a community admin: the live initiatives whose own built-in member
     #: role holds each permission, by permission.
     own_member_permissions: dict[PermissionKey, list[int]] = Field(default_factory=dict)
+    #: For a community admin: of the live initiatives each plug-in is placed
+    #: in, those whose own built-in member role holds each of its initiative
+    #: permissions.
+    own_plugin_member_permissions: list[PluginPermissionInitiatives] = Field(
+        default_factory=list
+    )
 
 
 class InitiativeDefaultsUpdate(SanitizedBaseModel):
@@ -172,6 +219,9 @@ class InitiativeDefaultsUpdate(SanitizedBaseModel):
 
     tools: dict[Tool, bool | None] = Field(default_factory=dict)
     member_permissions: dict[PermissionKey, bool | None] = Field(default_factory=dict)
+    plugin_member_permissions: list[PluginPermissionDefault] = Field(
+        default_factory=list, max_length=1000
+    )
     custom_roles: bool | None = None
 
 
@@ -380,6 +430,7 @@ def serialize_role(
     member_count: int = 0,
     *,
     defaults: InitiativeDefaultsRead | None = None,
+    plugins: Sequence[Any] = (),
 ) -> InitiativeRoleRead:
     """Serialize a role model to a read schema.
 
@@ -388,13 +439,51 @@ def serialize_role(
     "who can see Posts" must not have to know that an absent key means the
     documented default. The stored row wins wherever there is one, and for the
     built-in member role what the community set (``defaults``) wins over it.
+
+    So is every initiative permission of each install in ``plugins``, those
+    placed in the role's initiative: a manager holds every one, and otherwise
+    what the community set for members where it holds, the role's row, or the
+    plug-in's default for members, in that order.
     """
+    from app.services.marketplace.service_plugins import (
+        declared_permissions,
+        members_hold,
+    )
+
+    stored = [perm for perm in (role.permissions or []) if perm.install_id is None]
     permissions = {
         **DEFAULT_PERMISSION_VALUES,
-        **{perm.key: perm.enabled for perm in (role.permissions or [])},
+        **{perm.key: perm.enabled for perm in stored},
     }
+    community: dict[tuple[int, str], bool] = {}
     if defaults is not None and community_holds_role(role, defaults):
         permissions.update(defaults.member_permissions)
+        community = {
+            (rule.install_id, rule.permission): rule.enabled
+            for rule in defaults.plugin_member_permissions
+        }
+    own = {
+        (int(perm.install_id), perm.key): perm.enabled
+        for perm in (role.permissions or [])
+        if perm.install_id is not None
+    }
+    plugin_permissions = [
+        PluginPermissionRule(
+            install_id=plugin.id,
+            permission=entry["id"],
+            enabled=role.is_manager
+            or community.get(
+                (plugin.id, entry["id"]),
+                own.get(
+                    (plugin.id, entry["id"]),
+                    members_hold(plugin.definition, entry["id"]),
+                ),
+            ),
+        )
+        for plugin in plugins
+        for entry in declared_permissions(plugin.definition)
+        if entry["level"] == "initiative"
+    ]
     return InitiativeRoleRead(
         id=role.id,
         name=role.name,
@@ -404,6 +493,7 @@ def serialize_role(
         override_share_restrictions=getattr(role, "override_share_restrictions", False),
         position=role.position,
         permissions=permissions,
+        plugin_permissions=plugin_permissions,
         member_count=member_count,
     )
 

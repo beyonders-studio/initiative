@@ -3074,22 +3074,32 @@ async def sync_definitions(
 
 
 class _Offered:
-    """Whether a reader is drawn an install's values in an initiative: it is
-    placed there with a role the reader holds (or the reader is the
-    community's admin), and the reader is old enough for it. Each pair is
-    decided once, and the reader's age read only if a plug-in asks for one."""
+    """Whether a reader is drawn an install's field in an initiative it is
+    placed in: the reader holds the field's permission there
+    (:meth:`GuildContext.holds_plugin_permission`) and is old enough for the
+    plug-in. Each install's age is decided once, and the reader's age read
+    only if a plug-in asks for one."""
 
     def __init__(self, context: GuildContext) -> None:
         self._context = context
         self._viewer: Any = None
-        self._known: dict[tuple[int, int], bool] = {}
+        self._old_enough: dict[int, bool] = {}
 
     async def __call__(
-        self, install_id: int, initiative_id: int, roles: Any, minimum: Any
+        self,
+        install_id: int,
+        initiative_id: int,
+        field: Any,
+        permissions: Any,
+        minimum: Any,
     ) -> bool:
-        from app.services.tenant import guild_plugins, plugin_age
+        from app.services.marketplace.service_plugins import (
+            members_hold,
+            surface_permission,
+        )
+        from app.services.tenant import plugin_age
 
-        if (install_id, initiative_id) not in self._known:
+        if install_id not in self._old_enough:
             old_enough = True
             if minimum is not None:
                 self._viewer = self._viewer or await plugin_age.current_viewer(
@@ -3098,28 +3108,24 @@ class _Offered:
                 old_enough = plugin_age.age_allows(
                     {"minimum_age": minimum}, self._viewer
                 )
-            self._known[(install_id, initiative_id)] = (
-                guild_plugins.surface_access(
-                    guild_plugins.ITEM_SURFACE,
-                    initiative_id=initiative_id,
-                    placement_role_ids=list(roles or ()),
-                    is_guild_admin=self._context.is_admin,
-                    member_role_ids=self._context.member_role_ids,
-                    age_allows=old_enough,
-                )
-                is guild_plugins.SurfaceAccess.open
-            )
-        return self._known[(install_id, initiative_id)]
+            self._old_enough[install_id] = old_enough
+        permission = surface_permission(field)
+        return self._old_enough[install_id] and self._context.holds_plugin_permission(
+            install_id,
+            permission,
+            initiative_id=initiative_id,
+            members=members_hold({"permissions": permissions}, permission),
+        )
 
 
 async def _plugin_summaries(
     session: AsyncSession, target: str, ids: Sequence[int]
 ) -> dict[int, list[PropertySummary]]:
     """The shown plug-in values on items of one kind, by item id, a list's as
-    an array (:func:`assembled`): those of the installs whose actions the
-    reader could run there — on, placed in the item's initiative with a role
-    the reader holds (or the reader its admin), and the reader old enough for
-    the plug-in (``guild_plugins.surface_access``). One query for the page.
+    an array (:func:`assembled`): those of installs that are on and placed in
+    the item's initiative, whose field's permission the reader holds there and
+    whose plug-in they are old enough for (:class:`_Offered`). One query for
+    the page, and one for its installs' declarations.
 
     ``session`` is the reader's, so which values it reads is the table's
     policies' answer; which installs' values are drawn is decided here. An
@@ -3136,8 +3142,6 @@ async def _plugin_summaries(
                 MetadataDefinition,
                 MetadataValue,
                 PluginPlacement.initiative_id,
-                PluginPlacement.role_ids,
-                GuildPlugin.definition["minimum_age"],
             )
             .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
             .join(GuildPlugin, GuildPlugin.id == MetadataDefinition.install_id)
@@ -3156,13 +3160,39 @@ async def _plugin_summaries(
             .order_by(MetadataDefinition.id, *NEWEST_FIRST)
         )
     ).all()
+    # Each install's fields, permissions and minimum age, read once each.
+    declares = {
+        install_id: (fields, permissions, minimum)
+        for install_id, fields, permissions, minimum in await session.exec(
+            select(
+                GuildPlugin.id,
+                GuildPlugin.definition["fields"],
+                GuildPlugin.definition["permissions"],
+                GuildPlugin.definition["minimum_age"],
+            ).where(
+                col(GuildPlugin.id).in_(
+                    sorted({int(defn.install_id or 0) for defn, _, _ in rows})
+                )
+            )
+        )
+    }
     offered = _Offered(context)
     definitions: dict[int, MetadataDefinition] = {}
     held: dict[tuple[int, int], list[Any]] = defaultdict(list)
-    for defn, row, initiative_id, roles, minimum in rows:
-        if await offered(int(defn.install_id or 0), initiative_id, roles, minimum):
-            definitions[defn.id] = defn
-            held[(row.entity_id, defn.id)].append(row)
+    for defn, row, initiative_id in rows:
+        install_id = int(defn.install_id or 0)
+        fields, permissions, minimum = declares[install_id]
+        field = next(
+            (
+                entry
+                for entry in (fields if isinstance(fields, list) else ())
+                if isinstance(entry, dict) and entry.get("key") == defn.key
+            ),
+            None,
+        )
+        if await offered(install_id, initiative_id, field, permissions, minimum):
+            definitions[int(defn.id or 0)] = defn
+            held[(row.entity_id, int(defn.id or 0))].append(row)
     # A select's options in the reader's language, read once for the page.
     language = "en"
     if any(
@@ -3231,13 +3261,14 @@ async def filter_fields(
     if not wanted or context is None or context.guest:
         return {}
     installs = sorted({install for install, _ in wanted})
-    # Each install's fields and minimum age, read once each.
+    # Each install's fields, permissions and minimum age, read once each.
     declares = {
-        install_id: (fields, minimum)
-        for install_id, fields, minimum in await session.exec(
+        install_id: (fields, permissions, minimum)
+        for install_id, fields, permissions, minimum in await session.exec(
             select(
                 GuildPlugin.id,
                 GuildPlugin.definition["fields"],
+                GuildPlugin.definition["permissions"],
                 GuildPlugin.definition["minimum_age"],
             ).where(GuildPlugin.enabled.is_(True), col(GuildPlugin.id).in_(installs))
         )
@@ -3252,18 +3283,16 @@ async def filter_fields(
         )
     }
     placements = await session.exec(
-        select(
-            PluginPlacement.install_id,
-            PluginPlacement.initiative_id,
-            PluginPlacement.role_ids,
-        ).where(col(PluginPlacement.install_id).in_(list(declares)))
+        select(PluginPlacement.install_id, PluginPlacement.initiative_id).where(
+            col(PluginPlacement.install_id).in_(list(declares))
+        )
     )
     offered = _Offered(context)
     reach: dict[tuple[int, str], set[int]] = defaultdict(set)
     # The facets of each field's states.
     facets: dict[tuple[int, str], frozenset[str]] = {}
-    for install_id, initiative_id, roles in placements.all():
-        fields, minimum = declares[install_id]
+    for install_id, initiative_id in placements.all():
+        fields, permissions, minimum = declares[install_id]
         for field in _fields_on(fields, "task"):
             pair = (install_id, field["key"])
             if pair not in wanted or pair not in definitions:
@@ -3272,7 +3301,7 @@ async def filter_fields(
             facets[pair] = frozenset(
                 map(str, states if isinstance(states, dict) else ())
             )
-            if await offered(install_id, initiative_id, roles, minimum):
+            if await offered(install_id, initiative_id, field, permissions, minimum):
                 reach[pair].add(initiative_id)
     return {
         wanted[pair]: FilterField(definitions[pair], facets[pair], frozenset(found))

@@ -143,10 +143,10 @@ class PluginEndpointRead(SanitizedBaseModel):
     """
 
     id: str
-    #: Read by the community's admins alone — enforced again on every fetch
-    #: under the caller's own session, so this is what the picker shows rather
-    #: than what protects the data.
-    admin_only: bool = False
+    #: The initiative permission a reader holds to read it, when it names one
+    #: — enforced again on every fetch under the caller's own session, so this
+    #: is what the picker shows rather than what protects the data.
+    permission: str | None = None
     #: What the manifest asks for, already clamped at publish time. The proxy
     #: applies the deployment's own ceiling on top.
     cache_ttl_seconds: int = 0

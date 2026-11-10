@@ -212,7 +212,8 @@ async def _build_roles(ctx: SectionContext) -> tuple[dict[str, Any], int] | None
 
     from app.core.user_display import handle_of
     from app.models.platform.user_profile_view import GuildMember
-    from app.models.tenant.custom_role import CustomRole
+    from app.models.tenant.custom_role import CustomRole, CustomRolePluginPermission
+    from app.models.tenant.guild_plugin import GuildPlugin
     from app.services.tenant import custom_roles
 
     roles = list(
@@ -220,18 +221,34 @@ async def _build_roles(ctx: SectionContext) -> tuple[dict[str, Any], int] | None
     )
     if not roles:
         return None
+    # A role's plug-in permissions name the plug-in as the plugins section
+    # does: by its listing.
+    kept: dict[int, list[dict[str, str]]] = {}
+    for role_id, listing_uid, permission in await ctx.session.exec(
+        select(
+            CustomRolePluginPermission.role_id,
+            GuildPlugin.listing_uid,
+            CustomRolePluginPermission.permission,
+        )
+        .join(GuildPlugin, GuildPlugin.id == CustomRolePluginPermission.install_id)
+        .order_by(GuildPlugin.listing_uid, CustomRolePluginPermission.permission)
+    ):
+        kept.setdefault(role_id, []).append(
+            {"listing_uid": listing_uid, "permission": permission}
+        )
     holders = await custom_roles.holders(ctx.session, ctx.guild_id)
     profiles = {
         profile.id: profile for profile in await ctx.session.exec(select(GuildMember))
     }
     payload = {
         "type": "guild-roles",
-        "schema_version": 1,
+        "schema_version": 2,
         "roles": [
             {
                 "name": role.name,
                 "base_rung": role.base_rung,
                 "surfaces": list(role.surfaces),
+                "plugin_permissions": kept.get(role.id, []),
                 "holders": [
                     handle_of(profiles[user_id])
                     for user_id, role_id in holders
@@ -286,12 +303,35 @@ async def _build_plugins(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
             )
     if not kept:
         return None
+    from sqlmodel import col, select
+
+    from app.models.tenant.initiative import InitiativeRoleModel, InitiativeRule
     from app.services.tenant.guild_plugins import placements_by_install
 
     placements = await placements_by_install(ctx.session, [row.id for row in kept])
+    # Who holds each install's initiative permissions: a role's answer, by the
+    # role's name in its initiative, or what members hold in every initiative.
+    rules: dict[int, list[dict[str, Any]]] = {}
+    for rule, role_name in await ctx.session.exec(
+        select(InitiativeRule, InitiativeRoleModel.name)
+        .outerjoin(
+            InitiativeRoleModel,
+            col(InitiativeRoleModel.id) == InitiativeRule.initiative_role_id,
+        )
+        .where(col(InitiativeRule.install_id).in_([row.id for row in kept]))
+        .order_by(InitiativeRule.initiative_id, InitiativeRule.key)
+    ):
+        rules.setdefault(int(rule.install_id or 0), []).append(
+            {
+                "initiative_id": rule.initiative_id,
+                "role": role_name,
+                "permission": rule.key,
+                "enabled": rule.enabled,
+            }
+        )
     payload = {
         "type": "guild-plugins",
-        "schema_version": 2,
+        "schema_version": 3,
         "plugins": [
             {
                 "listing_uid": row.listing_uid,
@@ -301,13 +341,10 @@ async def _build_plugins(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
                 "enabled": row.enabled,
                 "auto_update": row.auto_update,
                 "config": dict(row.config or {}),
-                "placements": [
-                    {
-                        "initiative_id": placement.initiative_id,
-                        "role_ids": list(placement.role_ids or []),
-                    }
-                    for placement in placements.get(row.id, [])
+                "placed_initiative_ids": [
+                    placement.initiative_id for placement in placements.get(row.id, [])
                 ],
+                "permissions": rules.get(row.id, []),
             }
             for row in kept
         ],
@@ -363,6 +400,7 @@ SECTION_TABLES: dict[str, str] = {
     "initiative_rules": "initiatives",
     "custom_roles": "roles",
     "custom_role_members": "roles",
+    "custom_role_plugin_permissions": "roles",
 }
 
 # Guild-level tables deliberately NOT exported, and why. A reason is required:

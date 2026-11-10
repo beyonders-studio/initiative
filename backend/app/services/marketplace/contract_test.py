@@ -149,8 +149,10 @@ def test_vocabularies_come_from_the_validator():
     scope_items = props["service"]["properties"]["scopes"]["items"]["anyOf"]
     assert set(scope_items[0]["enum"]) == set(ALL_SCOPES)
     assert scope_items[1] == {"$ref": "#/$defs/pluginScope"}
-    assert defs["page"]["properties"]["admin_only"]["type"] == "boolean"
-    assert defs["endpoint"]["properties"]["admin_only"]["type"] == "boolean"
+    for surface in ("page", "field", "part", "action", "endpoint"):
+        assert "permission" in defs[surface]["properties"]
+        assert "admin_only" not in defs[surface]["properties"]
+    assert set(defs["permission"]["properties"]["level"]["enum"]) == SURFACE_SCOPES
     assert set(defs["page"]["properties"]["scopes"]["items"]["enum"]) == SURFACE_SCOPES
     assert set(defs["page"]["properties"]["capabilities"]["items"]["enum"]) == (
         PAGE_CAPABILITIES
@@ -302,7 +304,7 @@ ACCEPTED = [
                     "path": "/page/board",
                     "name": {"en": "Board"},
                     "scopes": ["community", "initiative"],
-                    "admin_only": True,
+                    "permission": "use",
                     "capabilities": ["clipboard-write", "fullscreen"],
                     "requires": {"any_of": ["account"]},
                 }
@@ -536,18 +538,18 @@ REFUSED_BY_BOTH = [
     pytest.param(
         _manifest(
             features=["pages"],
-            pages=[{"id": "e", "path": "/e", "name": {"en": "E"}, "admin_only": "yes"}],
+            pages=[{"id": "e", "path": "/e", "name": {"en": "E"}, "permission": "A B"}],
         ),
-        id="admin-only-not-a-boolean",
+        id="permission-not-an-identifier",
     ),
     pytest.param(
         _manifest(
             features=["endpoints"],
             endpoints=[
-                {"id": "plugin.acme.tracker.s", "direction": "read", "admin_only": 1}
+                {"id": "plugin.acme.tracker.s", "direction": "read", "permission": 1}
             ],
         ),
-        id="endpoint-admin-only-not-a-boolean",
+        id="endpoint-permission-not-an-identifier",
     ),
     pytest.param(
         _manifest(
@@ -860,72 +862,94 @@ def test_public_is_stored_only_when_set_and_refused_on_an_emission():
         endpoint(direction="emit", public=True)
 
 
-def test_admin_only_defaults_to_false_and_is_always_stored():
+def test_a_surface_names_a_permission_declared_where_it_is_held():
+    from app.services.marketplace.manifest_values import ListingDefinitionError
     from app.services.marketplace.service_plugins import (
         normalize_service_plugin_definition,
     )
 
-    def page(**extra):
+    settings = {"id": "settings", "name": {"en": "Settings"}, "level": "community"}
+
+    def page(permissions, **extra):
         body = _manifest(
             features=["pages"],
+            permissions=permissions,
             pages=[{"id": "e", "path": "/e", "name": {"en": "E"}, **extra}],
         )
-        return normalize_service_plugin_definition(body)["pages"][0]
+        return normalize_service_plugin_definition(body)
 
-    assert page()["admin_only"] is False
-    assert page(admin_only=True)["admin_only"] is True
-    assert "visibility" not in page()
+    assert "permission" not in page([])["pages"][0]
+    assert page([], permission="use", scopes=["initiative"])["pages"][0][
+        "permission"
+    ] == ("use")
+    assert page([settings], permission="settings")["permissions"] == [settings]
+    # A page names one for every level it renders in.
+    with pytest.raises(ListingDefinitionError, match="initiative level"):
+        page([settings], permission="settings", scopes=["community", "initiative"])
+    with pytest.raises(ListingDefinitionError, match="community level"):
+        page([], permission="settings")
+    with pytest.raises(ListingDefinitionError, match="share the id"):
+        page([settings, settings])
+    # Whether members start with it is an initiative permission's alone, and
+    # kept only when it is true.
+    with pytest.raises(ListingDefinitionError, match="initiative permission"):
+        page([{**settings, "members": True}])
+    inside = {**settings, "level": "initiative"}
+    assert page([{**inside, "members": False}])["permissions"] == [inside]
+    assert page([{**inside, "members": True}])["permissions"] == [
+        {**inside, "members": True}
+    ]
+
+
+def test_an_endpoint_names_an_initiative_permission():
+    from app.services.marketplace.manifest_values import ListingDefinitionError
+
+    def endpoint(level: str):
+        return _manifest(
+            features=["endpoints"],
+            permissions=[{"id": "costs", "name": {"en": "Costs"}, "level": level}],
+            endpoints=[
+                {
+                    "id": "plugin.acme.tracker.s",
+                    "direction": "read",
+                    "permission": "costs",
+                }
+            ],
+        )
+
+    platform_accepts(endpoint("initiative"))
+    with pytest.raises(ListingDefinitionError, match="initiative level"):
+        platform_accepts(endpoint("community"))
 
 
 @pytest.mark.parametrize("where", ["page", "endpoint"])
-def test_the_retired_audience_term_is_refused_by_name(where):
-    """Every other unknown term is dropped and reported; this one narrowed who
-    reached something, so it is refused and the author is told why."""
+@pytest.mark.parametrize("term", ["visibility", "admin_only"])
+def test_the_retired_audience_terms_are_refused_by_name(where, term):
+    """Every other unknown term is dropped and reported; these narrowed who
+    reached something, so each is refused and the author is told why."""
     from app.services.marketplace.manifest_values import ListingDefinitionError
 
     if where == "page":
         body = _manifest(
             features=["pages"],
-            pages=[
-                {"id": "e", "path": "/e", "name": {"en": "E"}, "visibility": "member"}
-            ],
+            pages=[{"id": "e", "path": "/e", "name": {"en": "E"}, term: True}],
         )
     else:
         body = _manifest(
             features=["endpoints"],
             endpoints=[
-                {
-                    "id": "plugin.acme.tracker.s",
-                    "direction": "read",
-                    "visibility": "guild_admin",
-                }
+                {"id": "plugin.acme.tracker.s", "direction": "read", term: True}
             ],
         )
-    with pytest.raises(ListingDefinitionError, match="visibility"):
+    with pytest.raises(ListingDefinitionError, match=term):
         platform_accepts(body)
 
 
-def test_an_endpoint_admin_only_defaults_to_false_and_is_always_stored():
-    from app.services.marketplace.service_plugins import (
-        normalize_service_plugin_definition,
-    )
-
-    def endpoint(**extra):
-        body = _manifest(
-            features=["endpoints"],
-            endpoints=[{"id": "plugin.acme.tracker.s", "direction": "read", **extra}],
-        )
-        return normalize_service_plugin_definition(body)["endpoints"][0]
-
-    assert endpoint()["admin_only"] is False
-    assert endpoint(admin_only=True)["admin_only"] is True
-
-
-def test_an_emission_is_not_admin_only():
+def test_an_emission_names_no_permission():
     """Nobody reads or calls an emission, so there is nobody to narrow."""
     from app.services.marketplace.manifest_values import ListingDefinitionError
 
-    with pytest.raises(ListingDefinitionError, match="admin_only"):
+    with pytest.raises(ListingDefinitionError, match="permission"):
         platform_accepts(
             _manifest(
                 features=["endpoints"],
@@ -933,26 +957,37 @@ def test_an_emission_is_not_admin_only():
                     {
                         "id": "plugin.acme.tracker.told",
                         "direction": "emit",
-                        "admin_only": False,
+                        "permission": "use",
                     }
                 ],
             )
         )
 
 
-@pytest.mark.parametrize(
-    "declared,expected",
-    [
-        ({}, False),
-        ({"admin_only": False}, False),
-        ({"admin_only": True}, True),
-        (None, False),
-    ],
-)
-def test_is_admin_only_reads_its_flag(declared, expected):
-    from app.services.marketplace.service_plugins import is_admin_only
+def test_a_stored_definition_reads_its_permissions():
+    from app.services.marketplace.service_plugins import (
+        declared_permissions,
+        members_hold,
+        surface_permission,
+    )
 
-    assert is_admin_only(declared) is expected
+    prices = {"id": "prices", "level": "initiative", "name": {}, "members": True}
+    use = {"id": "use", "level": "community", "name": {"en": "Open"}}
+    definition = {"permissions": [prices, use]}
+    # Each level's use first, named where the plug-in named it.
+    assert declared_permissions(definition) == [
+        {"id": "use", "level": "initiative"},
+        prices,
+        use,
+    ]
+    assert declared_permissions(None) == [
+        {"id": "use", "level": "initiative"},
+        {"id": "use", "level": "community"},
+    ]
+    assert members_hold(definition, "prices") is True
+    assert members_hold(definition, "use") is False
+    assert surface_permission({"permission": "prices"}) == "prices"
+    assert surface_permission({}) == surface_permission(None) == "use"
 
 
 @pytest.mark.parametrize(

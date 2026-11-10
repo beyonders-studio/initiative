@@ -23,6 +23,7 @@ from app.core.audit_events import AuditEventType
 from app.core.messages import (
     AuthMessages,
     GuildMessages,
+    GuildPluginMessages,
     InitiativeMessages,
     UserMessages,
 )
@@ -78,6 +79,7 @@ from app.services.platform import accounts as accounts_service
 from app.services.platform import guilds as guilds_service
 from app.services.platform import presence
 from app.services.platform import users as users_service
+from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant.names import ensure_name_free
 
@@ -137,8 +139,12 @@ _ROLE_AUDIT_FIELDS = ("display_name", "is_manager")
 
 
 def _role_permissions(role: InitiativeRoleModel) -> dict[str, bool]:
-    """A role's permission toggles, by key."""
-    return {p.key: p.enabled for p in role.permissions}
+    """A role's permission toggles, by key, a plug-in's as
+    ``"<install id>:<permission>"``."""
+    return {
+        p.key if p.install_id is None else f"{p.install_id}:{p.key}": p.enabled
+        for p in role.permissions
+    }
 
 
 async def _get_initiative_or_404(
@@ -1017,8 +1023,14 @@ async def list_initiative_roles(
         session, initiative_id=initiative_id
     )
     defaults = await initiatives_service.community_defaults(session)
+    plugins = await guild_plugins_service.placed_installs(session, initiative_id)
     return [
-        serialize_role(role, member_count=counts.get(role.id, 0), defaults=defaults)
+        serialize_role(
+            role,
+            member_count=counts.get(role.id, 0),
+            defaults=defaults,
+            plugins=plugins,
+        )
         for role in roles
     ]
 
@@ -1080,7 +1092,12 @@ async def create_initiative_role(
         },
     )
     await session.commit()
-    return serialize_role(role, member_count=0)
+    return serialize_role(
+        role,
+        member_count=0,
+        defaults=defaults,
+        plugins=await guild_plugins_service.placed_installs(session, initiative_id),
+    )
 
 
 @router.patch("/{initiative_id}/roles/{role_id}", response_model=InitiativeRoleRead)
@@ -1112,7 +1129,9 @@ async def update_initiative_role(
         )
 
     # The built-ins that hold every permission have nothing to configure.
-    if role.name in LOCKED_PERMISSION_ROLE_NAMES and role_in.permissions is not None:
+    if role.name in LOCKED_PERMISSION_ROLE_NAMES and (
+        role_in.permissions is not None or role_in.plugin_permissions is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=InitiativeMessages.CANNOT_MODIFY_BUILTIN_PERMISSIONS,
@@ -1167,12 +1186,35 @@ async def update_initiative_role(
 
     # Update permissions if provided
     permissions = role_in.permissions
-    if permissions is not None:
+    plugin_rules = role_in.plugin_permissions
+    if permissions is not None or plugin_rules is not None:
+        permissions = permissions or {}
+        plugin_rules = plugin_rules or []
+        if plugin_rules:
+            declared = await guild_plugins_service.declared_permission_ids(
+                session, "initiative"
+            )
+            if any(
+                (rule.install_id, rule.permission) not in declared
+                for rule in plugin_rules
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=GuildPluginMessages.PERMISSION_UNKNOWN,
+                )
         defaults = await initiatives_service.community_defaults(session)
         if community_holds_role(role, defaults):
+            set_for_members = {
+                (rule.install_id, rule.permission): rule.enabled
+                for rule in defaults.plugin_member_permissions
+            }
             if any(
                 permissions.get(key, enabled) != enabled
                 for key, enabled in defaults.member_permissions.items()
+            ) or any(
+                set_for_members.get((rule.install_id, rule.permission), rule.enabled)
+                != rule.enabled
+                for rule in plugin_rules
             ):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -1185,8 +1227,16 @@ async def update_initiative_role(
                 for key, on in permissions.items()
                 if key not in defaults.member_permissions
             }
+            plugin_rules = [
+                rule
+                for rule in plugin_rules
+                if (rule.install_id, rule.permission) not in set_for_members
+            ]
         role = await initiatives_service.update_role_permissions(
-            session, role=role, permissions=permissions
+            session,
+            role=role,
+            permissions=permissions,
+            plugin_permissions=plugin_rules,
         )
 
     changed = audit_service.changed_fields(
@@ -1228,6 +1278,7 @@ async def update_initiative_role(
         role,
         member_count=member_count,
         defaults=await initiatives_service.community_defaults(session),
+        plugins=await guild_plugins_service.placed_installs(session, initiative_id),
     )
 
 

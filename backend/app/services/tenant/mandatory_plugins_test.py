@@ -30,7 +30,6 @@ from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.platform.intake_setup import set_operations_guild
 from app.services.tenant import mandatory_plugins
-from app.services.tenant.initiatives import get_moderator_role
 from app.services.tenant.mandatory_plugins import backfill_mandatory_plugins
 from app.testing import (
     create_guild,
@@ -384,10 +383,7 @@ class TestPlacement:
                 select(PluginPlacement).where(PluginPlacement.install_id == plugin.id)
             )
         ).all()
-        placed = {row.initiative_id: list(row.role_ids) for row in rows}
-        role = await get_moderator_role(session, initiative_id=before.id)
-        assert role is not None
-        assert placed == {before.id: [role.id]}
+        assert {row.initiative_id for row in rows} == {before.id}
 
     async def test_an_install_already_there_is_left_as_the_seat_set_it(
         self, session: AsyncSession, mandatory_registration

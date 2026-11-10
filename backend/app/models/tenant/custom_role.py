@@ -109,6 +109,32 @@ class CustomRole(CreatedByMixin, table=True):
     )
 
 
+class CustomRolePluginPermission(SQLModel, table=True):
+    """A plug-in's community permission a custom role on the admin rung keeps,
+    as the role's ``surfaces`` keep parts of administering the community. Goes
+    with the role and with the install."""
+
+    __tablename__ = "custom_role_plugin_permissions"
+
+    role_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("custom_roles.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    install_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("guild_plugins.id", ondelete="CASCADE"),
+            primary_key=True,
+            index=True,
+        )
+    )
+    #: The permission's id, as the install's pinned definition declares it.
+    permission: str = Field(sa_column=Column(String(length=64), primary_key=True))
+
+
 class CustomRoleMember(SQLModel, table=True):
     """Who holds a custom role: one per person, from ``assigned_at``."""
 

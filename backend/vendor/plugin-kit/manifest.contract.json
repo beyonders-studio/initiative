@@ -248,6 +248,7 @@
     "fields": 32,
     "parts": 16,
     "actions": 16,
+    "permissions": 16,
     "partNodes": 50,
     "partDepth": 4,
     "facetsPerField": 4,
@@ -1108,10 +1109,9 @@
           },
           "description": "Whose credential the call runs on, best first. Read and write only. An endpoint offering only 'member' refuses when that member has connected nothing, rather than quietly acting as the plug-in instead."
         },
-        "admin_only": {
-          "type": "boolean",
-          "default": false,
-          "description": "Only the community's admins read or call this endpoint \u2014 a figure for the community's settings page, say. Anyone who can see where it is used may otherwise."
+        "permission": {
+          "ref": "identifier",
+          "description": "Read and write only. The initiative permission a reader holds, in the initiative it is read in, to read or call this through a widget, an action or a form: one this manifest declares at the initiative level, or 'use'. Absent: whoever can see where it is used. An endpoint naming one is not offered to other plug-ins."
         },
         "public": {
           "type": "boolean",
@@ -1234,10 +1234,9 @@
           ],
           "description": "Where the page renders. Declaring both gives it a community-wide entry and an entry inside each initiative."
         },
-        "admin_only": {
-          "type": "boolean",
-          "default": false,
-          "description": "Only the community's admins open this page, whatever roles a placement allows \u2014 a settings page, say. Who else may open a page is chosen in the community, per initiative and per role, not declared here."
+        "permission": {
+          "ref": "identifier",
+          "description": "The permission that opens it, at each level it renders in: one this manifest declares at that level, or 'use'. Absent: 'use'. Who holds it is the community's to decide, never the plug-in's."
         },
         "capabilities": {
           "type": "array",
@@ -1342,6 +1341,10 @@
             "ref": "identifier"
           },
           "description": "Declarative plug-ins, on a list field: actions offered on each of its elements, by id, each one offered on every item kind this field is. An action run from an element reads that element's 'ref' as 'element'."
+        },
+        "permission": {
+          "ref": "identifier",
+          "description": "The initiative permission a reader holds to see it: one this manifest declares at the initiative level, or 'use'. Absent: 'use'."
         },
         "requires": {
           "ref": "requires"
@@ -1738,6 +1741,10 @@
           "ref": "localizedText",
           "description": "The one line the view editor's Add picker shows beside the name."
         },
+        "permission": {
+          "ref": "identifier",
+          "description": "The initiative permission a reader holds to see it: one this manifest declares at the initiative level, or 'use'. Absent: 'use'."
+        },
         "requires": {
           "ref": "requires"
         }
@@ -1799,13 +1806,57 @@
           "default": false,
           "description": "Also offered in the item's own menu."
         },
-        "admin_only": {
-          "type": "boolean",
-          "default": false,
-          "description": "Only the community's admins run this action, whatever roles a placement allows. Who else may run it is chosen in the community, per initiative and per role, not declared here."
+        "permission": {
+          "ref": "identifier",
+          "description": "The initiative permission a reader holds to run it: one this manifest declares at the initiative level, or 'use'. Absent: 'use'."
         },
         "requires": {
           "ref": "requires"
+        }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "description": "Something the community decides who may do with the plug-in, at one level. Inside an initiative, its roles hold it as they hold a tool's permissions, and its managers and the community's admins always do. At the community level, its admins hold it as they hold the parts of administering the community, and a custom role on the admin rung keeps some of them. The plug-in names a permission and says whether members start with it; who holds it is the community's to decide.",
+      "required": [
+        "id",
+        "name",
+        "level"
+      ],
+      "properties": {
+        "id": {
+          "ref": "identifier",
+          "description": "Unique among this manifest's permissions of its level. 'use' is every plug-in's at each level, declared or not: declaring it names it, and inside an initiative says whether members start with it."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "What the community's role pages call it."
+        },
+        "level": {
+          "enum": "surfaceScope",
+          "description": "Where it is held: 'initiative' by an initiative's roles, 'community' by the community's admins."
+        },
+        "members": {
+          "type": "boolean",
+          "default": false,
+          "description": "An initiative permission's only: whether a role holds it where nobody in the community said otherwise. Absent: only the roles the community chooses."
+        }
+      },
+      "if": {
+        "properties": {
+          "level": {
+            "const": "community"
+          }
+        },
+        "required": [
+          "level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "members": {
+            "const": false
+          }
         }
       }
     },
@@ -2943,6 +2994,14 @@
           "ref": "setting"
         },
         "description": "Values the community's admins set on the install, which the plug-in's expressions and its parts' text read. At most {settings}."
+      },
+      "permissions": {
+        "type": "array",
+        "maxItems": "permissions",
+        "items": {
+          "ref": "permission"
+        },
+        "description": "What the community decides who may do with this plug-in, at most {permissions}. Every page, field, part, action and endpoint answers to one: the one it names, or 'use' at its level. Absent: 'use' alone, at each level, which inside an initiative members start without."
       },
       "help": {
         "type": "object",

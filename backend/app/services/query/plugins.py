@@ -46,11 +46,12 @@ async def prepare(
     session: AsyncSession,
     calls: Iterable[object],
     *,
+    initiative_id: int | None,
     as_installation: bool = False,
     fetch: bool = True,
 ) -> dict[PluginCall, Prepared | QueryError]:
     """Each ``plugin()`` call among *calls*, settled for the person *session*
-    was routed for, or the code it is refused with.
+    was routed for, read in *initiative_id*, or the code it is refused with.
 
     *as_installation* is a dashboard that runs as its initiative: each call
     is made as the installation, on the community's connections. With *fetch*
@@ -96,6 +97,7 @@ async def prepare(
                         name: list(value) if isinstance(value, tuple) else value
                         for name, value in call.params
                     },
+                    initiative_id=initiative_id,
                     as_installation=as_installation,
                 ),
             )
@@ -159,13 +161,18 @@ async def with_rows(
     session: AsyncSession,
     sql: str,
     *,
+    initiative_id: int | None,
     as_installation: bool = False,
     fetch: bool = True,
 ) -> ResolvedQuery:
-    """*sql*, resolved with what its ``plugin()`` calls read. Its
-    spreadsheets are read where it runs."""
+    """*sql*, resolved with what its ``plugin()`` calls read in
+    *initiative_id*. Its spreadsheets are read where it runs."""
     statement = resolve(sql)
     prepared = await prepare(
-        session, statement.unread, as_installation=as_installation, fetch=fetch
+        session,
+        statement.unread,
+        initiative_id=initiative_id,
+        as_installation=as_installation,
+        fetch=fetch,
     )
     return resolved_with(sql, statement, await answered(prepared))

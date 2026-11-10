@@ -3,9 +3,10 @@
 
 Each write is refused here with the reason, and by the policies on
 ``custom_roles`` and ``custom_role_members`` whatever the route says
-(``app.db.guild_ddl``): nobody writes or gives a role holding a surface they do
-not hold, a role on the admin rung takes an admin, and taking one off an admin
-takes somebody who holds every surface. While the deployment has closed
+(``app.db.guild_ddl``): nobody writes or gives a role holding a surface or a
+plug-in permission they do not hold, a role on the admin rung takes an admin,
+only a role on the admin rung keeps plug-in permissions, and taking one off an
+admin takes somebody who holds every surface. While the deployment has closed
 ``surface.custom_roles`` nothing here changes, and the roles the community has
 keep applying. A role the deployment defined is given here and changed only by
 billing's sync, and its name is the deployment's.
@@ -16,7 +17,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
@@ -29,7 +30,7 @@ from app.api.deps import (
     require_surface,
 )
 from app.core.audit_events import AuditEventType
-from app.core.messages import CustomRoleMessages, GuildMessages
+from app.core.messages import CustomRoleMessages, GuildMessages, GuildPluginMessages
 from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
 from app.models.platform.guild import (
     MEMBER_ROLE_SURFACES,
@@ -37,7 +38,7 @@ from app.models.platform.guild import (
     CommunityRole,
     GuildMembership,
 )
-from app.models.tenant.custom_role import CustomRole
+from app.models.tenant.custom_role import CustomRole, CustomRolePluginPermission
 from app.schemas.tenant.custom_role import (
     CustomRoleAssignment,
     CustomRoleCreate,
@@ -45,9 +46,11 @@ from app.schemas.tenant.custom_role import (
     CustomRoleRead,
     CustomRoleUpdate,
     HeldSurfacesRead,
+    PluginPermissionRef,
 )
 from app.services import audit as audit_service
 from app.services.tenant import custom_roles as custom_roles_service
+from app.services.tenant import guild_plugins as guild_plugins_service
 
 router = APIRouter()
 
@@ -78,35 +81,124 @@ def _refused(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
+#: The plug-ins' community permissions a role keeps, as ``(install id,
+#: permission id)``.
+Kept = frozenset[tuple[int, str]]
+
+
 def _require_gives(
-    context: GuildContext, base_rung: CommunityRole, surfaces: set[AdminSurface]
+    context: GuildContext,
+    base_rung: CommunityRole,
+    surfaces: set[AdminSurface],
+    kept: Kept = frozenset(),
 ) -> None:
     """The writer may make or give a role on ``base_rung`` holding
-    ``surfaces``. A settings grant answers for the community it is lent."""
-    if base_rung is CommunityRole.member and not surfaces <= MEMBER_ROLE_SURFACES:
+    ``surfaces`` and keeping ``kept``. A settings grant answers for the
+    community it is lent."""
+    if base_rung is CommunityRole.member and (
+        not surfaces <= MEMBER_ROLE_SURFACES or kept
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=CustomRoleMessages.CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS,
         )
     if context.settings_rung is not None:
         return
-    if not all(context.holds_surface(s) for s in surfaces) or (
-        base_rung is CommunityRole.admin and not context.is_admin
+    if (
+        not all(context.holds_surface(s) for s in surfaces)
+        or not all(
+            context.holds_plugin_permission(install_id, permission, initiative_id=None)
+            for install_id, permission in kept
+        )
+        or (base_rung is CommunityRole.admin and not context.is_admin)
     ):
         raise _refused(CustomRoleMessages.CUSTOM_ROLE_BEYOND_YOURS)
 
 
-def _require_takes_off(context: GuildContext, role: CustomRole) -> None:
+async def _kept(session: AsyncSession, *role_ids: int) -> dict[int, Kept]:
+    """What each of these roles keeps of the plug-ins' permissions."""
+    rows = await session.exec(
+        select(CustomRolePluginPermission).where(
+            col(CustomRolePluginPermission.role_id).in_(role_ids)
+        )
+    )
+    kept: dict[int, set[tuple[int, str]]] = {role_id: set() for role_id in role_ids}
+    for row in rows.all():
+        kept[row.role_id].add((row.install_id, row.permission))
+    return {role_id: frozenset(pairs) for role_id, pairs in kept.items()}
+
+
+async def _require_gives_role(
+    session: AsyncSession, context: GuildContext, role: CustomRole
+) -> Kept:
+    """:func:`_require_gives` for a role as it stands; answers what it keeps."""
+    kept = (await _kept(session, int(role.id or 0)))[int(role.id or 0)]
+    _require_gives(
+        context,
+        CommunityRole(role.base_rung),
+        {AdminSurface(s) for s in role.surfaces},
+        kept,
+    )
+    return kept
+
+
+async def _require_takes_off(
+    session: AsyncSession, context: GuildContext, role: CustomRole
+) -> None:
     """The writer may take ``role`` off its holders: as giving it, and an
     admin's only while holding every surface, since it widens them."""
-    rung = CommunityRole(role.base_rung)
-    _require_gives(context, rung, {AdminSurface(s) for s in role.surfaces})
-    if rung is CommunityRole.admin and not context.manages_admins:
+    await _require_gives_role(session, context, role)
+    if (
+        CommunityRole(role.base_rung) is CommunityRole.admin
+        and not context.manages_admins
+    ):
         raise _refused(CustomRoleMessages.CUSTOM_ROLE_WIDENS_AN_ADMIN)
 
 
-def _read(role: CustomRole) -> CustomRoleRead:
-    return CustomRoleRead.model_validate(role, from_attributes=True)
+async def _requested(session: AsyncSession, refs: list[PluginPermissionRef]) -> Kept:
+    """The plug-in permissions a request names, each a community permission
+    an installed plug-in declares."""
+    wanted = frozenset((ref.install_id, ref.permission) for ref in refs)
+    if wanted - await guild_plugins_service.declared_permission_ids(
+        session, "community"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=GuildPluginMessages.PERMISSION_UNKNOWN,
+        )
+    return wanted
+
+
+async def _keep(
+    session: AsyncSession, role: CustomRole, before: Kept, after: Kept
+) -> None:
+    """Make the role keep ``after`` in place of ``before``."""
+    for install_id, permission in before - after:
+        await session.exec(
+            delete(CustomRolePluginPermission).where(
+                CustomRolePluginPermission.role_id == role.id,
+                CustomRolePluginPermission.install_id == install_id,
+                CustomRolePluginPermission.permission == permission,
+            )
+        )
+    for install_id, permission in sorted(after - before):
+        session.add(
+            CustomRolePluginPermission(
+                role_id=int(role.id or 0), install_id=install_id, permission=permission
+            )
+        )
+    await session.flush()
+
+
+def _read(role: CustomRole, kept: Kept) -> CustomRoleRead:
+    return CustomRoleRead.model_validate(role, from_attributes=True).model_copy(
+        update={
+            "plugin_permissions": [
+                PluginPermissionRef(install_id=install_id, permission=permission)
+                for install_id, permission in sorted(kept)
+            ]
+        }
+    )
 
 
 async def _role_or_404(session: AsyncSession, role_id: int) -> CustomRole:
@@ -145,6 +237,7 @@ async def _record(
     actor: int,
     role: CustomRole,
     action: str,
+    kept: Kept = frozenset(),
 ) -> None:
     await audit_service.record(
         session,
@@ -158,6 +251,7 @@ async def _record(
             "name": role.name,
             "base_rung": role.base_rung,
             "surfaces": sorted(role.surfaces),
+            "plugin_permissions": [f"{i}:{p}" for i, p in sorted(kept)],
         },
     )
 
@@ -180,16 +274,32 @@ async def list_custom_roles(
 ) -> list[CustomRoleRead]:
     """The community's custom roles, for anybody in it: who holds what is
     shown beside each member."""
-    return [_read(role) for role in await custom_roles_service.list_roles(session)]
+    roles = await custom_roles_service.list_roles(session)
+    kept = await _kept(session, *(int(role.id or 0) for role in roles))
+    return [_read(role, kept[int(role.id or 0)]) for role in roles]
 
 
 @router.get("/held", response_model=HeldSurfacesRead)
-async def read_held_surfaces(context: SettingsContextDep) -> HeldSurfacesRead:
-    """The admin surfaces the reader holds here: every one for an admin with
-    no custom role, a role's otherwise, none for a member without one. What
-    the community's settings pages are shown by."""
+async def read_held_surfaces(
+    session: SettingsRLSSessionDep, context: SettingsContextDep
+) -> HeldSurfacesRead:
+    """The admin surfaces and the plug-ins' community permissions the reader
+    holds here: every one for an admin with no custom role, a role's
+    otherwise, none for a member without one. What the community's settings
+    pages are shown by, and a role's editor offers."""
     return HeldSurfacesRead(
-        surfaces=[s for s in AdminSurface if context.holds_surface(s)]
+        surfaces=[s for s in AdminSurface if context.holds_surface(s)],
+        plugin_permissions=[
+            PluginPermissionRef(install_id=install_id, permission=permission)
+            for install_id, permission in sorted(
+                await guild_plugins_service.declared_permission_ids(
+                    session, "community"
+                )
+            )
+            if context.holds_plugin_permission(
+                install_id, permission, initiative_id=None
+            )
+        ],
     )
 
 
@@ -201,7 +311,8 @@ async def create_custom_role(
     current_user: CurrentUser,
 ) -> CustomRoleRead:
     surfaces = set(payload.surfaces)
-    _require_gives(context, payload.base_rung, surfaces)
+    kept = await _requested(session, payload.plugin_permissions)
+    _require_gives(context, payload.base_rung, surfaces, kept)
     await _require_free(session, payload.name)
     role = CustomRole(
         name=payload.name,
@@ -210,9 +321,10 @@ async def create_custom_role(
     )
     session.add(role)
     await _flush_named(session)
-    await _record(session, context, current_user.id, role, "created")
+    await _keep(session, role, frozenset(), kept)
+    await _record(session, context, current_user.id, role, "created", kept)
     await session.commit()
-    return _read(role)
+    return _read(role, kept)
 
 
 @router.patch("/{role_id}", response_model=CustomRoleRead)
@@ -227,19 +339,23 @@ async def update_custom_role(
     made on."""
     role = await _communitys_role(session, role_id)
     rung = CommunityRole(role.base_rung)
-    _require_gives(context, rung, {AdminSurface(s) for s in role.surfaces})
+    before = kept = await _require_gives_role(session, context, role)
     if payload.name is not None:
         await _require_free(session, payload.name)
         role.name = payload.name
+    surfaces = {AdminSurface(s) for s in role.surfaces}
     if payload.surfaces is not None:
         surfaces = set(payload.surfaces)
-        _require_gives(context, rung, surfaces)
-        role.surfaces = sorted(s.value for s in surfaces)
+    if payload.plugin_permissions is not None:
+        kept = await _requested(session, payload.plugin_permissions)
+    _require_gives(context, rung, surfaces, kept)
+    role.surfaces = sorted(s.value for s in surfaces)
     session.add(role)
     await _flush_named(session)
-    await _record(session, context, current_user.id, role, "changed")
+    await _keep(session, role, before, kept)
+    await _record(session, context, current_user.id, role, "changed", kept)
     await session.commit()
-    return _read(role)
+    return _read(role, kept)
 
 
 @router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -251,7 +367,7 @@ async def delete_custom_role(
 ) -> Response:
     """Delete a role. Its holders stand on their plain rung again."""
     role = await _communitys_role(session, role_id)
-    _require_takes_off(context, role)
+    await _require_takes_off(session, context, role)
     await _record(session, context, current_user.id, role, "deleted")
     await session.delete(role)
     await session.commit()
@@ -296,15 +412,11 @@ async def assign_custom_role(
         )
     held = await custom_roles_service.held_role(session, user_id)
     if held is not None:
-        _require_takes_off(context, held)
+        await _require_takes_off(session, context, held)
     role = None
     if payload.role_id is not None:
         role = await _role_or_404(session, payload.role_id)
-        _require_gives(
-            context,
-            CommunityRole(role.base_rung),
-            {AdminSurface(s) for s in role.surfaces},
-        )
+        await _require_gives_role(session, context, role)
     await custom_roles_service.assign(session, user_id=user_id, role_id=payload.role_id)
     await audit_service.record(
         session,

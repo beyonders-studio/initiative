@@ -44,7 +44,7 @@ from app.models.platform.user import User
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.initiative import InitiativeMember, InitiativeRule
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.plugin_placement import PluginPlacement
@@ -1192,10 +1192,14 @@ async def _shown_board(
             )
         )
     ).one()
-    await session.exec(
-        update(PluginPlacement)
-        .where(PluginPlacement.install_id == installed.plugin.id)
-        .values(role_ids=[role_id])
+    session.add(
+        InitiativeRule(
+            initiative_id=installed.placed.id,
+            initiative_role_id=role_id,
+            install_id=installed.plugin.id,
+            key="use",
+            enabled=True,
+        )
     )
     await session.commit()
     written = await client.put(

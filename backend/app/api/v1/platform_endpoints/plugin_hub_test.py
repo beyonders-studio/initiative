@@ -29,11 +29,13 @@ from app.core.plugin_access_token import seal_install_token
 from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.initiative import InitiativeRule
 from app.models.tenant.plugin_member_consent import PluginMemberConsent
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace import plugin_data as plugin_data_service
 from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
 from app.services.marketplace.plugin_refs import ensure_plugin_ref
+from app.services.tenant.initiatives import get_member_role
 from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.testing import (
     create_guild_plugin,
@@ -181,9 +183,9 @@ async def _hub(
     definition: dict[str, Any] | None = None,
 ) -> tuple[InstalledPlugin, GuildPlugin | None]:
     """A caller asking for ``plugins:tests.github``, and the target installed in
-    the same community, placed where the caller is unless told otherwise. A
-    ``declarative`` target is called by Initiative itself, on the community's
-    stored token."""
+    the same community, placed where the caller is unless told otherwise, where
+    its members' role uses it. A ``declarative`` target is called by Initiative
+    itself, on the community's stored token."""
     installed = await install_plugin(
         session,
         acting_user,
@@ -234,8 +236,36 @@ async def _hub(
         session.add(
             PluginPlacement(install_id=target.id, initiative_id=installed.placed.id)
         )
-        await session.commit()
+        await _hold(session, installed, target, "use")
     return installed, target
+
+
+async def _hold(
+    session: AsyncSession, installed, target, permission: str, *, enabled=True
+) -> None:
+    """The placed initiative's member role's answer for one of the target's
+    permissions."""
+    await route_session_to_guild(session, installed.guild.id)
+    role = await get_member_role(session, initiative_id=installed.placed.id)
+    assert role is not None
+    rule = (
+        await session.exec(
+            select(InitiativeRule).where(
+                InitiativeRule.initiative_role_id == role.id,
+                InitiativeRule.install_id == target.id,
+                InitiativeRule.key == permission,
+            )
+        )
+    ).first() or InitiativeRule(
+        initiative_id=installed.placed.id,
+        initiative_role_id=role.id,
+        install_id=target.id,
+        key=permission,
+        enabled=enabled,
+    )
+    rule.enabled = enabled
+    session.add(rule)
+    await session.commit()
 
 
 def _installation_headers(
@@ -514,6 +544,40 @@ async def test_a_member_call_hands_on_only_the_members_connections(
 
     assert response.status_code == 200, response.text
     assert upstream.claims()["connection_refs"] == {"account": "cr_member_account"}
+
+
+async def test_a_member_call_is_held_to_the_members_permission_in_the_target(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
+):
+    """As opening the target would be: the member's role where the target is
+    placed holds the permission the endpoint names, or ``use``. A call made as
+    the community answers to what the community granted alone."""
+    definition = _target_definition()
+    definition["permissions"] = [
+        {"id": "triage", "level": "initiative", "name": {"en": "Triage"}}
+    ]
+    definition["endpoints"][0]["permission"] = "triage"
+    installed, target = await _hub(
+        session, acting_user, role_session, definition=definition
+    )
+    assert target is not None
+    member = await _member(session, acting_user, installed)
+    await _connect(session, installed, target, member)
+
+    async def call(endpoint_id: str, headers) -> int:
+        response = await client.post(
+            _url(endpoint_id), json={"params": {}}, headers=headers
+        )
+        if response.status_code == 403:
+            assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
+        return response.status_code
+
+    assert await call(ISSUES, _member_headers(installed, member)) == 403
+    assert await call(ISSUES, _installation_headers(installed)) == 200
+    await _hold(session, installed, target, "triage")
+    assert await call(ISSUES, _member_headers(installed, member)) == 200
+    await _hold(session, installed, target, "use", enabled=False)
+    assert await call(COMMENT, _member_headers(installed, member)) == 403
 
 
 async def test_a_read_only_consent_does_not_write_as_the_member(

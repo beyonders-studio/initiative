@@ -110,6 +110,7 @@ def _with_permission_row(statement, permission_key: PermissionKey):
         InitiativeRule,
         and_(
             InitiativeRule.initiative_role_id == InitiativeRoleModel.id,
+            InitiativeRule.install_id.is_(None),
             InitiativeRule.key == permission_key,
         ),
     )

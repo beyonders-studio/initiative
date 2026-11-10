@@ -174,11 +174,12 @@ _ROUTED_AS_GUEST = "pg_has_role(current_user, 'guest_base', 'USAGE')"
 #: What the community sets for every initiative in it: its own
 #: ``initiative_rules`` rows, the ones with no initiative
 #: (``app.models.tenant.initiative.COMMUNITY_DEFAULT_KEYS``), read once. Each
-#: statement's ``WITH`` names it.
+#: statement's ``WITH`` names it. A row naming an install is that plug-in's
+#: permission, read on its own (``my_plugin_rules``).
 _COMMUNITY_DEFAULTS_CTE = """community_defaults AS MATERIALIZED (
   SELECT r.key, r.enabled
   FROM initiative_rules r
-  WHERE r.initiative_id IS NULL
+  WHERE r.initiative_id IS NULL AND r.install_id IS NULL
 )"""
 
 #: The roles what the community set for members holds for: the built-in
@@ -241,8 +242,30 @@ my_role_permissions AS MATERIALIZED (
   FROM my_initiatives m
   JOIN initiative_rules rp
     ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
+   AND rp.install_id IS NULL
   LEFT JOIN community_defaults cd
     ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
+),
+-- A plug-in's permissions, as a tool's keys are held: what the community set
+-- for members where it reaches the role, in every initiative the reader is
+-- in, and otherwise the role's own rows.
+my_plugin_rules AS MATERIALIZED (
+  SELECT m.initiative_id, c.install_id, c.key, c.enabled
+  FROM my_initiatives m
+  JOIN initiative_rules c
+    ON c.initiative_id IS NULL AND c.install_id IS NOT NULL
+  WHERE {_HELD_FOR_MEMBERS}
+  UNION ALL
+  SELECT rp.initiative_id, rp.install_id, rp.key, rp.enabled
+  FROM my_initiatives m
+  JOIN initiative_rules rp
+    ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
+   AND rp.install_id IS NOT NULL
+  WHERE NOT ({_HELD_FOR_MEMBERS} AND EXISTS (
+    SELECT 1 FROM initiative_rules c
+    WHERE c.initiative_id IS NULL
+      AND c.install_id = rp.install_id AND c.key = rp.key
+  ))
 ),
 my_grants AS MATERIALIZED (
   SELECT g.purpose, g.access_level::text AS access_level
@@ -266,6 +289,24 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
                WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
                WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
                ELSE ''
+             END
+      FROM my_membership m
+      LEFT JOIN custom_role_members cm
+        ON cm.user_id = {gucs.USER_ID} AND cm.assigned_at >= m.joined_at
+      LEFT JOIN custom_roles r
+        ON r.id = cm.role_id AND r.base_rung = m.role::text
+    ), '')""",
+    # As the surfaces are held: a custom role on the admin rung keeps the ones
+    # it lists, and the admin rung with none holds every one.
+    gucs.HELD_PLUGIN_PERMISSIONS: f"""COALESCE((
+      SELECT CASE
+               WHEN m.role NOT IN ({_ADMIN_RUNGS_SQL}) THEN ''
+               WHEN r.id IS NULL THEN '*'
+               ELSE COALESCE((
+                 SELECT string_agg(p.install_id || ':' || p.permission, ',')
+                 FROM custom_role_plugin_permissions p
+                 WHERE p.role_id = r.id
+               ), '')
              END
       FROM my_membership m
       LEFT JOIN custom_role_members cm
@@ -340,6 +381,18 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.key, ',')
       FROM my_role_permissions rp
       WHERE NOT rp.enabled
+    ), '')""",
+    gucs.PLUGIN_GRANTS: """COALESCE((
+      SELECT string_agg(DISTINCT
+        pr.initiative_id || ':' || pr.install_id || ':' || pr.key, ',')
+      FROM my_plugin_rules pr
+      WHERE pr.enabled
+    ), '')""",
+    gucs.PLUGIN_DENIES: """COALESCE((
+      SELECT string_agg(DISTINCT
+        pr.initiative_id || ':' || pr.install_id || ':' || pr.key, ',')
+      FROM my_plugin_rules pr
+      WHERE NOT pr.enabled
     ), '')""",
     gucs.COMMUNITY_TOOLS: f"""COALESCE((
       SELECT string_agg(
@@ -493,6 +546,9 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.HELD_SURFACES: f"""COALESCE((
       SELECT '{_EVERY_SURFACE}' FROM standing_level lv WHERE lv.administers
     ), '')""",
+    gucs.HELD_PLUGIN_PERMISSIONS: """''""",
+    gucs.PLUGIN_GRANTS: """''""",
+    gucs.PLUGIN_DENIES: """''""",
     gucs.GUILD_SEAT: """'false'""",
     gucs.SETTINGS_RUNG: """''""",
     gucs.PAM_GUILD_ID: """''""",
@@ -741,11 +797,13 @@ permitted AS (
      OR COALESCE(cd.enabled, EXISTS (
        SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
+         AND rp.install_id IS NULL
          AND rp.key = k.key
          AND rp.enabled
      ) OR (k.is_default AND NOT EXISTS (
        SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
+         AND rp.install_id IS NULL
          AND rp.key = k.key
          AND NOT rp.enabled
      )))
@@ -886,6 +944,14 @@ class GuildContext:
     community_tools: tuple[str, ...] = ()
     #: The admin surfaces the reader holds (:meth:`holds_surface`).
     held_surfaces: tuple[str, ...] = ()
+    #: The plug-ins' community permissions the reader holds, as
+    #: ``"<install id>:<permission>"``, or ``*`` for every one
+    #: (:meth:`holds_plugin_permission`).
+    held_plugin_permissions: tuple[str, ...] = ()
+    #: ``"<initiative id>:<install id>:<permission>"`` where a rule gives the
+    #: reader's role one of a plug-in's permissions, and where one says no.
+    plugin_grants: tuple[str, ...] = ()
+    plugin_denies: tuple[str, ...] = ()
     #: Initiatives where the reader's role holds "Full access".
     override_initiatives: tuple[int, ...] = ()
     #: The community's sign-in policy is satisfied by this session.
@@ -924,6 +990,39 @@ class GuildContext:
         what an admin route asks, where :attr:`is_admin` is the reach into
         the community's content. A grant holds none."""
         return surface.value in self.held_surfaces
+
+    def holds_plugin_permission(
+        self,
+        install_id: int,
+        permission: str,
+        *,
+        initiative_id: int | None,
+        members: bool = False,
+    ) -> bool:
+        """Whether the reader holds one of an installed plug-in's permissions,
+        as the database computed it, as the community's own are held.
+
+        At the community level (``initiative_id`` ``None``), as an admin
+        surface: the admin rung holds every one, and a custom role on it the
+        ones it keeps. Inside an initiative, as a tool's key: the community's
+        admins and the initiative's managers hold every one, and any other role
+        of the initiative by its rule, or where it has none by ``members``, the
+        default the plug-in declared. A grant holds none. Where the plug-in is
+        placed is the caller's to ask."""
+        if initiative_id is None:
+            return bool(
+                {"*", f"{install_id}:{permission}"}.intersection(
+                    self.held_plugin_permissions
+                )
+            )
+        if self.is_admin or initiative_id in self.manager_initiatives:
+            return True
+        if initiative_id not in self.member_initiatives:
+            return False
+        pair = f"{initiative_id}:{install_id}:{permission}"
+        if pair in self.plugin_grants:
+            return True
+        return members and pair not in self.plugin_denies
 
     @property
     def holds_every_surface(self) -> bool:

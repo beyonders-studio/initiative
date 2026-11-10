@@ -28,6 +28,7 @@ from app.schemas.platform.marketplace import ListingSource
 from app.schemas.query import PageMeta
 from app.services.marketplace.definitions import published_by_us
 from app.services.marketplace.registration_lookup import InstallState
+from app.services.marketplace.service_plugins import declared_permissions
 from app.services.tenant import plugin_age
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant.guild_plugins import (
@@ -47,8 +48,9 @@ class CommunityPluginInstall(SanitizedBaseModel):
 
     The definition comes from the catalog, and the content the install creates
     is made server-side. What the request adds is the seat's answer to the
-    install dialog: what the plug-in may reach, where it appears, and who opens it
-    there. The install, its grant and its placements are one transaction.
+    install dialog: what the plug-in may reach and where it appears. Who uses it
+    there is each initiative's roles' answer. The install, its grant and its
+    placements are one transaction.
     """
 
     listing_uid: str = Field(max_length=14)
@@ -67,10 +69,6 @@ class CommunityPluginInstall(SanitizedBaseModel):
     placements: Literal["all"] | Annotated[list[int], Field(max_length=1000)] = Field(
         default_factory=list
     )
-    #: The built-in initiative roles that may open the plug-in in each placement,
-    #: by name (``moderator``, ``project_manager``, ``member``), resolved to
-    #: each initiative's own role of that name.
-    role_kinds: list[str] = Field(default_factory=lambda: ["moderator"], max_length=10)
 
 
 class CommunityPluginUpdate(SanitizedBaseModel):
@@ -181,25 +179,35 @@ class CommunityPluginSettingRead(SanitizedBaseModel):
     aliases: list[str] = []
 
 
-class PluginPlacementRead(SanitizedBaseModel):
-    """One initiative a plug-in is placed in, and who may open it there."""
+class PluginPermissionRead(SanitizedBaseModel):
+    """One of a plug-in's permissions, as the community's role pages list it."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    id: str
+    #: ``initiative``: held by an initiative's roles, as a tool's permissions
+    #: are. ``community``: held by the community's admins, as an admin surface.
+    level: Literal["initiative", "community"]
+    #: What the plug-in calls it, by language. Absent for a ``use`` the plug-in
+    #: did not declare, which the client names itself.
+    name: dict[str, str] | None = None
+    #: An initiative permission's default: whether a role holds it where no
+    #: rule says otherwise.
+    members: bool = False
+
+
+class PluginItemAccessRead(SanitizedBaseModel):
+    """What of a plug-in the viewer meets on the items of one initiative."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     initiative_id: int
-    #: The initiative roles allowed to open the plug-in's surfaces here.
-    role_ids: list[int] = []
-
-
-class PluginPlacementUpdate(SanitizedBaseModel):
-    """Who may open a plug-in's surfaces in one initiative.
-
-    The whole set: a role left out is no longer allowed. Every id must be a
-    role of that initiative. An empty list places the plug-in with no role, so
-    only guild admins open it there.
-    """
-
-    role_ids: list[int] = Field(default_factory=list, max_length=200)
+    #: The declared fields and parts the viewer is drawn there: those whose
+    #: permission they hold and whose connections hold what they require.
+    fields: list[str] = []
+    parts: list[str] = []
+    #: The declared actions the viewer may run on those items.
+    actions: list[str] = []
 
 
 class CommunityPluginScopesUpdate(SanitizedBaseModel):
@@ -298,23 +306,19 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: columns nothing here reads.
     definition: dict[str, Any] = {}
     #: The initiatives this plug-in's initiative-scoped surfaces appear in, as the
-    #: seat set them, each with the roles allowed to open it there. An
-    #: initiative not listed is one the plug-in does not appear in. Placement
-    #: rather than permission: it is the community's own answer to where an
-    #: plug-in belongs, so it reads the same for everyone.
-    placements: list[PluginPlacementRead] = []
+    #: seat set them. An initiative not listed is one the plug-in does not
+    #: appear in. Placement rather than permission: it is the community's own
+    #: answer to where a plug-in belongs, so it reads the same for everyone.
+    placed_initiative_ids: list[int] = []
+    #: What the community decides who may do with the plug-in: its declared
+    #: permissions, ``use`` at each level among them.
+    permissions: list[PluginPermissionRead] = []
     #: Each page the pinned definition declares, with where the
     #: viewer may open it.
     surface_access: list[PluginSurfaceAccessRead] = []
-    #: The initiatives whose items show the viewer this plug-in's values and
-    #: parts.
-    item_initiatives: list[int] = []
-    #: The declared fields and parts offered there: those whose connections
-    #: hold what they require.
-    item_fields: list[str] = []
-    item_parts: list[str] = []
-    #: The declared actions the viewer may run on those items.
-    item_actions: list[str] = []
+    #: What the viewer meets on items, by initiative: those where they meet
+    #: anything of it.
+    item_access: list[PluginItemAccessRead] = []
     #: The install's settings' values by key, which its parts' text names.
     setting_values: dict[str, Any] = {}
     #: The scopes the community's seat granted this install: empty until the
@@ -628,17 +632,12 @@ def serialize_guild_plugin(
     state = plugin_config_service.config_state(plugin)
     age_allows = plugin_age.age_allows(definition, viewer)
     openability = surface_openability(
-        definition,
-        placements=placements,
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
-        age_allows=age_allows,
+        plugin, placements=placements, context=context, age_allows=age_allows
     )
     on_items = item_openability(
         plugin,
         placements=placements,
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
+        context=context,
         age_allows=age_allows,
         frozen=context.content_read_only,
     )
@@ -662,11 +661,9 @@ def serialize_guild_plugin(
         avatar_url=avatar_url,
         features=list(features) if isinstance(features, list) else [],
         definition=definition,
-        placements=[
-            PluginPlacementRead(
-                initiative_id=row.initiative_id, role_ids=list(row.role_ids or [])
-            )
-            for row in sorted(placements, key=lambda row: row.initiative_id)
+        placed_initiative_ids=sorted(row.initiative_id for row in placements),
+        permissions=[
+            PluginPermissionRead(**entry) for entry in declared_permissions(definition)
         ],
         surface_access=[
             PluginSurfaceAccessRead(
@@ -676,10 +673,15 @@ def serialize_guild_plugin(
             )
             for one in openability
         ],
-        item_initiatives=list(on_items.initiatives),
-        item_fields=list(on_items.fields),
-        item_parts=list(on_items.parts),
-        item_actions=list(on_items.actions),
+        item_access=[
+            PluginItemAccessRead(
+                initiative_id=one.initiative_id,
+                fields=list(one.fields),
+                parts=list(one.parts),
+                actions=list(one.actions),
+            )
+            for one in on_items
+        ],
         setting_values=dict(plugin.settings or {}),
         granted_scopes=sorted(plugin.granted_scopes or []),
         mandatory=service_state.mandatory,

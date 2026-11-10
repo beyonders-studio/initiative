@@ -13,12 +13,22 @@ from app.models.tenant.custom_role import (
 from app.schemas.base import SanitizedBaseModel, TitleStr
 
 
+class PluginPermissionRef(SanitizedBaseModel):
+    """One installed plug-in's community permission."""
+
+    install_id: int
+    permission: str = Field(min_length=1, max_length=64)
+
+
 class CustomRoleRead(SanitizedBaseModel):
     id: int
     name: str
     #: The rung the role applies on: ``member`` or ``admin``.
     base_rung: CommunityRole
     surfaces: list[AdminSurface]
+    #: The plug-ins' community permissions a role on the admin rung keeps, as
+    #: ``surfaces`` keeps parts of administering the community.
+    plugin_permissions: list[PluginPermissionRef] = []
     #: Who defined the role. The community gives a role the deployment
     #: defined, and does not change or delete it.
     set_by: SetBy
@@ -29,6 +39,9 @@ class CustomRoleCreate(SanitizedBaseModel):
     #: ``member`` or ``admin`` (``CUSTOM_ROLE_RUNGS``).
     base_rung: CommunityRole
     surfaces: list[AdminSurface] = Field(default_factory=list)
+    plugin_permissions: list[PluginPermissionRef] = Field(
+        default_factory=list, max_length=1000
+    )
 
     @field_validator("base_rung")
     @classmethod
@@ -43,6 +56,10 @@ class CustomRoleUpdate(SanitizedBaseModel):
         default=None, min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH
     )
     surfaces: list[AdminSurface] | None = None
+    #: The whole set of plug-ins' community permissions the role keeps.
+    plugin_permissions: list[PluginPermissionRef] | None = Field(
+        default=None, max_length=1000
+    )
 
 
 class CustomRoleAssignment(SanitizedBaseModel):
@@ -59,6 +76,8 @@ class HeldSurfacesRead(SanitizedBaseModel):
     #: The admin surfaces the reader holds in the community, as the request's
     #: standing computed them.
     surfaces: list[AdminSurface]
+    #: The installed plug-ins' community permissions they hold, likewise.
+    plugin_permissions: list[PluginPermissionRef] = []
 
 
 #: A group as a provider spells it, without the spaces around it.

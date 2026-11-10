@@ -13,13 +13,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.errors import CodedError
-from app.core.messages import InitiativeMessages
+from app.core.messages import GuildPluginMessages, InitiativeMessages
 from app.core.tools import Tool
 from app.db.query import ids_in
 from app.db.session import routed_context, routed_guild_id
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
     BUILTIN_ROLE_PERMISSIONS,
@@ -44,6 +45,8 @@ from app.schemas.tenant.initiative import (
     InitiativeDefaultsUpdate,
     InitiativeDirectoryEntry,
     InitiativeJoinRequestRead,
+    PluginPermissionInitiatives,
+    PluginPermissionRule,
 )
 from app.services import audit as audit_service
 
@@ -465,12 +468,20 @@ async def update_role_permissions(
     *,
     role: InitiativeRoleModel,
     permissions: dict[PermissionKey, bool],
+    plugin_permissions: Iterable[PluginPermissionRule] = (),
 ) -> InitiativeRoleModel:
-    """Update permissions for a role."""
-    for perm_key, enabled in permissions.items():
-        # Find existing permission
+    """Update permissions for a role: tools' keys, and plug-ins' initiative
+    permissions by install."""
+    answers = [(None, key, on) for key, on in permissions.items()] + [
+        (rule.install_id, rule.permission, rule.enabled) for rule in plugin_permissions
+    ]
+    for install_id, perm_key, enabled in answers:
         existing = next(
-            (p for p in role.permissions if p.key == perm_key),
+            (
+                p
+                for p in role.permissions
+                if p.key == perm_key and p.install_id == install_id
+            ),
             None,
         )
         if existing:
@@ -483,6 +494,7 @@ async def update_role_permissions(
                     initiative_role_id=role.id,
                     key=perm_key,
                     enabled=enabled,
+                    install_id=install_id,
                 )
             )
     await session.flush()
@@ -1207,7 +1219,8 @@ async def _community_rows(session: AsyncSession) -> dict[str, InitiativeRule]:
     initiative."""
     rows = await session.exec(
         select(InitiativeRule).where(
-            InitiativeRule.initiative_id.is_(None)  # type: ignore[union-attr]
+            InitiativeRule.initiative_id.is_(None),  # type: ignore[union-attr]
+            InitiativeRule.install_id.is_(None),  # type: ignore[union-attr]
         )
     )
     return {row.key: row for row in rows.all()}
@@ -1233,6 +1246,23 @@ async def community_defaults(
             if _member_key(key) in rows
         },
         custom_roles=custom_roles is None or custom_roles.enabled,
+        plugin_member_permissions=[
+            PluginPermissionRule(
+                install_id=int(row.install_id or 0),
+                permission=row.key,
+                enabled=row.enabled,
+            )
+            for row in (
+                await session.exec(
+                    select(InitiativeRule)
+                    .where(
+                        InitiativeRule.initiative_id.is_(None),  # type: ignore[union-attr]
+                        InitiativeRule.install_id.is_not(None),  # type: ignore[union-attr]
+                    )
+                    .order_by(InitiativeRule.install_id, InitiativeRule.key)
+                )
+            ).all()
+        ],
     )
     if not with_own:
         return defaults
@@ -1259,7 +1289,10 @@ async def community_defaults(
             )
         )
     ).all()
-    member = {(rule.initiative_id, rule.key): rule.enabled for rule in member_rules}
+    member = {
+        (rule.initiative_id, rule.install_id, rule.key): rule.enabled
+        for rule in member_rules
+    }
     defaults.own_tools = {
         tool: [iid for iid, i in live.items() if getattr(i, tool.view_permission)]
         for tool in Tool
@@ -1268,10 +1301,36 @@ async def community_defaults(
         key: [
             iid
             for iid in live
-            if member.get((iid, key.value), DEFAULT_PERMISSION_VALUES[key])
+            if member.get((iid, None, key.value), DEFAULT_PERMISSION_VALUES[key])
         ]
         for key in PermissionKey
     }
+    from app.services.marketplace.service_plugins import (
+        declared_permissions,
+        members_hold,
+    )
+    from app.services.tenant.guild_plugins import placements_by_install
+
+    plugins = (await session.exec(select(GuildPlugin).order_by(GuildPlugin.id))).all()
+    placed = await placements_by_install(session, [int(p.id or 0) for p in plugins])
+    defaults.own_plugin_member_permissions = [
+        PluginPermissionInitiatives(
+            install_id=int(plugin.id or 0),
+            permission=entry["id"],
+            initiative_ids=[
+                row.initiative_id
+                for row in placed[int(plugin.id or 0)]
+                if row.initiative_id in live
+                and member.get(
+                    (row.initiative_id, plugin.id, entry["id"]),
+                    members_hold(plugin.definition, entry["id"]),
+                )
+            ],
+        )
+        for plugin in plugins
+        for entry in declared_permissions(plugin.definition)
+        if entry["level"] == "initiative"
+    ]
     return defaults
 
 
@@ -1287,6 +1346,34 @@ async def set_community_defaults(
     a tool or a permission back. Written on the admin's own session: the
     community's rows have no initiative, so no manager's policy admits them."""
     before = await community_defaults(session)
+    if changes.plugin_member_permissions:
+        from app.services.tenant.guild_plugins import declared_permission_ids
+
+        declared = await declared_permission_ids(session, "initiative")
+        for rule in changes.plugin_member_permissions:
+            if (rule.install_id, rule.permission) not in declared:
+                raise CodedError(GuildPluginMessages.PERMISSION_UNKNOWN, 422)
+            if rule.enabled is None:
+                await session.exec(
+                    delete(InitiativeRule).where(
+                        InitiativeRule.initiative_id.is_(None),  # type: ignore[union-attr]
+                        InitiativeRule.install_id == rule.install_id,
+                        InitiativeRule.key == rule.permission,
+                    )
+                )
+            else:
+                await session.exec(
+                    pg_insert(InitiativeRule)
+                    .values(
+                        install_id=rule.install_id,
+                        key=rule.permission,
+                        enabled=rule.enabled,
+                    )
+                    .on_conflict_do_update(
+                        constraint="uq_initiative_rules_subject",
+                        set_={"enabled": rule.enabled},
+                    )
+                )
     stored: dict[str, bool | None] = {
         **{INITIATIVE_TOOL_KEYS[tool]: on for tool, on in changes.tools.items()},
         **{_member_key(key): on for key, on in changes.member_permissions.items()},
@@ -1299,6 +1386,7 @@ async def set_community_defaults(
             await session.exec(
                 delete(InitiativeRule).where(
                     InitiativeRule.initiative_id.is_(None),  # type: ignore[union-attr]
+                    InitiativeRule.install_id.is_(None),  # type: ignore[union-attr]
                     InitiativeRule.key == key,
                 )
             )

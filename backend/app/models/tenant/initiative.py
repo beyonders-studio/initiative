@@ -236,17 +236,23 @@ class InitiativeRule(SQLModel, table=True):
     (``PermissionKey``). Kept in the community's own schema beside the
     initiative, and gone with it; a role's rules go with the role. A row with
     no initiative is the community's, for every initiative
-    (``COMMUNITY_DEFAULT_KEYS``)."""
+    (``COMMUNITY_DEFAULT_KEYS``).
+
+    A row naming an install is that plug-in's permission, by its id, and only
+    that: what one role holds of it, or with no initiative and no role, what
+    members hold in every initiative. It goes with the install."""
 
     __tablename__ = "initiative_rules"
     __table_args__ = (
         CheckConstraint(
-            "(initiative_id IS NOT NULL AND key IN ("
+            "(install_id IS NULL AND ((initiative_id IS NOT NULL AND key IN ("
             + _quoted(key.value for key in PermissionKey)
             + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
             + " AND key IN ("
             + _quoted(COMMUNITY_DEFAULT_KEYS)
-            + "))",
+            + "))))"
+            + " OR (install_id IS NOT NULL"
+            + " AND (initiative_id IS NULL) = (initiative_role_id IS NULL))",
             name="ck_initiative_rules_key",
             info={FROM_REGISTRY: True},
         ),
@@ -260,6 +266,7 @@ class InitiativeRule(SQLModel, table=True):
             "initiative_id",
             "key",
             "initiative_role_id",
+            "install_id",
             name="uq_initiative_rules_subject",
             postgresql_nulls_not_distinct=True,
         ),
@@ -281,6 +288,17 @@ class InitiativeRule(SQLModel, table=True):
     )
     key: str = Field(sa_column=Column(String(64), nullable=False))
     enabled: bool = Field(sa_column=Column(Boolean, nullable=False))
+    #: The installed plug-in whose permission ``key`` is, or ``None`` for a
+    #: tool's key or one of the community's own.
+    install_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey("guild_plugins.id", ondelete="CASCADE"),
+            nullable=True,
+            index=True,
+        ),
+    )
 
     role: Optional["InitiativeRoleModel"] = Relationship(back_populates="permissions")
 

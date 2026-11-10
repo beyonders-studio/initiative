@@ -9,6 +9,62 @@ matter and can be deleted.
 
 ## After 0.78.0
 
+### A plug-in answers to the community's roles
+
+Who reaches a plug-in inside an initiative is the initiative's roles' answer,
+held as they hold a tool's permissions, so a placement says only where the
+plug-in works: the read carries `placed_initiative_ids` in place of
+`placements`, and the route that set one placement's roles goes. What the
+viewer meets on items is per initiative, as `item_access`, in place of
+`item_initiatives`, `item_fields`, `item_parts` and `item_actions`.
+
+- GET /api/v1/c/{community_id}/plugins/ removed the required property `items/items/item_actions` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/ removed the required property `items/items/item_fields` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/ removed the required property `items/items/item_initiatives` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/ removed the required property `items/items/item_parts` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/ removed the required property `items/items/placements` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/ removed the required property `item_actions` from the response with the `201` status
+- POST /api/v1/c/{community_id}/plugins/ removed the required property `item_fields` from the response with the `201` status
+- POST /api/v1/c/{community_id}/plugins/ removed the required property `item_initiatives` from the response with the `201` status
+- POST /api/v1/c/{community_id}/plugins/ removed the required property `item_parts` from the response with the `201` status
+- POST /api/v1/c/{community_id}/plugins/ removed the required property `placements` from the response with the `201` status
+- GET /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_actions` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_fields` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_initiatives` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_parts` from the response with the `200` status
+- GET /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `placements` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_actions` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_fields` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_initiatives` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `item_parts` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/plugins/{plugin_id} removed the required property `placements` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/config removed the required property `item_actions` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/config removed the required property `item_fields` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/config removed the required property `item_initiatives` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/config removed the required property `item_parts` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/config removed the required property `placements` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/placements/{initiative_id} api path removed without deprecation
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/scopes removed the required property `item_actions` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/scopes removed the required property `item_fields` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/scopes removed the required property `item_initiatives` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/scopes removed the required property `item_parts` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/scopes removed the required property `placements` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/settings/{key} removed the required property `item_actions` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/settings/{key} removed the required property `item_fields` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/settings/{key} removed the required property `item_initiatives` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/settings/{key} removed the required property `item_parts` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/plugins/{plugin_id}/settings/{key} removed the required property `placements` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade removed the required property `item_actions` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade removed the required property `item_fields` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade removed the required property `item_initiatives` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade removed the required property `item_parts` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade removed the required property `placements` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade/decline removed the required property `item_actions` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade/decline removed the required property `item_fields` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade/decline removed the required property `item_initiatives` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade/decline removed the required property `item_parts` from the response with the `200` status
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/upgrade/decline removed the required property `placements` from the response with the `200` status
+
 ### Every message device signs its keys
 
 A device registered before 0.73 signed itself later through its own route;

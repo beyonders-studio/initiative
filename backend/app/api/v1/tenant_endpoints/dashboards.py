@@ -503,6 +503,7 @@ async def canvas_widget_data(
                     plugin=install,
                     endpoint_id=str(binding.get("endpoint_id")),
                     params=binding.get("params") or {},
+                    initiative_id=dashboard.initiative_id,
                     as_installation=as_installation,
                 )
         except (query_service.QueryError, plugin_data.PluginDataError) as refused:
@@ -510,6 +511,7 @@ async def canvas_widget_data(
     prepared = await query_plugins.prepare(
         session,
         [call for _, statement in sources.values() for call in statement.unread],
+        initiative_id=dashboard.initiative_id,
         as_installation=as_installation,
     )
 

@@ -20,7 +20,12 @@ The checks, in order, each with its own refusal:
    ``member`` for a member token (``actor_not_supported``);
 6. a caller confined to an initiative finds the target placed there too
    (``target_not_placed``);
-7. a member token's member is named to the target by the target's own
+7. a member token's member holds the permission the endpoint names, or
+   ``use``, in the target as they would opening it themselves: in the
+   initiative the caller is confined to, or else in one the target is placed
+   in (``permission_required``). A call made as the community answers to the
+   seat's grant alone;
+8. a member token's member is named to the target by the target's own
    reference, which the caller never sees.
 
 A read goes through the widget path's response cache, keyed also by the
@@ -44,15 +49,17 @@ from app.core.messages import PluginDataMessages, PluginHubMessages
 from app.core.plugin_scopes import plugin_scope
 from app.db.guild_standing import ISSUABLE_SCOPES_SQL
 from app.db.request_context import SystemGuild
-from app.db.session import clear_rls_context, set_rls_context
+from app.db.session import clear_rls_context, require_guild_context, set_rls_context
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.plugin_member_consent import ConsentAccess, PluginMemberConsent
 from app.models.tenant.plugin_placement import PluginPlacement
+from app.services.cross_guild import gather_across_guilds
 from app.services.marketplace import plugin_data
 from app.services.marketplace.plugin_data import CallingPlugin, PluginDataError
 from app.services.marketplace.plugin_refs import PluginNameRefused, ensure_plugin_ref
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
-from app.services.marketplace.service_plugins import is_admin_only
+from app.services.marketplace.service_plugins import surface_permission
+from app.services.tenant.guild_plugins import holds_permission, placed_initiative_ids
 from app.services.tenant.plugin_channels import owns_install
 
 __all__ = [
@@ -224,8 +231,7 @@ async def call_plugin(
         endpoint = _callable_endpoint(target.definition, endpoint_id)
         if endpoint is None:
             raise _refuse(PluginDataMessages.ENDPOINT_NOT_FOUND, 404)
-        # An endpoint for the community's admins alone is not offered to plug-ins.
-        if endpoint.get("public") is not True or is_admin_only(endpoint):
+        if endpoint.get("public") is not True:
             raise _refuse(PluginHubMessages.ENDPOINT_NOT_PUBLIC, 403)
 
         actors = endpoint.get("actors")
@@ -259,6 +265,34 @@ async def call_plugin(
         session.expunge_all()
         clear_rls_context(session)
         await session.rollback()
+
+    if caller.actor == MEMBER:
+        # Asked as opening the target would ask it, of the member entered
+        # through the seam a request of theirs takes: in the initiative
+        # the caller is confined to, or else in any the target is placed in.
+        permission = surface_permission(endpoint)
+
+        async def holds(routed: AsyncSession, _guild_id: int) -> list[bool]:
+            context = require_guild_context(routed)
+            where = await placed_initiative_ids(routed, int(target.id or 0))
+            if caller.initiative_id is not None:
+                where &= {caller.initiative_id}
+            return [
+                any(
+                    holds_permission(context, target, permission, initiative_id=here)
+                    for here in where
+                )
+            ]
+
+        if not any(
+            await gather_across_guilds(
+                session,
+                {int(caller.member_user_id or 0): [caller.guild_id]},
+                holds,
+                on_behalf=True,
+            )
+        ):
+            raise _refuse(PluginDataMessages.PERMISSION_REQUIRED, 403)
 
     member_user_id = caller.member_user_id
     try:

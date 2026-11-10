@@ -86,11 +86,14 @@ __all__ = [
     "PLUGIN_WIDGET_TYPE_PREFIX",
     "SURFACE_SCOPES",
     "TONES",
+    "USE_PERMISSION",
     "WIDGET_BINDABLE_DIRECTIONS",
-    "is_admin_only",
+    "declared_permissions",
+    "members_hold",
     "normalize_service_plugin_definition",
     "plugin_widget_type",
     "schedule_minutes",
+    "surface_permission",
 ]
 
 # --- vocabulary -------------------------------------------------------------
@@ -169,17 +172,58 @@ SURFACE_SCOPES: frozenset[str] = contract.enum("surfaceScope")
 #: ones: one per plug-in it calls through Initiative.
 MAX_PLUGIN_SCOPES = contract.cap("pluginScopes")
 
-#: A term an earlier contract used to say who opens a surface or reads an
-#: endpoint. Who opens a surface is now the community's to choose, per
-#: initiative and role. A manifest still naming it is refused with a reason,
+#: The terms earlier contracts used to say who opens a surface or reads an
+#: endpoint. Who reaches one is now a permission it names, which the community
+#: decides who holds. A manifest still naming one is refused with a reason,
 #: unlike other unknown terms, so its author moves to what replaced it rather
 #: than finding the term quietly gone.
-RETIRED_AUDIENCE_TERM = "visibility"
+RETIRED_AUDIENCE_TERMS: tuple[str, ...] = ("visibility", "admin_only")
+
+#: The permission every plug-in has at each level, declared or not: what a
+#: surface naming none answers to.
+USE_PERMISSION = "use"
+#: Where a permission is held, the same two places a page renders in.
+PERMISSION_LEVELS: frozenset[str] = contract.enum("surfaceScope")
+MAX_PERMISSIONS = contract.cap("permissions")
 
 
-def is_admin_only(declared: Any) -> bool:
-    """Whether a stored surface or endpoint is for the community's admins alone."""
-    return isinstance(declared, dict) and declared.get("admin_only") is True
+def surface_permission(declared: Any) -> str:
+    """The permission a stored page, field, part, action or endpoint answers
+    to: the one it names, or :data:`USE_PERMISSION`."""
+    named = declared.get("permission") if isinstance(declared, dict) else None
+    return named if isinstance(named, str) else USE_PERMISSION
+
+
+def declared_permissions(definition: Any) -> list[dict[str, Any]]:
+    """A pinned definition's permissions, ``use`` at each level among them
+    whether it declared it or not: a level's ``use`` first, then the rest in
+    the definition's order. An undeclared ``use`` has no name of its own."""
+    declared = definition.get("permissions") if isinstance(definition, dict) else None
+    entries = [
+        entry
+        for entry in (declared if isinstance(declared, list) else [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("id"), str)
+        and entry.get("level") in PERMISSION_LEVELS
+    ]
+    answer: list[dict[str, Any]] = []
+    for level in sorted(PERMISSION_LEVELS, reverse=True):
+        at_level = [entry for entry in entries if entry["level"] == level]
+        if not any(entry["id"] == USE_PERMISSION for entry in at_level):
+            answer.append({"id": USE_PERMISSION, "level": level})
+        answer += sorted(at_level, key=lambda entry: entry["id"] != USE_PERMISSION)
+    return answer
+
+
+def members_hold(definition: Any, permission: str) -> bool:
+    """Whether a role holds one of a definition's initiative permissions where
+    no rule says otherwise: its ``members``, false where it says nothing."""
+    return any(
+        entry["id"] == permission
+        and entry["level"] == "initiative"
+        and entry.get("members") is True
+        for entry in declared_permissions(definition)
+    )
 
 
 #: Browser features a page may ask its frame for.
@@ -470,29 +514,83 @@ def _requires(
     return {key: cleaned}
 
 
-def _admin_only(raw: dict[str, Any], *, what: str) -> bool:
-    """``admin_only``, defaulting to false; absent and null read the same."""
-    value = raw.get("admin_only")
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        fail(f"{what}: admin_only must be true or false")
-    return value
-
-
 def _refuse_retired_audience(raw: dict[str, Any], *, what: str) -> None:
-    """Refuse the audience term an earlier contract used.
+    """Refuse the audience terms earlier contracts used.
 
-    Every other unknown term is dropped and reported. This one narrowed who
-    could reach something, so it is refused by name and the author is told
-    what replaced it.
+    Every other unknown term is dropped and reported. These narrowed who could
+    reach something, so each is refused by name and the author is told what
+    replaced it.
     """
-    if RETIRED_AUDIENCE_TERM in raw:
-        fail(
-            f"{what}: {RETIRED_AUDIENCE_TERM!r} is not a term this contract "
-            "declares; who opens a surface is chosen by the community, and "
-            "'admin_only' limits one to its admins"
+    for term in RETIRED_AUDIENCE_TERMS:
+        if term in raw:
+            fail(
+                f"{what}: {term!r} is not a term this contract declares; who "
+                "reaches it is a permission it names, which the community "
+                "decides who holds"
+            )
+
+
+def _permission(raw: dict[str, Any], cleaned: dict[str, Any], *, what: str) -> None:
+    """The permission a surface names, kept only when it names one. Whether it
+    is declared where the surface is held is checked once every permission is
+    known (:func:`_check_permissions_named`)."""
+    if raw.get("permission") is not None:
+        cleaned["permission"] = check_identifier(
+            raw["permission"], what=f"{what} permission"
         )
+
+
+def _permissions(raw: Any) -> list[dict[str, Any]]:
+    """The permissions a plug-in declares, each once at its level. ``members``
+    is an initiative permission's alone, and kept only when it is true."""
+    permissions: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for entry in require_list(raw, "service plug-in: permissions", MAX_PERMISSIONS):
+        permission = require_mapping(entry, "permission")
+        permission_id = check_identifier(permission.get("id"), what="permission id")
+        level = permission.get("level")
+        what = f"permission {permission_id!r}"
+        if level not in PERMISSION_LEVELS:
+            fail(f"{what}: level must be one of {', '.join(sorted(PERMISSION_LEVELS))}")
+        if (level, permission_id) in seen:
+            fail(
+                f"service plug-in: two {level} permissions share the id {permission_id!r}"
+            )
+        seen.add((level, permission_id))
+        cleaned: dict[str, Any] = {
+            "id": permission_id,
+            "name": _label(permission.get("name"), what=what),
+            "level": level,
+        }
+        if permission.get("members") is not None and _flag(
+            permission["members"], what=f"{what} members"
+        ):
+            if level != "initiative":
+                fail(f"{what}: members is an initiative permission's alone")
+            cleaned["members"] = True
+        permissions.append(cleaned)
+    return permissions
+
+
+def _check_permissions_named(
+    permissions: list[dict[str, Any]], surfaces: dict[str, list[dict[str, Any]]]
+) -> None:
+    """Every surface names a permission declared at each level it is held at,
+    or ``use``: a page at each level it renders in, the rest inside an
+    initiative."""
+    declared = {(entry["level"], entry["id"]) for entry in permissions}
+    for block, entries in surfaces.items():
+        for entry in entries:
+            named = entry.get("permission")
+            if named is None or named == USE_PERMISSION:
+                continue
+            levels = entry["scopes"] if block == "pages" else ["initiative"]
+            for level in levels:
+                if (level, named) not in declared:
+                    fail(
+                        f"service plug-in: {block} entry names {named!r}, which is "
+                        f"not a permission it declares at the {level} level"
+                    )
 
 
 def _field(
@@ -2029,7 +2127,7 @@ def _endpoint(
             "requires",
             "cache_ttl_seconds",
             "actors",
-            "admin_only",
+            "permission",
             "public",
             "unavailable",
             *DECLARATIVE_ENDPOINT_TERMS,
@@ -2058,9 +2156,7 @@ def _endpoint(
                     f"{what}: a container plug-in's endpoint is answered by its handler"
                 )
 
-    # Whoever the call is for, stored whichever way it was declared so every
-    # pinned endpoint answers the question the same way.
-    cleaned["admin_only"] = _admin_only(endpoint, what=what)
+    _permission(endpoint, cleaned, what=what)
     # Whether other plug-ins may call it through Initiative. Stored only when it
     # is, so an endpoint published before the term reads the same as one that
     # left it out.
@@ -2608,17 +2704,13 @@ def _page(raw: Any, *, connection_ids: set[str]) -> dict[str, Any]:
 
     _refuse_retired_audience(page, what=what)
 
-    admin_only = _admin_only(page, what=what)
-
     cleaned: dict[str, Any] = {
         "id": page_id,
         "path": check_path(page.get("path"), what=f"{what} path"),
         "scopes": _scopes(page.get("scopes"), what=what),
-        # Stored whichever way it was declared, so every pinned surface answers
-        # the question the same way.
-        "admin_only": admin_only,
         "name": _label(page.get("name"), what=what),
     }
+    _permission(page, cleaned, what=what)
     capabilities = _capabilities(page.get("capabilities"), what=what)
     if capabilities:
         cleaned["capabilities"] = capabilities
@@ -2699,7 +2791,7 @@ def _item_field(
         "kind": kind,
         "on": _item_kinds(field.get("on"), what=what),
     }
-    # Stored only when it is, as admin_only is.
+    # Stored only when it is, as a surface's permission is.
     if field.get("list") is not None and _flag(field["list"], what=f"{what} list"):
         if kind == "multi_select":
             fail(f"{what}: a multi_select field is several values already")
@@ -2726,6 +2818,7 @@ def _item_field(
             declarative=declarative,
             what=what,
         )
+    _permission(field, cleaned, what=what)
     requires = _requires(
         field.get("requires"), connection_ids=connection_ids, what=what
     )
@@ -2955,10 +3048,8 @@ def _action(
         if action.get("menu") is None
         else _flag(action["menu"], what=f"{what} menu")
     )
-    # Stored only when it is, so an action published before the term reads the
-    # same as one that left it out.
-    if _admin_only(action, what=what):
-        cleaned["admin_only"] = True
+    _refuse_retired_audience(action, what=what)
+    _permission(action, cleaned, what=what)
     if action.get("confirm") is not None:
         cleaned["confirm"] = _label(action["confirm"], what=f"{what} confirm")
     requires = _requires(
@@ -2995,6 +3086,7 @@ def _part(
     description = localized_text(part.get("description"), MAX_TEXT_LENGTH)
     if description is not None:
         cleaned["description"] = description
+    _permission(part, cleaned, what=what)
     requires = _requires(part.get("requires"), connection_ids=connection_ids, what=what)
     if requires is not None:
         cleaned["requires"] = requires
@@ -3541,6 +3633,18 @@ def normalize_service_plugin_definition(
             fail(f"service plug-in: two parts share the id {part['id']!r}")
         part_ids.add(part["id"])
 
+    permissions = _permissions(body.get("permissions"))
+    _check_permissions_named(
+        permissions,
+        {
+            "pages": pages,
+            "fields": fields,
+            "parts": parts,
+            "actions": actions,
+            "endpoints": endpoints,
+        },
+    )
+
     cleaned: dict[str, Any] = {
         "plugin_kind": "service",
         "features": _features(body.get("features")),
@@ -3579,6 +3683,8 @@ def normalize_service_plugin_definition(
         cleaned["actions"] = actions
     if settings:
         cleaned["settings"] = settings
+    if permissions:
+        cleaned["permissions"] = permissions
     if body.get("help") is not None:
         cleaned["help"] = _help(body["help"])
 
