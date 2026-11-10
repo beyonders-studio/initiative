@@ -416,10 +416,15 @@ async def _current_body(
         from app.core.encryption import SALT_PLUGIN_CONFIG
 
         sealed = stored.get("sealed_tokens") or {}
+        values = dict(stored.get("fields") or {})
+        for key, value in (stored.get("sealed_values") or {}).items():
+            if (opened := _opened(value, SALT_PLUGIN_CONFIG)) is not None:
+                values[key] = opened
         return {
             "connection": stored.get("connection"),
             "access_token": _opened(sealed.get("access_token"), SALT_PLUGIN_CONFIG),
             "refresh_token": _opened(sealed.get("refresh_token"), SALT_PLUGIN_CONFIG),
+            "values": values,
         }
     if hook == "entitlement":
         from app.services.marketplace import plugin_entitlements
