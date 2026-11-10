@@ -59,6 +59,8 @@ export const RemoveCommunityMemberDialog = ({
           member.ban ? t("removeMember.banned", { email }) : t("removeMember.removed", { email })
         );
         onSuccess?.();
+        // The dialog stays mounted between people; the next one starts unticked.
+        setBan(false);
         onOpenChange(false);
       },
     }
