@@ -19,6 +19,8 @@ interface PendingSignIn {
   verifier: string;
   origin: string;
   startedAt: number;
+  /** Where the sign-in was headed, as the web's `next` is. */
+  next?: string;
 }
 
 const base64url = (bytes: Uint8Array): string =>
@@ -39,10 +41,17 @@ export const pkcePair = async (): Promise<{ verifier: string; challenge: string 
  *
  * The verifier is written before the browser opens: the phone often closes the
  * app while the browser is in front, and the callback then starts it afresh.
+ * So is `next`, where the sign-in was headed: the app, not the server, keeps
+ * it, because the app is where the sign-in comes back to.
  */
-export const beginNativeSignIn = async (origin: string): Promise<string> => {
+export const beginNativeSignIn = async (origin: string, next?: string | null): Promise<string> => {
   const { verifier, challenge } = await pkcePair();
-  const pending: PendingSignIn = { verifier, origin, startedAt: Date.now() };
+  const pending: PendingSignIn = {
+    verifier,
+    origin,
+    startedAt: Date.now(),
+    ...(next ? { next } : {}),
+  };
   await setItem(CREDENTIAL_KEYS.pendingSignIn, JSON.stringify(pending));
   return challenge;
 };

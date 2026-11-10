@@ -10,9 +10,11 @@ import { communityPath } from "@/lib/communityUrl";
 import { nearOfPlace, nearSearchOf, type Place, saveNear } from "@/lib/directoryNear";
 import { type FirstHomeContext, seedFirstHome } from "@/lib/home/firstHome";
 import { toast } from "@/lib/mascotToast";
+import { returnPath } from "@/lib/returnPath";
 import {
   clearStart,
   findStartedCommunity,
+  readPendingNext,
   readPendingStart,
   type StartAnswers,
   type Starter,
@@ -107,6 +109,7 @@ export const useSeedStarter = () => {
  * on the first load that is signed in as that account.
  */
 export const useFinishPendingStart = (): void => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { communities, loading, refreshCommunities } = useCommunities();
   const seed = useSeedStarter();
@@ -120,12 +123,15 @@ export const useFinishPendingStart = (): void => {
     if (done.current || !user?.email || loading) return;
     const answers = readPendingStart(user.email);
     if (!answers) return;
+    // The page that sent them to sign up, when one did, is where it lands.
+    const next = returnPath(readPendingNext(user.email));
     if (answers.path === "join" || answers.path === "invite") {
       done.current = true;
       seedHome(answers.path);
       void (async () => {
         await clearStart();
-        if (answers.path === "join" && !user.age_below_minimum_at) {
+        if (next) await navigate({ href: next });
+        else if (answers.path === "join" && !user.age_below_minimum_at) {
           await openDirectory(answers.categories, nearOfPlace(answers.near));
         }
       })();
@@ -146,7 +152,17 @@ export const useFinishPendingStart = (): void => {
       await clearStart();
       const starter = await seed(community.id, answers);
       seedHome(answers.path, firstHomeContext(community.id, starter));
-      await landOn(community.id, starter);
+      await (next ? navigate({ href: next }) : landOn(community.id, starter));
     })();
-  }, [user, loading, communities, refreshCommunities, seed, landOn, openDirectory, seedHome]);
+  }, [
+    user,
+    loading,
+    communities,
+    refreshCommunities,
+    seed,
+    landOn,
+    openDirectory,
+    seedHome,
+    navigate,
+  ]);
 };

@@ -128,7 +128,7 @@ const SignInCard = () => {
       const params = new URLSearchParams({
         mobile: "true",
         device_name: await resolveDeviceName(),
-        code_challenge: await beginNativeSignIn(origin),
+        code_challenge: await beginNativeSignIn(origin, searchParams.next),
       });
       await Browser.open({ url: `${origin}${provider.login_url}?${params}` });
     } else {

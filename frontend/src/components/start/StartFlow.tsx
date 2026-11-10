@@ -443,8 +443,10 @@ const StartSteps = ({
       dropPlanTab();
       const underAge = Boolean(created.age_below_minimum_at);
       await clearStart();
-      if (answers.path !== "invite" && !(answers.path === "join" && underAge)) {
-        await savePendingStart(details.email, withDefaults(answers));
+      // Left for the first sign-in when there is something to finish, or a
+      // page that sent them here to return to.
+      if (resumeTo || (answers.path !== "invite" && !(answers.path === "join" && underAge))) {
+        await savePendingStart(details.email, withDefaults(answers), resumeTo);
       }
       setHeld({ approval: created.status !== "active", underAge });
       commit("checkEmail");
