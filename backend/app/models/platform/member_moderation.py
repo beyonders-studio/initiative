@@ -18,6 +18,8 @@ from enum import Enum
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String
 from sqlmodel import Field, SQLModel
 
+from app.models.platform.guild import GUILD_ADMIN_ROLES
+
 
 class ModerationKind(str, Enum):
     """What was done to the person."""
@@ -67,10 +69,14 @@ class MemberModeration(SQLModel, table=True):
     )
 
 
-def live_timeout_sql(alias: str) -> str:
-    """The row ``alias`` is a timeout still running, as the standing
-    statements ask it (``member_moderation.live_timeout_end`` asks the same in
-    the membership lookup)."""
+def live_timeout_sql(alias: str, role: str) -> str:
+    """The row ``alias`` is a timeout holding its person, whose membership's
+    rung is ``role``: still running, and they are not an administrator, so
+    one promoted while timed out is held no longer. The standing statements
+    ask this; ``member_moderation.live_timeout_end`` asks the same in the
+    membership lookup."""
+    admin_rungs = ", ".join(f"'{rung.value}'" for rung in sorted(GUILD_ADMIN_ROLES))
     return (
-        f"({alias}.kind = '{ModerationKind.timeout.value}' AND {alias}.ends_at > now())"
+        f"({alias}.kind = '{ModerationKind.timeout.value}' AND {alias}.ends_at > now()"
+        f" AND {role}::text NOT IN ({admin_rungs}))"
     )

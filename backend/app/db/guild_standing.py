@@ -387,7 +387,7 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
         SELECT 1 FROM my_row r
         JOIN public.member_moderation mm
           ON mm.guild_id = g.id AND mm.user_id = {gucs.USER_ID}
-        WHERE {live_timeout_sql("mm")}
+        WHERE {live_timeout_sql("mm", "r.role")}
       ))::text
       FROM public.guilds g
       WHERE g.id = {gucs.GUILD_ID}
@@ -477,8 +477,10 @@ ISSUABLE_SCOPES_SQL = (
 #: community's is frozen, or the member a member token acts for is timed out.
 _INSTALL_HOLD = f"""(g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
         SELECT 1 FROM public.member_moderation mm
+        JOIN public.guild_memberships m
+          ON m.guild_id = mm.guild_id AND m.user_id = mm.user_id
         WHERE mm.guild_id = g.id AND mm.user_id = {gucs.USER_ID}
-          AND {live_timeout_sql("mm")}
+          AND {live_timeout_sql("mm", "m.role")}
       ))"""
 
 

@@ -18,7 +18,7 @@ from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
-from app.models.platform.guild import GuildMembership
+from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
 from app.models.platform.member_moderation import MemberModeration, ModerationKind
 from app.models.platform.user_profile_view import MemberProfile
 from app.services import audit as audit_service
@@ -32,7 +32,9 @@ async def _put(
     kind: ModerationKind,
     ends_at: datetime | None,
 ) -> None:
-    """Make the person's row this one, whatever it was."""
+    """Make the person's row this one. A ban replaces whatever was there; a
+    timeout replaces only a timeout, so one set in the same moment as a ban
+    never lifts it."""
     now = datetime.now(UTC)
     await session.exec(
         insert(MemberModeration)
@@ -46,6 +48,11 @@ async def _put(
         .on_conflict_do_update(
             index_elements=["guild_id", "user_id"],
             set_={"kind": kind.value, "ends_at": ends_at, "created_at": now},
+            where=(
+                col(MemberModeration.kind) == ModerationKind.timeout.value
+                if kind is ModerationKind.timeout
+                else None
+            ),
         )
     )
 
@@ -172,34 +179,45 @@ async def lift_timeout(
         )
 
 
+def _holds_membership():
+    """The timeout of ``GuildMembership``'s person, still running, while they
+    are not an administrator: one who was promoted while timed out is held no
+    longer, as ``live_timeout_sql`` has it in the standing."""
+    return (
+        MemberModeration.guild_id == GuildMembership.guild_id,
+        MemberModeration.user_id == GuildMembership.user_id,
+        MemberModeration.kind == ModerationKind.timeout,
+        col(MemberModeration.ends_at) > func.now(),
+        col(GuildMembership.role).notin_(GUILD_ADMIN_ROLES),
+    )
+
+
 def live_timeout_end():
     """A column: when the timeout of the row's person in the row's community
-    ends, where one is running. Correlated on ``GuildMembership``."""
+    ends, where one holds them. Correlated on ``GuildMembership``."""
     return (
-        select(MemberModeration.ends_at)
-        .where(
-            MemberModeration.guild_id == GuildMembership.guild_id,
-            MemberModeration.user_id == GuildMembership.user_id,
-            MemberModeration.kind == ModerationKind.timeout,
-            col(MemberModeration.ends_at) > func.now(),
-        )
-        .scalar_subquery()
+        select(MemberModeration.ends_at).where(*_holds_membership()).scalar_subquery()
     )
 
 
 async def live_timeouts(
     session: AsyncSession, *, user_id: int, guild_ids: Collection[int]
 ) -> dict[int, datetime]:
-    """When each of ``user_id``'s running timeouts in ``guild_ids`` ends."""
+    """When each timeout holding ``user_id`` in ``guild_ids`` ends."""
     if not guild_ids:
         return {}
     rows = (
         await session.exec(
-            select(MemberModeration.guild_id, MemberModeration.ends_at).where(
+            select(MemberModeration.guild_id, MemberModeration.ends_at)
+            .join(
+                GuildMembership,
+                (GuildMembership.guild_id == MemberModeration.guild_id)
+                & (GuildMembership.user_id == MemberModeration.user_id),
+            )
+            .where(
                 MemberModeration.user_id == user_id,
                 col(MemberModeration.guild_id).in_(guild_ids),
-                MemberModeration.kind == ModerationKind.timeout,
-                col(MemberModeration.ends_at) > func.now(),
+                *_holds_membership(),
             )
         )
     ).all()

@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from httpx2 import AsyncClient
 from sqlalchemy import text
-from sqlmodel import update
+from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import establish_guild_access
@@ -20,8 +20,9 @@ from app.core.tools import Tool
 from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
-from app.models.platform.member_moderation import MemberModeration
+from app.models.platform.member_moderation import MemberModeration, ModerationKind
 from app.services.platform import guilds as guilds_service
+from app.services.platform import member_moderation as moderation_service
 from app.services.tenant import task_statuses as task_statuses_service
 
 
@@ -259,3 +260,66 @@ async def test_a_timeout_is_refused(
     )
     assert response.status_code == status, response.text
     assert response.json()["detail"] == code
+
+
+async def test_a_timeout_never_replaces_a_ban(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A timeout set in the same moment as a ban leaves the ban in place."""
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    await client.delete(
+        admin.g(f"/users/{member.user.id}?ban=true"), headers=admin.headers
+    )
+
+    await set_rls_context(session, Unattributed())
+    await moderation_service.time_out(
+        session,
+        guild_id=admin.guild.id,
+        user_id=member.user.id,
+        ends_at=datetime.now(UTC) + timedelta(hours=1),
+        actor_user_id=admin.user.id,
+    )
+    await session.commit()
+    row = (
+        await session.exec(
+            select(MemberModeration).where(MemberModeration.user_id == member.user.id)
+        )
+    ).one()
+    assert row.kind == ModerationKind.ban
+    assert row.ends_at is None
+
+
+async def test_promotion_ends_the_hold(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Administrators are never timed out, so promoting a timed-out member
+    lets them write again."""
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    await client.put(
+        admin.g(f"/users/{member.user.id}/timeout"),
+        headers=admin.headers,
+        json={"ends_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat()},
+    )
+    promoted = await client.patch(
+        f"/api/v1/communities/{admin.guild.id}/members/{member.user.id}",
+        headers=admin.headers,
+        json={"role": "admin"},
+    )
+    assert promoted.status_code == 204, promoted.text
+
+    context = await establish_guild_access(session, member.user, admin.guild.id)
+    assert context.content_read_only is False
+    assert context.content_hold is False
+
+
+async def test_a_timeout_names_its_offset(client: AsyncClient, acting_user):
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    response = await client.put(
+        admin.g(f"/users/{member.user.id}/timeout"),
+        headers=admin.headers,
+        json={"ends_at": "2099-01-01T12:00:00"},
+    )
+    assert response.status_code == 422, response.text

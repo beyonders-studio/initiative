@@ -30,6 +30,7 @@ const state = vi.hoisted(() => ({
   authOptions: [] as CommunityAuthOption[],
   invites: [] as CommunityInviteRead[],
   bans: [] as CommunityBanRead[],
+  bansFailed: false,
 }));
 vi.mock("@/hooks/useAppConfig", () => ({ useAppConfig: () => ({ billing: state.billing }) }));
 
@@ -51,7 +52,7 @@ const setApiAccess = vi.hoisted(() => vi.fn());
 const liftBan = vi.hoisted(() => vi.fn());
 const liftTimeout = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/useUsers", () => ({
-  useCommunityBans: () => ({ data: state.bans }),
+  useCommunityBans: () => ({ data: state.bans, isError: state.bansFailed, refetch: vi.fn() }),
   useLiftBan: () => ({ mutate: liftBan, isPending: false }),
   useLiftMemberTimeout: () => ({ mutate: liftTimeout, isPending: false }),
   useTimeOutMember: () => ({ mutate: vi.fn(), isPending: false }),
@@ -89,6 +90,7 @@ beforeEach(() => {
   state.invites = [];
   state.members = [];
   state.bans = [];
+  state.bansFailed = false;
 });
 
 // The page's last render, whose reads are waited on before clicking into a
@@ -355,6 +357,14 @@ describe("UsersPage bans and timeouts", () => {
     expect(await screen.findByText("Banned")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Lift ban" }));
     expect(liftBan).toHaveBeenCalledWith({ userId: banned.id });
+  });
+
+  it("says so when the bans could not be read, rather than showing none", async () => {
+    state.bansFailed = true;
+    setup({ role: "admin" });
+
+    expect(await screen.findByText("Banned")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Lift ban" })).not.toBeInTheDocument();
   });
 
   it("says nothing about bans while there are none", async () => {

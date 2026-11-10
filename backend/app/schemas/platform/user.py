@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import (
     AliasChoices,
+    AwareDatetime,
     ConfigDict,
     EmailStr,
     Field,
@@ -995,6 +996,6 @@ class CommunityBanRead(SanitizedBaseModel):
 
 
 class CommunityTimeoutWrite(SanitizedBaseModel):
-    """When a timeout ends."""
+    """When a timeout ends, with its offset: an instant, not a wall-clock time."""
 
-    ends_at: datetime
+    ends_at: AwareDatetime

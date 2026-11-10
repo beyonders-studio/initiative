@@ -98,18 +98,27 @@ const UnownedContentCard = ({ onClaim }: UnownedContentCardProps) => {
 };
 
 /**
- * Who this community has banned. Shown once there is anybody; lifting a ban
- * lets them be invited or join again, and puts nobody back.
+ * Who this community has banned. Shown once there is anybody, or when the list
+ * could not be read, so a failure never passes for nobody; lifting a ban lets
+ * them be invited or join again, and puts nobody back.
  */
 const BansCard = () => {
   const { t } = useTranslation("communities");
-  const bans = useCommunityBans().data ?? [];
+  const query = useCommunityBans();
+  const bans = query.data ?? [];
   const liftBan = useLiftBan({
     onSuccess: (_data, { userId }) => {
       const lifted = bans.find((ban) => ban.user.id === userId);
       toast.success(t("bans.lifted", { name: lifted ? getUserDisplayName(lifted.user) : "" }));
     },
   });
+  if (query.isError) {
+    return (
+      <SettingsSection title={t("bans.title")} description={t("bans.description")}>
+        <StatusMessage onRetry={query.refetch} />
+      </SettingsSection>
+    );
+  }
   if (bans.length === 0) return null;
   return (
     <SettingsSection title={t("bans.title")} description={t("bans.description")}>

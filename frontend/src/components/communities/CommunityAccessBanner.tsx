@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useCommunities } from "@/hooks/useCommunities";
 import { formatDateTime, minutesLeft } from "@/ui/lib/formatDate";
 
-/** The longest a browser timer waits; a later end is picked up on a later read. */
+/** The longest a browser timer waits. */
 const MAX_TIMER_MS = 2_147_483_647;
 
 /**
@@ -21,12 +21,20 @@ export const CommunityAccessBanner = () => {
   const timedOutUntil = activeCommunity?.timed_out_until ?? null;
 
   // A timeout ends by itself. Re-read the community then, so the write
-  // controls come back without a reload.
+  // controls come back without a reload; an end further off than one timer
+  // can wait is waited for in several.
   useEffect(() => {
     if (!timedOutUntil) return;
-    const wait = new Date(timedOutUntil).getTime() - Date.now();
-    if (wait > MAX_TIMER_MS) return;
-    const timer = setTimeout(() => void refreshCommunities(), Math.max(0, wait) + 1000);
+    const end = new Date(timedOutUntil).getTime();
+    let timer: ReturnType<typeof setTimeout>;
+    const wait = () => {
+      const left = end - Date.now();
+      timer =
+        left > MAX_TIMER_MS
+          ? setTimeout(wait, MAX_TIMER_MS)
+          : setTimeout(() => void refreshCommunities(), Math.max(0, left) + 1000);
+    };
+    wait();
     return () => clearTimeout(timer);
   }, [timedOutUntil, refreshCommunities]);
 
