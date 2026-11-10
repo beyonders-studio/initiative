@@ -2,10 +2,10 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Initiative plug-in API",
-    "version": "10.1.0",
+    "version": "10.1.1",
     "x-initiative-source": {
       "version": "0.78.0",
-      "commit": "402991395c489c54783b943ecd0003d22377072f"
+      "commit": "1562389f16c51c04a73c4aa442d31c2a80aaa128"
     }
   },
   "servers": [
@@ -7755,6 +7755,135 @@
       }
     },
     "/calendar-events/": {
+      "get": {
+        "tags": [
+          "calendar-events"
+        ],
+        "summary": "List Calendar Events",
+        "description": "The events starting in the window, by start: a repeating one once for\neach of its occurrences there, ``original_start`` naming it, and one\nmoved on its own at its new time. The calendar's entries list draws the\nsame events beside tasks and projects for a person; this is the events\nalone, for an installed plug-in too.\n\n``start_after``/``start_before`` are required; the window may span at most\n``MAX_CALENDAR_WINDOW``. ``calendar_ids`` and ``initiative_id`` narrow it.",
+        "operationId": "list_calendar_events",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarEventSummary"
+                  },
+                  "title": "Response List Calendar Events"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "calendars:read",
+        "parameters": [
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Initiative Id"
+            }
+          },
+          {
+            "name": "calendar_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Calendar Ids"
+            }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
+            "name": "start_after",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Start After"
+            }
+          },
+          {
+            "name": "start_before",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Start Before"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
       "post": {
         "tags": [
           "calendar-events"
@@ -7987,6 +8116,81 @@
         "summary": "Detach Occurrence",
         "description": "Copy the occurrence at ``start`` out into an event of its own, which\nthe series then skips.",
         "operationId": "detach_occurrence",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OccurrenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "calendars:write",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/calendar-events/{event_id}/occurrences/skip": {
+      "post": {
+        "tags": [
+          "calendar-events"
+        ],
+        "summary": "Skip Occurrence",
+        "description": "Skip the series' occurrence at ``start``, as deleting just that one\ndoes: its attendees hear it is cancelled, and restoring it brings it\nback. Requires write access on the calendar.",
+        "operationId": "skip_occurrence",
         "security": [
           {
             "PluginToken": []
@@ -11320,6 +11524,30 @@
             },
             "type": "array",
             "title": "Extra Starts"
+          },
+          "next_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Start"
+          },
+          "next_occurrence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Occurrence"
           }
         },
         "type": "object",
@@ -11350,9 +11578,219 @@
           "attendees",
           "overridden_fields",
           "skipped_starts",
-          "extra_starts"
+          "extra_starts",
+          "next_start",
+          "next_occurrence"
         ],
         "title": "CalendarEventRead"
+      },
+      "CalendarEventSummary": {
+        "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "all_day": {
+            "type": "boolean",
+            "title": "All Day",
+            "default": false
+          },
+          "rsvp_open": {
+            "type": "boolean",
+            "title": "Rsvp Open",
+            "default": true
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "recurrence_shift": {
+            "type": "integer",
+            "title": "Recurrence Shift",
+            "default": 0
+          },
+          "original_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Start"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "calendar_id": {
+            "type": "integer",
+            "title": "Calendar Id"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ContentCan"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "attendee_previews": {
+            "items": {
+              "$ref": "#/components/schemas/PluginPerson"
+            },
+            "type": "array",
+            "title": "Attendee Previews"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
+          "title",
+          "description",
+          "location",
+          "start_at",
+          "end_at",
+          "all_day",
+          "rsvp_open",
+          "recurrence",
+          "id",
+          "recurrence_shift",
+          "original_start",
+          "series_id",
+          "calendar_id",
+          "initiative_id",
+          "community_id",
+          "properties",
+          "tags",
+          "can",
+          "created_at",
+          "updated_at",
+          "attendee_previews"
+        ],
+        "title": "CalendarEventSummary"
       },
       "CalendarEventUpdate": {
         "properties": {
