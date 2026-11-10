@@ -27,6 +27,7 @@ import { DEFAULT_THEME } from "@/lib/themes";
 import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { getClock, useTimeFormat, useWeekStart } from "@/ui/host";
 import { cn } from "@/ui/lib/utils";
 import { EditorSkeleton, SkeletonPillRow, SkeletonRegion } from "@/ui/page-skeletons";
 
@@ -75,6 +76,7 @@ const HANDOFF = "initiative-plugin:handoff";
 const ERROR = "initiative-plugin:error";
 const LOCALE = "initiative-plugin:locale";
 const THEME = "initiative-plugin:theme";
+const CLOCK = "initiative-plugin:clock";
 
 export interface CommunityPluginPageProps {
   pluginId: number;
@@ -195,6 +197,9 @@ export function PluginPage({ pluginId, initiativeId }: CommunityPluginPageProps)
     () => effectiveThemeColors(colorThemeId, resolvedTheme),
     [colorThemeId, resolvedTheme]
   );
+  // And on the reader's clock, so its times and date pickers match this page.
+  const timeFormat = useTimeFormat();
+  const weekStart = useWeekStart();
 
   // Hold the translator in a ref so a language change cannot re-attach the
   // listener mid-exchange. Same for the theme.
@@ -236,6 +241,8 @@ export function PluginPage({ pluginId, initiativeId }: CommunityPluginPageProps)
           locale: localeRef.current,
           theme: themeRef.current,
           theme_colors: themeColorsRef.current,
+          time_format: getClock().timeFormat,
+          week_start: getClock().weekStart,
           sells,
         },
         // Never "*": that would hand the token to whatever happens to be
@@ -303,6 +310,14 @@ export function PluginPage({ pluginId, initiativeId }: CommunityPluginPageProps)
     if (!target) return;
     target.postMessage({ type: THEME, theme: resolvedTheme, colors: themeColors }, origin);
   }, [origin, resolvedTheme, themeColors]);
+
+  // And with a clock change.
+  useEffect(() => {
+    if (!origin) return;
+    const target = iframeRef.current?.contentWindow;
+    if (!target) return;
+    target.postMessage({ type: CLOCK, time_format: timeFormat, week_start: weekStart }, origin);
+  }, [origin, timeFormat, weekStart]);
 
   if (detail.isLoading) {
     return (
