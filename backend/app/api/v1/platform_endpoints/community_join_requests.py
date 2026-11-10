@@ -72,11 +72,11 @@ async def ask_to_join_community(
     guild, _request, created = await guilds_service.ask_to_join(
         session, guild_id=guild_id, user=current_user, message=payload.message
     )
-    await session.commit()
     if not created:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     # Addressed to whoever can answer, and straight to the queue they answer
-    # it in: who asked, what they said, and where to answer.
+    # it in: who asked, what they said, and where to answer. Queued in the
+    # transaction that holds the request, so the two commit together.
     await set_rls_context(session, SystemGuild(guild_id))
     requester = handle_of(current_user)
     await notifications_service.notify(
@@ -230,7 +230,6 @@ async def _tell_requester(
         email=letter,
         email_names_line=False,
     )
-    await session.commit()
 
 
 @router.post(
@@ -247,20 +246,34 @@ async def approve_community_join_request(
     current_user: CurrentUser,
 ) -> Response:
     """Let the asker in as a member. A refusal on the way in (the community is
-    full, the asker under age) leaves the request where it was."""
+    full, the asker under age) leaves the request where it was. Somebody who
+    came in as a guest while they waited becomes a member, as making a guest
+    one does. The claim and the notice commit together, once the membership
+    has."""
     user_id, community = await _claim(session, guild_id, request_id)
-    await guilds_service.ensure_membership(
-        system_session,
-        guild_id=guild_id,
-        user_id=user_id,
-        role=CommunityRole.member,
-        actor_user_id=current_user.id,
-        via="request",
+    membership = await guilds_service.get_membership(
+        system_session, guild_id=guild_id, user_id=user_id
     )
+    if membership is not None and membership.guest_until is not None:
+        await guilds_service.make_guest_a_member(
+            system_session,
+            guild_id=guild_id,
+            user_id=user_id,
+            actor_user_id=current_user.id,
+        )
+    else:
+        await guilds_service.ensure_membership(
+            system_session,
+            guild_id=guild_id,
+            user_id=user_id,
+            role=CommunityRole.member,
+            actor_user_id=current_user.id,
+            via="request",
+        )
     await system_session.commit()
     await post_commit.settle(system_session)
-    await session.commit()
     await _tell_requester(session, user_id=user_id, community=community, approved=True)
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -287,6 +300,6 @@ async def deny_community_join_request(
         target_type="guild",
         target_id=guild_id,
     )
-    await session.commit()
     await _tell_requester(session, user_id=user_id, community=community, approved=False)
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

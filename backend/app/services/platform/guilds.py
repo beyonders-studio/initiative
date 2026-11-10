@@ -2862,8 +2862,9 @@ async def ask_to_join(
     if await get_membership(session, guild_id=guild_id, user_id=user.id):
         raise CommunityJoinRequestError(GuildMessages.COMMUNITY_ALREADY_A_MEMBER)
     await assert_age_confirmed(session, user=user)
-    # A full community says so now, rather than when an admin says yes.
-    await assert_member_capacity(session, guild_id=guild_id)
+    # A full community says so now, rather than when an admin says yes. A
+    # reading only: asking takes no seat, so it does not queue behind joins.
+    await assert_member_capacity(session, guild_id=guild_id, claiming_seat=False)
     inserted = (
         await session.exec(
             pg_insert(CommunityJoinRequest)
