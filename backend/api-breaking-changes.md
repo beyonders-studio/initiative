@@ -109,3 +109,32 @@ stream's `mode` in the ticket availability may hold it.
 - GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `moderation/mode` response property for the response status `200`
 - GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `security/mode` response property for the response status `200`
 - GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `support/mode` response property for the response status `200`
+
+### Communities that take requests to join
+
+A community's `is_community` becomes `join_policy` (`private`, `request` or
+`open`), and `NotificationType` takes the three notices of a request to join a
+community, so every response carrying a notification's type may hold them.
+
+- GET /api/v1/communities/ removed the required property `items/is_community` from the response with the `200` status
+- POST /api/v1/communities/ removed the required property `is_community` from the response with the `201` status
+- POST /api/v1/communities/directory/{community_id}/join removed the required property `is_community` from the response with the `200` status
+- POST /api/v1/communities/invite/accept removed the required property `is_community` from the response with the `200` status
+- GET /api/v1/communities/{community_id} removed the required property `is_community` from the response with the `200` status
+- PATCH /api/v1/communities/{community_id} removed the required property `is_community` from the response with the `200` status
+- DELETE /api/v1/communities/{community_id}/banner removed the required property `is_community` from the response with the `200` status
+- PUT /api/v1/communities/{community_id}/banner removed the required property `is_community` from the response with the `200` status
+- DELETE /api/v1/communities/{community_id}/icon removed the required property `is_community` from the response with the `200` status
+- PUT /api/v1/communities/{community_id}/icon removed the required property `is_community` from the response with the `200` status
+- GET /api/v1/notifications/ added the new `community_join_approved` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/ added the new `community_join_denied` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/ added the new `community_join_requested` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `community_join_approved` enum value to the `notification/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `community_join_denied` enum value to the `notification/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `community_join_requested` enum value to the `notification/type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `community_join_approved` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `community_join_denied` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `community_join_requested` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `community_join_approved` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `community_join_denied` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `community_join_requested` enum value to the `type` response property for the response status `200`

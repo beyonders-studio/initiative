@@ -389,5 +389,18 @@
       "this": "cette collection",
       "plural": "collections"
     }
+  },
+  "joinRequests": {
+    "messageLabel": "Message (facultatif)",
+    "messagePlaceholder": "Dites pourquoi vous souhaitez la rejoindre…",
+    "send": "Envoyer la demande",
+    "sending": "Envoi…",
+    "queueTitle": "Demandes d’adhésion",
+    "noMessage": "Aucun message",
+    "unknownRequester": "Quelqu’un",
+    "priorDenials_one": "Refusée {{count}} fois auparavant",
+    "priorDenials_other": "Refusée {{count}} fois auparavant",
+    "approve": "Approuver",
+    "deny": "Refuser"
   }
 }

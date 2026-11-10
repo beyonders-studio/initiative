@@ -117,8 +117,13 @@
     "retentionAfter_other": "Delete permanently after <days/> days",
     "retentionUpdatedSuccessfully": "Retention updated.",
     "discoveryTitle": "Community directory",
-    "discoveryDescription": "A listed community appears in the directory, where anyone signed in can find it and join without an invite.",
-    "discoveryToggleLabel": "List this community",
+    "discoveryDescription": "A listed community appears in the directory, where anyone signed in can find it and join it, or ask to.",
+    "discoveryPolicyLabel": "Who can join",
+    "discoveryPolicy": {
+      "private": "Invite only",
+      "open": "Listed: anyone can join",
+      "request": "Listed: ask to join"
+    },
     "discoveryCategoriesLabel": "Categories",
     "discoveryCategoriesHint": "Pick the subjects that describe this community. They decide which shelves it appears under.",
     "discoveryCapacityBlocked": "This community has room for only one person, so nobody could join it from the directory. Ask your platform operator to raise its member limit.",
@@ -217,7 +222,11 @@
     "apiAccessColumn": "API access",
     "apiAccessLabel": "Personal API keys for {{name}}",
     "apiAccessSaved": "API access saved",
-    "apiAccessError": "Could not save API access"
+    "apiAccessError": "Could not save API access",
+    "joinRequestsDescription": "People who asked to join this community. Approving adds them as a member.",
+    "joinRequestApproved": "{{name}} joined the community.",
+    "joinRequestDenied": "{{name}}'s request was denied.",
+    "joinRequestError": "Unable to answer this request right now."
   },
   "notMember": {
     "title": "Community not available",
@@ -269,6 +278,9 @@
     "initiativeJoinRequested": "{{requester}} asked to join {{initiativeName}}.",
     "initiativeJoinApproved": "Your request to join {{initiativeName}} was approved.",
     "initiativeJoinDenied": "Your request to join {{initiativeName}} was declined.",
+    "communityJoinRequested": "{{requester}} asked to join {{community}}.",
+    "communityJoinApproved": "Your request to join {{community}} was approved.",
+    "communityJoinDenied": "Your request to join {{community}} was declined.",
     "shareRequested": {
       "read_one": "{{requester}} asks to view {{title}}.",
       "read_other": "{{requester}} asks to view {{count}} files.",
@@ -394,7 +406,8 @@
       "project": "A project",
       "projectIn": "a project",
       "task": "A task",
-      "taskObject": "your task"
+      "taskObject": "your task",
+      "community": "a community"
     },
     "moderationRemoved": "A moderator took down something you wrote: {{reason}}",
     "moderationRemovedLegal": "Something you wrote was taken down for legal reasons",
@@ -570,6 +583,15 @@
     "open": "Open",
     "joinedToast": "You joined {{community}}.",
     "joinFailed": "Unable to join that community.",
+    "askToJoin": "Ask to join",
+    "requested": "Requested",
+    "withdraw": "Withdraw",
+    "askTitle": "Ask to join {{community}}",
+    "askDescription": "An admin of this community will read your request. You'll get a notification when they answer.",
+    "askHint": "The admins may not know who you are, so this note may be all they have to go on. Say who you are and why you'd like to join.",
+    "askedToast": "Your request to join {{community}} was sent.",
+    "askFailed": "Unable to send this request.",
+    "withdrawFailed": "Unable to withdraw this request.",
     "noDescription": "No description yet.",
     "resultCount_one": "{{count}} community",
     "resultCount_other": "{{count}} communities",
@@ -583,7 +605,7 @@
     "disabledDescription": "This deployment doesn't run a community directory. A platform owner can turn one on from platform settings.",
     "publish": {
       "title": "List this community in the directory",
-      "description": "Anyone signed in will be able to find this community and join it without an invite.",
+      "description": "Anyone signed in will be able to find this community in the directory.",
       "categoriesLabel": "Pick at least one category",
       "categoriesHint": "These decide where the community shows up when people browse.",
       "certifyLabel": "This community contains no adult content",

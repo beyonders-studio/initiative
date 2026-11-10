@@ -2,6 +2,8 @@ import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import {
+  approveCommunityJoinRequest,
+  denyCommunityJoinRequest,
   extendCommunityGuest,
   makeCommunityGuestAMember,
   setMemberApiAccess,
@@ -395,6 +397,26 @@ export const useDeleteOwnAccount = (
     {
       mutationFn: (data) => deleteOwnAccount(data),
       errorKey: "settings:deleteAccount.deleteError",
+    },
+    options
+  );
+
+type AnswerCommunityJoinRequestVars = { communityId: number; requestId: number; approved: boolean };
+
+/** Answer one request to join the community. Approving adds a member, so the
+ *  roster re-reads with the queue. */
+export const useAnswerCommunityJoinRequest = (
+  options?: MutationOpts<void, AnswerCommunityJoinRequestVars>
+) =>
+  useApiMutation<void, AnswerCommunityJoinRequestVars>(
+    {
+      mutationFn: ({ communityId, requestId, approved }) =>
+        approved
+          ? approveCommunityJoinRequest(communityId, requestId)
+          : denyCommunityJoinRequest(communityId, requestId),
+      invalidate: (_data, { communityId }) =>
+        invalidate(q.communityJoinRequests(communityId), q.communityMembers()),
+      errorKey: "communities:users.joinRequestError",
     },
     options
   );

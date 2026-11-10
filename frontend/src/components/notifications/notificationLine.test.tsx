@@ -243,6 +243,42 @@ describe("an announcement the reader dismissed", () => {
   });
 });
 
+describe("a request to join a community", () => {
+  const requested = notice("community_join_requested", {
+    community_id: 4,
+    requester_name: "ada#0007",
+    target_path: "/settings/users",
+  });
+
+  it("names who asked, and opens the queue in that community", () => {
+    expect(notificationText(requested, t)).toBe(
+      `notifications.communityJoinRequested(${JSON.stringify({
+        requester: "ada#0007",
+        community: "notifications.plain.community",
+      })})`
+    );
+    expect(notificationLink(requested)).toBe("/c/4/settings/users");
+  });
+
+  it("opens the community an approval let the asker into", () => {
+    const approved = notice("community_join_approved", { community_id: 4, target_path: "/" });
+
+    expect(notificationText(approved, t)).toMatch(/^notifications\.communityJoinApproved\(/);
+    expect(notificationLink(approved)).toBe("/c/4/");
+  });
+
+  it("takes a turned-down asker back to the directory, outside the community", () => {
+    const denied = notice("community_join_denied", {
+      community_id: 4,
+      target_path: "/communities",
+      smart_link: "https://example.test/navigate?community_id=4&target=%2Fcommunities",
+    });
+
+    expect(notificationText(denied, t)).toMatch(/^notifications\.communityJoinDenied\(/);
+    expect(notificationLink(denied)).toBe("/communities");
+  });
+});
+
 describe("a plug-in asking to act as the reader", () => {
   const request = notice("plugin_consent_requested", {
     community_id: 4,

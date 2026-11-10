@@ -265,6 +265,13 @@ class GuildMessages:
     # is no longer active). Reported as a 404 — an unlisted guild has published
     # nothing, its existence at a given id included.
     COMMUNITY_NOT_A_COMMUNITY = "COMMUNITY_NOT_A_COMMUNITY"
+    # A listed community's join policy decides the way in: asked to join one
+    # that takes requests, or to ask one that does not.
+    COMMUNITY_JOIN_BY_REQUEST = "COMMUNITY_JOIN_BY_REQUEST"
+    COMMUNITY_JOIN_NOT_BY_REQUEST = "COMMUNITY_JOIN_NOT_BY_REQUEST"
+    COMMUNITY_ALREADY_A_MEMBER = "COMMUNITY_ALREADY_A_MEMBER"
+    # Answered, withdrawn, or never this community's.
+    COMMUNITY_JOIN_REQUEST_NOT_FOUND = "COMMUNITY_JOIN_REQUEST_NOT_FOUND"
     # The three things a guild must be before it can be listed: on at least one
     # shelf, declared free of adult content, and able to admit anyone at all.
     COMMUNITY_COMMUNITY_REQUIRES_CATEGORY = "COMMUNITY_COMMUNITY_REQUIRES_CATEGORY"

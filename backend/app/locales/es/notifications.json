@@ -38,6 +38,20 @@
       "body": "Tu solicitud para unirte a {{initiative}} fue rechazada"
     }
   },
+  "community": {
+    "joinRequested": {
+      "title": "Nueva solicitud de ingreso",
+      "body": "{{requester}} pidió unirse a {{community}}"
+    },
+    "joinApproved": {
+      "title": "Solicitud de ingreso aprobada",
+      "body": "Ya eres miembro de {{community}}"
+    },
+    "joinDenied": {
+      "title": "Solicitud de ingreso rechazada",
+      "body": "Tu solicitud para unirte a {{community}} fue rechazada"
+    }
+  },
   "project": {
     "added": {
       "title": "Nuevo proyecto agregado",

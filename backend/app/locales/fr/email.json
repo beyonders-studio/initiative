@@ -238,6 +238,31 @@
       "textBody": "Votre demande pour rejoindre {{initiativeName}} a été refusée. {{link}}"
     }
   },
+  "communityJoinRequest": {
+    "requested": {
+      "subject": "Demande d’adhésion à {{communityName}}",
+      "title": "Nouvelle demande d’adhésion",
+      "buttonLabel": "Examiner la demande",
+      "body": "<strong>{{requester}}</strong> a demandé à rejoindre <strong>{{communityName}}</strong>.",
+      "note": "Message : <em>{{message}}</em>",
+      "noteText": "Message : {{message}}",
+      "textBody": "{{requester}} a demandé à rejoindre {{communityName}}. Examinez la demande sur {{link}}."
+    },
+    "approved": {
+      "subject": "Vous avez rejoint {{communityName}}",
+      "title": "Demande d’adhésion approuvée",
+      "buttonLabel": "Ouvrir la communauté",
+      "body": "Votre demande pour rejoindre <strong>{{communityName}}</strong> a été approuvée : vous en êtes maintenant membre.",
+      "textBody": "Votre demande pour rejoindre {{communityName}} a été approuvée : vous en êtes maintenant membre. {{link}}"
+    },
+    "denied": {
+      "subject": "Demande d’adhésion à {{communityName}} refusée",
+      "title": "Demande d’adhésion refusée",
+      "buttonLabel": "Parcourir les communautés",
+      "body": "Votre demande pour rejoindre <strong>{{communityName}}</strong> a été refusée.",
+      "textBody": "Votre demande pour rejoindre {{communityName}} a été refusée. {{link}}"
+    }
+  },
   "reaction": {
     "subject": "Nouvelles réactions à vos publications",
     "title": "Résumé des réactions",

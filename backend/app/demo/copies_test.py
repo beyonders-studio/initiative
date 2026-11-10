@@ -789,7 +789,7 @@ async def test_a_listed_pitch_from_the_api_and_its_deletion(
     ).one()
     listed = await session.get(Guild, pitch_id)
     created_at = listed.created_at
-    assert listed.is_community and listed.categories == ["education"]
+    assert listed.listed and listed.categories == ["education"]
     assert listed.has_adult_content is False
     assert (await rules.platform_values(session))["community_directory_enabled"]
     await route_session_to_guild(session, pitch_id)

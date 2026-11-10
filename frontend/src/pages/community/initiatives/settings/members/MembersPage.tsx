@@ -5,8 +5,10 @@ import type { InitiativeRoleRead, UserSummary } from "@/api/generated/initiative
 import {
   InitiativeJoinPolicy,
   type InitiativeMemberRead,
+  JoinRequestStatus,
 } from "@/api/generated/initiativeAPI.schemas";
 import { JoinPolicySection } from "@/components/initiatives/JoinPolicySection";
+import { JoinRequestQueue } from "@/components/members/JoinRequestQueue";
 import { useSeenMembers } from "@/components/members/MemberSearchSelect";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
@@ -16,8 +18,10 @@ import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
   useAddInitiativeMember,
+  useInitiativeJoinRequests,
   useInitiativeRoster,
   useRemoveInitiativeMember,
+  useResolveJoinRequest,
   useUpdateInitiative,
   useUpdateInitiativeMember,
 } from "@/hooks/useInitiatives";
@@ -38,8 +42,6 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { DataTable } from "@/ui/data-table";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-
-import { InitiativeJoinRequestQueue } from "./InitiativeJoinRequestQueue";
 
 interface RemoveInitiativeMemberDialogProps {
   initiativeId: number;
@@ -228,6 +230,20 @@ const InitiativeSettingsMembersTab = ({
     "initiatives:settings.roleUpdateError"
   );
 
+  const joinRequests = useInitiativeJoinRequests(initiativeId, undefined, {
+    enabled: canManageMembers,
+  });
+  const resolveRequest = useResolveJoinRequest({
+    onSuccess: (request) => {
+      const name = getUserDisplayName(request.user, t("common:joinRequests.unknownRequester"));
+      toast.success(
+        request.status === JoinRequestStatus.approved
+          ? t("joinRequests.approved", { name })
+          : t("joinRequests.denied", { name })
+      );
+    },
+  });
+
   const handleAddMember = () => {
     if (!selectedUserId || !effectiveRoleId) {
       return;
@@ -379,7 +395,16 @@ const InitiativeSettingsMembersTab = ({
       {/* Requests come before the roster: they are the roster's inbox, and
           answering one is the same act as adding a member by hand. Manager-only,
           matching who may answer them. */}
-      {canManageMembers ? <InitiativeJoinRequestQueue initiativeId={initiativeId} /> : null}
+      {canManageMembers ? (
+        <JoinRequestQueue
+          description={t("joinRequests.queueDescription")}
+          queue={joinRequests}
+          answeringId={resolveRequest.isPending ? resolveRequest.variables?.requestId : undefined}
+          onAnswer={(request, approved) =>
+            resolveRequest.mutate({ initiativeId, requestId: request.id, approved })
+          }
+        />
+      ) : null}
       {/* The door, above the people who came through it. It saves on change —
           it is a single setting, not a field of a form with a Save button. */}
       <JoinPolicySection

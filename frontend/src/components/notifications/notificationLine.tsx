@@ -78,6 +78,11 @@ const entityRefFromData = (data: Record<string, unknown>): string | null => {
 };
 
 export const notificationLink = (notification: NotificationRead): string | null => {
+  // A turned-down asker is in no community to open: they go back to the
+  // directory, which is the app's own, whatever community the line names.
+  if (notification.type === "community_join_denied") {
+    return "/communities";
+  }
   const smartLink = resolveSmartLink(notification);
   if (smartLink) {
     return smartLink;
@@ -457,6 +462,19 @@ export const notificationText = (
     case "initiative_join_denied":
       return t("notifications.initiativeJoinDenied", {
         initiativeName: data.initiative_name ?? t("notifications.plain.initiativeIn"),
+      });
+    case "community_join_requested":
+      return t("notifications.communityJoinRequested", {
+        requester: data.requester_name ?? t("notifications.someone"),
+        community: data.community_name ?? t("notifications.plain.community"),
+      });
+    case "community_join_approved":
+      return t("notifications.communityJoinApproved", {
+        community: data.community_name ?? t("notifications.plain.community"),
+      });
+    case "community_join_denied":
+      return t("notifications.communityJoinDenied", {
+        community: data.community_name ?? t("notifications.plain.community"),
       });
     case "export_ready":
       return t("notifications.exportReady");

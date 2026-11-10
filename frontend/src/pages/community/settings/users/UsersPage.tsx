@@ -3,6 +3,7 @@ import { Download, HandCoins, IdCard, RefreshCcw, Timer, TimerOff, UserMinus } f
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useListCommunityJoinRequests } from "@/api/generated/communities/communities";
 import type { OwnedContentResponse, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityRole, type UserCommunityMember } from "@/api/generated/initiativeAPI.schemas";
 import { useListUnownedContent } from "@/api/generated/users/users";
@@ -10,6 +11,7 @@ import { MemberInvites } from "@/components/communities/CommunityInvites";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { TimeOutMemberDialog } from "@/components/communities/TimeOutMemberDialog";
+import { JoinRequestQueue } from "@/components/members/JoinRequestQueue";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/user/UserHandle";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -25,6 +27,7 @@ import {
 } from "@/hooks/useCustomRoles";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import {
+  useAnswerCommunityJoinRequest,
   useCommunityBans,
   useExportCommunityUsersCsv,
   useLiftBan,
@@ -152,7 +155,7 @@ const NO_CUSTOM_ROLE = "none";
 
 export const UsersPage = () => {
   const { user } = useAuth();
-  const { t } = useTranslation(["communities", "settings"]);
+  const { t } = useTranslation(["communities", "settings", "common"]);
 
   const { activeCommunity } = useCommunities();
   // Running the community, not reaching its work: the roster and its
@@ -182,6 +185,18 @@ export const UsersPage = () => {
   const apiAccessFixed = (authSettings?.set_by_deployment ?? []).includes("api_keys");
 
   const invites = useCommunityInvites(activeCommunityId, managesInvites);
+
+  // Requests to join are answered, so, like the invites, a grant that only
+  // reads does not list them.
+  const answersRequests = held.writes && managesMembers;
+  const joinRequests = useListCommunityJoinRequests(activeCommunityId ?? 0, {
+    query: { enabled: answersRequests && activeCommunityId != null },
+  });
+  const answerRequest = useAnswerCommunityJoinRequest({
+    // Answered by somebody else, or refused on the way in: the queue says
+    // which rows still wait.
+    onError: () => void joinRequests.refetch(),
+  });
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<{
     userId: number;
     email: string;
@@ -542,6 +557,29 @@ export const UsersPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* The roster's inbox: answering one is the same act as adding a member. */}
+      {answersRequests && activeCommunityId ? (
+        <JoinRequestQueue
+          description={t("users.joinRequestsDescription")}
+          queue={joinRequests}
+          answeringId={answerRequest.isPending ? answerRequest.variables?.requestId : undefined}
+          onAnswer={(request, approved) => {
+            const name = getUserDisplayName(
+              request.user,
+              t("common:joinRequests.unknownRequester")
+            );
+            answerRequest.mutate(
+              { communityId: activeCommunityId, requestId: request.id, approved },
+              {
+                onSuccess: () =>
+                  toast.success(
+                    t(approved ? "users.joinRequestApproved" : "users.joinRequestDenied", { name })
+                  ),
+              }
+            );
+          }}
+        />
+      ) : null}
       {managesInvites ? (
         <SettingsSection
           title={t("users.invitesTitle")}

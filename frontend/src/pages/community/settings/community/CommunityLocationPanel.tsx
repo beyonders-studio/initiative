@@ -92,7 +92,7 @@ export const CommunityLocationPanel = () => {
           />
         </Field>
 
-        {activeCommunity.is_community && location ? (
+        {activeCommunity.join_policy !== "private" && location ? (
           <p className="text-muted-foreground text-xs">{t("location.listedNote")}</p>
         ) : null}
 

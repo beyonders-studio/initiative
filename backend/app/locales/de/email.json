@@ -238,6 +238,31 @@
       "textBody": "Deine Anfrage, {{initiativeName}} beizutreten, wurde abgelehnt. {{link}}"
     }
   },
+  "communityJoinRequest": {
+    "requested": {
+      "subject": "Beitrittsanfrage für {{communityName}}",
+      "title": "Neue Beitrittsanfrage",
+      "buttonLabel": "Anfrage prüfen",
+      "body": "<strong>{{requester}}</strong> möchte <strong>{{communityName}}</strong> beitreten.",
+      "note": "Nachricht: <em>{{message}}</em>",
+      "noteText": "Nachricht: {{message}}",
+      "textBody": "{{requester}} möchte {{communityName}} beitreten. Prüfe die Anfrage unter {{link}}."
+    },
+    "approved": {
+      "subject": "Du bist jetzt Mitglied von {{communityName}}",
+      "title": "Beitrittsanfrage genehmigt",
+      "buttonLabel": "Community öffnen",
+      "body": "Deine Anfrage, <strong>{{communityName}}</strong> beizutreten, wurde genehmigt – du bist jetzt Mitglied.",
+      "textBody": "Deine Anfrage, {{communityName}} beizutreten, wurde genehmigt – du bist jetzt Mitglied. {{link}}"
+    },
+    "denied": {
+      "subject": "Beitrittsanfrage für {{communityName}} abgelehnt",
+      "title": "Beitrittsanfrage abgelehnt",
+      "buttonLabel": "Communities durchsuchen",
+      "body": "Deine Anfrage, <strong>{{communityName}}</strong> beizutreten, wurde abgelehnt.",
+      "textBody": "Deine Anfrage, {{communityName}} beizutreten, wurde abgelehnt. {{link}}"
+    }
+  },
   "reaction": {
     "subject": "Neue Reaktionen auf deine Beiträge",
     "title": "Reaktionsübersicht",

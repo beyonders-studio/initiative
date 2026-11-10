@@ -38,6 +38,20 @@
       "body": "Votre demande pour rejoindre {{initiative}} a été refusée"
     }
   },
+  "community": {
+    "joinRequested": {
+      "title": "Nouvelle demande d'adhésion",
+      "body": "{{requester}} a demandé à rejoindre {{community}}"
+    },
+    "joinApproved": {
+      "title": "Demande d'adhésion approuvée",
+      "body": "Vous êtes maintenant membre de {{community}}"
+    },
+    "joinDenied": {
+      "title": "Demande d'adhésion refusée",
+      "body": "Votre demande pour rejoindre {{community}} a été refusée"
+    }
+  },
   "project": {
     "added": {
       "title": "Nouveau projet ajouté",

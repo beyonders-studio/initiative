@@ -117,8 +117,13 @@
     "retentionAfter_other": "Supprimer définitivement après <days/> jours",
     "retentionUpdatedSuccessfully": "Rétention mise à jour.",
     "discoveryTitle": "Annuaire des communautés",
-    "discoveryDescription": "Une communauté inscrite apparaît dans l’annuaire, où toute personne connectée peut la trouver et la rejoindre sans invitation.",
-    "discoveryToggleLabel": "Inscrire cette communauté",
+    "discoveryDescription": "Une communauté inscrite apparaît dans l’annuaire, où toute personne connectée peut la trouver et la rejoindre, ou demander à la rejoindre.",
+    "discoveryPolicyLabel": "Qui peut rejoindre",
+    "discoveryPolicy": {
+      "private": "Sur invitation uniquement",
+      "open": "Inscrite : tout le monde peut rejoindre",
+      "request": "Inscrite : sur demande"
+    },
     "discoveryCategoriesLabel": "Catégories",
     "discoveryCategoriesHint": "Choisissez les sujets qui décrivent cette communauté. Ils déterminent les catégories où elle apparaît.",
     "discoveryCapacityBlocked": "Cette communauté n’a de place que pour une personne : personne ne pourrait la rejoindre depuis l’annuaire. Demandez à votre opérateur de plateforme d’augmenter la limite de membres.",
@@ -217,7 +222,11 @@
     "apiAccessColumn": "Accès par API",
     "apiAccessLabel": "Clés d'API personnelles de {{name}}",
     "apiAccessSaved": "Accès par API enregistré",
-    "apiAccessError": "Impossible d'enregistrer l'accès par API"
+    "apiAccessError": "Impossible d'enregistrer l'accès par API",
+    "joinRequestsDescription": "Les personnes qui ont demandé à rejoindre cette communauté. Approuver les ajoute comme membres.",
+    "joinRequestApproved": "{{name}} a rejoint la communauté.",
+    "joinRequestDenied": "La demande de {{name}} a été refusée.",
+    "joinRequestError": "Impossible de répondre à cette demande pour le moment."
   },
   "notMember": {
     "title": "Communauté non disponible",
@@ -269,6 +278,9 @@
     "initiativeJoinRequested": "{{requester}} demande à rejoindre {{initiativeName}}.",
     "initiativeJoinApproved": "Votre demande pour rejoindre {{initiativeName}} a été acceptée.",
     "initiativeJoinDenied": "Votre demande pour rejoindre {{initiativeName}} a été refusée.",
+    "communityJoinRequested": "{{requester}} demande à rejoindre {{community}}.",
+    "communityJoinApproved": "Votre demande pour rejoindre {{community}} a été acceptée.",
+    "communityJoinDenied": "Votre demande pour rejoindre {{community}} a été refusée.",
     "shareRequested": {
       "read_one": "{{requester}} demande à voir {{title}}.",
       "read_other": "{{requester}} demande à voir {{count}} fichiers.",
@@ -394,7 +406,8 @@
       "project": "Un projet",
       "projectIn": "un projet",
       "task": "Une tâche",
-      "taskObject": "votre tâche"
+      "taskObject": "votre tâche",
+      "community": "une communauté"
     },
     "moderationRemoved": "Un modérateur a retiré quelque chose que vous avez écrit : {{reason}}",
     "moderationRemovedLegal": "Quelque chose que vous avez écrit a été retiré pour des raisons légales",
@@ -570,6 +583,15 @@
     "open": "Ouvrir",
     "joinedToast": "Vous avez rejoint {{community}}.",
     "joinFailed": "Impossible de rejoindre cette communauté.",
+    "askToJoin": "Demander à rejoindre",
+    "requested": "Demande envoyée",
+    "withdraw": "Retirer",
+    "askTitle": "Demander à rejoindre {{community}}",
+    "askDescription": "Un administrateur de cette communauté lira votre demande. Vous recevrez une notification dès sa réponse.",
+    "askHint": "Les administrateurs ne vous connaissent peut-être pas : ce message est peut-être tout ce dont ils disposent. Dites qui vous êtes et pourquoi vous souhaitez la rejoindre.",
+    "askedToast": "Votre demande pour rejoindre {{community}} a été envoyée.",
+    "askFailed": "Impossible d’envoyer cette demande.",
+    "withdrawFailed": "Impossible de retirer cette demande.",
     "noDescription": "Pas encore de description.",
     "resultCount_one": "{{count}} communauté",
     "resultCount_other": "{{count}} communautés",
@@ -583,7 +605,7 @@
     "disabledDescription": "Cette instance ne propose pas d'annuaire des communautés. Un propriétaire de la plateforme peut l'activer dans les paramètres de la plateforme.",
     "publish": {
       "title": "Inscrire cette communauté à l’annuaire",
-      "description": "Toute personne connectée pourra trouver cette communauté et la rejoindre sans invitation.",
+      "description": "Toute personne connectée pourra trouver cette communauté dans l’annuaire.",
       "categoriesLabel": "Choisissez au moins une catégorie",
       "categoriesHint": "Elles déterminent où la communauté apparaît quand on parcourt l’annuaire.",
       "certifyLabel": "Cette communauté ne contient aucun contenu pour adultes",

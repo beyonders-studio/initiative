@@ -10,6 +10,7 @@ from app.api.v1.platform_endpoints import (
     auth,
     auth_providers,
     billing,
+    community_join_requests,
     config,
     demo,
     dm,
@@ -157,6 +158,9 @@ api_router.include_router(email_otp.router, prefix="/auth", tags=["auth"])
 api_router.include_router(sessions.router, prefix="/auth", tags=["auth"])
 api_router.include_router(operator.router, prefix="/operator", tags=["operator"])
 api_router.include_router(guilds.router, prefix="/communities", tags=["communities"])
+api_router.include_router(
+    community_join_requests.router, prefix="/communities", tags=["communities"]
+)
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 # Direct messages, both halves, gated on the platform switch in one place: a
 # deployment that does not offer messaging refuses the whole surface rather

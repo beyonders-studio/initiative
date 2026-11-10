@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.models.platform.guild import CommunityJoinPolicy
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.schemas.base import SanitizedBaseModel
 
@@ -146,7 +147,7 @@ class ManifestCommunity(SanitizedBaseModel):
     id: int
     name: str
     description: str | None = None
-    is_community: bool = False
+    join_policy: CommunityJoinPolicy = CommunityJoinPolicy.private
 
 
 class BackupManifest(SanitizedBaseModel):

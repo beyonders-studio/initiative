@@ -20,6 +20,7 @@ import type {
   CommunityAuthOption,
   CommunityBanRead,
   CommunityInviteRead,
+  CommunityJoinRequestRead,
   CommunityRead,
   UserCommunityMember,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -31,6 +32,7 @@ const state = vi.hoisted(() => ({
   invites: [] as CommunityInviteRead[],
   bans: [] as CommunityBanRead[],
   bansFailed: false,
+  joinRequests: [] as CommunityJoinRequestRead[],
 }));
 vi.mock("@/hooks/useAppConfig", () => ({ useAppConfig: () => ({ billing: state.billing }) }));
 
@@ -38,7 +40,15 @@ const mintHandoff = vi.hoisted(() => vi.fn());
 const listInvites = vi.hoisted(() => vi.fn());
 const createInvite = vi.hoisted(() => vi.fn());
 const deleteInvite = vi.hoisted(() => vi.fn());
+const listJoinRequests = vi.hoisted(() => vi.fn());
 vi.mock("@/api/generated/communities/communities", () => ({
+  useListCommunityJoinRequests: (
+    communityId: number,
+    options?: { query?: { enabled?: boolean } }
+  ) => {
+    if (options?.query?.enabled !== false) listJoinRequests(communityId);
+    return { data: state.joinRequests, isPending: false, isError: false, refetch: vi.fn() };
+  },
   createCommunityInvite: createInvite,
   deleteCommunityInvite: deleteInvite,
   useListCommunityInvites: (communityId: number, options?: { query?: { enabled?: boolean } }) => {
@@ -51,11 +61,13 @@ vi.mock("@/api/generated/communities/communities", () => ({
 const setApiAccess = vi.hoisted(() => vi.fn());
 const liftBan = vi.hoisted(() => vi.fn());
 const liftTimeout = vi.hoisted(() => vi.fn());
+const answerRequest = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/useUsers", () => ({
   useCommunityBans: () => ({ data: state.bans, isError: state.bansFailed, refetch: vi.fn() }),
   useLiftBan: () => ({ mutate: liftBan, isPending: false }),
   useLiftMemberTimeout: () => ({ mutate: liftTimeout, isPending: false }),
   useTimeOutMember: () => ({ mutate: vi.fn(), isPending: false }),
+  useAnswerCommunityJoinRequest: () => ({ mutate: answerRequest, isPending: false }),
   USER_ID_LOOKUP_MAX: 100,
   useUsers: () => ({
     data: {
@@ -91,6 +103,7 @@ beforeEach(() => {
   state.members = [];
   state.bans = [];
   state.bansFailed = false;
+  state.joinRequests = [];
 });
 
 // The page's last render, whose reads are waited on before clicking into a
@@ -264,6 +277,45 @@ describe("UsersPage invites", () => {
 
     expect(await screen.findByText("No active invites.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete invite" })).not.toBeInTheDocument();
+  });
+});
+
+describe("UsersPage requests to join", () => {
+  const ada = {
+    id: 9,
+    user: {
+      id: 43,
+      username: "ada",
+      discriminator: 7,
+      avatar_url: null,
+      status: "active" as const,
+    },
+    message: "We met at the Thursday read.",
+    created_at: new Date().toISOString(),
+  };
+
+  it("lists who asked and answers them", async () => {
+    state.joinRequests = [ada];
+    const community = setup({ role: "admin" });
+
+    expect(await screen.findByText("ada#0007")).toBeInTheDocument();
+    expect(screen.getByText("We met at the Thursday read.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Approve/ }));
+
+    expect(answerRequest).toHaveBeenCalledWith(
+      { communityId: community.id, requestId: 9, approved: true },
+      expect.anything()
+    );
+  });
+
+  it("leaves the queue out for a rung that only reads the roster", async () => {
+    state.joinRequests = [ada];
+    const community = buildCommunity({ role: "admin" }) as CommunityRead;
+    setup({ role: "admin", can: { ...community.can, configure: false } });
+
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.queryByText("Requests to join")).not.toBeInTheDocument();
+    expect(listJoinRequests).not.toHaveBeenCalled();
   });
 });
 

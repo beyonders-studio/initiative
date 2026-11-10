@@ -297,6 +297,12 @@ class AuditEventType(str, Enum):
     #: one is recorded, and redeeming one is a ``GUILD_MEMBER_ADDED``.
     GUILD_INVITE_CREATED = "guild.invite_created", AuditCategory.AUTHORIZATION
     GUILD_INVITE_REVOKED = "guild.invite_revoked", AuditCategory.AUTHORIZATION
+    #: A request to join turned down. Approving one is a ``GUILD_MEMBER_ADDED``
+    #: ``via`` ``request``.
+    GUILD_JOIN_REQUEST_DENIED = (
+        "guild.join_request_denied",
+        AuditCategory.AUTHORIZATION,
+    )
     #: A guest's end moved. Becoming a guest is a ``GUILD_MEMBER_ADDED`` with
     #: ``guest_until`` in its detail, and leaving one a ``GUILD_MEMBER_REMOVED``.
     GUILD_GUEST_EXTENDED = "guild.guest_extended", AuditCategory.AUTHORIZATION

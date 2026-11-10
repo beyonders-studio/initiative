@@ -209,6 +209,8 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.initiative_added,
                 NotificationType.initiative_join_approved,
                 NotificationType.initiative_join_denied,
+                NotificationType.community_join_approved,
+                NotificationType.community_join_denied,
                 NotificationType.share_granted,
                 NotificationType.share_declined,
             }
@@ -224,6 +226,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         types=frozenset(
             {
                 NotificationType.initiative_join_requested,
+                NotificationType.community_join_requested,
                 NotificationType.share_requested,
                 NotificationType.access_grant_requested,
                 NotificationType.plugin_consent_requested,

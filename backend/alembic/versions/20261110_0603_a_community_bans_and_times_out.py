@@ -10,7 +10,7 @@ Nothing to backfill, so the table is locked down as soon as it exists. Its
 policies are rendered from the shared-table registry at boot.
 
 Revision ID: 20261110_0603
-Revises: 20261109_0601
+Revises: 20261110_0602
 Create Date: 2026-11-10
 """
 
@@ -20,7 +20,7 @@ from alembic import op
 from app.core.config import settings
 
 revision = "20261110_0603"
-down_revision = "20261109_0601"
+down_revision = "20261110_0602"
 branch_labels = None
 depends_on = None
 

@@ -24,6 +24,7 @@ from app.models.platform.guild import (
     BannerFade,
     BannerTextAlign,
     CommunityCategory,
+    CommunityJoinPolicy,
     CommunityRole,
     CommunityStatus,
 )
@@ -249,10 +250,11 @@ class CommunityRead(CommunityBase):
     # community (``ai_connections``, ``plugins``), so their settings UI says so
     # instead of offering them; ``None`` for non-admin members.
     closed_surfaces: list[str] | None = None
-    # Community directory opt-in and its subject tags. Guild identity, not
-    # administration: every member sees them (they are published to strangers
-    # anyway), and the settings page shows the controls to admins.
-    is_community: bool = False
+    # How people join, which is also the directory opt-in, and its subject
+    # tags. Guild identity, not administration: every member sees them (they
+    # are published to strangers anyway), and the settings page shows the
+    # controls to admins.
+    join_policy: CommunityJoinPolicy = CommunityJoinPolicy.private
     categories: list[CommunityCategory] = []
     # The 18+ declaration. ``None`` — unanswered — is the normal state for a
     # guild that has never been listed; listing requires an explicit ``False``.
@@ -425,13 +427,12 @@ class CommunityUpdate(SanitizedBaseModel):
     # Sentinel "unset" semantics: explicitly omit the field to leave the
     # current setting untouched; set null to switch to never-purge.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
-    # Community directory opt-in and subject tags. Omit-to-skip, like the
-    # fields above: the endpoint inspects ``model_fields_set``, so a PATCH that
-    # only renames a guild never disturbs its listing. A null ``categories``
-    # is read as "no categories" — the empty list means the same thing and the
-    # UI sends that — while a null ``is_community`` is a no-op (a boolean
-    # opt-in has no third state).
-    is_community: bool | None = None
+    # How people join (the directory opt-in) and subject tags. Omit-to-skip,
+    # like the fields above: the endpoint inspects ``model_fields_set``, so a
+    # PATCH that only renames a guild never disturbs its listing. A null
+    # ``categories`` is read as "no categories" — the empty list means the same
+    # thing and the UI sends that — while a null ``join_policy`` is a no-op.
+    join_policy: CommunityJoinPolicy | None = None
     categories: list[CommunityCategory] | None = None
     # The whole banner, replaced. Omit-to-skip like the fields above; an
     # explicit null puts it back to the default rather than clearing it, since
@@ -868,8 +869,9 @@ class DirectoryCommunityRead(SanitizedBaseModel):
     Deliberately not a :class:`CommunityRead`: the reader is a stranger, so this
     carries only what the guild published by opting in — its identity, its
     shelves, and how many people are already there. No membership fields (they
-    have none), no lifecycle status, no administration. ``already_member`` is
-    about the *caller*, and only says whether the Join button applies to them.
+    have none), no lifecycle status, no administration. ``already_member`` and
+    ``request_pending`` are about the *caller*: which button applies to them,
+    beside the ``join_policy`` that says whether it joins or asks.
 
     ``online_count`` is how many of those people have the guild open right now.
     It is a live reading rather than a stored one, taken from the process
@@ -887,6 +889,8 @@ class DirectoryCommunityRead(SanitizedBaseModel):
     member_count: int = 0
     online_count: int = 0
     already_member: bool = False
+    join_policy: CommunityJoinPolicy = CommunityJoinPolicy.open
+    request_pending: bool = False
     # The guild's banner, its ``image_url`` naming the card rendition rather
     # than the full one: a directory page is up to sixty of these, so the bytes
     # stay out of the payload and are fetched (and then cached) per card. The

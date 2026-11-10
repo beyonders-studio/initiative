@@ -38,11 +38,15 @@ import type {
   InitiativeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeJoinPolicy } from "@/api/generated/initiativeAPI.schemas";
-import { RequestToJoinDialog } from "@/components/initiatives/RequestToJoinDialog";
 import { Markdown } from "@/components/markdown/Markdown";
+import { RequestToJoinDialog } from "@/components/members/RequestToJoinDialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useInitiativeAccess } from "@/hooks/useInitiativeAccess";
-import { useInitiatives, useJoinInitiative } from "@/hooks/useInitiatives";
+import {
+  useInitiatives,
+  useJoinInitiative,
+  useRequestToJoinInitiative,
+} from "@/hooks/useInitiatives";
 import { useToolCountsByInitiative } from "@/hooks/useToolCounts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { hexToRgba, InitiativeColorDot, resolveInitiativeColor } from "@/lib/initiativeColors";
@@ -139,6 +143,12 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
   // Which door is being knocked on, if any — the dialog is one instance for the
   // whole section rather than one per card.
   const [requesting, setRequesting] = useState<{ id: number; name: string } | null>(null);
+  const requestToJoin = useRequestToJoinInitiative({
+    onSuccess: () => {
+      toast.success(t("initiatives:joinRequests.requested", { name: requesting?.name ?? "" }));
+      setRequesting(null);
+    },
+  });
 
   // Nothing to show and nothing to add: the community simply has no initiatives
   // this reader can reach, and the surrounding page says so where it matters.
@@ -347,7 +357,13 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
         </CollapsibleContent>
 
         <RequestToJoinDialog
-          initiative={requesting}
+          title={t("initiatives:joinRequests.dialogTitle", { name: requesting?.name ?? "" })}
+          description={t("initiatives:joinRequests.dialogDescription")}
+          hint={t("initiatives:joinRequests.messageHint")}
+          pending={requestToJoin.isPending}
+          onSend={(message) =>
+            requesting && requestToJoin.mutate({ initiativeId: requesting.id, data: { message } })
+          }
           open={requesting !== null}
           onOpenChange={(next) => {
             if (!next) {

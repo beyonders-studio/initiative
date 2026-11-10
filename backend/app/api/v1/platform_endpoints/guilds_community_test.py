@@ -20,10 +20,12 @@ from app.models.platform.guild import (
     Guild,
     GuildMembership,
 )
+from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.tenant.initiative import InitiativeMember
 from app.services.platform import guilds as guilds_service
 from app.services.platform import rules
+from app.testing import drain_notices
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
@@ -61,7 +63,7 @@ async def _list_as_community(
     content — the database refuses to store one that is not — so the default
     category keeps every test that does not care about shelves valid.
     """
-    guild.is_community = True
+    guild.join_policy = "open"
     guild.categories = categories or ["other"]
     guild.has_adult_content = False
     session.add(guild)
@@ -417,6 +419,206 @@ async def test_join_respects_the_member_cap(
     assert response.json()["detail"] == "COMMUNITY_USER_LIMIT_REACHED"
 
 
+async def _a_request_community(session: AsyncSession, acting_user):
+    """A listed guild that asks its joiners to ask, and one of its admins."""
+    guild = await _a_listed_guild(session, name="Knock First")
+    guild.join_policy = "request"
+    session.add(guild)
+    await session.commit()
+    admin = await acting_user(guild_role=CommunityRole.admin, guild=guild)
+    return guild, admin
+
+
+async def _notified(session: AsyncSession, user_id: int, ntype: NotificationType):
+    await drain_notices()
+    return (
+        await session.exec(
+            select(Notification).where(
+                Notification.user_id == user_id, Notification.type == ntype
+            )
+        )
+    ).all()
+
+
+@pytest.mark.parametrize("answer", ["approve", "deny"])
+async def test_a_request_community_lets_people_in_only_once_an_admin_says_yes(
+    client: AsyncClient, session: AsyncSession, acting_user, answer: str
+):
+    """The card asks rather than joins; the ask waits in the admins' queue
+    with its note, tells them, and the answer decides the membership and is
+    told back. A request is answered once."""
+    guild, admin = await _a_request_community(session, acting_user)
+    asker = await acting_user("member", username="ada", discriminator=1815)
+    ask = f"/api/v1/communities/directory/{guild.id}/join-requests"
+    queue = f"/api/v1/communities/{guild.id}/join-requests"
+
+    joined = await client.post(
+        f"/api/v1/communities/directory/{guild.id}/join", headers=asker.headers
+    )
+    assert joined.status_code == 409
+    assert joined.json()["detail"] == "COMMUNITY_JOIN_BY_REQUEST"
+
+    # Withdrawn and asked again; asking twice is one request.
+    first = await client.post(ask, json={}, headers=asker.headers)
+    assert first.status_code == 204, first.text
+    assert (await client.delete(ask, headers=asker.headers)).status_code == 204
+    for _ in range(2):
+        asked = await client.post(
+            ask, json={"message": "I run the Tuesday game"}, headers=asker.headers
+        )
+        assert asked.status_code == 204
+
+    card = (
+        await client.get("/api/v1/communities/directory", headers=asker.headers)
+    ).json()["items"][0]
+    assert (card["join_policy"], card["request_pending"]) == ("request", True)
+    waiting = (await client.get(queue, headers=admin.headers)).json()
+    assert [(r["user"]["username"], r["message"]) for r in waiting] == [
+        ("ada", "I run the Tuesday game")
+    ]
+    requested = await _notified(
+        session, admin.user.id, NotificationType.community_join_requested
+    )
+    # Told of each request, not of each ask: the one withdrawn and the one
+    # that waits.
+    assert [n.data["requester_id"] for n in requested] == [asker.user.id] * 2
+
+    answered = await client.post(
+        f"{queue}/{waiting[0]['id']}/{answer}", headers=admin.headers
+    )
+    again = await client.post(
+        f"{queue}/{waiting[0]['id']}/{answer}", headers=admin.headers
+    )
+
+    assert answered.status_code == 204
+    assert again.status_code == 404
+    assert again.json()["detail"] == "COMMUNITY_JOIN_REQUEST_NOT_FOUND"
+    assert (await client.get(queue, headers=admin.headers)).json() == []
+    membership = await _membership_of(session, guild=guild, user_id=asker.user.id)
+    assert (membership is not None) is (answer == "approve")
+    outcome = (
+        NotificationType.community_join_approved
+        if answer == "approve"
+        else NotificationType.community_join_denied
+    )
+    assert len(await _notified(session, asker.user.id, outcome)) == 1
+
+
+async def test_somebody_banned_cannot_ask(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A ban keeps a request out of the admins' queue, as it keeps the person
+    out of the community."""
+    guild, admin = await _a_request_community(session, acting_user)
+    member = await acting_user(guild_role=CommunityRole.member, guild=guild)
+    banned = await client.delete(
+        admin.g(f"/users/{member.user.id}?ban=true"), headers=admin.headers
+    )
+    assert banned.status_code == 204, banned.text
+
+    asked = await client.post(
+        f"/api/v1/communities/directory/{guild.id}/join-requests",
+        json={},
+        headers=member.headers,
+    )
+    assert asked.status_code == 403, asked.text
+    assert asked.json()["detail"] == "BANNED_FROM_COMMUNITY"
+
+
+async def test_only_the_communitys_roster_holders_reach_its_requests(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A plain member reads no queue, and another community's admin cannot
+    answer this one's request through their own community."""
+    guild, admin = await _a_request_community(session, acting_user)
+    member = await acting_user(guild_role=CommunityRole.member, guild=guild)
+    elsewhere = await acting_user(guild_role=CommunityRole.admin)
+    asker = await acting_user("member")
+    await client.post(
+        f"/api/v1/communities/directory/{guild.id}/join-requests",
+        json={},
+        headers=asker.headers,
+    )
+    request_id = (
+        await client.get(
+            f"/api/v1/communities/{guild.id}/join-requests", headers=admin.headers
+        )
+    ).json()[0]["id"]
+
+    read = await client.get(
+        f"/api/v1/communities/{guild.id}/join-requests", headers=member.headers
+    )
+    crossed = await client.post(
+        f"/api/v1/communities/{elsewhere.guild.id}/join-requests/{request_id}/approve",
+        headers=elsewhere.headers,
+    )
+
+    assert read.status_code == 403
+    assert crossed.status_code == 404
+    assert await _membership_of(session, guild=guild, user_id=asker.user.id) is None
+
+
+@pytest.mark.parametrize(
+    ("policy", "already_in", "detail"),
+    [
+        ("open", False, "COMMUNITY_JOIN_NOT_BY_REQUEST"),
+        ("request", True, "COMMUNITY_ALREADY_A_MEMBER"),
+    ],
+)
+async def test_only_a_stranger_asks_a_request_community(
+    client: AsyncClient,
+    session: AsyncSession,
+    acting_user,
+    policy: str,
+    already_in: bool,
+    detail: str,
+):
+    guild, _admin = await _a_request_community(session, acting_user)
+    guild.join_policy = policy
+    session.add(guild)
+    await session.commit()
+    asker = (
+        await acting_user(guild_role=CommunityRole.member, guild=guild)
+        if already_in
+        else await acting_user("member")
+    )
+
+    response = await client.post(
+        f"/api/v1/communities/directory/{guild.id}/join-requests",
+        json={},
+        headers=asker.headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == detail
+
+
+async def test_an_approval_with_no_seat_left_keeps_the_request(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Approving goes through the seat cap like every way in; refused, the
+    request stays for when there is room."""
+    guild, admin = await _a_request_community(session, acting_user)
+    await guild_administration(session, guild, max_users=2)
+    asker = await acting_user("member")
+    await client.post(
+        f"/api/v1/communities/directory/{guild.id}/join-requests",
+        json={},
+        headers=asker.headers,
+    )
+    await acting_user(guild_role=CommunityRole.member, guild=guild)
+    queue = f"/api/v1/communities/{guild.id}/join-requests"
+    request_id = (await client.get(queue, headers=admin.headers)).json()[0]["id"]
+
+    response = await client.post(f"{queue}/{request_id}/approve", headers=admin.headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "COMMUNITY_USER_LIMIT_REACHED"
+    assert [
+        r["id"] for r in (await client.get(queue, headers=admin.headers)).json()
+    ] == [request_id]
+
+
 async def test_a_member_cannot_opt_the_guild_in(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
@@ -425,13 +627,13 @@ async def test_a_member_cannot_opt_the_guild_in(
 
     response = await client.patch(
         f"/api/v1/communities/{guild.id}",
-        json={"is_community": True},
+        json={"join_policy": "open"},
         headers=member.headers,
     )
 
     assert response.status_code == 403
     await session.refresh(guild)
-    assert guild.is_community is False
+    assert guild.join_policy == "private"
 
 
 async def test_an_unknown_category_is_rejected(
@@ -465,7 +667,7 @@ async def test_the_adult_content_declaration_starts_unanswered(
     assert response.status_code == 200
     entry = next(item for item in response.json() if item["id"] == guild.id)
     assert entry["has_adult_content"] is None
-    assert entry["is_community"] is False
+    assert entry["join_policy"] == "private"
 
 
 #: The listing rules, each as the PATCH that breaks it. ``guild_fields`` go to
@@ -475,28 +677,28 @@ REFUSED_LISTINGS = (
     pytest.param(
         {},
         None,
-        {"is_community": True, "has_adult_content": False},
+        {"join_policy": "open", "has_adult_content": False},
         "COMMUNITY_COMMUNITY_REQUIRES_CATEGORY",
         id="a card nobody could reach by browsing",
     ),
     pytest.param(
         {},
         None,
-        {"is_community": True, "categories": ["art"]},
+        {"join_policy": "open", "categories": ["art"]},
         "COMMUNITY_COMMUNITY_CONTENT_NOT_DECLARED",
         id="the content question left unanswered",
     ),
     pytest.param(
         {},
         None,
-        {"is_community": True, "categories": ["art"], "has_adult_content": True},
+        {"join_policy": "open", "categories": ["art"], "has_adult_content": True},
         "COMMUNITY_COMMUNITY_ADULT_CONTENT",
         id="an adult guild",
     ),
     pytest.param(
         {"max_users": 1},
         None,
-        {"is_community": True, "categories": ["art"], "has_adult_content": False},
+        {"join_policy": "open", "categories": ["art"], "has_adult_content": False},
         "COMMUNITY_COMMUNITY_REQUIRES_CAPACITY",
         id="one seat, so no joiner could ever take one",
     ),
@@ -536,7 +738,7 @@ async def test_a_listing_that_breaks_a_rule_is_refused_and_changes_nothing(
     guild, headers = await _admin_of(session, acting_user, **guild_fields)
     if listed_with is not None:
         await _list_as_community(session, guild, categories=listed_with)
-    before = (guild.is_community, guild.categories, guild.has_adult_content)
+    before = (guild.join_policy, guild.categories, guild.has_adult_content)
 
     response = await client.patch(
         f"/api/v1/communities/{guild.id}", json=body, headers=headers
@@ -545,7 +747,7 @@ async def test_a_listing_that_breaks_a_rule_is_refused_and_changes_nothing(
     assert response.status_code == 400
     assert response.json()["detail"] == expected_detail
     await session.refresh(guild)
-    assert (guild.is_community, guild.categories, guild.has_adult_content) == before
+    assert (guild.join_policy, guild.categories, guild.has_adult_content) == before
 
 
 #: The PATCHes the rules let through, each with what the guild must read back
@@ -555,12 +757,12 @@ ACCEPTED_LISTINGS = (
         {},
         None,
         {
-            "is_community": True,
+            "join_policy": "open",
             "categories": ["gaming", "ttrpg"],
             "has_adult_content": False,
         },
         {
-            "is_community": True,
+            "join_policy": "open",
             "categories": ["gaming", "ttrpg"],
             "has_adult_content": False,
         },
@@ -569,8 +771,8 @@ ACCEPTED_LISTINGS = (
     pytest.param(
         {"max_users": 2},
         None,
-        {"is_community": True, "categories": ["art"], "has_adult_content": False},
-        {"is_community": True},
+        {"join_policy": "open", "categories": ["art"], "has_adult_content": False},
+        {"join_policy": "open"},
         id="two seats, room for one more",
     ),
     pytest.param(
@@ -584,21 +786,21 @@ ACCEPTED_LISTINGS = (
         {},
         None,
         {"has_adult_content": True},
-        {"has_adult_content": True, "is_community": False},
+        {"has_adult_content": True, "join_policy": "private"},
         id="an unlisted guild declaring adult content",
     ),
     pytest.param(
         {},
         ["gaming"],
         {"name": "Open Table Renamed"},
-        {"name": "Open Table Renamed", "is_community": True, "categories": ["gaming"]},
+        {"name": "Open Table Renamed", "join_policy": "open", "categories": ["gaming"]},
         id="a rename leaving the listing alone",
     ),
     pytest.param(
         {},
         ["art"],
-        {"is_community": False, "categories": []},
-        {"is_community": False},
+        {"join_policy": "private", "categories": []},
+        {"join_policy": "private"},
         id="delisting, which asks nothing of the guild",
     ),
 )
@@ -672,7 +874,7 @@ async def test_every_directory_surface_is_refused_where_it_is_switched_off(
         response = await client.patch(
             f"/api/v1/communities/{guild.id}",
             json={
-                "is_community": True,
+                "join_policy": "open",
                 "categories": ["gaming"],
                 "has_adult_content": False,
             },
@@ -683,7 +885,7 @@ async def test_every_directory_surface_is_refused_where_it_is_switched_off(
     assert response.json()["detail"] == "COMMUNITY_DIRECTORY_DISABLED"
     assert await _membership_of(session, guild=guild, user_id=caller.user.id) is None
     await session.refresh(guild)
-    assert guild.is_community is listed
+    assert guild.listed is listed
 
 
 async def test_a_listed_guild_can_still_unlist_where_the_directory_is_off(
@@ -697,12 +899,12 @@ async def test_a_listed_guild_can_still_unlist_where_the_directory_is_off(
 
     response = await client.patch(
         f"/api/v1/communities/{guild.id}",
-        json={"is_community": False},
+        json={"join_policy": "private"},
         headers=headers,
     )
 
     assert response.status_code == 200
-    assert response.json()["is_community"] is False
+    assert response.json()["join_policy"] == "private"
 
 
 async def test_switching_the_directory_off_keeps_the_guilds_opt_in(
@@ -1192,7 +1394,7 @@ async def test_a_guild_holding_an_under_age_member_cannot_be_listed(
         f"/api/v1/communities/{guild.id}",
         headers=admin_headers,
         json={
-            "is_community": True,
+            "join_policy": "open",
             "categories": ["other"],
             "has_adult_content": False,
         },
@@ -1201,7 +1403,7 @@ async def test_a_guild_holding_an_under_age_member_cannot_be_listed(
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == "COMMUNITY_COMMUNITY_UNDER_AGE_MEMBERS"
     await session.refresh(guild)
-    assert guild.is_community is False
+    assert guild.join_policy == "private"
 
 
 async def test_an_unanswered_member_does_not_stop_a_guild_being_listed(
@@ -1222,7 +1424,7 @@ async def test_an_unanswered_member_does_not_stop_a_guild_being_listed(
         f"/api/v1/communities/{guild.id}",
         headers=admin_headers,
         json={
-            "is_community": True,
+            "join_policy": "open",
             "categories": ["other"],
             "has_adult_content": False,
         },
@@ -1230,7 +1432,7 @@ async def test_an_unanswered_member_does_not_stop_a_guild_being_listed(
 
     assert response.status_code == 200, response.text
     await session.refresh(guild)
-    assert guild.is_community is True
+    assert guild.join_policy == "open"
 
 
 async def test_an_already_listed_guild_is_not_re_checked_on_an_unrelated_edit(

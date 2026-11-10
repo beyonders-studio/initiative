@@ -3,10 +3,11 @@
  *
  * The load-bearing details are that the filter rail actually narrows the
  * request (rather than filtering client-side, which would only ever narrow the
- * current page), and that a community the caller is already in offers a way in
- * rather than a second way to join.
+ * current page), that a community the caller is already in offers a way in
+ * rather than a second way to join, and that one taking requests is asked
+ * rather than joined.
  */
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,11 +20,15 @@ import { CommunitiesPage } from "./CommunitiesPage";
 
 const directoryFor = vi.fn();
 const join = vi.fn();
+const ask = vi.fn();
+const withdraw = vi.fn();
 const fetchNextPage = vi.fn();
 
 vi.mock("@/hooks/useCommunityDirectory", () => ({
   useDirectoryCommunities: (params: unknown, options?: unknown) => directoryFor(params, options),
   useJoinDirectoryCommunity: () => ({ mutateAsync: join, isPending: false }),
+  useAskToJoinDirectoryCommunity: () => ({ mutateAsync: ask, isPending: false }),
+  useWithdrawDirectoryJoinRequest: () => ({ mutateAsync: withdraw, isPending: false }),
 }));
 
 // Whether this deployment has a directory at all is the platform owner's
@@ -49,6 +54,8 @@ const community = (overrides: Partial<DirectoryCommunityRead> = {}): DirectoryCo
   member_count: 12,
   online_count: 0,
   already_member: false,
+  join_policy: "open",
+  request_pending: false,
   ...overrides,
 });
 
@@ -416,6 +423,53 @@ describe("CommunitiesPage", () => {
 
     expect(await screen.findByRole("button", { name: "Open" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Join" })).not.toBeInTheDocument();
+  });
+
+  describe("a community that takes requests", () => {
+    beforeEach(() => {
+      directoryFor.mockReturnValue(directoryResult([community({ join_policy: "request" })]));
+    });
+
+    it("asks rather than joins, with the note the reader wrote", async () => {
+      ask.mockResolvedValue(undefined);
+      renderDirectory();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Ask to join" }));
+      const dialog = await screen.findByRole("dialog");
+      // The note may be all the admins have to go on, so the dialog says so.
+      expect(within(dialog).getByText(/may be all they have to go on/)).toBeInTheDocument();
+      await userEvent.type(within(dialog).getByRole("textbox"), "  I run the Thursday read.  ");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+
+      await waitFor(() =>
+        expect(ask).toHaveBeenCalledWith({ communityId: 1, message: "I run the Thursday read." })
+      );
+      expect(join).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
+    it("asks an unconfirmed account its age before asking, not after", async () => {
+      renderDirectory({}, { user: buildUser({ age_confirmed_at: null }) });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Ask to join" }));
+
+      expect(await screen.findByText("How old are you?")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Send request" })).not.toBeInTheDocument();
+    });
+
+    it("says the ask is waiting, and takes it back", async () => {
+      directoryFor.mockReturnValue(
+        directoryResult([community({ join_policy: "request", request_pending: true })])
+      );
+      withdraw.mockResolvedValue(undefined);
+      renderDirectory();
+
+      expect(await screen.findByText("Requested")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Ask to join" })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+
+      await waitFor(() => expect(withdraw).toHaveBeenCalledWith(1));
+    });
   });
 
   it("fetches the next page rather than asking for a bigger one", async () => {

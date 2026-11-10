@@ -38,6 +38,20 @@
       "body": "Deine Anfrage, {{initiative}} beizutreten, wurde abgelehnt"
     }
   },
+  "community": {
+    "joinRequested": {
+      "title": "Neue Beitrittsanfrage",
+      "body": "{{requester}} möchte {{community}} beitreten"
+    },
+    "joinApproved": {
+      "title": "Beitrittsanfrage genehmigt",
+      "body": "Du bist jetzt Mitglied von {{community}}"
+    },
+    "joinDenied": {
+      "title": "Beitrittsanfrage abgelehnt",
+      "body": "Deine Anfrage, {{community}} beizutreten, wurde abgelehnt"
+    }
+  },
   "project": {
     "added": {
       "title": "Neues Projekt hinzugefügt",

@@ -73,7 +73,7 @@ export function buildCommunity(overrides: Partial<CommunityRead> = {}): Communit
     contact_email: null,
     auth_options: null,
     closed_surfaces: null,
-    is_community: false,
+    join_policy: "private",
     categories: [],
     has_adult_content: null,
     ...overrides,

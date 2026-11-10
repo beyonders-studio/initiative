@@ -117,8 +117,13 @@
     "retentionAfter_other": "Nach <days/> Tagen endgültig löschen",
     "retentionUpdatedSuccessfully": "Aufbewahrung aktualisiert.",
     "discoveryTitle": "Community-Verzeichnis",
-    "discoveryDescription": "Eine eingetragene Community erscheint im Verzeichnis, wo alle angemeldeten Personen sie finden und ohne Einladung beitreten können.",
-    "discoveryToggleLabel": "Diese Community eintragen",
+    "discoveryDescription": "Eine eingetragene Community erscheint im Verzeichnis, wo alle angemeldeten Personen sie finden und ihr beitreten oder den Beitritt anfragen können.",
+    "discoveryPolicyLabel": "Wer beitreten kann",
+    "discoveryPolicy": {
+      "private": "Nur auf Einladung",
+      "open": "Eingetragen: alle können beitreten",
+      "request": "Eingetragen: Beitritt auf Anfrage"
+    },
     "discoveryCategoriesLabel": "Kategorien",
     "discoveryCategoriesHint": "Wähle die Themen, die zu dieser Community passen. Sie bestimmen, unter welchen Kategorien sie erscheint.",
     "discoveryCapacityBlocked": "Diese Community hat nur für eine Person Platz, also könnte ihr niemand über das Verzeichnis beitreten. Bitte deinen Plattformbetreiber, das Mitgliederlimit zu erhöhen.",
@@ -217,7 +222,11 @@
     "apiAccessColumn": "API-Zugriff",
     "apiAccessLabel": "Persönliche API-Schlüssel für {{name}}",
     "apiAccessSaved": "API-Zugriff gespeichert",
-    "apiAccessError": "API-Zugriff konnte nicht gespeichert werden"
+    "apiAccessError": "API-Zugriff konnte nicht gespeichert werden",
+    "joinRequestsDescription": "Personen, die um Beitritt zu dieser Community gebeten haben. Eine Zusage fügt sie als Mitglied hinzu.",
+    "joinRequestApproved": "{{name}} ist der Community beigetreten.",
+    "joinRequestDenied": "Die Anfrage von {{name}} wurde abgelehnt.",
+    "joinRequestError": "Die Anfrage kann derzeit nicht beantwortet werden."
   },
   "notMember": {
     "title": "Community nicht verfügbar",
@@ -269,6 +278,9 @@
     "initiativeJoinRequested": "{{requester}} möchte {{initiativeName}} beitreten.",
     "initiativeJoinApproved": "Deine Anfrage, {{initiativeName}} beizutreten, wurde angenommen.",
     "initiativeJoinDenied": "Deine Anfrage, {{initiativeName}} beizutreten, wurde abgelehnt.",
+    "communityJoinRequested": "{{requester}} möchte {{community}} beitreten.",
+    "communityJoinApproved": "Deine Anfrage, {{community}} beizutreten, wurde angenommen.",
+    "communityJoinDenied": "Deine Anfrage, {{community}} beizutreten, wurde abgelehnt.",
     "shareRequested": {
       "read_one": "{{requester}} möchte {{title}} ansehen.",
       "read_other": "{{requester}} möchte {{count}} Dateien ansehen.",
@@ -394,7 +406,8 @@
       "project": "Ein Projekt",
       "projectIn": "einem Projekt",
       "task": "Eine Aufgabe",
-      "taskObject": "deine Aufgabe"
+      "taskObject": "deine Aufgabe",
+      "community": "einer Community"
     },
     "moderationRemoved": "Ein Moderator hat etwas von dir entfernt: {{reason}}",
     "moderationRemovedLegal": "Etwas, das du geschrieben hast, wurde aus rechtlichen Gründen entfernt",
@@ -570,6 +583,15 @@
     "open": "Öffnen",
     "joinedToast": "Du bist {{community}} beigetreten.",
     "joinFailed": "Beitritt zu dieser Community nicht möglich.",
+    "askToJoin": "Beitritt anfragen",
+    "requested": "Angefragt",
+    "withdraw": "Zurückziehen",
+    "askTitle": "Beitritt zu {{community}} anfragen",
+    "askDescription": "Ein Admin dieser Community liest deine Anfrage. Du wirst benachrichtigt, sobald geantwortet wird.",
+    "askHint": "Die Admins kennen dich vielleicht nicht, und diese Nachricht ist womöglich alles, was sie haben. Sag, wer du bist und warum du beitreten möchtest.",
+    "askedToast": "Deine Anfrage für {{community}} wurde gesendet.",
+    "askFailed": "Die Anfrage kann nicht gesendet werden.",
+    "withdrawFailed": "Die Anfrage kann nicht zurückgezogen werden.",
     "noDescription": "Noch keine Beschreibung.",
     "resultCount_one": "{{count}} Community",
     "resultCount_other": "{{count}} Communitys",
@@ -583,7 +605,7 @@
     "disabledDescription": "Diese Instanz betreibt kein Community-Verzeichnis. Ein Plattform-Eigentümer kann es in den Plattformeinstellungen aktivieren.",
     "publish": {
       "title": "Diese Community im Verzeichnis eintragen",
-      "description": "Alle angemeldeten Personen können diese Community dann finden und ohne Einladung beitreten.",
+      "description": "Alle angemeldeten Personen können diese Community dann im Verzeichnis finden.",
       "categoriesLabel": "Wähle mindestens eine Kategorie",
       "categoriesHint": "Sie bestimmen, wo die Community beim Stöbern erscheint.",
       "certifyLabel": "Diese Community enthält keine Inhalte für Erwachsene",

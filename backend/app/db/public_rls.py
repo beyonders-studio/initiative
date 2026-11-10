@@ -641,6 +641,38 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             app_guild_base=None,
         ),
     ),
+    # Who is asking to join a ``request`` community, until somebody answers.
+    "community_join_requests": SharedTable(
+        rls=TableRls(
+            policies=(
+                # The routed community's roster holder reads who is asking and
+                # turns them down. Approving claims the row here too; the
+                # system engine then writes the membership.
+                Policy(
+                    "guild_delete",
+                    DELETE,
+                    ("app_guild_base",),
+                    using=routed_admin_write("guild_id", AdminSurface.members),
+                ),
+                Policy(
+                    "guild_select",
+                    SELECT,
+                    (
+                        "app_guild_base",
+                        "app_guild_base_ro",
+                    ),
+                    using=routed_admin("guild_id", AdminSurface.members),
+                ),
+            ),
+        ),
+        grants=Grants(
+            # Asked, withdrawn and shown on the directory card by the asker, who
+            # is in no community to route into; approving writes the membership.
+            app_admin=frozenset({SELECT, INSERT, DELETE}),
+            # Read and answered on a routed request (guild_* above).
+            app_guild_base=frozenset({SELECT, DELETE}),
+        ),
+    ),
     # Who an account has agreed to hear from. Per-account and cross-guild, like
     # ``user_dm_settings``.
     "community_rules": SharedTable(
@@ -1516,8 +1548,8 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             app_user=frozenset({SELECT}),
             # 0138 revoked INSERT and UPDATE at the table level. UPDATE survives as
             # column grants on the identity columns a community's admin edits (name,
-            # description, banner, categories, is_community, has_adult_content,
-            # location, updated_at — 0138, 0196, 0200, 0456).
+            # description, banner, categories, join_policy, has_adult_content,
+            # location, updated_at — 0138, 0196, 0200, 0456, 0602).
             # guild_select_routed narrows SELECT to the routed community (0360). 0357
             # took DELETE back: creating, deleting and purging a community run on the
             # system engine.

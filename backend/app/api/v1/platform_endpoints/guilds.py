@@ -68,6 +68,7 @@ from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
     AdminSurface,
     CommunityCategory,
+    CommunityJoinPolicy,
     CommunityRole,
     CommunityStatus,
     Guild,
@@ -286,7 +287,7 @@ def _serialize_guild(
         # Guild identity, not administration: the directory publishes both to
         # strangers, so withholding them from the guild's own members would
         # only mean the settings page could not render its own state.
-        is_community=guild.is_community,
+        join_policy=guild.join_policy,
         categories=[CommunityCategory(value) for value in guild.categories],
         has_adult_content=guild.has_adult_content,
         location=guild.location,
@@ -385,7 +386,7 @@ _GUILD_PROFILE_FIELDS = (
     "name",
     "description",
     "banner",
-    "is_community",
+    "join_policy",
     "categories",
     "has_adult_content",
     "location",
@@ -559,11 +560,11 @@ async def list_directory_communities(
     )
     # Who is present is live state held by the process, not a column, so it is
     # read here for the page being returned rather than joined in the query.
-    online = content_sockets.present_counts(guild.id for guild, _, _ in rows)
+    online = content_sockets.present_counts(guild.id for guild, *_ in rows)
     # Digests only, in one query: a card names its pictures, never carries them.
     images = await images_service.image_urls(
         session,
-        [guild.id for guild, _, _ in rows],
+        [guild.id for guild, *_ in rows],
         GuildImageVariant.icon,
         GuildImageVariant.card,
     )
@@ -584,8 +585,10 @@ async def list_directory_communities(
                     member_count=member_count,
                     online_count=online.get(guild.id, 0),
                     already_member=already_member,
+                    join_policy=guild.join_policy,
+                    request_pending=request_pending,
                 )
-                for guild, member_count, already_member in rows
+                for guild, member_count, already_member, request_pending in rows
             ],
             total,
             page,
@@ -814,10 +817,10 @@ async def update_community(
     # re-asked: the ways in keep it true from here, and failing an unrelated
     # edit over a member's answer would leave an admin nothing to do but
     # remove them.
-    if updates.is_community:
+    if updates.join_policy not in (None, CommunityJoinPolicy.private):
         listed_before = (
             await guilds_service.get_guild(system_session, guild_id=guild_id)
-        ).is_community
+        ).listed
         if not listed_before:
             await guilds_service.assert_may_list_with_members(
                 system_session, guild_id=guild_id
@@ -845,7 +848,7 @@ async def update_community(
         description=updates.description,
         retention_days=updates.retention_days,
         retention_days_provided=retention_days_provided,
-        is_community=updates.is_community,
+        join_policy=updates.join_policy,
         categories=(
             [category.value for category in updates.categories]
             if updates.categories
