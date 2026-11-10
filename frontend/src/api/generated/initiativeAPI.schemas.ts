@@ -4644,7 +4644,7 @@ export interface CommunityTaskBreakdown {
 }
 
 /**
- * When a timeout ends.
+ * When a timeout ends, with its offset: an instant, not a wall-clock time.
  */
 export interface CommunityTimeoutWrite {
   ends_at: string;
