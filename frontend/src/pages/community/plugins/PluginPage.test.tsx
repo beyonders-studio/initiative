@@ -9,12 +9,13 @@
  */
 
 import { Capacitor } from "@capacitor/core";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
+import { setClock } from "@/ui/host";
 
 const mint = vi.fn();
 
@@ -194,6 +195,37 @@ describe("PluginPage", () => {
       "--background": expect.stringMatching(/^oklch\(/),
       "--foreground": expect.stringMatching(/^oklch\(/),
     });
+  });
+
+  it("sends the reader's clock with the token, and when it changes", async () => {
+    setClock({ timeFormat: "24", weekStart: 1 });
+    try {
+      mint.mockImplementation((surfaceId: string) => Promise.resolve(handoff(surfaceId)));
+      const { PluginPage } = await import("./PluginPage");
+      renderPage(() => <PluginPage pluginId={1} />);
+
+      await screen.findByTitle("Automations");
+      await announceReady();
+
+      type Sent = { type: string; time_format?: string; week_start?: number };
+      const sent = () => postSpy.mock.calls.map(([message]) => message as Sent);
+      expect(sent().find((m) => m.type === "initiative-plugin:handoff")).toMatchObject({
+        time_format: "24",
+        week_start: 1,
+      });
+
+      act(() => setClock({ weekStart: 6 }));
+      expect(
+        sent()
+          .filter((m) => m.type === "initiative-plugin:clock")
+          .at(-1)
+      ).toMatchObject({
+        time_format: "24",
+        week_start: 6,
+      });
+    } finally {
+      setClock({ timeFormat: "system", weekStart: 0 });
+    }
   });
 
   it("says with the token whether the host may sell here", async () => {
