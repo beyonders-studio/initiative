@@ -43,8 +43,6 @@ import type {
   PluginActionRun,
   PluginDataResponse,
   PluginParamOptionsResponse,
-  PluginPlacementRead,
-  PluginPlacementUpdate,
   PluginSummaryListResponse,
   PluginWidgetCatalogResponse,
   ReadPluginDataParams,
@@ -1126,9 +1124,9 @@ export function useListCommunityPlugins<
  *
  * The install dialog is the seat's consent, and it lands with the install in
  * one transaction: the scopes granted (checked as ``PUT …/scopes`` checks
- * them), the initiatives the plug-in is placed in (``"all"`` is every initiative
- * that exists now), and the built-in roles that open it in each. Anything
- * refused is refused before the install exists.
+ * them) and the initiatives the plug-in is placed in (``"all"`` is every
+ * initiative that exists now). Who uses it there is each initiative's roles'
+ * answer. Anything refused is refused before the install exists.
  * @summary Install Community Plugin
  */
 export const installCommunityPlugin = (
@@ -1378,10 +1376,9 @@ export function useGetCommunityPlugin<
  * them.
  *
  * ``placed_initiative_ids`` is the whole set of initiatives a plug-in's
- * initiative-scoped surfaces appear in. An initiative that stays placed keeps
- * the roles it had, a new one starts with its moderator role, and one left out
- * is removed. It is the community's own answer to where a plug-in belongs rather
- * than a permission, so it reads the same for everyone, admins included.
+ * initiative-scoped surfaces appear in; one left out is removed. It is the
+ * community's own answer to where a plug-in belongs rather than a permission,
+ * so it reads the same for everyone, admins included.
  * @summary Update Community Plugin
  */
 export const updateCommunityPlugin = (
@@ -2186,109 +2183,6 @@ export const useUpdateCommunityPluginSetting = <
   return useMutation(getUpdateCommunityPluginSettingMutationOptions(options), queryClient);
 };
 /**
- * Place the plug-in in one initiative with exactly these roles.
- *
- * Creates the placement or replaces its roles. Every role must be one of that
- * initiative's; guild admins open the plug-in there whatever the roles say.
- * @summary Put Community Plugin Placement
- */
-export const putCommunityPluginPlacement = (
-  communityId: number,
-  pluginId: number,
-  initiativeId: number,
-  pluginPlacementUpdate: BodyType<PluginPlacementUpdate>,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<PluginPlacementRead>(
-    {
-      url: `/api/v1/c/${communityId}/plugins/${pluginId}/placements/${initiativeId}`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: pluginPlacementUpdate,
-      signal,
-    },
-    options
-  );
-};
-
-export const getPutCommunityPluginPlacementMutationKey = () =>
-  ["putCommunityPluginPlacement"] as const;
-
-export const getPutCommunityPluginPlacementMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof putCommunityPluginPlacement>>,
-    TError,
-    PutCommunityPluginPlacementMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof apiMutator>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof putCommunityPluginPlacement>>,
-  TError,
-  PutCommunityPluginPlacementMutationVariables,
-  TContext
-> => {
-  const mutationKey = getPutCommunityPluginPlacementMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof putCommunityPluginPlacement>>,
-    PutCommunityPluginPlacementMutationVariables
-  > = (props) => {
-    const { communityId, pluginId, initiativeId, data } = props ?? {};
-
-    return putCommunityPluginPlacement(communityId, pluginId, initiativeId, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type PutCommunityPluginPlacementMutationResult = NonNullable<
-  Awaited<ReturnType<typeof putCommunityPluginPlacement>>
->;
-export type PutCommunityPluginPlacementMutationBody = BodyType<PluginPlacementUpdate>;
-export type PutCommunityPluginPlacementMutationError = ErrorType<HTTPValidationError>;
-export type PutCommunityPluginPlacementMutationVariables = {
-  communityId: number;
-  pluginId: number;
-  initiativeId: number;
-  data: BodyType<PluginPlacementUpdate>;
-};
-
-/**
- * @summary Put Community Plugin Placement
- */
-export const usePutCommunityPluginPlacement = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof putCommunityPluginPlacement>>,
-      TError,
-      PutCommunityPluginPlacementMutationVariables,
-      TContext
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseMutationResult<
-  Awaited<ReturnType<typeof putCommunityPluginPlacement>>,
-  TError,
-  PutCommunityPluginPlacementMutationVariables,
-  TContext
-> => {
-  return useMutation(getPutCommunityPluginPlacementMutationOptions(options), queryClient);
-};
-/**
  * Grant the install exactly these scopes.
  *
  * Each must be one the plug-in's manifest requests and one the deployment's
@@ -2394,8 +2288,8 @@ export const usePutCommunityPluginScopes = <
  *
  * Whether the surface may be opened is decided here, under the caller's real
  * session, so the plug-in never makes that call and never sees a request from
- * somebody who failed it. At the community level only the guild's admins open
- * a surface.
+ * somebody who failed it. At the community level the caller holds the
+ * surface's permission as an admin surface is held.
  *
  * The token goes to the iframe by ``postMessage`` — never a query string —
  * and expires in a minute.
@@ -3650,9 +3544,9 @@ export const useRevokeAllMemberConnections = <
  *
  * Three gates, outermost first. The initiative must be one this caller can
  * reach. The manifest must declare the surface for this scope, and the seat
- * must have placed the plug-in here. And the caller must hold one of the roles
- * that placement allows — or be a guild admin, as everywhere in their own
- * guild. A surface marked ``admin_only`` is for the admins alone.
+ * must have placed the plug-in here. And the caller's role here must hold the
+ * permission the surface names, as a tool's permissions are held — which a
+ * guild admin and the initiative's managers always do.
  *
  * The initiative in the minted token is this route's, never the caller's to
  * supply, so a plug-in can scope what it shows without asking a second question

@@ -6,7 +6,7 @@
  * joined: their sidebar lists only their own memberships, so taking the
  * project manager role here is what brings one into it.
  */
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
@@ -242,6 +242,7 @@ describe("InitiativesPage roster and rules", () => {
         HttpResponse.json({
           tools: { contact: false },
           member_permissions: { create_posts: false },
+          plugin_member_permissions: [],
           custom_roles: true,
           own_tools: { calendar: [INITIATIVE_ID] },
           own_member_permissions: {},
@@ -269,6 +270,76 @@ describe("InitiativesPage roster and rules", () => {
       expect(saved).toEqual({
         tools: { calendar: false },
         member_permissions: { calendars_enabled: null, create_calendars: null },
+      })
+    );
+  });
+
+  it("lists a plug-in's rule beside the tools', and names who a change reaches", async () => {
+    stubTable([]);
+    let saved: unknown;
+    server.use(
+      // CI is placed in Apollo only, so Gemini is never changed.
+      communityHttp.get("/initiatives/", () =>
+        HttpResponse.json([
+          buildInitiative({ id: INITIATIVE_ID, name: "Apollo" }),
+          buildInitiative({ id: 8, name: "Gemini" }),
+        ])
+      ),
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 3,
+              name: "CI",
+              placed_initiative_ids: [INITIATIVE_ID],
+              permissions: [
+                { id: "use", level: "initiative", name: null, members: false },
+                { id: "export", level: "initiative", name: { en: "Export builds" }, members: true },
+                { id: "use", level: "community", name: null, members: false },
+              ],
+            },
+          ],
+        })
+      ),
+      communityHttp.get("/initiatives/defaults", () =>
+        HttpResponse.json({
+          tools: {},
+          member_permissions: {},
+          plugin_member_permissions: [{ install_id: 3, permission: "export", enabled: false }],
+          custom_roles: true,
+          own_tools: {},
+          own_member_permissions: {},
+          // Apollo's own Member role holds export beneath the rule, and not use.
+          own_plugin_member_permissions: [
+            { install_id: 3, permission: "use", initiative_ids: [] },
+            { install_id: 3, permission: "export", initiative_ids: [INITIATIVE_ID] },
+          ],
+        })
+      ),
+      communityHttp.patch("/initiatives/defaults", async ({ request }) => {
+        saved = await request.json();
+        return HttpResponse.json({});
+      })
+    );
+    const user = userEvent.setup();
+    render();
+
+    expect(await screen.findByText("Only managers have “Export builds”.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit the CI rule" }));
+    const use = await screen.findByRole("radiogroup", { name: "Do members have “Use”?" });
+    await user.click(within(use).getByRole("radio", { name: "Yes, in every initiative" }));
+    const exportRule = screen.getByRole("radiogroup", { name: "Do members have “Export builds”?" });
+    await user.click(within(exportRule).getByRole("radio", { name: "Each initiative decides" }));
+    expect(screen.getByText("Gives members “Use” in Apollo.")).toBeInTheDocument();
+    expect(screen.getByText("Gives members “Export builds” in Apollo.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save rule" }));
+    await waitFor(() =>
+      expect(saved).toEqual({
+        plugin_member_permissions: [
+          { install_id: 3, permission: "use", enabled: true },
+          { install_id: 3, permission: "export", enabled: null },
+        ],
       })
     );
   });

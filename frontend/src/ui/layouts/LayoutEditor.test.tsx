@@ -188,10 +188,7 @@ const ciPlugin = communityHttp.get("/plugins/", () =>
         definition: {
           fields: [{ key: "ci.state", name: { en: "Build" }, kind: "badge", on: ["task"] }],
         },
-        item_initiatives: [1],
-        item_fields: ["ci.state"],
-        item_parts: [],
-        item_actions: [],
+        item_access: [{ initiative_id: 1, fields: ["ci.state"], parts: [], actions: [] }],
       },
     ],
   })

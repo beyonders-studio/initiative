@@ -10,6 +10,7 @@ import {
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import {
   ADMIN_SURFACES,
   MEMBER_ROLE_SURFACES,
@@ -19,6 +20,7 @@ import {
   useHeldSurfaces,
   useUpdateCustomRole,
 } from "@/hooks/useCustomRoles";
+import { permissionName } from "@/lib/pluginSurfaces";
 import type { DialogProps } from "@/types/dialog";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
@@ -50,6 +52,30 @@ type Rung = Extract<CommunityRole, "member" | "admin">;
 const offeredSurfaces = (rung: Rung): readonly AdminSurface[] =>
   rung === "member" ? MEMBER_ROLE_SURFACES : ADMIN_SURFACES;
 
+/** One installed plug-in's community permission, as a role keeps it. */
+const keyOf = (installId: number, permission: string) => `${installId}:${permission}`;
+
+/** Each installed plug-in's community permissions, named as the role list and
+ *  the dialog show them. */
+const usePluginPermissions = () => {
+  const { t, i18n } = useTranslation("plugins");
+  const plugins = useCommunityPlugins().data?.items;
+  const offered = (plugins ?? []).flatMap((install) =>
+    install.permissions
+      .filter((permission) => permission.level === "community")
+      .map((permission) => ({
+        install_id: install.id,
+        permission: permission.id,
+        key: keyOf(install.id, permission.id),
+        name: t("permissions.named", {
+          plugin: install.name,
+          permission: permissionName(permission, i18n.language, t),
+        }),
+      }))
+  );
+  return { loaded: plugins !== undefined, offered };
+};
+
 interface CustomRoleDialogProps extends DialogProps {
   /** The role being edited; left out, the dialog adds one. */
   role?: CustomRoleRead;
@@ -62,9 +88,11 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
   const held = useHeldSurfaces();
   const createRole = useCreateCustomRole();
   const updateRole = useUpdateCustomRole();
+  const plugins = usePluginPermissions();
   const [name, setName] = useState("");
   const [rung, setRung] = useState<Rung>("member");
   const [surfaces, setSurfaces] = useState<AdminSurface[]>([]);
+  const [kept, setKept] = useState<string[]>([]);
 
   const [prev, setPrev] = useState({ open, role });
   if (prev.open !== open || prev.role !== role) {
@@ -73,6 +101,7 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
       setName(role?.name ?? "");
       setRung(role?.base_rung === "admin" ? "admin" : "member");
       setSurfaces(role?.surfaces ?? []);
+      setKept((role?.plugin_permissions ?? []).map((one) => keyOf(one.install_id, one.permission)));
     }
   }
 
@@ -87,16 +116,26 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // Only what the rung offers: a member role never carries an admin's part.
+    // Only what the rung offers: a member role never carries an admin's part,
+    // nor any plug-in's permission. Those are sent once the plug-ins have
+    // loaded, as the whole set the role keeps.
     const sent = surfaces.filter((surface) => offered.includes(surface));
+    const pluginPermissions =
+      rung === "admin" && plugins.loaded
+        ? {
+            plugin_permissions: plugins.offered
+              .filter((one) => kept.includes(one.key))
+              .map(({ install_id, permission }) => ({ install_id, permission })),
+          }
+        : {};
     if (role) {
       updateRole.mutate(
-        { roleId: role.id, data: { name: name.trim(), surfaces: sent } },
+        { roleId: role.id, data: { name: name.trim(), surfaces: sent, ...pluginPermissions } },
         { onSuccess: close }
       );
     } else {
       createRole.mutate(
-        { name: name.trim(), base_rung: rung, surfaces: sent },
+        { name: name.trim(), base_rung: rung, surfaces: sent, ...pluginPermissions },
         { onSuccess: close }
       );
     }
@@ -169,6 +208,40 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
               );
             })}
           </fieldset>
+          {rung === "admin" && plugins.offered.length > 0 && (
+            <fieldset className="space-y-3">
+              <legend className="mb-2 font-medium text-sm">{t("customRoles.pluginsLabel")}</legend>
+              {plugins.offered.map((one) => {
+                const id = `custom-role-plugin-${one.key}`;
+                const yours = held.holdsPluginPermission(one.install_id, one.permission);
+                return (
+                  <div key={one.key} className="flex items-start gap-3">
+                    <Checkbox
+                      id={id}
+                      checked={kept.includes(one.key)}
+                      onCheckedChange={(checked) =>
+                        setKept((current) =>
+                          checked === true
+                            ? [...current, one.key]
+                            : current.filter((value) => value !== one.key)
+                        )
+                      }
+                      disabled={!yours}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor={id} className="font-normal">
+                        {one.name}
+                      </Label>
+                      {!yours && (
+                        <p className="text-muted-foreground text-xs">{t("customRoles.notYours")}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </fieldset>
+          )}
           <DialogFooter
             submitLabel={role ? t("common:save") : t("customRoles.add")}
             pending={pending}
@@ -190,6 +263,7 @@ export const RolesPage = () => {
   const { activeCommunity } = useCommunities();
   const { guestsEnabled } = useAppConfig();
   const held = useHeldSurfaces();
+  const plugins = usePluginPermissions();
   // Highest first. Guests only where the deployment allows them and the
   // community takes any, as on the Guests tab.
   const builtInRoles: CommunityRole[] = [
@@ -260,13 +334,24 @@ export const RolesPage = () => {
                     {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
                   </span>
                 </div>
-                {role.surfaces.length > 0 ? (
+                {role.surfaces.length > 0 || (role.plugin_permissions ?? []).length > 0 ? (
                   <div className="flex flex-wrap gap-1">
                     {role.surfaces.map((surface) => (
                       <Badge key={surface} variant="secondary" className="font-normal">
                         {t(`customRoles.surfaces.${surface}.label`)}
                       </Badge>
                     ))}
+                    {plugins.offered
+                      .filter((one) =>
+                        (role.plugin_permissions ?? []).some(
+                          (kept) => keyOf(kept.install_id, kept.permission) === one.key
+                        )
+                      )
+                      .map((one) => (
+                        <Badge key={one.key} variant="secondary" className="font-normal">
+                          {one.name}
+                        </Badge>
+                      ))}
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-xs">{t("customRoles.holdsNothing")}</p>

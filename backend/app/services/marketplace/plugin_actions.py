@@ -64,7 +64,10 @@ from app.services.marketplace.registration_lookup import (
     RegistrationSnapshot,
     is_declarative,
 )
-from app.services.marketplace.service_plugins import PLATFORM_CODES, is_admin_only
+from app.services.marketplace.service_plugins import (
+    PLATFORM_CODES,
+    surface_permission,
+)
 from app.services.tenant import guild_plugins, metadata, plugin_config
 from app.services.tenant.guild_plugins import SurfaceAccess
 from app.services.tenant.plugin_channels import PluginChannelError
@@ -348,21 +351,23 @@ async def run_action(
     install_id = int(plugin.id or 0)
     initiative_id, title = await _item(session, kind, entity_id, context)
     offered = guild_plugins.surface_access(
-        {
-            **guild_plugins.ITEM_SURFACE,
-            "admin_only": is_admin_only(action) or is_admin_only(endpoint),
-        },
+        plugin,
+        {**guild_plugins.ITEM_SURFACE, "permission": surface_permission(action)},
+        context=context,
         initiative_id=initiative_id,
-        placement_role_ids=await guild_plugins.placement_role_ids(
-            session, install_id, initiative_id
-        ),
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
+        placed=await guild_plugins.is_placed(session, install_id, initiative_id),
         age_allows=age_allows,
     )
     if offered is SurfaceAccess.too_young:
         raise PluginDataError(GuildPluginMessages.AGE_RESTRICTED, 403)
-    if offered is not SurfaceAccess.open:
+    # An endpoint it calls that names a permission answers to it too.
+    named = (endpoint or {}).get("permission")
+    if offered is not SurfaceAccess.open or not (
+        named is None
+        or guild_plugins.holds_permission(
+            context, plugin, named, initiative_id=initiative_id
+        )
+    ):
         raise _not_offered()
     if not await _reads(
         plugin, registration, guild_id=context.guild_id, kind=kind, entity_id=entity_id

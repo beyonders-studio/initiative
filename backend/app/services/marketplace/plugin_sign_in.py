@@ -194,6 +194,7 @@ def discovery_document() -> dict[str, Any]:
             "community_admin",
             "initiative_id",
             "initiative_moderator",
+            "permissions",
         ],
     }
 
@@ -431,10 +432,9 @@ async def places_for(
             (
                 answer
                 for answer in surface_openability(
-                    plugin.definition,
+                    plugin,
                     placements=placements,
-                    is_guild_admin=context.is_admin,
-                    member_role_ids=context.member_role_ids,
+                    context=context,
                     age_allows=plugin_age.age_allows(plugin.definition, viewer),
                 )
                 if answer.surface_id == page_id

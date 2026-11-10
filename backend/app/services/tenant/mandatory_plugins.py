@@ -237,7 +237,7 @@ async def install_mandatory_plugins(
             continue
         present.add(registration.public_id)
         await session.flush()
-        await guild_plugins_service.place_in_every_initiative(session, plugin)
+        await guild_plugins_service.set_placed_initiatives(session, plugin, None)
         await plugin_schedules.reconcile(
             guild_id, plugin.id, definition, session=session
         )

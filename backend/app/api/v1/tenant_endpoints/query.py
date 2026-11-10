@@ -57,7 +57,9 @@ async def describe_query(
     plug-in it reads is described from its declaration, not called.
     """
     columns, statement = await query_service.describe(
-        await query_plugins.with_rows(session, payload.sql, fetch=False),
+        await query_plugins.with_rows(
+            session, payload.sql, initiative_id=payload.initiative_id, fetch=False
+        ),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
@@ -119,7 +121,9 @@ async def run_query(
 ) -> QueryResponse:
     """Read one statement and return its rows."""
     result = await query_service.execute(
-        await query_plugins.with_rows(session, payload.sql),
+        await query_plugins.with_rows(
+            session, payload.sql, initiative_id=payload.initiative_id
+        ),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
@@ -145,7 +149,9 @@ async def build_query(
     """
     sql = query_builder.build(_spec(payload))
     columns, statement = await query_service.describe(
-        await query_plugins.with_rows(session, sql, fetch=False),
+        await query_plugins.with_rows(
+            session, sql, initiative_id=payload.initiative_id, fetch=False
+        ),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )

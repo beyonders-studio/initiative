@@ -100,6 +100,7 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # (app.db.guild_ddl._custom_roles_block).
         "custom_roles",
         "custom_role_members",
+        "custom_role_plugin_permissions",
         # Which custom role a provider's group gives: sign-in configuration,
         # the seat's (SEAT_TABLES).
         "custom_role_claim_rules",
@@ -351,6 +352,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "calendar_event_attendees",
         "calendar_event_answers",
         "custom_role_members",
+        "custom_role_plugin_permissions",
         "initiative_members",
         "initiative_rules",
         "task_assignees",

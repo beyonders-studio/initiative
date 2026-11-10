@@ -199,6 +199,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
                 exists()
                 .where(
                     InitiativeRule.initiative_role_id == im.role_id,
+                    InitiativeRule.install_id.is_(None),
                     InitiativeRule.key == tool.view_permission,
                     InitiativeRule.enabled.is_(enabled),
                 )

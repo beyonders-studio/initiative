@@ -415,6 +415,7 @@ export function QueryBuilder({
               param={param}
               pluginId={installed?.entry.plugin_id}
               endpointId={endpoint?.id}
+              initiativeId={initiativeId}
               values={calling.params ?? {}}
               open
               onChange={setParam}

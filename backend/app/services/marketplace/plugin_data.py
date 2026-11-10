@@ -97,9 +97,10 @@ from app.services.marketplace.registration_lookup import (
     registration_for_definition,
     service_public_id,
 )
-from app.services.marketplace.service_plugins import _requests, is_admin_only
+from app.services.marketplace.service_plugins import _requests
 from app.services.safe_http import build_validated_request
 from app.services.tenant import plugin_config as plugin_config_service
+from app.services.tenant.guild_plugins import holds_permission
 from app.services.webhook_target_url import (
     WebhookTargetUrlError,
     WebhookTargetUrlPrivateError,
@@ -1083,6 +1084,29 @@ async def _call_plugin[T](
 # --- the whole path ---------------------------------------------------------
 
 
+def _require_permission(
+    session: AsyncSession,
+    plugin: GuildPlugin,
+    endpoint: dict[str, Any],
+    *,
+    initiative_id: int | None,
+) -> None:
+    """Refuse a reader who does not hold the permission an endpoint names, in
+    the initiative it is read in. An endpoint naming none answers to whatever
+    it is read through; one that names one, read in no initiative, is
+    refused."""
+    named = endpoint.get("permission")
+    if named is None:
+        return
+    context = guild_context(session)
+    if (
+        context is None
+        or initiative_id is None
+        or not holds_permission(context, plugin, named, initiative_id=initiative_id)
+    ):
+        raise PluginDataError(PluginDataMessages.PERMISSION_REQUIRED, 403)
+
+
 async def fetch_plugin_source(
     session: AsyncSession,
     *,
@@ -1090,7 +1114,8 @@ async def fetch_plugin_source(
     endpoint_id: str,
     raw_params: str | None,
     user_id: int | None,
-    is_guild_admin: bool,
+    initiative_id: int | None,
+    on_usage: bool = False,
     as_installation: bool = False,
     transport: httpx2.AsyncBaseTransport | None = None,
 ) -> PluginDataResult:
@@ -1102,7 +1127,8 @@ async def fetch_plugin_source(
         endpoint_id=endpoint_id,
         raw_params=raw_params,
         user_id=user_id,
-        is_guild_admin=is_guild_admin,
+        initiative_id=initiative_id,
+        on_usage=on_usage,
         as_installation=as_installation,
         transport=transport,
     )
@@ -1116,7 +1142,8 @@ async def prepare_plugin_source(
     endpoint_id: str,
     raw_params: str | None,
     user_id: int | None,
-    is_guild_admin: bool,
+    initiative_id: int | None,
+    on_usage: bool = False,
     as_installation: bool = False,
     transport: httpx2.AsyncBaseTransport | None = None,
 ) -> Callable[[], Awaitable[PluginDataResult]]:
@@ -1131,6 +1158,11 @@ async def prepare_plugin_source(
     the caller may read it, both kill switches are open, the parameters are ones
     the endpoint declared, and the credentials it named are present.
 
+    ``initiative_id`` is where it is read: an endpoint naming a permission is
+    read by those who hold it there (:func:`_require_permission`). The
+    community's summary is read ``on_usage``, the Usage settings, whose
+    surface already decided who reads it.
+
     The call is made as the first of the endpoint's ``actors`` it can be
     (:func:`first_actor`), or, where it declares none, on every credential
     the caller and the community hold. ``as_installation`` is a dashboard
@@ -1144,8 +1176,8 @@ async def prepare_plugin_source(
     ):
         raise PluginDataError(PluginDataMessages.ENDPOINT_NOT_FOUND, 404)
 
-    if is_admin_only(endpoint) and not is_guild_admin:
-        raise PluginDataError(PluginDataMessages.ADMIN_ONLY, 403)
+    if not on_usage:
+        _require_permission(session, plugin, endpoint, initiative_id=initiative_id)
     if not plugin.enabled:
         raise PluginDataError(PluginDataMessages.PLUGIN_DISABLED, 409)
 
@@ -1215,11 +1247,13 @@ async def prepare_for_session(
     plugin: GuildPlugin,
     endpoint_id: str,
     params: Mapping[str, Any],
+    initiative_id: int | None,
     as_installation: bool = False,
 ) -> Callable[[], Awaitable[PluginDataResult]]:
     """The call to one of *plugin*'s read endpoints with *params*, for the
-    person *session* was routed for (:func:`prepare_plugin_source`). A
-    plug-in's minimum age holds for its rows as for its tiles."""
+    person *session* was routed for, read in *initiative_id*
+    (:func:`prepare_plugin_source`). A plug-in's minimum age holds for its
+    rows as for its tiles."""
     # Imported here: the age check reads the platform's settings.
     from app.services.tenant import plugin_age
 
@@ -1228,14 +1262,13 @@ async def prepare_for_session(
         plugin.definition, await plugin_age.current_viewer(user_id)
     ):
         raise PluginDataError(GuildPluginMessages.AGE_RESTRICTED, 403)
-    standing = guild_context(session)
     return await prepare_plugin_source(
         session,
         plugin=plugin,
         endpoint_id=endpoint_id,
         raw_params=json.dumps(dict(params)),
         user_id=user_id,
-        is_guild_admin=bool(standing and standing.is_admin),
+        initiative_id=initiative_id,
         as_installation=as_installation,
     )
 
@@ -1338,7 +1371,8 @@ async def read_community_summary(
         endpoint_id=endpoint["id"],
         raw_params=None,
         user_id=user_id,
-        is_guild_admin=True,
+        initiative_id=None,
+        on_usage=True,
     )
     return PluginDataResponse(
         rows=result.rows,
@@ -1369,7 +1403,7 @@ async def read_community_summary(
 #   mapped from answers the same form already holds, so a caller cannot shape
 #   the upstream request;
 # * the source is fetched by ``fetch_plugin_source`` exactly as it is for a placed
-#   tile, on the caller's own credentials and with its own ``admin_only``
+#   tile, on the caller's own credentials and with its own ``permission``
 #   enforced. What comes back is what this caller may see, or nothing.
 
 #: The most values one menu hands back. A picker is a control somebody reads,
@@ -1468,7 +1502,7 @@ async def resolve_param_options(
     param_key: str,
     raw_params: str | None,
     user_id: int,
-    is_guild_admin: bool,
+    initiative_id: int | None,
     transport: httpx2.AsyncBaseTransport | None = None,
 ) -> tuple[list[dict[str, str]], str | None]:
     """The values one parameter permits, from the read its plug-in named.
@@ -1488,8 +1522,7 @@ async def resolve_param_options(
     if endpoint is None:
         raise PluginDataError(PluginDataMessages.ENDPOINT_NOT_FOUND, 404)
     # A form for an endpoint the caller may not read is not theirs to fill in.
-    if is_admin_only(endpoint) and not is_guild_admin:
-        raise PluginDataError(PluginDataMessages.ADMIN_ONLY, 403)
+    _require_permission(session, plugin, endpoint, initiative_id=initiative_id)
 
     param = find_param(endpoint, param_key)
     if param is None:
@@ -1527,7 +1560,7 @@ async def resolve_param_options(
             endpoint_id=source_id,
             raw_params=json.dumps(asked) if asked else None,
             user_id=user_id,
-            is_guild_admin=is_guild_admin,
+            initiative_id=initiative_id,
             transport=transport,
         )
     except PluginDataError:

@@ -147,6 +147,7 @@ export function PluginParamControl({
   param,
   pluginId,
   endpointId,
+  initiativeId,
   values,
   open,
   onChange,
@@ -154,6 +155,8 @@ export function PluginParamControl({
   param: PluginDataParam;
   pluginId: number | undefined;
   endpointId: string | undefined;
+  /** The initiative the form is filled in, whose menus it asks for. */
+  initiativeId: number;
   values: Record<string, unknown>;
   open: boolean;
   onChange: (key: string, value: unknown) => void;
@@ -168,6 +171,7 @@ export function PluginParamControl({
     endpointId,
     param: param.key,
     params: values,
+    initiativeId,
     enabled: open && Boolean(param.options_from),
   });
 

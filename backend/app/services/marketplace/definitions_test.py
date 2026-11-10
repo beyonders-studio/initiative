@@ -889,11 +889,7 @@ class TestEndpoints:
     def test_a_read_endpoint_stores_no_audience(self):
         endpoint = _with_source()["endpoints"][0]
         assert "visibility" not in endpoint
-        assert endpoint["admin_only"] is False
-
-    def test_a_write_endpoint_may_be_admin_only(self):
-        endpoint = _with_source(direction="write", admin_only=True)["endpoints"][0]
-        assert endpoint["admin_only"] is True
+        assert "permission" not in endpoint
 
     def test_a_cache_window_is_clamped_rather_than_refused(self):
         definition = _with_source(cache_ttl_seconds=10_000_000)
@@ -1080,7 +1076,7 @@ class TestPages:
         page = {
             "id": "orders",
             "path": "/page/orders",
-            "admin_only": True,
+            "permission": "use",
             "name": _label("Orders"),
         }
         page.update(overrides)
@@ -1101,8 +1097,8 @@ class TestPages:
                 "id": "orders",
                 "path": "/page/orders",
                 "scopes": ["community"],
-                "admin_only": True,
                 "name": {"en": "Orders"},
+                "permission": "use",
             }
         ]
 
@@ -1196,12 +1192,9 @@ class TestWhereASurfaceRenders:
         assert self._page(scopes=["community", "community"])["scopes"] == ["community"]
 
 
-class TestAdminOnlySurfaces:
-    """``admin_only`` is the one audience a manifest may still name.
-
-    Who else opens a surface is the community's to choose, per initiative and
-    role, so the manifest says only whether a surface is for admins alone.
-    """
+class TestSurfacePermissions:
+    """A surface names the permission it answers to; who holds it is the
+    community's to choose, with its own roles."""
 
     def _page(self, **overrides) -> dict:
         page = {
@@ -1211,29 +1204,29 @@ class TestAdminOnlySurfaces:
             "scopes": ["initiative"],
         }
         page.update(overrides)
-        return _normalize(features=["pages"], pages=[page])["pages"][0]
+        return _normalize(
+            features=["pages"],
+            pages=[page],
+            permissions=[{"id": "board", "level": "initiative", "name": _label("B")}],
+        )["pages"][0]
 
-    def test_saying_nothing_is_not_admin_only(self):
-        assert self._page()["admin_only"] is False
+    def test_saying_nothing_stores_nothing(self):
+        assert "permission" not in self._page()
 
-    @pytest.mark.parametrize(
-        "scopes", [["community"], ["initiative"], ["community", "initiative"]]
-    )
-    def test_any_surface_may_be_admin_only(self, scopes):
-        assert self._page(scopes=scopes, admin_only=True)["admin_only"] is True
+    def test_it_names_one_declared_where_it_is_held(self):
+        assert self._page(permission="board")["permission"] == "board"
+        with pytest.raises(ListingDefinitionError, match="community level"):
+            self._page(permission="board", scopes=["community", "initiative"])
 
-    @pytest.mark.parametrize("value", ["true", 1, None, []])
-    def test_anything_but_a_boolean_is_refused(self, value):
-        if value is None:
-            # Absent and null read the same: the default.
-            assert self._page(admin_only=value)["admin_only"] is False
-            return
-        with pytest.raises(ListingDefinitionError, match="admin_only"):
-            self._page(admin_only=value)
+    @pytest.mark.parametrize("value", [True, 1, [], "Not An Id"])
+    def test_anything_but_an_identifier_is_refused(self, value):
+        with pytest.raises(ListingDefinitionError, match="permission"):
+            self._page(permission=value)
 
-    def test_the_retired_audience_term_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="visibility"):
-            self._page(visibility="initiative_manager")
+    @pytest.mark.parametrize("term", ["visibility", "admin_only"])
+    def test_the_retired_audience_terms_are_refused(self, term):
+        with pytest.raises(ListingDefinitionError, match=term):
+            self._page(**{term: True})
 
 
 class TestEmissions:

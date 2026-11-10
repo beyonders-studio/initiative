@@ -452,9 +452,19 @@ EVERY_SURFACE = (
     f"ARRAY[{', '.join(f"'{surface.value}'" for surface in AdminSurface)}]::text[]"
 )
 
-#: The reader holds every surface here: an admin with no custom role, or one
-#: whose role keeps every one. What making or unmaking an admin asks.
-HOLDS_EVERY_SURFACE = f"({HELD_SURFACES} @> {EVERY_SURFACE})"
+#: The installed plug-ins' community permissions the reader holds in this
+#: community: ``*`` for every one.
+HELD_PLUGIN_PERMISSIONS = (
+    f"(CASE WHEN {STANDING_IS_THIS_GUILD} THEN {gucs.HELD_PLUGIN_PERMISSIONS.sql}"
+    " ELSE ARRAY[]::text[] END)"
+)
+
+#: The reader holds everything the admin rung holds here, every surface and
+#: every plug-in permission: an admin with no custom role. What making or
+#: unmaking an admin asks, since either widens somebody to all of it.
+HOLDS_EVERY_SURFACE = (
+    f"({HELD_SURFACES} @> {EVERY_SURFACE} AND '*' = ANY ({HELD_PLUGIN_PERMISSIONS}))"
+)
 
 
 #: This request administers the community's configuration: a live settings
@@ -677,9 +687,22 @@ class Legs:
         return f"('{surface.value}' = ANY ({self.field('held_surfaces')}))"
 
     @property
+    def held_plugin_permissions(self) -> str:
+        """The plug-ins' community permissions the reader holds here: ``*``
+        for every one."""
+        return (
+            f"(CASE WHEN {self.this_guild}"
+            f" THEN {gucs.HELD_PLUGIN_PERMISSIONS.once} ELSE ARRAY[]::text[] END)"
+        )
+
+    @property
     def holds_every_surface(self) -> str:
-        """The reader holds the whole catalog (:data:`HOLDS_EVERY_SURFACE`)."""
-        return f"({self.field('held_surfaces')} @> {EVERY_SURFACE})"
+        """The reader holds everything the admin rung holds
+        (:data:`HOLDS_EVERY_SURFACE`)."""
+        return (
+            f"({self.field('held_surfaces')} @> {EVERY_SURFACE}"
+            f" AND '*' = ANY ({self.held_plugin_permissions}))"
+        )
 
     @property
     def auth_ok(self) -> str:

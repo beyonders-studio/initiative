@@ -16,17 +16,16 @@ import {
   declaredPages,
   initiativePluginPath,
   pageAllow,
-  placedIn,
   pluginPages,
+  pluginPermissions,
   type SurfaceAccess,
 } from "./pluginSurfaces";
 
-const page = (id: string, scopes?: string[], adminOnly?: boolean) => ({
+const page = (id: string, scopes?: string[]) => ({
   id,
   path: `/page/${id}`,
   name: { en: id },
   ...(scopes ? { scopes } : {}),
-  ...(adminOnly !== undefined ? { admin_only: adminOnly } : {}),
 });
 
 const access = (
@@ -127,7 +126,7 @@ describe("communityPluginPath", () => {
     expect(
       communityPluginPath({
         id: 7,
-        definition: { pages: [page("console", ["community"], true)] },
+        definition: { pages: [page("console", ["community"])] },
         surface_access: [access("console", false)],
       })
     ).toBeNull();
@@ -168,7 +167,6 @@ describe("initiativePluginPath", () => {
   const plugin = (openIn: number[]) => ({
     id: 7,
     definition: { pages: [page("runs", ["initiative"])] },
-    placements: [{ initiative_id: 4 }],
     surface_access: [access("runs", false, openIn)],
   });
 
@@ -183,7 +181,6 @@ describe("initiativePluginPath", () => {
         {
           id: 7,
           definition: { pages: [page("board")] },
-          placements: [{ initiative_id: 4 }],
           surface_access: [access("board", true)],
         },
         4
@@ -199,30 +196,26 @@ describe("initiativePluginPath", () => {
   });
 });
 
-describe("placedIn", () => {
-  it("offers a plug-in placed nowhere in no initiative", () => {
-    expect(placedIn({ placements: [] }, 4)).toBe(false);
-    expect(placedIn({ placements: null }, 4)).toBe(false);
-    expect(placedIn({}, 4)).toBe(false);
+describe("pluginPermissions", () => {
+  it("gives a plug-in that declares none use at each level, held by managers", () => {
+    expect(pluginPermissions({})).toEqual([
+      { id: "use", level: "initiative", name: null, members: false },
+      { id: "use", level: "community", name: null, members: false },
+    ]);
+    expect(pluginPermissions(null)).toHaveLength(2);
   });
 
-  it("offers a placed plug-in only where it was placed", () => {
-    const plugin = { placements: [{ initiative_id: 4 }, { initiative_id: 9 }] };
-    expect(placedIn(plugin, 4)).toBe(true);
-    expect(placedIn(plugin, 5)).toBe(false);
-  });
-
-  it("keeps a row out of an initiative the plug-in was placed away from", () => {
-    // Placement is where the plug-in goes, so it reads the same for an admin.
-    const plugin = {
-      id: 7,
-      placements: [{ initiative_id: 9 }],
-      definition: {
-        pages: [{ id: "runs", path: "/page", name: { en: "Runs" }, scopes: ["initiative"] }],
-      },
-      surface_access: [access("runs", false, [9])],
-    };
-    expect(initiativePluginPath(plugin, 9)).toBe("/i/9/plugins/7");
-    expect(initiativePluginPath(plugin, 4)).toBeNull();
+  it("lists each level's use first, named where the plug-in names it", () => {
+    const permissions = [
+      { id: "export", level: "initiative", name: { en: "Export" } },
+      { id: "settings", level: "community", name: { en: "Settings" } },
+      { id: "use", level: "initiative", name: { en: "See builds" }, members: true },
+    ];
+    expect(pluginPermissions({ permissions })).toEqual([
+      { id: "use", level: "initiative", name: { en: "See builds" }, members: true },
+      { id: "export", level: "initiative", name: { en: "Export" }, members: false },
+      { id: "use", level: "community", name: null, members: false },
+      { id: "settings", level: "community", name: { en: "Settings" }, members: false },
+    ]);
   });
 });

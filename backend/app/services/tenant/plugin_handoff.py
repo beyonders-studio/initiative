@@ -8,12 +8,12 @@ the audience names one registration, and why the lifetime is a minute.
 **Authorization is settled here, before a token exists.** The member's real
 session decides whether the surface may be opened at all — the install must be
 enabled, its plug-in service must be registered and live, the manifest must declare
-that surface, and the community's own choice must admit the caller: inside an
-initiative, the install is placed there and the caller holds one of the roles
-the placement allows; at the community level, and for a surface marked
-``admin_only``, the caller is a guild admin. A guild admin opens any surface
-that is there. A plug-in never has to make that decision, and never sees a request
-from somebody who failed it.
+that surface, and the community's own roles must admit the caller: inside an
+initiative, the install is placed there and the caller's role holds the
+permission the surface names, as a tool's permissions are held; at the
+community level, the caller holds it as an admin surface is held. A plug-in
+never has to make that decision, and never sees a request from somebody who
+failed it.
 
 **The token carries the minimum.** Guild and its status, install, surface, who is opening it,
 whether they administer the community, and — where the surface was opened
@@ -40,6 +40,9 @@ The claims a plug-in receives:
   viewer's role there manages it with "Full access", as a moderator's does. A
   plug-in uses it the way it uses ``community_admin``, such as to let only a
   moderator set something up that acts with a moderator's standing;
+* ``permissions`` — the ids of the plug-in's permissions the viewer holds
+  where the surface was opened, at that level, ``use`` among them. A plug-in
+  shapes its pages by them; like ``community_admin``, they are not a grant;
 * ``jti``, ``iat``, ``exp``, ``iss`` and ``aud`` — the envelope.
 
 **Where a surface was opened is the route's to say.** A surface declares the
@@ -75,12 +78,13 @@ from app.db.guild_standing import GuildContext
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import plugin_refs, registration_lookup
 from app.services.marketplace.community_status import community_status
-from app.services.marketplace.service_plugins import is_admin_only
+from app.services.marketplace.service_plugins import declared_permissions
 from app.services.tenant import plugin_age
 from app.services.tenant.guild_plugins import (
     SurfaceAccess,
     declared_surfaces,
-    placement_role_ids,
+    holds_permission,
+    is_placed,
     surface_access,
     surface_renders_in,
 )
@@ -136,13 +140,6 @@ def page_by_id(
     return None
 
 
-def _refusal(page: dict[str, Any], *, initiative_id: int | None) -> str:
-    """The code a refused viewer is given: which audience they missed."""
-    if initiative_id is None or is_admin_only(page):
-        return GuildPluginMessages.SURFACE_ADMIN_ONLY
-    return GuildPluginMessages.SURFACE_ROLE_NOT_ALLOWED
-
-
 async def require_live_registration(
     plugin: GuildPlugin, guild_id: int
 ) -> registration_lookup.RegistrationSnapshot:
@@ -185,9 +182,9 @@ async def authorize_surface(
     Who may open it is :func:`~app.services.tenant.guild_plugins.surface_access`,
     the same decision the plug-in read reports to the client, measured on the
     viewer's standing (``context``) and their age where they are (``viewer``).
-    An initiative surface reads the placement's roles in one query. The page
-    handoff and Sign in with Initiative both ask it, so both doors make one
-    decision.
+    An initiative surface reads whether it is placed there in one query. The
+    page handoff and Sign in with Initiative both ask it, so both doors make
+    one decision.
     """
     if not plugin.enabled:
         raise HTTPException(
@@ -205,15 +202,11 @@ async def authorize_surface(
             detail=GuildPluginMessages.SURFACE_NOT_FOUND,
         )
     access = surface_access(
+        plugin,
         page,
+        context=context,
         initiative_id=initiative_id,
-        placement_role_ids=(
-            None
-            if initiative_id is None
-            else await placement_role_ids(session, plugin.id, initiative_id)
-        ),
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
+        placed=await is_placed(session, plugin.id, initiative_id),
         age_allows=plugin_age.age_allows(plugin.definition, viewer),
     )
     if access is SurfaceAccess.not_here:
@@ -229,7 +222,7 @@ async def authorize_surface(
     if access is SurfaceAccess.refused:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=_refusal(page, initiative_id=initiative_id),
+            detail=GuildPluginMessages.SURFACE_PERMISSION_REQUIRED,
         )
 
     return page, await require_live_registration(plugin, context.guild_id)
@@ -293,6 +286,16 @@ async def surface_claims(
         # The viewer's community role, from the standing the access decision
         # was measured on, so a plug-in need not ask for it separately.
         "community_admin": bool(context.is_admin),
+        # What the viewer holds of the plug-in here, from the same standing.
+        "permissions": [
+            entry["id"]
+            for entry in declared_permissions(plugin.definition)
+            if entry["level"]
+            == ("community" if initiative_id is None else "initiative")
+            and holds_permission(
+                context, plugin, entry["id"], initiative_id=initiative_id
+            )
+        ],
     }
     # Absent guild-wide rather than null, so "which initiative is this?" has one
     # answer instead of two shapes that both mean none.

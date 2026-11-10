@@ -101,6 +101,7 @@ _NAMED: dict[str, GuestAccess] = {
     # the guest rung).
     "custom_role_members": GuestAccess.read,
     "custom_roles": GuestAccess.read,
+    "custom_role_plugin_permissions": GuestAccess.read,
 }
 
 
@@ -167,6 +168,10 @@ GUEST_ROWS: dict[str, str] = {
     "custom_roles": (
         "custom_roles.id IN (SELECT cm.role_id FROM custom_role_members cm"
         f" WHERE cm.user_id = {_UID})"
+    ),
+    "custom_role_plugin_permissions": (
+        "custom_role_plugin_permissions.role_id IN (SELECT cm.role_id"
+        f" FROM custom_role_members cm WHERE cm.user_id = {_UID})"
     ),
     # Only the sharing rows that reach them: not who else something is
     # shared with.

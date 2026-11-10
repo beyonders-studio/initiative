@@ -265,9 +265,10 @@ export const useCreateCustomRole = <TError = ErrorType<HTTPValidationError>, TCo
   return useMutation(getCreateCustomRoleMutationOptions(options), queryClient);
 };
 /**
- * The admin surfaces the reader holds here: every one for an admin with
- * no custom role, a role's otherwise, none for a member without one. What
- * the community's settings pages are shown by.
+ * The admin surfaces and the plug-ins' community permissions the reader
+ * holds here: every one for an admin with no custom role, a role's
+ * otherwise, none for a member without one. What the community's settings
+ * pages are shown by, and a role's editor offers.
  * @summary Read Held Surfaces
  */
 export const readHeldSurfaces = (

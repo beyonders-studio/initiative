@@ -459,7 +459,6 @@ def _asking_definition(
                         "id": surface,
                         "path": f"/embed/{surface}",
                         "scopes": ["initiative"],
-                        "admin_only": False,
                         "name": {"en": surface.title()},
                     }
                     for surface in inside

@@ -39,7 +39,11 @@ def _community(key: str):
     """The community's row for ``key``, over an alias of its own so it never
     correlates with a query that reads ``initiative_rules`` too."""
     row = aliased(InitiativeRule)
-    return row, and_(row.initiative_id.is_(None), row.key == key)  # type: ignore[union-attr]
+    return row, and_(
+        row.initiative_id.is_(None),  # type: ignore[union-attr]
+        row.install_id.is_(None),  # type: ignore[union-attr]
+        row.key == key,
+    )
 
 
 def community_switch(context: ActorContext, tool: Tool) -> bool | None:

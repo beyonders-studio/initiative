@@ -237,7 +237,8 @@ Admins can make roles, and so can anyone whose own custom role includes **Roles*
 3. Type a **Name**.
 4. In **For**, choose **Members** or **Admins**. This can't be changed once the role is made.
 5. Under **What it holds**, tick the jobs it includes.
-6. Select **Add role**.
+6. For a role for admins, tick under **What it holds of the plug-ins** the parts of your plug-ins it keeps, such as a plug-in's settings page.
+7. Select **Add role**.
 
 To give somebody a role:
 
@@ -262,7 +263,8 @@ You can also open the person's menu on the **Members** page and choose **Custom 
 A few rules keep it fair:
 
 - **One role each.** A role only counts while its holder is still a member or an admin, whichever it was made for, so making an admin a member again quietly sets their admin role aside. Somebody who leaves and comes back starts with none.
-- **Nobody hands out more than they hold.** You can't make, change or give a role that holds a job you don't. Taking an admin's role off gives them every job back, so only an admin who holds every job can do that.
+- **Plug-ins follow the admins' roles.** Admins hold everything your plug-ins add to Community settings, and an admin's role keeps only the parts it lists. A role for members holds none of it.
+- **Nobody hands out more than they hold.** You can't make, change or give a role that holds a job, or a part of a plug-in, you don't. Taking an admin's role off gives them every job back, so only an admin who holds every job can do that.
 - **Guest invites stay with admins**, even for a member whose role holds **Invites**, because a guest can be let into any initiative.
 - **Settings are optional.** Invites and the member list also work from the front page and the **Members** page, so your door person never has to go looking for Community settings.
 

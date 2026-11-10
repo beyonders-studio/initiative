@@ -61,19 +61,19 @@
     "whereTitle": "Where it works",
     "whereDescription": "It shows its page, and reads and changes things, only in the initiatives you choose.",
     "whereDescriptionNoPage": "It reads and changes things only in the initiatives you choose.",
-    "whoTitle": "Who can open it there",
+    "whoTitle": "Who can use it",
     "callersTitle": "Plug-ins that can use it",
     "callersDescription": "These plug-ins in your community ask to use {{name}}. Each one you leave ticked can.",
-    "roles": {
-      "moderator": "Moderators",
-      "project_manager": "Project managers",
-      "member": "Members"
-    },
     "entitlementRequired": "This plug-in has to be set up for your community before it can be added.",
     "entitlementAction": "See options",
     "termFull": "This deployment's plan has no seat free for {{name}}.",
     "termFullRequest": "Request",
-    "termFullAskAdmins": "Ask your community's admins to request it."
+    "termFullAskAdmins": "Ask your community's admins to request it.",
+    "permissions": {
+      "initiativeMembers": "In each initiative, every role starts with it. Change that on the initiative's Roles screen.",
+      "initiativeManagers": "In each initiative, managers start with it. Give it to other roles on the initiative's Roles screen.",
+      "community": "Across the community, admins hold it. Choose the custom admin roles that keep it on the community's Roles screen."
+    }
   },
   "connections": {
     "none": "This plug-in asks for nothing to be set up.",
@@ -201,12 +201,9 @@
     "some": "Only the initiatives I choose",
     "none": "No initiatives chosen, so this plug-in reaches nothing inside initiatives.",
     "roles": {
-      "open": "Who can open it in {{name}}",
-      "title": "Who can open it here",
-      "adminsAlways": "Community admins can always open it.",
-      "adminsOnly": "Community admins only",
-      "count_one": "{{count}} role",
-      "count_other": "{{count}} roles"
+      "open": "Roles in {{name}}",
+      "link": "Roles",
+      "note": "Each initiative's roles say who uses it there, on its Roles screen."
     }
   },
   "connected": {
@@ -334,5 +331,9 @@
     "provided": "This community added it, and its publisher provides it — not Initiative.",
     "report": "Something wrong with it? Report it.",
     "continue": "Continue"
+  },
+  "permissions": {
+    "use": "Use",
+    "named": "{{plugin}}: {{permission}}"
   }
 }

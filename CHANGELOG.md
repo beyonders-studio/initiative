@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Plug-ins answer to your roles.** Who uses a plug-in inside an initiative is set on the initiative's **Roles** page, beside its tools: its managers and community admins always can, and other roles as you set them, starting from what the plug-in suggests. Community admins can set members' answer for every initiative, as for a tool. A plug-in's community pages follow the admin rung, and a custom role on it can keep only some of them. Placing a plug-in now only says where it works; the roles each placement allowed carry over, and an initiative's managers now reach every plug-in placed there. **Plug-in developers:** a page, field, part, action or endpoint names a `permission` your manifest declares in `permissions`, in place of `admin_only`, and a handoff and an ID token carry the ones the person holds.
 - **Old passwords need resetting.** An account that hasn't signed in with a password since 0.44 sets a new one with **Forgot password** (it needs email set up on the server), or signs in with a passkey or single sign-on.
 - **Backups made before 0.78 no longer restore.** Restore one on 0.78 first, then back up again.
 - **Unsigned message devices are removed.** A device that never signed its keys (any on the app since 0.73 has) registers again the next time it opens, without the messages it held.

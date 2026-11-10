@@ -116,6 +116,9 @@ export type PluginActionDecl = {
  *  there, of what the server offers this reader. */
 export type PluginOnItems = {
   id: number;
+  /** The initiative it is met in, which an action's question asks its menus
+   *  for. */
+  initiativeId: number;
   /** The kind of item it is met on. */
   kind: PluginItemKind;
   /** What the community calls the install. */
@@ -171,55 +174,40 @@ const endpointParams = (definition: object): ReadonlyMap<string, PluginDataParam
 export const pluginsOnItems = (
   installs: Pick<
     CommunityPluginRead,
-    | "id"
-    | "name"
-    | "enabled"
-    | "definition"
-    | "item_initiatives"
-    | "item_fields"
-    | "item_parts"
-    | "item_actions"
-    | "setting_values"
+    "id" | "name" | "enabled" | "definition" | "item_access" | "setting_values"
   >[],
   initiativeId: number,
   kind: PluginItemKind = "task"
 ): ReadonlyMap<number, PluginOnItems> =>
   new Map(
-    installs
-      .filter((install) => install.enabled && install.item_initiatives.includes(initiativeId))
-      .map((install) => {
-        return [
-          install.id,
-          {
-            id: install.id,
-            kind,
-            name: install.name,
-            fields: declared<PluginFieldDecl>(
-              install.definition,
-              "fields",
-              "key",
-              install.item_fields,
-              kind
-            ),
-            parts: declared<PluginPartDecl>(
-              install.definition,
-              "parts",
-              "id",
-              install.item_parts,
-              kind
-            ),
-            actions: declared<PluginActionDecl>(
-              install.definition,
-              "actions",
-              "id",
-              install.item_actions,
-              kind
-            ),
-            endpoints: endpointParams(install.definition),
-            settings: install.setting_values ?? {},
-          },
-        ];
-      })
+    installs.flatMap((install) => {
+      const offered = install.item_access.find((one) => one.initiative_id === initiativeId);
+      if (!install.enabled || !offered) return [];
+      const plugin: PluginOnItems = {
+        id: install.id,
+        initiativeId,
+        kind,
+        name: install.name,
+        fields: declared<PluginFieldDecl>(
+          install.definition,
+          "fields",
+          "key",
+          offered.fields,
+          kind
+        ),
+        parts: declared<PluginPartDecl>(install.definition, "parts", "id", offered.parts, kind),
+        actions: declared<PluginActionDecl>(
+          install.definition,
+          "actions",
+          "id",
+          offered.actions,
+          kind
+        ),
+        endpoints: endpointParams(install.definition),
+        settings: install.setting_values ?? {},
+      };
+      return [[install.id, plugin] as const];
+    })
   );
 
 const NO_PLUGINS: ReadonlyMap<number, PluginOnItems> = new Map();
@@ -821,6 +809,7 @@ const PluginActionDialog = ({
               param={param}
               pluginId={asking.plugin.id}
               endpointId={asking.action.endpoint}
+              initiativeId={asking.plugin.initiativeId}
               values={values}
               open
               onChange={(key, value) =>

@@ -143,6 +143,80 @@ describe("RolesPage", () => {
     expect(screen.getAllByRole("button", { name: /Roll|Doors/ })).toHaveLength(1);
   });
 
+  it("keeps the plug-ins' community permissions an admin role lists", async () => {
+    const sent: unknown[] = [];
+    server.use(
+      // The reader holds use and settings of CI's, and not billing.
+      communityHttp.get("/custom-roles/held", () =>
+        HttpResponse.json({
+          surfaces: Object.values(AdminSurface),
+          plugin_permissions: [
+            { install_id: 3, permission: "use" },
+            { install_id: 3, permission: "settings" },
+          ],
+        })
+      ),
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 3,
+              name: "CI",
+              permissions: [
+                { id: "use", level: "initiative", name: null, members: false },
+                { id: "use", level: "community", name: null, members: false },
+                { id: "settings", level: "community", name: { en: "Settings" }, members: false },
+                { id: "billing", level: "community", name: { en: "Billing" }, members: false },
+              ],
+            },
+          ],
+        })
+      ),
+      communityHttp.get("/custom-roles/", () =>
+        HttpResponse.json([
+          {
+            id: 2,
+            name: "Roll",
+            base_rung: "admin",
+            surfaces: [],
+            plugin_permissions: [{ install_id: 3, permission: "settings" }],
+            set_by: "community",
+          },
+        ])
+      ),
+      communityHttp.patch("/custom-roles/:roleId", async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json({ id: 2 });
+      })
+    );
+    const user = userEvent.setup();
+    setup();
+
+    expect(await screen.findByText("CI: Settings")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Roll/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("CI: Settings")).toBeChecked();
+    // Only what the reader holds may be given.
+    expect(within(dialog).getByLabelText("CI: Billing")).toBeDisabled();
+    // Only the community's permissions: an initiative's are its roles'.
+    await user.click(within(dialog).getByLabelText("CI: Use"));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(sent).toEqual([
+        {
+          name: "Roll",
+          surfaces: [],
+          plugin_permissions: [
+            { install_id: 3, permission: "use" },
+            { install_id: 3, permission: "settings" },
+          ],
+        },
+      ])
+    );
+  });
+
   it("offers no change to a role the deployment defines", async () => {
     server.use(
       communityHttp.get("/custom-roles/", () =>

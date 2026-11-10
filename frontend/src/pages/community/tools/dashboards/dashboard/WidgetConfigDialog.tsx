@@ -338,6 +338,7 @@ export function WidgetConfigDialog({
                     param={param}
                     pluginId={plugin?.entry.plugin_id}
                     endpointId={pluginEndpoint?.id}
+                    initiativeId={initiativeId}
                     values={pluginParams}
                     open={open}
                     onChange={setPluginParam}

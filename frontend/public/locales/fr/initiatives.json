@@ -327,7 +327,11 @@
       "view": "Les membres peuvent voir les {{items}}.",
       "notView": "Les membres ne peuvent pas voir les {{items}}.",
       "create": "Les membres peuvent créer des {{items}}.",
-      "notCreate": "Seuls les responsables créent des {{items}}."
+      "notCreate": "Seuls les responsables créent des {{items}}.",
+      "plugin": {
+        "on": "Les membres ont « {{permission}} ».",
+        "off": "Seuls les responsables ont « {{permission}} »."
+      }
     },
     "extra": {
       "dashboards_run_as_initiative": {
@@ -338,14 +342,15 @@
     "addTitle": "Ajouter une règle",
     "editTitle": "Règle pour {{tool}}",
     "dialogDescription": "Choisissez ce qui s'applique dans toutes les initiatives, y compris celles ajoutées plus tard. Ce qui est laissé à chaque initiative reste le sien.",
-    "toolLabel": "Outil",
+    "toolLabel": "Outil ou plug-in",
     "question": {
       "tool": "{{tool}} est-il activé ?",
       "view": "Les membres peuvent-ils voir les {{items}} ?",
       "create": "Les membres peuvent-ils créer des {{items}} ?",
       "extra": {
         "dashboards_run_as_initiative": "Les membres peuvent-ils exécuter un tableau de bord en tant qu'initiative ?"
-      }
+      },
+      "plugin": "Les membres ont-ils « {{permission}} » ?"
     },
     "answer": {
       "tool": {
@@ -383,6 +388,10 @@
           "on": "Permet aux membres d'exécuter un tableau de bord en tant qu'initiative dans {{names}}.",
           "off": "Empêche les membres d'exécuter un tableau de bord en tant qu'initiative dans {{names}}."
         }
+      },
+      "plugin": {
+        "on": "Donne « {{permission}} » aux membres dans {{names}}.",
+        "off": "Retire « {{permission}} » aux membres dans {{names}}."
       }
     },
     "save": "Enregistrer la règle",

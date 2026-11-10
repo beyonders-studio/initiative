@@ -745,10 +745,14 @@ describe("TaskPage", () => {
               id: 3,
               enabled: true,
               definition: { actions: [action, { ...action, id: "hidden", menu: false }] },
-              item_initiatives: [INITIATIVE_ID],
-              item_fields: [],
-              item_parts: [],
-              item_actions: ["link", "hidden"],
+              item_access: [
+                {
+                  initiative_id: INITIATIVE_ID,
+                  fields: [],
+                  parts: [],
+                  actions: ["link", "hidden"],
+                },
+              ],
             },
           ],
         })

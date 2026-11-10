@@ -327,7 +327,11 @@
       "view": "Mitglieder können {{items}} ansehen.",
       "notView": "Mitglieder können {{items}} nicht ansehen.",
       "create": "Mitglieder können {{items}} erstellen.",
-      "notCreate": "Mitglieder können {{items}} nicht erstellen."
+      "notCreate": "Mitglieder können {{items}} nicht erstellen.",
+      "plugin": {
+        "on": "Mitglieder haben „{{permission}}“.",
+        "off": "Nur Manager haben „{{permission}}“."
+      }
     },
     "extra": {
       "dashboards_run_as_initiative": {
@@ -338,14 +342,15 @@
     "addTitle": "Regel hinzufügen",
     "editTitle": "Regel für {{tool}}",
     "dialogDescription": "Wähle, was in jeder Initiative gilt, auch in später hinzugefügten. Was jeder Initiative überlassen bleibt, entscheidet sie selbst.",
-    "toolLabel": "Tool",
+    "toolLabel": "Tool oder Plug-in",
     "question": {
       "tool": "Ist {{tool}} eingeschaltet?",
       "view": "Können Mitglieder {{items}} ansehen?",
       "create": "Können Mitglieder {{items}} erstellen?",
       "extra": {
         "dashboards_run_as_initiative": "Können Mitglieder ein Dashboard als Initiative ausführen?"
-      }
+      },
+      "plugin": "Haben Mitglieder „{{permission}}“?"
     },
     "answer": {
       "tool": {
@@ -383,6 +388,10 @@
           "on": "Mitglieder können in {{names}} ein Dashboard als Initiative ausführen.",
           "off": "Mitglieder können in {{names}} kein Dashboard mehr als Initiative ausführen."
         }
+      },
+      "plugin": {
+        "on": "Gibt Mitgliedern „{{permission}}“ in {{names}}.",
+        "off": "Nimmt Mitgliedern „{{permission}}“ in {{names}}."
       }
     },
     "save": "Regel speichern",

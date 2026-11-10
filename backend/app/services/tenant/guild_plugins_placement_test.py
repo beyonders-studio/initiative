@@ -1,19 +1,23 @@
 """Where an installed plug-in appears: ``plugin_placements`` rows.
 
-Placement is one row per (install, initiative), carrying the initiative roles
-allowed to open the plug-in there. These tests hold the service helpers that read
-and write those rows, the trigger that places a plug-in following new
-initiatives, and the export that carries them.
+Placement is one row per (install, initiative): where the plug-in appears. Who
+reaches it there is the initiative's roles' answer. These tests hold the
+service helpers that read and write placements, the decision behind opening a
+surface, and the export that carries both.
 """
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, ClassVar
 
 import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.guild_standing import GuildContext
+from app.models.platform.guild import Guild
+from app.models.tenant.initiative import InitiativeRule
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.export.guild_sections import SectionContext, _build_plugins
@@ -21,13 +25,12 @@ from app.services.tenant.guild_plugins import (
     PlacementError,
     SurfaceAccess,
     is_placed,
-    place_in_every_initiative,
     placed_initiative_ids,
     set_placed_initiatives,
     show_on_saved_layouts,
     surface_access,
 )
-from app.services.tenant.initiatives import get_moderator_role
+from app.services.tenant.initiatives import get_member_role
 from app.services.tenant.task_types import get_default_type
 from app.testing import (
     create_guild,
@@ -51,18 +54,12 @@ DEFINITION = {
 }
 
 
-async def _moderator_id(session: AsyncSession, initiative_id: int) -> int:
-    role = await get_moderator_role(session, initiative_id=initiative_id)
-    assert role is not None and role.id is not None
-    return role.id
-
-
-async def _rows(session: AsyncSession, guild_id: int, install_id: int) -> dict:
+async def _rows(session: AsyncSession, guild_id: int, install_id: int) -> set[int]:
     await route_session_to_guild(session, guild_id)
     rows = await session.exec(
         select(PluginPlacement).where(PluginPlacement.install_id == install_id)
     )
-    return {row.initiative_id: list(row.role_ids) for row in rows.all()}
+    return {row.initiative_id for row in rows.all()}
 
 
 async def _guild_with_two_initiatives(session: AsyncSession):
@@ -74,54 +71,39 @@ async def _guild_with_two_initiatives(session: AsyncSession):
 
 
 class TestSetPlacedInitiatives:
-    async def test_a_new_placement_starts_with_the_moderator_role(
-        self, session: AsyncSession
-    ):
-        user, guild, first, _ = await _guild_with_two_initiatives(session)
-        plugin = await create_guild_plugin(session, guild, user, definition=DEFINITION)
-
-        await route_session_to_guild(session, guild.id)
-        await set_placed_initiatives(session, plugin, {first.id})
-        await session.commit()
-
-        assert await _rows(session, guild.id, plugin.id) == {
-            first.id: [await _moderator_id(session, first.id)]
-        }
-
-    async def test_a_kept_placement_keeps_its_roles_and_a_dropped_one_goes(
+    async def test_it_places_exactly_these_and_answers_the_new_ones(
         self, session: AsyncSession
     ):
         user, guild, first, second = await _guild_with_two_initiatives(session)
         plugin = await create_guild_plugin(session, guild, user, definition=DEFINITION)
 
         await route_session_to_guild(session, guild.id)
-        await set_placed_initiatives(session, plugin, {first.id})
-        row = (
-            await session.exec(
-                select(PluginPlacement).where(PluginPlacement.install_id == plugin.id)
-            )
-        ).one()
-        row.role_ids = [123_456]
-        session.add(row)
+        assert await set_placed_initiatives(session, plugin, {first.id}) == [first.id]
         await session.commit()
+        assert await _rows(session, guild.id, plugin.id) == {first.id}
 
         await route_session_to_guild(session, guild.id)
-        await set_placed_initiatives(session, plugin, {first.id, second.id})
+        assert await set_placed_initiatives(session, plugin, {first.id, second.id}) == [
+            second.id
+        ]
         await session.commit()
-        assert await _rows(session, guild.id, plugin.id) == {
-            first.id: [123_456],
-            second.id: [await _moderator_id(session, second.id)],
-        }
 
         await route_session_to_guild(session, guild.id)
         await set_placed_initiatives(session, plugin, {second.id})
         await session.commit()
-        assert set(await _rows(session, guild.id, plugin.id)) == {second.id}
+        assert await _rows(session, guild.id, plugin.id) == {second.id}
 
         await route_session_to_guild(session, guild.id)
         await set_placed_initiatives(session, plugin, set())
         await session.commit()
-        assert await _rows(session, guild.id, plugin.id) == {}
+        assert await _rows(session, guild.id, plugin.id) == set()
+
+        # None is every initiative there is: what installing a mandatory
+        # plug-in does.
+        await route_session_to_guild(session, guild.id)
+        await set_placed_initiatives(session, plugin, None)
+        await session.commit()
+        assert await _rows(session, guild.id, plugin.id) == {first.id, second.id}
 
     async def test_it_may_only_name_this_guild_s_initiatives(
         self, session: AsyncSession
@@ -158,25 +140,8 @@ class TestIsPlaced:
         assert await is_placed(session, plugin.id, None) is True
 
 
-class TestPlaceInEveryInitiative:
-    async def test_place_in_every_initiative_covers_the_existing_ones(
-        self, session: AsyncSession
-    ):
-        user, guild, first, second = await _guild_with_two_initiatives(session)
-        plugin = await create_guild_plugin(session, guild, user, definition=DEFINITION)
-
-        await route_session_to_guild(session, guild.id)
-        await place_in_every_initiative(session, plugin)
-        await session.commit()
-
-        assert await _rows(session, guild.id, plugin.id) == {
-            first.id: [await _moderator_id(session, first.id)],
-            second.id: [await _moderator_id(session, second.id)],
-        }
-
-
 class TestExport:
-    async def test_the_plugins_section_carries_each_install_s_placements(
+    async def test_the_plugins_section_carries_placements_and_who_holds_what(
         self, session: AsyncSession
     ):
         await create_marketplace_listing(
@@ -193,6 +158,18 @@ class TestExport:
         )
         await route_session_to_guild(session, guild.id)
         await set_placed_initiatives(session, plugin, {first.id})
+        member = await get_member_role(session, initiative_id=first.id)
+        assert member is not None
+        session.add(
+            InitiativeRule(
+                initiative_id=first.id,
+                initiative_role_id=member.id,
+                install_id=plugin.id,
+                key="use",
+                enabled=True,
+            )
+        )
+        session.add(InitiativeRule(install_id=plugin.id, key="use", enabled=False))
         await session.commit()
 
         await route_session_to_guild(session, guild.id)
@@ -202,68 +179,124 @@ class TestExport:
         assert built is not None
         payload, count = built
         assert count == 1
-        assert payload["schema_version"] == 2
+        assert payload["schema_version"] == 3
         [entry] = payload["plugins"]
-        assert "placement" not in entry
-        assert entry["placements"] == [
+        assert entry["placed_initiative_ids"] == [first.id]
+        assert entry["permissions"] == [
             {
                 "initiative_id": first.id,
-                "role_ids": [await _moderator_id(session, first.id)],
-            }
+                "role": "member",
+                "permission": "use",
+                "enabled": True,
+            },
+            {
+                "initiative_id": None,
+                "role": None,
+                "permission": "use",
+                "enabled": False,
+            },
         ]
 
 
 class TestSurfaceAccess:
-    """The one decision behind opening a surface, without a database."""
+    """The one decision behind opening a surface, without a database: the
+    install's permissions held as the community's own are, read off the
+    reader's standing."""
 
     PAGE: ClassVar[dict[str, Any]] = {
         "id": "e",
         "path": "/e",
         "scopes": ["community", "initiative"],
     }
-    ADMIN_ONLY: ClassVar[dict[str, Any]] = {**PAGE, "admin_only": True}
+    PRICES: ClassVar[dict[str, Any]] = {**PAGE, "permission": "prices"}
+    PLUGIN = SimpleNamespace(
+        id=3,
+        definition={
+            "permissions": [
+                {"id": "prices", "level": "initiative", "name": {"en": "Prices"}},
+                {"id": "prices", "level": "community", "name": {"en": "Prices"}},
+                {"id": "open", "level": "initiative", "members": True, "name": {}},
+            ]
+        },
+    )
 
-    @staticmethod
-    def _decide(page, *, initiative_id=1, roles=(10,), admin=False, held=(10,)):
+    @classmethod
+    def _decide(cls, page, *, initiative_id=1, placed=True, **standing):
         return surface_access(
+            cls.PLUGIN,
             page,
+            context=GuildContext(
+                guild=Guild(id=7, name="g"),
+                user_id=11,
+                guild_id=7,
+                **{"member_initiatives": (1,), **standing},
+            ),
             initiative_id=initiative_id,
-            placement_role_ids=roles,
-            is_guild_admin=admin,
-            member_role_ids=held,
+            placed=placed,
         )
 
-    def test_a_role_the_placement_allows_opens_it(self):
-        assert self._decide(self.PAGE) is SurfaceAccess.open
-
-    def test_a_role_it_does_not_allow_is_refused(self):
-        assert self._decide(self.PAGE, held=(11,)) is SurfaceAccess.refused
-
-    def test_not_placed_is_not_here_even_for_an_admin(self):
-        for admin in (False, True):
-            assert (
-                self._decide(self.PAGE, roles=None, admin=admin)
-                is SurfaceAccess.not_here
-            )
-
-    def test_the_community_level_is_for_admins(self):
+    def test_inside_an_initiative_a_role_holds_it_by_its_rule(self):
+        assert self._decide(self.PAGE) is SurfaceAccess.refused
+        assert self._decide(self.PAGE, plugin_grants=("1:3:use",)) is SurfaceAccess.open
         assert (
-            self._decide(self.PAGE, initiative_id=None, roles=None)
+            self._decide(self.PRICES, plugin_grants=("1:3:use",))
             is SurfaceAccess.refused
         )
+        # A rule in another initiative, or naming another install, is not one here.
         assert (
-            self._decide(self.PAGE, initiative_id=None, roles=None, admin=True)
-            is SurfaceAccess.open
+            self._decide(self.PAGE, plugin_grants=("2:3:use", "1:4:use"))
+            is SurfaceAccess.refused
         )
 
-    def test_admin_only_outranks_the_roles(self):
-        assert self._decide(self.ADMIN_ONLY) is SurfaceAccess.refused
-        assert self._decide(self.ADMIN_ONLY, admin=True) is SurfaceAccess.open
+    def test_with_no_rule_a_role_takes_the_plug_in_s_default(self):
+        opens = {**self.PAGE, "permission": "open"}
+        assert self._decide(opens) is SurfaceAccess.open
+        assert self._decide(opens, plugin_denies=("1:3:open",)) is SurfaceAccess.refused
+        # Not a member of the initiative: no role there to hold it.
+        assert self._decide(opens, member_initiatives=()) is SurfaceAccess.refused
 
-    def test_a_surface_that_does_not_render_here_is_not_here(self):
+    def test_admins_and_the_initiative_s_managers_always_hold_it(self):
+        assert self._decide(self.PRICES, guild_admin=True) is SurfaceAccess.open
+        assert self._decide(self.PRICES, manager_initiatives=(1,)) is SurfaceAccess.open
+        assert (
+            self._decide(self.PRICES, manager_initiatives=(2,)) is SurfaceAccess.refused
+        )
+
+    def test_at_the_community_level_it_is_held_as_an_admin_surface(self):
+        community = {"initiative_id": None}
+        # The admin rung with no custom role holds every one.
+        assert (
+            self._decide(self.PRICES, **community, held_plugin_permissions=("*",))
+            is SurfaceAccess.open
+        )
+        # A custom role keeps some.
+        narrowed = ("3:use",)
+        assert (
+            self._decide(self.PAGE, **community, held_plugin_permissions=narrowed)
+            is SurfaceAccess.open
+        )
+        assert (
+            self._decide(self.PRICES, **community, held_plugin_permissions=narrowed)
+            is SurfaceAccess.refused
+        )
+        # A member holds none, whatever they hold inside initiatives.
+        assert (
+            self._decide(
+                self.PAGE, **community, plugin_grants=("1:3:use",), guild_admin=False
+            )
+            is SurfaceAccess.refused
+        )
+
+    def test_not_placed_or_not_rendered_here_is_not_here(self):
+        assert (
+            self._decide(self.PAGE, placed=False, guild_admin=True)
+            is SurfaceAccess.not_here
+        )
         inside_only = {**self.PAGE, "scopes": ["initiative"]}
         assert (
-            self._decide(inside_only, initiative_id=None, roles=None, admin=True)
+            self._decide(
+                inside_only, initiative_id=None, held_plugin_permissions=("*",)
+            )
             is SurfaceAccess.not_here
         )
 

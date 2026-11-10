@@ -51,7 +51,7 @@ from app.models.platform.plugin_service_registration import PluginServiceRegistr
 from app.models.platform.user import UserRole
 from app.models.tenant.dashboard import DashboardViewMode
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.initiative import InitiativeMember, InitiativeRule
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -133,14 +133,17 @@ GITHUB_CONNECTION = {
 
 
 def _definition() -> dict:
-    """A service plug-in offering several sources: one for guild admins (and one
-    pinned as such under the earlier contract), one that runs on the caller's
-    own vendor account, and ordinary ones."""
+    """A service plug-in offering several sources: one naming a permission
+    members do not hold, one that runs on the caller's own vendor account, and
+    ordinary ones."""
     return {
         "plugin_kind": "service",
         "service": {"public_id": PUBLIC_ID, "protocol": 1},
         "features": ["endpoints", "widgets"],
         "connections": [ADMIN_CONNECTION, GITHUB_CONNECTION],
+        "permissions": [
+            {"id": "manage", "level": "initiative", "name": {"en": "Manage"}}
+        ],
         "endpoints": [
             {
                 "id": ORDERS_SUMMARY,
@@ -194,7 +197,7 @@ def _definition() -> dict:
             {
                 "id": REVENUE,
                 "direction": "read",
-                "admin_only": True,
+                "permission": "manage",
                 "cache_ttl_seconds": 0,
                 "returns": [{"key": "tiers", "type": "string", "list": True}],
             },
@@ -501,8 +504,8 @@ class TestGates:
         assert upstream.count == 0
 
 
-class TestAdminOnly:
-    async def test_an_admin_only_source_is_open_to_an_admin(
+class TestPermission:
+    async def test_a_source_naming_a_permission_is_open_to_who_holds_it(
         self, client, acting_user, session, upstream
     ):
         a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
@@ -512,11 +515,11 @@ class TestAdminOnly:
         )
         assert response.status_code == 200, response.text
 
-    async def test_an_admin_only_source_is_refused_to_a_member(
+    async def test_it_is_refused_to_a_member_whose_role_does_not(
         self, client, acting_user, session, upstream
     ):
-        """Checked against the caller's real guild role, on the pinned
-        definition, not against anything the request supplied."""
+        """Checked against the caller's role in the dashboard's initiative, on
+        the pinned definition, not against anything the request supplied."""
         a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
         member = await _editor(session, acting_user, a, dashboard)
 
@@ -524,7 +527,7 @@ class TestAdminOnly:
             _url(member, plugin, REVENUE, dashboard), headers=member.headers
         )
         assert response.status_code == 403
-        assert response.json()["detail"] == PluginDataMessages.ADMIN_ONLY
+        assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
         assert upstream.count == 0
 
 
@@ -968,8 +971,8 @@ class TestWidgetCatalog:
         }
 
         sources = {source["id"]: source for source in entry["endpoints"]}
-        assert sources[REVENUE]["admin_only"] is True
-        assert sources[ORDERS_SUMMARY]["admin_only"] is False
+        assert sources[REVENUE]["permission"] == "manage"
+        assert sources[ORDERS_SUMMARY]["permission"] is None
         assert sources[ORDERS_SUMMARY]["cache_ttl_seconds"] == 60
 
     async def test_a_disabled_install_offers_no_widgets(
@@ -1146,12 +1149,13 @@ class TestParamOptions:
         assert response.status_code == 200, response.text
         assert response.json() == {"options": [], "unavailable": "unresolved"}
 
-    async def test_a_member_is_told_nothing_by_an_admin_only_source(
+    async def test_a_member_is_told_nothing_by_a_source_naming_a_permission(
         self, client, acting_user, session, upstream
     ):
-        """The source's own ``admin_only`` decides, exactly as it does for a
-        tile. A member asking for the values of a parameter sourced from an
-        admin-only read gets the same answer as one whose plug-in is down."""
+        """The source's own ``permission`` decides, exactly as it does for a
+        tile. A member asking for the values of a parameter sourced from a
+        read they do not hold gets the same answer as one whose plug-in is
+        down."""
         a, plugin, _ = await _workspace(session, acting_user)
         member = await acting_user(guild=a.guild, guild_role=CommunityRole.member)
 
@@ -1162,7 +1166,7 @@ class TestParamOptions:
         assert response.json() == {"options": [], "unavailable": "unresolved"}
         assert upstream.count == 0
 
-    async def test_a_member_fills_in_no_form_for_an_admin_only_endpoint(
+    async def test_a_member_fills_in_no_form_for_an_endpoint_they_do_not_hold(
         self, client, acting_user, session, upstream
     ):
         """Refused before the parameter is looked for: the form belongs to an
@@ -1174,7 +1178,7 @@ class TestParamOptions:
             _options_url(member, plugin, REVENUE, "anything"), headers=member.headers
         )
         assert response.status_code == 403
-        assert response.json()["detail"] == PluginDataMessages.ADMIN_ONLY
+        assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
         assert upstream.count == 0
 
     async def test_a_guild_admin_reads_that_same_source(
@@ -1183,8 +1187,12 @@ class TestParamOptions:
         a, plugin, _ = await _workspace(session, acting_user)
         upstream.rows = [{"tiers": "gold"}]
 
+        # Read where the form is filled in: the source names a permission.
         response = await client.get(
-            _options_url(a, plugin, ORDERS_SUMMARY, "tier"), headers=a.headers
+            _options_url(
+                a, plugin, ORDERS_SUMMARY, "tier", initiative_id=a.initiative.id
+            ),
+            headers=a.headers,
         )
         assert response.status_code == 200, response.text
         assert [o["value"] for o in response.json()["options"]] == ["gold"]
@@ -1808,10 +1816,13 @@ LINK_ISSUE = f"plugin.{PUBLIC_ID}.link-issue"
 
 def _action_definition() -> dict:
     """One field and two actions on tasks, each running a write, the second
-    for the community's admins alone."""
+    naming a permission members do not hold."""
     return {
         "plugin_kind": "service",
         "service": {"public_id": PUBLIC_ID, "protocol": 1, "scopes": ["projects:read"]},
+        "permissions": [
+            {"id": "manage", "level": "initiative", "name": {"en": "Manage"}}
+        ],
         "endpoints": [{"id": LINK_ISSUE, "direction": "write"}],
         "fields": [
             {"key": "issue", "name": {"en": "Issue"}, "kind": "number", "on": ["task"]}
@@ -1830,7 +1841,7 @@ def _action_definition() -> dict:
                 "endpoint": LINK_ISSUE,
                 "on": ["task"],
                 "menu": False,
-                "admin_only": True,
+                "permission": "manage",
             },
         ],
     }
@@ -1844,7 +1855,7 @@ def _declarative_action_definition() -> dict:
     for the task's title on the community's connection and keeps the number
     found; ``tally`` adds one to it; ``unlink``, for a reader who has
     connected their own account, drops it with no call, keeping what it was;
-    ``relink`` is the community's admins' alone; ``label`` makes the label
+    ``relink`` names a permission members do not hold; ``label`` makes the label
     write as the reader, on the account its request names for the member,
     once they have connected it, and as the installation, on the community's,
     before; ``garble`` answers a targeted change where a change belongs;
@@ -1876,6 +1887,7 @@ def _declarative_action_definition() -> dict:
     )
     definition.update(
         scopes=["projects:read"],
+        permissions=[{"id": "manage", "level": "initiative", "name": {"en": "Manage"}}],
         fields=[
             {"key": "issue", "name": {"en": "Issue"}, "kind": "number", "on": ["task"]},
             {
@@ -1921,7 +1933,7 @@ def _declarative_action_definition() -> dict:
                         "requires": {"all_of": ["github"]},
                     },
                 ),
-                ("relink", {"write": '{"set": {"issue": 1}}', "admin_only": True}),
+                ("relink", {"write": '{"set": {"issue": 1}}', "permission": "manage"}),
                 ("label", {"endpoint": f"plugin.{PUBLIC_ID}.label"}),
                 (
                     "garble",
@@ -2011,8 +2023,15 @@ async def _action_board(
         )
     ).one()
     session.add(
-        PluginPlacement(
-            install_id=plugin.id, initiative_id=admin.initiative.id, role_ids=[role_id]
+        PluginPlacement(install_id=plugin.id, initiative_id=admin.initiative.id)
+    )
+    session.add(
+        InitiativeRule(
+            initiative_id=admin.initiative.id,
+            initiative_role_id=role_id,
+            install_id=plugin.id,
+            key="use",
+            enabled=True,
         )
     )
     await session.commit()

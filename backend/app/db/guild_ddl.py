@@ -836,14 +836,17 @@ PLUGIN_CONNECTION_SECRET_FIELDS_TRIGGER = (
 
 _CUSTOM_ROLES_SECTION = """\
 -- ===========================================================================
--- Custom roles (custom_roles, custom_role_members): read within the schema.
+-- Custom roles (custom_roles, custom_role_members, and the plug-ins' community
+-- permissions a role on the admin rung keeps, custom_role_plugin_permissions):
+-- read within the schema.
 -- Written while the deployment leaves surface.custom_roles open, by a holder
 -- of the surface the write is part of (defining a role is roles, giving one
 -- is members), by a settings rung beside a read_write grant, or by the system
--- engine. Nobody writes or gives a role holding a surface they do not hold,
--- and a role on the admin rung takes an admin writer. Taking one off its
+-- engine. Nobody writes or gives a role holding a surface or a plug-in
+-- permission they do not hold, and a role on the admin rung takes an admin
+-- writer. Only a role on the admin rung keeps plug-in permissions. Taking one off its
 -- holders, by deleting it or the assignment, widens an admin back to every
--- surface, so that takes a writer who holds every surface. A role the
+-- surface and plug-in permission, so that takes a writer who holds all of it. A role the
 -- deployment defined (set_by) is the system engine's to write; the community
 -- gives it as it gives its own (custom_role_set_by_*, RESTRICTIVE).
 --
@@ -851,6 +854,17 @@ _CUSTOM_ROLES_SECTION = """\
 -- ==========================================================================="""
 
 _HELD_SURFACES = IN_POLICY.field("held_surfaces")
+_HELD_PLUGIN_PERMISSIONS = IN_POLICY.held_plugin_permissions
+
+
+def _holds_plugin_permission(row: str) -> str:
+    """The writer holds the plug-in permission ``row`` names: every one, or
+    that one."""
+    return (
+        f"('*' = ANY ({_HELD_PLUGIN_PERMISSIONS})"
+        f" OR ({row}.install_id::text || ':' || {row}.permission)"
+        f" = ANY ({_HELD_PLUGIN_PERMISSIONS}))"
+    )
 
 
 def _gives(role: str) -> str:
@@ -858,6 +872,8 @@ def _gives(role: str) -> str:
     on the admin rung takes an admin."""
     return (
         f"({role}.surfaces <@ {_HELD_SURFACES}"
+        " AND NOT EXISTS (SELECT 1 FROM custom_role_plugin_permissions p"
+        f" WHERE p.role_id = {role}.id AND NOT {_holds_plugin_permission('p')})"
         f" AND ({role}.base_rung = '{CommunityRole.member.value}'"
         f" OR {IN_POLICY.admin}))"
     )
@@ -865,8 +881,8 @@ def _gives(role: str) -> str:
 
 def _takes_off(role: str) -> str:
     """The writer may take ``role`` off its holders: it holds nothing they do
-    not, and an admin's widens them to every surface, so it takes a writer
-    who holds every one."""
+    not, and an admin's widens them to every surface and plug-in permission,
+    so it takes a writer who holds all of it."""
     return (
         f"({role}.surfaces <@ {_HELD_SURFACES}"
         f" AND ({role}.base_rung = '{CommunityRole.member.value}'"
@@ -912,10 +928,26 @@ def _custom_roles_block() -> str:
     takes_off = _custom_role_writer(AdminSurface.roles, _takes_off("custom_roles"))
     assigns = _custom_role_writer(AdminSurface.members, _role_of(_gives))
     unassigns = _custom_role_writer(AdminSurface.members, _role_of(_takes_off))
+    kept = "custom_role_plugin_permissions"
+    on_admin_rung = (
+        f"EXISTS (SELECT 1 FROM custom_roles r WHERE r.id = {kept}.role_id"
+        f" AND r.base_rung = '{CommunityRole.admin.value}'"
+        f" AND ({IN_POLICY.system} OR r.set_by = '{SetBy.community.value}'))"
+    )
+    keeps = (
+        f"({on_admin_rung} AND "
+        + _custom_role_writer(
+            AdminSurface.roles,
+            f"(EXISTS (SELECT 1 FROM custom_roles r WHERE r.id = {kept}.role_id"
+            f" AND {_gives('r')}) AND {_holds_plugin_permission(kept)})",
+        )
+        + ")"
+    )
     lines: list[str] = []
     for table, write, remove in (
         ("custom_roles", gives, takes_off),
         ("custom_role_members", assigns, unassigns),
+        (kept, keeps, keeps),
     ):
         lines += [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",

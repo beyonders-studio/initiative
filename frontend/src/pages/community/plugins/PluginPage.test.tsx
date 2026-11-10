@@ -80,7 +80,7 @@ const detail = {
         path: "/page/inside",
         name: { en: "Inside" },
         scopes: ["initiative"],
-        admin_only: true,
+        permission: "manage",
       },
     ],
   },
@@ -345,8 +345,9 @@ describe("PluginPage, read inside an initiative", () => {
   });
 
   it("says so plainly when nothing here is for this reader", async () => {
-    // A plain member of the initiative: the only surface here is for admins,
-    // so the server lists no initiative for it — nothing to open or mint.
+    // A plain member of the initiative: the only surface here names a
+    // permission their role does not hold, so the server lists no initiative
+    // for it — nothing to open or mint.
     surfaceAccess = ADMIN_ACCESS.map((one) =>
       one.surface_id === "inside" ? { ...one, openable_initiatives: [] } : one
     );

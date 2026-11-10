@@ -146,23 +146,24 @@ def test_needs_config_still_reads_from_presence():
     )
 
 
-def test_placements_are_the_rows_handed_in_ordered_by_initiative():
+def test_placements_and_permissions_are_read_off_the_rows_and_definition():
     """The serializer reads no placement off the install: the caller loads the
-    rows, once for a whole list."""
-    rows = [
-        SimpleNamespace(initiative_id=9, role_ids=[4]),
-        SimpleNamespace(initiative_id=2, role_ids=[]),
-    ]
+    rows, once for a whole list. The permissions are the definition's, ``use``
+    at each level among them."""
+    rows = [SimpleNamespace(initiative_id=9), SimpleNamespace(initiative_id=2)]
     payload = serialize_guild_plugin(
         _plugin(), context=CONTEXT, placements=rows, viewer=ADULT
     )
 
-    assert [p.model_dump() for p in payload.placements] == [
-        {"initiative_id": 2, "role_ids": []},
-        {"initiative_id": 9, "role_ids": [4]},
+    assert payload.placed_initiative_ids == [2, 9]
+    assert [p.model_dump() for p in payload.permissions] == [
+        {"id": "use", "level": "initiative", "name": None, "members": False},
+        {"id": "use", "level": "community", "name": None, "members": False},
     ]
     assert (
-        serialize_guild_plugin(_plugin(), context=CONTEXT, viewer=ADULT).placements
+        serialize_guild_plugin(
+            _plugin(), context=CONTEXT, viewer=ADULT
+        ).placed_initiative_ids
         == []
     )
 
@@ -183,31 +184,30 @@ def test_granted_scopes_are_reported_sorted_and_empty_by_default():
 
 
 def test_surface_access_is_computed_for_the_viewer():
-    """Each declared surface, with where this viewer opens it: the placement's
-    roles inside an initiative, admins alone at the community level and on an
-    ``admin_only`` surface."""
+    """Each declared surface, with where this viewer opens it: inside an
+    initiative where their role there holds the permission it names, at the
+    community level where they hold it as an admin surface is held."""
     definition = {
         **DEFINITION,
+        "permissions": [{"id": "settings", "level": "initiative", "name": {}}],
         "pages": [
             {"id": "board", "path": "/b", "scopes": ["community", "initiative"]},
             {
                 "id": "settings",
                 "path": "/s",
                 "scopes": ["initiative"],
-                "admin_only": True,
+                "permission": "settings",
             },
         ],
     }
-    rows = [
-        SimpleNamespace(initiative_id=2, role_ids=[40]),
-        SimpleNamespace(initiative_id=5, role_ids=[41]),
-    ]
+    rows = [SimpleNamespace(initiative_id=2), SimpleNamespace(initiative_id=5)]
     member = GuildContext(
         guild=Guild(id=7, name="g"),
         user_id=12,
         guild_id=7,
         standing_guild_id=7,
-        member_role_ids=(40,),
+        member_initiatives=(2, 5),
+        plugin_grants=("2:3:use",),
     )
     admin = GuildContext(
         guild=Guild(id=7, name="g"),
@@ -215,6 +215,7 @@ def test_surface_access_is_computed_for_the_viewer():
         guild_id=7,
         standing_guild_id=7,
         guild_admin=True,
+        held_plugin_permissions=("*",),
     )
 
     def access(context):
@@ -253,24 +254,25 @@ def test_surface_access_is_computed_for_the_viewer():
 
 
 def test_item_access_is_where_the_viewer_meets_the_plugin_on_items():
-    """The initiatives whose placements admit the viewer; the fields and parts
-    whose connections hold a value; and every action there but one that is
-    admin-only or whose write endpoint is, which only an admin runs, one whose
-    community connections hold nothing, and any while the community is
-    frozen. A member's own connection an action requires is theirs to make
-    when they run it, as is one a declarative plug-in's endpoint requires; a
-    container's endpoint is called as the installation, which no member's
-    connection answers. A declarative plug-in's fields, parts and actions are
-    offered as a container's are."""
+    """Per initiative it is placed in, the fields, parts and actions whose
+    permission the viewer holds there, an action's endpoint's too where it
+    names one; of those, the fields and parts whose connections hold a value,
+    and every action but one whose community connections hold nothing, and
+    none while the community is frozen. A member's own connection an action
+    requires is theirs to make when they run it, as is one a declarative
+    plug-in's endpoint requires; a container's endpoint is called as the
+    installation, which no member's connection answers. A declarative
+    plug-in's fields, parts and actions are offered as a container's are."""
     definition = {
         **DEFINITION,
         "connections": [
             *DEFINITION["connections"],
             {"id": "account", "scope": "interactive", "fields": []},
         ],
+        "permissions": [{"id": "manage", "level": "initiative", "name": {}}],
         "endpoints": [
             {"id": "link", "direction": "write"},
-            {"id": "purge", "direction": "write", "admin_only": True},
+            {"id": "purge", "direction": "write", "permission": "manage"},
             {"id": "sync", "direction": "write", "requires": {"all_of": ["admin"]}},
             {
                 "id": "assign",
@@ -293,15 +295,12 @@ def test_item_access_is_where_the_viewer_meets_the_plugin_on_items():
                 "on": ["task"],
                 "requires": {"all_of": ["admin", "account"]},
             },
-            {"id": "close", "endpoint": "link", "on": ["task"], "admin_only": True},
+            {"id": "close", "endpoint": "link", "on": ["task"], "permission": "manage"},
             {"id": "assign", "endpoint": "assign", "on": ["task"]},
         ],
         "minimum_age": {"default": 18},
     }
-    rows = [
-        SimpleNamespace(initiative_id=2, role_ids=[40]),
-        SimpleNamespace(initiative_id=5, role_ids=[41]),
-    ]
+    rows = [SimpleNamespace(initiative_id=2), SimpleNamespace(initiative_id=5)]
 
     def context(**standing):
         return GuildContext(
@@ -319,55 +318,37 @@ def test_item_access_is_where_the_viewer_meets_the_plugin_on_items():
             placements=rows,
             viewer=viewer,
         )
-        return (
-            payload.item_initiatives,
-            payload.item_fields,
-            payload.item_parts,
-            payload.item_actions,
-        )
+        return [
+            (one.initiative_id, one.fields, one.parts, one.actions)
+            for one in payload.item_access
+        ]
 
     every_field = ["ci.state", "ci.owner"]
-    assert access(context(member_role_ids=(40,))) == (
-        [2],
-        every_field,
-        ["builds"],
-        ["new-link", "sync", "audit"],
-    )
-    assert access(context(guild_admin=True)) == (
-        [2, 5],
-        every_field,
-        ["builds"],
-        ["new-link", "purge", "sync", "audit", "close"],
-    )
+    member = context(member_initiatives=(2, 5), plugin_grants=("2:3:use",))
+    admin = context(guild_admin=True)
+    assert access(member) == [
+        (2, every_field, ["builds"], ["new-link", "sync", "audit"])
+    ]
+    everything = ["new-link", "purge", "sync", "audit", "close"]
+    assert access(admin) == [
+        (2, every_field, ["builds"], everything),
+        (5, every_field, ["builds"], everything),
+    ]
     # The connection holds nothing.
-    assert access(context(guild_admin=True), secret_fields={}) == (
-        [2, 5],
-        ["ci.state"],
-        [],
-        ["new-link", "purge", "close"],
-    )
-    assert access(context(guild_admin=True, content_read_only=True)) == (
-        [2, 5],
-        every_field,
-        ["builds"],
-        [],
-    )
-    assert access(context(member_role_ids=(99,))) == ([], [], [], [])
-    assert access(context(guild_admin=True), AgeViewer(age=15, country="US")) == (
-        [],
-        [],
-        [],
-        [],
-    )
+    assert access(admin, secret_fields={}) == [
+        (2, ["ci.state"], [], ["new-link", "purge", "close"]),
+        (5, ["ci.state"], [], ["new-link", "purge", "close"]),
+    ]
+    assert access(context(guild_admin=True, content_read_only=True)) == [
+        (2, every_field, ["builds"], []),
+        (5, every_field, ["builds"], []),
+    ]
+    assert access(context(member_initiatives=(2, 5))) == []
+    assert access(admin, AgeViewer(age=15, country="US")) == []
     del definition["service"]
-    assert access(context(guild_admin=True)) == (
-        [2, 5],
-        every_field,
-        ["builds"],
-        ["new-link", "purge", "sync", "audit", "close", "assign"],
-    )
-    assert access(context(guild_admin=True), secret_fields={}) == (
-        [2, 5],
+    assert access(admin)[0] == (2, every_field, ["builds"], [*everything, "assign"])
+    assert access(admin, secret_fields={})[0] == (
+        2,
         ["ci.state"],
         [],
         ["new-link", "purge", "close"],
