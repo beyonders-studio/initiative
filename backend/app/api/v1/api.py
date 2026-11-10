@@ -41,6 +41,7 @@ from app.api.v1.platform_endpoints import (
     plugin_oauth,
     plugin_platform,
     plugin_services,
+    plugin_sign_in,
     provider_placement,
     push,
     recurrence,
@@ -211,6 +212,11 @@ api_router.include_router(
 # plug-in or installation token. The listing of its installs takes the plug-in token.
 api_router.include_router(
     plugin_oauth.router, prefix="/plugin-platform", tags=["plugin-platform"]
+)
+# Sign in with Initiative's own page: the plug-in asking, where the person may
+# open it, and the code that sends them back.
+api_router.include_router(
+    plugin_sign_in.router, prefix="/plugin-platform", tags=["plugin-platform"]
 )
 # An installed plug-in asking a member to let it act as them, on its installation
 # token. The member answers on their own consent screen.

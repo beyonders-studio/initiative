@@ -290,9 +290,11 @@ describe("a prompt in the system browser", () => {
     expect(mocks.finishPasskeyStepUp).toHaveBeenCalledWith({ credential: { id: "cred" } });
   });
 
-  it("finishes a sign-in whose answer starts the app afresh", async () => {
+  it("finishes a sign-in whose answer starts the app afresh, and says where it was headed", async () => {
     // The phone closed the app while the browser was in front.
-    void signInWithPasskey({ deviceName: "iPhone" }).catch(() => undefined);
+    void signInWithPasskey({ deviceName: "iPhone", next: "/c/4/projects/9" }).catch(
+      () => undefined
+    );
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
     const prompt = lastPrompt();
     vi.resetModules();
@@ -301,7 +303,7 @@ describe("a prompt in the system browser", () => {
 
     await expect(
       restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
-    ).resolves.toEqual({ access_token: "t" });
+    ).resolves.toEqual({ token: { access_token: "t" }, next: "/c/4/projects/9" });
     expect(mocks.finishPasskeySignIn).toHaveBeenCalledWith({
       credential: { id: "cred" },
       device_name: "iPhone",

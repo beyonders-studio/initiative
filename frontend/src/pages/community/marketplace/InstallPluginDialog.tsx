@@ -58,13 +58,21 @@ import { ListingProvenance } from "./ListingProvenance";
 
 export interface InstallPluginDialogProps extends DialogProps {
   listing: MarketplaceListingDetail;
+  /** Where to go once installed, in place of the plug-in's own page: the
+   *  sign-in that sent the seat here to add it. */
+  next?: string | null;
 }
 
 /** The built-in initiative roles the seat may let open the plug-in. */
 export const ROLE_KINDS = ["moderator", "project_manager", "member"] as const;
 type RoleKind = (typeof ROLE_KINDS)[number];
 
-export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPluginDialogProps) {
+export function InstallPluginDialog({
+  listing,
+  open,
+  onOpenChange,
+  next,
+}: InstallPluginDialogProps) {
   const { t } = useTranslation(["plugins", "common", "nav"]);
   const navigate = useNavigate();
   const gp = useCommunityPath();
@@ -108,6 +116,10 @@ export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPlug
         onSuccess: (plugin) => {
           toast.success(t("plugins:install.done", { name: plugin.name }));
           onOpenChange(false);
+          if (next) {
+            navigate({ href: next });
+            return;
+          }
           // Straight to what it created, when it created something reachable.
           const path = communityPluginPath(plugin);
           if (path) navigate({ to: gp(path) });

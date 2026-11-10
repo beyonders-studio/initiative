@@ -4,6 +4,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useResumeAfterSignIn } from "@/hooks/useResumeAfterSignIn";
 import { redeemNativeSignIn, takePendingSignIn } from "@/lib/nativeSignIn";
 import { takeBrowserAnswer } from "@/lib/passkeys";
 
@@ -25,6 +26,7 @@ export function useDeepLinks() {
   const router = useRouter();
   const { isNativePlatform, getServerOrigin } = useServer();
   const { completeOidcLogin, applySignIn } = useAuth();
+  const resumeAfterSignIn = useResumeAfterSignIn();
 
   useEffect(() => {
     if (!isNativePlatform) return;
@@ -40,8 +42,8 @@ export function useDeepLinks() {
       // refused one leaves the sign-in page up, to press again.
       const signedIn = await takeBrowserAnswer(url).catch(() => null);
       if (signedIn) {
-        await applySignIn(signedIn);
-        await router.navigate({ to: "/", replace: true });
+        await applySignIn(signedIn.token);
+        await resumeAfterSignIn(signedIn.next);
         return;
       }
       if (!isSignInCallback(url)) return;
@@ -59,7 +61,7 @@ export function useDeepLinks() {
         } else {
           throw new Error(error ?? "NOT_AUTHENTICATED");
         }
-        await router.navigate({ to: "/", replace: true });
+        await resumeAfterSignIn(pending.next);
       } catch (err) {
         await router.navigate({
           to: "/oidc/callback",
@@ -78,5 +80,12 @@ export function useDeepLinks() {
     return () => {
       void listener.then((l) => l.remove());
     };
-  }, [isNativePlatform, getServerOrigin, completeOidcLogin, applySignIn, router]);
+  }, [
+    isNativePlatform,
+    getServerOrigin,
+    completeOidcLogin,
+    applySignIn,
+    router,
+    resumeAfterSignIn,
+  ]);
 }

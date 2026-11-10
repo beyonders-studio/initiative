@@ -16,4 +16,9 @@ describe("a sign-in the app began in the phone's browser", () => {
     expect(pending?.origin).toBe("https://one.example");
     expect(takePendingSignIn("https://one.example")).toBeNull();
   });
+
+  it("keeps where the sign-in was headed for the app to land on", async () => {
+    await beginNativeSignIn("https://one.example", "/c/4/projects/9");
+    expect(takePendingSignIn("https://one.example")?.next).toBe("/c/4/projects/9");
+  });
 });

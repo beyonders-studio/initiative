@@ -33,7 +33,7 @@ import logging
 import secrets
 import string
 import unicodedata
-from collections.abc import Iterator, Mapping
+from collections.abc import Collection, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -309,6 +309,28 @@ async def page(
     if len(entries) <= limit:
         return entries, None
     return entries[:limit], _encode_cursor(entries[limit - 1])
+
+
+async def communities_holding(
+    listing_uid: str, guild_ids: Collection[int]
+) -> list[int]:
+    """Which of ``guild_ids`` hold an install of the listing, in a community
+    still live, in community order. Whether each install is switched on is the
+    install row's answer, as for :func:`routed`."""
+    if not guild_ids:
+        return []
+    statement = (
+        select(PluginInstall.guild_id)
+        .join(Guild, Guild.id == PluginInstall.guild_id)
+        .where(
+            PluginInstall.listing_uid == listing_uid,
+            col(PluginInstall.guild_id).in_(sorted(guild_ids)),
+            Guild.status.in_(sorted(LIVE_STATUS_VALUES)),
+        )
+        .order_by(PluginInstall.guild_id)
+    )
+    async with db_session.SystemSessionLocal() as session:
+        return list(dict.fromkeys((await session.exec(statement)).all()))
 
 
 async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:

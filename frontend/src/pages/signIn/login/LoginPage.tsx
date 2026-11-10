@@ -128,7 +128,7 @@ const SignInCard = () => {
       const params = new URLSearchParams({
         mobile: "true",
         device_name: await resolveDeviceName(),
-        code_challenge: await beginNativeSignIn(origin),
+        code_challenge: await beginNativeSignIn(origin, searchParams.next),
       });
       await Browser.open({ url: `${origin}${provider.login_url}?${params}` });
     } else {
@@ -236,7 +236,9 @@ const SignInCard = () => {
       // aside for the one the person just asked for.
       cancelPendingPasskeyPrompt();
       const deviceName = isNativePlatform ? await resolveDeviceName() : undefined;
-      await adoptPasskeySession(await signInWithPasskey({ inBrowser, deviceName }));
+      await adoptPasskeySession(
+        await signInWithPasskey({ inBrowser, deviceName, next: searchParams.next })
+      );
     } catch (err) {
       reportPasskeyFailure(err);
     } finally {
@@ -552,7 +554,10 @@ const SignInCard = () => {
               <Link
                 className="text-primary underline-offset-4 hover:underline"
                 to="/start"
-                search={inviteCodeParam ? { invite_code: inviteCodeParam } : {}}
+                search={{
+                  ...(inviteCodeParam ? { invite_code: inviteCodeParam } : {}),
+                  ...(searchParams.next ? { next: searchParams.next } : {}),
+                }}
               >
                 {t("login.register")}
               </Link>

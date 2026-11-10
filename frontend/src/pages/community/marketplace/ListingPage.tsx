@@ -33,6 +33,7 @@ import { useMarketplaceListing } from "@/hooks/useMarketplace";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { minimumAgeFor, parseCommunityShelf } from "@/lib/marketplace";
 import { listingShownHere } from "@/lib/marketplaceCuration";
+import { returnPath } from "@/lib/returnPath";
 import { listingKindTool } from "@/lib/tools";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { readConfig, readDefinition } from "@/lib/widgets/definition";
@@ -64,7 +65,10 @@ import { ProjectListingPreview } from "./ProjectListingPreview";
 export function ListingPage() {
   const { t } = useTranslation(["marketplace", "plugins"]);
   const { publicId } = useParams({ strict: false }) as { publicId: string };
-  const { kind: shelf } = useSearch({ strict: false }) as { kind?: ListingKind };
+  const { kind: shelf, next } = useSearch({ strict: false }) as {
+    kind?: ListingKind;
+    next?: string;
+  };
   const gp = useCommunityPath();
 
   const listingQuery = useMarketplaceListing(publicId ?? null);
@@ -345,7 +349,12 @@ export function ListingPage() {
       )}
 
       {listing && isPlugin ? (
-        <InstallPluginDialog listing={listing} open={installing} onOpenChange={setInstalling} />
+        <InstallPluginDialog
+          listing={listing}
+          open={installing}
+          onOpenChange={setInstalling}
+          next={returnPath(next)}
+        />
       ) : listing && tool ? (
         <InstallListingDialog
           listing={listing}

@@ -9741,6 +9741,8 @@ export interface PluginAccessTokenResponse {
   token_type?: string;
   expires_in: number;
   scope: string;
+  id_token?: string | null;
+  refresh_token?: string | null;
 }
 
 export type PluginActionResultValues = { [key: string]: unknown };
@@ -10107,6 +10109,55 @@ export interface PluginServiceVendorSetupComplete {
  */
 export interface PluginServiceVendorSetupStart {
   organization?: string | null;
+}
+
+/**
+ * The request, and the place the person chose.
+ */
+export interface PluginSignInAuthorize {
+  client_id?: string | null;
+  redirect_uri?: string | null;
+  response_type?: string | null;
+  scope?: string | null;
+  state?: string | null;
+  nonce?: string | null;
+  code_challenge?: string | null;
+  code_challenge_method?: string | null;
+  /** @exclusiveMinimum 0 */
+  community_id: number;
+  initiative_id?: number | null;
+}
+
+/**
+ * The plug-in asking, once its client and return address check out.
+ */
+export interface PluginSignInClientRead {
+  name: string;
+  listing_public_id: string;
+  refusal_redirect?: string | null;
+  cancel_redirect: string;
+}
+
+/**
+ * Somewhere the person may open the plug-in.
+ */
+export interface PluginSignInPlaceRead {
+  community_id: number;
+  community_name: string;
+  initiative_id?: number | null;
+  initiative_name?: string | null;
+}
+
+export interface PluginSignInPlacesRead {
+  places: PluginSignInPlaceRead[];
+  installed_community_ids: number[];
+}
+
+/**
+ * Where to send the person: back to the plug-in, with a code.
+ */
+export interface PluginSignInRedirect {
+  redirect_to: string;
 }
 
 export type PluginSummaryReturnLabel = { [key: string]: string } | null;
@@ -13366,6 +13417,8 @@ export type IssuePluginAccessTokenBodyGrantType =
 export const IssuePluginAccessTokenBodyGrantType = {
   client_credentials: "client_credentials",
   "urn:ietf:params:oauth:grant-type:jwt-bearer": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+  authorization_code: "authorization_code",
+  refresh_token: "refresh_token",
 } as const;
 
 export type IssuePluginAccessTokenBodyClientAssertionType =
@@ -13394,6 +13447,10 @@ export type IssuePluginAccessTokenBody = {
   resource?: string;
   level?: IssuePluginAccessTokenBodyLevel;
   assertion?: string;
+  code?: string;
+  redirect_uri?: string;
+  code_verifier?: string;
+  refresh_token?: string;
 };
 
 export type ListPluginInstallationsParams = {
@@ -13403,6 +13460,28 @@ export type ListPluginInstallationsParams = {
    */
   limit?: number;
   cursor?: string | null;
+};
+
+export type ReadSignInClientParams = {
+  client_id?: string | null;
+  redirect_uri?: string | null;
+  response_type?: string | null;
+  scope?: string | null;
+  state?: string | null;
+  nonce?: string | null;
+  code_challenge?: string | null;
+  code_challenge_method?: string | null;
+};
+
+export type ReadSignInPlacesParams = {
+  client_id?: string | null;
+  redirect_uri?: string | null;
+  response_type?: string | null;
+  scope?: string | null;
+  state?: string | null;
+  nonce?: string | null;
+  code_challenge?: string | null;
+  code_challenge_method?: string | null;
 };
 
 export type ListPlacementCommunitiesParams = {

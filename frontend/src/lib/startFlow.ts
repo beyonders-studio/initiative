@@ -89,18 +89,34 @@ export const saveStartDraft = (answers: StartAnswers): void => {
 interface PendingStart {
   email: string;
   answers: StartAnswers;
+  /** The page that sent them to sign up, such as a plug-in's sign-in. */
+  next?: string;
 }
 
-/** Leave the answers for the first signed-in load of the account `email`. */
-export const savePendingStart = async (email: string, answers: StartAnswers): Promise<void> => {
-  await setItem(PENDING_KEY, JSON.stringify({ email: email.toLowerCase(), answers }));
+const readPending = (email: string): PendingStart | null => {
+  const pending = parse<PendingStart>(getItem(PENDING_KEY));
+  return pending && pending.email === email.toLowerCase() ? pending : null;
+};
+
+/** Leave the answers, and where to land after, for the first signed-in load
+ *  of the account `email`. */
+export const savePendingStart = async (
+  email: string,
+  answers: StartAnswers,
+  next?: string | null
+): Promise<void> => {
+  await setItem(
+    PENDING_KEY,
+    JSON.stringify({ email: email.toLowerCase(), answers, ...(next ? { next } : {}) })
+  );
 };
 
 /** The answers left for this account, if any were. */
-export const readPendingStart = (email: string): StartAnswers | null => {
-  const pending = parse<PendingStart>(getItem(PENDING_KEY));
-  return pending && pending.email === email.toLowerCase() ? current(pending.answers) : null;
-};
+export const readPendingStart = (email: string): StartAnswers | null =>
+  current(readPending(email)?.answers ?? null);
+
+/** Where the start left for this account lands, when a page sent them to it. */
+export const readPendingNext = (email: string): string | null => readPending(email)?.next ?? null;
 
 export const clearStart = async (): Promise<void> => {
   await Promise.all([removeItem(DRAFT_KEY), removeItem(PENDING_KEY)]);

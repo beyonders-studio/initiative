@@ -1640,6 +1640,25 @@ class PluginServiceMessages:
     SHARED_ROUTES_IN_USE = "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE"
 
 
+class PluginSignInMessages:
+    """Codes for Sign in with Initiative's own page, which a plug-in sent
+    somebody to. Shown there rather than sent back, because each one means the
+    request cannot be trusted to name where to send them."""
+
+    #: No live plug-in with pages answers to the request's ``client_id``.
+    UNKNOWN_CLIENT = "PLUGIN_SIGN_IN_UNKNOWN_CLIENT"
+    #: The plug-in's manifest declares no ``sign_in``.
+    NOT_OFFERED = "PLUGIN_SIGN_IN_NOT_OFFERED"
+    #: ``redirect_uri`` is not the one the plug-in's manifest names.
+    REDIRECT_MISMATCH = "PLUGIN_SIGN_IN_REDIRECT_MISMATCH"
+    #: The request is malformed: no state, no PKCE ``S256`` challenge, no nonce.
+    INVALID_REQUEST = "PLUGIN_SIGN_IN_INVALID_REQUEST"
+    #: The place chosen no longer admits the person, or holds no such plug-in.
+    PLACE_UNAVAILABLE = "PLUGIN_SIGN_IN_PLACE_UNAVAILABLE"
+    #: Signing in to a plug-in takes a signed-in session, not an API key.
+    SESSION_REQUIRED = "PLUGIN_SIGN_IN_SESSION_REQUIRED"
+
+
 class PluginMessages:
     """Codes for an installed plug-in calling a route with its access token."""
 

@@ -12,6 +12,9 @@ Both are served only when the deployment's address can carry a passkey at all
 They are JSON at their exact paths with no redirect, which is what Apple's and
 Google's verifiers fetch; every other ``/.well-known`` path answers 404 (the
 SPA catch-all reserves the prefix in ``app.main``).
+
+``openid-configuration`` is Sign in with Initiative's provider metadata, for
+plug-ins that people open at their own address.
 """
 
 from __future__ import annotations
@@ -68,6 +71,15 @@ async def apple_app_site_association() -> JSONResponse:
     return JSONResponse(
         {"webcredentials": {"apps": list(native_apps.IOS_APP_IDS)}}, headers=_CACHE
     )
+
+
+@router.get("/openid-configuration")
+async def openid_configuration() -> JSONResponse:
+    """Sign in with Initiative's provider metadata (OpenID Connect Discovery
+    1.0): where a plug-in's library finds the endpoints and keys."""
+    from app.services.marketplace import plugin_sign_in
+
+    return JSONResponse(plugin_sign_in.discovery_document(), headers=_CACHE)
 
 
 @router.get("/security.txt")

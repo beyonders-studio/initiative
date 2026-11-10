@@ -2592,6 +2592,24 @@ def _page(raw: Any, *, connection_ids: set[str]) -> dict[str, Any]:
     return cleaned
 
 
+def _sign_in(raw: Any, *, page_ids: set[str]) -> dict[str, str] | None:
+    """The page people land in at the plug-in's own address, and the path
+    Initiative sends them back to: one of the manifest's own pages, and a path
+    on the origin its pages are served from."""
+    if raw is None:
+        return None
+    sign_in = require_mapping(raw, "sign_in")
+    page = check_identifier(sign_in.get("page"), what="sign_in page")
+    if page not in page_ids:
+        fail(f"sign_in: {page!r} is not one of this plug-in's pages")
+    return {
+        "page": page,
+        "return_path": check_path(
+            sign_in.get("return_path"), what="sign_in return_path"
+        ),
+    }
+
+
 # --- what a plug-in adds to items -------------------------------------------
 
 
@@ -3419,6 +3437,7 @@ def normalize_service_plugin_definition(
         if page["id"] in page_ids:
             fail(f"service plug-in: two pages share the id {page['id']!r}")
         page_ids.add(page["id"])
+    sign_in = _sign_in(body.get("sign_in"), page_ids=page_ids)
 
     actions = [
         _action(
@@ -3514,6 +3533,8 @@ def normalize_service_plugin_definition(
         cleaned["widgets"] = widgets
     if pages:
         cleaned["pages"] = pages
+    if sign_in is not None:
+        cleaned["sign_in"] = sign_in
     if fields:
         cleaned["fields"] = fields
     if parts:

@@ -13,7 +13,7 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { buildRouterContext, renderPage } from "@/__tests__/helpers/render";
 import { asPhoneThatMayNotSell } from "@/__tests__/helpers/storeSelling";
 import { catalogUrl } from "@/hooks/useBillingCatalog";
-import { clearStart, readPendingStart } from "@/lib/startFlow";
+import { clearStart, readPendingNext, readPendingStart } from "@/lib/startFlow";
 import { routeTree } from "@/routeTree.gen";
 
 import { StartPage } from "./StartPage";
@@ -89,11 +89,14 @@ const register = vi.fn();
 /** The seeds the suggestions were asked for, in order. */
 const suggestionSeeds: (string | null)[] = [];
 
-const renderStart = (options: { inviteCode?: string; native?: boolean } = {}) => {
+const renderStart = (options: { inviteCode?: string; native?: boolean; next?: string } = {}) => {
   if (options.native) asPhoneThatMayNotSell();
   return renderPage(StartPage, {
     initialRoute: "/start",
-    routerSearch: options.inviteCode ? { invite_code: options.inviteCode } : undefined,
+    routerSearch: {
+      ...(options.inviteCode ? { invite_code: options.inviteCode } : {}),
+      ...(options.next ? { next: options.next } : {}),
+    },
     auth: { user: null, token: null, register },
     server: { isNativePlatform: options.native ?? false },
   });
@@ -274,14 +277,33 @@ describe("what the account is made with", () => {
   });
 });
 
-it("sends /register to /start with its invite", async () => {
+it("keeps where to land for the first sign-in when the address waits to be confirmed", async () => {
+  const next = "/oauth/authorize?client_id=acme.hoard&state=s";
+  renderStart({ next });
+
+  await heading("What brings you here?");
+  await press("Continue");
+  await chooseHandle();
+  await continueEnabled();
+  await press("Continue");
+  await heading("Your space");
+  await press("Continue");
+  await createAccount();
+
+  expect(readPendingNext("new@example.com")).toBe(next);
+});
+
+it("sends /register to /start with its invite and where to land after", async () => {
+  const next = "/oauth/authorize?client_id=acme.hoard&state=s";
   const router = createRouter({
     routeTree,
     context: buildRouterContext(),
-    history: createMemoryHistory({ initialEntries: ["/register?invite_code=abc123"] }),
+    history: createMemoryHistory({
+      initialEntries: [`/register?invite_code=abc123&next=${encodeURIComponent(next)}`],
+    }),
   });
   await router.load();
 
   await waitFor(() => expect(router.state.location.pathname).toBe("/start"));
-  expect(router.state.location.search).toEqual({ invite_code: "abc123" });
+  expect(router.state.location.search).toEqual({ invite_code: "abc123", next });
 });

@@ -2881,6 +2881,24 @@
           "ref": "page"
         }
       },
+      "sign_in": {
+        "type": "object",
+        "required": [
+          "page",
+          "return_path"
+        ],
+        "properties": {
+          "page": {
+            "ref": "identifier",
+            "description": "The id of one of this plug-in's pages: the page somebody lands in after signing in at the plug-in's own address. Who may open it is decided as for that page inside Initiative, so somebody signs in only to a place where they could open it there."
+          },
+          "return_path": {
+            "ref": "path",
+            "description": "Where Initiative sends somebody back with an authorization code: this path on the origin the deployment serves the plug-in's pages from. Matched exactly."
+          }
+        },
+        "description": "Sign in with Initiative: people may also open the plug-in at its own address, full-window, signing in with their Initiative account through OpenID Connect's authorization code flow. The ID token carries what the page handoff carries for the place they chose, and renews against Initiative. Needs 'pages'. Absent: the plug-in's pages open only inside Initiative."
+      },
       "dashboards": {
         "type": "array",
         "maxItems": "bundledDashboards",

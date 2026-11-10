@@ -30,6 +30,10 @@ class PluginAccessTokenResponse(BaseModel):
     expires_in: int
     #: The scopes the token carries, space-separated. Empty for a plug-in token.
     scope: str
+    #: Sign in with Initiative: the ID token for the place the person chose.
+    id_token: str | None = None
+    #: Sign in with Initiative: what the plug-in renews with.
+    refresh_token: str | None = None
 
 
 class PluginOAuthErrorResponse(BaseModel):

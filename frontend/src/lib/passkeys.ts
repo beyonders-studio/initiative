@@ -165,6 +165,8 @@ const viaApp = async (kind: PromptKind, options: unknown): Promise<unknown> => {
 interface SignInToFinish {
   verifier: string;
   deviceName: string;
+  /** Where the sign-in was headed, for a launch the answer starts afresh. */
+  next?: string;
 }
 
 /** A sign-in whose prompt is in the browser, with the prompt's id and the
@@ -239,7 +241,9 @@ const finishSignIn = (credential: unknown, { verifier, deviceName }: SignInToFin
  * sign-in it answers, begun on the server the app is still on, is finished
  * here, and its session is what this resolves to. Null for anything else.
  */
-export const takeBrowserAnswer = async (url: URL): Promise<Token | null> => {
+export const takeBrowserAnswer = async (
+  url: URL
+): Promise<{ token: Token; next?: string } | null> => {
   if (url.protocol !== "initiative:" || url.host !== "passkey" || url.pathname !== "/callback") {
     return null;
   }
@@ -255,7 +259,7 @@ export const takeBrowserAnswer = async (url: URL): Promise<Token | null> => {
   if (!kept || !credential) return null;
   const signIn = JSON.parse(kept) as SignInToFinish & { prompt: string; origin: string };
   return signIn.prompt === prompt && signIn.origin === serverOrigin()
-    ? finishSignIn(JSON.parse(credential), signIn)
+    ? { token: await finishSignIn(JSON.parse(credential), signIn), next: signIn.next }
     : null;
 };
 
@@ -313,6 +317,9 @@ export interface PasskeySignInOptions {
   inBrowser?: boolean;
   /** What to call the device the app is running on, for the sign-in record. */
   deviceName?: string;
+  /** Where the sign-in is headed: kept with an app's prompt in the browser,
+   *  for when the phone closes the app before the answer comes back. */
+  next?: string | null;
 }
 
 /**
@@ -326,10 +333,15 @@ export const signInWithPasskey = async ({
   conditional = false,
   inBrowser = false,
   deviceName,
+  next,
 }: PasskeySignInOptions = {}): Promise<Token> => {
   const pair = await pkcePair();
   const begun = await beginPasskeySignIn({ code_challenge: pair.challenge });
-  const signIn = { verifier: pair.verifier, deviceName: deviceName ?? "" };
+  const signIn: SignInToFinish = {
+    verifier: pair.verifier,
+    deviceName: deviceName ?? "",
+    ...(next ? { next } : {}),
+  };
   const credential = await runPrompt("get", begun.options, { conditional, inBrowser, signIn });
   return finishSignIn(credential, signIn);
 };
