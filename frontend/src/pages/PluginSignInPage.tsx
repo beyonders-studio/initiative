@@ -158,9 +158,16 @@ const ChoosePlace = ({
 }) => {
   const { t } = useTranslation(["auth", "common"]);
   const { user, logout } = useAuth();
-  const placesQuery = useReadSignInPlaces(params, { query: { retry: false } });
+  // Read afresh each time the page opens: somebody returning from adding the
+  // plug-in to a community must see it there.
+  const placesQuery = useReadSignInPlaces(params, {
+    query: { retry: false, refetchOnMount: "always" },
+  });
   const authorize = useAuthorizeSignIn();
-  const places = placesQuery.data?.places ?? [];
+  // Only an answer read since the page opened counts, so a cached one never
+  // offers, or opens, a place that is no longer there.
+  const read = placesQuery.isFetchedAfterMount && !placesQuery.isError;
+  const places = read ? (placesQuery.data?.places ?? []) : [];
 
   const open = (place: PluginSignInPlaceRead) =>
     authorize.mutate(
@@ -198,7 +205,21 @@ const ChoosePlace = ({
     </>
   );
 
-  if (placesQuery.isLoading || places.length === 1) {
+  // A read that failed says nothing about where the plug-in is.
+  if (placesQuery.isError) {
+    return (
+      <Frame title={t("pluginSignIn.title")} footer={footer}>
+        <p className="text-center text-destructive text-sm">
+          {getErrorMessage(placesQuery.error, "auth:pluginSignIn.placesFailed")}
+        </p>
+        <Button className="w-full" onClick={() => void placesQuery.refetch()}>
+          {t("common:tryAgain")}
+        </Button>
+      </Frame>
+    );
+  }
+
+  if (!read || places.length === 1) {
     return (
       <Frame title={t("pluginSignIn.opening", { name: client.name })} footer={footer}>
         <SkeletonRegion>

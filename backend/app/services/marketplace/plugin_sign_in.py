@@ -35,8 +35,9 @@ plug-in's session at its next renewal.
 **A plug-in learns what a handoff tells it, and nothing more.** The ID token
 carries the handoff's claims: the member by the reference this plug-in knows them
 by in that community, and nothing about their name, address or other
-communities. Its issuer is the deployment's own address, and its ``typ`` is
-``JWT``, so it is never taken for a handoff, nor a handoff for it.
+communities. Its issuer is the deployment's own address, its audience the
+plug-in's ``client_id`` (its public id), and its ``typ`` is ``JWT``, so it is
+never taken for a handoff, nor a handoff for it.
 """
 
 from __future__ import annotations
@@ -71,7 +72,7 @@ from app.core.plugin_access_token import (
     ACCESS_TOKEN_LIFETIME_SECONDS,
     seal_plugin_token,
 )
-from app.core.security import plugin_platform_audience, sign_eddsa
+from app.core.security import sign_eddsa
 from app.db import cohorts
 from app.db import session as db_session
 from app.db.guild_standing import GuildContext
@@ -708,7 +709,9 @@ async def _issue(
     payload: dict[str, Any] = {
         "jti": str(uuid.uuid4()),
         "iss": issuer(),
-        "aud": plugin_platform_audience(client.public_id),
+        # OpenID Connect Core §2: the client_id it was issued to, which is the
+        # plug-in's public id. A handoff names ``initiative-plugin:<id>``.
+        "aud": client.public_id,
         "iat": now,
         "exp": now + ID_TOKEN_LIFETIME_SECONDS,
         **claims,

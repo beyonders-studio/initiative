@@ -42,8 +42,8 @@ export function useDeepLinks() {
       // refused one leaves the sign-in page up, to press again.
       const signedIn = await takeBrowserAnswer(url).catch(() => null);
       if (signedIn) {
-        await applySignIn(signedIn);
-        await router.navigate({ to: "/", replace: true });
+        await applySignIn(signedIn.token);
+        await resumeAfterSignIn(signedIn.next);
         return;
       }
       if (!isSignInCallback(url)) return;

@@ -236,7 +236,9 @@ const SignInCard = () => {
       // aside for the one the person just asked for.
       cancelPendingPasskeyPrompt();
       const deviceName = isNativePlatform ? await resolveDeviceName() : undefined;
-      await adoptPasskeySession(await signInWithPasskey({ inBrowser, deviceName }));
+      await adoptPasskeySession(
+        await signInWithPasskey({ inBrowser, deviceName, next: searchParams.next })
+      );
     } catch (err) {
       reportPasskeyFailure(err);
     } finally {

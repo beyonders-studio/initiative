@@ -157,7 +157,7 @@ def _claims(id_token: str) -> dict:
     return jwt.decode(
         id_token,
         options={"verify_signature": False},
-        audience=f"initiative-plugin:{CLIENT}",
+        audience=CLIENT,
     )
 
 

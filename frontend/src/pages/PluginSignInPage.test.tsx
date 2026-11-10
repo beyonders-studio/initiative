@@ -123,4 +123,24 @@ describe("PluginSignInPage", () => {
     ).toBeInTheDocument();
     expect(authorized).toEqual([]);
   });
+
+  it("says a failed read failed, rather than that the plug-in is missing", async () => {
+    server.use(
+      http.get("/api/v1/plugin-platform/oauth/authorize/places", () =>
+        HttpResponse.json({ detail: "boom" }, { status: 500 })
+      )
+    );
+    renderPage(PluginSignInPage, {
+      ...PAGE,
+      auth: { user: buildUser(), loading: false },
+      communities: {
+        communities: [buildCommunity({ role: "superadmin" })],
+        canCreateCommunities: true,
+      },
+    });
+
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Add Hoard/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Start a community/ })).not.toBeInTheDocument();
+  });
 });
