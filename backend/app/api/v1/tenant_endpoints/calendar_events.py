@@ -307,6 +307,13 @@ async def _serialized_event(
             if occurrence is not None
             else await occurrences_service.answers_on(session, event)
         ),
+        upcoming=occurrences_service.next_event(
+            event,
+            await occurrences_service.overrides(session, event),
+            datetime.now(UTC),
+        )
+        if event.recurrence
+        else None,
     )
 
 

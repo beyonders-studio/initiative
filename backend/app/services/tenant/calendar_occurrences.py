@@ -122,6 +122,39 @@ async def overrides(
     )
 
 
+def next_event(
+    series: CalendarEvent, rows: Iterable[CalendarEvent], now: datetime
+) -> tuple[datetime, datetime] | None:
+    """A repeating series' first event at or after ``now``, as ``(start,
+    occurrence)``: when it starts, a moved one at its new time, and its start
+    in the series, which names it. None once none is still to come."""
+    if not series.recurrence:
+        return None
+    moved = {
+        _utc(row.original_start): _utc(row.start_at)
+        for row in rows
+        if row.original_start is not None
+    }
+    plain = next(
+        (
+            start
+            for start in recurrence.starting(
+                series.recurrence,
+                series.start_at,
+                series.recurrence_shift,
+                now,
+                len(moved) + 1,
+            )
+            if start not in moved
+        ),
+        None,
+    )
+    events = [(start, at) for at, start in moved.items() if start >= now]
+    if plain is not None:
+        events.append((plain, plain))
+    return min(events, default=None)
+
+
 def has_plain_from(
     series: CalendarEvent, at: datetime, changed: Iterable[datetime]
 ) -> bool:

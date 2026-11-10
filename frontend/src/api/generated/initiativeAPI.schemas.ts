@@ -2210,6 +2210,8 @@ export interface CalendarEventRead {
   overridden_fields: string[];
   skipped_starts: string[];
   extra_starts: string[];
+  next_start: string | null;
+  next_occurrence: string | null;
 }
 
 export type CalendarEventUpdateScope =
