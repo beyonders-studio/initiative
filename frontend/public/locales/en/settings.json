@@ -2247,6 +2247,7 @@
     },
     "rungFixed": "Who a role is for can't change once it is made.",
     "surfacesLabel": "What it holds",
+    "pluginsLabel": "What it holds of the plug-ins",
     "notYours": "You don't hold this yourself, so you can't give it.",
     "holdsNothing": "Holds nothing yet.",
     "builtIn": "Built-in",

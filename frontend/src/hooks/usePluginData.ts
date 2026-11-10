@@ -131,7 +131,8 @@ export const pluginParamOptionsKey = (
   pluginId: number,
   endpointId: string,
   param: string,
-  params: Record<string, unknown> | undefined
+  params: Record<string, unknown> | undefined,
+  initiativeId: number
 ) =>
   [
     "plugin-param-options",
@@ -139,6 +140,7 @@ export const pluginParamOptionsKey = (
     pluginId,
     endpointId,
     param,
+    initiativeId,
     JSON.stringify(Object.entries(params ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))),
   ] as const;
 
@@ -147,6 +149,8 @@ export interface PluginParamOptionsQuery {
   endpointId: string | undefined;
   param: string;
   params?: Record<string, unknown>;
+  /** The initiative the form is filled in. */
+  initiativeId: number;
   enabled?: boolean;
 }
 
@@ -168,6 +172,7 @@ export const usePluginParamOptions = ({
   endpointId,
   param,
   params,
+  initiativeId,
   enabled = true,
 }: PluginParamOptionsQuery) => {
   const communityId = useActiveCommunityId();
@@ -180,7 +185,14 @@ export const usePluginParamOptions = ({
     endpointId.length > 0;
 
   return useQuery<PluginParamOptionsResponse>({
-    queryKey: pluginParamOptionsKey(communityId, pluginId ?? 0, endpointId ?? "", param, params),
+    queryKey: pluginParamOptionsKey(
+      communityId,
+      pluginId ?? 0,
+      endpointId ?? "",
+      param,
+      params,
+      initiativeId
+    ),
     queryFn: () =>
       getPluginParamOptions({
         communityId,
@@ -188,6 +200,7 @@ export const usePluginParamOptions = ({
         endpointId: endpointId as string,
         param,
         params,
+        initiativeId,
       }),
     enabled: ready,
     staleTime: 60_000,

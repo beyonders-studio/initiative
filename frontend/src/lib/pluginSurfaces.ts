@@ -11,21 +11,22 @@
  *
  * A surface says where it renders; *who* may open it there is the server's
  * answer (`surface_access`), computed by the same decision the handoff mint
- * makes: the placement's roles inside an initiative, the community's admins at
- * the community level and on an `admin_only` surface. Nothing here decides
- * access — this decides what is worth offering, so a reader is not handed a
- * door that would not open.
+ * makes: whether the reader holds the permission the surface names, where it is
+ * opened. Nothing here decides access — this decides what is worth offering, so
+ * a reader is not handed a door that would not open.
  */
 
+import type { TFunction } from "i18next";
+
+import type { PluginPermissionRead } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute, TOOLS, toolListRoute } from "@/lib/tools";
+import { localized } from "@/lib/widgets/widgetMeta";
 
 export interface PluginPage {
   id: string;
   path: string;
   /** Where it renders. Absent means community-wide, the only placement there was. */
   scopes?: string[];
-  /** Opened by the community's admins alone, whatever a placement allows. */
-  admin_only?: boolean;
   /** Localized label, keyed by language. */
   name?: Record<string, string>;
   /** Browser features the surface asked its frame for, from the closed
@@ -58,23 +59,10 @@ export interface PluginSurfaceSource {
   tool?: string | null;
   artifacts?: { type: string; id: number }[];
   definition?: Record<string, unknown> | null;
-  /** The initiatives the seat placed this plug-in in, one entry each. */
-  placements?: { initiative_id: number }[] | null;
-  /** Where the viewer may open each surface. */
+  /** Where the viewer may open each surface: only ever where the plug-in is
+   *  placed. */
   surface_access?: SurfaceAccess[] | null;
 }
-
-/**
- * Whether a plug-in's initiative surfaces appear in one initiative.
- *
- * A plug-in appears only where it was placed. Placement is the community's own
- * answer to where a plug-in belongs, so it reads the same for everyone — an admin
- * who left an initiative out left it out for themselves too.
- */
-export const placedIn = (
-  plugin: Pick<PluginSurfaceSource, "placements">,
-  initiativeId: number
-): boolean => (plugin.placements ?? []).some((one) => one.initiative_id === initiativeId);
 
 /** The pages a definition declares for one scope, whoever reads. */
 export const declaredPages = (
@@ -124,9 +112,9 @@ export const pluginHasConnections = (definition?: Record<string, unknown> | null
 /**
  * Whether a plug-in has anything to place in an initiative: a page rendering
  * there, or fields, sections or actions on items, which the server draws in
- * the item's initiative to whoever the placement's roles admit, as it opens a
- * page. The same rule as a listing's `has_initiative_surfaces`, read off the
- * pinned definition.
+ * the item's initiative to whoever holds the permission each names there, as it
+ * opens a page. The same rule as a listing's `has_initiative_surfaces`, read
+ * off the pinned definition.
  */
 export const hasInitiativeSurfaces = (definition?: Record<string, unknown> | null): boolean =>
   declaredPages(definition, "initiative").length > 0 ||
@@ -168,8 +156,49 @@ export const initiativePluginPath = (
   plugin: PluginSurfaceSource & { id: number },
   initiativeId: number
 ): string | null => {
-  if (plugin.tool || !placedIn(plugin, initiativeId)) return null;
+  if (plugin.tool) return null;
   return pluginPages(plugin, initiativeId).length
     ? `${initiativeRoute(initiativeId)}/plugins/${plugin.id}`
     : null;
 };
+
+/** The permission every plug-in has at each level, declared or not. */
+const USE = "use";
+
+/**
+ * A pinned definition's permissions, as the server lists an install's: inside
+ * initiatives, then across the community, each level's `use` first, declared
+ * or not, then the rest in the definition's order.
+ */
+export const pluginPermissions = (
+  definition: Record<string, unknown> | null | undefined
+): PluginPermissionRead[] => {
+  const entries = Array.isArray(definition?.permissions)
+    ? (definition.permissions as Partial<PluginPermissionRead>[])
+    : [];
+  return (["initiative", "community"] as const).flatMap((level) => {
+    const declared = entries
+      .filter((entry) => typeof entry?.id === "string" && entry.level === level)
+      .map((entry) => ({
+        id: entry.id as string,
+        level,
+        name: entry.name ?? null,
+        members: entry.members === true,
+      }));
+    const use = declared.find((entry) => entry.id === USE);
+    return [
+      use ?? { id: USE, level, name: null, members: false },
+      ...declared.filter((entry) => entry !== use),
+    ];
+  });
+};
+
+/** What a permission is called: its own name, or, for a `use` the plug-in did
+ *  not name, the word every plug-in's is called by. */
+export const permissionName = (
+  permission: Pick<PluginPermissionRead, "id" | "name">,
+  language: string,
+  t: TFunction<any>
+): string =>
+  localized(permission.name ?? undefined, language) ??
+  (permission.id === USE ? t("plugins:permissions.use" as never) : permission.id);

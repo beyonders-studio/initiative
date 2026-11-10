@@ -4101,12 +4101,24 @@ export type CommunityPluginDetailSettingValues = { [key: string]: unknown };
 
 export type CommunityPluginDetailPluginNames = { [key: string]: string };
 
+export type PluginPermissionReadLevel =
+  (typeof PluginPermissionReadLevel)[keyof typeof PluginPermissionReadLevel];
+
+export const PluginPermissionReadLevel = {
+  initiative: "initiative",
+  community: "community",
+} as const;
+
+export type PluginPermissionReadName = { [key: string]: string } | null;
+
 /**
- * One initiative a plug-in is placed in, and who may open it there.
+ * One of a plug-in's permissions, as the community's role pages list it.
  */
-export interface PluginPlacementRead {
-  initiative_id: number;
-  role_ids: number[];
+export interface PluginPermissionRead {
+  id: string;
+  level: PluginPermissionReadLevel;
+  name: PluginPermissionReadName;
+  members: boolean;
 }
 
 /**
@@ -4119,6 +4131,16 @@ export interface PluginSurfaceAccessRead {
   surface_id: string;
   openable_community_wide: boolean;
   openable_initiatives: number[];
+}
+
+/**
+ * What of a plug-in the viewer meets on the items of one initiative.
+ */
+export interface PluginItemAccessRead {
+  initiative_id: number;
+  fields: string[];
+  parts: string[];
+  actions: string[];
 }
 
 export type CommunityPluginSettingReadLabel = { [key: string]: string };
@@ -4231,12 +4253,10 @@ export interface CommunityPluginDetail {
   avatar_url: string | null;
   features: string[];
   definition: CommunityPluginDetailDefinition;
-  placements: PluginPlacementRead[];
+  placed_initiative_ids: number[];
+  permissions: PluginPermissionRead[];
   surface_access: PluginSurfaceAccessRead[];
-  item_initiatives: number[];
-  item_fields: string[];
-  item_parts: string[];
-  item_actions: string[];
+  item_access: PluginItemAccessRead[];
   setting_values: CommunityPluginDetailSettingValues;
   granted_scopes: string[];
   mandatory: boolean;
@@ -4278,8 +4298,9 @@ export interface CommunityPluginHandoff {
  *
  * The definition comes from the catalog, and the content the install creates
  * is made server-side. What the request adds is the seat's answer to the
- * install dialog: what the plug-in may reach, where it appears, and who opens it
- * there. The install, its grant and its placements are one transaction.
+ * install dialog: what the plug-in may reach and where it appears. Who uses it
+ * there is each initiative's roles' answer. The install, its grant and its
+ * placements are one transaction.
  */
 export interface CommunityPluginInstall {
   /** @maxLength 14 */
@@ -4290,8 +4311,6 @@ export interface CommunityPluginInstall {
   /** @maxItems 64 */
   callers?: number[];
   placements?: "all" | number[];
-  /** @maxItems 10 */
-  role_kinds?: string[];
 }
 
 export type CommunityPluginReadDefinition = { [key: string]: unknown };
@@ -4316,12 +4335,10 @@ export interface CommunityPluginRead {
   avatar_url: string | null;
   features: string[];
   definition: CommunityPluginReadDefinition;
-  placements: PluginPlacementRead[];
+  placed_initiative_ids: number[];
+  permissions: PluginPermissionRead[];
   surface_access: PluginSurfaceAccessRead[];
-  item_initiatives: number[];
-  item_fields: string[];
-  item_parts: string[];
-  item_actions: string[];
+  item_access: PluginItemAccessRead[];
   setting_values: CommunityPluginReadSettingValues;
   granted_scopes: string[];
   mandatory: boolean;
@@ -5372,6 +5389,18 @@ export interface CustomRoleClaimRuleUpdate {
   role_id?: number | null;
 }
 
+/**
+ * One installed plug-in's community permission.
+ */
+export interface PluginPermissionRef {
+  install_id: number;
+  /**
+   * @minLength 1
+   * @maxLength 64
+   */
+  permission: string;
+}
+
 export interface CustomRoleCreate {
   /**
    * @minLength 1
@@ -5380,6 +5409,8 @@ export interface CustomRoleCreate {
   name: string;
   base_rung: CommunityRole;
   surfaces?: AdminSurface[];
+  /** @maxItems 1000 */
+  plugin_permissions?: PluginPermissionRef[];
 }
 
 export interface CustomRoleHolder {
@@ -5403,12 +5434,14 @@ export interface CustomRoleRead {
   name: string;
   base_rung: CommunityRole;
   surfaces: AdminSurface[];
+  plugin_permissions?: PluginPermissionRef[];
   set_by: SetBy;
 }
 
 export interface CustomRoleUpdate {
   name?: string | null;
   surfaces?: AdminSurface[] | null;
+  plugin_permissions?: PluginPermissionRef[] | null;
 }
 
 /**
@@ -7177,6 +7210,7 @@ export interface HeldChangeOutcome {
 
 export interface HeldSurfacesRead {
   surfaces: AdminSurface[];
+  plugin_permissions?: PluginPermissionRef[];
 }
 
 /**
@@ -7494,15 +7528,54 @@ export const PermissionKey = {
 } as const;
 
 /**
+ * An answer for one installed plug-in's initiative permission: a role's,
+ * or what members hold in every initiative.
+ */
+export interface PluginPermissionRule {
+  install_id: number;
+  /**
+   * @minLength 1
+   * @maxLength 64
+   */
+  permission: string;
+  enabled: boolean;
+}
+
+/**
+ * One plug-in's initiative permission, and initiatives that answer it.
+ */
+export interface PluginPermissionInitiatives {
+  install_id: number;
+  permission: string;
+  initiative_ids: number[];
+}
+
+/**
  * What the community sets for every initiative in it. A tool or a member
  * permission absent here is each initiative's own to set.
  */
 export interface InitiativeDefaultsRead {
   tools: Partial<Record<Tool, boolean>>;
   member_permissions: Partial<Record<PermissionKey, boolean>>;
+  plugin_member_permissions: PluginPermissionRule[];
   custom_roles: boolean;
   own_tools: Partial<Record<Tool, number[]>>;
   own_member_permissions: Partial<Record<PermissionKey, number[]>>;
+  own_plugin_member_permissions: PluginPermissionInitiatives[];
+}
+
+/**
+ * What members hold of one plug-in's initiative permission in every
+ * initiative; ``null`` hands it back to each initiative.
+ */
+export interface PluginPermissionDefault {
+  install_id: number;
+  /**
+   * @minLength 1
+   * @maxLength 64
+   */
+  permission: string;
+  enabled: boolean | null;
 }
 
 /**
@@ -7512,6 +7585,8 @@ export interface InitiativeDefaultsRead {
 export interface InitiativeDefaultsUpdate {
   tools?: Partial<Record<Tool, boolean | null>>;
   member_permissions?: Partial<Record<PermissionKey, boolean | null>>;
+  /** @maxItems 1000 */
+  plugin_member_permissions?: PluginPermissionDefault[];
   custom_roles?: boolean | null;
 }
 
@@ -7695,6 +7770,7 @@ export interface InitiativeRoleRead {
   override_share_restrictions: boolean;
   position: number;
   permissions: Partial<Record<PermissionKey, boolean>>;
+  plugin_permissions: PluginPermissionRule[];
   member_count: number;
 }
 
@@ -7705,6 +7781,7 @@ export interface InitiativeRoleUpdate {
   display_name?: string | null;
   is_manager?: boolean | null;
   permissions?: Partial<Record<PermissionKey, boolean>> | null;
+  plugin_permissions?: PluginPermissionRule[] | null;
 }
 
 /**
@@ -9860,7 +9937,7 @@ export interface PluginDataReturn {
  */
 export interface PluginEndpointRead {
   id: string;
-  admin_only?: boolean;
+  permission?: string | null;
   cache_ttl_seconds?: number;
   params?: PluginDataParam[];
   returns?: PluginDataReturn[];
@@ -9902,18 +9979,6 @@ export interface PluginParamOption {
 export interface PluginParamOptionsResponse {
   options?: PluginParamOption[];
   unavailable?: string | null;
-}
-
-/**
- * Who may open a plug-in's surfaces in one initiative.
- *
- * The whole set: a role left out is no longer allowed. Every id must be a
- * role of that initiative. An empty list places the plug-in with no role, so
- * only guild admins open it there.
- */
-export interface PluginPlacementUpdate {
-  /** @maxItems 200 */
-  role_ids?: number[];
 }
 
 /**
@@ -14226,6 +14291,8 @@ export type ReadPluginParamOptionsParams = {
   param: string;
   /** What the form has answered so far, as a JSON object. Only the answers a source's `needs` names are ever forwarded. */
   params?: string | null;
+  /** The initiative the form is filled in: the dashboard's, or the item's an action runs on. An endpoint naming a permission answers only where the caller holds it. */
+  initiative_id?: number | null;
 };
 
 export type UninstallCommunityPluginParams = {

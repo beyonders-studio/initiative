@@ -67,6 +67,8 @@ export interface HeldSurfaces {
   isLoading: boolean;
   /** Whether the reader holds `surface` in the community. */
   holds: (surface: AdminSurface) => boolean;
+  /** Whether the reader holds one installed plug-in's community permission. */
+  holdsPluginPermission: (installId: number, permission: string) => boolean;
   /** Whether the reader holds any part of running it. */
   holdsAny: boolean;
   /** Whether the reader may change what they hold, not only read it. */
@@ -84,9 +86,10 @@ export interface HeldSurfaces {
 }
 
 /**
- * The parts of running a community the reader holds: every one for an admin
- * with no custom role, a role's otherwise, none for a plain member. A live
- * settings grant answers for the configuration parts at the rung it lends.
+ * The parts of running a community the reader holds, and the plug-ins'
+ * community permissions: every one for an admin with no custom role, a role's
+ * otherwise, none for a plain member. A live settings grant answers for the
+ * configuration parts at the rung it lends, and gives any plug-in permission.
  *
  * Until the server answers (or where it cannot), the rung answers: an admin
  * holds every part, a member none. A caller that must not show an admin a part
@@ -124,14 +127,28 @@ export const useHeldSurfaces = (
       own.includes(surface) || (lent && SETTINGS_GRANT_SURFACES.includes(surface)),
     [own, lent]
   );
+  const ownPlugins = query.data ? (query.data.plugin_permissions ?? []) : null;
+  const holdsPluginPermission = useCallback(
+    (installId: number, permission: string) =>
+      lent ||
+      (ownPlugins === null
+        ? Boolean(rungAnswer)
+        : ownPlugins.some((one) => one.install_id === installId && one.permission === permission)),
+    [ownPlugins, lent, rungAnswer]
+  );
   const holdsAny = ADMIN_SURFACES.some(holds);
   // What the server allows, so nobody is offered a change it must refuse. A
   // settings grant answers for itself.
   const managesAdmins = lent || ADMIN_SURFACES.every(holds);
   const gives = useCallback(
     (role: CustomRoleRead) =>
-      lent || (role.surfaces.every(holds) && (role.base_rung !== "admin" || administers)),
-    [lent, holds, administers]
+      lent ||
+      (role.surfaces.every(holds) &&
+        (role.plugin_permissions ?? []).every((one) =>
+          holdsPluginPermission(one.install_id, one.permission)
+        ) &&
+        (role.base_rung !== "admin" || administers)),
+    [lent, holds, holdsPluginPermission, administers]
   );
   const takesOff = useCallback(
     (role: CustomRoleRead) => gives(role) && (role.base_rung !== "admin" || managesAdmins),
@@ -140,6 +157,7 @@ export const useHeldSurfaces = (
   return {
     isLoading: asked && query.isPending,
     holds,
+    holdsPluginPermission,
     holdsAny,
     // The admin rung writes where the server says it may; a member writes
     // what their role gives them.

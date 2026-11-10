@@ -79,6 +79,10 @@ export interface PluginParamOptionsRequest {
   /** What the form has answered so far. Only the answers the source's own
    *  `needs` names are forwarded — the rest never leaves this process. */
   params?: Record<string, unknown>;
+  /** The initiative the form is filled in: the dashboard's, or the item's an
+   *  action runs on. An endpoint naming a permission answers where the caller
+   *  holds it there. */
+  initiativeId: number;
 }
 
 /**
@@ -96,6 +100,7 @@ export const getPluginParamOptions = ({
   endpointId,
   param,
   params,
+  initiativeId,
 }: PluginParamOptionsRequest) =>
   apiClient
     .get<PluginParamOptionsResponse>(
@@ -103,6 +108,7 @@ export const getPluginParamOptions = ({
       {
         params: {
           param,
+          initiative_id: initiativeId,
           ...(params && Object.keys(params).length ? { params: JSON.stringify(params) } : {}),
         },
       }

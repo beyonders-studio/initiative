@@ -264,6 +264,69 @@ describe("initiative settings sections", () => {
     expect(screen.getByText(/sets this for every initiative/)).toBeInTheDocument();
   });
 
+  it("lists each placed plug-in's permissions on a role, and saves the one changed", async () => {
+    const patches: Record<string, unknown>[] = [];
+    stubInitiative();
+    server.use(
+      communityHttp.get("/plugins/", () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 3,
+              name: "CI",
+              permissions: [
+                { id: "use", level: "initiative", name: null, members: false },
+                { id: "export", level: "initiative", name: { en: "Export builds" }, members: true },
+                { id: "use", level: "community", name: null, members: false },
+              ],
+            },
+          ],
+        })
+      ),
+      communityHttp.get("/initiatives/:id/roles", () =>
+        HttpResponse.json([
+          buildInitiativeRole({
+            id: 2,
+            name: "member",
+            display_name: "Member",
+            is_builtin: true,
+            plugin_permissions: [
+              { install_id: 3, permission: "use", enabled: false },
+              { install_id: 3, permission: "export", enabled: true },
+            ],
+          }),
+        ])
+      ),
+      communityHttp.get("/initiatives/defaults", () =>
+        HttpResponse.json({
+          tools: {},
+          member_permissions: {},
+          plugin_member_permissions: [{ install_id: 3, permission: "export", enabled: true }],
+          custom_roles: true,
+        })
+      ),
+      communityHttp.patch("/initiatives/:id/roles/:roleId", async ({ request }) => {
+        patches.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 2 });
+      })
+    );
+
+    renderSection(RolesPage, "roles");
+
+    // Export is the community's for members, shown as its value; use is the
+    // role's own, and only the one changed is sent.
+    const use = await screen.findByRole("switch", { name: "CI: Use" });
+    await waitFor(() =>
+      expect(screen.queryByRole("switch", { name: "CI: Export builds" })).not.toBeInTheDocument()
+    );
+    expect(screen.getByText("Export builds")).toBeInTheDocument();
+    await userEvent.click(use);
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toEqual({
+      plugin_permissions: [{ install_id: 3, permission: "use", enabled: true }],
+    });
+  });
+
   /**
    * A permission for a tool the initiative has switched off grants nothing —
    * the mirror of the details screen never mentioning roles. The roles screen

@@ -9,6 +9,7 @@ import type {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import {
   EXTRA_PERMISSION_KEYS,
   PERMISSION_LABEL_KEYS,
@@ -18,6 +19,7 @@ import {
   useUpdateRole,
 } from "@/hooks/useInitiativeRoles";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
+import { permissionName } from "@/lib/pluginSurfaces";
 import {
   isToolEnabled,
   SIDEBAR_TOOLS,
@@ -245,14 +247,19 @@ const InitiativeSettingsRolesTab = ({
   onDeleteRole,
   onRenameRole,
 }: InitiativeSettingsRolesTabProps) => {
-  const { t } = useTranslation(["initiatives", "common"]);
+  const { t, i18n } = useTranslation(["initiatives", "common", "plugins"]);
 
   const rolesQuery = useInitiativeRoles(initiativeId || null);
   // What the community set for every initiative: the built-in member role's
   // permissions it set are shown, not changed, and it may keep initiatives to
-  // their built-in roles.
+  // their built-in roles. A plug-in's permission is keyed by its install.
   const defaults = useInitiativeDefaults().data;
-  const memberLocked = new Set(Object.keys(defaults?.member_permissions ?? {}));
+  const memberLocked = new Set([
+    ...Object.keys(defaults?.member_permissions ?? {}),
+    ...(defaults?.plugin_member_permissions ?? []).map(
+      (rule) => `${rule.install_id}:${rule.permission}`
+    ),
+  ]);
   // What the community set for members holds for the built-in Member role,
   // and for every custom role that is not a manager's while it keeps
   // initiatives to their built-in roles.
@@ -263,8 +270,24 @@ const InitiativeSettingsRolesTab = ({
       : NOTHING_LOCKED;
   const updateRoleMutation = useUpdateRole(initiativeId);
   const deleteRoleMutation = useDeleteRole(initiativeId);
+  const plugins = useCommunityPlugins().data?.items ?? [];
 
   const tools = splitToolsForRoleEditing(initiative);
+
+  /** Each plug-in placed here, its initiative permissions named as it
+   *  declares them, with the role's answer to each. */
+  const pluginRules = (role: InitiativeRoleRead) =>
+    plugins.flatMap((install) => {
+      const rules = install.permissions.flatMap((permission) => {
+        const rule = role.plugin_permissions.find(
+          (one) => one.install_id === install.id && one.permission === permission.id
+        );
+        return permission.level === "initiative" && rule
+          ? [{ permission, enabled: rule.enabled }]
+          : [];
+      });
+      return rules.length > 0 ? [{ install, rules }] : [];
+    });
 
   // Every manager role holds every permission by construction, so each gets a
   // card that says what it is. Project Manager used to render sixteen switches
@@ -411,6 +434,49 @@ const InitiativeSettingsRolesTab = ({
                           }
                         />
                       )}
+                    </div>
+                  ))}
+
+                  {/* Each plug-in placed here, as the plug-in names what
+                      it asks to be allowed. */}
+                  {pluginRules(role).map(({ install, rules }) => (
+                    <div key={install.id} className="space-y-3 border-t pt-3">
+                      <p className="font-medium text-sm">{install.name}</p>
+                      {rules.map(({ permission, enabled }) => {
+                        const key = `${install.id}:${permission.id}`;
+                        const name = permissionName(permission, i18n.language, t);
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="min-w-0 flex-1 text-sm">{name}</span>
+                            {lockedFor(role).has(key) ? (
+                              <SetByCommunity on={enabled} t={translate} />
+                            ) : (
+                              <Switch
+                                checked={enabled}
+                                disabled={!canManageMembers || updateRoleMutation.isPending}
+                                aria-label={t("plugins:permissions.named", {
+                                  plugin: install.name,
+                                  permission: name,
+                                })}
+                                onCheckedChange={(on) =>
+                                  updateRoleMutation.mutate({
+                                    roleId: role.id,
+                                    data: {
+                                      plugin_permissions: [
+                                        {
+                                          install_id: install.id,
+                                          permission: permission.id,
+                                          enabled: on,
+                                        },
+                                      ],
+                                    },
+                                  })
+                                }
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
 

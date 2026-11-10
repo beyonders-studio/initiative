@@ -327,7 +327,11 @@
       "view": "Los miembros pueden ver {{items}}.",
       "notView": "Los miembros no pueden ver {{items}}.",
       "create": "Los miembros pueden crear {{items}}.",
-      "notCreate": "Los miembros no pueden crear {{items}}."
+      "notCreate": "Los miembros no pueden crear {{items}}.",
+      "plugin": {
+        "on": "Los miembros tienen «{{permission}}».",
+        "off": "Solo los responsables tienen «{{permission}}»."
+      }
     },
     "extra": {
       "dashboards_run_as_initiative": {
@@ -338,14 +342,15 @@
     "addTitle": "Añadir una regla",
     "editTitle": "Regla de {{tool}}",
     "dialogDescription": "Elige lo que se aplica en todas las iniciativas, también en las que se añadan después. Lo que dejes a cada iniciativa sigue siendo suyo.",
-    "toolLabel": "Herramienta",
+    "toolLabel": "Herramienta o complemento",
     "question": {
       "tool": "¿Está {{tool}} activado?",
       "view": "¿Pueden los miembros ver {{items}}?",
       "create": "¿Pueden los miembros crear {{items}}?",
       "extra": {
         "dashboards_run_as_initiative": "¿Pueden los miembros ejecutar un panel como la iniciativa?"
-      }
+      },
+      "plugin": "¿Tienen los miembros «{{permission}}»?"
     },
     "answer": {
       "tool": {
@@ -383,6 +388,10 @@
           "on": "Permite a los miembros ejecutar un panel como la iniciativa en {{names}}.",
           "off": "Impide a los miembros ejecutar un panel como la iniciativa en {{names}}."
         }
+      },
+      "plugin": {
+        "on": "Da a los miembros «{{permission}}» en {{names}}.",
+        "off": "Quita a los miembros «{{permission}}» en {{names}}."
       }
     },
     "save": "Guardar regla",

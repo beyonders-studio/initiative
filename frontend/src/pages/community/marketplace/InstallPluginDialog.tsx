@@ -12,8 +12,10 @@
  * 2. **Where it appears.** Only for a plug-in with a page inside initiatives, or
  *    fields, sections or actions on items: every current initiative, or the
  *    ones picked here.
- * 3. **Who can open it there.** Built-in roles, moderators by default, applied
- *    to every initiative it is placed in.
+ * 3. **Who can use it.** Nothing to choose: each permission the plug-in
+ *    declares, with whether members start with it and where it is changed
+ *    afterwards, an initiative's on its Roles page and the community's on the
+ *    community's.
  * 4. **Which plug-ins can use it.** The ones already here that ask to, all
  *    ticked to start. A plug-in is never asked about using one the community
  *    does not have, so this is where that question comes up.
@@ -37,7 +39,12 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { listingShownHere } from "@/lib/marketplaceCuration";
 import { toast } from "@/lib/mascotToast";
 import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes";
-import { communityPluginPath, declaredPages } from "@/lib/pluginSurfaces";
+import {
+  communityPluginPath,
+  declaredPages,
+  permissionName,
+  pluginPermissions,
+} from "@/lib/pluginSurfaces";
 import type { DialogProps } from "@/types/dialog";
 import { Checkbox } from "@/ui/checkbox";
 import {
@@ -63,29 +70,25 @@ export interface InstallPluginDialogProps extends DialogProps {
   next?: string | null;
 }
 
-/** The built-in initiative roles the seat may let open the plug-in. */
-export const ROLE_KINDS = ["moderator", "project_manager", "member"] as const;
-type RoleKind = (typeof ROLE_KINDS)[number];
-
 export function InstallPluginDialog({
   listing,
   open,
   onOpenChange,
   next,
 }: InstallPluginDialogProps) {
-  const { t } = useTranslation(["plugins", "common", "nav"]);
+  const { t, i18n } = useTranslation(["plugins", "common", "nav"]);
   const navigate = useNavigate();
   const gp = useCommunityPath();
 
   const requested = listing.requested_scopes ?? [];
   const grantable = new Set(listing.grantable_scopes ?? []);
-  // A page inside initiatives, or fields, sections or actions on items: the
-  // roles chosen here say who opens the page and who is drawn the rest.
+  // A page inside initiatives, or fields, sections or actions on items.
   const placesInInitiatives = listing.has_initiative_surfaces ?? false;
   const hasPage = declaredPages(listing.definition, "initiative").length > 0;
   // A plug-in reaches content only in the initiatives it is placed in, so one
   // that asks for any access is placed too, whether or not it has a page.
   const placeable = placesInInitiatives || requested.length > 0;
+  const permissions = pluginPermissions(listing.definition);
 
   const [name, setName] = useState(listing.name);
   // Every scope the server allows starts ticked, bar a standing; the seat
@@ -95,7 +98,6 @@ export function InstallPluginDialog({
   );
   const [where, setWhere] = useState<"all" | "some">("all");
   const [picked, setPicked] = useState<number[]>([]);
-  const [roles, setRoles] = useState<RoleKind[]>(["moderator"]);
   const callers = listing.callers ?? [];
   const [allowedCallers, setAllowedCallers] = useState<number[]>(() =>
     callers.map((caller) => caller.id)
@@ -109,7 +111,6 @@ export function InstallPluginDialog({
         name: name.trim() || listing.name,
         granted_scopes: scopes,
         placements: !placeable ? [] : where === "all" ? "all" : picked,
-        role_kinds: placesInInitiatives ? roles : [],
         callers: allowedCallers,
       },
       {
@@ -125,11 +126,6 @@ export function InstallPluginDialog({
           if (path) navigate({ to: gp(path) });
         },
       }
-    );
-
-  const toggleRole = (role: RoleKind, on: boolean) =>
-    setRoles((current) =>
-      on ? [...new Set([...current, role])] : current.filter((one) => one !== role)
     );
 
   // Only the catalogue this app shows can be installed from it.
@@ -229,33 +225,27 @@ export function InstallPluginDialog({
           </section>
         )}
 
-        {placesInInitiatives && (
-          <section className="space-y-2" aria-labelledby="install-plugin-who">
-            <div>
-              <h3 id="install-plugin-who" className="font-medium text-sm">
-                {t("plugins:install.whoTitle")}
-              </h3>
-              <p className="text-muted-foreground text-xs">
-                {t("plugins:placement.roles.adminsAlways")}
-              </p>
-            </div>
-            <div className="space-y-2">
-              {ROLE_KINDS.map((role) => (
-                <div key={role} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`install-plugin-role-${role}`}
-                    checked={roles.includes(role)}
-                    disabled={install.isPending}
-                    onCheckedChange={(state) => toggleRole(role, state === true)}
-                  />
-                  <Label htmlFor={`install-plugin-role-${role}`} className="font-normal">
-                    {t(`plugins:install.roles.${role}` as never)}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        <section className="space-y-2" aria-labelledby="install-plugin-who">
+          <h3 id="install-plugin-who" className="font-medium text-sm">
+            {t("plugins:install.whoTitle")}
+          </h3>
+          <ul className="space-y-2">
+            {permissions.map((permission) => (
+              <li key={`${permission.level}:${permission.id}`} className="space-y-0.5">
+                <p className="text-sm">{permissionName(permission, i18n.language, t)}</p>
+                <p className="text-muted-foreground text-xs">
+                  {t(
+                    permission.level === "community"
+                      ? "plugins:install.permissions.community"
+                      : permission.members
+                        ? "plugins:install.permissions.initiativeMembers"
+                        : "plugins:install.permissions.initiativeManagers"
+                  )}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         {callers.length > 0 && (
           <section className="space-y-2" aria-labelledby="install-plugin-callers">

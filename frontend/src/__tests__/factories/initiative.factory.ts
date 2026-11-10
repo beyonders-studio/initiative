@@ -114,6 +114,7 @@ export function buildInitiativeRole(
     override_share_restrictions: false,
     position: counter,
     permissions: { ...defaults, ...permissions },
+    plugin_permissions: [],
     member_count: 0,
     ...rest,
   };

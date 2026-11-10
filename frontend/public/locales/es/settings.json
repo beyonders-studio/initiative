@@ -2247,6 +2247,7 @@
     },
     "rungFixed": "Para quién es un rol no se puede cambiar una vez creado.",
     "surfacesLabel": "Qué incluye",
+    "pluginsLabel": "Qué incluye de los complementos",
     "notYours": "No tienes esto tú mismo, así que no puedes darlo.",
     "holdsNothing": "Aún no incluye nada.",
     "builtIn": "Integrado",

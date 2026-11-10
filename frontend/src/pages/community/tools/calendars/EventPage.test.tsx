@@ -213,10 +213,14 @@ describe("an event's page", () => {
                 ],
                 actions: [{ id: "rerun", name: { en: "Run again" }, on, menu: true }],
               },
-              item_initiatives: [1],
-              item_fields: ["ci.state", "ci.url", "task.only"],
-              item_parts: ["builds"],
-              item_actions: ["rerun"],
+              item_access: [
+                {
+                  initiative_id: 1,
+                  fields: ["ci.state", "ci.url", "task.only"],
+                  parts: ["builds"],
+                  actions: ["rerun"],
+                },
+              ],
             },
           ],
         })

@@ -2247,6 +2247,7 @@
     },
     "rungFixed": "À qui s'adresse un rôle ne peut plus changer une fois qu'il est créé.",
     "surfacesLabel": "Ce qu'il comprend",
+    "pluginsLabel": "Ce qu'il comprend des plug-ins",
     "notYours": "Vous ne l'avez pas vous-même, vous ne pouvez donc pas le donner.",
     "holdsNothing": "Ne comprend encore rien.",
     "builtIn": "Intégré",

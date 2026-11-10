@@ -204,10 +204,12 @@ describe("configuring a plug-in widget", () => {
     expect(await screen.findByRole("option", { name: "north" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "south" })).toBeInTheDocument();
 
-    // And it asked the plug-in, for that parameter, rather than guessing.
+    // And it asked the plug-in, for that parameter in the dashboard's
+    // initiative, rather than guessing.
     const asked = apiGet.mock.calls.find(([url]) => isOptions(url));
     expect(asked?.[0]).toContain(encodeURIComponent(ORDERS));
     expect(asked?.[1]?.params?.param).toBe("shop");
+    expect(asked?.[1]?.params?.initiative_id).toBe(7);
   });
 
   it("saves the chosen value onto the binding's own params", async () => {

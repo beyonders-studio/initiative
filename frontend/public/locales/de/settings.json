@@ -2247,6 +2247,7 @@
     },
     "rungFixed": "Für wen eine Rolle ist, lässt sich nach dem Anlegen nicht mehr ändern.",
     "surfacesLabel": "Was sie umfasst",
+    "pluginsLabel": "Was sie von den Plug-ins umfasst",
     "notYours": "Das hast du selbst nicht, also kannst du es nicht vergeben.",
     "holdsNothing": "Umfasst noch nichts.",
     "builtIn": "Integriert",

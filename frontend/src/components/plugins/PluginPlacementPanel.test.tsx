@@ -34,37 +34,8 @@ const mutateAsync = vi.fn((body: unknown) => {
   return new Promise<object>((resolve) => release.push(() => resolve({})));
 });
 
-/** Every role save, as the hook was called with it. */
-const roleSaves: unknown[] = [];
-const setRoles = vi.fn(
-  (
-    variables: { initiativeId: number; roleIds: number[] },
-    handlers?: { onSuccess?: (placement: { role_ids: number[] }) => void }
-  ) => {
-    roleSaves.push(variables);
-    handlers?.onSuccess?.({ role_ids: variables.roleIds });
-  }
-);
-
 vi.mock("@/hooks/useCommunityPlugins", () => ({
   useUpdateCommunityPlugin: () => ({ mutateAsync }),
-  useSetPluginPlacementRoles: () => ({ mutate: setRoles, isPending: false }),
-}));
-
-/** The initiatives whose roles were asked for. */
-const rolesAskedFor: Array<number | null> = [];
-
-vi.mock("@/hooks/useInitiativeRoles", () => ({
-  useInitiativeRoles: (initiativeId: number | null) => {
-    rolesAskedFor.push(initiativeId);
-    return {
-      isLoading: false,
-      data: [
-        { id: 11, display_name: "Project manager" },
-        { id: 12, display_name: "Member" },
-      ],
-    };
-  },
 }));
 
 let roster = [
@@ -86,16 +57,16 @@ const initiativePage = { id: "board", path: "/board", scopes: ["initiative"] };
 const taskField = { key: "estimate", kind: "text", on: ["task"] };
 
 /**
- * An install placed in these initiatives, each allowing ``roleIds``. It shows
- * a page inside initiatives unless ``page`` is false, and the ``fields`` given.
+ * An install placed in these initiatives. It shows a page inside initiatives
+ * unless ``page`` is false, and the ``fields`` given.
  */
-const plugin = (placed: number[], roleIds: number[] = [], page = true, fields: object[] = []) =>
+const plugin = (placed: number[], page = true, fields: object[] = []) =>
   ({
     id: 7,
     name: "Automations",
     definition: { pages: page ? [initiativePage] : [], fields },
     requested_scopes: ["projects:read"],
-    placements: placed.map((initiative_id) => ({ initiative_id, role_ids: roleIds })),
+    placed_initiative_ids: placed,
   }) as unknown as CommunityPluginDetail;
 
 beforeEach(() => {
@@ -103,9 +74,6 @@ beforeEach(() => {
   release = [];
   holdSaves = false;
   mutateAsync.mockClear();
-  roleSaves.length = 0;
-  setRoles.mockClear();
-  rolesAskedFor.length = 0;
   roster = [
     { id: 1, name: "Platform" },
     { id: 2, name: "Marketing" },
@@ -222,70 +190,44 @@ describe("PluginPlacementPanel", () => {
     expect(sent).toEqual([]);
   });
 
-  describe("who can open it", () => {
-    it("loads an initiative's roles only when its chooser opens", async () => {
+  describe("where its roles are set", () => {
+    const rolesLink = (name: string) => screen.queryByRole("link", { name: `Roles in ${name}` });
+
+    it("links each initiative it is placed in to that initiative's Roles screen", async () => {
       renderPage(() => <PluginPlacementPanel plugin={plugin([1])} />);
 
-      const trigger = await screen.findByLabelText("Who can open it in Platform");
-      expect(trigger).toHaveTextContent("Community admins only");
-      // Marketing is not placed, so it has no chooser at all.
-      expect(screen.queryByLabelText("Who can open it in Marketing")).toBeNull();
-      expect(rolesAskedFor.filter((id) => id !== null)).toEqual([]);
-
-      trigger.click();
-      expect(await screen.findByText("Community admins can always open it.")).toBeTruthy();
-      expect(new Set(rolesAskedFor)).toEqual(new Set([1]));
+      await screen.findByLabelText("Platform");
+      expect(rolesLink("Platform")?.getAttribute("href")).toMatch(/\/i\/1\/settings\/roles$/);
+      // Marketing is not placed, so its roles have nothing of the plug-in.
+      expect(rolesLink("Marketing")).toBeNull();
+      expect(screen.getByText(/Each initiative's roles say who uses it there/)).toBeTruthy();
     });
 
-    it("saves the whole role set for that one initiative", async () => {
-      renderPage(() => <PluginPlacementPanel plugin={plugin([1], [11])} />);
+    it("links every placement when placed everywhere", async () => {
+      renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2])} />);
 
-      const trigger = await screen.findByLabelText("Who can open it in Platform");
-      expect(trigger).toHaveTextContent("1 role");
-      trigger.click();
-
-      expect(await screen.findByLabelText("Project manager")).toBeChecked();
-      (await screen.findByLabelText("Member")).click();
-      await waitFor(() => expect(roleSaves).toEqual([{ initiativeId: 1, roleIds: [11, 12] }]));
-      expect(screen.getByLabelText("Member")).toBeChecked();
-
-      screen.getByLabelText("Project manager").click();
-      await waitFor(() => expect(roleSaves[1]).toEqual({ initiativeId: 1, roleIds: [12] }));
-      // Roles never go through the whole-selection save.
-      expect(sent).toEqual([]);
+      expect(await screen.findByRole("link", { name: "Roles in Platform" })).toBeTruthy();
+      expect(rolesLink("Marketing")).toBeTruthy();
     });
 
-    it("offers the roles of each placement when placed everywhere", async () => {
-      renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2], [11, 12])} />);
-
-      expect(await screen.findByLabelText("Who can open it in Platform")).toHaveTextContent(
-        "2 roles"
-      );
-      expect(screen.getByLabelText("Who can open it in Marketing")).toBeTruthy();
-    });
-
-    it("offers no roles for a plug-in with no page inside initiatives", async () => {
-      renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2], [11], false)} />);
+    it("links no roles for a plug-in with no page inside initiatives", async () => {
+      renderPage(() => <PluginPlacementPanel plugin={plugin([1, 2], false)} />);
 
       expect(
         await screen.findByText(
           "This plug-in reads and changes things only in the initiatives you choose."
         )
       ).toBeTruthy();
-      expect(screen.queryByLabelText("Who can open it in Platform")).toBeNull();
+      expect(rolesLink("Platform")).toBeNull();
     });
 
-    it("offers roles for a plug-in with a field on items and no page", async () => {
-      // The roles say who is drawn the field on an item there, as they would
-      // say who opens a page.
-      renderPage(() => <PluginPlacementPanel plugin={plugin([1], [11], false, [taskField])} />);
+    it("links roles for a plug-in with a field on items and no page", async () => {
+      // The roles say who is drawn the field on an item there, as they say
+      // who opens a page.
+      renderPage(() => <PluginPlacementPanel plugin={plugin([1], false, [taskField])} />);
 
-      expect(
-        await screen.findByText(
-          "This plug-in reads and changes things only in the initiatives you choose."
-        )
-      ).toBeTruthy();
-      expect(screen.getByLabelText("Who can open it in Platform")).toHaveTextContent("1 role");
+      await screen.findByLabelText("Platform");
+      expect(rolesLink("Platform")).toBeTruthy();
     });
   });
 });

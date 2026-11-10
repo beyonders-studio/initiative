@@ -4,8 +4,9 @@
  * What matters is what reaches the server: every scope the server allows is
  * granted unless the seat unticks it, a scope it does not allow can never be
  * sent, placement is asked of a plug-in with a page inside initiatives or access
- * to reach there, moderators open a page unless the seat says otherwise, and the
- * plug-ins here that ask to use it may unless the seat unticks them.
+ * to reach there, and the plug-ins here that ask to use it may unless the seat
+ * unticks them. Who uses it is the roles' answer afterwards, so the dialog says
+ * which permissions there are and where each is changed.
  */
 
 import { screen, waitFor } from "@testing-library/react";
@@ -66,7 +67,7 @@ beforeEach(() => {
 });
 
 describe("InstallPluginDialog", () => {
-  it("grants everything the server allows, everywhere, to moderators by default", async () => {
+  it("grants everything the server allows, everywhere, by default", async () => {
     open();
 
     expect(await screen.findByLabelText("Read projects")).toBeChecked();
@@ -77,7 +78,6 @@ describe("InstallPluginDialog", () => {
       name: "WidgetCo",
       granted_scopes: ["projects:read", "members:read"],
       placements: "all",
-      role_kinds: ["moderator"],
       callers: [],
     });
   });
@@ -102,31 +102,57 @@ describe("InstallPluginDialog", () => {
     expect((await install()).granted_scopes).toEqual(["projects:read"]);
   });
 
-  it("places it in the initiatives picked, for the roles chosen", async () => {
+  it("places it in the initiatives picked", async () => {
     open();
 
     (await screen.findByLabelText("Only the initiatives I choose")).click();
     (await screen.findByLabelText("Kitchen")).click();
-    (await screen.findByLabelText("Project managers")).click();
     await waitFor(() => expect(screen.getByLabelText("Kitchen")).toBeChecked());
 
-    const body = await install();
-    expect(body.placements).toEqual([12]);
-    expect(body.role_kinds).toEqual(["moderator", "project_manager"]);
+    expect((await install()).placements).toEqual([12]);
   });
 
-  it("places a plug-in with access but no page, and asks nothing about roles", async () => {
+  it("places a plug-in with access but no page", async () => {
     open({ has_initiative_surfaces: false });
 
     expect(await screen.findByText("Where it works")).toBeInTheDocument();
     expect(
       screen.getByText("It reads and changes things only in the initiatives you choose.")
     ).toBeInTheDocument();
-    expect(screen.queryByText("Who can open it there")).not.toBeInTheDocument();
 
-    const body = await install();
-    expect(body.placements).toEqual("all");
-    expect(body.role_kinds).toEqual([]);
+    expect((await install()).placements).toEqual("all");
+  });
+
+  it("names each permission, whether members start with it, and where it is changed", async () => {
+    open({
+      definition: {
+        permissions: [
+          { id: "export", level: "initiative", name: { en: "Export builds" }, members: true },
+          { id: "settings", level: "community", name: { en: "Settings" } },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Who can use it")).toBeInTheDocument();
+    // Use at each level, named by the app where the plug-in names it not.
+    expect(screen.getAllByText("Use")).toHaveLength(2);
+    expect(screen.getByText("Export builds")).toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "In each initiative, managers start with it. Give it to other roles on the initiative's Roles screen."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "In each initiative, every role starts with it. Change that on the initiative's Roles screen."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        "Across the community, admins hold it. Choose the custom admin roles that keep it on the community's Roles screen."
+      )
+    ).toHaveLength(2);
   });
 
   it("asks to use another plug-in by that plug-in's name, and grants it", async () => {
@@ -187,7 +213,6 @@ describe("InstallPluginDialog", () => {
 
     await screen.findByRole("button", { name: "Add to community" });
     expect(screen.queryByText("Where it works")).not.toBeInTheDocument();
-    expect(screen.queryByText("Who can open it there")).not.toBeInTheDocument();
     expect((await install()).placements).toEqual([]);
   });
 });

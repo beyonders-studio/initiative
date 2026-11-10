@@ -61,19 +61,19 @@
     "whereTitle": "Wo es arbeitet",
     "whereDescription": "Es zeigt seine Seite und liest und ändert Inhalte nur in den Initiativen, die du auswählst.",
     "whereDescriptionNoPage": "Es liest und ändert Inhalte nur in den Initiativen, die du auswählst.",
-    "whoTitle": "Wer es dort öffnen kann",
+    "whoTitle": "Wer es verwenden kann",
     "callersTitle": "Plug-ins, die es verwenden dürfen",
     "callersDescription": "Diese Plug-ins in deiner Community möchten {{name}} verwenden. Jedes, das angehakt bleibt, darf es.",
-    "roles": {
-      "moderator": "Moderation",
-      "project_manager": "Projektleitung",
-      "member": "Mitglieder"
-    },
     "entitlementRequired": "Dieses Plug-in muss für eure Community eingerichtet werden, bevor es hinzugefügt werden kann.",
     "entitlementAction": "Optionen ansehen",
     "termFull": "Der Plan dieser Installation hat keinen freien Platz für {{name}}.",
     "termFullRequest": "Anfragen",
-    "termFullAskAdmins": "Bitte die Admins eurer Community, es anzufragen."
+    "termFullAskAdmins": "Bitte die Admins eurer Community, es anzufragen.",
+    "permissions": {
+      "initiativeMembers": "In jeder Initiative haben es zunächst alle Rollen. Ändere das im Rollen-Bildschirm der Initiative.",
+      "initiativeManagers": "In jeder Initiative haben es zunächst die Manager. Gib es anderen Rollen im Rollen-Bildschirm der Initiative.",
+      "community": "In der ganzen Community haben es die Administratoren. Wähle im Rollen-Bildschirm der Community die eigenen Administrator-Rollen, die es behalten."
+    }
   },
   "connections": {
     "none": "Dieses Plug-in verlangt keine Einrichtung.",
@@ -201,12 +201,9 @@
     "some": "Nur ausgewählte Initiativen",
     "none": "Keine Initiative ausgewählt – dieses Plug-in erreicht nichts innerhalb von Initiativen.",
     "roles": {
-      "open": "Wer es in {{name}} öffnen kann",
-      "title": "Wer es hier öffnen kann",
-      "adminsAlways": "Community-Admins können es immer öffnen.",
-      "adminsOnly": "Nur Community-Admins",
-      "count_one": "{{count}} Rolle",
-      "count_other": "{{count}} Rollen"
+      "open": "Rollen in {{name}}",
+      "link": "Rollen",
+      "note": "Die Rollen jeder Initiative legen in ihrem Rollen-Bildschirm fest, wer es dort verwendet."
     }
   },
   "connected": {
@@ -334,5 +331,9 @@
     "provided": "Diese Community hat es hinzugefügt, und sein Herausgeber stellt es bereit – nicht Initiative.",
     "report": "Stimmt etwas nicht? Melde es.",
     "continue": "Weiter"
+  },
+  "permissions": {
+    "use": "Verwenden",
+    "named": "{{plugin}}: {{permission}}"
   }
 }

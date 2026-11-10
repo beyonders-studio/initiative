@@ -61,19 +61,19 @@
     "whereTitle": "Où il travaille",
     "whereDescription": "Il affiche sa page, et lit et modifie le contenu, uniquement dans les initiatives que vous choisissez.",
     "whereDescriptionNoPage": "Il lit et modifie le contenu uniquement dans les initiatives que vous choisissez.",
-    "whoTitle": "Qui peut l'y ouvrir",
+    "whoTitle": "Qui peut l'utiliser",
     "callersTitle": "Plug-ins qui peuvent l'utiliser",
     "callersDescription": "Ces plug-ins de votre communauté demandent à utiliser {{name}}. Chacun que vous laissez coché le pourra.",
-    "roles": {
-      "moderator": "Modérateurs",
-      "project_manager": "Chefs de projet",
-      "member": "Membres"
-    },
     "entitlementRequired": "Ce plug-in doit être activé pour votre communauté avant de pouvoir être ajouté.",
     "entitlementAction": "Voir les options",
     "termFull": "L'offre de ce déploiement n'a plus de place libre pour {{name}}.",
     "termFullRequest": "Demander",
-    "termFullAskAdmins": "Demandez aux administrateurs de votre communauté d'en faire la demande."
+    "termFullAskAdmins": "Demandez aux administrateurs de votre communauté d'en faire la demande.",
+    "permissions": {
+      "initiativeMembers": "Dans chaque initiative, tous les rôles l'ont au départ. Modifiez cela sur l'écran Rôles de l'initiative.",
+      "initiativeManagers": "Dans chaque initiative, les responsables l'ont au départ. Accordez-le à d'autres rôles sur l'écran Rôles de l'initiative.",
+      "community": "Dans toute la communauté, les administrateurs l'ont. Choisissez sur l'écran Rôles de la communauté les rôles d'administrateur personnalisés qui le gardent."
+    }
   },
   "connections": {
     "none": "Ce plug-in ne demande aucune configuration.",
@@ -201,12 +201,9 @@
     "some": "Uniquement les initiatives que je choisis",
     "none": "Aucune initiative choisie : ce plug-in n'atteint rien à l'intérieur des initiatives.",
     "roles": {
-      "open": "Qui peut l'ouvrir dans {{name}}",
-      "title": "Qui peut l'ouvrir ici",
-      "adminsAlways": "Les administrateurs de la communauté peuvent toujours l'ouvrir.",
-      "adminsOnly": "Administrateurs de la communauté uniquement",
-      "count_one": "{{count}} rôle",
-      "count_other": "{{count}} rôles"
+      "open": "Rôles dans {{name}}",
+      "link": "Rôles",
+      "note": "Les rôles de chaque initiative indiquent qui l'y utilise, sur son écran Rôles."
     }
   },
   "connected": {
@@ -334,5 +331,9 @@
     "provided": "Cette communauté l'a ajouté, et c'est son éditeur qui le fournit, pas Initiative.",
     "report": "Un problème ? Signalez-le.",
     "continue": "Continuer"
+  },
+  "permissions": {
+    "use": "Utiliser",
+    "named": "{{plugin}} : {{permission}}"
   }
 }

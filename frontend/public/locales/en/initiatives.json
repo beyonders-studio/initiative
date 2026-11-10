@@ -327,7 +327,11 @@
       "view": "Members can view {{items}}.",
       "notView": "Members can't view {{items}}.",
       "create": "Members can create {{items}}.",
-      "notCreate": "Members can't create {{items}}."
+      "notCreate": "Members can't create {{items}}.",
+      "plugin": {
+        "on": "Members have “{{permission}}”.",
+        "off": "Only managers have “{{permission}}”."
+      }
     },
     "extra": {
       "dashboards_run_as_initiative": {
@@ -338,14 +342,15 @@
     "addTitle": "Add a rule",
     "editTitle": "Rule for {{tool}}",
     "dialogDescription": "Pick what holds in every initiative, including ones added later. Anything left to each initiative stays theirs.",
-    "toolLabel": "Tool",
+    "toolLabel": "Tool or plug-in",
     "question": {
       "tool": "Is {{tool}} turned on?",
       "view": "Can members view {{items}}?",
       "create": "Can members create {{items}}?",
       "extra": {
         "dashboards_run_as_initiative": "Can members run a dashboard as the initiative?"
-      }
+      },
+      "plugin": "Do members have “{{permission}}”?"
     },
     "answer": {
       "tool": {
@@ -383,6 +388,10 @@
           "on": "Lets members run a dashboard as the initiative in {{names}}.",
           "off": "Stops members running a dashboard as the initiative in {{names}}."
         }
+      },
+      "plugin": {
+        "on": "Gives members “{{permission}}” in {{names}}.",
+        "off": "Takes “{{permission}}” from members in {{names}}."
       }
     },
     "save": "Save rule",

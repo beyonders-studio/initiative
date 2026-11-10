@@ -15,11 +15,9 @@ import type {
   CommunityPluginUpdate,
   ItemKind,
   PluginActionResult,
-  PluginPlacementRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   installCommunityPlugin,
-  putCommunityPluginPlacement,
   putCommunityPluginScopes,
   runPluginAction,
   uninstallCommunityPlugin,
@@ -95,27 +93,6 @@ export const useUninstallCommunityPlugin = (options?: MutationOpts<void, Uninsta
     {
       mutationFn: (communityId, { pluginId, erase }) =>
         uninstallCommunityPlugin(communityId, pluginId, erase ? { erase: true } : undefined),
-      invalidate: () => invalidate(q.plugins()),
-      errorKey: "plugins:error",
-    },
-    options
-  );
-};
-
-export interface PluginPlacementRoles {
-  initiativeId: number;
-  roleIds: number[];
-}
-
-/** Place the plug-in in one initiative with exactly these roles. */
-export const useSetPluginPlacementRoles = (
-  pluginId: number,
-  options?: MutationOpts<PluginPlacementRead, PluginPlacementRoles>
-) => {
-  return useCommunityMutation<PluginPlacementRead, PluginPlacementRoles>(
-    {
-      mutationFn: (communityId, { initiativeId, roleIds }) =>
-        putCommunityPluginPlacement(communityId, pluginId, initiativeId, { role_ids: roleIds }),
       invalidate: () => invalidate(q.plugins()),
       errorKey: "plugins:error",
     },
