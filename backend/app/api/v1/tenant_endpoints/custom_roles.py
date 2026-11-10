@@ -6,7 +6,7 @@ Each write is refused here with the reason, and by the policies on
 (``app.db.guild_ddl``): nobody writes or gives a role holding a surface or a
 plug-in permission they do not hold, a role on the admin rung takes an admin,
 only a role on the admin rung keeps plug-in permissions, and taking one off an
-admin takes somebody who holds every surface. While the deployment has closed
+admin takes somebody who holds every surface and plug-in permission. While the deployment has closed
 ``surface.custom_roles`` nothing here changes, and the roles the community has
 keep applying. A role the deployment defined is given here and changed only by
 billing's sync, and its name is the deployment's.
@@ -146,7 +146,8 @@ async def _require_takes_off(
     session: AsyncSession, context: GuildContext, role: CustomRole
 ) -> None:
     """The writer may take ``role`` off its holders: as giving it, and an
-    admin's only while holding every surface, since it widens them."""
+    admin's only while holding everything the admin rung holds, since it
+    widens them to all of it."""
     await _require_gives_role(session, context, role)
     if (
         CommunityRole(role.base_rung) is CommunityRole.admin

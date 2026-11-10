@@ -3,7 +3,7 @@ nobody makes, gives or takes off a role past what they hold."""
 
 from app.core.messages import CustomRoleMessages, GuildMessages
 from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface, CommunityRole
 from app.services.platform import rules
 from app.testing import create_guild_plugin
 
@@ -137,6 +137,20 @@ async def test_a_narrowed_admin_hands_out_no_more_than_it_holds(
     assert beyond.json()["detail"] == CustomRoleMessages.CUSTOM_ROLE_BEYOND_YOURS
 
     widens = await _give(client, narrowed, narrowed.user.id, None)
+    assert widens.status_code == 403
+    assert widens.json()["detail"] == CustomRoleMessages.CUSTOM_ROLE_WIDENS_AN_ADMIN
+    # Every surface and no plug-in permission: taking it off would widen them
+    # to every plug-in permission, so it is not every job.
+    jobs = await _make(
+        client,
+        admin,
+        name="Every job",
+        base_rung="admin",
+        surfaces=[surface.value for surface in AdminSurface],
+    )
+    whole = await acting_user(guild_role=CommunityRole.admin, guild=admin.guild)
+    assert (await _give(client, admin, whole.user.id, jobs)).status_code == 204
+    widens = await _give(client, whole, whole.user.id, None)
     assert widens.status_code == 403
     assert widens.json()["detail"] == CustomRoleMessages.CUSTOM_ROLE_WIDENS_AN_ADMIN
 

@@ -472,10 +472,13 @@ async def update_role_permissions(
 ) -> InitiativeRoleModel:
     """Update permissions for a role: tools' keys, and plug-ins' initiative
     permissions by install."""
-    answers = [(None, key, on) for key, on in permissions.items()] + [
-        (rule.install_id, rule.permission, rule.enabled) for rule in plugin_permissions
-    ]
-    for install_id, perm_key, enabled in answers:
+    # One answer per key, the last given winning.
+    answers: dict[tuple[int | None, str], bool] = {
+        (None, key): on for key, on in permissions.items()
+    } | {
+        (rule.install_id, rule.permission): rule.enabled for rule in plugin_permissions
+    }
+    for (install_id, perm_key), enabled in answers.items():
         existing = next(
             (
                 p

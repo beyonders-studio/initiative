@@ -2667,8 +2667,9 @@ async def test_a_role_holds_a_plug_in_s_permissions_as_it_holds_a_tool_s(
     member_role = next(r for r in roles if r["name"] == "member")
     role_url = f"{roles_url}/{member_role['id']}"
     use = {"install_id": plugin.id, "permission": "use", "enabled": True}
+    # The same answer twice is one answer.
     changed = await client.patch(
-        role_url, headers=admin.headers, json={"plugin_permissions": [use]}
+        role_url, headers=admin.headers, json={"plugin_permissions": [use, use]}
     )
     assert changed.status_code == 200, changed.text
     assert await answers("member") == {"use": True, "prices": True}

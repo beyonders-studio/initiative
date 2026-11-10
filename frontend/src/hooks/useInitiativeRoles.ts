@@ -51,7 +51,8 @@ export const useUpdateRole = (initiativeId: number) => {
     ) => updateInitiativeRole(communityId, initiativeId, roleId, data),
     invalidate: () => {
       toast.success(t("settings.roleUpdated"));
-      return invalidate(q.initiativeRoles(initiativeId), q.allInitiatives());
+      // And what the reader meets of each plug-in, which the role may decide.
+      return invalidate(q.initiativeRoles(initiativeId), q.allInitiatives(), q.plugins());
     },
     errorKey: "initiatives:settings.roleUpdateError",
   });
@@ -221,8 +222,9 @@ export const useSetInitiativeDefaults = () => {
       void queryClient.invalidateQueries({
         queryKey: getGetInitiativeDefaultsQueryKey(communityId),
       });
-      // Each initiative answers with its switches as they now stand.
-      void invalidate(q.allInitiatives());
+      // Each initiative answers with its switches as they now stand, and each
+      // plug-in with what the reader meets of it.
+      void invalidate(q.allInitiatives(), q.plugins());
       toast.success(t("communityDefaults.saved"));
     },
     errorKey: "initiatives:communityDefaults.error",

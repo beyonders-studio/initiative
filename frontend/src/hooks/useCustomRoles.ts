@@ -190,8 +190,8 @@ export const useUpdateCustomRole = () => {
     ) => updateCustomRole(communityId, roleId, data),
     invalidate: () => {
       toast.success(t("customRoles.updated"));
-      // The reader may hold the role they changed.
-      return invalidate(q.customRoles());
+      // The reader may hold the role they changed, and with it plug-in pages.
+      return invalidate(q.customRoles(), q.plugins());
     },
     errorKey: "settings:customRoles.updateError",
   });
@@ -203,7 +203,7 @@ export const useDeleteCustomRole = () => {
     mutationFn: (communityId: number, roleId: number) => deleteCustomRole(communityId, roleId),
     invalidate: () => {
       toast.success(t("customRoles.deleted"));
-      return invalidate(q.customRoles());
+      return invalidate(q.customRoles(), q.plugins());
     },
     errorKey: "settings:customRoles.deleteError",
   });
@@ -219,7 +219,7 @@ export const useAssignCustomRole = () => {
     ) => assignCustomRole(communityId, userId, { role_id: roleId }),
     invalidate: () => {
       toast.success(t("customRoles.assigned"));
-      return invalidate(q.customRoles());
+      return invalidate(q.customRoles(), q.plugins());
     },
     errorKey: "settings:customRoles.assignError",
   });

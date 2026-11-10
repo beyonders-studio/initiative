@@ -846,7 +846,7 @@ _CUSTOM_ROLES_SECTION = """\
 -- permission they do not hold, and a role on the admin rung takes an admin
 -- writer. Only a role on the admin rung keeps plug-in permissions. Taking one off its
 -- holders, by deleting it or the assignment, widens an admin back to every
--- surface, so that takes a writer who holds every surface. A role the
+-- surface and plug-in permission, so that takes a writer who holds all of it. A role the
 -- deployment defined (set_by) is the system engine's to write; the community
 -- gives it as it gives its own (custom_role_set_by_*, RESTRICTIVE).
 --
@@ -854,10 +854,7 @@ _CUSTOM_ROLES_SECTION = """\
 -- ==========================================================================="""
 
 _HELD_SURFACES = IN_POLICY.field("held_surfaces")
-_HELD_PLUGIN_PERMISSIONS = (
-    f"(CASE WHEN {IN_POLICY.this_guild}"
-    f" THEN {gucs.HELD_PLUGIN_PERMISSIONS.once} ELSE ARRAY[]::text[] END)"
-)
+_HELD_PLUGIN_PERMISSIONS = IN_POLICY.held_plugin_permissions
 
 
 def _holds_plugin_permission(row: str) -> str:
@@ -884,8 +881,8 @@ def _gives(role: str) -> str:
 
 def _takes_off(role: str) -> str:
     """The writer may take ``role`` off its holders: it holds nothing they do
-    not, and an admin's widens them to every surface, so it takes a writer
-    who holds every one."""
+    not, and an admin's widens them to every surface and plug-in permission,
+    so it takes a writer who holds all of it."""
     return (
         f"({role}.surfaces <@ {_HELD_SURFACES}"
         f" AND ({role}.base_rung = '{CommunityRole.member.value}'"

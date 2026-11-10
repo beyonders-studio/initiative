@@ -1026,16 +1026,19 @@ class GuildContext:
 
     @property
     def holds_every_surface(self) -> bool:
-        """Whether the reader holds the whole catalog: an admin with no custom
-        role, or one whose role keeps every surface. What making or unmaking
-        an admin asks, since the admin rung holds every one."""
-        return all(self.holds_surface(surface) for surface in AdminSurface)
+        """Whether the reader holds everything the admin rung holds, every
+        surface and every plug-in permission: an admin with no custom role.
+        What making or unmaking an admin asks, since either widens somebody
+        to all of it."""
+        return "*" in self.held_plugin_permissions and all(
+            self.holds_surface(surface) for surface in AdminSurface
+        )
 
     @property
     def manages_admins(self) -> bool:
-        """Whether this request may make or unmake an admin: holding every
-        surface, as the admin rung does, or on a settings grant — the answer
-        the membership policy gives too."""
+        """Whether this request may make or unmake an admin: holding
+        everything, as the admin rung does, or on a settings grant — the
+        answer the membership policy gives too."""
         return self.holds_every_surface or self.settings_rung is not None
 
     @property
