@@ -293,13 +293,32 @@
     "updateError": "Unable to update interface preferences",
     "themeDescriptions": {
       "kobold": "The classic Initiative theme with deep indigo tones.",
-      "displacer": "Catppuccin-inspired soothing pastel theme (Latte/Macchiato).",
-      "strahd": "Dark gothic theme with purple accents (Dracula/Alucard).",
+      "catppuccin": "Soothing pastels: Latte in light mode, and Frappé, Macchiato or Mocha in dark.",
+      "dracula": "Purple accents: Alucard in light mode, Dracula in dark.",
       "unicorn": "Full-spectrum neon rainbow — loud and proud.",
       "darkKnight": "AMOLED black theme with dark red and yellow accents.",
       "orc": "Earthy green theme with vivid orc-skin green accents. ORC ORC ORC!",
-      "aboleth": "Monokai-inspired dark lair with vivid bioluminescent accent colors."
+      "monokai": "Vivid lime, cyan, purple, orange and pink accents on warm neutrals.",
+      "nord": "Arctic blues and frosty greys: Snow Storm in light mode, Polar Night in dark.",
+      "elemental": "A metallic sheen across the app, in the element you choose."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Copper",
+        "silver": "Silver",
+        "gold": "Gold",
+        "roseGold": "Rose gold",
+        "lapis": "Lapis",
+        "cobalt": "Cobalt",
+        "emerald": "Emerald",
+        "garnet": "Garnet",
+        "amethyst": "Amethyst",
+        "obsidian": "Obsidian"
+      }
+    },
+    "themeVariantGroup": "{{theme}} variants",
+    "useVariantForDark": "Use {{variant}} for dark mode",
+    "useVariant": "Use {{variant}}",
     "taskCompletionVisualFeedback": {
       "label": "Task completion feedback",
       "description": "A bit of fun when you finish a task you were assigned to.",

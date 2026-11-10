@@ -20,15 +20,13 @@ import {
   type TaskCompletionVisualFeedback,
   triggerTaskCompletionHaptic,
 } from "@/lib/taskCompletionFeedback";
-import type { ThemeColors } from "@/lib/themes";
-import { getThemeList } from "@/lib/themes";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
+import { ThemePicker } from "@/pages/my/settings/ThemePicker";
 import Desktop from "@/plugins/desktop";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { parseTimeFormat, TIME_FORMAT_PREFERENCES } from "@/ui/host";
 import { Input } from "@/ui/input";
-import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
@@ -66,141 +64,6 @@ const LANGUAGE_OPTIONS = [
   { label: "Français", value: "fr" },
   { label: "Deutsch", value: "de" },
 ];
-
-function MiniMockup({ colors }: { colors: ThemeColors }) {
-  const c = (value: string): string => `oklch(${value})`;
-
-  return (
-    <div
-      className="flex overflow-hidden rounded-lg border"
-      style={{
-        height: 88,
-        borderColor: c(colors.border),
-        backgroundColor: c(colors.background),
-      }}
-    >
-      {/* Sidebar strip */}
-      <div
-        className="flex flex-col gap-1.5 p-1.5"
-        style={{ width: 28, backgroundColor: c(colors.sidebar) }}
-      >
-        <div
-          className="rounded"
-          style={{ height: 6, width: "100%", backgroundColor: c(colors.sidebarPrimary) }}
-        />
-        <div
-          className="rounded"
-          style={{ height: 6, width: "100%", backgroundColor: c(colors.muted) }}
-        />
-        <div
-          className="rounded"
-          style={{ height: 6, width: "100%", backgroundColor: c(colors.muted) }}
-        />
-      </div>
-
-      {/* Main area */}
-      <div className="flex flex-1 flex-col gap-2 p-2">
-        {/* Mini card */}
-        <div
-          className="flex flex-col gap-1.5 rounded p-2"
-          style={{ backgroundColor: c(colors.card) }}
-        >
-          <div
-            className="rounded"
-            style={{
-              height: 6,
-              width: "80%",
-              backgroundColor: c(colors.foreground),
-              opacity: 0.8,
-            }}
-          />
-          <div
-            className="rounded"
-            style={{
-              height: 4,
-              width: "50%",
-              backgroundColor: c(colors.mutedForeground),
-              opacity: 0.6,
-            }}
-          />
-          <div className="mt-1 flex gap-1">
-            <div
-              className="rounded"
-              style={{ height: 8, width: 24, backgroundColor: c(colors.ring) }}
-            />
-            <div
-              className="rounded"
-              style={{ height: 8, width: 24, backgroundColor: c(colors.border) }}
-            />
-          </div>
-        </div>
-
-        {/* Chart color swatches */}
-        <div className="flex gap-0.5">
-          {[colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5].map(
-            (color) => (
-              <div
-                key={color}
-                className="flex-1 rounded-sm"
-                style={{ height: 6, backgroundColor: c(color) }}
-              />
-            )
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Every theme as a tile showing it in light and dark; the chosen one is ringed. */
-function ThemePicker({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (themeId: string) => void;
-  disabled?: boolean;
-}) {
-  const { t } = useTranslation("settings");
-  return (
-    <div
-      role="radiogroup"
-      aria-label={t("interface.colorTheme")}
-      className="grid grid-cols-fill-56/3 gap-3"
-    >
-      {getThemeList().map((theme) => {
-        const selected = theme.id === value;
-        return (
-          // biome-ignore lint/a11y/useSemanticElements: a tile of previews, not a bare radio input
-          <button
-            key={theme.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            disabled={disabled}
-            onClick={() => onChange(theme.id)}
-            className={cn(
-              "space-y-2 rounded-lg border p-2 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
-              selected && "border-primary ring-2 ring-primary"
-            )}
-          >
-            <div className="grid grid-cols-2 gap-1.5">
-              <MiniMockup colors={theme.light} />
-              <MiniMockup colors={theme.dark} />
-            </div>
-            <div className="px-1 pb-1">
-              <p className="font-medium text-sm">{theme.name}</p>
-              <p className="text-muted-foreground text-xs">
-                {t(`interface.themeDescriptions.${theme.id}` as never)}
-              </p>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 /** The account's interface preferences, as the page shows them. */
 const prefsOf = (user: UserRead) => ({
