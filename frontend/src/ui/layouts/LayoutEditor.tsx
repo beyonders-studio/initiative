@@ -5,8 +5,6 @@ import type {
   ColumnLimit,
   DetailLayoutDefinitionInput,
   LayoutGrouping,
-  LayoutPreset,
-  ListLayoutDefinitionInput,
   ListLayoutReadKind,
   PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -51,8 +49,10 @@ import {
   detailLayoutOf,
   type LayoutChange,
   type LayoutSet,
+  type ListLayoutDefinition,
   listLayouts,
   type SaveLayouts,
+  type StoredPreset,
 } from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import type { LayoutNode } from "@/ui/layouts/tree";
@@ -130,7 +130,7 @@ export type LayoutEdits = {
   /** The open list draws the scale `field` as `display`. */
   changeDisplay: (field: string, display: FieldDisplay) => void;
   /** The open list offers `presets`, in order. */
-  changePresets: (presets: LayoutPreset[]) => void;
+  changePresets: (presets: StoredPreset[]) => void;
   /** The open list offers `groupings`, in order, and starts grouped by
    *  `groupBy`, one of them, or not at all. */
   changeGroupings: (groupings: LayoutGrouping[], groupBy: string | null) => void;
@@ -232,7 +232,7 @@ const detailKey = ({ spec, taskTypeId }: EditableDetail<PropertyDefinition>): st
  *  as shipped), by {@link detailKey}, and the list the target opens on. Save
  *  stores only what changed, each on its own. */
 type Draft = {
-  lists: Partial<Record<ListLayoutReadKind, ListLayoutDefinitionInput | null>>;
+  lists: Partial<Record<ListLayoutReadKind, ListLayoutDefinition | null>>;
   details: Partial<Record<string, DetailLayoutDefinitionInput | null>>;
   opensOn: ListLayoutReadKind;
 };
@@ -241,10 +241,7 @@ const draftOf = (set: LayoutSet, details: EditableDetail<PropertyDefinition>[]):
   const lists = listLayouts(set);
   return {
     lists: Object.fromEntries(
-      lists.map((layout) => [
-        layout.kind,
-        layout.updated_at ? (layout.definition as ListLayoutDefinitionInput) : null,
-      ])
+      lists.map((layout) => [layout.kind, layout.updated_at ? layout.definition : null])
     ),
     details: Object.fromEntries(
       details.map((detail) => [
@@ -264,11 +261,11 @@ const changesFrom = (
   base: Draft,
   draft: Draft,
   details: EditableDetail<PropertyDefinition>[]
-): LayoutChange<string>[] => {
-  const changes: LayoutChange<string>[] = [];
+): LayoutChange<string, StoredPreset>[] => {
+  const changes: LayoutChange<string, StoredPreset>[] = [];
   for (const [kind, definition] of Object.entries(draft.lists) as [
     ListLayoutReadKind,
-    ListLayoutDefinitionInput | null,
+    ListLayoutDefinition | null,
   ][]) {
     if (same(definition, base.lists[kind])) continue;
     changes.push(definition ? { save: { kind, definition } } : { reset: kind });
@@ -484,7 +481,7 @@ export const LayoutEditor = <D extends PropertyDefinition>({
     dispatch({ type: "change", present: next });
     if (then) setSelected(then);
   };
-  const changeList = (definition: ListLayoutDefinitionInput, then?: Selection) => {
+  const changeList = (definition: ListLayoutDefinition, then?: Selection) => {
     if (current) {
       changeDraft({ ...draft, lists: { ...draft.lists, [current.kind]: definition } }, then);
     }

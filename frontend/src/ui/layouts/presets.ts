@@ -7,14 +7,10 @@
 
 import type { SortingState } from "@tanstack/react-table";
 
-import type {
-  LayoutPreset,
-  ListLayoutDefinitionInput,
-  PresetSortField,
-  SortDir,
-  SortField,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { SortField } from "@/api/generated/initiativeAPI.schemas";
 import { slugify } from "@/ui/lib/slug";
+
+import type { StoredPreset } from "./layoutSet";
 
 /** A preset as a list offers it, holding its tool's filters `F`. A shipped
  *  one is named by `nameKey`, in the reader's words. */
@@ -49,7 +45,7 @@ export const MAX_PRESETS = 20;
  *  keeps none of its own. One kept with no name is a shipped one no one
  *  renamed, named in each reader's words. */
 export const presetsOf = <F>(
-  definition: ListLayoutDefinitionInput | undefined,
+  definition: { presets?: readonly StoredPreset[] | null } | undefined,
   kind: PresetKind<F>
 ): Preset<F>[] =>
   definition?.presets == null
@@ -78,14 +74,11 @@ export const presetName = (
 
 /** `preset` of `kind` as a layout keeps it: a shipped one by its slug alone,
  *  so each reader still reads its name in their own words. */
-export const storedPreset = <F>(preset: Preset<F>, kind: PresetKind<F>): LayoutPreset => ({
+export const storedPreset = <F>(preset: Preset<F>, kind: PresetKind<F>): StoredPreset => ({
   ...(preset.nameKey ? {} : { name: preset.name }),
   slug: preset.slug,
-  filters: preset.filters as LayoutPreset["filters"],
-  sort: (kind.sorting?.stored(preset.sorting) ?? []).map(({ field, dir }) => ({
-    field: field as PresetSortField,
-    dir: dir as SortDir,
-  })),
+  filters: preset.filters as StoredPreset["filters"],
+  sort: kind.sorting?.stored(preset.sorting) ?? [],
 });
 
 const MAX_SLUG_LENGTH = 64;

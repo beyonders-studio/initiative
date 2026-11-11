@@ -4,13 +4,10 @@
  * opened, to undo and redo.
  */
 
-import type {
-  CardPartInput,
-  ListLayoutDefinitionInput,
-  ListLayoutReadKind,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { CardPartInput, ListLayoutReadKind } from "@/api/generated/initiativeAPI.schemas";
 
 import type { FieldDef } from "./fields";
+import type { ListLayoutDefinition } from "./layoutSet";
 import type { LayoutNode } from "./tree";
 
 /** What a kind of item's lists draw until they are changed: a card's parts
@@ -34,7 +31,7 @@ export const CARD_LISTS: ReadonlySet<ListLayoutReadKind> = new Set([
  *  it lists, and what it draws as shipped. */
 export type ListLayout = {
   kind: ListLayoutReadKind;
-  definition: ListLayoutDefinitionInput;
+  definition: ListLayoutDefinition;
   shape: ListShape;
 };
 
@@ -45,7 +42,7 @@ const pluginFieldIds = (fields: ReadonlyMap<string, FieldDef>): string[] =>
 
 /** A board's card: its own, or the shipped one with the plug-ins' fields. */
 export const cardOf = (
-  definition: ListLayoutDefinitionInput,
+  definition: ListLayoutDefinition,
   fields: ReadonlyMap<string, FieldDef>,
   { card: shipped }: ListShape
 ): LayoutNode => {
@@ -64,14 +61,14 @@ export const cardOf = (
 };
 
 export const withCard = (
-  definition: ListLayoutDefinitionInput,
+  definition: ListLayoutDefinition,
   card: LayoutNode
-): ListLayoutDefinitionInput => ({ ...definition, card: card as CardPartInput });
+): ListLayoutDefinition => ({ ...definition, card: card as CardPartInput });
 
 /** A table's columns, as field ids in order: its own, or the shipped ones
  *  with the plug-ins' fields. */
 export const columnsOf = (
-  definition: ListLayoutDefinitionInput,
+  definition: ListLayoutDefinition,
   fields: ReadonlyMap<string, FieldDef>,
   { columns: shipped }: ListShape
 ): string[] => definition.columns ?? [...shipped, ...pluginFieldIds(fields)];

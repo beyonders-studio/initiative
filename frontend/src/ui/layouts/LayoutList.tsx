@@ -2,24 +2,23 @@ import { Pencil, Star, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  ListLayoutDefinitionInput,
-  ListLayoutRead,
-} from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { host } from "@/ui/host";
 import {
   type DetailLayout,
   isListLayout,
   type LayoutChange,
+  type ListLayoutDefinition,
+  type ListView,
   type SaveLayouts,
+  type StoredPreset,
 } from "@/ui/layouts/layoutSet";
 import { type LayoutLook, listLayoutLooks } from "@/ui/layouts/looks";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Switch } from "@/ui/switch";
 
-type Layout = ListLayoutRead | DetailLayout;
+type Layout = ListView | DetailLayout;
 
 /** Asks whether to delete the task type `typeId` with its page, while it is
  *  set; `onClose` puts it away. */
@@ -33,7 +32,7 @@ const noop = () => {};
 /** `save`, and whether a run of it from here is under way. */
 const useSaving = (save: SaveLayouts) => {
   const [pending, setPending] = useState(false);
-  const run = (changes: LayoutChange<string>[]) => {
+  const run = (changes: LayoutChange<string, StoredPreset>[]) => {
     setPending(true);
     save(changes)
       .catch(noop)
@@ -43,10 +42,10 @@ const useSaving = (save: SaveLayouts) => {
 };
 
 /** A definition as it is written back: what it sets, and nothing left unset. */
-const setOf = (definition: ListLayoutRead["definition"]) =>
+const setOf = (definition: ListLayoutDefinition) =>
   Object.fromEntries(
     Object.entries(definition).filter(([, value]) => value != null)
-  ) as ListLayoutDefinitionInput;
+  ) as ListLayoutDefinition;
 
 /**
  * A target's layouts, each with when it was last changed, or a dash while it
@@ -236,7 +235,7 @@ const ViewSwitch = ({
   label,
 }: {
   save: SaveLayouts;
-  view: ListLayoutRead;
+  view: ListView;
   last: boolean;
   label: string;
 }) => {
@@ -262,7 +261,7 @@ const OpensFirstButton = ({
   label,
 }: {
   save: SaveLayouts;
-  view: ListLayoutRead;
+  view: ListView;
   label: string;
 }) => {
   const { pending, run } = useSaving(save);
