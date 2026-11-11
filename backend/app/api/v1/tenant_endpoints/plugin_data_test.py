@@ -65,6 +65,7 @@ from app.services.marketplace.plugin_refs import (
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_connection_flows
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
+from app.services.tenant.initiatives import create_custom_role
 from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.testing import (
     create_access_grant,
@@ -2178,7 +2179,7 @@ class TestActions:
             ),
             ("member", "hidden", {}, 404, None),
             ("admin", "elsewhere", {}, 403, "ACTION_NOT_OFFERED"),
-            ("manager", "shared", {}, 403, "ACTION_NOT_OFFERED"),
+            ("viewer", "shared", {}, 403, "ACTION_NOT_OFFERED"),
             ("member", "shared", {"action": "relink"}, 403, "ACTION_NOT_OFFERED"),
             ("member", "mine", {}, 403, "ACTION_NOT_OFFERED"),
         ],
@@ -2187,7 +2188,7 @@ class TestActions:
             "an item kind the action is not on",
             "an item the viewer cannot read",
             "an initiative the install is not placed in",
-            "a role the placement does not allow",
+            "a role not given the install's use",
             "an action for the community's admins alone",
             "an item the install cannot read",
         ],
@@ -2206,11 +2207,20 @@ class TestActions:
     ):
         admin, member, plugin, tasks = await _action_board(session, acting_user)
         actors = {"admin": admin, "member": member}
-        actors["manager"] = await acting_user(
+        # A role no manager's and not given the install's use.
+        await route_session_to_guild(session, admin.guild.id)
+        await create_custom_role(
+            session,
+            initiative_id=admin.initiative.id,
+            name="viewer",
+            display_name="Viewer",
+        )
+        await session.commit()
+        actors["viewer"] = await acting_user(
             guild_role=CommunityRole.member,
             guild=admin.guild,
             initiative=admin.initiative,
-            initiative_role="project_manager",
+            initiative_role="viewer",
         )
         actor = actors[who]
 

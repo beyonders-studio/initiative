@@ -531,18 +531,18 @@ async def test_an_install_without_a_tool_scope_reads_none_of_it(
     await s.rollback()
 
 
-async def test_the_plugin_role_cannot_read_the_communitys_settings(
+async def test_the_plugin_role_reads_no_setting_but_retention(
     session, acting_user, role_session
 ):
+    """Binning a row reads how long the bin keeps it; nothing else of the
+    community's settings is the role's."""
     install = await _install(session, acting_user, role_session, granted=["files:read"])
     s, _context = await _route(role_session, install, ["files:read"])
+    settings = f'"{guild_schema_name(install.guild.id)}".guild_settings'
+    rows = (await s.exec(text(f"SELECT id, retention_days FROM {settings}"))).all()
+    assert len(rows) == 1
     with pytest.raises(DBAPIError, match="permission denied"):
-        await s.exec(
-            text(
-                f'SELECT count(*) FROM "{guild_schema_name(install.guild.id)}"'
-                ".guild_settings"
-            )
-        )
+        await s.exec(text(f"SELECT * FROM {settings}"))
     await s.rollback()
 
 
