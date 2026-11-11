@@ -91,7 +91,9 @@ export interface DetailExtension<I> {
  * properties, its properties and its actions are drawn alike for every kind;
  * what the app adds to each is its extension's. `H` is what the kind says of
  * where an item lives that its extension reads, and `D` its definitions: an
- * initiative's unless a plug-in's own are named.
+ * initiative's unless a plug-in's own are named. What reads them is a method,
+ * whose parameter TypeScript checks both ways, so a view draws kinds of any
+ * definitions alike.
  */
 export interface DetailKind<
   I extends DetailItem,

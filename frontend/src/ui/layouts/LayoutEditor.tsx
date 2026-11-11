@@ -156,7 +156,9 @@ export type ListPreview = {
 /** What a target lists (a project's tasks, a collection's files): the
  *  fields its lists can show, what they draw as shipped, the open list drawn
  *  with the target's own items, and its settings. Its definitions (`D`) are
- *  an initiative's unless a plug-in's own are named. */
+ *  an initiative's unless a plug-in's own are named; `fields` is a method,
+ *  whose parameter TypeScript checks both ways, so the editor reads lists of
+ *  any definitions alike. */
 export type EditableLists<D extends PropertyDefinition = PropertyDefinitionRead> = {
   /** Its fields, by id: the built-ins, the properties of `definitions`, and
    *  the plug-ins'. */
@@ -179,7 +181,8 @@ export type EditableLists<D extends PropertyDefinition = PropertyDefinitionRead>
 };
 
 /** A kind of detail, as the editor lays it out, its definitions (`D`) an
- *  initiative's unless a plug-in's own are named. */
+ *  initiative's unless a plug-in's own are named; `fields` is a method, as
+ *  {@link EditableLists}' is. */
 export type EditableDetail<D extends PropertyDefinition = PropertyDefinitionRead> = {
   spec: DetailLayoutSpec;
   /** For a page laid out per type of item, which type's, and its name, which
