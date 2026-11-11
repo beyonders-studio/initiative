@@ -115,4 +115,30 @@ describe("MemberPicker with multiple", () => {
     await userEvent.click(kept);
     expect(onChange).toHaveBeenCalledWith([], []);
   });
+
+  it("picks the people a plug-in knows by reference, on a row of its own kind", async () => {
+    const adaRef = { ...ada, id: "p-ada" };
+    const graceRef = { ...grace, id: "p-grace" };
+    const material: MemberScope<string> = { type: "canOpen", tool: "material", id: 3 };
+    const searchMembers = vi.fn<SearchMembers<string, string>>(async (_scope, query) =>
+      "ids" in query ? [graceRef] : [adaRef, graceRef]
+    );
+    const onChange = vi.fn();
+    renderWithProviders(
+      <MemberPicker
+        multiple
+        searchMembers={searchMembers}
+        scope={material}
+        value={["p-grace"]}
+        onChange={onChange}
+        placeholder="Search members"
+      />
+    );
+    expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
+    expect(searchMembers).toHaveBeenCalledWith(material, { ids: ["p-grace"] });
+
+    await userEvent.click(screen.getByRole("combobox"));
+    await userEvent.click(await screen.findByRole("option", { name: /Ada Lovelace/ }));
+    expect(onChange).toHaveBeenLastCalledWith(["p-grace", "p-ada"], [graceRef, adaRef]);
+  });
 });
