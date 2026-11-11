@@ -468,6 +468,16 @@ jobs:
             | tee "$RUNNER_TEMP/pytest.log" || [[ $? -eq 5 ]] || status=1
           exit $status
 
+      - name: Say whether the runner ran out of memory
+        # The job can end cancelled with no other word near the end of the
+        # tests. A runner out of memory loses a process to the kernel, and
+        # its log says which; this runs on a cancelled job too.
+        if: always()
+        run: |
+          free -m
+          sudo dmesg --ctime | grep -iE "out of memory|oom-kill|killed process" \
+            || echo "The kernel killed no process for want of memory."
+
       - name: Publish the test selection data
         # A run with failures records too: a test that failed is selected
         # again until it passes. A run that stopped part way does not.
