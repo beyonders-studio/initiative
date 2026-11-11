@@ -223,7 +223,7 @@ export const userReferenceValue = (property: PropertySummary): UserValue | null 
   if (raw && typeof raw === "object" && isMemberId((raw as { id?: unknown }).id)) {
     return raw as UserValue;
   }
-  return null;
+  return isMemberId(raw) ? { id: raw } : null;
 };
 
 /** The file a ``file`` value names, as the server reads it back: what draws

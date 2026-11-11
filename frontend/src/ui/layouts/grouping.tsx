@@ -23,6 +23,7 @@ import {
   type PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
 import { dateTimeFormat } from "@/ui/lib/intl";
+import type { MemberId } from "@/ui/member-picker";
 import { extractUser, PropertyValueCell } from "@/ui/properties/PropertyValueCell";
 import {
   type PropertyDefinition,
@@ -207,8 +208,25 @@ const bucketLabel = (key: string, bucket: DateBucket, t: LayoutEnv["t"]): string
   }
 };
 
+/** The person a person group's key names, as the items hold them: an app's
+ *  string reference stays a string. A key no item holds is a numeric id. */
+const personOf = (
+  definition: PropertyDefinition,
+  items: readonly { properties: PropertySummary[] }[],
+  key: string
+): MemberId => {
+  for (const item of items) {
+    const person = extractUser(
+      item.properties?.find((each) => each.property_id === definition.id)?.value
+    );
+    if (person && String(person.id) === key) return person.id;
+  }
+  return String(Number(key)) === key ? Number(key) : key;
+};
+
 const propertyMove = (
-  definition: PropertyDefinition
+  definition: PropertyDefinition,
+  items: readonly { properties: PropertySummary[] }[]
 ): ((from: string, to: string) => PropertyMove) | undefined => {
   const id = definition.id;
   const write = (to: string, value: unknown): PropertyMove => ({
@@ -225,7 +243,7 @@ const propertyMove = (
         properties: { merge: true, options: [{ property_id: id, ...swap(from, to) }] },
       });
     case MetadataType.user_reference:
-      return (_from, to) => write(to, Number(to));
+      return (_from, to) => write(to, personOf(definition, items, to));
     case MetadataType.checkbox:
       return (_from, to) => write(to, to === "true");
     default:
@@ -327,7 +345,7 @@ export const offeredGroupings = <I extends { id: number; properties: PropertySum
       move: entry.bucket
         ? undefined
         : field.property
-          ? propertyMove(field.property)
+          ? propertyMove(field.property, items)
           : own.move(field.id),
     };
     return [{ grouping, hidden: new Set(entry.hidden ?? []) }];
