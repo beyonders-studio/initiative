@@ -5,7 +5,7 @@ import type {
   RecurrencePreviewRequest,
 } from "@/api/generated/initiativeAPI.schemas";
 import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
-import type { Member } from "@/ui/member-picker";
+import type { Member, MemberId } from "@/ui/member-picker";
 import type { UserValue } from "@/ui/properties/propertyHelpers";
 
 /**
@@ -97,8 +97,10 @@ export interface Host {
   /** Whether an address is served from the app's own origin. */
   isOwnOrigin: (url: string) => boolean;
   /** How a person a field's value names is drawn: their name, picture and
-   *  initials, from the person as the server reads them back. */
-  member: (person: UserValue) => Member;
+   *  initials, from the person as the server reads them back. A method, whose
+   *  parameter TypeScript checks both ways: an app that knows its people by
+   *  number draws them by number. */
+  member(person: UserValue): Member<MemberId>;
   /** The next starts of a repeat, from the engine the app's calendar uses;
    *  the editor shows none when unset. */
   previewRecurrence?: (request: RecurrencePreviewRequest) => Promise<RecurrencePreview>;

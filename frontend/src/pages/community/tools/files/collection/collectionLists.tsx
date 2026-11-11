@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import type {
   CollectionFileSummary,
   FileSummary,
-  ListLayoutDefinitionInput,
   ListLayoutReadKind,
   TimelineBucket,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -22,6 +21,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { fieldColumn } from "@/ui/layouts/columns";
 import { cardOf, columnsOf, indexPaths } from "@/ui/layouts/draft";
 import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
+import type { ListLayoutDefinition } from "@/ui/layouts/layoutSet";
 import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/ui/layouts/tree";
 import type { AppColumnDef } from "@/ui/lib/table";
 
@@ -169,7 +169,7 @@ export const CollectionListView = ({
   stepCounter,
 }: {
   kind: CollectionList;
-  definition: ListLayoutDefinitionInput;
+  definition: ListLayoutDefinition;
   /** Every field the list can show, its ratings drawn as it says. */
   fields: ReadonlyMap<string, FieldDef<CollectionFileSummary>>;
   files: CollectionFileSummary[];

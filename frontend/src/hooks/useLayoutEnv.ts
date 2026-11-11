@@ -34,7 +34,7 @@ export const useCounterSteps = <I extends { id: number }>(
 ): NonNullable<LayoutEnv<I>["stepCounter"]> => {
   const { mutateAsync } = useStepCounter(target);
   return useCallback(
-    (item, definition) =>
+    (item, definition: PropertyDefinitionRead) =>
       may(item, definition) ? (up) => mutateAsync({ itemId: item.id, definition, up }) : null,
     [may, mutateAsync]
   );

@@ -6,8 +6,6 @@ import {
   type CounterSettingsInput,
   type CurrencyCode,
   MetadataType,
-  type PropertyDefinitionCreate,
-  type PropertyDefinitionRead,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
@@ -21,6 +19,7 @@ import {
   type MetadataOwner,
   normalizeOptionList,
   ownerColumns,
+  type PropertyDefinition,
   typeRequiresOptions,
 } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -44,11 +43,25 @@ export const PROPERTY_TYPES: MetadataType[] = [
   MetadataType.signature,
 ];
 
-/** Makes a property, answering with it as made. A failure is told by this,
- *  and rejects. */
-export type CreateProperty = (
-  property: PropertyDefinitionCreate
-) => Promise<PropertyDefinitionRead>;
+/** A property as it is made: an initiative's names the initiative, and
+ *  metadata its project or collection. A plug-in's names neither. */
+export interface NewProperty {
+  name: string;
+  type: MetadataType;
+  options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
+  counter?: CounterSettingsInput | null;
+  initiative_id?: number;
+  project_id?: number | null;
+  collection_id?: number | null;
+}
+
+/** Makes a property, answering with it as made (`D`). A failure is told by
+ *  this, and rejects. A method, whose parameter TypeScript checks both ways:
+ *  one that makes only an initiative's is taken where an initiative is given. */
+export type CreateProperty<D extends PropertyDefinition = PropertyDefinition> = {
+  create(property: NewProperty): Promise<D>;
+}["create"];
 
 /**
  * A new property for an initiative, or metadata of one of its projects or
@@ -70,7 +83,8 @@ export const NewPropertyForm = ({
   onCancel,
   onPendingChange,
 }: {
-  initiativeId: number;
+  /** The initiative it is made in; none for a plug-in's own. */
+  initiativeId?: number;
   /** The project or collection it may be metadata of; left out, it is the
    *  initiative's property. */
   owner?: MetadataOwner;
@@ -79,7 +93,7 @@ export const NewPropertyForm = ({
   name?: string;
   /** The type it starts as. */
   type?: MetadataType;
-  onCreated: (definition: PropertyDefinitionRead) => void;
+  onCreated: (definition: PropertyDefinition) => void;
   onCancel: () => void;
   /** Told when creating starts and ends. */
   onPendingChange?: (pending: boolean) => void;
@@ -113,10 +127,10 @@ export const NewPropertyForm = ({
       options = normalizeOptionList(newOptions);
       if (options.length === 0) return;
     }
-    const payload: PropertyDefinitionCreate = {
+    const payload: NewProperty = {
       name,
       type: newType,
-      initiative_id: initiativeId,
+      ...(initiativeId === undefined ? {} : { initiative_id: initiativeId }),
       ...ownerColumns(owned ? owner : undefined),
       options,
       ...(newType === MetadataType.currency ? { currency: newCurrency } : {}),

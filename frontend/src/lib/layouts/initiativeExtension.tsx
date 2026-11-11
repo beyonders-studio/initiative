@@ -7,7 +7,11 @@
 import { createContext, Fragment, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { DetailLayoutReadKind, EndpointRef } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  DetailLayoutReadKind,
+  EndpointRef,
+  Tool,
+} from "@/api/generated/initiativeAPI.schemas";
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
@@ -45,16 +49,19 @@ export interface ItemLinks {
   layout?: RelationsLayout;
 }
 
+/** Where one of Initiative's items lives: in an initiative, or none for a
+ *  community's own tool, opened in one of its tools, its links kept. */
+type InitiativeHome = {
+  initiativeId: number | null;
+  canOpen: { tool: Tool; id: number };
+  links: ItemLinks;
+};
+
 /** One of Initiative's kinds of item, whose home also says where an item's
  *  links are kept. */
-export type InitiativeDetail<I extends DetailItem, C, P> = DetailKind<
-  I,
-  C,
-  P,
-  { links: ItemLinks }
->;
+export type InitiativeDetail<I extends DetailItem, C, P> = DetailKind<I, C, P, InitiativeHome>;
 
-const useLinkedHome = useItemHome<{ links: ItemLinks }>;
+const useLinkedHome = useItemHome<InitiativeHome>;
 
 /** The links an item being added is to be made with. */
 export const AddingLinks = createContext<{
@@ -104,7 +111,7 @@ const NO_TASK = () => "";
  * and nothing a plug-in draws.
  */
 export const useInitiativeExtension = <I extends DetailItem>(
-  home: Pick<ItemHome<unknown, unknown>, "initiativeId" | "owner" | "readOnly">,
+  home: Pick<ItemHome<unknown, unknown> & InitiativeHome, "initiativeId" | "owner" | "readOnly">,
   kind: DetailLayoutReadKind
 ): DetailExtension<I> => {
   const { i18n } = useTranslation();

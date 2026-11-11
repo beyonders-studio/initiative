@@ -2,37 +2,37 @@ import { Pencil, Star, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  DetailLayoutRead,
-  ListLayoutDefinitionInput,
-  ListLayoutRead,
-} from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { host } from "@/ui/host";
-import { isListLayout, type LayoutChange } from "@/ui/layouts/layoutSet";
+import {
+  type DetailLayout,
+  isListLayout,
+  type LayoutChange,
+  type ListLayoutDefinition,
+  type ListView,
+  type SaveLayouts,
+  type StoredPreset,
+} from "@/ui/layouts/layoutSet";
 import { type LayoutLook, listLayoutLooks } from "@/ui/layouts/looks";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Switch } from "@/ui/switch";
 
-type Layout = ListLayoutRead | DetailLayoutRead;
-
-/** Stores changes to a target's layouts. One that fails says why itself. */
-type SaveLayouts = (changes: LayoutChange[]) => Promise<unknown>;
+type Layout = ListView | DetailLayout;
 
 /** Asks whether to delete the task type `typeId` with its page, while it is
  *  set; `onClose` puts it away. */
 type TypeDelete = (typeId: number | null, onClose: () => void) => ReactNode;
 
-/** Each kind of page's icon and name. */
-type PageLooks = Record<DetailLayoutRead["kind"], LayoutLook>;
+/** Each kind of page's icon and name, by its kind. */
+type PageLooks = Readonly<Record<string, LayoutLook>>;
 
 const noop = () => {};
 
 /** `save`, and whether a run of it from here is under way. */
 const useSaving = (save: SaveLayouts) => {
   const [pending, setPending] = useState(false);
-  const run = (changes: LayoutChange[]) => {
+  const run = (changes: LayoutChange<string, StoredPreset>[]) => {
     setPending(true);
     save(changes)
       .catch(noop)
@@ -42,10 +42,10 @@ const useSaving = (save: SaveLayouts) => {
 };
 
 /** A definition as it is written back: what it sets, and nothing left unset. */
-const setOf = (definition: ListLayoutRead["definition"]) =>
+const setOf = (definition: ListLayoutDefinition) =>
   Object.fromEntries(
     Object.entries(definition).filter(([, value]) => value != null)
-  ) as ListLayoutDefinitionInput;
+  ) as ListLayoutDefinition;
 
 /**
  * A target's layouts, each with when it was last changed, or a dash while it
@@ -67,7 +67,8 @@ export const LayoutList = ({
 }: {
   layouts: Layout[];
   pageLooks: PageLooks;
-  /** Saves a view shown or hidden; left out, the list only reads. */
+  /** Saves a view shown or hidden; left out, the list only reads. One that
+   *  fails says why itself. */
   save?: SaveLayouts;
   typeDelete?: TypeDelete;
   /** The layout editor's address. */
@@ -234,7 +235,7 @@ const ViewSwitch = ({
   label,
 }: {
   save: SaveLayouts;
-  view: ListLayoutRead;
+  view: ListView;
   last: boolean;
   label: string;
 }) => {
@@ -260,7 +261,7 @@ const OpensFirstButton = ({
   label,
 }: {
   save: SaveLayouts;
-  view: ListLayoutRead;
+  view: ListView;
   label: string;
 }) => {
   const { pending, run } = useSaving(save);

@@ -9,6 +9,7 @@ import { openExternal } from "@/lib/openExternal";
 import { getItem, setItem } from "@/lib/storage";
 import { getUserDisplayName, toMember } from "@/lib/userDisplay";
 import { type Blocker, type HostLinkProps, setHost } from "@/ui/host";
+import type { UserValue } from "@/ui/properties/propertyHelpers";
 
 // Hunspell's English dictionary, served by jsDelivr.
 const DICTIONARY = "https://cdn.jsdelivr.net/npm/dictionary-en@3.2.0/index";
@@ -61,7 +62,7 @@ export const connectKit = (): void =>
     },
     isOwnOrigin: (url) => isOwnOrigin(url),
     // A person whose value carries only their id is drawn by their number.
-    member: (person) => ({
+    member: (person: UserValue & { id: number }) => ({
       ...toMember(person),
       name: getUserDisplayName(person, `#${person.id}`),
     }),

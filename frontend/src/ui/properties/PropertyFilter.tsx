@@ -2,13 +2,14 @@ import { Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
-import type { SearchMembers } from "@/ui/member-picker";
+import type { MemberId, SearchMembers } from "@/ui/member-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { PropertyInput, type PropertyInputProps } from "./PropertyInput";
+import type { PropertyDefinition } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 export interface PropertyFilterCondition {
@@ -37,10 +38,10 @@ export interface PropertyFilterProps {
   onChange: (next: PropertyFilterCondition[], plugins: PluginFilterCondition[]) => void;
   /** The properties the list may be filtered by, and the metadata of the
    *  project it lists, where it lists one project's tasks. */
-  definitions: PropertyDefinitionRead[];
+  definitions: PropertyDefinition[];
   /** What a value's input adds or looks up, as `PropertyInput` takes them. */
   appendOption: PropertyInputProps["appendOption"];
-  searchMembers: SearchMembers;
+  searchMembers: SearchMembers<MemberId, string>;
   /** Plug-in fields offered beside the properties, and the filters on them. */
   plugins?: { fields: PluginFilterField[]; value: PluginFilterCondition[] };
   maxFilters?: number;

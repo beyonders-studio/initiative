@@ -1,11 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { type ComponentType, type FunctionComponent, memo, type ReactNode } from "react";
 
-import {
-  MetadataType,
-  type PropertyDefinitionRead,
-  type PropertySummary,
-} from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType, type PropertySummary } from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/ui/badge";
 import { DateCell } from "@/ui/date-cell";
 import { host } from "@/ui/host";
@@ -13,7 +9,7 @@ import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
 import { namePropertyColumns } from "@/ui/properties/propertyColumns";
-import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
+import type { FieldDisplay, PropertyDefinition } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import type { PropertyEnv } from "./fieldEditors";
@@ -117,7 +113,7 @@ export type FieldDef<I = unknown> = {
    *  fields groups the install's under that name. */
   plugin?: { install: number; name: string };
   /** A property field's definition. */
-  property?: PropertyDefinitionRead;
+  property?: PropertyDefinition;
   /** How a scale or a counter is drawn where the list showing it says. */
   display?: FieldDisplay;
   /** A property drawn on a card as its value alone, not named: a card under
@@ -156,12 +152,12 @@ export type LayoutEnv<I = unknown> = {
    *  drawn without its buttons. */
   stepCounter?(
     item: I,
-    definition: PropertyDefinitionRead
+    definition: PropertyDefinition
   ): ((up: boolean) => Promise<PropertySummary[]>) | null;
 
   /** What its property editors read and change through: a detail's. Left
    *  out, its properties are read, not changed. */
-  properties?: PropertyEnv;
+  properties?: PropertyEnv<PropertyDefinition>;
 };
 
 export type FieldRendererProps<I = unknown> = {
@@ -181,8 +177,8 @@ export const isEmptyValue = (value: unknown): boolean =>
 /** One field per property the initiative defines, two that share a name told
  *  apart in their labels; `read` reads one's value off an item. */
 export const propertyFields = <I,>(
-  definitions: PropertyDefinitionRead[],
-  read: (item: I, definition: PropertyDefinitionRead) => unknown
+  definitions: PropertyDefinition[],
+  read: (item: I, definition: PropertyDefinition) => unknown
 ): FieldDef<I>[] =>
   namePropertyColumns(definitions).map(({ definition, label }) => ({
     id: propertyFieldId(definition.id),

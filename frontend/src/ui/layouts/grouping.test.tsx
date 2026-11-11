@@ -5,6 +5,7 @@ import {
   buildDefaultTaskStatuses,
   buildPropertyDefinition,
   buildPropertyOption,
+  buildPropertySummary,
   buildTagSummary,
   buildTask,
   TASK_GROUPINGS,
@@ -55,11 +56,12 @@ const sprint = buildPropertyDefinition({
   options: [buildPropertyOption({ value: "s1" }), buildPropertyOption({ value: "s2" })],
 });
 const note = buildPropertyDefinition({ name: "Note", type: MetadataType.text });
+const owner = buildPropertyDefinition({ name: "Owner", type: MetadataType.user_reference });
 const sprintField = propertyFieldId(sprint.id);
 
 const all = groupables(
   TASK_GROUPINGS,
-  taskFields([sprint, note]),
+  taskFields([sprint, note, owner]),
   (field) => groupingName(field, t),
   BOARD_COLUMNS
 );
@@ -218,6 +220,31 @@ describe("a drop into another group", () => {
         options: [{ property_id: sprint.id, add: ["s2"], remove: ["s1"] }],
       },
     });
+  });
+
+  it("writes a person as the items hold them: an app's reference stays a string", () => {
+    const ownerField = propertyFieldId(owner.id);
+    const held = (id: number | string) =>
+      buildTask({
+        properties: [
+          buildPropertySummary({
+            property_id: owner.id,
+            type: MetadataType.user_reference,
+            value: { id },
+          }),
+        ],
+      });
+    const moveTo = (to: string, tasks: TaskListRead[]) =>
+      offered([{ field: ownerField }], { tasks })
+        .find(({ grouping }) => grouping.id === ownerField)
+        ?.grouping.move?.(NO_GROUP, to);
+    const written = (value: unknown) => ({
+      properties: { merge: true, values: [{ property_id: owner.id, value }] },
+    });
+
+    expect(moveTo("p-grace", [held("p-grace")])).toEqual(written("p-grace"));
+    expect(moveTo("12", [held("12")])).toEqual(written("12"));
+    expect(moveTo("12", [held(12)])).toEqual(written(12));
   });
 
   it("puts a task dropped into a task's band under that task, and out of every band under none", () => {

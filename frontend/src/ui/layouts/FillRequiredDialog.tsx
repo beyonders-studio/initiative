@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 
-import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -10,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import type { PropertyDefinition } from "@/ui/properties/propertyHelpers";
 
 import { type DetailItem, type DetailKind, DetailLayoutView } from "./DetailLayoutView";
 import { missingRequired, type StoredRegions } from "./detailLayout";
@@ -17,7 +17,7 @@ import { ItemDraftContext, useItemDraft, type Written } from "./editing";
 import type { LayoutNode } from "./tree";
 
 type FillProps<I extends DetailItem, C, P> = {
-  detail: DetailKind<I, C, P>;
+  detail: DetailKind<I, C, P, object, PropertyDefinition>;
   /** The item as the change would leave it: of its new type, or in its new
    *  project. */
   item: I;
@@ -25,7 +25,7 @@ type FillProps<I extends DetailItem, C, P> = {
   /** The properties and metadata its new place offers; undefined until they
    *  are read. A required one among `keys` that is not among them was
    *  deleted, and is not asked for. */
-  definitions: PropertyDefinitionRead[] | undefined;
+  definitions: PropertyDefinition[] | undefined;
   /** What its new page requires that it leaves empty, by `requiredKey`. */
   keys: readonly string[];
   /** What is being changed, as a heading. */

@@ -20,13 +20,12 @@ import {
   MetadataType,
   type PropertyDefinitionRead,
   type PropertySummary,
-  type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { host } from "@/ui/host";
 import { cn } from "@/ui/lib/utils";
-import type { SearchMembers } from "@/ui/member-picker";
+import type { MemberId, SearchMembers } from "@/ui/member-picker";
 import { AddPropertyButton } from "@/ui/properties/AddPropertyButton";
 import type { FileFieldFiles } from "@/ui/properties/FileFieldInput";
 import type { CreateProperty } from "@/ui/properties/NewPropertyForm";
@@ -37,6 +36,7 @@ import {
   type MetadataOwner,
   normalizePropertyValue,
   ownProperties,
+  type PropertyDefinition,
   propertyStubFromDefinition,
   steppedCount,
   userReferenceValue,
@@ -58,23 +58,24 @@ import {
  * What property editors read and change through, from the page around them
  * (a view's `LayoutEnv` carries it as `properties`): the properties an item
  * may hold, and making a property or an option, finding members and finding
- * and reading files.
+ * and reading files. Its definitions (`D`) are an initiative's unless a
+ * plug-in's own are named.
  */
-export interface PropertyEnv {
+export interface PropertyEnv<D extends PropertyDefinition = PropertyDefinitionRead> {
   /** What an item may hold: its initiative's properties, and its owner's
    *  metadata where it has an owner. No data until they are read. */
   definitions: {
-    data?: PropertyDefinitionRead[];
+    data?: D[];
     isLoading: boolean;
     isError: boolean;
     refetch: () => unknown;
   };
   /** Makes a property named from an item. */
-  createProperty: CreateProperty;
+  createProperty: CreateProperty<D>;
   /** Adds an option to a select property. */
   appendOption: PropertyInputProps["appendOption"];
   /** Finds the people a person-valued property may name. */
-  searchMembers: SearchMembers;
+  searchMembers: SearchMembers<MemberId, string>;
   /** What a file property picks from, links to and draws. */
   files: FileFieldFiles;
 }
@@ -114,7 +115,7 @@ interface Typeahead {
 const NO_TYPEAHEAD: Typeahead = { open: false, sync: () => {}, handlers: {}, popover: null };
 const useNoTypeahead = (): Typeahead => NO_TYPEAHEAD;
 
-const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
+const NO_DEFINITIONS: PropertyDefinition[] = [];
 
 /** Without `field-sizing`, a textarea stays as many rows high as it was
  *  given, so it is grown to what it holds, again whenever its width changes. */
@@ -306,18 +307,20 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   id: number;
   properties: PropertySummary[];
   readOnly: boolean;
-  initiativeId: number | null;
+  /** The initiative its properties are made in; null where none can be, and
+   *  left out for a plug-in's own item, whose properties are the plug-in's. */
+  initiativeId?: number | null;
   /** Whose people a person-valued property may name: who can open this tool.
    *  Left out (a collection, which has no sharing of its own), the
    *  initiative's members. */
-  canOpen?: { tool: Tool; id: number | null | undefined };
+  canOpen?: { tool: string; id: number | null | undefined };
   /** The project whose metadata the item holds beside the initiative's
    *  properties: a task's. */
   owner?: MetadataOwner;
   /** When the item last changed, which a signature made before it says. */
   updatedAt?: string | null;
   /** Without it, they are read, not changed. */
-  env?: PropertyEnv;
+  env?: PropertyEnv<PropertyDefinition>;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -351,7 +354,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   property,
   placed = false,
 }: PropertiesProps<I, P> & {
-  env: PropertyEnv;
+  env: PropertyEnv<PropertyDefinition>;
   property: PropertySummary;
   /** Placed on the layout on its own: it stays when emptied, so its button
    *  clears its value (a checkbox has no empty to click back to) rather than
@@ -497,7 +500,7 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
   propertyId: number;
   /** Where its definition is, where not among the initiative's properties
    *  and the owner's metadata: a collection's metadata. */
-  definitions?: PropertyDefinitionRead[];
+  definitions?: PropertyDefinition[];
 }) => {
   const { t } = useTranslation(["properties", "ui"]);
   const { env } = props;
@@ -554,7 +557,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   const label = t(props.owner ? "titleWithMetadata" : "title");
   const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = saves.useSave(label);
-  const add = (definition: PropertyDefinitionRead) => {
+  const add = (definition: PropertyDefinition) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
     void save.save({
       properties: { values: [{ property_id: definition.id, value: null }] },
@@ -617,12 +620,12 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       <AddPropertyButton
         definitions={env.definitions.data ?? NO_DEFINITIONS}
         loading={env.definitions.isLoading}
-        initiativeId={initiativeId ?? 0}
+        initiativeId={initiativeId ?? undefined}
         owner={props.owner}
         create={env.createProperty}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
-        disabled={!initiativeId}
+        disabled={initiativeId === null}
       />
     </FieldFrame>
   );
