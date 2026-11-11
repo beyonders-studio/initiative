@@ -442,6 +442,17 @@ jobs:
         run: |
           cd backend
           set -o pipefail
+          # Once a minute, what the runner has left. A runner that gives out
+          # ends the job with no later step, so the last of these lines are
+          # all the log says about what it ran short of.
+          while sleep 60; do
+            echo "runner: $(free -m | awk '/^Mem:/ {m = $7 " of " $2 " MB memory free"} /^Swap:/ {s = $3 " MB swap used"} END {print m ", " s}')," \
+              "$(df -h --output=avail / | tail -1 | tr -d ' ') disk free," \
+              "python $(ps -eo comm=,rss= | awk '$1 ~ /^python/ {s += $2} END {print int(s / 1024)}') MB," \
+              "$(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' | sed -E 's/^[0-9a-f]{32}_//; s| /.*||' | paste -sd, -)"
+          done &
+          sampler=$!
+          trap 'kill $sampler' EXIT
           if [[ "$MODE" == "select" && ! -f .testmondata ]]; then
             echo "::warning::No test selection data from dev, so running every test."
             MODE=full
@@ -467,16 +478,6 @@ jobs:
             -m "not always and not seam and not budget" --testmon-nocollect --testmon-forceselect \
             | tee "$RUNNER_TEMP/pytest.log" || [[ $? -eq 5 ]] || status=1
           exit $status
-
-      - name: Say whether the runner ran out of memory
-        # The job can end cancelled with no other word near the end of the
-        # tests. A runner out of memory loses a process to the kernel, and
-        # its log says which; this runs on a cancelled job too.
-        if: always()
-        run: |
-          free -m
-          sudo dmesg --ctime | grep -iE "out of memory|oom-kill|killed process" \
-            || echo "The kernel killed no process for want of memory."
 
       - name: Publish the test selection data
         # A run with failures records too: a test that failed is selected
