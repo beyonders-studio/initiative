@@ -866,12 +866,37 @@ async def _apply_parts(
 
     A schema that has the operations tables gets each part's operations share
     too; ``operations=True`` gives it them, tables first, where it has none.
+
+    The schema's tables are taken first, in the mode a vacuum takes, before
+    any part changes one: a vacuum of one then gives way to this transaction
+    rather than waiting on a catalog row it already changed while this waits
+    on the vacuum's lock. Reads and writes go on beside it until a part needs
+    the table to itself.
     """
     from app.db.guild_ddl import is_operations_statement
     from app.db.operations_schema import holds_operations
 
     schema = guild_schema_name(guild_id)
     bundle = await get_provisioning_bundle()
+    tables = (
+        (
+            await conn.execute(
+                text(
+                    "SELECT format('%I.%I', n.nspname, c.relname) FROM pg_class c"
+                    " JOIN pg_namespace n ON n.oid = c.relnamespace"
+                    " WHERE n.nspname = :schema AND c.relkind IN ('r', 'p')"
+                    " ORDER BY c.relname"
+                ),
+                {"schema": schema},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if tables:
+        await conn.exec_driver_sql(
+            f"LOCK TABLE {', '.join(tables)} IN SHARE UPDATE EXCLUSIVE MODE"
+        )
     if "schema" in parts:
         await conn.exec_driver_sql(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     if operations is None:
