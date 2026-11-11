@@ -44,7 +44,7 @@ const Field = ({
   target: PropertyTarget;
 }) => {
   const env = usePropertyEnv({
-    initiativeId: props.initiativeId,
+    initiativeId: props.initiativeId ?? null,
     owner: props.owner,
     enabled: !props.readOnly,
   });
