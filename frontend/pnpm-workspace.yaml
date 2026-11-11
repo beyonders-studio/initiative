@@ -65,6 +65,9 @@ overrides:
   # installs, so the two always want the same Chromium, whichever moves.
   '@playwright/mcp>playwright': $@playwright/test
   '@playwright/mcp>playwright-core': $@playwright/test
+  # vite.config.ts serves react-pdf the app's own pdfjs-dist (the legacy build
+  # and its self-hosted worker), so its types resolve to that one too.
+  react-pdf>pdfjs-dist: $pdfjs-dist
   sharp@<0.35.4: ^0.35.4
   fast-uri@<3.1.6: ^3.1.6
   mermaid@<11.16.1: ^11.16.1

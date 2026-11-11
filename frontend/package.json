@@ -126,7 +126,7 @@
     "mermaid": "^12.3.0",
     "modern-screenshot": "^4.7.0",
     "papaparse": "^5.7.0",
-    "pdfjs-dist": "6.3.289",
+    "pdfjs-dist": "6.5.438",
     "qrcode.react": "^4.2.0",
     "quickjs-emscripten-core": "^0.32.0",
     "react": "^19.3.1",
