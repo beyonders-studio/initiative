@@ -949,6 +949,11 @@ def _custom_roles_block() -> str:
         ("custom_role_members", assigns, unassigns),
         (kept, keeps, keeps),
     ):
+        update = (
+            f"CREATE POLICY custom_role_update ON {table} AS PERMISSIVE FOR UPDATE"
+            f"  USING ({remove if table == 'custom_role_members' else write})"
+            f" WITH CHECK ({write});"
+        )
         lines += [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
@@ -964,11 +969,9 @@ def _custom_roles_block() -> str:
                 f"CREATE POLICY custom_role_insert ON {table} AS PERMISSIVE FOR INSERT"
                 f"  WITH CHECK ({write});"
             ),
-            (
-                f"CREATE POLICY custom_role_update ON {table} AS PERMISSIVE FOR UPDATE"
-                f"  USING ({remove if table == 'custom_role_members' else write})"
-                f" WITH CHECK ({write});"
-            ),
+            # A kept plug-in permission is its key and nothing else: it is
+            # given or taken off, never changed.
+            *([] if table == kept else [update]),
             (
                 f"CREATE POLICY custom_role_delete ON {table} AS PERMISSIVE FOR DELETE"
                 f"  USING ({remove});"
