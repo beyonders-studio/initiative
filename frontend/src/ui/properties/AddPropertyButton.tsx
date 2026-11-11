@@ -2,35 +2,36 @@ import { Plus } from "lucide-react";
 import { type ComponentProps, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 
 import { type CreateProperty, NewPropertyForm } from "./NewPropertyForm";
+import type { PropertyDefinition } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 export interface AddPropertyButtonProps {
   /** What can be added: the initiative's properties, and the owner's
    *  metadata where there is an owner. */
-  definitions: PropertyDefinitionRead[];
+  definitions: PropertyDefinition[];
   /** While the definitions are being read. */
   loading?: boolean;
-  /** The initiative a property made from here is made in. */
-  initiativeId: number;
+  /** The initiative a property made from here is made in; none for a
+   *  plug-in's own, which are its own. */
+  initiativeId?: number;
   /** The project whose metadata the item may also hold (a task's), offered
    *  beside the properties and made from here as well. */
   owner?: ComponentProps<typeof NewPropertyForm>["owner"];
   /** Makes a property named from here. */
   create: CreateProperty;
   currentPropertyIds: number[];
-  onAdd: (definition: PropertyDefinitionRead) => void;
+  onAdd: (definition: PropertyDefinition) => void;
   disabled?: boolean;
 }
 
 /** Whether a definition is a project's or a collection's metadata rather than
  *  one of the initiative's properties. */
-const isOwned = (definition: PropertyDefinitionRead) =>
-  definition.project_id !== null || definition.collection_id !== null;
+const isOwned = (definition: PropertyDefinition) =>
+  definition.project_id != null || definition.collection_id != null;
 
 export const AddPropertyButton = ({
   definitions,

@@ -8,8 +8,6 @@ import type {
   LayoutPreset,
   ListLayoutDefinitionInput,
   ListLayoutReadKind,
-  PropertyDefinitionRead,
-  ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -48,11 +46,21 @@ import {
 } from "@/ui/layouts/draft";
 import type { PropertyEnv } from "@/ui/layouts/fieldEditors";
 import { type FieldDef, type LayoutEnv, propertyFieldId } from "@/ui/layouts/fields";
-import { detailLayoutOf, type LayoutChange, listLayouts } from "@/ui/layouts/layoutSet";
+import {
+  detailLayoutOf,
+  type LayoutChange,
+  type LayoutSet,
+  listLayouts,
+  type SaveLayouts,
+} from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
-import type { FieldDisplay, MetadataOwner } from "@/ui/properties/propertyHelpers";
+import type {
+  FieldDisplay,
+  MetadataOwner,
+  PropertyDefinition,
+} from "@/ui/properties/propertyHelpers";
 import {
   Select,
   SelectContent,
@@ -79,7 +87,7 @@ import { DetailLayoutSettings, LayoutProperties, ListLayoutSettings } from "./La
 
 const noop = () => {};
 
-const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
+const NO_DEFINITIONS: PropertyDefinition[] = [];
 
 /** No fields: those of a list with nothing of its own to draw here. Where a
  *  list shows a property is its own card or columns, or its shape's, whatever
@@ -150,7 +158,7 @@ export type ListPreview = {
 export type EditableLists = {
   /** Its fields, by id: the built-ins, the properties of `definitions`, and
    *  the plug-ins'. */
-  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
+  fields(definitions: PropertyDefinition[], plugins: FieldDef[]): Map<string, FieldDef>;
   shape: ListShape;
   /** The open list, its parts marked, drawn in `frame`; its scales as its
    *  `displays` say. */
@@ -188,7 +196,7 @@ export type EditableDetail = {
     parts: string;
   };
   /** Its fields, by id: the built-ins, and the plug-ins' where they draw on it. */
-  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
+  fields(definitions: PropertyDefinition[], plugins: FieldDef[]): Map<string, FieldDef>;
   /** The detail drawn with one of its own, laid out as `tree` says. */
   preview: (tree: LayoutNode) => ReactNode;
 };
@@ -223,7 +231,7 @@ type Draft = {
   opensOn: ListLayoutReadKind;
 };
 
-const draftOf = (set: ToolLayoutSetRead, details: EditableDetail[]): Draft => {
+const draftOf = (set: LayoutSet, details: EditableDetail[]): Draft => {
   const lists = listLayouts(set);
   return {
     lists: Object.fromEntries(
@@ -246,8 +254,12 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 /** What a save sends to make `base` into `draft`: each layout that changed,
  *  saved or put back as shipped, then the list it opens on, if that moved. */
-const changesFrom = (base: Draft, draft: Draft, details: EditableDetail[]): LayoutChange[] => {
-  const changes: LayoutChange[] = [];
+const changesFrom = (
+  base: Draft,
+  draft: Draft,
+  details: EditableDetail[]
+): LayoutChange<string>[] => {
+  const changes: LayoutChange<string>[] = [];
   for (const [kind, definition] of Object.entries(draft.lists) as [
     ListLayoutReadKind,
     ListLayoutDefinitionInput | null,
@@ -326,7 +338,9 @@ export const LayoutEditor = ({
   /** Reads the words of what is laid out: its kinds' fields, parts and lists,
    *  and what the editor says of them. */
   t: LayoutEnv["t"];
-  initiativeId: number;
+  /** The initiative a field made in the editor is made in; none for a
+   *  plug-in's own. */
+  initiativeId?: number;
   /** Its lists, drawn with its items. A target without offers its lists'
    *  presets alone. */
   lists?: EditableLists;
@@ -339,15 +353,15 @@ export const LayoutEditor = ({
    *  one is made. */
   propertyEnv: Pick<PropertyEnv, "definitions" | "createProperty">;
   /** The target's layouts, read by someone who may change them. */
-  layouts: ToolLayoutSetRead;
+  layouts: LayoutSet;
   /** Stores `changes`, in order, answering with the layouts as stored. One
    *  that fails says why itself. */
-  save: (changes: LayoutChange[]) => Promise<ToolLayoutSetRead | undefined>;
+  save: SaveLayouts;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
   /** The target's own properties (a project's, a collection's), listed beside
    *  its layouts, each said where it is placed by `placement`. */
-  properties?: (placement: (definition: PropertyDefinitionRead) => string) => ReactNode;
+  properties?: (placement: (definition: PropertyDefinition) => string) => ReactNode;
   /** Where the initiative's metadata is edited: what a field showing it
    *  links to. */
   metadataHref: string;
@@ -393,7 +407,7 @@ export const LayoutEditor = ({
   // Someone else's change, read while nothing is changed here, is what the
   // editor starts from. One read mid-edit is set aside: Save sends only what
   // this editor changed, against what it started from.
-  const adopt = (stored: ToolLayoutSetRead) => {
+  const adopt = (stored: LayoutSet) => {
     const fresh = draftOf(stored, details);
     setSeen(stored);
     setBase(fresh);

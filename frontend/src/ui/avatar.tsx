@@ -42,14 +42,15 @@ interface AvatarFallbackProps
    * non-user avatars (community icons, generic placeholders), which keep the
    * default ``bg-muted`` look.
    */
-  userId?: number | null;
+  userId?: number | string | null;
 }
 
 const AvatarFallback = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Fallback>,
   AvatarFallbackProps
 >(({ className, style, userId, ...props }, ref) => {
-  const hasUserColor = typeof userId === "number" && userId > 0;
+  const hasUserColor =
+    (typeof userId === "number" && userId > 0) || (typeof userId === "string" && userId !== "");
   const mergedStyle = hasUserColor ? { ...getUserColorStyle(userId), ...style } : style;
   return (
     <AvatarPrimitive.Fallback

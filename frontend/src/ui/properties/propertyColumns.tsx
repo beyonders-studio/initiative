@@ -1,13 +1,11 @@
 import type { RowData } from "@tanstack/react-table";
 import type { LucideIcon } from "lucide-react";
 
-import type {
-  PropertyDefinitionRead,
-  PropertySummary,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
 import type { AppColumnDef } from "@/ui/lib/table";
 
 import { PropertyValueCell } from "./PropertyValueCell";
+import type { PropertyDefinition } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 /**
@@ -43,7 +41,7 @@ const PROPERTY_COLUMN_ID_PREFIX = "property:";
  * across multiple initiatives), the id + label get a ``(#<id>)`` suffix.
  */
 export const propertyColumnId = (
-  definition: Pick<PropertyDefinitionRead, "id" | "name">,
+  definition: Pick<PropertyDefinition, "id" | "name">,
   isAmbiguous = false
 ): string => {
   const trimmed = definition.name?.trim();
@@ -54,7 +52,7 @@ export const propertyColumnId = (
 
 /** Human-readable label used by the column-visibility dropdown. */
 export const propertyColumnLabel = (
-  definition: Pick<PropertyDefinitionRead, "id" | "name">,
+  definition: Pick<PropertyDefinition, "id" | "name">,
   isAmbiguous = false
 ): string => {
   const trimmed = definition.name?.trim();
@@ -67,7 +65,7 @@ export const propertyColumnLabel = (
  * ``propertyColumnId`` can disambiguate them. Names that appear only once
  * keep the plain form; duplicates get the ``(#<id>)`` suffix.
  */
-const buildAmbiguousNameSet = (definitions: PropertyDefinitionRead[]): Set<string> => {
+const buildAmbiguousNameSet = (definitions: PropertyDefinition[]): Set<string> => {
   const counts = new Map<string, number>();
   for (const definition of definitions) {
     const trimmed = definition.name?.trim()?.toLowerCase();
@@ -82,7 +80,7 @@ const buildAmbiguousNameSet = (definitions: PropertyDefinitionRead[]): Set<strin
 };
 
 const isDefinitionAmbiguous = (
-  definition: Pick<PropertyDefinitionRead, "name">,
+  definition: Pick<PropertyDefinition, "name">,
   ambiguousNames: Set<string>
 ): boolean => {
   const trimmed = definition.name?.trim()?.toLowerCase();
@@ -96,8 +94,8 @@ const isDefinitionAmbiguous = (
  * property reads the same in both menus.
  */
 export const namePropertyColumns = (
-  definitions: PropertyDefinitionRead[]
-): { definition: PropertyDefinitionRead; id: string; label: string }[] => {
+  definitions: PropertyDefinition[]
+): { definition: PropertyDefinition; id: string; label: string }[] => {
   const ambiguousNames = buildAmbiguousNameSet(definitions);
   return definitions.map((definition) => {
     const ambiguous = isDefinitionAmbiguous(definition, ambiguousNames);
@@ -130,7 +128,7 @@ export const PropertyColumnHeader = ({
  * needs server support we don't have yet.
  */
 export function buildPropertyColumns<T extends RowData>(
-  definitions: PropertyDefinitionRead[],
+  definitions: PropertyDefinition[],
   getProperties: (row: T) => PropertySummary[] | undefined | null
 ): AppColumnDef<T>[] {
   if (definitions.length > PROPERTY_COLUMN_CAP) {
@@ -172,5 +170,5 @@ export function buildPropertyColumns<T extends RowData>(
  * ``columnVisibility`` map so the default-hidden toggle keys match the
  * column ids actually rendered.
  */
-export const propertyColumnIds = (definitions: PropertyDefinitionRead[]): string[] =>
+export const propertyColumnIds = (definitions: PropertyDefinition[]): string[] =>
   namePropertyColumns(definitions).map(({ id }) => id);

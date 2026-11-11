@@ -114,7 +114,7 @@ export type AddChoices = {
   parts: PickerPart[];
   /** Where a new field is made, where one can be placed: among the
    *  initiative's metadata, or the project's or collection's properties. */
-  newField?: { initiativeId: number; owner?: MetadataOwner; create: CreateProperty };
+  newField?: { initiativeId?: number; owner?: MetadataOwner; create: CreateProperty };
 };
 
 /** What a pick in the Add picker does. */

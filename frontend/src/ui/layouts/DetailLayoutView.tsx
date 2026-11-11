@@ -12,14 +12,14 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  PropertyDefinitionRead,
-  PropertySummary,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
-import { type MetadataOwner, ownProperties } from "@/ui/properties/propertyHelpers";
+import {
+  type MetadataOwner,
+  ownProperties,
+  type PropertyDefinition,
+} from "@/ui/properties/propertyHelpers";
 
 import {
   addingTree,
@@ -46,11 +46,13 @@ export interface ItemHome<I, P> {
   saves: ItemSaves<I, P>;
   /** The server says the reader cannot change it. */
   readOnly: boolean;
-  /** Its initiative, which holds its properties' definitions; none for a
-   *  community's own tool. */
-  initiativeId: number | null;
-  /** The tool it is opened in: whose members a person-valued property names. */
-  canOpen: { tool: Tool; id: number };
+  /** Its initiative, which holds its properties' definitions; null for a
+   *  community's own tool, which has none. A plug-in's own item, whose
+   *  definitions are the plug-in's, leaves it out. */
+  initiativeId?: number | null;
+  /** The tool it is opened in (an Initiative tool, or a plug-in's own kind):
+   *  whose members a person-valued property names. */
+  canOpen: { tool: string; id: number };
   /** The project whose metadata it holds beside its initiative's properties:
    *  a task's. */
   owner?: MetadataOwner;
@@ -95,7 +97,7 @@ export interface DetailKind<I extends DetailItem, C, P, H extends object = objec
   typed?: { typeOf: (item: I) => number; spec: (item: I) => DetailLayoutSpec };
   /** Its fields, given its initiative's properties and the fields its
    *  extension adds. */
-  fields: (definitions: PropertyDefinitionRead[], added: FieldDef[]) => Map<string, FieldDef>;
+  fields(definitions: PropertyDefinition[], added: FieldDef[]): Map<string, FieldDef>;
   /** Where its fields' labels are worded. */
   namespaces: readonly FlatNamespace[];
   /** Its own fields' editors, by field id. */
@@ -104,8 +106,10 @@ export interface DetailKind<I extends DetailItem, C, P, H extends object = objec
   parts?: Parts<I>;
   home: (item: I, context: C) => ItemHome<I, P> & H;
   /** What the app drawing it adds to each item's detail, given where the
-   *  item lives and the kind its layout is stored as. */
-  useExtension: (home: ItemHome<I, P>, kind: DetailLayoutSpec["kind"]) => DetailExtension<I>;
+   *  item lives and the kind its layout is stored as. A method, whose
+   *  parameters TypeScript checks both ways: one that draws only Initiative's
+   *  tools' items, in an initiative, is one. */
+  useExtension(home: ItemHome<I, P>, kind: string): DetailExtension<I>;
   /** Holds what its parts keep across a change of layout. */
   Shell?: ComponentType<{ context: C; children: ReactNode }>;
   /** Its own parts an item being added draws: those that need nothing saved. */

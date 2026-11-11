@@ -2,7 +2,7 @@ import { EyeClosed } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { host } from "@/ui/host";
@@ -24,6 +24,7 @@ import { listFormat } from "@/ui/lib/intl";
 import {
   COUNTER_DISPLAYS,
   type FieldDisplay,
+  type PropertyDefinition,
   SCALE_DISPLAYS,
 } from "@/ui/properties/propertyHelpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -174,7 +175,7 @@ const MetadataFieldNote = ({
 }) => {
   const { t } = useTranslation(["layouts"]);
   const definition = fields.get(field)?.property;
-  if (!definition || definition.project_id !== null || definition.collection_id !== null) {
+  if (!definition || definition.project_id != null || definition.collection_id != null) {
     return null;
   }
   return (
@@ -315,7 +316,7 @@ export const LayoutProperties = ({
   list,
   shownOn,
 }: {
-  list: (placement: (definition: PropertyDefinitionRead) => string) => ReactNode;
+  list: (placement: (definition: PropertyDefinition) => string) => ReactNode;
   shownOn: (propertyId: number) => string[];
 }) => {
   const { t, i18n } = useTranslation(["layouts"]);

@@ -8,32 +8,45 @@ import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { cn } from "@/ui/lib/utils";
 
-/** Someone a picker or a field may name, as they are drawn. */
-export interface Member {
-  id: number;
+/** How the app knows a person: Initiative by number, a plug-in by the
+ *  reference it is given for them. */
+export type MemberId = number | string;
+
+/** Whether `id` is one a person is known by. */
+export const isMemberId = (id: unknown): id is MemberId =>
+  (typeof id === "number" && Number.isFinite(id)) || (typeof id === "string" && id !== "");
+
+/** Someone a picker or a field may name, as they are drawn, by the id the app
+ *  knows them by (`Id`). */
+export interface Member<Id extends MemberId = number> {
+  id: Id;
   name: string;
   /** Their picture; their initials are drawn where they have none. */
   picture?: string;
   initials: string;
 }
 
-/** Whose people are offered: the community's, those who can open one row, or
- *  one initiative's members. */
-export type MemberScope =
+/** Whose people are offered: the community's, those who can open one row of
+ *  a tool (`T`), or one initiative's members. */
+export type MemberScope<T extends string = Tool> =
   | { type: "community" }
-  | { type: "canOpen"; tool: Tool; id: number | null | undefined }
+  | { type: "canOpen"; tool: T; id: number | null | undefined }
   | { type: "initiative"; initiativeId: number | null | undefined };
 
-/** The members of `scope` whose names match `search`, or those `ids` names. */
-export type SearchMembers = (
-  scope: MemberScope,
-  query: { search: string } | { ids: number[] }
-) => Promise<Member[]>;
+/**
+ * The members of `scope` whose names match `search`, or those `ids` names. A
+ * method, whose parameters TypeScript checks both ways: one that knows its
+ * people by number and its tools by name is taken wherever the kit takes any,
+ * as the kit asks it only of the people and rows the same app gave it.
+ */
+export type SearchMembers<Id extends MemberId = number, T extends string = Tool> = {
+  search(scope: MemberScope<T>, query: { search: string } | { ids: Id[] }): Promise<Member<Id>[]>;
+}["search"];
 
-export type MemberPickerProps = {
+export type MemberPickerProps<Id extends MemberId = number> = {
   /** Finds the people listed, and who a bare `value` names. */
-  searchMembers: SearchMembers;
-  scope: MemberScope;
+  searchMembers: SearchMembers<Id, string>;
+  scope: MemberScope<string>;
   /** Shown in the trigger while nobody is picked, and in the search field. */
   placeholder: string;
   /** Shown when nobody matches. */
@@ -47,22 +60,22 @@ export type MemberPickerProps = {
   | {
       multiple?: false;
       /** The person picked, by id; null for nobody. */
-      value: number | null;
+      value: Id | null;
       /** Who `value` names, so the trigger shows them without a lookup. Without
        *  it, the value is looked up. */
-      selected?: Member | null;
+      selected?: Member<Id> | null;
       /** The id picked and who it names; null for nobody. */
-      onChange: (id: number | null, member: Member | null) => void;
+      onChange: (id: Id | null, member: Member<Id> | null) => void;
     }
   | {
       /** Picks several, each shown as a chip that takes them off again. */
       multiple: true;
       /** The people picked, by id. */
-      value: number[];
+      value: Id[];
       /** Who `value` names, as far as the caller knows; the rest are looked up. */
-      selected?: Member[];
+      selected?: Member<Id>[];
       /** The ids picked and who they name. */
-      onChange: (ids: number[], members: Member[]) => void;
+      onChange: (ids: Id[], members: Member<Id>[]) => void;
       /** Choices that name nobody in particular, listed above the people and
        *  each picked on its own. */
       extras?: readonly {
@@ -72,14 +85,14 @@ export type MemberPickerProps = {
         onToggle: (selected: boolean) => void;
       }[];
       /** The reader, listed first and marked as them. */
-      currentUserId?: number;
+      currentUserId?: Id;
       /** "filter" is the compact field of a row of filters: it says who or how
        *  many are picked, with no chips and no Clear. */
       variant?: "default" | "filter";
     }
 );
 
-const MemberAvatar = ({ member, className }: { member: Member; className?: string }) => (
+const MemberAvatar = ({ member, className }: { member: Member<MemberId>; className?: string }) => (
   <Avatar className={cn("h-6 w-6 border text-3xs", className)}>
     {member.picture ? <AvatarImage src={member.picture} alt={member.name} /> : null}
     <AvatarFallback userId={member.id}>{member.initials}</AvatarFallback>
@@ -88,7 +101,7 @@ const MemberAvatar = ({ member, className }: { member: Member; className?: strin
 
 /** One of the people in `scope`, or several with `multiple`, searched for by
  *  name while the list is open. */
-export const MemberPicker = (props: MemberPickerProps) => {
+export const MemberPicker = <Id extends MemberId = number>(props: MemberPickerProps<Id>) => {
   const {
     searchMembers,
     scope,
@@ -102,13 +115,13 @@ export const MemberPicker = (props: MemberPickerProps) => {
   const { t } = useTranslation("ui");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [found, setFound] = useState<Member[]>([]);
+  const [found, setFound] = useState<Member<Id>[]>([]);
   const [loading, setLoading] = useState(false);
   // Everyone found or looked up so far, so a pick stays named once the search
   // moves on.
-  const [named, setNamed] = useState<ReadonlyMap<number, Member>>(() => new Map());
+  const [named, setNamed] = useState<ReadonlyMap<Id, Member<Id>>>(() => new Map());
   const remember = useCallback(
-    (members: Member[]) =>
+    (members: Member<Id>[]) =>
       setNamed((known) => new Map([...known, ...members.map((each) => [each.id, each] as const)])),
     []
   );
@@ -116,7 +129,7 @@ export const MemberPicker = (props: MemberPickerProps) => {
   // Kept by what it says, so a scope given afresh each render asks nothing new.
   const scopeKey = JSON.stringify(scope);
   const search = useCallback(
-    (asked: Parameters<SearchMembers>[1]) => searchMembers(JSON.parse(scopeKey), asked),
+    (asked: Parameters<SearchMembers<Id>>[1]) => searchMembers(JSON.parse(scopeKey), asked),
     [searchMembers, scopeKey]
   );
 
@@ -142,19 +155,20 @@ export const MemberPicker = (props: MemberPickerProps) => {
   const ids = props.multiple ? props.value : props.value === null ? [] : [props.value];
   const selected = props.multiple ? (props.selected ?? []) : props.selected ? [props.selected] : [];
   const known = new Map([...named, ...selected.map((each) => [each.id, each] as const)]);
-  const draw = (each: number): Member =>
+  const draw = (each: Id): Member<Id> =>
     known.get(each) ?? {
       id: each,
       name: t("memberPicker.userWithId", { id: each }),
       initials: "?",
     };
 
-  // Joined, so a value given afresh each render looks nobody up again.
-  const unnamed = ids.filter((each) => !known.has(each)).join(",");
+  // Written out, so a value given afresh each render looks nobody up again.
+  const unnamed = JSON.stringify(ids.filter((each) => !known.has(each)));
   useEffect(() => {
-    if (!unnamed) return;
+    const asked: Id[] = JSON.parse(unnamed);
+    if (asked.length === 0) return;
     let current = true;
-    search({ ids: unnamed.split(",").map(Number) })
+    search({ ids: asked })
       .then((members) => {
         if (current) remember(members);
       })
@@ -216,13 +230,15 @@ export const MemberPicker = (props: MemberPickerProps) => {
   }
 
   const { value, onChange, extras = [], currentUserId, variant = "default" } = props;
-  const pick = (next: number[]) => onChange(next, next.map(draw));
+  const pick = (next: Id[]) => onChange(next, next.map(draw));
   const foundIds = new Set(found.map((each) => each.id));
   // The people picked stay listed when the search misses them, so they can be
   // taken off; then the reader goes first.
   const listed = [...value.filter((each) => !foundIds.has(each)).map(draw), ...found].sort(
     (a, b) => Number(b.id === currentUserId) - Number(a.id === currentUserId)
   );
+  // Each person listed by the value a row of the list carries.
+  const listedIds = new Map(listed.map((member) => [String(member.id), member.id]));
 
   const picker = (
     <Combobox
@@ -245,7 +261,11 @@ export const MemberPicker = (props: MemberPickerProps) => {
       onValueChange={(next) => {
         const extra = extras.find((each) => next.includes(each.value) !== each.selected);
         if (extra) return extra.onToggle(!extra.selected);
-        pick(next.filter((each) => !extras.some((other) => other.value === each)).map(Number));
+        pick(
+          next
+            .filter((each) => !extras.some((other) => other.value === each))
+            .flatMap((each) => listedIds.get(each) ?? [])
+        );
       }}
       placeholder={placeholder}
       aria-label={ariaLabel}

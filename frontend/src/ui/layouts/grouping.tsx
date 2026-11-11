@@ -19,13 +19,15 @@ import {
   type ListLayoutDefinitionOutput,
   type ListLayoutReadKind,
   MetadataType,
-  type PropertyDefinitionRead,
   type PropertySummary,
   type PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { extractUser, PropertyValueCell } from "@/ui/properties/PropertyValueCell";
-import { propertyStubFromDefinition } from "@/ui/properties/propertyHelpers";
+import {
+  type PropertyDefinition,
+  propertyStubFromDefinition,
+} from "@/ui/properties/propertyHelpers";
 
 import type { FieldDef, LayoutEnv } from "./fields";
 
@@ -44,7 +46,7 @@ export type GroupingChoice = {
   bucket: boolean;
   /** Whether it is what a board's columns are, so its bands never are. */
   columns?: boolean;
-  property?: PropertyDefinitionRead;
+  property?: PropertyDefinition;
 };
 
 /** A grouping choice, as a list draws it. */
@@ -206,7 +208,7 @@ const bucketLabel = (key: string, bucket: DateBucket, t: LayoutEnv["t"]): string
 };
 
 const propertyMove = (
-  definition: PropertyDefinitionRead
+  definition: PropertyDefinition
 ): ((from: string, to: string) => PropertyMove) | undefined => {
   const id = definition.id;
   const write = (to: string, value: unknown): PropertyMove => ({
@@ -265,11 +267,11 @@ export const offeredGroupings = <I extends { id: number; properties: PropertySum
     const names = new Map((data?.groups ?? []).map((group) => [group.key, group.label]));
     const named = (key: string) => label(names.get(key) ?? key);
     const summary = (value: unknown): PropertySummary => ({
-      ...propertyStubFromDefinition(field.property as PropertyDefinitionRead),
+      ...propertyStubFromDefinition(field.property as PropertyDefinition),
       value,
     });
 
-    const propertyHeader = (definition: PropertyDefinitionRead, key: string): ReactNode => {
+    const propertyHeader = (definition: PropertyDefinition, key: string): ReactNode => {
       switch (definition.type) {
         case MetadataType.checkbox:
           return label(

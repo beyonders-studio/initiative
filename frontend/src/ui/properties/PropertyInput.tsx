@@ -4,10 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import {
   MetadataType,
-  type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
-  type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -16,23 +14,25 @@ import { DateTimePicker } from "@/ui/date-time-picker";
 import { Input } from "@/ui/input";
 import { toPickerValue } from "@/ui/lib/localDateTime";
 import { cn } from "@/ui/lib/utils";
-import { type Member, MemberPicker, type SearchMembers } from "@/ui/member-picker";
+import { type Member, type MemberId, MemberPicker, type SearchMembers } from "@/ui/member-picker";
 import { Slider } from "@/ui/slider";
 
 import { type FileFieldFiles, FileFieldInput } from "./FileFieldInput";
+import { extractUser } from "./PropertyValueCell";
 import {
   counterCount,
   counterSettings,
   type FieldDisplay,
   fileFieldValue,
   numericValue,
+  type PropertyDefinition,
   scaleValue,
   steppedCount,
   withinBounds,
 } from "./propertyHelpers";
 import { SignatureFieldInput } from "./SignatureFieldInput";
 
-type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
+type PropertyDefinitionLike = PropertyDefinition | PropertySummary;
 
 export interface PropertyInputProps {
   definition: PropertyDefinitionLike;
@@ -41,14 +41,14 @@ export interface PropertyInputProps {
   disabled?: boolean;
   className?: string;
   /** Initiative that scopes the `user_reference` and `file` pickers. Falls back to the
-   *  definition's own `initiative_id` when it carries one (a full
-   *  `PropertyDefinitionRead`); required via this prop when the definition
+   *  definition's own `initiative_id` when it carries one (an
+   *  initiative's definition); required via this prop when the definition
    *  arrives as an embedded `PropertySummary`. */
   initiativeId?: number | null;
   /** The row whose readers a `user_reference` value may name (the task's
    *  project, the event's calendar, the file). Without it the picker
    *  offers the initiative's members, which is what a filter wants. */
-  canOpen?: { tool: Tool; id: number | null | undefined };
+  canOpen?: { tool: string; id: number | null | undefined };
   /** Adds an option named `label` to a select property, or finds the one
    *  already named so, and answers with it. A failure is told by this, and
    *  rejects. */
@@ -57,10 +57,10 @@ export interface PropertyInputProps {
     label: string
   ) => Promise<PropertyOption>;
   /** Finds the people a `user_reference` value may name. */
-  searchMembers: SearchMembers;
+  searchMembers: SearchMembers<MemberId, string>;
   /** Who a pre-set `user_reference` value names, so the picker shows them
    *  without a search round-trip. Without it, the value is looked up. */
-  selectedUser?: Member | null;
+  selectedUser?: Member<MemberId> | null;
   /** How a scale is set: as a number, by stars, or along a bar. A number
    *  without. */
   display?: FieldDisplay | null;
@@ -500,7 +500,7 @@ export const PropertyInput = ({
                     ("initiative_id" in definition ? definition.initiative_id : null),
                 }
           }
-          value={coerceId(value)}
+          value={extractUser(value)?.id ?? null}
           selected={selectedUser}
           onChange={(id) => onChange(id)}
           placeholder={t("input.userPlaceholder")}

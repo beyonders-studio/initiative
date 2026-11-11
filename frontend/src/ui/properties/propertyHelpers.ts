@@ -1,12 +1,32 @@
 import {
   type CounterSettingsInput,
+  type CounterSettingsOutput,
+  type CurrencyCode,
   type FileType,
   type ListLayoutDefinitionInputDisplays,
   MetadataType,
-  type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
+import { isMemberId, type MemberId } from "@/ui/member-picker";
+
+/**
+ * A property an item may hold, as its definition is read: an initiative's
+ * property or metadata, or a plug-in's own. An initiative's names it, which a
+ * person-valued filter offers the members of; metadata names the project or
+ * collection it is of. A plug-in's names neither.
+ */
+export interface PropertyDefinition {
+  id: number;
+  name: string;
+  type: MetadataType;
+  options: PropertyOption[] | null;
+  currency: CurrencyCode | null;
+  counter: CounterSettingsOutput | null;
+  initiative_id?: number;
+  project_id?: number | null;
+  collection_id?: number | null;
+}
 
 /** Who a definition belongs to where it is not the initiative's: a project
  *  (its metadata, on its tasks) or a collection (its metadata, on its files). */
@@ -188,7 +208,7 @@ export const nonEmptyPropertySummaries = (
 /** A person a value names, as the server reads it back: their handle, name
  *  and picture, or their id alone where the reader cannot see them. */
 export interface UserValue {
-  id: number;
+  id: MemberId;
   username?: string | null;
   discriminator?: number | null;
   display_name?: string | null;
@@ -200,7 +220,7 @@ export interface UserValue {
 export const userReferenceValue = (property: PropertySummary): UserValue | null => {
   if (property.type !== MetadataType.user_reference) return null;
   const raw = property.value;
-  if (raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "number") {
+  if (raw && typeof raw === "object" && isMemberId((raw as { id?: unknown }).id)) {
     return raw as UserValue;
   }
   return null;
@@ -235,7 +255,7 @@ export const signatureValue = (raw: unknown): SignatureValue | null =>
     : null;
 
 /** Convert a server ``PropertySummary.value`` into the shape an edited value
- *  takes: ``user_reference`` and ``file`` collapse to their numeric id
+ *  takes: ``user_reference`` and ``file`` collapse to their id
  *  (``PropertyInput`` round-trips the id), everything else passes through. */
 export const normalizePropertyValue = (property: PropertySummary): unknown =>
   property.type === MetadataType.user_reference
@@ -249,7 +269,7 @@ export const normalizePropertyValue = (property: PropertySummary): unknown =>
  *  initial value then. */
 export const listedValue = (
   summaries: PropertySummary[] | undefined | null,
-  definition: PropertyDefinitionRead
+  definition: PropertyDefinition
 ): PropertySummary | null => {
   const summary = summaries?.find((each) => each.property_id === definition.id);
   if (definition.type === MetadataType.counter) {
@@ -259,14 +279,12 @@ export const listedValue = (
 };
 
 /** A property just picked, before it has a value, as an item lists it. */
-export const propertyStubFromDefinition = (
-  definition: PropertyDefinitionRead
-): PropertySummary => ({
+export const propertyStubFromDefinition = (definition: PropertyDefinition): PropertySummary => ({
   property_id: definition.id,
   name: definition.name,
   type: definition.type,
-  project_id: definition.project_id,
-  collection_id: definition.collection_id,
+  project_id: definition.project_id ?? null,
+  collection_id: definition.collection_id ?? null,
   install_id: null,
   key: null,
   options: definition.options ?? null,

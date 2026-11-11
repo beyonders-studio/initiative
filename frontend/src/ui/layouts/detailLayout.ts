@@ -8,7 +8,6 @@ import { createContext } from "react";
 
 import type {
   DetailLayoutDefinitionInput,
-  DetailLayoutRead,
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { isEmptyPropertyValue } from "@/ui/properties/propertyHelpers";
@@ -182,8 +181,9 @@ const LAYOUT_PARTS = new Set(["section", "stack", "field", "properties"]);
 
 /** One kind of detail: as shipped, and as a stored layout draws it. */
 export interface DetailLayoutSpec {
-  /** What its layout is stored as. */
-  kind: DetailLayoutRead["kind"];
+  /** What its layout is stored as: an Initiative tool's kind (`task`), or a
+   *  plug-in's own. */
+  kind: string;
   /** The regions as shipped. */
   shipped: Record<Region, LayoutNode[]>;
   /** The detail's own parts, each placed at most once: what the shipped
@@ -220,7 +220,7 @@ export const detailLayoutSpec = ({
   requiredParts = null,
   knows = shipped,
 }: {
-  kind: DetailLayoutRead["kind"];
+  kind: string;
   shipped: Record<Region, LayoutNode[]>;
   fieldParts: readonly string[];
   /** Its own parts a layout can require; none where it requires nothing. */

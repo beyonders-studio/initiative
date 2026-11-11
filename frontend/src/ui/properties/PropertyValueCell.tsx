@@ -15,7 +15,7 @@ import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
-import type { Member } from "@/ui/member-picker";
+import { isMemberId, type Member, type MemberId } from "@/ui/member-picker";
 
 import {
   counterCount,
@@ -324,20 +324,14 @@ const SelectChip = ({ option, slug, unknownLabel, dense }: SelectChipProps) => {
 };
 
 export const extractUser = (raw: unknown): UserValue | null => {
-  if (raw && typeof raw === "object" && "id" in raw) {
-    const id = (raw as { id: unknown }).id;
-    if (typeof id === "number" && Number.isFinite(id)) {
-      return raw as UserValue;
-    }
+  if (raw && typeof raw === "object" && "id" in raw && isMemberId(raw.id)) {
+    return raw as UserValue;
   }
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    return { id: raw };
-  }
-  return null;
+  return isMemberId(raw) ? { id: raw } : null;
 };
 
 /** A person's avatar, at a cell's size. */
-const PersonAvatar = ({ member, name }: { member: Member; name: string }) => (
+const PersonAvatar = ({ member, name }: { member: Member<MemberId>; name: string }) => (
   <Avatar className="h-5 w-5 text-3xs">
     {member.picture ? <AvatarImage src={member.picture} alt={name} /> : null}
     <AvatarFallback userId={member.id}>{member.initials}</AvatarFallback>
