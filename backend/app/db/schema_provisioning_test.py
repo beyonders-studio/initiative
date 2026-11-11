@@ -47,6 +47,7 @@ _GID_READ_FLOOR = 990_121
 _GID_SEAT = 990_122
 _GID_PLUGIN = 990_125
 _GID_PLUGIN_DENIED = 990_126
+_GID_VACUUM = 990_127
 # Back-fill sweep (each pair: one provisioned, one only a public row).
 _GID_BACKFILL_DONE = 990_111
 _GID_BACKFILL_MISSING = 990_112
@@ -158,6 +159,60 @@ async def test_provision_is_idempotent(engine):
             )
         assert count == len(GUILD_SCOPED_TABLES - OPERATIONS_TABLES)
     finally:
+        async with engine.begin() as conn:
+            await drop_guild_schema(conn, gid)
+
+
+async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
+    engine, monkeypatch
+):
+    """A vacuum reaching a table after provisioning's grants and before its
+    policies waits for provisioning to finish. Its analyze writes the table's
+    catalog row, which the grants wrote; had it held the table, the policies
+    would have waited on it while it waited on them."""
+    gid = _GID_VACUUM
+    # A table no part before the policies takes a lock on.
+    table = f'"{guild_schema_name(gid)}".view_preferences'
+    real_apply_guild_rls = schema_provisioning.apply_guild_rls
+    vacuums: list[asyncio.Task] = []
+    vacuum_pid: list[int] = []
+
+    async def vacuum() -> None:
+        async with engine.connect() as conn:
+            await conn.begin()
+            vacuum_pid.append(await conn.scalar(text("SELECT pg_backend_pid()")))
+            await conn.exec_driver_sql(
+                f"LOCK TABLE {table} IN SHARE UPDATE EXCLUSIVE MODE"
+            )
+            await conn.exec_driver_sql(f"ANALYZE {table}")
+            await conn.commit()
+
+    async def rls_once_a_vacuum_waits(conn, schema: str) -> None:
+        vacuums.append(asyncio.create_task(vacuum()))
+        async with engine.connect() as probe:
+            while not vacuum_pid or not await probe.scalar(
+                text(
+                    "SELECT 1 FROM pg_stat_activity "
+                    "WHERE pid = :pid AND wait_event_type = 'Lock'"
+                ),
+                {"pid": vacuum_pid[0]},
+            ):
+                assert not vacuums[0].done(), "the vacuum did not wait"
+                await asyncio.sleep(0.05)
+        await real_apply_guild_rls(conn, schema)
+
+    try:
+        async with engine.begin() as conn:
+            await provision_guild_schema(conn, gid)
+        monkeypatch.setattr(
+            schema_provisioning, "apply_guild_rls", rls_once_a_vacuum_waits
+        )
+        async with engine.begin() as conn:
+            await provision_guild_schema(conn, gid)
+        await vacuums[0]
+    finally:
+        for task in vacuums:
+            task.cancel()
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)
 
