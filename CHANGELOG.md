@@ -32,12 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Plug-ins answer to your roles.** Who uses a plug-in inside an initiative is set on the initiative's **Roles** page, beside its tools: its managers and community admins always can, and other roles as you set them, starting from what the plug-in suggests. Community admins can set members' answer for every initiative, as for a tool. A plug-in's community pages follow the admin rung, and a custom role on it can keep only some of them. Placing a plug-in now only says where it works; the roles each placement allowed carry over, and an initiative's managers now reach every plug-in placed there. **Plug-in developers:** a page, field, part, action or endpoint names a `permission` your manifest declares in `permissions`, in place of `admin_only`, and a handoff and an ID token carry the ones the person holds.
+- **Plug-ins answer to your roles.** Who uses a plug-in in an initiative is set on its **Roles** page, beside its tools; managers and community admins always can, and the roles each placement allowed carry over. **Plug-in developers:** a page, field, part, action or endpoint names a `permission` your manifest declares in `permissions`, in place of `admin_only`, and a handoff and an ID token carry the ones the person holds.
 - **Old passwords need resetting.** An account that hasn't signed in with a password since 0.44 sets a new one with **Forgot password** (it needs email set up on the server), or signs in with a passkey or single sign-on.
 - **Backups made before 0.78 no longer restore.** Restore one on 0.78 first, then back up again.
 - **Unsigned message devices are removed.** A device that never signed its keys (any on the app since 0.73 has) registers again the next time it opens, without the messages it held.
 - **Help leads with the user guide.** **Help**, in your account menu and the command palette, searches the guide, starting with the page you're on. Where your server takes requests, **Ask the team** starts one; the documentation and lifebuoy icons are gone.
 - **Update waits beside the bell.** Once you close a new version's prompt, **Update** stays beside the bell, or in the desktop app's title bar. The version number and **What's new** moved to the foot of **My Settings**.
+- **A narrower sidebar.** The navigation beside the communities rail starts narrower; drag its edge to widen it.
 - **Event themes replace the Pride choice.** The app dresses up for Pride in June, through Christmas and for the new year. One switch under **My Settings → Interface → This device** turns them off.
 - **Themes go by their real names.** Displacer is **Catppuccin**, Strahd **Dracula** and Aboleth **Monokai**, and you keep yours under its new name.
 - **Closed announcements stay in notifications.** A closed announcement leaves a read line in your notifications that opens it again, in place of the **Past announcements** page.
@@ -49,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Press and hold to reorder on phones.** A drag starts after a short hold, so a swipe over a page tree or list scrolls it.
 - **Task tables scroll with the page.** A project's task table keeps its column headings at the top as you scroll, and long collections scroll smoothly.
 - **Loading shows the page's shape.** Lists, pages and panels show their outline while they load, and anything that fails to load says so, with **Try again**.
-- **Dialogs look and behave alike.** Every dialog and side panel keeps its title and buttons in view, and Save, Create and Delete show a spinner and can't be pressed twice. Every create dialog has **Cancel**, and bulk deletes ask in the app.
+- **Dialogs look and behave alike.** Dialogs and side panels keep their title and buttons in view, and Save, Create and Delete show a spinner and can't be pressed twice.
 - **Fields look and read alike.** Every field shares one box and focus ring, is outlined red when invalid, and focuses from its label. A screen reader reads a field's hint and error with it.
 - **Tool cards look alike.** Every tool's cards lift under the pointer, and a name cut short shows in full when you point at it.
 - **Sideways rows scroll alike.** From collections above a file list to an item's links, drag, swipe or use the arrow buttons.
@@ -72,9 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Repeating tasks a plug-in completes land on the right day.** A task that repeats after completion counts its next due date in the plug-in's or automation's time zone, not UTC. A plug-in reading a repeating event is told when it next starts.
 - **Group rules give their initiative role.** Where a provider connection adds people on arrival, someone a group rule places in an auto-join initiative gets the rule's role there, not a plain member's.
 - **The S3 move in the order that works.** On the storage page, save S3 with **Serve missing objects from local** on, then **Start backfill**, which waits until S3 is saved.
-- **Single sign-on goes on past an age limit.** Where a listed community's provider connection adds people on arrival, an account its age answer keeps out is left out of it, and the sign-in goes on.
 - **Passkeys work in the apps.** Signing in, adding a passkey, breaking glass, the billing console and every other passkey prompt open your browser and carry on in the app, with no second sign-in.
-- **Plug-in updates that ask for access.** Its row in **Settings › Integrations** shows **Update waiting** with what the version asks for, and a version this server can't run says why.
+- **Single sign-on goes on past an age limit.** Where a listed community's provider connection adds people on arrival, an account its age answer keeps out is left out of it, and the sign-in goes on.
+- **Plug-in updates show what they ask for.** Its row in **Settings › Integrations** shows **Update waiting** with what the version asks for, and a version this server can't run says why.
 - **Create from `[[` in wikis and posts.** It asks what kind of thing to make, and links it.
 - **Posts from X and Reddit show.** In a document, on a whiteboard or as a link file, on the web and in the apps.
 - **New plug-in widgets appear at once.** A plug-in's widgets are offered as soon as it's installed or upgraded.

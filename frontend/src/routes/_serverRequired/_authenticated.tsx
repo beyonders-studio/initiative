@@ -307,7 +307,7 @@ function AppLayout() {
               className="h-full min-h-0"
               style={
                 {
-                  "--sidebar-width": "20rem",
+                  "--sidebar-width": "17rem",
                   "--sidebar-width-mobile": "90vw",
                 } as React.CSSProperties
               }
