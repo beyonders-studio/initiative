@@ -17,7 +17,7 @@ import { ItemDraftContext, useItemDraft, type Written } from "./editing";
 import type { LayoutNode } from "./tree";
 
 type FillProps<I extends DetailItem, C, P> = {
-  detail: DetailKind<I, C, P>;
+  detail: DetailKind<I, C, P, object, PropertyDefinition>;
   /** The item as the change would leave it: of its new type, or in its new
    *  project. */
   item: I;

@@ -16,7 +16,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { MetadataType, type PropertySummary } from "@/api/generated/initiativeAPI.schemas";
+import {
+  MetadataType,
+  type PropertyDefinitionRead,
+  type PropertySummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { host } from "@/ui/host";
@@ -54,19 +58,20 @@ import {
  * What property editors read and change through, from the page around them
  * (a view's `LayoutEnv` carries it as `properties`): the properties an item
  * may hold, and making a property or an option, finding members and finding
- * and reading files.
+ * and reading files. Its definitions (`D`) are an initiative's unless a
+ * plug-in's own are named.
  */
-export interface PropertyEnv {
+export interface PropertyEnv<D extends PropertyDefinition = PropertyDefinitionRead> {
   /** What an item may hold: its initiative's properties, and its owner's
    *  metadata where it has an owner. No data until they are read. */
   definitions: {
-    data?: PropertyDefinition[];
+    data?: D[];
     isLoading: boolean;
     isError: boolean;
     refetch: () => unknown;
   };
   /** Makes a property named from an item. */
-  createProperty: CreateProperty;
+  createProperty: CreateProperty<D>;
   /** Adds an option to a select property. */
   appendOption: PropertyInputProps["appendOption"];
   /** Finds the people a person-valued property may name. */
@@ -315,7 +320,7 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   /** When the item last changed, which a signature made before it says. */
   updatedAt?: string | null;
   /** Without it, they are read, not changed. */
-  env?: PropertyEnv;
+  env?: PropertyEnv<PropertyDefinition>;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -349,7 +354,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   property,
   placed = false,
 }: PropertiesProps<I, P> & {
-  env: PropertyEnv;
+  env: PropertyEnv<PropertyDefinition>;
   property: PropertySummary;
   /** Placed on the layout on its own: it stays when emptied, so its button
    *  clears its value (a checkbox has no empty to click back to) rather than

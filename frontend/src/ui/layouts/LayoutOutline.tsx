@@ -50,7 +50,7 @@ import {
   NewPropertyForm,
   PROPERTY_TYPES,
 } from "@/ui/properties/NewPropertyForm";
-import type { MetadataOwner } from "@/ui/properties/propertyHelpers";
+import type { MetadataOwner, PropertyDefinition } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -167,7 +167,7 @@ export const listChoices = (
  *  parts once each, and plug-in parts. */
 export const detailChoices = (
   detail: LayoutNode,
-  { spec, words }: EditableDetail,
+  { spec, words }: EditableDetail<PropertyDefinition>,
   fields: ReadonlyMap<string, FieldDef>,
   { installs, addable }: LayoutPlugins,
   translate: Translate,
@@ -420,7 +420,7 @@ export const DetailLayoutOutline = ({
   /** The detail as one tree: the layout, holding its header, main and side. */
   detail: LayoutNode;
   /** Which kind of detail it is. */
-  of: EditableDetail;
+  of: EditableDetail<PropertyDefinition>;
   fields: ReadonlyMap<string, FieldDef>;
   labels: PartLabels;
   choices: AddChoices;

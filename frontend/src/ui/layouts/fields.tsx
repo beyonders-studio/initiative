@@ -157,7 +157,7 @@ export type LayoutEnv<I = unknown> = {
 
   /** What its property editors read and change through: a detail's. Left
    *  out, its properties are read, not changed. */
-  properties?: PropertyEnv;
+  properties?: PropertyEnv<PropertyDefinition>;
 };
 
 export type FieldRendererProps<I = unknown> = {

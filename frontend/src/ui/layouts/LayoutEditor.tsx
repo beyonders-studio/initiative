@@ -8,6 +8,7 @@ import type {
   LayoutPreset,
   ListLayoutDefinitionInput,
   ListLayoutReadKind,
+  PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -87,7 +88,7 @@ import { DetailLayoutSettings, LayoutProperties, ListLayoutSettings } from "./La
 
 const noop = () => {};
 
-const NO_DEFINITIONS: PropertyDefinition[] = [];
+const NO_DEFINITIONS: never[] = [];
 
 /** No fields: those of a list with nothing of its own to draw here. Where a
  *  list shows a property is its own card or columns, or its shape's, whatever
@@ -154,11 +155,12 @@ export type ListPreview = {
 
 /** What a target lists (a project's tasks, a collection's files): the
  *  fields its lists can show, what they draw as shipped, the open list drawn
- *  with the target's own items, and its settings. */
-export type EditableLists = {
+ *  with the target's own items, and its settings. Its definitions (`D`) are
+ *  an initiative's unless a plug-in's own are named. */
+export type EditableLists<D extends PropertyDefinition = PropertyDefinitionRead> = {
   /** Its fields, by id: the built-ins, the properties of `definitions`, and
    *  the plug-ins'. */
-  fields(definitions: PropertyDefinition[], plugins: FieldDef[]): Map<string, FieldDef>;
+  fields(definitions: D[], plugins: FieldDef[]): Map<string, FieldDef>;
   shape: ListShape;
   /** The open list, its parts marked, drawn in `frame`; its scales as its
    *  `displays` say. */
@@ -176,8 +178,9 @@ export type EditableLists = {
   ) => ReactNode;
 };
 
-/** A kind of detail, as the editor lays it out. */
-export type EditableDetail = {
+/** A kind of detail, as the editor lays it out, its definitions (`D`) an
+ *  initiative's unless a plug-in's own are named. */
+export type EditableDetail<D extends PropertyDefinition = PropertyDefinitionRead> = {
   spec: DetailLayoutSpec;
   /** For a page laid out per type of item, which type's, and its name, which
    *  `words.name` takes as `{{name}}`. */
@@ -196,7 +199,7 @@ export type EditableDetail = {
     parts: string;
   };
   /** Its fields, by id: the built-ins, and the plug-ins' where they draw on it. */
-  fields(definitions: PropertyDefinition[], plugins: FieldDef[]): Map<string, FieldDef>;
+  fields(definitions: D[], plugins: FieldDef[]): Map<string, FieldDef>;
   /** The detail drawn with one of its own, laid out as `tree` says. */
   preview: (tree: LayoutNode) => ReactNode;
 };
@@ -219,7 +222,7 @@ const NO_PLUGINS: LayoutPlugins = { fields: [], shipped: [], installs: [], addab
 
 /** What the editor knows a detail by: its kind, and for a page laid out per
  *  type of item, its type (`task:12`). What `initialKind` names. */
-const detailKey = ({ spec, taskTypeId }: EditableDetail): string =>
+const detailKey = ({ spec, taskTypeId }: EditableDetail<PropertyDefinition>): string =>
   taskTypeId ? `${spec.kind}:${taskTypeId}` : spec.kind;
 
 /** What the editor changes: each list's layout and each detail's (null: drawn
@@ -231,7 +234,7 @@ type Draft = {
   opensOn: ListLayoutReadKind;
 };
 
-const draftOf = (set: LayoutSet, details: EditableDetail[]): Draft => {
+const draftOf = (set: LayoutSet, details: EditableDetail<PropertyDefinition>[]): Draft => {
   const lists = listLayouts(set);
   return {
     lists: Object.fromEntries(
@@ -257,7 +260,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const changesFrom = (
   base: Draft,
   draft: Draft,
-  details: EditableDetail[]
+  details: EditableDetail<PropertyDefinition>[]
 ): LayoutChange<string>[] => {
   const changes: LayoutChange<string>[] = [];
   for (const [kind, definition] of Object.entries(draft.lists) as [
@@ -320,7 +323,7 @@ const stillThere = (selection: Selection, tree: LayoutNode, columns: string[]): 
  * then. Nothing changes while a save is under way, and leaving with changes,
  * or during a save, asks first.
  */
-export const LayoutEditor = ({
+export const LayoutEditor = <D extends PropertyDefinition>({
   t,
   initiativeId,
   lists,
@@ -343,15 +346,15 @@ export const LayoutEditor = ({
   initiativeId?: number;
   /** Its lists, drawn with its items. A target without offers its lists'
    *  presets alone. */
-  lists?: EditableLists;
-  details: EditableDetail[];
+  lists?: EditableLists<D>;
+  details: EditableDetail<D>[];
   /** The presets its lists offer; a target with no lists has none. */
   presets?: EditablePresets;
   /** The plug-ins that draw on its items. */
   plugins?: LayoutPlugins;
   /** The initiative's properties, which its fields may show, and how a new
    *  one is made. */
-  propertyEnv: Pick<PropertyEnv, "definitions" | "createProperty">;
+  propertyEnv: Pick<PropertyEnv<D>, "definitions" | "createProperty">;
   /** The target's layouts, read by someone who may change them. */
   layouts: LayoutSet;
   /** Stores `changes`, in order, answering with the layouts as stored. One

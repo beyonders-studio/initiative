@@ -12,7 +12,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  PropertyDefinitionRead,
+  PropertySummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 import {
@@ -87,9 +90,16 @@ export interface DetailExtension<I> {
  * and where an item of it lives. The fields placed from its initiative's
  * properties, its properties and its actions are drawn alike for every kind;
  * what the app adds to each is its extension's. `H` is what the kind says of
- * where an item lives that its extension reads.
+ * where an item lives that its extension reads, and `D` its definitions: an
+ * initiative's unless a plug-in's own are named.
  */
-export interface DetailKind<I extends DetailItem, C, P, H extends object = object> {
+export interface DetailKind<
+  I extends DetailItem,
+  C,
+  P,
+  H extends object = object,
+  D extends PropertyDefinition = PropertyDefinitionRead,
+> {
   spec: DetailLayoutSpec;
   /** For a kind laid out once per type of item (a task): the type an item is,
    *  whose stored page is its own, and the page its type is drawn as until
@@ -97,7 +107,7 @@ export interface DetailKind<I extends DetailItem, C, P, H extends object = objec
   typed?: { typeOf: (item: I) => number; spec: (item: I) => DetailLayoutSpec };
   /** Its fields, given its initiative's properties and the fields its
    *  extension adds. */
-  fields(definitions: PropertyDefinition[], added: FieldDef[]): Map<string, FieldDef>;
+  fields(definitions: D[], added: FieldDef[]): Map<string, FieldDef>;
   /** Where its fields' labels are worded. */
   namespaces: readonly FlatNamespace[];
   /** Its own fields' editors, by field id. */
@@ -108,8 +118,8 @@ export interface DetailKind<I extends DetailItem, C, P, H extends object = objec
   /** What the app drawing it adds to each item's detail, given where the
    *  item lives and the kind its layout is stored as. A method, whose
    *  parameters TypeScript checks both ways: one that draws only Initiative's
-   *  tools' items, in an initiative, is one. */
-  useExtension(home: ItemHome<I, P>, kind: string): DetailExtension<I>;
+   *  own kinds is one. */
+  useExtension(home: ItemHome<I, P> & H, kind: string): DetailExtension<I>;
   /** Holds what its parts keep across a change of layout. */
   Shell?: ComponentType<{ context: C; children: ReactNode }>;
   /** Its own parts an item being added draws: those that need nothing saved. */
@@ -126,7 +136,7 @@ export interface DetailKind<I extends DetailItem, C, P, H extends object = objec
 }
 
 interface Drawn {
-  detail: DetailKind<DetailItem, unknown, unknown>;
+  detail: DetailKind<DetailItem, unknown, unknown, object, PropertyDefinition>;
   context: unknown;
   home: ItemHome<DetailItem, unknown>;
   extension: DetailExtension<DetailItem>;
@@ -362,7 +372,7 @@ const partsOf = <I extends DetailItem>(
 };
 
 type ViewProps<I extends DetailItem, C, P> = {
-  detail: DetailKind<I, C, P>;
+  detail: DetailKind<I, C, P, object, PropertyDefinition>;
   item: I;
   context: C;
   layout?: StoredRegions | null;

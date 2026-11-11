@@ -56,11 +56,11 @@ export interface NewProperty {
   collection_id?: number | null;
 }
 
-/** Makes a property, answering with it as made. A failure is told by this,
- *  and rejects. A method, whose parameter TypeScript checks both ways: one
- *  that makes only an initiative's is taken where an initiative is given. */
-export type CreateProperty = {
-  create(property: NewProperty): Promise<PropertyDefinition>;
+/** Makes a property, answering with it as made (`D`). A failure is told by
+ *  this, and rejects. A method, whose parameter TypeScript checks both ways:
+ *  one that makes only an initiative's is taken where an initiative is given. */
+export type CreateProperty<D extends PropertyDefinition = PropertyDefinition> = {
+  create(property: NewProperty): Promise<D>;
 }["create"];
 
 /**

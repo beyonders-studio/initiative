@@ -13,7 +13,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   type CommunityPluginRead,
-  type DetailLayoutReadKind,
   ItemKind,
   MetadataType,
   type PropertySummary,
@@ -138,7 +137,7 @@ export type PluginItemKind = ItemKind;
 
 /** The kind of item plug-ins draw on that a detail lays out, or null for one
  *  they draw nothing on (a file opened from a collection). */
-export const pluginKindOf = (kind: DetailLayoutReadKind): PluginItemKind | null =>
+export const pluginKindOf = (kind: string): PluginItemKind | null =>
   Object.hasOwn(ItemKind, kind) ? (kind as PluginItemKind) : null;
 
 /** What a block declares on one kind of item, of what the server offers the
@@ -376,7 +375,7 @@ export const pluginFields = (
  *  layout editor offers them, in the reader's language. */
 export const useLayoutPlugins = (
   initiativeId: number | null | undefined,
-  kind: DetailLayoutReadKind | undefined
+  kind: string | undefined
 ): LayoutPlugins => {
   const plugins = usePluginsOnItems(initiativeId, true, kind ? pluginKindOf(kind) : null);
   const { language } = useTranslation().i18n;

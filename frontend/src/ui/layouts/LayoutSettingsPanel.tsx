@@ -269,7 +269,7 @@ export const DetailLayoutSettings = ({
   t: Translate;
   /** The detail as one tree: the layout, holding its header, main and side. */
   detail: LayoutNode;
-  of: EditableDetail;
+  of: EditableDetail<PropertyDefinition>;
   /** Whether the target lays out its own detail, as against the shipped one. */
   stored: boolean;
   fields: ReadonlyMap<string, FieldDef>;
@@ -377,7 +377,7 @@ const PartSettings = ({
   fields: ReadonlyMap<string, FieldDef>;
   edits: LayoutEdits;
   /** The detail the part is on; none on a card. */
-  on?: EditableDetail;
+  on?: EditableDetail<PropertyDefinition>;
 }) => {
   const node = nodeAt(tree, path);
   if (!node) return null;
