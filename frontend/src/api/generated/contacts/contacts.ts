@@ -191,7 +191,8 @@ export function useListContacts<
  * needs the ``community_contacts`` surface and the community contacts
  * plug-in, whose install owns it. An installed plug-in's initiative contact
  * is owned by its install; it makes a community contact on a token not
- * narrowed to one initiative, and the database gives that one to the
+ * narrowed to one initiative, as itself or for a member holding the
+ * surface, and the database gives that one to the
  * community contacts plug-in's install as it goes in.
  * @summary Create Contact
  */
