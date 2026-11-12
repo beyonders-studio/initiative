@@ -395,10 +395,6 @@ _FROM_CONTENT = f"'{Provenance.content.value}'"
 #: :mod:`app.db.authorization`.
 _GUILD_ADMIN = _P.system_or_admin
 
-#: An installed plug-in acting in this community on a token that is not narrowed
-#: to one initiative.
-_UNNARROWED_INSTALL = _P.unnarrowed_install
-
 #: A live PAM window, either level. Used where a leg is about what a guild has
 #: switched on rather than about what one person may reach.
 _PAM_ANY = _P.pam_any
@@ -468,8 +464,9 @@ def direct_or_guild(tool: Tool) -> InitiativePath:
     decide: every member reads it as its sharing allows, and making or
     changing it is for the holders of its tool's surface (or a live write
     grant), or the installed plug-in's on a token not narrowed to one
-    initiative — and, where the tool says so (``COMMUNITY_ROWS``), for whoever
-    its sharing lets write it. Sharing still applies on top, which is how the
+    initiative, as itself or for a member holding that surface — and, where
+    the tool says so (``COMMUNITY_ROWS``), for whoever its sharing lets write
+    it. Sharing still applies on top, which is how the
     admin decides who writes what the row holds. ``resource_actions`` asks the
     same writer for ``edit``.
     """
@@ -1364,7 +1361,8 @@ def webhook_subscription_path() -> InitiativePath:
     nothing to decide", which admits any member. A guild-wide subscription
     reports across every initiative, so reaching it is the holder of
     ``AdminSurface.webhooks``'s — the admin rung, which already spans them — or
-    an installed plug-in's whose token is not narrowed to one initiative. A plug-in sees and changes only the
+    an installed plug-in's whose token is not narrowed to one initiative, acting
+    as itself or for a member who holds that surface. A plug-in sees and changes only the
     subscriptions it registered (the ``plugin_scope_*`` policies), and what one
     delivers is capped by where the plug-in is placed and the scopes it holds.
     """
@@ -1372,7 +1370,7 @@ def webhook_subscription_path() -> InitiativePath:
         predicate=lambda t, w: (
             f"(CASE WHEN {t}.initiative_id IS NULL "
             f"THEN ({_P.system} OR {_P.holds(AdminSurface.webhooks)}"
-            f" OR {_UNNARROWED_INSTALL}) "
+            f" OR {_P.unnarrowed_install(AdminSurface.webhooks)}) "
             f"ELSE {_access(f'{t}.initiative_id', w)} END)"
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",

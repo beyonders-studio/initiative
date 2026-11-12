@@ -21,6 +21,7 @@ from app.db import cohorts
 from app.db.guild_standing import InstallContext
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.webhook_delivery import WebhookDelivery
 from app.models.tenant.webhook_subscription import WebhookSubscription
@@ -172,7 +173,8 @@ def assert_install_may_subscribe(
     - Every demo event needs the community-admin standing, held now: the
       token asking for it and the seat's grant holding it.
     - A token narrowed to one initiative subscribes to that initiative only.
-    - A community-wide subscription needs a token that is not narrowed.
+    - A community-wide subscription needs a token that is not narrowed, and
+      a member token's member holding the ``webhooks`` surface.
     - A named initiative is one the install is placed in.
 
     Delivery asks the same of the install again on every pass, against the
@@ -198,7 +200,9 @@ def assert_install_may_subscribe(
             raise refused
     narrowed = context.scope_initiative_id
     if initiative_id is None:
-        if narrowed is not None:
+        if narrowed is not None or not context.member_holds_surface(
+            AdminSurface.webhooks
+        ):
             raise refused
         return
     if narrowed is not None and initiative_id != narrowed:

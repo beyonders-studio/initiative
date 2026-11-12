@@ -271,9 +271,10 @@ COMMUNITY_CONTACTS_INSTALL = Guc(
     "app.community_contacts_install", Kind.INT, standing=True
 )
 #: For a member token, the admin surfaces the member it acts for holds, read
-#: as ``app.held_surfaces`` is for a person. A community contact the token
-#: creates takes the ``community_contacts`` surface here, as the member's own
-#: would. Empty for the install itself, and on every request a person makes.
+#: as ``app.held_surfaces`` is for a person. A row of the whole community the
+#: token writes takes the surface that administers it here, as the member's
+#: own would. Empty for the install itself, and on every request a person
+#: makes.
 MEMBER_SURFACES = Guc("app.member_surfaces", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------

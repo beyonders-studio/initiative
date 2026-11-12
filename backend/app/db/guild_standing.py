@@ -692,7 +692,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: and "Full access" within those initiatives; and writes only when the
 #: consent is ``read_write``. It is never an admin, the seat, a grantee or a
 #: manager; the admin surfaces the member holds are carried apart, in
-#: ``app.member_surfaces``, for a community contact it creates. The consent was given from a session that met the community's
+#: ``app.member_surfaces``, for the rows of the whole community it writes. The consent was given from a session that met the community's
 #: sign-in rules, so that value too is what ``live`` says.
 #:
 #: Two more columns carry what the install calls things, both read only in its
@@ -1261,8 +1261,9 @@ class InstallContext:
     #: The install of the community contacts plug-in, which a community
     #: contact this install creates goes into; ``None`` when there is none.
     community_contacts_install: int | None = None
-    #: For a member token, the admin surfaces the member holds; none for the
-    #: install itself.
+    #: For a member token, the admin surfaces the member holds, which the rows
+    #: of the whole community it writes ask of it; none for the install
+    #: itself.
     member_surfaces: tuple[str, ...] = ()
     #: What this install calls its community, when it has been named to it.
     guild_ref: str | None = None
@@ -1304,6 +1305,12 @@ class InstallContext:
 
     def holds_surface(self, surface: AdminSurface) -> bool:
         return surface.value in self.held_surfaces
+
+    def member_holds_surface(self, surface: AdminSurface) -> bool:
+        """Whether a member token's member holds ``surface``, as a row of the
+        community's that ``surface`` administers asks of a plug-in writing it
+        for them. The install acting as itself answers by its scopes alone."""
+        return self.member_user_id is None or surface.value in self.member_surfaces
 
     @property
     def content_read_only(self) -> bool:

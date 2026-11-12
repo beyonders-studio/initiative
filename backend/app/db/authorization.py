@@ -440,6 +440,14 @@ HELD_SURFACES = (
 )
 
 
+#: For a member token, the admin surfaces its member holds; NULL for an
+#: install acting as itself, which no member's surfaces narrow.
+MEMBER_SURFACES = (
+    f"(CASE WHEN {gucs.USER_ID.text} IS NULL THEN NULL::text[]"
+    f" ELSE {gucs.MEMBER_SURFACES.sql} END)"
+)
+
+
 def holds(surface: AdminSurface) -> str:
     """The reader holds ``surface`` here: :data:`GUILD_ADMIN`'s counterpart for
     a leg that guards one part of administering the community rather than
@@ -587,8 +595,11 @@ STANDING_FIELDS: tuple[tuple[str, str, str], ...] = (
     _read(gucs.CLOSED_SURFACES),
     # The tool switches the community set for every initiative.
     _read(gucs.COMMUNITY_TOOLS),
-    # The admin surfaces the reader holds. Last, as ``ALTER TYPE`` appends.
+    # The admin surfaces the reader holds.
     ("held_surfaces", "text[]", HELD_SURFACES),
+    # For a member token, the ones its member holds. Last, as ``ALTER TYPE``
+    # appends.
+    ("member_surfaces", "text[]", MEMBER_SURFACES),
 )
 _STANDING_NAMES = frozenset(name for name, _type, _expr in STANDING_FIELDS)
 
@@ -754,23 +765,27 @@ class Legs:
     def system_or_admin(self) -> str:
         return f"({self.system} OR {self.admin})"
 
-    @property
-    def unnarrowed_install(self) -> str:
+    def unnarrowed_install(self, surface: AdminSurface) -> str:
         """An installed plug-in acting in this community on a token that is not
-        narrowed to one initiative."""
+        narrowed to one initiative, for a part of the community ``surface``
+        administers: as itself, or for a member who holds ``surface``."""
+        member_surfaces = self.field("member_surfaces")
         return (
             f"({self.install_id} IS NOT NULL AND {self.scope} IS NULL"
-            f" AND {self.this_guild} AND {self.auth_ok})"
+            f" AND {self.this_guild} AND {self.auth_ok}"
+            f" AND ({member_surfaces} IS NULL"
+            f" OR '{surface.value}' = ANY ({member_surfaces})))"
         )
 
     def guild_row_writer(self, surface: AdminSurface) -> str:
         """Who makes and changes a row that belongs to the whole community
         rather than one initiative (:data:`COMMUNITY_ROWS`): the system, a
         holder of ``surface``, a live write grant, or an installed plug-in on
-        a token not narrowed to one initiative."""
+        a token not narrowed to one initiative, as itself or for a member
+        holding ``surface``."""
         return (
             f"({self.system} OR {self.holds(surface)}"
-            f" OR {self.pam_write} OR {self.unnarrowed_install})"
+            f" OR {self.pam_write} OR {self.unnarrowed_install(surface)})"
         )
 
 
