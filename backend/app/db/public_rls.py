@@ -1351,8 +1351,9 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             platform_base=frozenset({SELECT}),
             # No TABLE grant: a column-scoped SELECT on (guild_id, user_id), which a
             # member token's standing reads for the member's own row in the routed
-            # community (install_reads_its_member; migration 20260924_0385), and
-            # on (guest_until, role), to ask whether that row is live (0488).
+            # community (install_reads_its_member; migration 20260924_0385),
+            # on (guest_until, role), to ask whether that row is live (0488), and
+            # on joined_at, to read the surfaces the member holds (0607).
             plugin_install_base=None,
             # Their own row (guest_reads_own_membership), for the standing.
             guest_base=frozenset({SELECT}),

@@ -220,15 +220,20 @@ def install_headers(
     initiative_id: int | None = None,
     install_id: int | None = None,
     client_id: str = CLIENT,
+    user_id: int | None = None,
+    purpose: str | None = None,
 ) -> dict[str, str]:
     """The ``Authorization`` header of an installation token for ``installed``,
-    carrying ``scopes`` and narrowed to ``initiative_id`` when one is given."""
+    carrying ``scopes`` and narrowed to ``initiative_id`` when one is given; a
+    member token for ``user_id`` at ``purpose`` when one is given."""
     token, _exp = seal_install_token(
         guild_id=installed.guild.id,
         install_id=install_id if install_id is not None else installed.plugin.id,
         client_id=client_id,
         scopes=frozenset(scopes),
         initiative_id=initiative_id,
+        user_id=user_id,
+        purpose=purpose,
     )
     return {"Authorization": f"Bearer {token}"}
 

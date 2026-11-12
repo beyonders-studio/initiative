@@ -5,8 +5,12 @@ that writes the owner row of what a request creates, now also handles a
 contact an installed plug-in creates outside any initiative. That contact goes
 to the community contacts plug-in's install, which the request's standing names
 (``app.community_contacts_install``), and is shared with every member to read,
-as a person's community contact is. With no such install the insert is refused.
-Everything else it does is unchanged.
+as a person's community contact is. With no such install the insert is refused,
+and so it is for a member token whose member does not hold the
+``community_contacts`` surface (``app.member_surfaces``, which the standing
+reads from the member's membership row and custom role: the install floor now
+reads ``guild_memberships.joined_at`` for it). Everything else it does is
+unchanged.
 
 Revision ID: 20261111_0607
 Revises: 20261110_0606
@@ -32,6 +36,11 @@ BEGIN
     IF NEW.initiative_id IS NULL THEN
         IF v_install IS NULL OR TG_ARGV[0] <> 'contact' THEN
             RETURN NULL;
+        END IF;
+        IF v_member IS NOT NULL
+           AND NOT 'community_contacts' = ANY (COALESCE(string_to_array(NULLIF(current_setting('app.member_surfaces'::text, true), ''::text), ','::text), ARRAY[]::text[])) THEN
+            RAISE EXCEPTION 'the member does not hold the community''s contacts'
+                USING ERRCODE = '42501';
         END IF;
         IF v_holder IS NULL THEN
             RAISE EXCEPTION 'no install holds the community''s contacts'
@@ -107,7 +116,13 @@ $owns$;
 
 def upgrade() -> None:
     op.execute(_UPGRADE)
+    op.execute(
+        "GRANT SELECT (joined_at) ON public.guild_memberships TO plugin_install_base"
+    )
 
 
 def downgrade() -> None:
+    op.execute(
+        "REVOKE SELECT (joined_at) ON public.guild_memberships FROM plugin_install_base"
+    )
     op.execute(_DOWNGRADE)

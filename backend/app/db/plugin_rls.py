@@ -32,6 +32,7 @@ from app.core.tools import Tool
 from app.db import gucs
 from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
 from app.db.search_index import SEARCH_SOURCES
+from app.models.platform.guild import AdminSurface
 
 
 class PluginTableKind(str, Enum):
@@ -188,7 +189,8 @@ PLUGIN_REFUSED_TABLES: frozenset[str] = frozenset(
 #: install mounts it by the code that makes it. A contact an installed plug-in
 #: makes there goes to the community contacts plug-in's install, which the
 #: request's standing names, shared with every member to read, as a person's
-#: is; with no such install it is refused.
+#: is. It is refused with no such install, and for a member token whose member
+#: does not hold the ``community_contacts`` surface, as that member would be.
 #: Shared, in ``public``; the row lands in the schema the trigger fired in.
 #: Restated in full by the migration that sets it (20261111_0607).
 INSTALL_OWNS_WHAT_IT_CREATES = f"""
@@ -202,6 +204,11 @@ BEGIN
     IF NEW.initiative_id IS NULL THEN
         IF v_install IS NULL OR TG_ARGV[0] <> '{Tool.contact.value}' THEN
             RETURN NULL;
+        END IF;
+        IF v_member IS NOT NULL
+           AND NOT '{AdminSurface.community_contacts.value}' = ANY ({gucs.MEMBER_SURFACES}) THEN
+            RAISE EXCEPTION 'the member does not hold the community''s contacts'
+                USING ERRCODE = '42501';
         END IF;
         IF v_holder IS NULL THEN
             RAISE EXCEPTION 'no install holds the community''s contacts'

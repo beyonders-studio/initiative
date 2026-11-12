@@ -8,7 +8,8 @@ everything after that flows from the contact's resource grants
 A contact with no initiative is one of the **community's contacts**. It lives
 inside the community contacts plug-in, whose install owns it, and is made by
 holders of the ``community_contacts`` surface, or by an installed plug-in on a
-token not narrowed to one initiative. Members read it through the
+token not narrowed to one initiative, acting as itself or for a member who
+holds that surface. Members read it through the
 share with everyone; a guest reads one only where it is shared with them by
 name. Holders of the surface edit it, and so does anyone given write on it.
 An initiative's content may link to one.
@@ -83,7 +84,8 @@ async def create_contact(
     needs the ``community_contacts`` surface and the community contacts
     plug-in, whose install owns it. An installed plug-in's initiative contact
     is owned by its install; it makes a community contact on a token not
-    narrowed to one initiative, and the database gives that one to the
+    narrowed to one initiative, as itself or for a member holding the
+    surface, and the database gives that one to the
     community contacts plug-in's install as it goes in.
     """
     resource_access.refuse_plugin_sharing(guild_context, contact_in, "grants")

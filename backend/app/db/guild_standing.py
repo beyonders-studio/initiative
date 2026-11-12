@@ -276,26 +276,33 @@ my_grants AS MATERIALIZED (
     AND {_GRANT_HELD}
 )"""
 
+
+def _held_surfaces(membership: str) -> str:
+    """The admin surfaces ``app.current_user_id`` holds by ``membership``, a
+    relation of their membership row's ``role`` and ``joined_at``: a custom
+    role given during this membership, on the rung the membership holds,
+    decides; otherwise the rung does."""
+    return f"""COALESCE((
+      SELECT CASE
+               WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
+               WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
+               ELSE ''
+             END
+      FROM {membership} m
+      LEFT JOIN custom_role_members cm
+        ON cm.user_id = {gucs.USER_ID} AND cm.assigned_at >= m.joined_at
+      LEFT JOIN custom_roles r
+        ON r.id = cm.role_id AND r.base_rung = m.role::text
+    ), '')"""
+
+
 #: What the person statement writes: each standing key and its expression.
 _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.STANDING_GUILD_ID: f"""COALESCE({gucs.ROUTED_COMMUNITY}, '')""",
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
     ), 'false')""",
-    # A custom role given during this membership, on the rung the membership
-    # holds, decides; otherwise the rung does.
-    gucs.HELD_SURFACES: f"""COALESCE((
-      SELECT CASE
-               WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
-               WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
-               ELSE ''
-             END
-      FROM my_membership m
-      LEFT JOIN custom_role_members cm
-        ON cm.user_id = {gucs.USER_ID} AND cm.assigned_at >= m.joined_at
-      LEFT JOIN custom_roles r
-        ON r.id = cm.role_id AND r.base_rung = m.role::text
-    ), '')""",
+    gucs.HELD_SURFACES: _held_surfaces("my_membership"),
     # As the surfaces are held: a custom role on the admin rung keeps the ones
     # it lists, and the admin rung with none holds every one.
     gucs.HELD_PLUGIN_PERMISSIONS: f"""COALESCE((
@@ -630,6 +637,14 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
       ORDER BY h.id
       LIMIT 1
     ), '')""",
+    # The surfaces the member a member token acts for holds, as theirs are
+    # read when they sign in themselves.
+    gucs.MEMBER_SURFACES: _held_surfaces(f"""(
+        SELECT gm.role, gm.joined_at
+        FROM public.guild_memberships gm
+        WHERE gm.guild_id = {gucs.GUILD_ID} AND gm.user_id = {gucs.USER_ID}
+          AND EXISTS (SELECT 1 FROM install)
+      )"""),
 }
 
 #: An installed plug-in's standing, in one statement. Runs as
@@ -676,7 +691,8 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: that the scopes also allow, and every other key denied; the member's roles
 #: and "Full access" within those initiatives; and writes only when the
 #: consent is ``read_write``. It is never an admin, the seat, a grantee or a
-#: manager. The consent was given from a session that met the community's
+#: manager; the admin surfaces the member holds are carried apart, in
+#: ``app.member_surfaces``, for a community contact it creates. The consent was given from a session that met the community's
 #: sign-in rules, so that value too is what ``live`` says.
 #:
 #: Two more columns carry what the install calls things, both read only in its
@@ -1245,6 +1261,9 @@ class InstallContext:
     #: The install of the community contacts plug-in, which a community
     #: contact this install creates goes into; ``None`` when there is none.
     community_contacts_install: int | None = None
+    #: For a member token, the admin surfaces the member holds; none for the
+    #: install itself.
+    member_surfaces: tuple[str, ...] = ()
     #: What this install calls its community, when it has been named to it.
     guild_ref: str | None = None
     #: The references this request named that resolve in the install's own

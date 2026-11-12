@@ -1218,7 +1218,7 @@ _PLUGIN_SECTION = """\
 -- member, for a member token), written by the trigger on the resource it
 -- creates (for a contact outside any initiative, the community contacts
 -- plug-in's owner row and the share with every member, as the standing names
--- that install), and, with sharing:write and the tool's write scope, the read and
+-- that install, where a member token's member holds community_contacts), and, with sharing:write and the tool's write scope, the read and
 -- write shares of a resource it holds write on. Reactions and recent views
 -- are refused. A member token also reads
 -- the member's own roster rows and the roles they name, and its own install's
@@ -1259,10 +1259,13 @@ _PLUGIN_CREATED_OWNER_ROW = (
 #: The rows on a contact an installed plug-in creates outside any initiative,
 #: written by the same trigger: the owner row naming the community contacts
 #: plug-in's install, as the request's standing names it, and the share with
-#: every member to read.
+#: every member to read. A member token's member holds the
+#: ``community_contacts`` surface, as a person making one does.
 _PLUGIN_CREATED_COMMUNITY_CONTACT_ROW = (
     "(pg_trigger_depth() > 0"
     f" AND resource_type = '{Tool.contact.value}'"
+    f" AND ({_PLUGIN_MEMBER} IS NULL"
+    f" OR '{AdminSurface.community_contacts.value}' = ANY ({gucs.MEMBER_SURFACES}))"
     " AND initiative_id IS NULL"
     " AND role_id IS NULL"
     " AND user_id IS NULL"

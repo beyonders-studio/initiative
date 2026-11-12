@@ -104,15 +104,25 @@ async def organizations_of(
 async def community_holder(session: AsyncSession, guild_context: ActorContext) -> int:
     """The id of the install a community contact goes into, once the request
     may put one there: a person holding the ``community_contacts`` surface, or
-    an installed plug-in on a token not narrowed to one initiative, in a
-    community that has the plug-in. For a plug-in the install is the one its
-    standing names, which the database gives the contact to as it goes in."""
+    an installed plug-in on a token not narrowed to one initiative, acting as
+    itself or for a member holding that surface, in a community that has the
+    plug-in. For a plug-in the install is the one its standing names, which
+    the database gives the contact to as it goes in."""
     holder: int | None
     if isinstance(guild_context, InstallContext):
         if guild_context.scope_initiative_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=ContactMessages.PLUGIN_INITIATIVE_REQUIRED,
+            )
+        if (
+            guild_context.member_user_id is not None
+            and AdminSurface.community_contacts.value
+            not in guild_context.member_surfaces
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
             )
         holder = guild_context.community_contacts_install
     else:
