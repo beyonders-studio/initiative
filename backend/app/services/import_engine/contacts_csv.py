@@ -46,7 +46,6 @@ from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.contact import DETAILS, Contact
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
-from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.schemas.tenant.contact import ContactCreate
@@ -408,7 +407,8 @@ class Place:
     its columns fill."""
 
     initiative: Initiative | None
-    plugin: GuildPlugin | None
+    #: The install that holds the community's contacts, for those.
+    holder: int | None
     properties: dict[int, MetadataDefinition] = field(default_factory=dict)
 
 
@@ -426,10 +426,10 @@ async def place(
     the initiative has."""
     mapped = {c.property_id for c in request.columns if c.target is Target.property}
     initiative: Initiative | None = None
-    plugin: GuildPlugin | None = None
+    holder: int | None = None
     definitions: dict[int, MetadataDefinition] = {}
     if request.initiative_id is None:
-        plugin = await contacts_service.community_holder(session, user, context)
+        holder = await contacts_service.community_holder(session, context)
     else:
         initiative = await resource_access.prepare_create(
             session, Tool.contact, request.initiative_id, user, context
@@ -451,7 +451,7 @@ async def place(
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
     return Place(
         initiative,
-        plugin,
+        holder,
         {
             property_id: definitions[property_id]
             for property_id in mapped
@@ -542,12 +542,12 @@ async def _make(
     )
     session.add(contact)
     await session.flush()
-    if place.plugin is not None:
+    if place.holder is not None:
         await ownership_service.give_to_install(
             session,
             Tool.contact,
             contact,
-            install_id=place.plugin.id,
+            install_id=place.holder,
             guild_id=context.guild_id,
             grants=contact_in.grants,
             actor_user_id=user.id,

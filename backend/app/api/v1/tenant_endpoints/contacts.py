@@ -7,7 +7,8 @@ everything after that flows from the contact's resource grants
 
 A contact with no initiative is one of the **community's contacts**. It lives
 inside the community contacts plug-in, whose install owns it, and is made by
-holders of the ``community_contacts`` surface. Members read it through the
+holders of the ``community_contacts`` surface, or by an installed plug-in on a
+token not narrowed to one initiative. Members read it through the
 share with everyone; a guest reads one only where it is shared with them by
 name. Holders of the surface edit it, and so does anyone given write on it.
 An initiative's content may link to one.
@@ -35,7 +36,6 @@ from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.comment import Comment
 from app.models.tenant.contact import DETAILS, Contact
-from app.models.tenant.guild_plugin import GuildPlugin
 from app.schemas.tenant.contact import ContactCreate, ContactRead, ContactUpdate
 from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.tenant.tool import serialize_tool
@@ -81,16 +81,16 @@ async def create_contact(
     ``create_contacts`` permission (or guild admin), and its maker owns it.
     With ``initiative_id`` omitted it is one of the community's contacts: it
     needs the ``community_contacts`` surface and the community contacts
-    plug-in, whose install owns it. An installed plug-in creates initiative
-    contacts only, owned by its install.
+    plug-in, whose install owns it. An installed plug-in's initiative contact
+    is owned by its install; it makes a community contact on a token not
+    narrowed to one initiative, and the database gives that one to the
+    community contacts plug-in's install as it goes in.
     """
     resource_access.refuse_plugin_sharing(guild_context, contact_in, "grants")
     initiative_id = contact_in.initiative_id
-    plugin: GuildPlugin | None = None
+    holder: int | None = None
     if initiative_id is None:
-        plugin = await contacts_service.community_holder(
-            session, current_user, guild_context
-        )
+        holder = await contacts_service.community_holder(session, guild_context)
     else:
         await resource_access.prepare_create(
             session, Tool.contact, initiative_id, current_user, guild_context
@@ -103,7 +103,9 @@ async def create_contact(
     session.add(contact)
     await session.flush()
 
-    if plugin is None:
+    if holder is None or current_user is None:
+        # A plug-in's community contact was given to its holder by the
+        # insert's trigger; only the sharing its create asked for is left.
         await resource_access.grant_initial_sharing(
             session,
             guild_context,
@@ -119,10 +121,10 @@ async def create_contact(
             session,
             Tool.contact,
             contact,
-            install_id=plugin.id,
+            install_id=holder,
             guild_id=guild_context.guild_id,
             grants=contact_in.grants,
-            actor_user_id=guild_context.user_id,
+            actor_user_id=current_user.id,
         )
     if contact_in.tag_ids:
         await tags_service.set_entity_tags(
@@ -194,9 +196,7 @@ async def move_contact(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ContactMessages.ALREADY_IN_COMMUNITY,
         )
-    plugin = await contacts_service.community_holder(
-        session, current_user, guild_context
-    )
+    holder = await contacts_service.community_holder(session, guild_context)
     await resource_access.require_stays_in(session, contact.initiative_id, None)
 
     await metadata_service.drop_values(
@@ -211,7 +211,7 @@ async def move_contact(
         session,
         Tool.contact,
         contact,
-        install_id=plugin.id,
+        install_id=holder,
         guild_id=guild_context.guild_id,
         grants=initiative_readable(),
         actor_user_id=current_user.id,

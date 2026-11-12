@@ -619,6 +619,17 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
       FROM public.guilds g
       WHERE g.id = {gucs.GUILD_ID}
     ), 'false')""",
+    # The install that mounts contacts at community scope, as
+    # ``guild_plugins.find_mounting_plugin`` finds it for a person.
+    gucs.COMMUNITY_CONTACTS_INSTALL: f"""COALESCE((
+      SELECT h.id::text
+      FROM guild_plugins h
+      WHERE h.definition ->> 'plugin_kind' = 'tool_instance'
+        AND h.definition ->> 'tool' = '{Tool.contact.value}'
+        AND EXISTS (SELECT 1 FROM install)
+      ORDER BY h.id
+      LIMIT 1
+    ), '')""",
 }
 
 #: An installed plug-in's standing, in one statement. Runs as
@@ -1231,6 +1242,9 @@ class InstallContext:
     #: The resources its scopes let it read, and write.
     install_read: tuple[str, ...] = ()
     install_write: tuple[str, ...] = ()
+    #: The install of the community contacts plug-in, which a community
+    #: contact this install creates goes into; ``None`` when there is none.
+    community_contacts_install: int | None = None
     #: What this install calls its community, when it has been named to it.
     guild_ref: str | None = None
     #: The references this request named that resolve in the install's own

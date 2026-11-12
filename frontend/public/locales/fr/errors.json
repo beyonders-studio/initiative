@@ -368,7 +368,7 @@
   "CALENDAR_COMMUNITY_PLUGIN_REQUIRED": "Le plug-in calendrier de la communauté n'est pas installé, il n'y a donc nulle part où placer un calendrier de communauté",
   "CALENDAR_PLUGIN_INITIATIVE_REQUIRED": "Un plug-in crée un calendrier dans une initiative. Choisissez l'initiative à laquelle il appartient.",
   "CONTACT_COMMUNITY_PLUGIN_REQUIRED": "Le plug-in contacts de la communauté n'est pas installé, il n'y a donc nulle part où placer un contact de communauté",
-  "CONTACT_PLUGIN_INITIATIVE_REQUIRED": "Un plug-in crée un contact dans une initiative. Choisissez l'initiative à laquelle il appartient.",
+  "CONTACT_PLUGIN_INITIATIVE_REQUIRED": "Un plug-in limité à une initiative y crée ses contacts. Choisissez cette initiative.",
   "CONTACT_ALREADY_IN_COMMUNITY": "Ce contact appartient déjà à toute la communauté",
   "CONTACT_PHONE_INVALID": "Un numéro de téléphone peut contenir des chiffres, des espaces, + - ( ) . et un x avant un poste",
   "CONTACT_WEBSITE_INVALID": "Un site web doit être une adresse web, comme example.com",

@@ -263,6 +263,13 @@ HELD_PLUGIN_PERMISSIONS = Guc(
 #: what the community set for members; and where such a rule says no.
 PLUGIN_GRANTS = Guc("app.plugin_grants", Kind.NAMES, standing=True)
 PLUGIN_DENIES = Guc("app.plugin_denies", Kind.NAMES, standing=True)
+#: For an installed plug-in's request, the install of the community contacts
+#: plug-in, which holds the community's contacts: a community contact the
+#: request creates is that install's. Empty when the community has none, and
+#: on every request a person makes.
+COMMUNITY_CONTACTS_INSTALL = Guc(
+    "app.community_contacts_install", Kind.INT, standing=True
+)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam
