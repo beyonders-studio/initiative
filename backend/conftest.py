@@ -1216,6 +1216,11 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient]:
                 await conn.close()
             with suppress(Exception):
                 await eng.dispose()
+        # FastAPI keeps every dependency it has called, the overrides above
+        # included, in caches of 4096 (fastapi.dependencies.models), and they
+        # reach this dict. Emptied, the engines go with the test rather than
+        # staying for the rest of the run.
+        served.clear()
         # The create-guild endpoint ends on a SELECT (no commit), so the privileged
         # setup session may hold a lock on public.guilds; release it too.
         with suppress(Exception):
