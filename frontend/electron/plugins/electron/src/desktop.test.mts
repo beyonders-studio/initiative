@@ -49,6 +49,7 @@ vi.mock("./app.mjs", () => {
     setBadgeCount: vi.fn(),
     getPath: () => electron.userData,
     getAppPath: () => "/app",
+    isPackaged: false,
     getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
     setLoginItemSettings: vi.fn(),
     quit: vi.fn(),
@@ -223,6 +224,22 @@ describe("opening at sign-in", () => {
 
     await desktop.setOpenAtLogin({ enabled: false });
     await expect(desktop.getSettings()).resolves.toMatchObject({ openAtLogin: false });
+  });
+
+  it("is on from the first start until the person switches it off", async () => {
+    onPlatform("linux");
+    electron.app.isPackaged = true as never;
+    try {
+      const { desktop } = started();
+      expect(readFileSync(autostart(), "utf8")).toContain("--hidden");
+
+      await desktop.setOpenAtLogin({ enabled: false });
+      const next = new Desktop({ notifyListeners: vi.fn() });
+      next.load();
+      await expect(next.getSettings()).resolves.toMatchObject({ openAtLogin: false });
+    } finally {
+      electron.app.isPackaged = false as never;
+    }
   });
 
   it("asks Windows for a login item that starts in the tray", async () => {

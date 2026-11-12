@@ -56,7 +56,13 @@ export class Desktop {
     if (process.platform === "win32") {
       app.setAppUserModelId(APP_ID);
     }
-    this.keepRunning = readKeepRunning();
+    const settings = readSettings();
+    this.keepRunning = settings.keepRunning !== false;
+    // On by default: the first packaged start turns it on, once. After that
+    // it is the person's to change.
+    if (settings.openAtLogin === undefined && app.isPackaged) {
+      this.setOpenAtLogin({ enabled: true });
+    }
     app.on("before-quit", () => {
       this.quitting = true;
     });
@@ -130,7 +136,7 @@ export class Desktop {
 
   async setKeepRunning({ enabled }: { enabled: boolean }) {
     this.keepRunning = enabled;
-    writeKeepRunning(enabled);
+    writeSettings({ keepRunning: enabled });
     this.refreshTray();
     // The app opens at sign-in in the tray only while there is a tray to open in.
     if (openAtLogin()) {
@@ -140,6 +146,7 @@ export class Desktop {
 
   async setOpenAtLogin({ enabled }: { enabled: boolean }) {
     setOpenAtLogin(enabled, this.startsHidden());
+    writeSettings({ openAtLogin: enabled });
   }
 
   /**
@@ -213,17 +220,22 @@ export const mainWindow = () => BrowserWindow.getAllWindows().find(isMainWindow)
 
 const settingsFile = () => join(app.getPath("userData"), "desktop.json");
 
-/** On unless the person has switched it off. */
-const readKeepRunning = (): boolean => {
+/** What the person chose; a setting they never touched is absent. */
+interface Settings {
+  keepRunning?: boolean;
+  openAtLogin?: boolean;
+}
+
+const readSettings = (): Settings => {
   try {
-    return JSON.parse(readFileSync(settingsFile(), "utf8")).keepRunning !== false;
+    return JSON.parse(readFileSync(settingsFile(), "utf8"));
   } catch {
-    return true;
+    return {};
   }
 };
 
-const writeKeepRunning = (enabled: boolean) => {
-  writeFileSync(settingsFile(), JSON.stringify({ keepRunning: enabled }));
+const writeSettings = (change: Settings) => {
+  writeFileSync(settingsFile(), JSON.stringify({ ...readSettings(), ...change }));
 };
 
 // --- Opening at sign-in -----------------------------------------------------
