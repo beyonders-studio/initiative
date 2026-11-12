@@ -189,8 +189,11 @@ export function useListContacts<
  * ``create_contacts`` permission (or guild admin), and its maker owns it.
  * With ``initiative_id`` omitted it is one of the community's contacts: it
  * needs the ``community_contacts`` surface and the community contacts
- * plug-in, whose install owns it. An installed plug-in creates initiative
- * contacts only, owned by its install.
+ * plug-in, whose install owns it. An installed plug-in's initiative contact
+ * is owned by its install; it makes a community contact on a token not
+ * narrowed to one initiative, as itself or for a member holding the
+ * surface, and the database gives that one to the
+ * community contacts plug-in's install as it goes in.
  * @summary Create Contact
  */
 export const createContact = (

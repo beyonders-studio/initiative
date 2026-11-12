@@ -28,9 +28,11 @@ from app.core.plugin_scopes import (
     tool_resource,
 )
 from app.core.search import SearchEntityType
+from app.core.tools import Tool
 from app.db import gucs
 from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
 from app.db.search_index import SEARCH_SOURCES
+from app.models.platform.guild import AdminSurface
 
 
 class PluginTableKind(str, Enum):
@@ -182,19 +184,47 @@ PLUGIN_REFUSED_TABLES: frozenset[str] = frozenset(
 #: attached with the tool's value as its argument): when a request creates a
 #: tool's resource, it writes the one owner row. That row names the person who
 #: made it, the install, or, for a member token, the member it acts for. A
-#: system job names nobody, and the function writes nothing. Nor does it for a
-#: row outside any initiative: that is community level, and the calendar plug-in
-#: whose install mounts it is named as its owner by the code that makes it.
+#: system job names nobody, and the function writes nothing. A row outside any
+#: initiative is community level: a person's is given to the plug-in whose
+#: install mounts it by the code that makes it. A contact an installed plug-in
+#: makes there goes to the community contacts plug-in's install, which the
+#: request's standing names, shared with every member to read, as a person's
+#: is. It is refused with no such install, and for a member token whose member
+#: does not hold the ``community_contacts`` surface, as that member would be.
 #: Shared, in ``public``; the row lands in the schema the trigger fired in.
-#: Restated in full by the migration that sets it (20260927_0407).
+#: Restated in full by the migration that sets it (20261111_0607).
 INSTALL_OWNS_WHAT_IT_CREATES = f"""
 CREATE OR REPLACE FUNCTION public.fn_install_owns_what_it_creates() RETURNS trigger
     LANGUAGE plpgsql AS $owns$
 DECLARE
     v_install integer := {gucs.INSTALL_ID};
     v_member integer := {gucs.USER_ID};
+    v_holder integer := {gucs.COMMUNITY_CONTACTS_INSTALL};
 BEGIN
-    IF NEW.initiative_id IS NULL OR (v_install IS NULL AND v_member IS NULL) THEN
+    IF NEW.initiative_id IS NULL THEN
+        IF v_install IS NULL OR TG_ARGV[0] <> '{Tool.contact.value}' THEN
+            RETURN NULL;
+        END IF;
+        IF v_member IS NOT NULL
+           AND NOT '{AdminSurface.community_contacts.value}' = ANY ({gucs.MEMBER_SURFACES}) THEN
+            RAISE EXCEPTION 'the member does not hold the community''s contacts'
+                USING ERRCODE = '42501';
+        END IF;
+        IF v_holder IS NULL THEN
+            RAISE EXCEPTION 'no install holds the community''s contacts'
+                USING ERRCODE = '42501';
+        END IF;
+        EXECUTE format(
+            'INSERT INTO %I.resource_grants '
+            '(resource_type, resource_id, initiative_id, plugin_install_id, level, '
+            'all_initiative_members, created_at) '
+            'VALUES ($1, $2, NULL, $3, ''owner'', false, now()), '
+            '($1, $2, NULL, NULL, ''read'', true, now())',
+            TG_TABLE_SCHEMA
+        ) USING TG_ARGV[0], NEW.id, v_holder;
+        RETURN NULL;
+    END IF;
+    IF v_install IS NULL AND v_member IS NULL THEN
         RETURN NULL;
     END IF;
     IF v_member IS NULL THEN

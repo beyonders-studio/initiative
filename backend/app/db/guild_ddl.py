@@ -1216,7 +1216,9 @@ _PLUGIN_SECTION = """\
 -- no initiative, as on the tables the entries describe. The
 -- grants an install's request writes are the owner row naming it (the
 -- member, for a member token), written by the trigger on the resource it
--- creates, and, with sharing:write and the tool's write scope, the read and
+-- creates (for a contact outside any initiative, the community contacts
+-- plug-in's owner row and the share with every member, as the standing names
+-- that install, where a member token's member holds community_contacts), and, with sharing:write and the tool's write scope, the read and
 -- write shares of a resource it holds write on. Reactions and recent views
 -- are refused. A member token also reads
 -- the member's own roster rows and the roles they name, and its own install's
@@ -1254,6 +1256,26 @@ _PLUGIN_CREATED_OWNER_ROW = (
     f" OR (user_id = {_PLUGIN_MEMBER} AND plugin_install_id IS NULL)))"
 )
 
+#: The rows on a contact an installed plug-in creates outside any initiative,
+#: written by the same trigger: the owner row naming the community contacts
+#: plug-in's install, as the request's standing names it, and the share with
+#: every member to read. A member token's member holds the
+#: ``community_contacts`` surface, as a person making one does.
+_PLUGIN_CREATED_COMMUNITY_CONTACT_ROW = (
+    "(pg_trigger_depth() > 0"
+    f" AND resource_type = '{Tool.contact.value}'"
+    f" AND ({_PLUGIN_MEMBER} IS NULL"
+    f" OR '{AdminSurface.community_contacts.value}' = ANY ({gucs.MEMBER_SURFACES}))"
+    " AND initiative_id IS NULL"
+    " AND role_id IS NULL"
+    " AND user_id IS NULL"
+    f" AND ((level = '{ResourceAccessLevel.owner.value}'"
+    " AND NOT all_initiative_members"
+    f" AND plugin_install_id = {gucs.COMMUNITY_CONTACTS_INSTALL})"
+    f" OR (level = '{ResourceAccessLevel.read.value}'"
+    " AND all_initiative_members AND plugin_install_id IS NULL)))"
+)
+
 #: The write scope of the tool a grant row is about: the row names its tool
 #: by value, and the scope by the tool's plural.
 _GRANT_TOOL_SCOPE = (
@@ -1283,11 +1305,12 @@ _PLUGIN_SHARE_ROW = (
 )
 
 #: What an installed plug-in's request writes on ``resource_grants``: the owner
-#: row on what it creates, and, with ``sharing:write``, the sharing rows of a
-#: resource it may share. A share is rewritten by deleting and inserting rows,
-#: so an install updates none.
+#: row on what it creates (and a community contact's two rows), and, with
+#: ``sharing:write``, the sharing rows of a resource it may share. A share is
+#: rewritten by deleting and inserting rows, so an install updates none.
 _PLUGIN_GRANT_INSERT = (
-    f"({_IID} IS NULL OR {_PLUGIN_CREATED_OWNER_ROW} OR {_PLUGIN_SHARE_ROW})"
+    f"({_IID} IS NULL OR {_PLUGIN_CREATED_OWNER_ROW}"
+    f" OR {_PLUGIN_CREATED_COMMUNITY_CONTACT_ROW} OR {_PLUGIN_SHARE_ROW})"
 )
 _PLUGIN_GRANT_DELETE = f"({_IID} IS NULL OR {_PLUGIN_SHARE_ROW})"
 

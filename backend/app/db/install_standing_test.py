@@ -784,8 +784,12 @@ async def test_a_new_transaction_replays_the_install(
         # Whether the registration's publisher is on.
         ("publishers", {"id", "enabled"}),
         # A member token's standing: the member's own membership row, whether
-        # it is live (a guest's ends), and whether their account is active.
-        ("guild_memberships", {"guild_id", "user_id", "guest_until", "role"}),
+        # it is live (a guest's ends), the surfaces it holds, and whether their
+        # account is active.
+        (
+            "guild_memberships",
+            {"guild_id", "user_id", "guest_until", "role", "joined_at"},
+        ),
         ("users", {"id", "status"}),
     ],
 )

@@ -558,7 +558,8 @@ async def strip_template_registry_objects(conn: AsyncConnection) -> int:
 #: columns, or ``()`` for the whole row. The install standing statement reads
 #: the install, the scopes its pinned version requests and where it is
 #: placed, and for a member token the member's
-#: consent and what their initiative roles permit; the sharing gate reads the
+#: consent, what their initiative roles permit and the custom role that names
+#: the admin surfaces they hold; the sharing gate reads the
 #: grant rows; a notification about what the install did names it; a task
 #: written for a member is held to its board's column limits, which its
 #: project's board layout holds; a row it bins is kept for the community's
@@ -581,6 +582,8 @@ PLUGIN_ROLE_MACHINERY_READS: dict[str, tuple[str, ...]] = {
         "granted_access",
         "revoked_at",
     ),
+    "custom_roles": ("id", "surfaces", "base_rung"),
+    "custom_role_members": ("user_id", "role_id", "assigned_at"),
     "initiative_rules": (
         "initiative_id",
         "initiative_role_id",

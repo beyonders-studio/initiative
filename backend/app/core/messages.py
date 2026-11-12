@@ -1227,8 +1227,8 @@ class ContactMessages:
     # A community contact lives inside the community contacts plug-in, which is
     # what reaches it and what its removal takes with it.
     PLUGIN_REQUIRED = "CONTACT_COMMUNITY_PLUGIN_REQUIRED"
-    # An installed plug-in creates a contact in an initiative; a community one
-    # is recorded on the community contacts plug-in's install.
+    # A plug-in on a token narrowed to one initiative creates a contact in an
+    # initiative; a community one takes a token that is not narrowed.
     PLUGIN_INITIATIVE_REQUIRED = "CONTACT_PLUGIN_INITIATIVE_REQUIRED"
     # Moving a contact into the community's contacts, when it is there already.
     ALREADY_IN_COMMUNITY = "CONTACT_ALREADY_IN_COMMUNITY"

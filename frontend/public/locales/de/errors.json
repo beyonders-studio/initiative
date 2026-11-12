@@ -368,7 +368,7 @@
   "CALENDAR_COMMUNITY_PLUGIN_REQUIRED": "Das Community-Kalender-Plug-in ist nicht installiert, daher gibt es keinen Ort für einen Community-Kalender",
   "CALENDAR_PLUGIN_INITIATIVE_REQUIRED": "Ein Plug-in erstellt einen Kalender in einer Initiative. Wähle die Initiative, zu der er gehört.",
   "CONTACT_COMMUNITY_PLUGIN_REQUIRED": "Das Plug-in für Community-Kontakte ist nicht installiert, daher gibt es keinen Ort für einen Community-Kontakt",
-  "CONTACT_PLUGIN_INITIATIVE_REQUIRED": "Ein Plug-in erstellt einen Kontakt in einer Initiative. Wähle die Initiative, zu der er gehört.",
+  "CONTACT_PLUGIN_INITIATIVE_REQUIRED": "Ein Plug-in, das auf eine Initiative beschränkt ist, erstellt Kontakte dort. Wähle diese Initiative.",
   "CONTACT_ALREADY_IN_COMMUNITY": "Dieser Kontakt gehört bereits der ganzen Community",
   "CONTACT_PHONE_INVALID": "Eine Telefonnummer darf Ziffern, Leerzeichen, + - ( ) . und ein x vor einer Durchwahl enthalten",
   "CONTACT_WEBSITE_INVALID": "Eine Website muss eine Webadresse sein, etwa example.com",

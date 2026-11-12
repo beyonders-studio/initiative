@@ -20,11 +20,9 @@ from app.core.messages import ContactMessages, GuildMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
-from app.db.guild_standing import ActorContext
+from app.db.guild_standing import ActorContext, InstallContext
 from app.models.platform.guild import AdminSurface
-from app.models.platform.user import User
 from app.models.tenant.contact import Contact
-from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import metadata as metadata_service
@@ -103,28 +101,43 @@ async def organizations_of(
     return found
 
 
-async def community_holder(
-    session: AsyncSession, user: User | None, guild_context: ActorContext
-) -> GuildPlugin:
-    """The install a community contact goes into, once the request may put one
-    there: a person holding the ``community_contacts`` surface, in a community
-    that has the plug-in."""
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ContactMessages.PLUGIN_INITIATIVE_REQUIRED,
+async def community_holder(session: AsyncSession, guild_context: ActorContext) -> int:
+    """The id of the install a community contact goes into, once the request
+    may put one there: a person holding the ``community_contacts`` surface, or
+    an installed plug-in on a token not narrowed to one initiative, acting as
+    itself or for a member holding that surface, in a community that has the
+    plug-in. For a plug-in the install is the one its standing names, which
+    the database gives the contact to as it goes in."""
+    holder: int | None
+    if isinstance(guild_context, InstallContext):
+        if guild_context.scope_initiative_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ContactMessages.PLUGIN_INITIATIVE_REQUIRED,
+            )
+        if (
+            guild_context.member_user_id is not None
+            and AdminSurface.community_contacts.value
+            not in guild_context.member_surfaces
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+            )
+        holder = guild_context.community_contacts_install
+    else:
+        if not guild_context.holds_surface(AdminSurface.community_contacts):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+            )
+        plugin = await guild_plugins_service.find_mounting_plugin(
+            session, tool=Tool.contact.value
         )
-    if not guild_context.holds_surface(AdminSurface.community_contacts):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
-        )
-    plugin = await guild_plugins_service.find_mounting_plugin(
-        session, tool=Tool.contact.value
-    )
-    if plugin is None:
+        holder = plugin.id if plugin is not None else None
+    if holder is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ContactMessages.PLUGIN_REQUIRED,
         )
-    return plugin
+    return holder

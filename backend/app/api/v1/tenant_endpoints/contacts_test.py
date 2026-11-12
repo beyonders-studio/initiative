@@ -10,16 +10,20 @@ and coming back in.
 
 import csv
 import io
+from datetime import UTC, datetime
 
 from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import ContactMessages, InitiativeMessages
+from app.core.messages import ContactMessages, GuildMessages, InitiativeMessages
 from app.core.tools import Tool
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface, CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.contact import Contact
+from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.metadata import MetadataType
+from app.models.tenant.plugin_member_consent import ConsentAccess, PluginMemberConsent
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
@@ -35,9 +39,11 @@ from app.testing import (
     create_task,
     get_auth_headers,
     grant_role_permission,
+    guild_url,
     route_session_to_guild,
     strip_non_owner_grants,
 )
+from app.testing.plugin_clients import install_headers, install_plugin
 
 
 async def _install(session: AsyncSession, actor):
@@ -290,6 +296,108 @@ async def test_the_communitys_contacts_are_its_surface_holders_to_make(
             admin.g(f"/contacts/{contact_id}"), headers=get_auth_headers(guest)
         )
     ).status_code == 200
+
+
+async def test_an_installed_plugin_makes_a_community_contact(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session
+):
+    """On a token not narrowed to one initiative, as a person makes one: held
+    by the community contacts plug-in's install and shared with every member,
+    with the plug-in as its author. Not on a narrowed token, and not without
+    the community contacts plug-in."""
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=["contacts:write"]
+    )
+    member = await acting_user(guild_role=CommunityRole.member, guild=installed.guild)
+    url = guild_url(installed.guild.id, "/contacts/")
+    headers = install_headers(installed, ["contacts:write"])
+
+    no_plugin = await client.post(url, headers=headers, json={"name": "Bloom & Co"})
+    assert no_plugin.status_code == 403
+    assert no_plugin.json()["detail"] == ContactMessages.PLUGIN_REQUIRED
+
+    holder = await _install(session, installed.seat)
+    narrowed = await client.post(
+        url,
+        headers=install_headers(
+            installed, ["contacts:write"], initiative_id=installed.placed.id
+        ),
+        json={"name": "Bloom & Co"},
+    )
+    assert narrowed.status_code == 403
+    assert narrowed.json()["detail"] == ContactMessages.PLUGIN_INITIATIVE_REQUIRED
+
+    made = await client.post(
+        url, headers=headers, json={"name": "Bloom & Co", "is_organization": True}
+    )
+    assert made.status_code == 201, made.text
+    contact_id = made.json()["id"]
+    assert made.json()["initiative_id"] is None
+    assert await _sharing(session, installed.guild.id, contact_id) == {
+        (holder.id, None, "owner", False, None),
+        (None, None, "read", True, None),
+    }
+    contact = await session.get(Contact, contact_id)
+    assert contact is not None
+    assert (contact.created_by, contact.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
+
+    read = await client.get(member.g(f"/contacts/{contact_id}"), headers=member.headers)
+    assert read.status_code == 200, read.text
+    assert read.json()["name"] == "Bloom & Co"
+
+
+async def test_a_member_token_makes_a_community_contact_for_a_surface_holder(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session
+):
+    """A plug-in acting for a member makes a community contact only where the
+    member holds the ``community_contacts`` surface, as the member would."""
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=["contacts:write"]
+    )
+    holder = await _install(session, installed.seat)
+    member = await acting_user(guild_role=CommunityRole.member, guild=installed.guild)
+    await route_session_to_guild(session, installed.guild.id)
+    session.add(
+        PluginMemberConsent(
+            install_id=installed.plugin.id,
+            user_id=member.user.id,
+            purpose="sync",
+            label="Keep contacts as you",
+            requested_access=ConsentAccess.read_write.value,
+            granted_access=ConsentAccess.read_write.value,
+            granted_at=datetime.now(UTC),
+        )
+    )
+    await session.commit()
+    url = guild_url(installed.guild.id, "/contacts/")
+    headers = install_headers(
+        installed, ["contacts:write"], user_id=member.user.id, purpose="sync"
+    )
+
+    refused = await client.post(url, headers=headers, json={"name": "Bloom & Co"})
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == GuildMessages.COMMUNITY_ADMIN_REQUIRED
+
+    await route_session_to_guild(session, installed.guild.id)
+    role = CustomRole(
+        name="Contacts",
+        base_rung=CommunityRole.member.value,
+        surfaces=[AdminSurface.community_contacts.value],
+    )
+    session.add(role)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=role.id))
+    await session.commit()
+
+    made = await client.post(url, headers=headers, json={"name": "Bloom & Co"})
+    assert made.status_code == 201, made.text
+    assert await _sharing(session, installed.guild.id, made.json()["id"]) == {
+        (holder.id, None, "owner", False, None),
+        (None, None, "read", True, None),
+    }
 
 
 async def test_initiative_work_links_to_a_community_contact(

@@ -20,16 +20,20 @@ from sqlmodel import select
 
 from app.api.deps import InstallAccessError
 from app.core.file_types import FileType
+from app.core.tools import Tool
 from app.db.guild_standing import InstallContext
 from app.db.schema_provisioning import GuildRoleKind, guild_role_name, guild_schema_name
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.platform.user import User, UserStatus
+from app.models.tenant.contact import Contact
+from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.plugin_member_consent import ConsentAccess, PluginMemberConsent
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_file,
+    create_guild_plugin,
     create_resource_grant,
     route_as_install,
     route_session_to_guild,
@@ -514,3 +518,69 @@ async def test_a_member_token_writes_no_owner_row_itself(
     with pytest.raises(DBAPIError, match="row-level security"):
         await s.flush()
     await s.rollback()
+
+
+async def test_a_member_token_makes_a_community_contact_as_a_surface_holder(
+    session, acting_user, role_session
+):
+    """The standing carries the admin surfaces the member holds, and the
+    database takes ``community_contacts`` there of a community contact the
+    token creates, as it does of the member making one themselves."""
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=["contacts:write"]
+    )
+    holder = await create_guild_plugin(
+        session,
+        installed.guild,
+        installed.seat.user,
+        definition={"plugin_kind": "tool_instance", "tool": Tool.contact.value},
+        plugin_kind="tool_instance",
+    )
+    member = await _member(acting_user, installed)
+    await _consent(session, installed, member.user.id)
+
+    s, context = await _route(
+        role_session, installed, member.user.id, ["contacts:write"]
+    )
+    assert context.member_surfaces == ()
+    s.add(Contact(initiative_id=None, name="Bloom & Co"))
+    with pytest.raises(DBAPIError, match="does not hold the community's contacts"):
+        await s.flush()
+    await s.rollback()
+
+    await route_session_to_guild(session, installed.guild.id)
+    role = CustomRole(
+        name="Contacts",
+        base_rung=CommunityRole.member.value,
+        surfaces=[AdminSurface.community_contacts.value],
+    )
+    session.add(role)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=role.id))
+    await session.commit()
+
+    s, context = await _route(
+        role_session, installed, member.user.id, ["contacts:write"]
+    )
+    assert context.member_surfaces == (AdminSurface.community_contacts.value,)
+    made = Contact(initiative_id=None, name="Bloom & Co")
+    s.add(made)
+    await s.flush()
+    made_id = made.id
+    await s.commit()
+    await route_session_to_guild(session, installed.guild.id)
+    grants = (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == Tool.contact.value,
+                ResourceGrant.resource_id == made_id,
+            )
+        )
+    ).all()
+    assert {
+        (g.level, g.plugin_install_id, g.user_id, g.all_initiative_members)
+        for g in grants
+    } == {
+        (ResourceAccessLevel.owner, holder.id, None, False),
+        (ResourceAccessLevel.read, None, None, True),
+    }
