@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The S3 move in the order that works.** On the storage page, save S3 with **Serve missing objects from local** on, then **Start backfill**, which waits until S3 is saved.
 - **Passkeys work in the apps.** Signing in, adding a passkey, breaking glass, the billing console and every other passkey prompt open your browser and carry on in the app, with no second sign-in.
 - **Single sign-on goes on past an age limit.** Where a listed community's provider connection adds people on arrival, an account its age answer keeps out is left out of it, and the sign-in goes on.
+- **A plug-in acting for you has your community settings, no more.** On a member token, it changes the community's calendars or adds a community-wide webhook only when you could yourself.
 - **Plug-in updates show what they ask for.** Its row in **Settings › Integrations** shows **Update waiting** with what the version asks for, and a version this server can't run says why.
 - **Create from `[[` in wikis and posts.** It asks what kind of thing to make, and links it.
 - **Posts from X and Reddit show.** In a document, on a whiteboard or as a link file, on the web and in the apps.

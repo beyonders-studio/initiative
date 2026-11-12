@@ -115,11 +115,7 @@ async def community_holder(session: AsyncSession, guild_context: ActorContext) -
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=ContactMessages.PLUGIN_INITIATIVE_REQUIRED,
             )
-        if (
-            guild_context.member_user_id is not None
-            and AdminSurface.community_contacts.value
-            not in guild_context.member_surfaces
-        ):
+        if not guild_context.member_holds_surface(AdminSurface.community_contacts):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,

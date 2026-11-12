@@ -1259,13 +1259,13 @@ _PLUGIN_CREATED_OWNER_ROW = (
 #: The rows on a contact an installed plug-in creates outside any initiative,
 #: written by the same trigger: the owner row naming the community contacts
 #: plug-in's install, as the request's standing names it, and the share with
-#: every member to read. A member token's member holds the
-#: ``community_contacts`` surface, as a person making one does.
+#: every member to read, for a plug-in that may write the community's contacts
+#: (a member token's member holds the ``community_contacts`` surface, as a
+#: person making one does).
 _PLUGIN_CREATED_COMMUNITY_CONTACT_ROW = (
     "(pg_trigger_depth() > 0"
     f" AND resource_type = '{Tool.contact.value}'"
-    f" AND ({_PLUGIN_MEMBER} IS NULL"
-    f" OR '{AdminSurface.community_contacts.value}' = ANY ({gucs.MEMBER_SURFACES}))"
+    f" AND {IN_POLICY.unnarrowed_install(AdminSurface.community_contacts)}"
     " AND initiative_id IS NULL"
     " AND role_id IS NULL"
     " AND user_id IS NULL"

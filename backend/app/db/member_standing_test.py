@@ -20,11 +20,14 @@ from sqlmodel import select
 
 from app.api.deps import InstallAccessError
 from app.core.file_types import FileType
+from app.core.plugin_scopes import tool_resource
 from app.core.tools import Tool
+from app.db.authorization import COMMUNITY_ROWS
 from app.db.guild_standing import InstallContext
 from app.db.schema_provisioning import GuildRoleKind, guild_role_name, guild_schema_name
 from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.platform.user import User, UserStatus
+from app.models.tenant.calendar import Calendar
 from app.models.tenant.contact import Contact
 from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.file import File
@@ -544,7 +547,7 @@ async def test_a_member_token_makes_a_community_contact_as_a_surface_holder(
     )
     assert context.member_surfaces == ()
     s.add(Contact(initiative_id=None, name="Bloom & Co"))
-    with pytest.raises(DBAPIError, match="does not hold the community's contacts"):
+    with pytest.raises(DBAPIError, match="row-level security"):
         await s.flush()
     await s.rollback()
 
@@ -584,3 +587,62 @@ async def test_a_member_token_makes_a_community_contact_as_a_surface_holder(
         (ResourceAccessLevel.owner, holder.id, None, False),
         (ResourceAccessLevel.read, None, None, True),
     }
+
+
+#: The model of each tool whose rows may belong to the whole community.
+_COMMUNITY_ROW_MODELS = {Tool.calendar: Calendar, Tool.contact: Contact}
+
+
+@pytest.mark.parametrize("tool", sorted(COMMUNITY_ROWS, key=lambda t: t.value))
+async def test_a_member_token_changes_a_community_row_as_the_member_would(
+    session, acting_user, role_session, tool
+):
+    """A member with a write grant on a row of the whole community changes it
+    through a member token exactly where they could themselves: where the
+    grant changes the row, or once they hold the surface that administers
+    it."""
+    rows = COMMUNITY_ROWS[tool]
+    scope = f"{tool_resource(tool).value}:write"
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=[scope]
+    )
+    member = await _member(acting_user, installed)
+    await _consent(session, installed, member.user.id)
+
+    await route_session_to_guild(session, installed.guild.id)
+    model = _COMMUNITY_ROW_MODELS[tool]
+    row = model(initiative_id=None, name="The whole community's")
+    session.add(row)
+    await session.flush()
+    session.add(
+        ResourceGrant(
+            resource_type=tool.value,
+            resource_id=row.id,
+            user_id=member.user.id,
+            level=ResourceAccessLevel.write,
+        )
+    )
+    await session.commit()
+    rename = text(
+        f"UPDATE {model.__tablename__} SET name = 'Renamed' WHERE id = :id RETURNING id"
+    ).bindparams(id=row.id)
+
+    s, _context = await _route(role_session, installed, member.user.id, [scope])
+    changed = (await s.exec(rename)).first() is not None
+    assert changed is rows.granted_writes_row
+    await s.rollback()
+
+    await route_session_to_guild(session, installed.guild.id)
+    role = CustomRole(
+        name="Community rows",
+        base_rung=CommunityRole.member.value,
+        surfaces=[rows.surface.value],
+    )
+    session.add(role)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=role.id))
+    await session.commit()
+
+    s, _context = await _route(role_session, installed, member.user.id, [scope])
+    assert (await s.exec(rename)).first() is not None
+    await s.rollback()

@@ -219,6 +219,15 @@ def _install_context(**overrides):
         pytest.param(
             {"guild_admin": True}, ["demo.link_opened"], None, id="demo-event-admin"
         ),
+        pytest.param(
+            {"member_user_id": 7, "member_surfaces": ("webhooks",)},
+            ["files.created"],
+            None,
+            id="member-holding-webhooks",
+        ),
+        pytest.param(
+            {"member_user_id": 7}, ["files.created"], 12, id="member-in-initiative"
+        ),
     ],
 )
 def test_an_install_may_subscribe_within_its_standing(
@@ -261,6 +270,12 @@ def test_an_install_may_subscribe_within_its_standing(
             ["demo.lead_left"],
             None,
             id="demo-event-without-admin-standing",
+        ),
+        pytest.param(
+            {"member_user_id": 7},
+            ["files.created"],
+            None,
+            id="member-community-wide-without-webhooks",
         ),
     ],
 )
