@@ -58,9 +58,7 @@ class EnvelopeImportResult(SanitizedBaseModel):
     failed: dict[str, int] = {}
     # The rows behind ``failed`` where the import reads rows (a spreadsheet).
     failed_rows: list[ImportRowFailure] = []
-    # Property definitions that collided by name and were created renamed
-    # (names when known, count always).
-    renamed_properties: list[str] = []
+    # Property definitions that collided by name and were created renamed.
     renamed_property_count: int = 0
     # Edges the deferred pass wrote for this envelope, and the ones whose far
     # end was never imported. Zero on every importer that reads no links.
@@ -99,7 +97,7 @@ class EnvelopeImporter(Protocol):
         hard ceiling (len(tasks), len(items), … — 1 for a lone file)."""
         ...
 
-    def people(self, validated: BaseModel) -> list["ManifestPerson"]:
+    def people(self, validated: BaseModel) -> list[ManifestPerson]:
         """Everybody this envelope quotes, most-quoted first.
 
         The same inventory a backup's manifest carries, read from one
@@ -120,7 +118,7 @@ class EnvelopeImporter(Protocol):
         envelope: BaseModel,
         target_initiative: Initiative,
         importer: User,
-        context: "ImportContext | None" = None,
+        context: ImportContext | None = None,
     ) -> EnvelopeImportResult:
         """Insert the envelope's rows (importer becomes owner, owner grant
         synthesized). Flush-only — the caller commits.

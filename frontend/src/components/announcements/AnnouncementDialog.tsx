@@ -8,27 +8,28 @@ import {
   TriangleAlert,
   Wrench,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
   AnnouncementCategory,
   AnnouncementSection,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Markdown } from "@/components/Markdown";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Markdown } from "@/components/markdown/Markdown";
+import { splitIntoPages } from "@/lib/announcementPages";
+import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { splitIntoPages } from "@/lib/announcementPages";
-import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
+} from "@/ui/dialog";
+import { Lightbox } from "@/ui/lightbox";
 
 const CATEGORY_ICON: Record<AnnouncementCategory, typeof Megaphone> = {
   release: Rocket,
@@ -86,10 +87,12 @@ export const AnnouncementDialog = ({
   // A dialog opening is a fresh read, and so is a different announcement
   // arriving in the same dialog — both start at page one. The title stands in
   // for "which announcement": the pages themselves are a fresh array each
-  // render, so they cannot be the dependency.
-  useEffect(() => {
+  // render, so they cannot be what is compared.
+  const [prev, setPrev] = useState({ open, title });
+  if (prev.open !== open || prev.title !== title) {
+    setPrev({ open, title });
     setPageIndex(0);
-  }, [open, title]);
+  }
 
   const safeIndex = Math.min(pageIndex, Math.max(pages.length - 1, 0));
   const isLastPage = safeIndex >= pages.length - 1;
@@ -103,8 +106,8 @@ export const AnnouncementDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 space-y-2">
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader className="space-y-2">
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1.5">
               <Icon className="h-3.5 w-3.5" />
@@ -118,12 +121,8 @@ export const AnnouncementDialog = ({
           <DialogDescription className="sr-only">{t(`category.${category}`)}</DialogDescription>
         </DialogHeader>
 
-        {/* A plain overflow container rather than ScrollArea: the dialog is
-            bounded by max-height, and Radix's viewport sizes itself with
-            ``h-full``, which resolves to nothing against an indefinite height
-            — the content would be clipped instead of scrolled. */}
-        <div ref={bodyRef} className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
-          <div className="space-y-6 py-4">
+        <DialogBody ref={bodyRef}>
+          <div className="space-y-6">
             {(pages[safeIndex] ?? []).map((section, index) => (
               <AnnouncementSectionView
                 // Sections have no identity of their own — they are an ordered
@@ -135,7 +134,7 @@ export const AnnouncementDialog = ({
               />
             ))}
           </div>
-        </div>
+        </DialogBody>
 
         {pages.length > 1 || footer ? (
           <DialogFooter className="shrink-0 border-t pt-4 sm:items-center">

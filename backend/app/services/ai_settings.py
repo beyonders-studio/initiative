@@ -23,24 +23,24 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from functools import partial
 
 from fastapi import HTTPException
 from sqlalchemy import func, text, update
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.rules import SURFACE_AI_CONNECTIONS
-from app.db import cohorts
-from app.db.session import routed_guild_id, set_rls_context
 from app.core.audit_events import AuditEventType
 from app.core.encryption import SALT_AI_API_KEY, decrypt_field, encrypt_field
 from app.core.messages import AIMessages, GuildMessages
+from app.core.rules import SURFACE_AI_CONNECTIONS
+from app.db import cohorts, post_commit
 from app.db import session as db_session
+from app.db.request_context import SystemGuild
+from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.ai_connection import PlatformAIConnection
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.tenant.ai_connection import GuildAIConnection, GuildAIConnectionKey
-from app.services.platform.app_settings import get_app_settings, locked_settings
-from app.services.platform import rules
 from app.schemas.ai_settings import (
     AIConfigMode,
     AIConnectionCommunity,
@@ -58,12 +58,13 @@ from app.schemas.ai_settings import (
 from app.services import ai_provider
 from app.services import audit as audit_service
 from app.services.ai_provider import AIRequestError, Target
+from app.services.platform import rules
+from app.services.platform.app_settings import get_app_settings, locked_settings
 from app.services.webhook_target_url import (
     WebhookTargetUrlError,
     WebhookTargetUrlPrivateError,
     assert_target_url_is_public_async,
 )
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
@@ -293,7 +294,7 @@ async def _validate_connection_base_url(
         return
     try:
         await assert_target_url_is_public_async(base_url)
-    except (WebhookTargetUrlError, WebhookTargetUrlPrivateError):
+    except WebhookTargetUrlError, WebhookTargetUrlPrivateError:
         raise HTTPException(status_code=400, detail=AIMessages.INVALID_BASE_URL)
 
 
@@ -326,6 +327,33 @@ async def record_health(
     async with cohorts.system_session(guild_id) as system, system.begin():
         await set_rls_context(system, SystemGuild(guild_id))
         await system.exec(stmt)
+
+
+async def turn_off_guild_connections(guild_id: int) -> None:
+    """While a community's AI is off, turn its own connections off, on the
+    system engine. Run once a change that may have switched it off commits."""
+    async with cohorts.system_session(guild_id) as system, system.begin():
+        if await rules.community_value(system, guild_id, "allow_ai"):
+            return
+        await set_rls_context(system, SystemGuild(guild_id))
+        await system.exec(
+            update(GuildAIConnection)
+            .where(col(GuildAIConnection.enabled))
+            .values(enabled=False)
+        )
+
+
+def turn_off_guild_connections_once_committed(
+    session: AsyncSession, guild_id: int
+) -> None:
+    """:func:`turn_off_guild_connections` once ``session`` commits the
+    deployment's rules for the community, which may have switched its AI off.
+    The seat's own change runs it as its rule's follow-up."""
+    post_commit.after_commit(
+        session,
+        partial(turn_off_guild_connections, guild_id),
+        key=("ai_connections_off", guild_id),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -711,7 +739,6 @@ async def _clear_guild_default(session: AsyncSession) -> None:
 async def create_guild_connection(
     session: AsyncSession,
     guild_id: int,
-    user_id: int,
     payload: AIConnectionCreate,
     *,
     actor_user_id: int | None = None,
@@ -720,12 +747,13 @@ async def create_guild_connection(
     # Guild connections are always public-only (scope="community" => no private).
     await _validate_connection_base_url(payload.provider, base_url, "community")
     row = GuildAIConnection(
-        created_by=user_id,
         label=payload.label.strip(),
         provider=payload.provider.value,
         base_url=base_url,
         model=_normalize_optional_string(payload.model),
-        enabled=payload.enabled,
+        # While the community's AI is off, a new connection starts off too.
+        enabled=payload.enabled
+        and await rules.community_value(session, guild_id, "allow_ai"),
         is_default=payload.is_default,
     )
     key = (
@@ -799,6 +827,14 @@ async def update_guild_connection(
         # A key goes only where it was given for.
         key = None
     if "enabled" in data and payload.enabled is not None:
+        if (
+            payload.enabled
+            and not row.enabled
+            and not await rules.community_value(
+                session, routed_guild_id(session), "allow_ai"
+            )
+        ):
+            raise HTTPException(status_code=409, detail=AIMessages.NOT_ENABLED)
         row.enabled = payload.enabled
     if "is_default" in data and payload.is_default is not None:
         if payload.is_default:

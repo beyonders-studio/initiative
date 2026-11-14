@@ -10,7 +10,7 @@
  * States cross the boundary as hex, and the caller names the Yjs client a
  * state is written as.
  */
-import { buildEditorFromExtensions } from "@lexical/extension";
+import { buildEditorFromExtensions, getExtensionDependencyFromEditor } from "@lexical/extension";
 import { $convertFromMarkdownString } from "@lexical/markdown";
 import {
   type Binding,
@@ -42,11 +42,11 @@ import {
   type Text as YText,
 } from "yjs";
 
-import { documentExtension } from "@/components/ui/editor/document-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/ui/editor/extensions/markdown-shortcuts-extension";
-import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/ui/editor/nodes/image-node";
-import { registerLegacyNodes } from "@/components/ui/editor/nodes/legacy-nodes";
+import { InitiativeExtension } from "@/components/editor/initiative-extension";
 import { readRange } from "@/lib/spreadsheet/range";
+import { documentExtension } from "@/ui/editor/document-extension";
+import { MarkdownShortcutsExtension } from "@/ui/editor/extensions/markdown-shortcuts-extension";
+import { COLLAB_EXCLUDED_PROPERTIES } from "@/ui/editor/nodes/image-node";
 
 /** The id the browser's `CollaborationPlugin` binds under. */
 const ROOT_ID = "main";
@@ -90,6 +90,7 @@ function withEditor<T>(clientId: number | null, use: (editor: LexicalEditor, doc
       onError: (error) => {
         throw error;
       },
+      extension: InitiativeExtension,
     })
   );
   const doc = new Doc();
@@ -134,10 +135,6 @@ function withEditor<T>(clientId: number | null, use: (editor: LexicalEditor, doc
   }
 }
 
-/** Rewrite the legacy nodes a document holds as current content, as the
- * browser's editor does when it opens one. */
-const modernize = (editor: LexicalEditor) => registerLegacyNodes(editor)();
-
 /**
  * A document's Yjs state, from its editor JSON, or with one empty paragraph
  * when it has none — what the browser's editor starts a new document with.
@@ -148,7 +145,6 @@ function bootstrap(json: string | null, clientId: number): string {
       editor.update(() => $getRoot().append($createParagraphNode()), { discrete: true });
     } else {
       editor.setEditorState(editor.parseEditorState(json), { tag: "history-merge" });
-      modernize(editor);
     }
     return toHex(encodeStateAsUpdate(doc));
   });
@@ -163,7 +159,6 @@ function load(editor: LexicalEditor, doc: Doc, state: string) {
 function render(state: string): string {
   return withEditor(null, (editor, doc) => {
     load(editor, doc, state);
-    modernize(editor);
     return JSON.stringify(editor.getEditorState().toJSON());
   });
 }
@@ -337,7 +332,6 @@ function apply(state: string, json: string, clientId: number): string {
     editor.update(() => $reconcileChildren($getRoot(), was.children ?? [], next.children ?? []), {
       discrete: true,
     });
-    modernize(editor);
     return toHex(encodeStateAsUpdate(doc, before));
   });
 }
@@ -349,6 +343,10 @@ function apply(state: string, json: string, clientId: number): string {
  */
 function fromMarkdown(text: string, plain: boolean): string {
   return withEditor(null, (editor) => {
+    const { output: transformers } = getExtensionDependencyFromEditor(
+      editor,
+      MarkdownShortcutsExtension
+    );
     editor.update(
       () => {
         const root = $getRoot();
@@ -363,13 +361,12 @@ function fromMarkdown(text: string, plain: boolean): string {
             root.append(paragraph);
           }
         } else {
-          $convertFromMarkdownString(text, MARKDOWN_TRANSFORMERS);
+          $convertFromMarkdownString(text, transformers);
         }
         if (root.getChildrenSize() === 0) root.append($createParagraphNode());
       },
       { discrete: true }
     );
-    modernize(editor);
     return JSON.stringify(editor.getEditorState().toJSON());
   });
 }

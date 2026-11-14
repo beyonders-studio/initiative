@@ -9,6 +9,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/dev-ports.sh"
 cd "$SCRIPT_DIR/.."
 
+# A fresh clone has no backend/.env. It starts from backend/.env.example, with
+# a SECRET_KEY of its own and the database's port (scripts/dev-ports.sh).
+env_file="$DEV_MAIN_ROOT/backend/.env"
+if [ ! -f "$env_file" ]; then
+    secret_key="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')"
+    sed -e "s#^SECRET_KEY=.*#SECRET_KEY=$secret_key#" \
+        -e "s#@localhost:5432/#@localhost:$POSTGRES_PORT/#" \
+        "$DEV_MAIN_ROOT/backend/.env.example" > "$env_file"
+    echo "Created backend/.env from backend/.env.example, with a new SECRET_KEY."
+fi
+
 su_user="${POSTGRES_USER:-initiative}"
 if [ -n "${DEV_DATABASE:-}" ] && ! docker compose exec -T db psql -U "$su_user" -d postgres -tAc \
     "SELECT 1 FROM pg_database WHERE datname = '$DEV_DATABASE'" | grep -q 1; then
@@ -25,7 +36,7 @@ fi
 # fatal, since search works either way.
 bootstrap_url=""
 if grep -qsE '^DATABASE_URL_APP=.+' backend/.env "$DEV_MAIN_ROOT/backend/.env"; then
-    bootstrap_url="postgresql+asyncpg://${su_user}:${POSTGRES_PASSWORD:-initiative}@localhost:5432/${DEV_DATABASE:-${POSTGRES_DB:-initiative}}"
+    bootstrap_url="postgresql+asyncpg://${su_user}:${POSTGRES_PASSWORD:-initiative}@localhost:$POSTGRES_PORT/${DEV_DATABASE:-${POSTGRES_DB:-initiative}}"
 fi
 if ! (
     cd backend && source .venv/bin/activate &&

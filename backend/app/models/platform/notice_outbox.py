@@ -16,8 +16,8 @@ grants say exactly that. A row is deleted once it has been delivered: the bell
 line is the record.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -42,7 +42,7 @@ class NoticeOutboxItem(SQLModel, table=True):
         Index("ix_notice_outbox_due", "deliver_after", "user_id"),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None, sa_column=Column(BigInteger, primary_key=True, autoincrement=True)
     )
     user_id: int = Field(
@@ -50,7 +50,7 @@ class NoticeOutboxItem(SQLModel, table=True):
             Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
         )
     )
-    guild_id: Optional[int] = Field(
+    guild_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("guilds.id", ondelete="CASCADE"), nullable=True
@@ -58,8 +58,9 @@ class NoticeOutboxItem(SQLModel, table=True):
     )
     #: What the worker does with it: ``notice`` writes or joins a bell line,
     #: ``reaction`` rolls a reaction into the line for what was reacted to,
-    #: ``withdraw`` takes one back out, and ``push`` is a push with no line of
-    #: its own — a digest's or a hold summary's. One recipient's rows apply in order.
+    #: ``withdraw`` takes one back out, ``push`` is a push with no line of
+    #: its own — a digest's or a hold summary's — and ``record`` writes a line
+    #: already read, with nothing else. One recipient's rows apply in order.
     kind: str = Field(
         default="notice",
         sa_column=Column(String(16), nullable=False, server_default="notice"),
@@ -71,41 +72,41 @@ class NoticeOutboxItem(SQLModel, table=True):
     data: dict[str, Any] = Field(sa_column=Column(JSONB, nullable=False))
     #: The thread a rolled-up line belongs to, and who it names; null for a
     #: notice that is a line of its own.
-    rollup_key: Optional[str] = Field(default=None, sa_column=Column(Text))
-    actor_id: Optional[int] = Field(default=None, sa_column=Column(Integer))
-    actor_name: Optional[str] = Field(default=None, sa_column=Column(Text))
+    rollup_key: str | None = Field(default=None, sa_column=Column(Text))
+    actor_id: int | None = Field(default=None, sa_column=Column(Integer))
+    actor_name: str | None = Field(default=None, sa_column=Column(Text))
     #: What the push says; null when no push may go.
-    push_title: Optional[str] = Field(default=None, sa_column=Column(Text))
-    push_body: Optional[str] = Field(default=None, sa_column=Column(Text))
-    push_data: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
+    push_title: str | None = Field(default=None, sa_column=Column(Text))
+    push_body: str | None = Field(default=None, sa_column=Column(Text))
+    push_data: dict[str, Any] | None = Field(default=None, sa_column=Column(JSONB))
     #: The email's pieces; null when no email may go.
-    email_subject: Optional[str] = Field(default=None, sa_column=Column(Text))
-    email_headline: Optional[str] = Field(default=None, sa_column=Column(Text))
-    email_body: Optional[str] = Field(default=None, sa_column=Column(Text))
-    email_link: Optional[str] = Field(default=None, sa_column=Column(Text))
-    email_link_label: Optional[str] = Field(default=None, sa_column=Column(Text))
+    email_subject: str | None = Field(default=None, sa_column=Column(Text))
+    email_headline: str | None = Field(default=None, sa_column=Column(Text))
+    email_body: str | None = Field(default=None, sa_column=Column(Text))
+    email_link: str | None = Field(default=None, sa_column=Column(Text))
+    email_link_label: str | None = Field(default=None, sa_column=Column(Text))
     #: Whether reading the bell line makes the email unnecessary.
     email_names_line: bool = Field(
         default=True,
         sa_column=Column(Boolean, nullable=False, server_default=text("true")),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: The earliest the worker may take it: now, or later after a failed push.
     deliver_after: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: Held by the pass delivering it. Older than the lease means that pass
     #: never finished, and another may take it.
-    claimed_at: Optional[datetime] = Field(
+    claimed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True))
     )
     #: Set once the bell line and the email are written, so a push that has to
     #: be tried again does not write them twice.
-    bell_written_at: Optional[datetime] = Field(
+    bell_written_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True))
     )
     attempts: int = Field(

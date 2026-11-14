@@ -23,19 +23,24 @@
  * hand the lot to `useQueries` — a hook cannot be called in a loop. A tool
  * whose hook is hand-written still declares its options here, so the query is
  * described once and the hand-written hook wraps these rather than repeating
- * the key.
+ * the key. The options are the generated `get…QueryOptions`, so each read is
+ * keyed by its path and cancelled when its key moves on.
  */
 
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  type QueryFunction,
+  type SkipToken,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import {
   createCalendar,
   deleteCalendar,
   duplicateCalendar,
-  getListCalendarsQueryKey,
-  getReadCalendarQueryKey,
-  listCalendars,
-  readCalendar,
+  getListCalendarsQueryOptions,
+  getReadCalendarQueryOptions,
   setCalendarGrants,
   updateCalendar,
 } from "@/api/generated/calendars/calendars";
@@ -43,10 +48,8 @@ import {
   createContact,
   deleteContact,
   duplicateContact,
-  getListContactsQueryKey,
-  getReadContactQueryKey,
-  listContacts,
-  readContact,
+  getListContactsQueryOptions,
+  getReadContactQueryOptions,
   setContactGrants,
   updateContact,
 } from "@/api/generated/contacts/contacts";
@@ -54,10 +57,8 @@ import {
   createCounterGroup,
   deleteCounterGroup,
   duplicateCounterGroup,
-  getListCounterGroupsQueryKey,
-  getReadCounterGroupQueryKey,
-  listCounterGroups,
-  readCounterGroup,
+  getListCounterGroupsQueryOptions,
+  getReadCounterGroupQueryOptions,
   setCounterGroupGrants,
   updateCounterGroup,
 } from "@/api/generated/counters/counters";
@@ -65,10 +66,8 @@ import {
   createDashboard,
   deleteDashboard,
   duplicateDashboard,
-  getListDashboardsQueryKey,
-  getReadDashboardQueryKey,
-  listDashboards,
-  readDashboard,
+  getListDashboardsQueryOptions,
+  getReadDashboardQueryOptions,
   setDashboardGrants,
   updateDashboard,
 } from "@/api/generated/dashboards/dashboards";
@@ -77,9 +76,8 @@ import {
   deleteFile,
   duplicateFile,
   getListFilesQueryKey,
-  getReadFileQueryKey,
+  getReadFileQueryOptions,
   listFiles,
-  readFile,
   setFileGrants,
   updateFile,
 } from "@/api/generated/files/files";
@@ -90,31 +88,21 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getListMyCalendarsQueryKey,
-  getListMyContactsQueryKey,
-  getListMyCounterGroupsQueryKey,
-  getListMyDashboardsQueryKey,
-  getListMyFilesQueryKey,
-  getListMyPostsQueryKey,
-  getListMyProjectsQueryKey,
-  getListMyWikisQueryKey,
-  listMyCalendars,
-  listMyContacts,
-  listMyCounterGroups,
-  listMyDashboards,
-  listMyFiles,
-  listMyPosts,
-  listMyProjects,
-  listMyWikis,
+  getListMyCalendarsQueryOptions,
+  getListMyContactsQueryOptions,
+  getListMyCounterGroupsQueryOptions,
+  getListMyDashboardsQueryOptions,
+  getListMyFilesQueryOptions,
+  getListMyPostsQueryOptions,
+  getListMyProjectsQueryOptions,
+  getListMyWikisQueryOptions,
 } from "@/api/generated/my-tools/my-tools";
 import {
   createPost,
   deletePost,
   duplicatePost,
-  getListPostsQueryKey,
-  getReadPostQueryKey,
-  listPosts,
-  readPost,
+  getListPostsQueryOptions,
+  getReadPostQueryOptions,
   setPostGrants,
   updatePost,
 } from "@/api/generated/posts/posts";
@@ -122,10 +110,8 @@ import {
   createProject,
   deleteProject,
   duplicateProject,
-  getListProjectsQueryKey,
-  getReadProjectQueryKey,
-  listProjects,
-  readProject,
+  getListProjectsQueryOptions,
+  getReadProjectQueryOptions,
   setProjectGrants,
   updateProject,
 } from "@/api/generated/projects/projects";
@@ -133,10 +119,8 @@ import {
   createWiki,
   deleteWiki,
   duplicateWiki,
-  getListWikisQueryKey,
-  getReadWikiQueryKey,
-  listWikis,
-  readWiki,
+  getListWikisQueryOptions,
+  getReadWikiQueryOptions,
   setWikiGrants,
   updateWiki,
 } from "@/api/generated/wikis/wikis";
@@ -144,12 +128,19 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { fetchAllPages } from "@/lib/fetchAllPages";
+import { askForStoreReview } from "@/lib/storeReview";
 import { toolCamelPlural } from "@/lib/tools";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
 /** A cache key, as the generated key builders return one. */
 type CacheKey = readonly unknown[];
+
+/** A read's key and its fetch, as a generated `get…QueryOptions` returns them. */
+export interface ReadQuery<T> {
+  queryKey: CacheKey;
+  queryFn?: QueryFunction<T> | SkipToken;
+}
 
 /** Copies one into an initiative: `POST /{tool}/{id}/duplicate`, one route shape for every tool. */
 type Duplicate = (
@@ -215,31 +206,6 @@ interface ToolListPage {
 // fields out of its record and never calls that builder.
 
 /**
- * One page of the tool's list, in this community and across every one at once.
- *
- * Options rather than hooks: the two tables that show one tool at a time ask
- * all nine and hand the lot to `useQueries`, and a hook cannot be called in a
- * loop. Both are declared for every tool, including the ones whose own
- * list hook is hand-written — those wrap these, so the key and the fetch are
- * written once wherever the list is reached from.
- */
-const listQueries = <TList, TMyList, TParams, TMyParams>(endpoints: {
-  listKey: (communityId: number, params?: TParams) => CacheKey;
-  list: (communityId: number, params?: TParams) => Promise<TList>;
-  myListKey: (params?: TMyParams) => CacheKey;
-  myList: (params?: TMyParams) => Promise<TMyList>;
-}) => ({
-  listQuery: (communityId: number, params?: TParams) => ({
-    queryKey: endpoints.listKey(communityId, params),
-    queryFn: () => endpoints.list(communityId, params),
-  }),
-  myListQuery: (params?: TMyParams) => ({
-    queryKey: endpoints.myListKey(params),
-    queryFn: () => endpoints.myList(params),
-  }),
-});
-
-/**
  * One page of the tool's community-wide list.
  *
  * `keepPreviousData` keeps the rows on screen while a changed page, search or
@@ -247,35 +213,17 @@ const listQueries = <TList, TMyList, TParams, TMyParams>(endpoints: {
  * every keystroke.
  */
 const listHook = <TList, TParams>(endpoints: {
-  listKey: (communityId: number, params?: TParams) => CacheKey;
-  list: (communityId: number, params?: TParams) => Promise<TList>;
+  listQuery: (communityId: number, params?: TParams) => ReadQuery<TList>;
 }) => {
   return (params?: TParams, options?: QueryOpts<TList>) => {
     const communityId = useActiveCommunityId();
     return useQuery<TList>({
-      queryKey: endpoints.listKey(communityId, params),
-      queryFn: () => endpoints.list(communityId, params),
+      ...endpoints.listQuery(communityId, params),
       placeholderData: keepPreviousData,
       ...options,
     });
   };
 };
-
-/**
- * One row, as query options: for a caller that holds the tool as a value
- * rather than calling that tool's own hook — the page title reads whichever
- * tool the route is in. The same key and fetch `useDetail` uses, so the two
- * share one cache entry.
- */
-const detailQueryOf =
-  <TRead>(endpoints: {
-    detailKey: (communityId: number, id: number) => CacheKey;
-    detail: (communityId: number, id: number) => Promise<TRead>;
-  }) =>
-  (communityId: number, id: number) => ({
-    queryKey: endpoints.detailKey(communityId, id),
-    queryFn: () => endpoints.detail(communityId, id),
-  });
 
 /**
  * One row. `null` for an id the route has not resolved yet, which holds the
@@ -287,15 +235,13 @@ const detailQueryOf =
  * one's id. It shows its loading state instead.
  */
 const detailHook = <TRead>(endpoints: {
-  detailKey: (communityId: number, id: number) => CacheKey;
-  detail: (communityId: number, id: number) => Promise<TRead>;
+  detailQuery: (communityId: number, id: number) => ReadQuery<TRead>;
 }) => {
-  const detailQuery = detailQueryOf(endpoints);
   return (id: number | null, options?: QueryOpts<TRead>) => {
     const communityId = useActiveCommunityId();
     const { enabled: userEnabled = true, ...rest } = options ?? {};
     return useQuery<TRead>({
-      ...detailQuery(communityId, id!),
+      ...endpoints.detailQuery(communityId, id!),
       enabled: id !== null && Number.isFinite(id) && userEnabled,
       placeholderData: undefined,
       ...rest,
@@ -310,12 +256,15 @@ const createHook = <TRead, TCreate>(
   },
   errorKey: string
 ) => {
-  return (options?: MutationOpts<TRead, TCreate>) =>
+  return (options?: MutationOpts<TRead, TCreate>, failureKey = errorKey) =>
     useCommunityMutation<TRead, TCreate>(
       {
         mutationFn: (communityId, data) => endpoints.create(communityId, data),
-        invalidate: () => invalidate(q.toolList(endpoints.tool)),
-        errorKey,
+        invalidate: () => {
+          askForStoreReview();
+          return invalidate(q.toolList(endpoints.tool));
+        },
+        errorKey: failureKey,
       },
       options
     );
@@ -343,7 +292,7 @@ interface ToolWriteOptions {
 const updateHook = <TRead, TUpdate>(
   endpoints: {
     update: (communityId: number, id: number, data: TUpdate) => Promise<TRead>;
-    detailKey: (communityId: number, id: number) => CacheKey;
+    detailQuery: (communityId: number, id: number) => ReadQuery<TRead>;
     tool: Tool;
   },
   errorKey: string,
@@ -357,7 +306,7 @@ const updateHook = <TRead, TUpdate>(
         mutationFn: (community, data) => endpoints.update(community, id, data),
         invalidate: (updated) => {
           if (seedsDetailOnUpdate) {
-            client.setQueryData(endpoints.detailKey(communityId, id), updated);
+            client.setQueryData(endpoints.detailQuery(communityId, id).queryKey, updated);
           }
           return refreshesRelationships
             ? invalidate(q.tool(endpoints.tool, id), q.relationships())
@@ -409,12 +358,20 @@ const grantsHook = <TRead>(
 
 /** Everything the generated client offers for a tool with no exceptions. */
 interface ToolEndpoints<TRead, TList, TMyList, TCreate, TUpdate, TParams> {
-  listKey: (communityId: number, params?: TParams) => CacheKey;
-  list: (communityId: number, params?: TParams) => Promise<TList>;
-  myListKey: (params?: ToolMyListParams) => CacheKey;
-  myList: (params?: ToolMyListParams) => Promise<TMyList>;
-  detailKey: (communityId: number, id: number) => CacheKey;
-  detail: (communityId: number, id: number) => Promise<TRead>;
+  /**
+   * One page of the tool's list, in this community and across every one at
+   * once. Options rather than hooks: the two tables that show one tool at a
+   * time ask all nine and hand the lot to `useQueries`, and a hook cannot be
+   * called in a loop.
+   */
+  listQuery: (communityId: number, params?: TParams) => ReadQuery<TList>;
+  myListQuery: (params?: ToolMyListParams) => ReadQuery<TMyList>;
+  /**
+   * One row: for a caller that holds the tool as a value rather than calling
+   * that tool's own hook — the page title reads whichever tool the route is
+   * in. `useDetail` reads the same, so the two share one cache entry.
+   */
+  detailQuery: (communityId: number, id: number) => ReadQuery<TRead>;
   create: (communityId: number, data: TCreate) => Promise<TRead>;
   update: (communityId: number, id: number, data: TUpdate) => Promise<TRead>;
   remove: (communityId: number, id: number) => Promise<void>;
@@ -434,8 +391,9 @@ const makeToolHooks = <TRead, TList, TMyList, TCreate, TUpdate, TParams>(
 ) => {
   const errorKey = `${toolCamelPlural(endpoints.tool)}:error`;
   return {
-    ...listQueries(endpoints),
-    detailQuery: detailQueryOf(endpoints),
+    listQuery: endpoints.listQuery,
+    myListQuery: endpoints.myListQuery,
+    detailQuery: endpoints.detailQuery,
     create: endpoints.create,
     duplicate: endpoints.duplicate,
     remove: endpoints.remove,
@@ -451,12 +409,9 @@ const makeToolHooks = <TRead, TList, TMyList, TCreate, TUpdate, TParams>(
 // ── One record per tool ──────────────────────────────────────────────────────
 
 const calendarEndpoints = {
-  listKey: getListCalendarsQueryKey,
-  list: listCalendars,
-  myListKey: getListMyCalendarsQueryKey,
-  myList: listMyCalendars,
-  detailKey: getReadCalendarQueryKey,
-  detail: readCalendar,
+  listQuery: getListCalendarsQueryOptions,
+  myListQuery: getListMyCalendarsQueryOptions,
+  detailQuery: getReadCalendarQueryOptions,
   create: createCalendar,
   update: updateCalendar,
   remove: deleteCalendar,
@@ -466,12 +421,9 @@ const calendarEndpoints = {
 };
 
 const contactEndpoints = {
-  listKey: getListContactsQueryKey,
-  list: listContacts,
-  myListKey: getListMyContactsQueryKey,
-  myList: listMyContacts,
-  detailKey: getReadContactQueryKey,
-  detail: readContact,
+  listQuery: getListContactsQueryOptions,
+  myListQuery: getListMyContactsQueryOptions,
+  detailQuery: getReadContactQueryOptions,
   create: createContact,
   update: updateContact,
   remove: deleteContact,
@@ -481,12 +433,9 @@ const contactEndpoints = {
 };
 
 const counterGroupEndpoints = {
-  listKey: getListCounterGroupsQueryKey,
-  list: listCounterGroups,
-  myListKey: getListMyCounterGroupsQueryKey,
-  myList: listMyCounterGroups,
-  detailKey: getReadCounterGroupQueryKey,
-  detail: readCounterGroup,
+  listQuery: getListCounterGroupsQueryOptions,
+  myListQuery: getListMyCounterGroupsQueryOptions,
+  detailQuery: getReadCounterGroupQueryOptions,
   create: createCounterGroup,
   update: updateCounterGroup,
   remove: deleteCounterGroup,
@@ -496,12 +445,9 @@ const counterGroupEndpoints = {
 };
 
 const dashboardEndpoints = {
-  listKey: getListDashboardsQueryKey,
-  list: listDashboards,
-  myListKey: getListMyDashboardsQueryKey,
-  myList: listMyDashboards,
-  detailKey: getReadDashboardQueryKey,
-  detail: readDashboard,
+  listQuery: getListDashboardsQueryOptions,
+  myListQuery: getListMyDashboardsQueryOptions,
+  detailQuery: getReadDashboardQueryOptions,
   create: createDashboard,
   update: updateDashboard,
   remove: deleteDashboard,
@@ -513,15 +459,14 @@ const dashboardEndpoints = {
 // Only a file's create is hand-written (`useFiles.ts`): it copies a
 // template client-side and can link the new row to a project.
 const fileEndpoints = {
-  listKey: getListFilesQueryKey,
   // `page_size: 0` asks for the complete set, which the server serves in
   // windows; this walks them. A positive page size passes straight through.
-  list: (communityId: number, params?: ListFilesParams) =>
-    fetchAllPages((p) => listFiles(communityId, p), params ?? {}),
-  myListKey: getListMyFilesQueryKey,
-  myList: listMyFiles,
-  detailKey: getReadFileQueryKey,
-  detail: readFile,
+  listQuery: (communityId: number, params?: ListFilesParams) => ({
+    queryKey: getListFilesQueryKey(communityId, params),
+    queryFn: () => fetchAllPages((p) => listFiles(communityId, p), params ?? {}),
+  }),
+  myListQuery: getListMyFilesQueryOptions,
+  detailQuery: getReadFileQueryOptions,
   update: updateFile,
   remove: deleteFile,
   setGrants: setFileGrants,
@@ -529,8 +474,9 @@ const fileEndpoints = {
 };
 
 const fileHooks = {
-  ...listQueries(fileEndpoints),
-  detailQuery: detailQueryOf(fileEndpoints),
+  listQuery: fileEndpoints.listQuery,
+  myListQuery: fileEndpoints.myListQuery,
+  detailQuery: fileEndpoints.detailQuery,
   create: createFile,
   duplicate: duplicateFile,
   remove: fileEndpoints.remove,
@@ -545,12 +491,9 @@ const fileHooks = {
 };
 
 const postEndpoints = {
-  listKey: getListPostsQueryKey,
-  list: listPosts,
-  myListKey: getListMyPostsQueryKey,
-  myList: listMyPosts,
-  detailKey: getReadPostQueryKey,
-  detail: readPost,
+  listQuery: getListPostsQueryOptions,
+  myListQuery: getListMyPostsQueryOptions,
+  detailQuery: getReadPostQueryOptions,
   create: createPost,
   update: updatePost,
   remove: deletePost,
@@ -560,12 +503,9 @@ const postEndpoints = {
 };
 
 const projectEndpoints = {
-  listKey: getListProjectsQueryKey,
-  list: listProjects,
-  myListKey: getListMyProjectsQueryKey,
-  myList: listMyProjects,
-  detailKey: getReadProjectQueryKey,
-  detail: readProject,
+  listQuery: getListProjectsQueryOptions,
+  myListQuery: getListMyProjectsQueryOptions,
+  detailQuery: getReadProjectQueryOptions,
   create: createProject,
   update: updateProject,
   remove: deleteProject,
@@ -575,12 +515,9 @@ const projectEndpoints = {
 };
 
 const wikiEndpoints = {
-  listKey: getListWikisQueryKey,
-  list: listWikis,
-  myListKey: getListMyWikisQueryKey,
-  myList: listMyWikis,
-  detailKey: getReadWikiQueryKey,
-  detail: readWiki,
+  listQuery: getListWikisQueryOptions,
+  myListQuery: getListMyWikisQueryOptions,
+  detailQuery: getReadWikiQueryOptions,
   create: createWiki,
   update: updateWiki,
   remove: deleteWiki,
@@ -600,19 +537,10 @@ const wikiEndpoints = {
  * one caller drives all nine with.
  */
 interface ToolQueries {
-  listQuery: (
-    communityId: number,
-    params?: ToolListParams
-  ) => { queryKey: CacheKey; queryFn: () => Promise<ToolListPage> };
-  myListQuery: (params?: ToolMyListParams) => {
-    queryKey: CacheKey;
-    queryFn: () => Promise<ToolListPage>;
-  };
+  listQuery: (communityId: number, params?: ToolListParams) => ReadQuery<ToolListPage>;
+  myListQuery: (params?: ToolMyListParams) => ReadQuery<ToolListPage>;
   /** Reads one — what the page title asks of whichever tool the route is in. */
-  detailQuery: (
-    communityId: number,
-    id: number
-  ) => { queryKey: CacheKey; queryFn: () => Promise<{ name: string }> };
+  detailQuery: (communityId: number, id: number) => ReadQuery<{ name: string }>;
   /** Makes one from a name and its initiative — what `useCreateTool` sends every tool. */
   create: (
     communityId: number,

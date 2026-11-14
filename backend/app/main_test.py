@@ -6,14 +6,14 @@ import json
 
 import pytest
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
-from fastapi.testclient import TestClient
 from fastapi.exceptions import RequestValidationError
-from httpx import ASGITransport, AsyncClient
+from fastapi.routing import APIRoute, iter_route_contexts
+from fastapi.testclient import TestClient
+from httpx2 import ASGITransport, AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 import app.main as main_module
 from app.core.config import API_V1_STR, Settings, settings
@@ -236,7 +236,7 @@ async def _hsts_for(app_url: str) -> str | None:
     """
     hsts_value = (
         "max-age=63072000; includeSubDomains"
-        if Settings(APP_URL=app_url).app_url_is_https  # ty: ignore[missing-argument]
+        if Settings(APP_URL=app_url).app_url_is_https
         else None
     )
     probe = FastAPI()
@@ -336,8 +336,8 @@ def test_mcp_is_served_with_or_without_the_trailing_slash() -> None:
 def test_every_operation_has_its_own_name() -> None:
     names = [
         route.name
-        for route in main_module.app.routes
-        if isinstance(route, APIRoute) and route.include_in_schema
+        for route in iter_route_contexts(main_module.app.routes)
+        if isinstance(route.original_route, APIRoute) and route.include_in_schema
     ]
     assert sorted({n for n in names if names.count(n) > 1}) == []
 

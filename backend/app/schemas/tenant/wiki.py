@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import AliasChoices, ConfigDict, Field
 
-from app.core.identity_boundary import GuildId, PersonId
+from app.core.identity_boundary import GuildId
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import LexicalState, MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
-from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
+from app.schemas.tenant.archive import ToolCan
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.file import smart_link_url
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
@@ -18,6 +19,7 @@ from app.schemas.tenant.property import (
     PropertySummary,
     annotated_properties,
 )
+from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.tag import TagSummary, annotated_tags
 from app.schemas.tenant.tool import ToolSummaryBase, from_row
@@ -28,17 +30,17 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class WikiBase(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[MentionStr] = Field(default=None, max_length=2000)
+    description: MentionStr | None = Field(default=None, max_length=2000)
 
 
 class WikiCreate(WikiBase, PropertiesOnCreate):
     name: TitleStr = Field(..., min_length=1, max_length=255)
     initiative_id: int
-    tag_ids: Optional[List[int]] = None
+    tag_ids: list[int] | None = None
     # Initial sharing — the same grant list the PUT /grants endpoint takes. A
     # wiki defaults to readable by the whole initiative: it is written to be
     # read.
-    grants: List[ResourceGrantSchema] = Field(default_factory=initiative_readable)
+    grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
 class WikiSettings(SanitizedBaseModel):
@@ -49,40 +51,41 @@ class WikiSettings(SanitizedBaseModel):
     """
 
     #: How siblings are ordered in the tree.
-    page_order: Optional[WikiPageOrder] = None
+    page_order: WikiPageOrder | None = None
     #: How deep the contents rail goes — 2 to 4 heading levels.
-    contents_depth: Optional[int] = Field(default=None, ge=2, le=4)
+    contents_depth: int | None = Field(default=None, ge=2, le=4)
     #: Whether a page shows what links to it.
-    show_connections: Optional[bool] = None
-    show_updated_at: Optional[bool] = None
+    show_connections: bool | None = None
+    show_updated_at: bool | None = None
     #: Whether a page's body fills the screen or holds to a reading measure.
-    reading_width: Optional[WikiReadingWidth] = None
+    reading_width: WikiReadingWidth | None = None
     #: The wiki's own accent, as a CSS colour. ``null`` takes the app's.
-    accent_color: Optional[str] = Field(default=None, max_length=32)
+    accent_color: str | None = Field(default=None, max_length=32)
     #: A page whose body seeds every new one. ``null`` clears it; a set value
     #: has to be one of this wiki's own pages.
-    template_page_id: Optional[int] = None
+    template_page_id: int | None = None
 
 
 class WikiUpdate(WikiSettings):
-    name: Optional[TitleStr] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[MentionStr] = Field(default=None, max_length=2000)
+    name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
+    description: MentionStr | None = Field(default=None, max_length=2000)
     #: The page the wiki opens on. ``null`` clears the choice and it opens on
     #: the first top-level page; a set value has to be one of its own pages.
-    home_page_id: Optional[int] = None
+    home_page_id: int | None = None
 
 
-class WikiSummary(WikiBase, ToolSummaryBase):
+class WikiSummary(WikiBase, ToolSummaryBase[ToolCan]):
+    initiative_id: int
     #: The page it opens on, or ``null`` where none was chosen.
-    home_page_id: Optional[int] = None
+    home_page_id: int | None = None
     #: What this wiki is for — see :class:`WikiSettings`.
     page_order: WikiPageOrder = WikiPageOrder.manual
     contents_depth: int = 3
     show_connections: bool = True
     show_updated_at: bool = True
     reading_width: WikiReadingWidth = WikiReadingWidth.wide
-    accent_color: Optional[str] = None
-    template_page_id: Optional[int] = None
+    accent_color: str | None = None
+    template_page_id: int | None = None
     comment_count: int = 0
 
 
@@ -95,7 +98,7 @@ class WikiRead(WikiSummary):
 
 
 class WikiListResponse(PageMeta):
-    items: List[WikiSummary]
+    items: list[WikiSummary]
 
 
 class WikiPageCreate(PropertiesOnCreate):
@@ -103,16 +106,16 @@ class WikiPageCreate(PropertiesOnCreate):
     #: anything, so it starts with no name rather than one somebody has to
     #: delete before typing their own. Every surface that draws a page falls
     #: back to "Untitled" for one that has not been named yet.
-    title: Optional[TitleStr] = Field(default=None, max_length=255)
+    title: TitleStr | None = Field(default=None, max_length=255)
     #: What to file the new page under. Absent means the top of the wiki.
-    parent_page_id: Optional[int] = None
+    parent_page_id: int | None = None
     #: A page starts as a draft, and is published when somebody says so. A new
     #: page is empty and unnamed for as long as it takes to write it, and a
     #: wiki people read should not be showing them that — so the default is the
     #: safe half of the answer, and publishing is a decision.
     is_draft: bool = True
-    content: Optional[LexicalState] = None
-    tag_ids: Optional[List[int]] = None
+    content: LexicalState | None = None
+    tag_ids: list[int] | None = None
 
 
 class WikiPageUpdate(PropertiesOnUpdate):
@@ -122,15 +125,15 @@ class WikiPageUpdate(PropertiesOnUpdate):
     page is the same request shape as editing its body.
     """
 
-    title: Optional[TitleStr] = Field(default=None, min_length=1, max_length=255)
-    is_draft: Optional[bool] = None
-    content: Optional[LexicalState] = None
+    title: TitleStr | None = Field(default=None, min_length=1, max_length=255)
+    is_draft: bool | None = None
+    content: LexicalState | None = None
     #: The ``content_version`` of the read this ``content`` was made from.
     #: Given and still current, the write merges in, into a live editing
     #: session too; given and out of date, it is refused with
     #: ``*_CONTENT_CHANGED``. Left out, a live session refuses the write.
-    content_version: Optional[str] = None
-    tag_ids: Optional[List[int]] = None
+    content_version: str | None = None
+    tag_ids: list[int] | None = None
 
 
 class WikiPageMove(SanitizedBaseModel):
@@ -143,7 +146,7 @@ class WikiPageMove(SanitizedBaseModel):
 
     #: What the page is now filed under. Absent — the default — is the top of
     #: the wiki, so a move that says nothing about filing unfiles the page.
-    parent_page_id: Optional[int] = None
+    parent_page_id: int | None = None
     #: Index among the pages filed in the same place, after the move.
     #: Out-of-range clamps.
     position: int = Field(default=0, ge=0)
@@ -181,7 +184,7 @@ class WikiPageHeading(SanitizedBaseModel):
     anchor: str
 
 
-class WikiPageSummary(SanitizedBaseModel):
+class WikiPageSummary(CreatedByRead):
     """One page as the navigation draws it — no body.
 
     The navigation renders every page of a wiki at once, so this carries what a
@@ -203,28 +206,27 @@ class WikiPageSummary(SanitizedBaseModel):
     kind: WikiPageKind = WikiPageKind.page
     #: What this row is filed under: a page, or ``None`` for the top. A
     #: file is filed like a page is, but never holds anything itself.
-    parent_page_id: Optional[int] = None
+    parent_page_id: int | None = None
     position: int = 0
     #: A file placed in a wiki is never a draft: it is not this wiki's to
     #: hold back, and it is readable wherever else it already lives.
     is_draft: bool = False
     title: str
     slug: str
-    created_by: PersonId | None = None
     created_at: datetime
     updated_at: datetime
     #: What is written on the page, so the navigation can nest it without
     #: opening it.
-    headings: List[WikiPageHeading] = Field(default_factory=list)
-    tags: List[TagSummary] = Field(default_factory=list)
-    properties: List[PropertySummary] = Field(default_factory=list)
+    headings: list[WikiPageHeading] = Field(default_factory=list)
+    tags: list[TagSummary] = Field(default_factory=list)
+    properties: list[PropertySummary] = Field(default_factory=list)
     #: A file row's kind of file and the facts its icon is drawn
     #: from — a PDF, a spreadsheet and a link to a design tool each look like
     #: what they are. ``None`` on a page.
-    file_type: Optional[str] = None
-    file_content_type: Optional[str] = None
-    original_filename: Optional[str] = None
-    smart_link_url: Optional[str] = None
+    file_type: str | None = None
+    file_content_type: str | None = None
+    original_filename: str | None = None
+    smart_link_url: str | None = None
 
 
 class WikiPageRead(WikiPageSummary):
@@ -234,10 +236,10 @@ class WikiPageRead(WikiPageSummary):
     #: The version of ``content`` this read returns. Send it back with a
     #: ``PATCH`` of ``content`` so the write merges into the body only if
     #: nobody has changed it since. ``null`` when the body was left out.
-    content_version: Optional[str] = None
+    content_version: str | None = None
     #: When a moderator closed its comments: they still read, and nothing is
     #: added or edited until it is reopened. Null while it is open.
-    comments_locked_at: Optional[datetime] = None
+    comments_locked_at: datetime | None = None
 
 
 class WikiPageTree(SanitizedBaseModel):
@@ -250,11 +252,11 @@ class WikiPageTree(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[WikiPageSummary]
+    items: list[WikiPageSummary]
 
 
 def serialize_wiki_page_summary(
-    page: "Any", *, context: ActorContext, heading_nodes: Optional[list] = None
+    page: Any, *, context: ActorContext, heading_nodes: list | None = None
 ) -> WikiPageSummary:
     """A page as a row. ``heading_nodes`` are its headings as the tree read
     them (``wikis.heading_nodes``), in place of its body."""
@@ -272,13 +274,13 @@ def serialize_wiki_page_summary(
 
 
 def serialize_file_as_page(
-    file: "Any",
+    file: Any,
     *,
     context: ActorContext,
     wiki_id: int,
     position: int,
     heading_nodes: list,
-    parent_page_id: Optional[int] = None,
+    parent_page_id: int | None = None,
 ) -> WikiPageSummary:
     """A file, as the wiki's navigation draws it.
 
@@ -300,6 +302,7 @@ def serialize_file_as_page(
         title=file.name,
         slug=slugify(file.name, fallback=f"file-{file.id}"),
         created_by=file.created_by,
+        created_by_kind=file.created_by_kind,
         created_at=file.created_at,
         updated_at=file.updated_at,
         headings=[WikiPageHeading(**h) for h in page_headings(heading_nodes)],
@@ -310,7 +313,7 @@ def serialize_file_as_page(
     )
 
 
-def serialize_wiki_page(page: "Any", *, context: ActorContext) -> WikiPageRead:
+def serialize_wiki_page(page: Any, *, context: ActorContext) -> WikiPageRead:
     return WikiPageRead(
         **serialize_wiki_page_summary(page, context=context).model_dump(),
         content=page.content or {},

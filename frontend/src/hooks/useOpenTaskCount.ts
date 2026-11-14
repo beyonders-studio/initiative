@@ -1,9 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import type { ListMyTasksParams } from "@/api/generated/initiativeAPI.schemas";
-import { getListMyTasksQueryKey, listMyTasks } from "@/api/generated/tasks/tasks";
-import { browserTimezone } from "@/lib/timezones";
+import { useListMyTasks } from "@/api/generated/tasks/tasks";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 const OPEN = ["backlog", "todo", "in_progress"];
 
@@ -28,11 +27,8 @@ export const useOpenTaskCount = (dueAfter: string | null, dueBefore: string) => 
     }),
     [dueAfter, dueBefore]
   );
-  return useQuery({
-    queryKey: getListMyTasksQueryKey(params),
-    queryFn: () => listMyTasks(params),
-    staleTime: 60_000,
-    select: (data) => data.total_count,
+  return useListMyTasks(params, {
+    query: { staleTime: 60_000, select: (data) => data.total_count },
   });
 };
 
@@ -42,10 +38,7 @@ export const useCreatedTaskCount = () => {
     () => ({ created: true, include_archived: true, page: 1, page_size: 1 }),
     []
   );
-  return useQuery({
-    queryKey: getListMyTasksQueryKey(params),
-    queryFn: () => listMyTasks(params),
-    staleTime: 60_000,
-    select: (data) => data.total_count,
+  return useListMyTasks(params, {
+    query: { staleTime: 60_000, select: (data) => data.total_count },
   });
 };

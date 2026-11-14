@@ -36,19 +36,19 @@ from datetime import timedelta
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.backfill_uploads_to_s3 import BackfillSummary, backfill_uploads_to_s3
+from app.core.clock import utcnow
+from app.core.messages import SettingsMessages
 from app.db import post_commit
 from app.db import session as db_session
-from app.db.session import SystemSessionLocal
+from app.db.backfill_uploads_to_s3 import BackfillSummary, backfill_uploads_to_s3
 from app.db.public_rls import PUBLIC_RLS, render_table_rls
+from app.db.session import SystemSessionLocal
 from app.db.system_grants import (
     ROLE_GRANTS,
     grant_statements,
     grantee,
     revoke_statements,
 )
-from app.core.clock import utcnow
-from app.core.messages import SettingsMessages
 
 logger = logging.getLogger(__name__)
 
@@ -279,7 +279,7 @@ async def _run() -> None:
             try:
                 summary = await backfill_uploads_to_s3(on_progress=_on_progress)
                 await _finalize(session, summary=summary)
-            except Exception:  # noqa: BLE001 — surface the failure in status
+            except Exception:
                 logger.exception("storage backfill failed")
                 await _finalize(session, error=SettingsMessages.STORAGE_BACKFILL_FAILED)
     except asyncio.CancelledError:

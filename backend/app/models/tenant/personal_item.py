@@ -11,7 +11,6 @@ the last one deletes the row (``app.services.tenant.personal_items``).
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import CheckConstraint, Column, DateTime, Float, Index, Text, text
 from sqlmodel import Field, SQLModel
@@ -106,34 +105,32 @@ class PersonalItem(SQLModel, table=True):
     entity_type: str = Field(sa_column=Column(Text, primary_key=True, nullable=False))
     entity_id: int = Field(primary_key=True)
     #: The last open, and where it came from: a :class:`ViewSource` value.
-    viewed_at: Optional[datetime] = Field(
+    viewed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    view_source: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-    bookmarked_at: Optional[datetime] = Field(
+    view_source: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    bookmarked_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Subscribed by hand, beyond what making it or being named on it does.
-    subscribed_at: Optional[datetime] = Field(
+    subscribed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Unsubscribed: nothing about it reaches them, whatever ties them to it.
-    unsubscribed_at: Optional[datetime] = Field(
+    unsubscribed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: When to remind the member of this task. A repeating task's next one
     #: takes it at the same distance from its due date
     #: (``task_series.next_reminders``).
-    remind_at: Optional[datetime] = Field(
+    remind_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: When that reminder went out; setting another clears it.
-    reminded_at: Optional[datetime] = Field(
+    reminded_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Where the member put this project in their own list.
-    sort_order: Optional[float] = Field(
+    sort_order: float | None = Field(
         default=None, sa_column=Column(Float, nullable=True)
     )

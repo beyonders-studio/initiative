@@ -434,9 +434,7 @@ async def test_the_community_list_is_exposed_and_nothing_else_of_its_router():
     """Where a session learns the ``community_id`` every other tool takes. The
     router's other routes are one community's administration."""
     tools = await build_mcp_server(app).list_tools()
-    community_routes = [
-        t.name for t in tools if "/communities" in getattr(t, "_route").path
-    ]
+    community_routes = [t.name for t in tools if "/communities" in t._route.path]
 
     assert community_routes == ["list_communities"]
 

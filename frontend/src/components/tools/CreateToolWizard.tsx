@@ -3,11 +3,11 @@ import type { FlatNamespace } from "i18next";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { type Choice, useCommunityInitiativeSteps } from "@/hooks/useCommunityInitiativeSteps";
 import { communityPath } from "@/lib/communityUrl";
 import { getItem, setItem } from "@/lib/storage";
 import { TOOL_ICONS, toolCamelPlural, toolCreateTarget } from "@/lib/tools";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 // ── Module-level openers, one per mounted tool (same pattern as CreateTaskWizard)
 

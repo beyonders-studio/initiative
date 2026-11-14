@@ -11,11 +11,8 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { PrivatePanel, unreachableReason } from "@/components/connections/UnreachableEmptyState";
-import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
-import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { UserHandle } from "@/components/user/UserHandle";
 import {
   useAcceptConnection,
   useAcceptMessageRequest,
@@ -29,7 +26,12 @@ import {
 import { useConversations, useLatestMessages, useUnreadMessages } from "@/hooks/useMyMessages";
 import { groupName, isGroup, roster } from "@/lib/conversationName";
 import { getUrlHandle, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+
+import { NewConversationDialog } from "./NewConversationDialog";
 
 const ROW = "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-sm";
 
@@ -469,7 +471,9 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
       </div>
 
       {conversations.isLoading ? (
-        <p className="px-2 py-1 text-muted-foreground text-sm">{t("loading")}</p>
+        <SkeletonRegion className="px-2 py-1">
+          <ListSkeleton rows={4} />
+        </SkeletonRegion>
       ) : (
         <>
           {waiting.length > 0 ? (

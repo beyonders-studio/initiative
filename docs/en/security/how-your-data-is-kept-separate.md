@@ -4,82 +4,96 @@ icon: lucide/lock
 
 # How your data is kept separate
 
-This page is the **technical explanation** of Initiative's multi-tenancy and access control — written for project managers, people who run servers, IT teams, and anyone evaluating Initiative for a group that cares about data isolation. It avoids code, but it doesn't shy away from detail.
+Many communities can share one Initiative server, and each community's content is out of reach of the others. Inside a community, an initiative's content is out of reach of members who aren't in it. PostgreSQL enforces both on every request, with a schema for each community and row-level security inside it, so the boundaries hold in the database as well as in the application.
 
-If you just want the everyday version, read [Security & privacy](index.md) instead.
+This page is for whoever has to check that: an IT team, an evaluator, somebody running a server. [Security & privacy](index.md) has the short version.
 
-## The short version
+## Each community has its own schema
 
-Initiative is **multi-tenant**: many separate groups (communities) share one server without ever seeing each other's data. The separation is enforced **in the database itself**, not only in the application, so the database is the final authority on what any request may return. Security is **fail-closed**: the default is no access, and access has to be positively established on every request.
+Every community's content lives in its own PostgreSQL schema. That holds its initiatives and everything in them: projects, tasks, documents, calendars, counters, posts, tags, comments and the rest of every tool's content. The schema is created with the community and dropped when the community is erased for good.
 
-## Each community gets its own space in the database
+Accounts and server-wide settings live in the shared `public` schema: users, community memberships, invitations, server settings, access grants and sign-in provider settings. Direct messages are kept there too, as encrypted envelopes, because they belong to people rather than to a community (see [Private messages](private-messages.md)).
 
-A community is not just a label attached to shared rows. Each community's content — its initiatives, projects, tasks, files, calendar, counters, posts, tags, and comments — lives in its **own dedicated area of the database** (a separate schema), provisioned when the community is created and removed when the community is deleted.
+A request about a community is routed into that community's schema, and from there it can't name a table in any other community's schema. The separation comes from where the data is stored, so it doesn't rely on every query filtering correctly.
 
-Shared identity and configuration (the list of users, community memberships, invitations, server settings) lives in a common area. Everything that *belongs to a community* lives in that community's own space.
+## Three database logins
 
-??? techspec "Why a separate schema per community, rather than a shared table with a community column?"
-    Because it makes the boundary structural rather than conditional. A request is routed into one community's space and literally cannot address another community's tables — the separation is a property of where the data sits, not of the queries written against it. That's a stronger isolation line, and it's what groups with real confidentiality requirements are asking about. This is a firm architectural commitment, not an implementation detail that might change.
+Initiative connects to PostgreSQL through three logins, each holding only what its job needs.
 
-## The database connects under least-privilege roles
-
-The application **never connects to the database as a superuser** — not for requests, not for jobs, not even for migrations. It uses purpose-built database roles, each with the least privilege it needs:
-
-| Role | Used for | Can it bypass security rules? |
+| Login | What it does | Row-level security |
 |---|---|---|
-| Application role | Every normal user request | **No** — security rules always apply |
-| System role | Background jobs, startup tasks | Yes, but never on a user request — and only on the specific tables it has been explicitly granted |
-| Provisioning role | Migrations, creating/removing community spaces | Structure only — it owns the tables but its own data access still obeys the security rules |
+| `app_user` | Serves every request a person makes. | Always applies. The login has no access to any community's schema of its own. Each request switches into the role of one community, or of the person's platform rung (`platform_<tier>`), and is reset before the connection goes back to the pool. |
+| `app_admin` | Runs background jobs and startup tasks, and the actions that have to happen before there's a membership to route through, such as creating a community or accepting an invitation. | Bypassed, but only on the shared tables it has been granted, one table at a time. To work in a community's schema it switches into that community's role, which gives up the bypass. |
+| `app_provisioner` | Runs migrations, and creates or removes each community's schema and roles. | Applies. It owns the tables but isn't a superuser, and `FORCE ROW LEVEL SECURITY` holds the owner to the same policies as everyone else. |
 
-The key point: the role that handles your requests **cannot bypass the security rules**. Each request temporarily assumes the specific community role it's allowed to, does its work, and resets. There is no standing, all-communities back door in the request path.
+Initiative never serves a request on a superuser connection. At startup it opens one connection as the database owner to create or check the three logins, and closes it before migrations run and before it serves anything. It refuses to start if the provisioning login is a superuser or can bypass row-level security. [Installation](../running-a-server/installation.md) covers how the logins are set up.
 
-## The gates
+## Four gates and two overrides
 
-Every read or write of community data passes through the same access model: four nested gates you clear from the outside in, plus two deliberate overrides above them.
+Every read or write of a community's content passes four gates, outermost first:
 
-```mermaid
-graph TD
-  A["1 · Community<br/>member of this group?"] --> B["2 · Initiative<br/>part of this effort?"]
-  B --> C["3 · Initiative role<br/>allowed to use this tool?"]
-  C --> D["4 · Item sharing<br/>shared with you (view/edit/own)?"]
-  D --> OK["✅ Access granted"]
-  E["Community admin<br/>(full access in own community)"] -.override.-> OK
-  F["Time-bound support grant<br/>(audited, expiring)"] -.override.-> OK
-```
+| Gate | What it asks | Where it's enforced |
+|---|---|---|
+| 1. Community | Does this person belong to the community, or hold a live access grant to it? | The schema boundary and the role the request switches into. Membership or the grant is looked up again on every request. |
+| 2. Initiative | Is this person a member of the initiative the content belongs to? | Row-level security on every table whose rows belong to an initiative. This is the hard boundary between groups inside one community. |
+| 3. Initiative role | Does their role in that initiative let them use this tool, and how? | The same policies, from the role's permissions. |
+| 4. Sharing | Has this item been shared with them, and at what level? | The same policies, from the item's grants. A grant can name one person, an initiative role, or every member of the initiative. |
 
-1. **Community** — no community data exists for you unless you belong to the community. This is the outer wall.
-2. **Initiative** — within a community, you can't reach the content of an initiative you're not a member of. This is the hard isolation boundary that keeps sensitive efforts away from non-involved members of the *same* community.
-3. **Initiative role** — your role decides which *kinds* of tools you may use, and how.
-4. **Item sharing** — for a specific project or file, per-item grants decide whether you can view, edit, or own it.
+Two overrides sit above the gates:
 
-Two deliberate overrides sit above the four gates:
+- **Community admins** can read and change everything in their own community, in every initiative, whatever its sharing. The exception is content the platform has put on hold, which reads as absent to everyone in the community, admins included.
+- **Access grants** let platform staff reach a community they don't belong to. A grant covers one community, expires on its own and is recorded in the audit log. The request is routed through that community's own roles, so the policies apply to it like any other.
 
-- **Community administrators** always have full read/write access within their own community. Running a group requires it.
-- **Support access** for hosted operators is **time-bound, scoped to one community, and recorded** — granted explicitly and expiring automatically. It is never a permanent or ambient bypass.
+| Grant | What it allows |
+|---|---|
+| Read | Read everything in the community. |
+| Read and write | Edit content that already exists. Creating content, managing members and changing permissions stay closed. |
+| Moderate | Read everything, held content included, and change nothing. |
 
-??? techspec "How the gates are actually enforced"
-    Gates 2–4 are implemented with PostgreSQL **row-level security** policies attached to the community content tables. Each policy defers to a single access function that asks: is the current user a member of this initiative, **or** a community admin, **or** acting under a valid support grant? Because the check lives in the database and runs on every statement, the application and the database agree on the answer — and the database has the final say. Gate 1 (community) is the schema boundary plus the per-request role described above. A consequence worth knowing: a community member who isn't in a given initiative gets a "not found" result for that initiative's content, because row-level security hides the rows entirely.
+Moderators and support staff request a grant and an approver grants or denies it. Platform operators and owners can issue themselves a short break-glass grant in one step, and the grant itself is the record. No grant makes its holder a community admin. [Platform roles](../running-a-server/platform-roles.md) covers who can do what.
 
-## Sessions and sign-in
+A member of a community who isn't in an initiative gets **404 Not Found** for that initiative's content. Row-level security hides the rows, so the server answers as if they weren't there.
 
-- **Web sessions** use secure, HttpOnly cookies, so the session is held by the browser rather than exposed to page scripts.
-- **Mobile apps** store their credentials in the device's secure storage.
-- **Single sign-on (OIDC)** is supported, with modern protections (PKCE) and optional automatic mapping of identity-provider groups to community and initiative memberships.
-- **Sign-in tokens carry the minimum** needed; your community and role context is worked out fresh, server-side, on each request — so a stale token can't grant access you no longer have.
+??? techspec "How the policies decide"
+    Gates 2 to 4 are PostgreSQL row-level security policies on the community's content tables. Each policy defers to one function in the community's own schema, `initiative_access()`, which admits a member of the initiative, a community admin, a live access grant, or the system login. Sharing is checked by `resource_access()` in the same policies.
+
+    The facts those functions read (which initiatives the person is in, their roles, whether they're a community admin, any live grant) are computed by the database at the start of each request, in that community's schema, from the membership and grant rows as they stand. Revoking a grant or a membership changes the next request's answer with nothing else to update.
+
+    Initiative's own query filters call the same function, so the application and the database give the same answer, and the database has the final say.
+
+## Sign-in and sessions
+
+| What | How |
+|---|---|
+| Browser session | A cookie named `session_token`: `HttpOnly`, `SameSite=Lax`, and `Secure` when `APP_URL` starts with `https`. It lasts `AUTH_ACCESS_TTL_MINUTES` (15 by default) and is renewed while you use the app. |
+| Renewal | A `refresh_token` cookie with the same flags, sent only to `/api/v1/auth`. A session ends after `AUTH_REFRESH_TTL_DAYS` (30 by default) without use. |
+| Changes made with the cookie | Must come from a page this deployment serves: `Sec-Fetch-Site: same-origin`, or an `Origin` on the CORS allowlist. Requests that carry an `Authorization` header, such as API keys and the apps, aren't affected. |
+| Phone and desktop apps | Keep their sign-in in the app's own storage (Capacitor Preferences), in a separate group that Android backups leave out. |
+| What a token carries | Who you are. Your communities, roles and grants are looked up again on each request, so a change applies to your next request. |
+| Single sign-on | OpenID Connect, with PKCE (`S256`). |
+| Passwords | At least 12 characters, checked against known breaches while that check is on (it is by default), and stored only as a one-way hash. The breach check sends only the first 5 characters of the password's SHA-1 hash. |
 
 ## Encryption
 
-- **In transit:** you should always run Initiative behind HTTPS, so traffic between browser and server is encrypted. (Running the server? See [Configuration](../running-a-server/configuration.md).)
-- **At rest:** the most sensitive stored fields — saved AI provider keys, single-sign-on secrets, email server passwords, and email addresses — are **encrypted** in the database using a key derived from the server's secret, so they aren't readable from the raw data alone.
+- **In transit.** Initiative expects to be served over HTTPS, by the server or a proxy in front of it. When `APP_URL` starts with `https`, it marks its cookies `Secure` and sends `Strict-Transport-Security`. See [Configuration](../running-a-server/configuration.md).
+- **Sensitive fields at rest.** Encrypted with Fernet, using a separate key for each kind of field, each derived from `SECRET_KEY` with HKDF-SHA256. Email addresses are also kept as a keyed hash, so an address can be looked up without decrypting every row. Set `PREVIOUS_SECRET_KEY` beside a new `SECRET_KEY` and Initiative re-encrypts all of them at startup.
+- **Stored files.** Encrypted when `STORAGE_ENCRYPTION` is set, and off by default. See [Encrypting stored files](../running-a-server/object-storage.md#encrypting-stored-files).
+- **Direct messages.** End-to-end encrypted. See [Private messages](private-messages.md).
 
-## What this means in practice
+The encrypted fields:
 
-- One server can safely host many unrelated groups.
-- The database boundary holds on its own terms, independently of the application — so the isolation between groups is a property of where the data lives, not of every feature being written correctly.
-- "Who can see this?" has one consistent answer, enforced everywhere. The web app, the mobile app, file downloads and live collaboration all defer to the same gates.
+- email addresses and dates of birth
+- authenticator-app (TOTP) seeds
+- AI provider keys
+- single sign-on client secrets, and the refresh tokens providers issue
+- the email server password, the S3 secret key, the captcha secret, the Firebase service account and the push relay key
+- plug-in settings, plug-in vendor secrets and the plug-in platform's signing key
+- the credentials an import uses
+- notes on held content, and the text of moderation removals
+- community storage keys
 
 ## Related
 
-- [Security & privacy](index.md) — the plain-language version.
-- [Data & compliance](data-and-compliance.md) — data ownership, your rights, and compliance posture.
-- [Sharing & access](../sharing/index.md) — how you set the initiative and item layers yourself.
+- [Security & privacy](index.md): the short version.
+- [Data & compliance](data-and-compliance.md): what's kept, what leaves the server, and your rights over it.
+- [Sharing & access](../sharing/index.md): how you set the initiative and item layers yourself.

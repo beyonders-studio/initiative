@@ -23,10 +23,12 @@ not have.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import Exists, func, or_, update as sa_update
+from sqlalchemy import Exists, func, or_
+from sqlalchemy import update as sa_update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -34,47 +36,45 @@ from app.core.version import get_version
 from app.db.query import apply_pagination
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import (
-    MarketplaceListing,
-    MarketplaceListingVersion,
     UID_ALPHABET,
     UID_LENGTH,
+    MarketplaceListing,
+    MarketplaceListingVersion,
 )
+from app.services.marketplace import contract, plugin_api, registration_lookup
+from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace.definitions import (
     LISTING_KINDS,
     LISTING_SOURCES,
     ListingDefinitionError,
-    plugin_widget_type,
-    normalize_publisher,
     normalize_listing_definition,
     normalize_listing_example,
+    normalize_publisher,
+    plugin_widget_type,
     reserved_prefix_problem,
 )
-from app.services.marketplace import contract
-from app.services.marketplace import plugin_api
-from app.services.marketplace import registration_lookup
-from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace.manifest_values import check_public_id
 
 __all__ = [
+    "REGISTRY_SOURCE",
     "CatalogError",
     "CatalogSourceConflict",
-    "REGISTRY_SOURCE",
-    "list_listings",
+    "bump_installs_count",
     "get_listing",
     "get_listing_by_uid",
-    "listing_avatars",
     "get_listing_version",
     "get_listing_versions",
-    "resolve_installable_version",
+    "list_listings",
+    "listing_avatars",
     "listing_versions",
     "published_uids",
+    "resolve_installable_version",
     "upsert_listing",
-    "withdraw_listing",
-    "withdraw_builtins_except",
-    "bump_installs_count",
     "version_is_compatible",
     "version_runs_here",
+    "withdraw_builtins_except",
+    "withdraw_listing",
 ]
 
 #: Characters a version string may use. Deliberately an explicit set rather than
@@ -166,7 +166,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def version_is_compatible(min_app_version: Optional[str]) -> bool:
+def version_is_compatible(min_app_version: str | None) -> bool:
     """Whether this deployment is new enough to run a listing version.
 
     A definition can name only what its app build has a renderer for, so a
@@ -187,7 +187,7 @@ def version_runs_here(version: MarketplaceListingVersion) -> bool:
     ) and plugin_api.serves_plugin_api(version.min_plugin_api)
 
 
-def _min_plugin_api(manifest: dict[str, Any], public_id: str) -> Optional[str]:
+def _min_plugin_api(manifest: dict[str, Any], public_id: str) -> str | None:
     """The contract a listing version needs, as its listing states it beside
     ``min_app_version`` or its plug-in's manifest does. Both may: the registry
     and the kit's packer write it in each place. When both do, they agree."""
@@ -217,7 +217,7 @@ def _min_plugin_api(manifest: dict[str, Any], public_id: str) -> Optional[str]:
 # --- reads ------------------------------------------------------------------
 
 
-async def _unoffered_plugin(guild_id: Optional[int]) -> Exists:
+async def _unoffered_plugin(guild_id: int | None) -> Exists:
     """Matches a plug-in listing this deployment does not run the service for
     in community ``guild_id``.
 
@@ -250,11 +250,11 @@ async def _unoffered_plugin(guild_id: Optional[int]) -> Exists:
 async def list_listings(
     session: AsyncSession,
     *,
-    kind: Optional[str] = None,
-    query: Optional[str] = None,
+    kind: str | None = None,
+    query: str | None = None,
     include_unavailable: bool = False,
-    bundled_with: Optional[Sequence[str]] = None,
-    sources: Optional[Sequence[str]] = None,
+    bundled_with: Sequence[str] | None = None,
+    sources: Sequence[str] | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[Sequence[MarketplaceListing], int]:
@@ -327,7 +327,7 @@ async def list_listings(
 
 async def get_listing(
     session: AsyncSession, public_id: str
-) -> Optional[MarketplaceListing]:
+) -> MarketplaceListing | None:
     return (
         await session.exec(
             select(MarketplaceListing).where(MarketplaceListing.public_id == public_id)
@@ -355,7 +355,7 @@ async def listing_avatars(session: AsyncSession, uids: Sequence[str]) -> dict[st
 
 async def get_listing_by_uid(
     session: AsyncSession, uid: str
-) -> Optional[MarketplaceListing]:
+) -> MarketplaceListing | None:
     return (
         await session.exec(
             select(MarketplaceListing).where(MarketplaceListing.uid == uid)
@@ -364,8 +364,8 @@ async def get_listing_by_uid(
 
 
 async def get_listing_version(
-    session: AsyncSession, version_id: Optional[int]
-) -> Optional[MarketplaceListingVersion]:
+    session: AsyncSession, version_id: int | None
+) -> MarketplaceListingVersion | None:
     if version_id is None:
         return None
     return (
@@ -378,7 +378,7 @@ async def get_listing_version(
 
 
 async def get_listing_versions(
-    session: AsyncSession, version_ids: Sequence[Optional[int]]
+    session: AsyncSession, version_ids: Sequence[int | None]
 ) -> dict[int, MarketplaceListingVersion]:
     """The named versions, keyed by id.
 
@@ -400,7 +400,7 @@ async def get_listing_versions(
 
 async def resolve_installable_version(
     session: AsyncSession, listing: MarketplaceListing
-) -> Optional[MarketplaceListingVersion]:
+) -> MarketplaceListingVersion | None:
     """The version a guild would get right now, or ``None`` if there is none it
     can run. A listing whose latest version needs a newer app is not silently
     downgraded to an older one — the guild is told to upgrade instead."""
@@ -418,9 +418,9 @@ async def upsert_listing(
     manifest: dict[str, Any],
     *,
     source: str,
-    bundled_with: Optional[str] = None,
+    bundled_with: str | None = None,
     hold_for_review: bool = False,
-    submitted_by: Optional[int] = None,
+    submitted_by: int | None = None,
 ) -> MarketplaceListing:
     """Create or update one listing and the version its manifest describes.
 
@@ -476,7 +476,7 @@ async def upsert_listing(
         if not manifest.get(required):
             raise CatalogError(f"{public_id}: {required} is required")
 
-    registration: Optional[registrations_service.ListingRegistration] = None
+    registration: registrations_service.ListingRegistration | None = None
     if manifest.get("registration") is not None:
         if kind != "plugin":
             raise CatalogError(f"{public_id}: only a plug-in carries a registration")
@@ -545,7 +545,7 @@ async def upsert_listing(
             f"{public_id} is already published {held}; refusing to republish {wants}"
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Everything a publish sets, whether the row is new or being updated. Built
     # once so a new listing is constructed complete rather than assembled by
     # assignment after the fact.
@@ -797,7 +797,7 @@ async def _publish_bundled_dashboards(
     for stale in await _bundled_dashboards_of(session, plugin.uid):
         if stale.uid not in published and stale.available:
             stale.available = False
-            stale.updated_at = datetime.now(timezone.utc)
+            stale.updated_at = datetime.now(UTC)
             session.add(stale)
 
     await session.flush()
@@ -834,7 +834,7 @@ async def withdraw_listing(session: AsyncSession, uid: str) -> bool:
     listing = await get_listing_by_uid(session, uid)
     if listing is None or not listing.available:
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     listing.available = False
     listing.updated_at = now
     session.add(listing)
@@ -890,7 +890,7 @@ async def withdraw_builtins_except(
         if listing.uid in keep:
             continue
         listing.available = False
-        listing.updated_at = datetime.now(timezone.utc)
+        listing.updated_at = datetime.now(UTC)
         session.add(listing)
         withdrawn += 1
     if withdrawn:

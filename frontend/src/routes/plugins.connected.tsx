@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { ConnectedPage } from "@/pages/community/plugins/ConnectedPage";
 
 export const Route = createFileRoute("/plugins/connected")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/plugins/PluginConnectedPage").then((m) => ({ default: m.PluginConnectedPage }))
-  ),
+  component: ConnectedPage,
 });

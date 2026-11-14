@@ -10,8 +10,7 @@ Shared (``public``) because a grant is: its rows go with it.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -38,9 +37,7 @@ class AccessGrantActivity(SQLModel, table=True):
         Index("ix_access_grant_activity_grant_occurred", "grant_id", "occurred_at"),
     )
 
-    id: Optional[int] = Field(
-        default=None, sa_column=Column(BigInteger, primary_key=True)
-    )
+    id: int | None = Field(default=None, sa_column=Column(BigInteger, primary_key=True))
     grant_id: int = Field(
         sa_column=Column(
             Integer,
@@ -49,7 +46,7 @@ class AccessGrantActivity(SQLModel, table=True):
         )
     )
     occurred_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     method: str = Field(sa_column=Column(String(length=8), nullable=False))
@@ -58,10 +55,10 @@ class AccessGrantActivity(SQLModel, table=True):
     status: int = Field(sa_column=Column(SmallInteger, nullable=False))
     is_write: bool = Field(sa_column=Column(Boolean, nullable=False))
     #: The thing the route named, where it named one: its kind and id.
-    target_type: Optional[str] = Field(
+    target_type: str | None = Field(
         default=None,
         sa_column=Column(String(length=TARGET_TYPE_LENGTH), nullable=True),
     )
-    target_id: Optional[int] = Field(
+    target_id: int | None = Field(
         default=None, sa_column=Column(BigInteger, nullable=True)
     )

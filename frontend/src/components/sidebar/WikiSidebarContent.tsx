@@ -12,25 +12,10 @@ import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
 import { HiddenFilesRequest } from "@/components/access/RequestAccess";
-import { FileChooserDialog } from "@/components/files/FileChooserDialog";
-import { WikiPageActions } from "@/components/initiativeTools/wikis/WikiPageActions";
-import {
-  useWikiTreeExpansion,
-  WikiPageTree,
-} from "@/components/initiativeTools/wikis/WikiPageTree";
-import { SubscribeButton } from "@/components/SubscribeButton";
-import { Button } from "@/components/ui/button";
-import {
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInput,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { FileChooserDialog } from "@/components/tools/files/FileChooserDialog";
+import { SubscribeButton } from "@/components/tools/SubscribeButton";
+import { WikiPageActions } from "@/components/tools/wikis/WikiPageActions";
+import { useWikiTreeExpansion, WikiPageTree } from "@/components/tools/wikis/WikiPageTree";
 import {
   useAddWikiFile,
   useAddWikiPage,
@@ -43,6 +28,20 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { TOOL_ICONS, toolSettingsRoute, wikiFileRoute, wikiPageRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+
+import {
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "./sidebar";
 
 // Adding a file to a wiki is named by the files tool itself, so the row
 // says which tool it reaches into rather than inventing a second mark for it.
@@ -175,7 +174,9 @@ export const WikiSidebarContent = ({
       <SidebarContent className="h-full overflow-y-auto overflow-x-hidden">
         <SidebarGroup>
           {pagesQuery.isLoading ? (
-            <p className="px-2 py-1.5 text-muted-foreground text-sm">{t("pages.loading")}</p>
+            <SkeletonRegion className="px-2 py-1.5">
+              <SkeletonLines lines={5} />
+            </SkeletonRegion>
           ) : needle ? (
             matches.length === 0 ? (
               <p className="px-2 py-1.5 text-muted-foreground text-sm">

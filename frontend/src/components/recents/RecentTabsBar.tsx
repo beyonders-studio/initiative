@@ -3,19 +3,19 @@ import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PersonalItemRead } from "@/api/generated/initiativeAPI.schemas";
-import { SkeletonPillRow, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
+import { renderRecentIcon } from "@/lib/recentIcon";
+import { type RecentKey, recentKeyMatches, recentRoute } from "@/lib/recentRoute";
+import { Button } from "@/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { renderRecentIcon } from "@/lib/recentIcon";
-import { type RecentKey, recentKeyMatches, recentRoute } from "@/lib/recentRoute";
-import { cn } from "@/lib/utils";
+} from "@/ui/context-menu";
+import { cn } from "@/ui/lib/utils";
+import { SkeletonPillRow, SkeletonRegion } from "@/ui/page-skeletons";
+import { ScrollArea, ScrollBar } from "@/ui/scroll-area";
 
 interface RecentTabsBarProps {
   items?: PersonalItemRead[];
@@ -53,7 +53,7 @@ export const RecentTabsBar = ({
     <ScrollArea className="h-12 pt-2.5">
       <div className="flex h-full items-end gap-2 px-4">
         {loading ? (
-          <SkeletonRegion label={t("tabsBar.loadingRecent")}>
+          <SkeletonRegion>
             <SkeletonPillRow count={3} pillClassName="h-9 w-36 rounded-t-md rounded-b-none" />
           </SkeletonRegion>
         ) : (

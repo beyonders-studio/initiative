@@ -18,17 +18,15 @@ Both go through ``app.services.auth.provider_probe`` and are rate limited,
 because both spend the deployment's egress.
 """
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Request, status
 
 from app.api.deps import SystemSessionDep
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
 from app.core.rate_limit import limiter
 from app.schemas.platform.settings import (
-    AuthProviderOwnerRead,
     AuthProviderCreate,
     AuthProviderDiscoverRequest,
+    AuthProviderOwnerRead,
     AuthProviderProbeResult,
     AuthProviderUpdate,
     PlatformProviderDefaultRead,
@@ -39,11 +37,11 @@ from app.services.auth import provider_defaults, provider_probe, provider_regist
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AuthProviderOwnerRead])
+@router.get("/", response_model=list[AuthProviderOwnerRead])
 async def list_auth_providers(
     session: SystemSessionDep,
     _owner: ConfigManageDep,
-) -> List[AuthProviderOwnerRead]:
+) -> list[AuthProviderOwnerRead]:
     return await provider_registry.list_providers(session)
 
 
@@ -117,14 +115,12 @@ async def test_auth_provider(
     return AuthProviderProbeResult.model_validate(result, from_attributes=True)
 
 
-@router.get(
-    "/{provider_id}/default", response_model=Optional[PlatformProviderDefaultRead]
-)
+@router.get("/{provider_id}/default", response_model=PlatformProviderDefaultRead | None)
 async def get_provider_default(
     provider_id: int,
     session: SystemSessionDep,
     _owner: ConfigManageDep,
-) -> Optional[PlatformProviderDefaultRead]:
+) -> PlatformProviderDefaultRead | None:
     """The deployment's own answer for this provider, or null where it has
     made none and every community speaks for itself."""
     return await provider_defaults.get_default(session, provider_id)

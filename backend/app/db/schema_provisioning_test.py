@@ -12,25 +12,24 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
-import app.db.schema_provisioning as schema_provisioning
+from app.db import schema_provisioning
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_ddl import rendered_constraint_names, rendered_trigger_names
 from app.db.registry_checks import registry_checks
 from app.db.schema_provisioning import (
-    GuildRoleKind,
     PLUGIN_ROLE_MACHINERY_READS,
     SUPPORT_WRITE_PROTECTED_TABLES,
+    SYSTEM_LOGIN_ROLE,
+    GuildRoleKind,
     apply_guild_rls,
-    strip_template_registry_objects,
     backfill_guild_schemas,
     drop_guild_schema,
     guild_role_name,
     guild_schema_name,
     provision_guild_schema,
-    SYSTEM_LOGIN_ROLE,
+    strip_template_registry_objects,
 )
 from app.db.tenancy import GUILD_SCOPED_TABLES, OPERATIONS_TABLES
-
 
 # Synthetic ids well above any real guild; each test uses its own.
 _GID_COMPLETE = 990_101
@@ -46,10 +45,9 @@ _GID_DROP_ABSENT = 990_110
 _GID_SUPPORT = 990_120
 _GID_READ_FLOOR = 990_121
 _GID_SEAT = 990_122
-_GID_RETIRED_A = 990_123
-_GID_RETIRED_B = 990_124
 _GID_PLUGIN = 990_125
 _GID_PLUGIN_DENIED = 990_126
+_GID_VACUUM = 990_127
 # Back-fill sweep (each pair: one provisioned, one only a public row).
 _GID_BACKFILL_DONE = 990_111
 _GID_BACKFILL_MISSING = 990_112
@@ -161,6 +159,60 @@ async def test_provision_is_idempotent(engine):
             )
         assert count == len(GUILD_SCOPED_TABLES - OPERATIONS_TABLES)
     finally:
+        async with engine.begin() as conn:
+            await drop_guild_schema(conn, gid)
+
+
+async def test_reprovisioning_and_a_vacuum_wait_for_each_other_in_turn(
+    engine, monkeypatch
+):
+    """A vacuum reaching a table after provisioning's grants and before its
+    policies waits for provisioning to finish. Its analyze writes the table's
+    catalog row, which the grants wrote; had it held the table, the policies
+    would have waited on it while it waited on them."""
+    gid = _GID_VACUUM
+    # A table no part before the policies takes a lock on.
+    table = f'"{guild_schema_name(gid)}".view_preferences'
+    real_apply_guild_rls = schema_provisioning.apply_guild_rls
+    vacuums: list[asyncio.Task] = []
+    vacuum_pid: list[int] = []
+
+    async def vacuum() -> None:
+        async with engine.connect() as conn:
+            await conn.begin()
+            vacuum_pid.append(await conn.scalar(text("SELECT pg_backend_pid()")))
+            await conn.exec_driver_sql(
+                f"LOCK TABLE {table} IN SHARE UPDATE EXCLUSIVE MODE"
+            )
+            await conn.exec_driver_sql(f"ANALYZE {table}")
+            await conn.commit()
+
+    async def rls_once_a_vacuum_waits(conn, schema: str) -> None:
+        vacuums.append(asyncio.create_task(vacuum()))
+        async with engine.connect() as probe:
+            while not vacuum_pid or not await probe.scalar(
+                text(
+                    "SELECT 1 FROM pg_stat_activity "
+                    "WHERE pid = :pid AND wait_event_type = 'Lock'"
+                ),
+                {"pid": vacuum_pid[0]},
+            ):
+                assert not vacuums[0].done(), "the vacuum did not wait"
+                await asyncio.sleep(0.05)
+        await real_apply_guild_rls(conn, schema)
+
+    try:
+        async with engine.begin() as conn:
+            await provision_guild_schema(conn, gid)
+        monkeypatch.setattr(
+            schema_provisioning, "apply_guild_rls", rls_once_a_vacuum_waits
+        )
+        async with engine.begin() as conn:
+            await provision_guild_schema(conn, gid)
+        await vacuums[0]
+    finally:
+        for task in vacuums:
+            task.cancel()
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)
 
@@ -355,9 +407,11 @@ async def test_the_plugin_role_holds_only_what_a_plugin_reaches(engine):
             await drop_guild_schema(conn, gid)
 
 
-async def test_the_plugin_role_is_refused_the_communitys_settings(engine):
-    """A session assuming ``guild_<id>_plugin`` cannot read ``guild_settings``."""
+async def test_the_plugin_role_reads_only_the_settings_retention(engine):
+    """A session assuming ``guild_<id>_plugin`` reads the community's trash
+    retention, which dates a row it bins, and nothing else of its settings."""
     gid = _GID_PLUGIN_DENIED
+    schema = guild_schema_name(gid)
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, gid)
@@ -365,12 +419,11 @@ async def test_the_plugin_role_is_refused_the_communitys_settings(engine):
             await conn.exec_driver_sql(
                 f'SET ROLE "{guild_role_name(gid, GuildRoleKind.plugin)}"'
             )
+            await conn.execute(
+                text(f'SELECT id, retention_days FROM "{schema}".guild_settings')
+            )
             with pytest.raises(ProgrammingError) as exc:
-                await conn.scalar(
-                    text(
-                        f'SELECT count(*) FROM "{guild_schema_name(gid)}".guild_settings'
-                    )
-                )
+                await conn.execute(text(f'SELECT * FROM "{schema}".guild_settings'))
             assert "permission denied" in str(exc.value).lower()
             await conn.rollback()
             await conn.exec_driver_sql("RESET ROLE")
@@ -1497,8 +1550,9 @@ async def test_engine_identities_warn_on_shared_app_and_admin_login(
 async def test_engine_identities_warn_on_privileged_app_login(
     engine, monkeypatch, caplog
 ):
-    import app.db.session as db_session
     from sqlalchemy.ext.asyncio import create_async_engine
+
+    import app.db.session as db_session
 
     # App engine as app_admin (BYPASSRLS) — a swapped-URLs deployment. A
     # DISTINCT engine from a distinct login must be the admin side so the
@@ -1637,10 +1691,10 @@ async def test_privileged_database_url_refuses_to_start(monkeypatch, attributes,
 async def test_privileged_derived_provisioner_names_the_role_to_fix(monkeypatch):
     """With DATABASE_URL as the owner the app made app_provisioner itself, so
     the remedy is the role, not the connection settings."""
-    from app.core.config import settings
+    from app.core.config import Settings
 
     _fake_provisioning_engine(monkeypatch, rolsuper=True)
-    monkeypatch.setattr(settings, "_database_logins_derived", True)
+    monkeypatch.setattr(Settings, "database_logins_derived", True)
 
     with pytest.raises(SystemExit) as exit_info:
         await schema_provisioning.reject_privileged_database_url()
@@ -1683,84 +1737,3 @@ async def test_a_provisioned_schema_names_no_community(engine):
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, _GID_NO_GUILD_COLUMN)
-
-
-async def test_retiring_a_function_leaves_the_shared_copy_to_the_boot_step(engine):
-    """A render retires only its own schema's copy of a retired function.
-
-    0.71 kept ``relationship_endpoint_access`` in ``public``, and every guild's
-    policies were bound to that one copy. The render drops retired functions
-    with the search path on ``<guild>, public``, so an unqualified drop in a
-    guild with no local copy reached the shared one and was refused — the
-    other guilds still depended on it — and the back-fill failed for every
-    guild in turn. Here guild B stands in for "every other guild".
-    """
-    from app.db.authorization import RETIRED_GUILD_FUNCTION_SIGNATURES
-    from app.db.guild_ddl import render_retired_functions_ddl
-
-    name, args = RETIRED_GUILD_FUNCTION_SIGNATURES[0]
-    schema_a = guild_schema_name(_GID_RETIRED_A)
-    schema_b = guild_schema_name(_GID_RETIRED_B)
-    shared = f"public.{name}{args}"
-    created_shared = False
-    try:
-        async with engine.begin() as conn:
-            if (
-                await conn.scalar(
-                    text("SELECT to_regprocedure(CAST(:s AS text))"), {"s": shared}
-                )
-                is None
-            ):
-                created_shared = True
-                await conn.exec_driver_sql(
-                    f"CREATE FUNCTION {shared} RETURNS boolean "
-                    "LANGUAGE sql STABLE AS 'SELECT true'"
-                )
-            for schema in (schema_a, schema_b):
-                await conn.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
-                await conn.exec_driver_sql(
-                    f'CREATE TABLE "{schema}".t (kind text, id integer)'
-                )
-            # Guild B's policy is bound to the shared copy, as every guild's
-            # was before this release re-rendered it.
-            await conn.exec_driver_sql(
-                f'ALTER TABLE "{schema_b}".t ENABLE ROW LEVEL SECURITY'
-            )
-            await conn.exec_driver_sql(
-                f'CREATE POLICY p ON "{schema_b}".t USING '
-                f"(public.{name}(kind, id, false))"
-            )
-            # Guild A has a copy of its own, which is the one to retire.
-            await conn.exec_driver_sql(
-                f'CREATE FUNCTION "{schema_a}".{name}{args} RETURNS boolean '
-                "LANGUAGE sql STABLE AS 'SELECT true'"
-            )
-
-        async with engine.begin() as conn:
-            await conn.exec_driver_sql(f'SET search_path TO "{schema_a}", public')
-            await conn.exec_driver_sql(render_retired_functions_ddl())
-            await conn.exec_driver_sql("SET search_path TO public")
-
-        async with engine.connect() as conn:
-            local = await conn.scalar(
-                text("SELECT to_regprocedure(CAST(:s AS text))"),
-                {"s": f'"{schema_a}".{name}{args}'},
-            )
-            still_shared = await conn.scalar(
-                text("SELECT to_regprocedure(CAST(:s AS text))"), {"s": shared}
-            )
-        assert local is None, "the guild's own copy is retired"
-        assert still_shared is not None, "the shared copy is left for the boot step"
-
-        # And a render in a schema with no copy of its own is a no-op, rather
-        # than a drop that reaches the shared one.
-        async with engine.begin() as conn:
-            await conn.exec_driver_sql(f'SET search_path TO "{schema_a}", public')
-            await conn.exec_driver_sql(render_retired_functions_ddl())
-            await conn.exec_driver_sql("SET search_path TO public")
-    finally:
-        async with engine.begin() as conn:
-            for schema in (schema_a, schema_b):
-                await conn.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
-            if created_shared:
-                await conn.exec_driver_sql(f"DROP FUNCTION IF EXISTS {shared}")

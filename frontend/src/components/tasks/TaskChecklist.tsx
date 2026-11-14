@@ -1,11 +1,4 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
@@ -19,7 +12,6 @@ import {
   ChevronUp,
   GripVertical,
   ListTree,
-  Loader2,
   Sparkles,
   SquareCheck,
   Trash2,
@@ -38,19 +30,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ChecklistItem, ChecklistProgress } from "@/api/generated/initiativeAPI.schemas";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import {
   useGenerateChecklist,
@@ -62,6 +41,20 @@ import { newChecklistItemId } from "@/lib/checklist";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { entityRefRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
+import { Textarea } from "@/ui/textarea";
 
 /** A checklist as the server holds it, in one comparable string. */
 const fingerprint = (items: ChecklistItem[]) =>
@@ -306,7 +299,7 @@ export const TaskChecklist = ({
     }
   };
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useDragSensors();
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -342,13 +335,9 @@ export const TaskChecklist = ({
               variant="ghost"
               size="sm"
               onClick={() => generateChecklist.mutate(taskId)}
-              disabled={generateChecklist.isPending}
+              pending={generateChecklist.isPending}
             >
-              {generateChecklist.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Sparkles className="h-3 w-3" />
-              )}
+              <Sparkles className="h-3 w-3" />
               {t("checklist.aiGenerate")}
             </Button>
           ) : null}
@@ -450,14 +439,11 @@ export const TaskChecklist = ({
               </div>
             ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button onClick={handleAddSuggestions} disabled={selected.size === 0}>
-              {t("checklist.addSelected", { count: selected.size })}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("checklist.addSelected", { count: selected.size })}
+            onSubmit={handleAddSuggestions}
+            disabled={selected.size === 0}
+          />
         </DialogContent>
       </Dialog>
     </Card>

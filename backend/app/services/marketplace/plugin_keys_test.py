@@ -1,21 +1,20 @@
 """The keys a plug-in signs with: pasted into its registration, or published by
 the plug-in at its key set address and fetched from there.
 
-The fetch runs through an injected ``httpx.MockTransport`` against a loopback
+The fetch runs through an injected ``httpx2.MockTransport`` against a loopback
 literal, so nothing here touches the network.
 """
 
 import json
 from types import MappingProxyType
 
-import httpx
+import httpx2
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from jwt.algorithms import ECAlgorithm, OKPAlgorithm
 
 from app.services.marketplace import plugin_keys
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
-
 
 BASE = "https://127.0.0.1:9443"
 JWKS_URI = f"{BASE}/.well-known/jwks.json"
@@ -48,11 +47,11 @@ def _snapshot(*, jwks_uri: str | None = JWKS_URI, base_url: str = BASE, keys=Non
 def _serving(document, *, status: int = 200):
     fetched: list[str] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         fetched.append(str(request.url))
-        return httpx.Response(status, json=document)
+        return httpx2.Response(status, json=document)
 
-    return fetched, httpx.MockTransport(handler)
+    return fetched, httpx2.MockTransport(handler)
 
 
 @pytest.fixture(autouse=True)

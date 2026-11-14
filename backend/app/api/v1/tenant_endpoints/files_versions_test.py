@@ -4,21 +4,21 @@ upload new version, list versions, download a specific version, delete a version
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.storage import get_guild_storage
-from app.services.tenant import attachments as attachments_service
+from app.models.platform.guild import CommunityRole
 from app.models.tenant.file import (
     File,
     FileVersion,
 )
-from app.models.platform.guild import CommunityRole
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.upload import Upload
+from app.services.storage import get_guild_storage
+from app.services.tenant import attachments as attachments_service
 from app.testing import create_resource_grant
-from app.testing.plugin_clients import install_plugin, install_headers
+from app.testing.plugin_clients import install_headers, install_plugin
 
 PDF_BYTES = b"%PDF-1.4 first version body"
 PDF_BYTES_V2 = b"%PDF-1.4 second version body that differs"

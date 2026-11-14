@@ -3,6 +3,7 @@
     "home": "Accueil d'Initiative",
     "download": "Télécharger",
     "pricing": "Tarifs",
+    "suggestions": "Suggestions",
     "docs": "Documentation",
     "signIn": "Se connecter",
     "signUp": "S'inscrire",
@@ -380,10 +381,8 @@
     "readMoreAria": "Lire l'article complet sur Initiative {{version}}",
     "older": "Voir les articles plus anciens",
     "back": "Tous les articles",
-    "loading": "Chargement…",
     "empty": "Rien pour l'instant.",
-    "notFound": "Impossible de trouver cette version. Elle n'est peut-être pas encore sortie.",
-    "error": "Impossible de charger les nouveautés. Patientez un instant et réessayez."
+    "notFound": "Impossible de trouver cette version. Elle n'est peut-être pas encore sortie."
   },
   "meta": {
     "homeTitle": "Initiative : votre groupe a beaucoup à gérer, et il est temps de prendre l'Initiative",

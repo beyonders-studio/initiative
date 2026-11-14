@@ -33,11 +33,11 @@ from sqlalchemy import delete, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.clock import utcnow
 from app.core.encryption import SALT_TOTP_SECRET, decrypt_field, encrypt_field
 from app.models.platform.mfa_recovery_code import MfaRecoveryCode
 from app.models.platform.user_totp import UserTotp
 from app.models.platform.user_totp_secret import UserTotpSecret
-from app.core.clock import utcnow
 
 #: The shape every authenticator app assumes, and the one an ``otpauth://`` URI
 #: does not need to spell out.

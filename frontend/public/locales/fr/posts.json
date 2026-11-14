@@ -51,8 +51,6 @@
     "allPosts": "Toutes les publications",
     "unreadOnly": "Non lues seulement"
   },
-  "loading": "Chargement des publications...",
-  "loadError": "Échec du chargement des publications.",
   "creating": "Publication en cours...",
   "saving": "Enregistrement...",
   "notFound": "Publication introuvable",

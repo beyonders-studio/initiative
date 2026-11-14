@@ -5,14 +5,13 @@ a provider the community already counts as its own, and it says where the
 people carrying one group land.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import guild_of
 from app.core.messages import AuthProviderMessages, SettingsMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
-from app.testing.schema_harness import route_session_to_guild
+from app.testing import guild_of
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -22,6 +21,7 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 async def _seat(session: AsyncSession, *, auth_options: list[str] | None = None):
@@ -64,7 +64,7 @@ async def _a_role(session: AsyncSession, initiative) -> tuple[int, str]:
     return row.id, row.display_name
 
 
-async def test_the_seat_writes_reads_and_removes_a_rule(
+async def test_the_seat_writes_reads_changes_and_removes_a_rule(
     client: AsyncClient, session: AsyncSession
 ):
     admin, guild = await _seat(session)
@@ -94,6 +94,24 @@ async def test_the_seat_writes_reads_and_removes_a_rule(
     # The operator told this provider where groups live, so a rule against it
     # can match something.
     assert listed.json()["reporting_provider_ids"] == [provider.id]
+
+    # Changed in place: the group it reads and the standing it gives.
+    changed = await client.patch(
+        f"{_base(guild.id)}/{body['id']}",
+        headers=headers,
+        json={"claim_value": " eng-core ", "community_role": "admin"},
+    )
+    assert changed.status_code == 200, changed.text
+    assert (changed.json()["claim_value"], changed.json()["community_role"]) == (
+        "eng-core",
+        "admin",
+    )
+    seat_role = await client.patch(
+        f"{_base(guild.id)}/{body['id']}",
+        headers=headers,
+        json={"community_role": "superadmin"},
+    )
+    assert seat_role.status_code == 400, seat_role.text
 
     removed = await client.delete(f"{_base(guild.id)}/{body['id']}", headers=headers)
     assert removed.status_code == 204, removed.text
@@ -276,6 +294,10 @@ async def test_another_communitys_rule_is_not_there(
     theirs = created.json()["id"]
 
     assert (await client.get(_base(guild.id), headers=headers)).json()["rules"] == []
+    changed = await client.patch(
+        f"{_base(guild.id)}/{theirs}", headers=headers, json={"claim_value": "mine"}
+    )
+    assert changed.status_code == 404, changed.text
     removed = await client.delete(f"{_base(guild.id)}/{theirs}", headers=headers)
     assert removed.status_code == 404, removed.text
 
@@ -283,7 +305,7 @@ async def test_another_communitys_rule_is_not_there(
 async def test_an_ordinary_admin_reads_but_does_not_write(
     client: AsyncClient, session: AsyncSession
 ):
-    admin, guild = await _seat(session)
+    _admin, guild = await _seat(session)
     provider = await _connected(session, guild)
     ordinary = await create_user(session)
     await create_guild_membership(
@@ -301,7 +323,7 @@ async def test_an_ordinary_admin_reads_but_does_not_write(
 
 
 async def test_a_member_sees_none_of_it(client: AsyncClient, session: AsyncSession):
-    admin, guild = await _seat(session)
+    _admin, guild = await _seat(session)
     member = await create_user(session)
     await create_guild_membership(
         session, user=member, guild=guild, role=CommunityRole.member

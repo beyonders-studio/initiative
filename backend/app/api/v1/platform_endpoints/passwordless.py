@@ -14,9 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
-    require_first_party_session,
-    SystemSessionDep,
     CurrentUser,
+    SystemSessionDep,
+    require_first_party_session,
 )
 from app.api.v1.platform_endpoints.password_recheck import (
     require_password_or_recent_proof,

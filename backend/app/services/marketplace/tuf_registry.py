@@ -53,18 +53,19 @@ import concurrent.futures
 import gzip
 import hashlib
 import io
-import zlib
 import json
 import logging
 import tarfile
 import tempfile
+import zlib
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping, Optional, Sequence
+from typing import Any
 from urllib import parse
 
-import httpx
+import httpx2
 from sqlalchemy import delete as sa_delete
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -192,7 +193,7 @@ class TrustAnchor:
     version: int
 
 
-def _read_root_file(path: Path) -> Optional[bytes]:
+def _read_root_file(path: Path) -> bytes | None:
     """The root file's bytes, or ``None`` when it is the placeholder."""
     try:
         data = path.read_bytes()
@@ -223,13 +224,13 @@ def _root_version(data: bytes) -> int:
     return metadata.signed.version
 
 
-def load_trust_anchor() -> Optional[TrustAnchor]:
+def load_trust_anchor() -> TrustAnchor | None:
     """The trusted root, or ``None`` when this build has none yet.
 
     ``MARKETPLACE_REGISTRY_ROOT`` replaces the shipped root. The result is
     ``builtin`` only when the root in use is byte for byte the shipped one.
     """
-    builtin_data: Optional[bytes] = None
+    builtin_data: bytes | None = None
     if BUILTIN_ROOT_PATH.is_file():
         builtin_data = _read_root_file(BUILTIN_ROOT_PATH)
 
@@ -276,7 +277,7 @@ _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 def _origin(url: str) -> tuple[str, str, int | None]:
-    parsed = httpx.URL(url)
+    parsed = httpx2.URL(url)
     return (
         parsed.scheme,
         parsed.host,
@@ -305,7 +306,7 @@ async def _get(url: str) -> bytes:
             "GET",
             url,
             headers=_request_headers(url),
-            timeout=httpx.Timeout(FETCH_TIMEOUT_SECONDS),
+            timeout=httpx2.Timeout(FETCH_TIMEOUT_SECONDS),
             max_bytes=MAX_FETCH_BYTES,
         )
     except ResponseTooLargeError as exc:
@@ -313,7 +314,7 @@ async def _get(url: str) -> bytes:
             f"{url} is larger than {MAX_FETCH_BYTES} bytes"
         ) from exc
     except (
-        httpx.HTTPError,
+        httpx2.HTTPError,
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,
     ) as exc:
@@ -362,10 +363,10 @@ class BundleFetcher(FetcherInterface):
         return iter((data,))
 
 
-def _bundle_name(raw: str) -> Optional[str]:
+def _bundle_name(raw: str) -> str | None:
     """A member name as the bundle fetcher looks it up, or ``None`` for one
     that is not a plain relative path."""
-    name = raw[2:] if raw.startswith("./") else raw
+    name = raw.removeprefix("./")
     if not name or name.startswith("/") or "\\" in name:
         return None
     parts = name.split("/")
@@ -510,7 +511,7 @@ class VerifiedRepository:
         #: Delegations whose metadata did not load this time, with the code
         #: naming why: what they cover is unknown, not gone.
         self.failed: list[tuple[DelegatedRole, str]] = []
-        self._facts: Optional[RepositoryFacts] = None
+        self._facts: RepositoryFacts | None = None
 
     def _restore(self, anchor: TrustAnchor, stored: Sequence[StoredFile]) -> None:
         history = self._workdir / _ROOT_HISTORY
@@ -611,7 +612,7 @@ class VerifiedRepository:
             )
         return sorted(found)
 
-    def package_role(self) -> Optional[tuple[DelegatedRole, Targets]]:
+    def package_role(self) -> tuple[DelegatedRole, Targets] | None:
         """The ``package`` delegation and the targets it signs, or ``None``
         when the repository carries no package role file.
 
@@ -646,7 +647,7 @@ class VerifiedRepository:
 
     def package_terms(
         self, role: DelegatedRole, targets: Targets, uid: str
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """The terms file the package role signs for listing ``uid``, or
         ``None`` when it signs none. Read from that role alone."""
         path = package_terms.terms_path(uid)
@@ -665,7 +666,7 @@ class VerifiedRepository:
         """Whether the client's own delegation search finds ``path``."""
         try:
             return self._updater.get_targetinfo(path) is not None
-        except (tuf_errors.RepositoryError, tuf_errors.DownloadError):
+        except tuf_errors.RepositoryError, tuf_errors.DownloadError:
             return False
 
     def fetch_target(self, path: str, max_bytes: int) -> bytes:
@@ -678,7 +679,7 @@ class VerifiedRepository:
             raise RegistryError(Codes.TARGET_REJECTED, f"{path} is not listed")
         return self._download(info, max_bytes)
 
-    def top_level_target(self, path: str, max_bytes: int) -> Optional[bytes]:
+    def top_level_target(self, path: str, max_bytes: int) -> bytes | None:
         """A file the top-level ``targets`` role lists itself, or ``None``."""
         info = self._kept_targets(Targets.type).targets.get(path)
         if info is None:
@@ -806,8 +807,8 @@ class RefreshResult:
     #: Whether it ran (false when disabled, not configured, or already running).
     ran: bool
     #: The refusal that stopped it, or ``None`` when it applied.
-    code: Optional[str] = None
-    root_version: Optional[int] = None
+    code: str | None = None
+    root_version: int | None = None
     upserted: int = 0
     withdrawn: int = 0
     #: The repository had not changed since the last clean refresh.
@@ -877,7 +878,7 @@ async def _apply(
         async def fetch(path: str, max_bytes: int) -> bytes:
             return await asyncio.to_thread(repo.fetch_target, path, max_bytes)
 
-        async def publisher_record(prefix: str) -> Optional[bytes]:
+        async def publisher_record(prefix: str) -> bytes | None:
             return await asyncio.to_thread(
                 repo.top_level_target,
                 registry_entries.publisher_record_path(prefix),
@@ -942,7 +943,7 @@ async def _apply(
 
 async def _read_terms(
     repo: VerifiedRepository, present: set[str], result: RefreshResult
-) -> tuple[dict[str, package_terms.ListingTerms], Optional[set[str]]]:
+) -> tuple[dict[str, package_terms.ListingTerms], set[str] | None]:
     """The package's terms for each listing present, and the uids whose
     terms could not be read and so stay as they are (``None`` for every one,
     when the package role itself did not load)."""
@@ -1029,7 +1030,7 @@ async def _run(
     fetcher_for: Callable[[], FetcherInterface],
     force: bool,
 ) -> RefreshResult:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     try:
         anchor = load_trust_anchor()
     except RegistryError as exc:
@@ -1071,7 +1072,7 @@ async def refresh_registry(
     session: AsyncSession,
     *,
     force: bool = False,
-    fetcher: Optional[FetcherInterface] = None,
+    fetcher: FetcherInterface | None = None,
 ) -> RefreshResult:
     """Fetch, verify and apply the registry, when the platform switch is on.
 
@@ -1122,12 +1123,12 @@ class RegistryStatus:
     configured: bool
     custom_root: bool
     registry_url: str
-    root_version: Optional[int]
-    expires_at: Optional[datetime]
-    source: Optional[str]
-    last_attempt_at: Optional[datetime]
-    last_success_at: Optional[datetime]
-    last_error: Optional[str]
+    root_version: int | None
+    expires_at: datetime | None
+    source: str | None
+    last_attempt_at: datetime | None
+    last_success_at: datetime | None
+    last_error: str | None
     listing_count: int
 
 
@@ -1135,7 +1136,7 @@ async def read_status(session: AsyncSession, *, enabled: bool) -> RegistryStatus
     """The status row and the configuration it is read against."""
     try:
         anchor = load_trust_anchor()
-        root_error: Optional[str] = None
+        root_error: str | None = None
     except RegistryError as exc:
         anchor = None
         root_error = exc.code

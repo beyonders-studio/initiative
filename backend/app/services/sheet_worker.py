@@ -23,8 +23,9 @@ from __future__ import annotations
 
 import re
 import zipfile
+from collections.abc import Callable, Iterator
 from datetime import date, datetime, time, timedelta
-from typing import Any, Callable, Iterator
+from typing import Any
 
 from defusedxml.ElementTree import iterparse
 from python_calamine import CalamineWorkbook, SheetTypeEnum, SheetVisibleEnum
@@ -321,7 +322,7 @@ def answer(
         return {"too_large": True}
     except MemoryError:
         return {"too_large": True, "replace": True}
-    except Exception as error:  # noqa: BLE001 - every read failure is one answer
+    except Exception as error:  # every read failure is one answer
         return {"error": str(error) or type(error).__name__}
     return {"sheets": sheets}
 
@@ -333,6 +334,6 @@ def start(arguments: list[str]) -> Callable[[dict[str, Any]], dict[str, Any]]:
         import resource
 
         resource.setrlimit(resource.RLIMIT_AS, (address_space, address_space))
-    except (ImportError, ValueError, OSError):
+    except ImportError, ValueError, OSError:
         pass
     return lambda request: answer(request, cells, rows, cols, scan)

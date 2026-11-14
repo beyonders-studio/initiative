@@ -13,14 +13,12 @@
 export { collect } from "./collect";
 export {
   ensureDevice,
-  ensureDeviceContext,
   forgetMessagesOnThisDevice,
   registeredDevice,
 } from "./device";
 export {
   answerNewDevice,
   HISTORY_ASK_NOTICE_MS,
-  type HistoryAskWaiting,
   historyAskWaiting,
 } from "./historySync";
 export { markRead, unreadIn } from "./readState";
@@ -50,6 +48,5 @@ export {
   rejectMatch,
   startVerification,
   subscribeVerification,
-  type VerificationView,
   verificationView,
 } from "./verification";

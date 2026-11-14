@@ -28,9 +28,7 @@
     "searchCalendars": "Search calendars...",
     "tasks": "Tasks"
   },
-  "loading": "Loading...",
   "loadError": "Failed to load events",
-  "loadingEvent": "Loading event...",
   "creating": "Creating...",
   "notFound": "Event not found",
   "notFoundDescription": "This event may have been deleted or you don't have access.",

@@ -4,28 +4,29 @@ Integration tests for file endpoints — create with permissions.
 
 from pathlib import Path
 from types import SimpleNamespace
+
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool
 from app.core.file_types import FileType
+from app.core.search import SearchEntityType
+from app.core.tools import Tool
+from app.models.platform.guild import CommunityRole
 from app.models.tenant.file import (
     File,
 )
-from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.core.search import SearchEntityType
 from app.services import editor_engine
 from app.services.storage import USER_CONTENT_CSP
 from app.services.tenant.collaboration import collaboration_manager
 from app.testing import (
-    guild_of,
     create_file,
     create_initiative,
     create_resource_grant,
+    guild_of,
     lexical_body,
     route_as,
 )

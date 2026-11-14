@@ -12,12 +12,15 @@ moved becomes one notice; the case then records what it told them.
 A closed case its filer has already been told about drops out of the scan
 unless something new is said to them, so a pass reads the open work, not the
 history.
+
+The same pass tells each voter whose idea moved to another status
+(:func:`app.services.platform.ideas.voter_notices`).
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, or_
 from sqlmodel import select
@@ -28,12 +31,17 @@ from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.notification import NotificationType
-from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.services.platform import ideas as ideas_service
 from app.services.platform import notice_outbox, ticket_stream
 from app.services.platform.intake import configured_operations_guild_id
-from app.services.platform.tickets import FilerState, derive_state
+from app.services.platform.tickets import (
+    FilerState,
+    derive_state,
+    latest_reply,
+    reaches_filer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +50,8 @@ logger = logging.getLogger(__name__)
 TICKET_NOTICE_POLL_SECONDS = 30
 
 
-def _latest_reply():
-    """The newest comment said to the filer by anybody but the filer."""
-    return (
-        select(func.max(Comment.id))
-        .where(Comment.task_id == IntakeCase.task_id)
-        .where(Comment.audience == CommentAudience.filer)
-        .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
-        .where(Comment.created_by.is_distinct_from(IntakeCase.filer_user_id))  # type: ignore[union-attr]
-        .correlate(IntakeCase)
-        .scalar_subquery()
-    )
-
-
 async def _moved(session: AsyncSession) -> list[Any]:
-    latest = _latest_reply().label("latest_reply")
+    latest = latest_reply().label("latest_reply")
     closed = or_(
         Task.deleted_at.is_not(None),  # type: ignore[union-attr]
         TaskStatus.category == TaskStatusCategory.done,
@@ -74,6 +69,7 @@ async def _moved(session: AsyncSession) -> list[Any]:
         .join(TaskStatus, TaskStatus.id == Task.task_status_id)
         .outerjoin(IntakeBinding, IntakeBinding.stream == IntakeCase.stream)
         .where(IntakeCase.filer_user_id.is_not(None))  # type: ignore[union-attr]
+        .where(reaches_filer())
         .where(
             or_(
                 # Not yet settled as closed: its state may have moved.
@@ -113,7 +109,8 @@ def _notice(case: IntakeCase, state: FilerState, *, replied: bool) -> dict[str, 
 
 
 async def notify_filers() -> int:
-    """One pass: tell each filer whose case moved. Returns how many were told."""
+    """One pass: tell each filer whose case moved, and each voter whose idea
+    did. Returns how many were told."""
     guild_id = await configured_operations_guild_id()
     if guild_id is None:
         return 0
@@ -134,7 +131,7 @@ async def notify_filers() -> int:
             replied = latest is not None and latest > (
                 case.filer_notified_comment_id or 0
             )
-            previous: Optional[str] = case.filer_notified_state
+            previous: str | None = case.filer_notified_state
             moved = previous is not None and previous != state.value
             # A case's first pass only records where it starts: its filer
             # filed it a moment ago and knows. A reply is still worth telling.
@@ -149,6 +146,7 @@ async def notify_filers() -> int:
             if latest is not None:
                 case.filer_notified_comment_id = latest
             session.add(case)
+        notices += await ideas_service.voter_notices(session)
         await notice_outbox.enqueue(session, notices)
         await session.commit()
     return len(notices)

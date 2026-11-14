@@ -9,11 +9,10 @@ not.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import create_resource_grant, guild_of
 from app.core.relationships import (
     ENDPOINT_KINDS,
     SPECS,
@@ -24,11 +23,11 @@ from app.core.relationships import (
     node_id,
 )
 from app.core.search import SearchEntityType
-from app.testing.schema_harness import route_session_to_guild
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import relationships
 from app.services.tenant.relationships import Endpoint
+from app.testing import create_resource_grant, guild_of
 from app.testing.factories import (
     create_calendar,
     create_calendar_event,
@@ -38,7 +37,7 @@ from app.testing.factories import (
     create_tag,
     create_task,
 )
-
+from app.testing.schema_harness import route_session_to_guild
 
 # ---------------------------------------------------------------------------
 # The vocabulary

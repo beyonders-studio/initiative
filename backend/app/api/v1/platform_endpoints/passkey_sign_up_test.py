@@ -10,8 +10,10 @@ password, and the recovery set that is its way back to one.
 
 from __future__ import annotations
 
+import secrets
+
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -19,9 +21,9 @@ from app.core.login_methods import LoginMethod
 from app.core.security import decode_session_token, has_usable_password
 from app.models.platform.user import User
 from app.models.platform.user_passkey import UserPasskey
+from app.services.auth.oidc.flow_state import s256
 from app.services.platform import auth_posture
 from app.testing import create_user, registration_for, stub_registration
-
 
 BEGIN = "/api/v1/auth/register/passkey/begin"
 FINISH = "/api/v1/auth/register/passkey/finish"
@@ -73,6 +75,31 @@ async def test_an_account_is_made_with_a_key_instead_of_a_password(
 
     # And a way back to a password, since there is no reset to send.
     assert len(body["codes"]) > 0
+    # A browser keeps its refresh token in a cookie it never reads.
+    assert body["refresh_token"] is None
+
+
+async def test_the_app_finishes_the_account_it_began(client: AsyncClient, ceremony):
+    """The app begins with its S256 challenge, so only the verifier behind it
+    finishes the registration, wherever the prompt ran. The app keeps its own
+    refresh token, so the account stays signed in across a restart."""
+    verifier = secrets.token_urlsafe(48)
+    challenge = await _begin(client, code_challenge=s256(verifier))
+    credential = registration_for(challenge)
+    app = {"Origin": "https://studio.beyonders.initiative"}
+
+    refused = await client.post(
+        FINISH, json={**DETAILS, "credential": credential}, headers=app
+    )
+    assert refused.status_code == 400, refused.text
+
+    response = await client.post(
+        FINISH,
+        json={**DETAILS, "credential": credential, "code_verifier": verifier},
+        headers=app,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["refresh_token"]
 
 
 async def test_the_address_is_checked_before_the_browser_is_sent_anywhere(

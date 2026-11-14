@@ -14,58 +14,29 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  PropertyStep,
   PropertySummary,
   PropertyTarget,
-  PropertyValueInput,
   PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
 import { setProperties } from "@/api/generated/properties/properties";
 import { describes, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
-import type { FieldSave, FieldSaveState } from "@/lib/layouts/editing";
+import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { currentServerKey } from "@/lib/offlineSession";
-
-/** A change to some of an item's fields: what is sent, and how the item reads
- *  once it is saved. A change to its properties names only those it sets,
- *  takes off or steps, so one person's leaves another's standing. */
-export type ItemEdit<I, P> = { shows: Partial<I> } & (
-  | { patch: P }
-  | {
-      properties: { values: PropertyValueInput[]; removed?: number[]; steps?: PropertyStep[] };
-    }
-);
-
-/** One field's save, as {@link useItemFieldSave} answers it. */
-export type ItemFieldSave<I, P> = FieldSave & {
-  save: (edit: ItemEdit<I, P>, undo?: ItemEdit<I, P>) => Promise<boolean>;
-  error: unknown;
-  reset: () => void;
-};
-
-/**
- * An item being added, which nothing has saved yet: its fields' saves change
- * the copy the dialog holds, and Add makes it whole.
- */
-export interface ItemDraft {
-  /** Takes in one field's change. */
-  edit: (edit: ItemEdit<unknown, unknown>) => void;
-  /** Adds it, as Enter in a typed field does. */
-  submit: () => void;
-  /** Whether the field `id` shows a value it cannot take (a number left
-   *  empty), which Add waits for. */
-  hold: (id: string, holding: boolean) => void;
-  /** The fields changed so far, as Add sends them. */
-  sent: () => Record<string, unknown>;
-}
-
-export const ItemDraftContext = createContext<ItemDraft | null>(null);
+import {
+  type FieldSave,
+  type FieldSaveState,
+  ItemDraftContext,
+  type ItemEdit,
+  type ItemFieldSave,
+} from "@/ui/layouts/editing";
+import type { ItemSaves } from "@/ui/layouts/fieldEditors";
 
 /** How one kind of item is saved field by field. */
 export interface FieldSaveKind<I, P> {
@@ -110,6 +81,9 @@ export interface FieldSaveOptions<I, P> {
 }
 
 const SAVED_SHOWN_MS = 2_000;
+
+/** The answers that refuse a value, rather than fail to save it. */
+const REFUSED: ReadonlySet<number> = new Set([400, 422]);
 
 /** One save of some of an item's fields, as the mutation that sends it carries it. */
 interface FieldSaveCall<I, P> {
@@ -208,13 +182,13 @@ export const useHeldItem = <I extends object, P>(
 };
 
 /** {@link usePendingShown} over the item as `query` read it. */
-export const useShownWithPending = <I, P>(
+export const useShownWithPending = <I, P, E>(
   kind: FieldSaveKind<I, P>,
   id: number | null,
-  query: UseQueryResult<I>
-): UseQueryResult<I> => {
+  query: UseQueryResult<I, E>
+): UseQueryResult<I, E> => {
   const data = usePendingShown(kind, id, query.data);
-  return data === query.data ? query : ({ ...query, data } as UseQueryResult<I>);
+  return data === query.data ? query : ({ ...query, data } as UseQueryResult<I, E>);
 };
 
 /**
@@ -236,7 +210,7 @@ export const useItemFieldSave = <I, P>(
   id: number,
   label: string,
   options: FieldSaveOptions<I, P> = {}
-): ItemFieldSave<I, P> => {
+): ItemFieldSave<I, P> & { error: unknown; reset: () => void } => {
   const { t } = useTranslation("common");
   const drafting = useContext(ItemDraftContext);
   const communityId = useActiveCommunityId();
@@ -386,6 +360,7 @@ export const useItemFieldSave = <I, P>(
     retry: () => {
       if (last.current) void send(last.current.edit, last.current.undo);
     },
+    refused: REFUSED.has(getHttpStatus(error) ?? 0) ? getErrorMessage(error) : undefined,
   };
   return {
     ...field,
@@ -397,3 +372,27 @@ export const useItemFieldSave = <I, P>(
     },
   };
 };
+
+/** One holder per read of a row's properties, so a copy passed again is the
+ *  same copy ({@link useHeldItem}). */
+const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
+const holderOf = (properties: PropertySummary[]) => {
+  let holder = holders.get(properties);
+  if (!holder) {
+    holder = { properties };
+    holders.set(properties, holder);
+  }
+  return holder;
+};
+
+/** How the property editors save item `id` of `kind`: each field through
+ *  {@link useItemFieldSave}, its properties held by {@link useHeldItem}. */
+export const itemSaves = <I, P>(kind: FieldSaveKind<I, P>, id: number): ItemSaves<I, P> => ({
+  useSave: (label) => useItemFieldSave(kind, id, label),
+  useShown: (properties) =>
+    useHeldItem(
+      kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
+      id,
+      holderOf(properties)
+    ).properties,
+});

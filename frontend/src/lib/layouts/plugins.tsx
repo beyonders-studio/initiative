@@ -2,6 +2,7 @@ import { Check, ExternalLink, Minus } from "lucide-react";
 import {
   createContext,
   Fragment,
+  memo,
   type ReactNode,
   useContext,
   useId,
@@ -12,18 +13,19 @@ import { useTranslation } from "react-i18next";
 
 import {
   type CommunityPluginRead,
-  type DetailLayoutReadKind,
   ItemKind,
   MetadataType,
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
-import type { PluginFilterField } from "@/components/properties/PropertyFilter";
-import { PropertyValueCell, ScaleValue } from "@/components/properties/PropertyValueCell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import contract from "@/contract/manifest.contract.json";
+import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
+import { withParamAnswer } from "@/lib/widgets/pluginParams";
+import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -31,24 +33,23 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import contract from "@/contract/manifest.contract.json";
-import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { numberFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
-import { withParamAnswer } from "@/lib/widgets/pluginParams";
-import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
-
-import type { FieldDef, FieldRendererProps } from "./fields";
-import { Section } from "./section";
+} from "@/ui/dialog";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import type { FieldDef, FieldRendererProps } from "@/ui/layouts/fields";
+import type { LayoutPlugins } from "@/ui/layouts/LayoutEditor";
+import { Section } from "@/ui/layouts/section";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
+import { numberFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import type { PluginFilterField } from "@/ui/properties/PropertyFilter";
+import { PropertyValueCell, ScaleValue } from "@/ui/properties/PropertyValueCell";
 
 /** What a plug-in draws on an item from: the item, and the values it carries,
  *  a plug-in's among them by its install and key. */
 export type PluginItem = { id: number; properties?: PropertySummary[] };
 
-import type { LayoutNode } from "./tree";
+import type { LayoutNode } from "@/ui/layouts/tree";
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
 
 // What an install's pinned definition declares for items, as the SDK's
 // contract writes it (`fields`, `parts`, `actions`). Publishing checked it.
@@ -114,6 +115,9 @@ export type PluginActionDecl = {
  *  there, of what the server offers this reader. */
 export type PluginOnItems = {
   id: number;
+  /** The initiative it is met in, which an action's question asks its menus
+   *  for. */
+  initiativeId: number;
   /** The kind of item it is met on. */
   kind: PluginItemKind;
   /** What the community calls the install. */
@@ -133,7 +137,7 @@ export type PluginItemKind = ItemKind;
 
 /** The kind of item plug-ins draw on that a detail lays out, or null for one
  *  they draw nothing on (a file opened from a collection). */
-export const pluginKindOf = (kind: DetailLayoutReadKind): PluginItemKind | null =>
+export const pluginKindOf = (kind: string): PluginItemKind | null =>
   Object.hasOwn(ItemKind, kind) ? (kind as PluginItemKind) : null;
 
 /** What a block declares on one kind of item, of what the server offers the
@@ -169,55 +173,40 @@ const endpointParams = (definition: object): ReadonlyMap<string, PluginDataParam
 export const pluginsOnItems = (
   installs: Pick<
     CommunityPluginRead,
-    | "id"
-    | "name"
-    | "enabled"
-    | "definition"
-    | "item_initiatives"
-    | "item_fields"
-    | "item_parts"
-    | "item_actions"
-    | "setting_values"
+    "id" | "name" | "enabled" | "definition" | "item_access" | "setting_values"
   >[],
   initiativeId: number,
   kind: PluginItemKind = "task"
 ): ReadonlyMap<number, PluginOnItems> =>
   new Map(
-    installs
-      .filter((install) => install.enabled && install.item_initiatives.includes(initiativeId))
-      .map((install) => {
-        return [
-          install.id,
-          {
-            id: install.id,
-            kind,
-            name: install.name,
-            fields: declared<PluginFieldDecl>(
-              install.definition,
-              "fields",
-              "key",
-              install.item_fields,
-              kind
-            ),
-            parts: declared<PluginPartDecl>(
-              install.definition,
-              "parts",
-              "id",
-              install.item_parts,
-              kind
-            ),
-            actions: declared<PluginActionDecl>(
-              install.definition,
-              "actions",
-              "id",
-              install.item_actions,
-              kind
-            ),
-            endpoints: endpointParams(install.definition),
-            settings: install.setting_values ?? {},
-          },
-        ];
-      })
+    installs.flatMap((install) => {
+      const offered = install.item_access.find((one) => one.initiative_id === initiativeId);
+      if (!install.enabled || !offered) return [];
+      const plugin: PluginOnItems = {
+        id: install.id,
+        initiativeId,
+        kind,
+        name: install.name,
+        fields: declared<PluginFieldDecl>(
+          install.definition,
+          "fields",
+          "key",
+          offered.fields,
+          kind
+        ),
+        parts: declared<PluginPartDecl>(install.definition, "parts", "id", offered.parts, kind),
+        actions: declared<PluginActionDecl>(
+          install.definition,
+          "actions",
+          "id",
+          offered.actions,
+          kind
+        ),
+        endpoints: endpointParams(install.definition),
+        settings: install.setting_values ?? {},
+      };
+      return [[install.id, plugin] as const];
+    })
   );
 
 const NO_PLUGINS: ReadonlyMap<number, PluginOnItems> = new Map();
@@ -232,12 +221,14 @@ export const usePluginsOnItems = (
   const { data } = useCommunityPlugins({
     enabled: enabled && initiativeId != null && kind !== null,
   });
+  // Off means none, even where another reader has the community's plug-ins
+  // cached: a board drawn from no community shows none of its plug-ins.
   return useMemo(
     () =>
-      data && initiativeId != null && kind !== null
+      enabled && data && initiativeId != null && kind !== null
         ? pluginsOnItems(data.items, initiativeId, kind)
         : NO_PLUGINS,
-    [data, initiativeId, kind]
+    [enabled, data, initiativeId, kind]
   );
 };
 
@@ -300,6 +291,21 @@ const nodesOf = (node: LayoutNode): LayoutNode[] => [
   ...(node.children ?? []).flatMap(nodesOf),
 ];
 
+/** The parts of an install a tree can still place: each once, and none past
+ *  {@link MAX_PLUGIN_PARTS}. */
+export const addablePluginParts = <P extends { id: string }>(
+  tree: LayoutNode,
+  install: number,
+  parts: P[]
+): P[] => {
+  const placed = nodesOf(tree).flatMap((node) =>
+    node.type === "plugin" && Number(node.props?.plugin) === install
+      ? [String(node.props?.part)]
+      : []
+  );
+  return placed.length >= MAX_PLUGIN_PARTS ? [] : parts.filter((part) => !placed.includes(part.id));
+};
+
 /**
  * The plug-in fields an item's page already shows inside a part it draws, by
  * field id: a part the page places, the reader is offered, and whose tree
@@ -338,22 +344,25 @@ const pluginSummary = (values: PropertySummary[] | undefined, install: number, k
 const pluginValue = (values: PropertySummary[] | undefined, install: number, key: string) =>
   pluginSummary(values, install, key)?.value ?? null;
 
-/** Every field the installs show on a task, after the built-ins and properties. */
+/** Every field the installs show on a task, after the built-ins and properties,
+ *  each drawn as its install declares it. */
 export const pluginFields = (
   plugins: ReadonlyMap<number, PluginOnItems>,
   language: string
-): FieldDef[] =>
+): FieldDef<PluginItem>[] =>
   [...plugins.values()].flatMap((plugin) =>
     [...plugin.fields.values()].map(
-      (field): FieldDef => ({
+      (field): FieldDef<PluginItem> => ({
         id: pluginFieldId(plugin.id, field.key),
-        kind: "plugin",
+        render: memo((props: FieldRendererProps<PluginItem>) => (
+          <PluginField {...props} install={plugin.id} declared={field} />
+        )),
         source: "plugin",
         label: localized(field.name, language) ?? field.key,
         hideable: true,
         // What a plug-in fills is the plug-in's.
         requireable: false,
-        plugin: { install: plugin.id, field, on: plugin },
+        plugin: { install: plugin.id, name: plugin.name },
         value: (task) => {
           const value = pluginValue(task.properties, plugin.id, field.key);
           return draws(field, value) ? value : null;
@@ -361,6 +370,33 @@ export const pluginFields = (
       })
     )
   );
+
+/** The community's installs on the items a detail of `kind` lays out, as the
+ *  layout editor offers them, in the reader's language. */
+export const useLayoutPlugins = (
+  initiativeId: number | null | undefined,
+  kind: string | undefined
+): LayoutPlugins => {
+  const plugins = usePluginsOnItems(initiativeId, true, kind ? pluginKindOf(kind) : null);
+  const { language } = useTranslation().i18n;
+  return useMemo(
+    () => ({
+      fields: pluginFields(plugins, language),
+      shipped: shippedPluginParts(plugins),
+      installs: [...plugins.values()].map((plugin) => ({
+        id: plugin.id,
+        name: plugin.name,
+        parts: [...plugin.parts.values()].map((part) => ({
+          id: part.id,
+          name: localized(part.name, language) ?? part.id,
+          description: localized(part.description, language),
+        })),
+      })),
+      addable: addablePluginParts,
+    }),
+    [plugins, language]
+  );
+};
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -530,7 +566,7 @@ const PluginScalar = ({
         const link = value as { url: string; text?: unknown };
         return (
           <a
-            href={link.url}
+            href={sanitizeUrl(link.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-w-0 items-center gap-1 text-primary underline-offset-4 hover:underline"
@@ -660,9 +696,15 @@ const PluginValue = ({
 
 /** A plug-in field as a view draws it: its value in a cell, and its name
  *  beside its value on a card. */
-export const PluginField = ({ value, item, field, variant }: FieldRendererProps) => {
-  if (!field.plugin || value === null) return null;
-  const { install, field: declared } = field.plugin;
+const PluginField = ({
+  value,
+  item,
+  field,
+  variant,
+  install,
+  declared,
+}: FieldRendererProps<PluginItem> & { install: number; declared: PluginFieldDecl }) => {
+  if (value === null) return null;
   const drawn = (
     <PluginValue field={declared} kept={pluginSummary(item.properties, install, declared.key)} />
   );
@@ -675,14 +717,25 @@ export const PluginField = ({ value, item, field, variant }: FieldRendererProps)
   );
 };
 
-/** A plug-in field on a detail: its name above its value, which the
- *  plug-in alone changes, and the actions a list offers on each element. */
-export const PluginFieldOnDetail = ({ field, item }: { field: FieldDef; item: PluginItem }) => {
+/** A plug-in field on a detail, as an install among `plugins` declares it: its
+ *  name above its value, which the plug-in alone changes, and the actions a
+ *  list offers on each element. */
+export const PluginFieldOnDetail = ({
+  plugins,
+  field,
+  item,
+}: {
+  plugins: ReadonlyMap<number, PluginOnItems>;
+  field: FieldDef;
+  item: PluginItem;
+}) => {
   const inParts = useContext(FieldsInParts);
-  const runner = useActionRunner(field.plugin?.on.kind ?? "task", item.id);
-  if (!field.plugin || inParts.has(field.id)) return null;
-  const { install, field: declared, on } = field.plugin;
-  const kept = pluginSummary(item.properties, install, declared.key);
+  const on = field.plugin ? plugins.get(field.plugin.install) : undefined;
+  const runner = useActionRunner(on?.kind ?? "task", item.id);
+  const declared =
+    on && [...on.fields.values()].find((each) => pluginFieldId(on.id, each.key) === field.id);
+  if (!on || !declared || inParts.has(field.id)) return null;
+  const kept = pluginSummary(item.properties, on.id, declared.key);
   if (!draws(declared, kept?.value ?? null)) return null;
   return (
     <div className="space-y-1">
@@ -755,6 +808,7 @@ const PluginActionDialog = ({
               param={param}
               pluginId={asking.plugin.id}
               endpointId={asking.action.endpoint}
+              initiativeId={asking.plugin.initiativeId}
               values={values}
               open
               onChange={(key, value) =>
@@ -779,7 +833,7 @@ const PluginActionDialog = ({
 /** Runs a plug-in's actions on an item, asking first when the action says
  *  to, or asks for something. */
 const useActionRunner = (kind: PluginItemKind, itemId: number) => {
-  const { t, i18n } = useTranslation("common");
+  const { i18n } = useTranslation("common");
   const run = useRunPluginAction();
   const [asking, setAsking] = useState<Asking | null>(null);
   const start = (plugin: PluginOnItems, action: PluginActionDecl, element?: string) => {
@@ -817,7 +871,6 @@ const useActionRunner = (kind: PluginItemKind, itemId: number) => {
         confirmLabel={
           asking ? (localized(asking.action.name, i18n.language) ?? asking.action.id) : ""
         }
-        cancelLabel={t("cancel")}
         onConfirm={() => {
           if (asking) {
             run.mutate({
@@ -982,19 +1035,19 @@ const drawPart = (node: LayoutNode, drawing: Drawing): ReactNode => {
 /** One of a plug-in's parts on an item, drawn from its manifest's tree. A part
  *  the install no longer declares, or one placed where its plug-in does not
  *  reach the reader, draws nothing. */
-export const PluginPartView = ({
+const PluginPartView = ({
   plugins,
   pluginId,
   partId,
   item,
 }: {
-  plugins: ReadonlyMap<number, PluginOnItems> | undefined;
+  plugins: ReadonlyMap<number, PluginOnItems>;
   pluginId: number;
   partId: string;
   item: PluginItem;
 }) => {
   const { i18n } = useTranslation();
-  const plugin = plugins?.get(pluginId);
+  const plugin = plugins.get(pluginId);
   const runner = useActionRunner(plugin?.kind ?? "task", item.id);
   const part = plugin?.parts.get(partId);
   if (!plugin || !part) return null;
@@ -1011,3 +1064,16 @@ export const PluginPartView = ({
     </>
   );
 };
+
+/** The `plugin` part, which draws one of the parts the installs in `plugins`
+ *  declare, on whatever kind of item they were read for. */
+export const pluginParts = (plugins: ReadonlyMap<number, PluginOnItems>) => ({
+  plugin: <I extends PluginItem>(node: LayoutNode, item: I) => (
+    <PluginPartView
+      plugins={plugins}
+      pluginId={Number(node.props?.plugin)}
+      partId={String(node.props?.part)}
+      item={item}
+    />
+  ),
+});

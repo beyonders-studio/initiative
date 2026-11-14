@@ -5,9 +5,9 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from enum import Enum
-from typing import Optional
 
 import pytest
+from fastapi.routing import iter_route_contexts
 from pydantic import BaseModel, ValidationError
 
 import app.schemas as schemas_pkg
@@ -30,12 +30,12 @@ class _Color(str, Enum):
 
 class _Model(SanitizedBaseModel):
     name: str
-    display: Optional[TitleStr] = None
-    bio: Optional[str] = None
+    display: TitleStr | None = None
+    bio: str | None = None
     rich: RichTextStr = ""
-    rich_opt: Optional[RichTextStr] = None
+    rich_opt: RichTextStr | None = None
     raw: RawTextStr = ""
-    raw_opt: Optional[RawTextStr] = None
+    raw_opt: RawTextStr | None = None
     count: int = 0
     enabled: bool = False
     color: _Color = _Color.red
@@ -284,8 +284,8 @@ def _request_body_models() -> set[type[BaseModel]]:
             for info in model.model_fields.values():
                 walk(info.annotation)
 
-    for route in fastapi_app.routes:
-        if isinstance(route, APIRoute) and route.body_field is not None:
+    for route in iter_route_contexts(fastapi_app.routes):
+        if isinstance(route.original_route, APIRoute) and route.body_field is not None:
             walk(route.body_field.field_info.annotation)
     return found
 

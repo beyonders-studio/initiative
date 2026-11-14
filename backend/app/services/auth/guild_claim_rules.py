@@ -36,10 +36,11 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCMappingTargetType,
 )
 from app.schemas.platform.settings import (
-    ProviderPlacementRuleRead,
     CommunityClaimRuleCreate,
     CommunityClaimRuleRead,
     CommunityClaimRulesResponse,
+    CommunityClaimRuleUpdate,
+    ProviderPlacementRuleRead,
 )
 from app.services import audit as audit_service
 from app.services.platform import provider_placement
@@ -259,6 +260,32 @@ async def create_rule(
     )
     await session.commit()
     await session.refresh(row)
+    return _rule_read(row, providers={provider.id: provider}, initiative=initiative)
+
+
+async def update_rule(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    rule_id: int,
+    payload: CommunityClaimRuleUpdate,
+    actor_user_id: int | None = None,
+) -> CommunityClaimRuleRead:
+    """Change the group a rule reads or where it places people. Like adding
+    or removing one, it takes hold for each person at their next sign-in
+    through the provider."""
+    row = await _editable_rule(session, rule_id, guild_id=guild_id)
+    provider = await connected_provider(
+        session, guild_id=guild_id, provider_id=row.provider_id
+    )
+    initiative = await provider_placement.rewrite_rule(
+        session,
+        row,
+        payload.model_dump(exclude_unset=True),
+        fields=AUDITED_FIELDS,
+        actor_user_id=actor_user_id,
+        record={"via": "guild"},
+    )
     return _rule_read(row, providers={provider.id: provider}, initiative=initiative)
 
 

@@ -14,8 +14,8 @@ know is what a board is called; the fetch looks that up and passes it in.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 #: The Sprint field's type in Jira Software. Its field id differs per site,
 #: so it is found in the field catalog by this.
@@ -30,11 +30,11 @@ class Sprint:
     id: int
     name: str
     state: str
-    board_id: Optional[int]
+    board_id: int | None
     goal: str
-    start: Optional[str]
-    end: Optional[str]
-    completed: Optional[str]
+    start: str | None
+    end: str | None
+    completed: str | None
 
 
 def sprint_ref(sprint_id: int) -> str:
@@ -56,20 +56,20 @@ def sprint_field_ids(catalog: Any) -> list[str]:
     ]
 
 
-def _iso(value: Any) -> Optional[str]:
+def _iso(value: Any) -> str | None:
     """A Jira agile timestamp (``2024-03-04T09:30:00.000Z``) as UTC ISO."""
     if not isinstance(value, str) or not value:
         return None
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc).isoformat()
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).isoformat()
 
 
-def read_sprint(value: Any) -> Optional[Sprint]:
+def read_sprint(value: Any) -> Sprint | None:
     """One sprint as the Sprint field carries it, or ``None`` if it is not
     one — a site's data is somebody else's, and a malformed entry is skipped
     rather than trusted."""
@@ -111,7 +111,7 @@ def issue_sprints(issue: Any, field_ids: list[str]) -> list[Sprint]:
     return found
 
 
-def _event(sprint: Sprint) -> Optional[dict[str, Any]]:
+def _event(sprint: Sprint) -> dict[str, Any] | None:
     """The event a sprint becomes, or ``None`` for one with no dates yet.
 
     A sprint that was planned but never started has no stretch of time to
@@ -122,8 +122,7 @@ def _event(sprint: Sprint) -> Optional[dict[str, Any]]:
     end = sprint.end or sprint.completed or start
     if start is None or end is None:
         return None
-    if end < start:
-        end = start
+    end = max(end, start)
     lines = []
     if sprint.goal:
         lines.append(f"**Goal:** {sprint.goal}")
@@ -149,7 +148,7 @@ def build_sprint_calendars(
     Returns the envelopes and the ids of the sprints that became events.
     The rest had no dates, and the tasks in them keep no link to them.
     """
-    by_board: dict[Optional[int], list[dict[str, Any]]] = {}
+    by_board: dict[int | None, list[dict[str, Any]]] = {}
     placed: set[int] = set()
     ordered = sorted(sprints.values(), key=lambda s: (s.start or s.end or "", s.id))
     for sprint in ordered:

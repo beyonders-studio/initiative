@@ -34,30 +34,30 @@ keep in step. :mod:`app.api.v1.tenant_endpoints.tool_grants` reads it.
 # have to be real objects for FastAPI to read them.
 
 import inspect
-from functools import lru_cache
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Awaitable, Callable, List, Literal, Mapping, Optional
+from functools import cache
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
-from sqlalchemy import and_, func, literal, select, union_all
+from sqlalchemy import and_, any_, func, literal, select, union_all
 from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.api import resource_access
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
-    RLSSessionDep,
-    plugin_scope,
-    get_current_active_user,
     GuildContextDep,
+    RLSSessionDep,
+    get_current_active_user,
+    plugin_scope,
 )
-from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
-from app.api import resource_access
 from app.api.v1.tenant_endpoints import calendars as calendars_endpoints
 from app.api.v1.tenant_endpoints import contacts as contacts_endpoints
 from app.api.v1.tenant_endpoints import counters as counters_endpoints
@@ -66,7 +66,9 @@ from app.api.v1.tenant_endpoints import files as files_endpoints
 from app.api.v1.tenant_endpoints import posts as posts_endpoints
 from app.api.v1.tenant_endpoints import projects as projects_endpoints
 from app.api.v1.tenant_endpoints import wikis as wikis_endpoints
+from app.core.file_types import FileKind, FileType
 from app.core.messages import QueryMessages
+from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
 from app.core.tools import Tool
 from app.db.query import build_paginated_response
 from app.models.platform.user import User
@@ -75,24 +77,23 @@ from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.contact import Contact
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
-from app.core.file_types import FileKind, FileType
 from app.models.tenant.file import File
+from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
-from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.wiki import Wiki
-from app.schemas.tenant.collection import (
-    CollectionFileListResponse,
-    CollectionFileSummary,
-)
 from app.schemas.tenant.calendar import (
     CalendarListResponse,
     CalendarRead,
     CalendarSummary,
 )
+from app.schemas.tenant.collection import (
+    CollectionFileListResponse,
+    CollectionFileSummary,
+)
 from app.schemas.tenant.contact import (
-    ContactOrganization,
     ContactListResponse,
+    ContactOrganization,
     ContactRead,
     ContactSummary,
 )
@@ -103,8 +104,8 @@ from app.schemas.tenant.counter import (
 )
 from app.schemas.tenant.dashboard import (
     DashboardListResponse,
-    DashboardRead,
     DashboardPreview,
+    DashboardRead,
     DashboardSummary,
 )
 from app.schemas.tenant.file import (
@@ -116,25 +117,25 @@ from app.schemas.tenant.initiative import (
     ToolCountsResponse,
 )
 from app.schemas.tenant.post import PostListResponse, PostRead
-from app.schemas.tenant.timeline import TimelineResponse
 from app.schemas.tenant.project import ProjectListResponse, ProjectRead
+from app.schemas.tenant.timeline import TimelineResponse
+from app.schemas.tenant.tool import ToolSummaryBase, serialize_tool
 from app.schemas.tenant.wiki import (
     WikiListResponse,
     WikiRead,
     WikiSummary,
 )
-from app.schemas.tenant.tool import ToolSummaryBase, serialize_tool
 from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
-from app.services.tenant import comments as comments_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import collections as collections_service
+from app.services.tenant import comments as comments_service
 from app.services.tenant import contacts as contacts_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
-from app.services.tenant import posts as posts_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import posts as posts_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import timeline as timeline_service
 from app.services.tenant import tool_listing
@@ -161,7 +162,7 @@ class ListRequest:
 
     session: AsyncSession
     #: The person asking; ``None`` when an installed plug-in is.
-    user: Optional[User]
+    user: User | None
     guild_context: ActorContext
     values: dict[str, Any]
 
@@ -170,7 +171,7 @@ class ListRequest:
         return self.guild_context.guild_id
 
     @property
-    def user_id(self) -> Optional[int]:
+    def user_id(self) -> int | None:
         """The person asking, by id; ``None`` for an installed plug-in."""
         return self.guild_context.user_id
 
@@ -201,31 +202,29 @@ _TOOL_SORT_DESCRIPTION = (
 )
 
 
-def _initiative_id(description: Optional[str] = None) -> ListParam:
+def _initiative_id(description: str | None = None) -> ListParam:
     return ListParam(
-        "initiative_id", Optional[int], Query(default=None, description=description)
+        "initiative_id", int | None, Query(default=None, description=description)
     )
 
 
-def search_param(description: Optional[str] = _ROW_SEARCH_DESCRIPTION) -> ListParam:
+def search_param(description: str | None = _ROW_SEARCH_DESCRIPTION) -> ListParam:
+    return ListParam("search", str | None, Query(default=None, description=description))
+
+
+def sort_by_param(description: str | None = _TOOL_SORT_DESCRIPTION) -> ListParam:
     return ListParam(
-        "search", Optional[str], Query(default=None, description=description)
+        "sort_by", str | None, Query(default=None, description=description)
     )
 
 
-def sort_by_param(description: Optional[str] = _TOOL_SORT_DESCRIPTION) -> ListParam:
+def sort_dir_param(description: str | None = _SORT_DIR_DESCRIPTION) -> ListParam:
     return ListParam(
-        "sort_by", Optional[str], Query(default=None, description=description)
+        "sort_dir", str | None, Query(default=None, description=description)
     )
 
 
-def sort_dir_param(description: Optional[str] = _SORT_DIR_DESCRIPTION) -> ListParam:
-    return ListParam(
-        "sort_dir", Optional[str], Query(default=None, description=description)
-    )
-
-
-def _tag_ids(tool: Tool, description: Optional[str] = None) -> ListParam:
+def _tag_ids(tool: Tool, description: str | None = None) -> ListParam:
     """Every tool is taggable, so every list narrows by tag — ANY-of, the way a
     shelf is narrowed by what somebody remembers about a row rather than by
     everything that is true of it."""
@@ -233,7 +232,7 @@ def _tag_ids(tool: Tool, description: Optional[str] = None) -> ListParam:
         plural = tool.plural.replace("_", " ")
         description = f"Only {plural} carrying any of these tags."
     return ListParam(
-        "tag_ids", Optional[List[int]], Query(default=None, description=description)
+        "tag_ids", list[int] | None, Query(default=None, description=description)
     )
 
 
@@ -242,7 +241,7 @@ def _property_filters() -> ListParam:
     each a typed comparison against one property's value."""
     return ListParam(
         "property_filters",
-        Optional[str],
+        str | None,
         Query(
             default=None,
             description=(
@@ -258,7 +257,7 @@ def _property_filters() -> ListParam:
 def _archived(described: bool = True) -> ListParam:
     return ListParam(
         "archived",
-        Optional[bool],
+        bool | None,
         Query(
             default=None,
             description=archive_service.ARCHIVED_QUERY_DESCRIPTION
@@ -273,7 +272,7 @@ def _is_template(tool: Tool) -> ListParam:
     plural = tool.plural.replace("_", " ")
     return ListParam(
         "is_template",
-        Optional[bool],
+        bool | None,
         Query(
             default=None,
             description=(
@@ -289,7 +288,7 @@ def page_param() -> ListParam:
 
 
 def page_size_param(
-    default: int, *, ge: int, le: int, description: Optional[str] = None
+    default: int, *, ge: int, le: int, description: str | None = None
 ) -> ListParam:
     """A tool's page defaults, declared where they can be compared.
 
@@ -323,7 +322,7 @@ _NOT_FILTERS = frozenset(
 )
 
 
-@lru_cache(maxsize=None)
+@cache
 def list_filter_model(tool: Tool) -> type[BaseModel]:
     """What one tool's list can be narrowed by: its params, less the ones that
     place and order a page. Derived, so a filter the list gains is one every
@@ -339,7 +338,7 @@ def list_filter_model(tool: Tool) -> type[BaseModel]:
     )
 
 
-def _list_filters(tool: Tool, raw: Optional[str]) -> dict[str, Any]:
+def _list_filters(tool: Tool, raw: str | None) -> dict[str, Any]:
     """The list filters a request sent as JSON, checked against the tool's
     list; the ones it left out are not narrowing."""
     if not raw:
@@ -388,9 +387,9 @@ class ToolListSpec:
     model: Any
     response_model: Any
     #: (req) -> eager loads for the page query
-    loader_options: Callable[["ListRequest"], list]
+    loader_options: Callable[[ListRequest], list]
     #: (req) -> ORDER BY when the request asks for no sort
-    default_order: Callable[["ListRequest"], list]
+    default_order: Callable[[ListRequest], list]
     #: async (spec, req, rows) -> the response's ``items``
     serialize: Callable[..., Awaitable[list]]
     params: tuple[ListParam, ...]
@@ -401,25 +400,25 @@ class ToolListSpec:
     #: (``tool_grants.py``) answers with.
     read_row: Callable[..., Awaitable[Any]]
     #: What the sharing route's published description adds for this tool.
-    grants_note: Optional[str] = None
+    grants_note: str | None = None
     #: async (spec, req) -> the whole WHERE. Defaults to the shared set.
-    conditions: Optional[Callable[..., Awaitable[list]]] = None
+    conditions: Callable[..., Awaitable[list]] | None = None
     #: Rows belonging to the guild rather than to an initiative (``COMMUNITY_ROWS``).
     guild_level_rows: bool = False
     #: Send a reader whose page has fallen off the end back to the first one.
     clamp_page: bool = False
     #: Sort fields this tool offers beyond the shared three.
-    extra_sort_fields: Optional[dict[str, Any]] = None
+    extra_sort_fields: dict[str, Any] | None = None
     #: (req) -> statement transform applied before ORDER BY reads it.
-    refine: Optional[Callable[["ListRequest"], Callable[[Any], Any]]] = None
+    refine: Callable[[ListRequest], Callable[[Any], Any]] | None = None
     #: The views the tool's page shows one at a time, each as the list
     #: parameters that select it. Every count is a count of one of these lists.
     views: Mapping[str, Mapping[str, Any]] = field(
         default_factory=lambda: dict(DEFAULT_VIEWS)
     )
-    list_doc: Optional[str] = None
+    list_doc: str | None = None
     #: The OpenAPI tag, where it is not the tool's own plural.
-    tag: Optional[str] = None
+    tag: str | None = None
     #: Whether an installed plug-in may list this tool, under its read scope.
     serves_plugins: bool = True
 
@@ -466,7 +465,7 @@ PreviewLoader = Callable[[AsyncSession, int, list], Awaitable[Mapping[int, Any]]
 
 
 def _summaries(
-    schema: type[ToolSummaryBase], preview: Optional[PreviewLoader] = None
+    schema: type[ToolSummaryBase], preview: PreviewLoader | None = None
 ) -> Callable[..., Awaitable[list]]:
     """The ordinary page: tag the rows, count their comments where the summary
     reports them, then turn each into its summary. A tool whose card previews
@@ -547,7 +546,7 @@ async def _project_conditions(spec: ToolListSpec, req: ListRequest) -> list:
         initiative_id=values.get("initiative_id"),
     )
     if values.get("writable"):
-        conditions.append(Project.actions.any(Action.edit.value))
+        conditions.append(Action.edit.value == any_(Project.actions))
     return conditions
 
 
@@ -612,7 +611,7 @@ async def _serialize_files(spec: ToolListSpec, req: ListRequest, rows: list) -> 
 
 _COLLECTION_FILTER = ListParam(
     "collection_id",
-    Optional[int],
+    int | None,
     Query(default=None, description="Filter to the files in one collection"),
 )
 
@@ -633,9 +632,7 @@ async def _community_conditions(spec: ToolListSpec, req: ListRequest) -> list:
     return conditions
 
 
-_COMMUNITY_SCOPE = ListParam(
-    "scope", Optional[Literal["community"]], Query(default=None)
-)
+_COMMUNITY_SCOPE = ListParam("scope", Literal["community"] | None, Query(default=None))
 
 
 async def _contact_conditions(spec: ToolListSpec, req: ListRequest) -> list:
@@ -788,18 +785,18 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             _property_filters(),
             ListParam(
                 "untagged",
-                Optional[bool],
+                bool | None,
                 Query(default=None, description="Filter to files with no tags"),
             ),
             _is_template(Tool.file),
             ListParam(
                 "file_type",
-                Optional[FileType],
+                FileType | None,
                 Query(default=None, description="Filter by file type"),
             ),
             ListParam(
                 "kind",
-                Optional[FileKind],
+                FileKind | None,
                 Query(default=None, description="Filter by kind of file"),
             ),
             _COLLECTION_FILTER,
@@ -954,7 +951,7 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             ),
             ListParam(
                 "until",
-                Optional[datetime],
+                datetime | None,
                 Query(
                     default=None,
                     description=(
@@ -1045,7 +1042,7 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             _archived(),
             ListParam(
                 "is_organization",
-                Optional[bool],
+                bool | None,
                 Query(
                     default=None,
                     description="Only organizations (true) or only people (false).",
@@ -1221,13 +1218,13 @@ async def get_tool_counts(
     session: RLSSessionDep,
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
-    initiative_id: Optional[int] = Query(default=None),
+    initiative_id: int | None = Query(default=None),
     view: str = Query(
         default="active",
         description="The view the tag counts are for: active, archived, or "
         "templates for a tool that has them",
     ),
-    filters: Optional[str] = Query(
+    filters: str | None = Query(
         default=None,
         description="JSON object of the tool's own list filters, as its list "
         'route takes them (``{"search": "notes", "kind": "document"}``), '
@@ -1385,7 +1382,7 @@ def _collection_files(collection_id: int) -> ToolListSpec:
 
 _UNTIL_ADDED = ListParam(
     "until",
-    Optional[datetime],
+    datetime | None,
     Query(
         default=None,
         description=(
@@ -1477,7 +1474,7 @@ get_collection_files_timeline.__signature__ = _signature(
         ),
         ListParam(
             "tz",
-            Optional[str],
+            str | None,
             Query(
                 default=None,
                 description=(

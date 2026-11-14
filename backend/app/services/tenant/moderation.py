@@ -17,11 +17,14 @@ everything in that initiative.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from fastapi import HTTPException, status as http_status
-from sqlalchemy import Table, select as sa_select, text, tuple_
+from fastapi import HTTPException
+from fastapi import status as http_status
+from sqlalchemy import Table, text, tuple_
+from sqlalchemy import select as sa_select
 from sqlmodel import SQLModel, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -46,15 +49,16 @@ from app.core.tools import Tool
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import paginated_query
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform import user_profile_view
+from app.models.platform.guild import CommunityJoinPolicy
 from app.models.platform.user import User
 from app.models.tenant.moderation import ModerationReport, ModerationReportReporter
 from app.models.tenant.search_entry import SearchEntry
 from app.services import audit as audit_service
 from app.services.platform import evidence as evidence_service
 from app.services.platform.intake import CaseFiler, CaseOutcome, CaseRefs, open_case
-from app.db.request_context import SystemGuild
 
 if TYPE_CHECKING:
     from app.db.guild_standing import GuildContext
@@ -69,11 +73,9 @@ class ReportFiled:
     — but, for an ``illegal`` report the platform takes no cases about, where
     to tell whoever runs this server themselves."""
 
-    __slots__ = ("venue", "platform_contact")
+    __slots__ = ("platform_contact", "venue")
 
-    def __init__(
-        self, venue: ReportVenue, platform_contact: Optional[str] = None
-    ) -> None:
+    def __init__(self, venue: ReportVenue, platform_contact: str | None = None) -> None:
         self.venue = venue
         self.platform_contact = platform_contact
 
@@ -85,8 +87,8 @@ def _refuse(code: str) -> HTTPException:
 def check_report(
     *,
     reason: ReportReason,
-    detail: Optional[str],
-    legal_basis: Optional[LegalBasis],
+    detail: str | None,
+    legal_basis: LegalBasis | None,
     attached: int,
 ) -> None:
     """What a report must say for its reason. An ``illegal`` one names the
@@ -121,7 +123,7 @@ def public_relation(name: str) -> Table:
 
 async def _resolve_initiative(
     session: AsyncSession, target: SearchEntityType, target_id: int
-) -> Optional[int]:
+) -> int | None:
     """The initiative a community target belongs to, or ``None``.
 
     The initiative is read with the expression
@@ -159,15 +161,15 @@ async def _resolve_initiative(
 async def file_report(
     reporter_session: AsyncSession,
     *,
-    reporter: "User",
+    reporter: User,
     target: SearchEntityType | PlatformReportTarget,
     target_id: int,
     reason: ReportReason,
-    detail: Optional[str],
-    guild_id: Optional[int] = None,
-    evidence: Sequence["PreparedEvidence"] = (),
-    now: Optional[datetime] = None,
-    legal_basis: Optional[LegalBasis] = None,
+    detail: str | None,
+    guild_id: int | None = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    now: datetime | None = None,
+    legal_basis: LegalBasis | None = None,
 ) -> ReportFiled:
     """Route one report to whoever handles that kind of thing.
 
@@ -188,7 +190,7 @@ async def file_report(
     check_report(
         reason=reason, detail=detail, legal_basis=legal_basis, attached=len(evidence)
     )
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     venue = venue_for(target)
 
     if venue is ReportVenue.initiative:
@@ -278,10 +280,10 @@ async def _place_in_initiative(
     target: SearchEntityType,
     target_id: int,
     reason: ReportReason,
-    detail: Optional[str],
+    detail: str | None,
     moment: datetime,
-    evidence: Sequence["PreparedEvidence"] = (),
-    legal_basis: Optional[LegalBasis] = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    legal_basis: LegalBasis | None = None,
 ) -> int:
     """Open or join the community's report for this target, and return its
     id.
@@ -373,11 +375,11 @@ async def _tell_the_platform(
     reporter_id: int,
     target: SearchEntityType,
     target_id: int,
-    detail: Optional[str],
-    legal_basis: Optional[LegalBasis],
+    detail: str | None,
+    legal_basis: LegalBasis | None,
     moment: datetime,
-    evidence: Sequence["PreparedEvidence"],
-) -> Optional[str]:
+    evidence: Sequence[PreparedEvidence],
+) -> str | None:
     """Open the platform's case about an ``illegal`` report beside the
     community's, with the reporter following it, and mark the community's
     report as one the platform was told about. Returns the address to tell
@@ -389,8 +391,7 @@ async def _tell_the_platform(
     """
     from app.core.intake import IntakeStream as _Stream
     from app.services.platform import case_activity
-    from app.services.platform.intake import configured_operations_guild_id
-    from app.services.platform.intake import contact_for
+    from app.services.platform.intake import configured_operations_guild_id, contact_for
 
     opened = await _open_platform_case(
         target=target,
@@ -480,11 +481,11 @@ _GUILD_TARGETS = frozenset(
 
 async def _locate_as_reporter(
     *,
-    reporter: "User",
+    reporter: User,
     target: SearchEntityType,
     target_id: int,
-    guild_id: Optional[int],
-) -> Optional[tuple[int, int]]:
+    guild_id: int | None,
+) -> tuple[int, int] | None:
     """``(guild_id, initiative_id)`` for a target this reporter can see.
 
     On a request session from the community's cohort, routed as the reporter
@@ -523,11 +524,13 @@ async def _platform_target_visible(
     relation = public_relation(PLATFORM_TARGET_RELATION[target])
     stmt = sa_select(relation.c["id"]).where(relation.c["id"] == target_id)
     if target is PlatformReportTarget.directory_listing:
-        stmt = stmt.where(relation.c["is_community"].is_(True))
+        stmt = stmt.where(
+            relation.c["join_policy"] != CommunityJoinPolicy.private.value
+        )
     return (await reporter_session.exec(stmt)).first() is not None
 
 
-async def _listing_note(session: AsyncSession, listing_id: int) -> Optional[str]:
+async def _listing_note(session: AsyncSession, listing_id: int) -> str | None:
     """Which listing a report names, in the words the catalog uses.
 
     A listing's row id means nothing to the person triaging the case, so the
@@ -557,16 +560,16 @@ async def _open_platform_case(
     target: SearchEntityType | PlatformReportTarget,
     target_id: int,
     reason: ReportReason,
-    detail: Optional[str],
+    detail: str | None,
     moment: datetime,
-    note: Optional[str] = None,
-    reporters: tuple[tuple[int, Optional[str]], ...] = (),
-    guild_id: Optional[int] = None,
-    evidence: Sequence["PreparedEvidence"] = (),
-    evidence_by: Optional[int] = None,
-    legal_basis: Optional[LegalBasis] = None,
-    filer: Optional[CaseFiler] = None,
-) -> Optional[CaseOutcome]:
+    note: str | None = None,
+    reporters: tuple[tuple[int, str | None], ...] = (),
+    guild_id: int | None = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    evidence_by: int | None = None,
+    legal_basis: LegalBasis | None = None,
+    filer: CaseFiler | None = None,
+) -> CaseOutcome | None:
     """File the report as an intake case in the operations guild.
 
     Returns the case, or ``None`` where none opened. ``open_case`` answers ``None`` on
@@ -625,14 +628,14 @@ async def settle_report(
     *,
     report_id: int,
     outcome: ReportOutcome,
-    note: Optional[str],
+    note: str | None,
     decided_by: int,
     guild_id: int,
-    now: Optional[datetime] = None,
-    context: Optional["GuildContext"] = None,
-    hold: Optional["HoldWhy"] = None,
-    removal_reason: Optional[RemovalReason] = None,
-    message: Optional[str] = None,
+    now: datetime | None = None,
+    context: GuildContext | None = None,
+    hold: HoldWhy | None = None,
+    removal_reason: RemovalReason | None = None,
+    message: str | None = None,
 ) -> ModerationReport:
     """Close a community report. Every outcome closes it, and the ones that
     say something was done do it.
@@ -652,7 +655,7 @@ async def settle_report(
     A report the platform was told about as well notes on the platform's case
     how the community settled it.
     """
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     # Locked before it is read, so two moderators deciding at once resolve in
     # order: the second finds it settled rather than overwriting the first's
     # outcome, note and name. Not a key lock: the log row an act writes names
@@ -804,16 +807,16 @@ async def settle_report(
 
 async def _act_on_report(
     session: AsyncSession,
-    context: Optional["GuildContext"],
+    context: GuildContext | None,
     *,
     report: ModerationReport,
     outcome: ReportOutcome,
     decided_by: int,
     guild_id: int,
-    note: Optional[str],
-    removal_reason: Optional[RemovalReason],
-    message: Optional[str],
-) -> Optional[int]:
+    note: str | None,
+    removal_reason: RemovalReason | None,
+    message: str | None,
+) -> int | None:
     """Do what settling ``report`` as ``outcome`` says was done, and return
     the log row it wrote.
 
@@ -942,7 +945,7 @@ class TargetLocation:
     since a task needs its project's id to be addressed at all.
     """
 
-    __slots__ = ("entity_type", "entity_id", "tool", "tool_id")
+    __slots__ = ("entity_id", "entity_type", "tool", "tool_id")
 
     def __init__(
         self, entity_type: str, entity_id: int, tool: Tool, tool_id: int
@@ -963,9 +966,7 @@ class TargetPreview:
 
     __slots__ = ("excerpt", "location")
 
-    def __init__(
-        self, excerpt: Optional[str], location: Optional[TargetLocation]
-    ) -> None:
+    def __init__(self, excerpt: str | None, location: TargetLocation | None) -> None:
         self.excerpt = excerpt
         self.location = location
 

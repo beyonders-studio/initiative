@@ -40,12 +40,12 @@
   "errors": {
     "communityContext": "Impossible de déterminer le contexte de la communauté pour cette tâche.",
     "statusUpdate": "Impossible de mettre à jour le statut de la tâche.",
-    "statusNoMatch": "Impossible de mettre à jour le statut de la tâche : aucun statut correspondant."
+    "statusNoMatch": "Impossible de mettre à jour le statut de la tâche : aucun statut correspondant.",
+    "reorder": "Impossible de déplacer la tâche."
   },
   "updating": "Mise à jour…",
   "projectFallback": "Projet n° {{id}}",
   "edit": {
-    "loadingTask": "Chargement de la tâche…",
     "notFound": "Tâche introuvable",
     "notFoundDescription": "Cette tâche a peut-être été supprimée, ou le lien que vous avez suivi est rompu.",
     "noAccess": "Accès refusé",
@@ -53,7 +53,6 @@
     "backToProjects": "← Retour aux projets",
     "loadProjectError": "Impossible de charger le contexte du projet de cette tâche.",
     "createdBy": "Créée par {{name}} · {{time}}",
-    "createdAt": "Créée {{time}}",
     "readOnlyNoAccess": "Vous n'avez qu'un accès en lecture à ce projet ; les champs de la tâche sont donc désactivés.",
     "readOnlyArchived": "Ce projet est archivé. Désarchivez-le depuis les paramètres du projet pour modifier les tâches.",
     "aiGenerate": "Générer avec l'IA",
@@ -112,22 +111,17 @@
       "days_other": "{{count}} jours",
       "any": "N'importe quelle date"
     },
-    "loadError": "Liste Focus indisponible pour le moment.",
     "truncated": "Affichage des {{shown}} premières. Réduisez la période pour une liste plus courte.",
     "settingsHint": "Les tâches épinglées apparaissent toujours, quels que soient ces paramètres."
   },
   "myTasks": {
     "title": "Mes tâches",
     "noCommunity": "Aucune communauté",
-    "loadError": "Impossible de charger vos tâches.",
     "groupByDate": "Date",
     "groupByCommunity": "Communauté"
   },
   "myCalendar": {
     "title": "Mon calendrier"
-  },
-  "tagTasks": {
-    "loadError": "Impossible de charger les tâches."
   },
   "ai": {
     "fromComments_one": "Rédigé sans le commentaire de la tâche, qui ne tenait pas.",
@@ -182,11 +176,9 @@
   "move": {
     "title": "Déplacer la tâche vers un autre projet",
     "description": "Sélectionnez un projet de destination dans la communauté actuel. Vous ne pouvez déplacer des tâches que vers des projets où vous avez la permission de créer du travail.",
-    "loadError": "Impossible de charger les projets modifiables.",
-    "loading": "Chargement des projets disponibles…",
     "noProjects": "Vous n'avez encore aucun autre projet modifiable.",
     "searchPlaceholder": "Rechercher des projets…",
-    "statusResetWarning": "Déplacer cette tâche réinitialisera son statut à « À traiter ».",
+    "statusResetWarning": "Déplacer cette tâche lui donne le statut par défaut du projet de destination.",
     "moving": "Déplacement…",
     "moveTask": "Déplacer la tâche"
   },
@@ -199,8 +191,7 @@
     "noInitiatives": "Aucune initiative trouvée dans cette communauté.",
     "noProjects": "Aucun projet trouvé dans cette initiative.",
     "back": "Retour",
-    "searchProjects": "Rechercher des projets…",
-    "loadMore": "Charger plus"
+    "searchProjects": "Rechercher des projets…"
   },
   "bulkEdit": {
     "title": "Modifier les tâches",

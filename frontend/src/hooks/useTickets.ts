@@ -6,8 +6,6 @@
  * kind; nothing here reasons about bindings or entitlements.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   AppealTicketCreate,
   FeedbackTicketCreate,
@@ -16,32 +14,49 @@ import type {
   ModerationTicketCreate,
   SecurityTicketCreate,
   SupportTicketCreate,
-  TaskCaseRead,
   TaskRead,
   TicketAccepted,
   TicketAvailability,
 } from "@/api/generated/initiativeAPI.schemas";
-import { getReadTaskCaseQueryKey, readTaskCase, takeTaskCase } from "@/api/generated/tasks/tasks";
+import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
+import {
+  getReadTaskCaseQueryKey,
+  joinCaseToIdea,
+  joinIdeaIntoAnother,
+  takeTaskCase,
+  unjoinCaseFromIdea,
+  useReadTaskCase,
+} from "@/api/generated/tasks/tasks";
 import {
   fileTicket,
-  getListFiledTicketsQueryKey,
   getReadFiledTicketQueryKey,
-  getReadTicketAvailabilityQueryKey,
-  listFiledTickets,
-  readFiledTicket,
-  readTicketAvailability,
   replyToFiledTicket,
+  useListFiledTickets,
+  useReadFiledTicket,
+  useReadTicketAvailability,
 } from "@/api/generated/tickets/tickets";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
-import { docsUrl } from "@/lib/links";
+import { refreshIdeas } from "@/hooks/useIdeas";
 import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
-/** Where somebody is sent when there is neither a form nor an address. */
-export const FAQ_URL = docsUrl("faq/");
+/** A ticket's one line at most this long, as the column behind it. */
+export const SUBJECT_MAX = 200;
+
+/** The help a person asks for about a community, rather than themselves. */
+export const COMMUNITY_TOPICS: ReadonlySet<string> = new Set([
+  SupportTopic.community,
+  SupportTopic.data_request,
+]);
+
+/** A help request's one line, from the start of what somebody wrote. */
+export const firstLine = (text: string) => {
+  const line = text.trim().split("\n")[0]?.trim() ?? "";
+  return line.length > SUBJECT_MAX ? `${line.slice(0, SUBJECT_MAX - 1)}…` : line;
+};
 
 /** One filing, told apart by its stream, and an appeal by its type. */
 export type TicketCreate =
@@ -75,40 +90,32 @@ export const useTicketAvailability = (
   options?: QueryOpts<TicketAvailability>
 ) => {
   const params = communityId == null ? undefined : { community_id: communityId };
-  return useQuery<TicketAvailability>({
-    queryKey: getReadTicketAvailabilityQueryKey(params),
-    queryFn: () => readTicketAvailability(params),
-    staleTime: 5 * 60 * 1000,
-    ...options,
-  });
+  return useReadTicketAvailability(params, { query: { staleTime: 5 * 60 * 1000, ...options } });
 };
 
-export const useFileTicket = (options?: MutationOpts<TicketAccepted, TicketFiling>) =>
+export const useFileTicket = (
+  options?: MutationOpts<TicketAccepted, TicketFiling>,
+  /** What a failure says. Omit where the caller reads the refusal itself. */
+  errorKey?: string
+) =>
   useApiMutation<TicketAccepted, TicketFiling>(
     {
       // The ticket travels as JSON beside the files: one multipart body.
       mutationFn: ({ ticket, files }) => fileTicket({ payload: JSON.stringify(ticket), files }),
       // A filing with somebody to answer it joins the reader's own tickets.
       invalidate: () => invalidate(q.filedTickets()),
+      errorKey,
     },
     options
   );
 
 /** The tickets the reader filed, most recently moved first. */
 export const useFiledTickets = (options?: QueryOpts<FiledTicketList>) =>
-  useQuery<FiledTicketList>({
-    queryKey: getListFiledTicketsQueryKey(),
-    queryFn: () => listFiledTickets(),
-    ...options,
-  });
+  useListFiledTickets({ query: options });
 
 /** One ticket the reader filed, with what has been said to them about it. */
 export const useFiledTicket = (taskId: number, options?: QueryOpts<FiledTicketDetailRead>) =>
-  useQuery<FiledTicketDetailRead>({
-    queryKey: getReadFiledTicketQueryKey(taskId),
-    queryFn: () => readFiledTicket(taskId),
-    ...options,
-  });
+  useReadFiledTicket(taskId, { query: options });
 
 /** Answer on a ticket the reader filed. The answer comes back as the ticket. */
 export const useReplyToTicket = (
@@ -131,12 +138,12 @@ export const useReplyToTicket = (
  *  A task no stream opened answers 404, which is the usual answer. */
 export const useTaskCase = (taskId: number) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TaskCaseRead>({
-    queryKey: getReadTaskCaseQueryKey(communityId, taskId),
-    queryFn: () => readTaskCase(communityId, taskId),
-    enabled: Number.isFinite(taskId),
-    // Most tasks are not cases: a 404 is the usual answer, not a failure.
-    retry: false,
+  return useReadTaskCase(communityId, taskId, {
+    query: {
+      enabled: Number.isFinite(taskId),
+      // Most tasks are not cases: a 404 is the usual answer, not a failure.
+      retry: false,
+    },
   });
 };
 
@@ -163,6 +170,39 @@ export const useTakeCase = (options?: MutationOpts<TaskRead, number>) =>
       invalidate: (_task, taskId) =>
         Promise.all([invalidate(q.allTasks(), q.task(taskId)), refreshTaskCase(taskId)]),
       errorKey: "intake:case.takeFailed",
+    },
+    options
+  );
+
+/** What joining changes: the case, the lists an idea joined into another
+ *  leaves, and the ideas. */
+const refreshJoined = (taskId: number) =>
+  Promise.all([invalidate(q.allTasks(), q.task(taskId)), refreshTaskCase(taskId), refreshIdeas()]);
+
+/** Join a feedback case to an idea on the Ideas board, in place of any other;
+ *  `null` takes it off. Whoever sent it gets a vote. */
+export const useJoinCaseToIdea = (taskId: number, options?: MutationOpts<void, number | null>) =>
+  useCommunityMutation<void, number | null>(
+    {
+      mutationFn: (communityId, ideaTaskId) =>
+        ideaTaskId == null
+          ? unjoinCaseFromIdea(communityId, taskId)
+          : joinCaseToIdea(communityId, taskId, { idea_task_id: ideaTaskId }),
+      invalidate: () => refreshJoined(taskId),
+      errorKey: "intake:case.idea.failed",
+    },
+    options
+  );
+
+/** Join an idea into another: its votes and feedback move there, and it is
+ *  archived. */
+export const useJoinIdeaInto = (taskId: number, options?: MutationOpts<void, number>) =>
+  useCommunityMutation<void, number>(
+    {
+      mutationFn: (communityId, ideaTaskId) =>
+        joinIdeaIntoAnother(communityId, taskId, { idea_task_id: ideaTaskId }),
+      invalidate: () => refreshJoined(taskId),
+      errorKey: "intake:case.idea.failed",
     },
     options
   );

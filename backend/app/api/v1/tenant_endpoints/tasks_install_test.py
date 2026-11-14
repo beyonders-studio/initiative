@@ -9,8 +9,9 @@ install's own references.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlmodel import select
 
@@ -18,31 +19,31 @@ from app.core.messages import PluginMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.notification import Notification, NotificationType
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.relationship import EntityRelationship
-from app.models.tenant.task import Task
+from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.testing import (
-    create_resource_grant,
-    guild_url,
     create_project,
     create_relationship,
+    create_resource_grant,
     create_task,
-    route_session_to_guild,
     drain_notices,
+    guild_url,
+    route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
-
 
 READ = ["projects:read"]
 WRITE = ["projects:read", "projects:write"]
 
 
 def _at(day: str) -> datetime:
-    return datetime.fromisoformat(day).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(day).replace(tzinfo=UTC)
 
 
 async def _reference_for_seat(
@@ -305,7 +306,10 @@ async def test_creates_a_task_assigned_by_reference_and_names_nobody(
 
     await route_session_to_guild(session, gid)
     stored = await session.get(Task, body["id"])
-    assert stored is not None and stored.created_by is None
+    assert stored is not None and (stored.created_by, stored.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
 
     lines = await _assignment_lines(session, installed.seat.user.id)
     assert [line.data["assigned_by_name"] for line in lines] == [installed.plugin.name]
@@ -400,6 +404,71 @@ async def test_updates_moves_ticks_and_duplicates_what_it_may_write(
     assert_names_nobody(copied.text, [installed.seat.user.id, gid])
 
 
+async def test_a_rolling_repeat_it_completes_counts_days_in_the_zone_it_names(
+    client, session, acting_user, role_session
+):
+    """An install has no zone of its own, so the edit names one.
+
+    UTC's day lands a day off when the due time and the moment of completion
+    sit on different sides of midnight UTC, so the due time is picked to:
+    5pm at UTC-8 is the next day in UTC, while the completion, past 8am UTC,
+    is the same day; before 8am UTC it is the other way round, for 1am.
+    """
+    installed = await install_plugin(session, acting_user, role_session, granted=WRITE)
+    headers = install_headers(installed, WRITE)
+    gid = installed.guild.id
+    project_id = await _own_project(client, installed, headers, "Chores")
+    zone = ZoneInfo("Etc/GMT+8")
+    now = datetime.now(UTC)
+    hour = 17 if now.hour >= 8 else 1
+    due = (
+        (now - timedelta(days=3))
+        .astimezone(zone)
+        .replace(hour=hour, minute=0, second=0, microsecond=0)
+    )
+    created = await client.post(
+        guild_url(gid, "/tasks/"),
+        headers=headers,
+        json={
+            "project_id": project_id,
+            "title": "Water plants",
+            "due_date": due.isoformat(),
+            "recurrence": "RRULE:FREQ=DAILY",
+            "recurrence_strategy": "rolling",
+        },
+    )
+    assert created.status_code == 201, created.text
+    await route_session_to_guild(session, gid)
+    done = (
+        await session.exec(
+            select(TaskStatus).where(
+                TaskStatus.project_id == project_id,
+                TaskStatus.category == TaskStatusCategory.done,
+            )
+        )
+    ).first()
+    assert done is not None
+
+    completed = await client.patch(
+        guild_url(gid, f"/tasks/{created.json()['id']}"),
+        headers=headers,
+        json={"task_status_id": done.id, "tz": str(zone)},
+    )
+    assert completed.status_code == 200, completed.text
+
+    successor = (
+        await session.exec(
+            select(Task).where(
+                Task.project_id == project_id, Task.id != created.json()["id"]
+            )
+        )
+    ).one()
+    assert successor.due_date is not None
+    assert successor.due_date.astimezone(zone) == datetime.combine(
+        now.astimezone(zone).date() + timedelta(days=1), time(hour), zone
+    )
+
+
 async def test_duplicates_a_project_with_the_shipped_layouts(
     client, session, acting_user, role_session
 ):
@@ -481,8 +550,16 @@ async def test_makes_a_project_from_a_template_with_its_task_links(
             )
         )
     ).all()
-    assert [(e.relationship_type, e.target_id, e.created_by) for e in edges] == [
-        (RelationshipType.depends_on.value, copies["Design"], None)
+    assert [
+        (e.relationship_type, e.target_id, e.created_by, e.created_by_kind)
+        for e in edges
+    ] == [
+        (
+            RelationshipType.depends_on.value,
+            copies["Design"],
+            installed.plugin.id,
+            ActorKind.plugin,
+        )
     ]
 
 

@@ -12,8 +12,7 @@ import pathlib
 
 import pytest
 
-
-from app.core.builtin_announcements import BUILTIN_ANNOUNCEMENTS, builtin_by_key
+from app.core.builtin_announcements import BUILTIN_ANNOUNCEMENTS
 from app.core.version import compare_versions
 from app.schemas.platform.announcement import (
     IMAGE_PATH_PREFIX,
@@ -32,12 +31,6 @@ _ASSET_URL_PREFIX = "/announcement-images/"
 def test_slugs_are_unique():
     slugs = [announcement.slug for announcement in BUILTIN_ANNOUNCEMENTS]
     assert len(slugs) == len(set(slugs))
-
-
-def test_every_entry_is_findable_by_its_key():
-    for announcement in BUILTIN_ANNOUNCEMENTS:
-        assert builtin_by_key(announcement.key) is announcement
-    assert builtin_by_key("builtin:nothing-by-that-name") is None
 
 
 def test_every_entry_says_something():

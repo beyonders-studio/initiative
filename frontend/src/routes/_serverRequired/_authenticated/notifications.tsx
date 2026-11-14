@@ -1,20 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
 
-const NotificationsInboxPage = lazy(() =>
-  import("@/pages/user/NotificationsInboxPage").then((m) => ({
-    default: m.NotificationsInboxPage,
-  }))
-);
+import { NotificationsPage } from "@/pages/my/NotificationsPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/notifications")({
-  component: NotificationsRoute,
+  component: NotificationsPage,
 });
-
-function NotificationsRoute() {
-  return (
-    <Suspense fallback={null}>
-      <NotificationsInboxPage />
-    </Suspense>
-  );
-}

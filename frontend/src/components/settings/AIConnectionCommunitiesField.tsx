@@ -10,11 +10,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AIConnectionCommunity } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { usePlatformCommunities } from "@/hooks/useSettings";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { Field } from "@/ui/field";
 
 interface AIConnectionCommunitiesFieldProps {
   communities: AIConnectionCommunity[];
@@ -38,8 +38,14 @@ export const AIConnectionCommunitiesField = ({
     .map((row) => ({ value: String(row.id), label: row.name }));
 
   return (
-    <div className="space-y-2">
-      <Label>{t("aiConnections.communitiesLabel")}</Label>
+    <Field
+      label={t("aiConnections.communitiesLabel")}
+      hint={
+        communities.length > 0
+          ? t("aiConnections.communitiesHelpGiven")
+          : t("aiConnections.communitiesHelpNone")
+      }
+    >
       {communities.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {communities.map((community) => {
@@ -62,8 +68,7 @@ export const AIConnectionCommunitiesField = ({
           })}
         </div>
       )}
-      <AsyncCombobox
-        aria-label={t("aiConnections.communitiesLabel")}
+      <Combobox
         items={items}
         value={null}
         onValueChange={(value) => {
@@ -77,11 +82,6 @@ export const AIConnectionCommunitiesField = ({
         searchPlaceholder={t("aiConnections.communitiesSearch")}
         emptyMessage={t("aiConnections.communitiesEmpty")}
       />
-      <p className="text-muted-foreground text-xs">
-        {communities.length > 0
-          ? t("aiConnections.communitiesHelpGiven")
-          : t("aiConnections.communitiesHelpNone")}
-      </p>
-    </div>
+    </Field>
   );
 };

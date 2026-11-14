@@ -3,6 +3,7 @@
     "home": "Inicio de Initiative",
     "download": "Descargar",
     "pricing": "Precios",
+    "suggestions": "Sugerencias",
     "docs": "Documentación",
     "signIn": "Iniciar sesión",
     "signUp": "Registrarse",
@@ -380,10 +381,8 @@
     "readMoreAria": "Leer la entrada completa sobre Initiative {{version}}",
     "older": "Ver entradas anteriores",
     "back": "Todas las entradas",
-    "loading": "Cargando…",
     "empty": "Todavía no hay nada.",
-    "notFound": "No encontramos esa versión. Puede que aún no haya salido.",
-    "error": "No se han podido cargar las novedades. Espera un momento y vuelve a intentarlo."
+    "notFound": "No encontramos esa versión. Puede que aún no haya salido."
   },
   "meta": {
     "homeTitle": "Initiative: tu grupo tiene mucho entre manos, y es hora de tomar la Initiative",

@@ -7,7 +7,7 @@ so it names no address to look up.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import AuthProviderMessages
@@ -22,7 +22,6 @@ from app.testing.factories import (
     get_auth_headers,
 )
 from app.testing.oidc import ISSUER, FakeIdp
-
 
 OPERATOR_BASE = "/api/v1/settings/auth/providers"
 

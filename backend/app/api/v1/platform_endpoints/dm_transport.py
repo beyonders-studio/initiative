@@ -23,30 +23,28 @@ from fastapi import (
     status,
 )
 
-from app.api.deps import UserSessionDep, CurrentUser
-from app.core import audit_context
-from app.core import auth_context
+from app.api.deps import CurrentUser, UserSessionDep
+from app.core import audit_context, auth_context
 from app.core.messages import DirectMessageTransportMessages as Messages
 from app.core.rate_limit import limiter
 from app.core.user_display import handle_of
 from app.schemas.platform.dm_transport import (
     MAX_GROUP_MEMBERS,
     DmConversationCreate,
-    DmGroupCreate,
-    DmRosterCheckRequest,
-    DmRosterCheckResponse,
     DmConversationRead,
     DmConversationsResponse,
     DmDeviceRegistration,
-    DmDeviceSignature,
     DmDevicesResponse,
+    DmGroupCreate,
     DmOneTimeKeyBatch,
     DmOwnSessionKeysRequest,
-    DmSessionKeysRequest,
     DmQueueAck,
     DmQueueResponse,
+    DmRosterCheckRequest,
+    DmRosterCheckResponse,
     DmSendRequest,
     DmSendResponse,
+    DmSessionKeysRequest,
     DmSessionKeysResponse,
     DmVerificationInbox,
     DmVerificationSend,
@@ -95,29 +93,6 @@ async def register_device(
     return DmDevicesResponse(
         devices=await service.list_devices(session, user_id=current_user.id),
         device_id=device_id,
-    )
-
-
-@me_router.put("/dm/devices/{device_id}/signature", response_model=DmDevicesResponse)
-async def sign_device(
-    device_id: uuid.UUID,
-    body: DmDeviceSignature,
-    session: UserSessionDep,
-    current_user: CurrentUser,
-) -> DmDevicesResponse:
-    """Sign a device registered before signing, once, and replace the keys it
-    published with signed ones."""
-    await service.sign_device(
-        session,
-        user_id=current_user.id,
-        device_id=device_id,
-        signature=body.signature,
-        fallback_key=body.fallback_key,
-        one_time_keys=body.one_time_keys,
-    )
-    await session.commit()
-    return DmDevicesResponse(
-        devices=await service.list_devices(session, user_id=current_user.id)
     )
 
 

@@ -51,20 +51,41 @@ check_tsc() { frontend typecheck; }
 
 check_migrations() {
   # A revision already on the base branch is fixed; edit, rename or delete
-  # one and this fails. --no-renames reports a rename as the old path deleted,
-  # so the merged name is checked.
-  local edited
+  # one and this fails, unless a commit on the branch names it in an
+  # Edits-merged-migration trailer (an edit the owner ruled), or it is deleted
+  # at or before the chain's baseline (collapsed into it by
+  # backend/scripts/collapse_migrations.py). --no-renames reports a rename as
+  # the old path deleted, so the merged name is checked.
+  local edited named baseline status file name collapsed=0 unnamed=()
   if ! git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null; then
     error "Cannot compare against $BASE_REF: it does not exist here. Run 'git fetch origin dev', or set BASE_REF."
     return 1
   fi
-  edited=$(git diff --name-only --no-renames --diff-filter=MDT "$BASE_REF...HEAD" -- backend/alembic/versions)
-  if [[ -n "$edited" ]]; then
-    error "Edited, renamed or removed a merged migration: $(tr '\n' ' ' <<<"$edited")"
+  edited=$(git diff --name-status --no-renames --diff-filter=MDT "$BASE_REF...HEAD" -- backend/alembic/versions)
+  named=$(git log --format='%(trailers:key=Edits-merged-migration,valueonly)' "$BASE_REF..HEAD")
+  baseline=$(backend python -c "
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+print(ScriptDirectory.from_config(Config('alembic.ini')).get_base())
+")
+  while IFS=$'\t' read -r status file; do
+    [[ -z "$file" ]] && continue
+    name=$(basename "$file")
+    if [[ "$status" == D && ! "${name:0:13}" > "$baseline" ]]; then
+      collapsed=$((collapsed + 1))
+    elif grep -qxF "$name" <<<"$named"; then
+      echo "Merged migration edited, named in a commit: $file"
+    else
+      unnamed+=("$file")
+    fi
+  done <<<"$edited"
+  ((collapsed)) && echo "$collapsed merged revisions collapsed into the baseline $baseline."
+  if ((${#unnamed[@]})); then
+    error "Edited, renamed or removed a merged migration: ${unnamed[*]}"
     echo "Add a new revision instead (AGENTS.md, \"Never edit a migration\")."
     return 1
   fi
-  echo "No merged migration edited."
+  [[ -z "$edited" ]] && echo "No merged migration edited."
 
   # get_current_head() raises when the revisions have more than one head.
   backend python -c "

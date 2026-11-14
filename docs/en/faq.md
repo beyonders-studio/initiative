@@ -4,230 +4,284 @@ icon: lucide/circle-help
 
 # Frequently asked questions
 
-Short answers to what people actually ask, with a pointer to the longer version if you want one.
+Short answers to what people actually ask, each with a pointer to the longer version if you want it.
 
 ## Starting out
 
-??? question "Do I need to know project management to use this?"
-    No, and please don't go and learn any first. A project is a board. A task is a to-do on it. That is genuinely enough to run real work, and always has been.
+### Do I need to know project management to use this?
 
-    Roles, tools, dashboards, plug-ins — all there when you need them, silent until then. See [Getting started](getting-started/index.md).
+No, and please don't go learn any first. A project is a list of tasks, and a task is one thing somebody has to do. That's enough to run real work, and everything else stays out of your way until you go looking for it. See [Getting started](getting-started/index.md).
 
-??? question "There's a lot here. Where do I begin?"
-    Make a community. Make one initiative in it, named after what you're doing. Make one project. Put some tasks on it.
+### There's a lot here. Where do I begin?
 
-    That's it. You now have a working setup and you are allowed to stop. Come back for the rest of this only when something actually feels missing, which for a lot of groups is never. See [Your first community](getting-started/your-first-community.md).
+Make or join a community, make one initiative in it named after what you're doing, put one project in that, and add a few tasks. That's a working setup, and you're allowed to stop there.
 
-??? question "Is it free?"
-    Self-hosting is free and always will be. It's open source, and it's the complete product rather than a trimmed-down teaser.
+Come back for the rest when something feels missing, which for plenty of groups is never. See [Your first community](getting-started/your-first-community.md).
 
-    A paid hosted version is coming for people who'd rather not run a server, which is a completely reasonable thing to not want to do. See [Self-host or let us host it](self-host-or-hosted.md).
+### Is it free?
 
-??? question "Is all of it open source?"
-    The part you run is, under the AGPL — the app, every tool in it, the mobile builds.
+Hosting it yourself is free. It's open source, and it's the complete product rather than a trimmed-down teaser.
 
-    So are the [plug-in SDK](https://github.com/beyonders-studio/initiative-plugin-sdk) and the [GitHub plug-in](https://github.com/beyonders-studio/initiative-developer/tree/main/plugins/github), under MIT, if you fancy building a plug-in of your own.
+If you'd rather not run a server, Initiative Cloud is the paid version we host for you. See [Self-host or let us host it](self-host-or-hosted.md).
 
-    The pieces that exist only to run the hosted service are ours and stay closed. Nothing you self-host waits on them.
+### Is all of it open source?
 
-??? question "Can I add tools that aren't built in?"
-    Yes — the **marketplace** has ready-made dashboards and plug-ins, and adding one takes a couple of clicks and no code. It holds what ships with Initiative plus whatever the person running your server has approved, so if something's missing, they're who to ask. See [Plug-ins & the marketplace](guides/plugins-and-marketplace.md).
+Everything in the app you run is, under the AGPL-3.0: the server, the web app, and the phone and desktop apps.
 
-    A few plug-ins need something set up behind them first. The **GitHub integration** runs inside Initiative, so there's no extra program to run; on your own server it needs a GitHub App, which is one button and a confirmation on GitHub. **Automations** are ours and live only on the hosted service. See [Plug-ins that need something running behind them](self-host-or-hosted.md#plug-ins-that-need-something-running-behind-them).
+The [plug-in SDK](https://github.com/beyonders-studio/initiative-plugin-sdk) and the [plug-in registry](https://github.com/beyonders-studio/initiative-developer), which includes a GitHub plug-in to start your own from, are under the MIT license, in case you want to build a plug-in of your own.
+
+### Can I add tools that aren't built in?
+
+Yes. The **Marketplace** has ready-made dashboards, projects and plug-ins, and adding one takes a couple of clicks and no code. It holds what ships with Initiative plus what the person running your server lets in, so if something's missing, they're who to ask.
+
+A dashboard or a project goes into an initiative like anything else you make. A plug-in is added to the whole community, by its superadmin. A few plug-ins connect to another service and need setting up on the server first; see [Plug-ins that need something running behind them](self-host-or-hosted.md#plug-ins-that-need-something-running-behind-them). More in [Plug-ins & the marketplace](guides/plugins-and-marketplace.md).
 
 ## Getting in
 
-??? question "I can't find the community I was told to join"
-    Most communities are private and don't appear anywhere at all until you're invited. You're not missing a search box — there's nothing to search.
+### I can't find the community I was told to join
 
-    Ask whoever mentioned it for an invite link. That link takes you straight there once you've made an account.
+Most communities are invite-only and don't show up anywhere until you're invited, so there's nothing to search for. Ask whoever mentioned it for an invite link, which takes you straight there once you've made an account.
 
-    If your server runs a [community directory](guides/communities.md#finding-a-community-to-join), listed communities show up under **Join a community** on the rail. A community that hasn't listed itself won't be there however hard you look.
+If your server has a community directory, listed communities show up under **Join a community** on the rail. A community that hasn't listed itself won't be there however hard you look. See [Find a community to join](guides/communities.md#finding-a-community-to-join).
 
-??? question "I don't see 'Join a community'"
-    The directory is a server-wide feature that starts switched **off**, so plenty of servers don't have one. Everything there is invite-only.
+### I don't see "Join a community"
 
-??? question "My invite link doesn't work"
-    Links can expire, run out of uses, or be switched off by an admin. None of this is a judgement on you as a person. Ask for a fresh one — it takes them about four seconds.
+Your server doesn't run a community directory. It starts switched off, and whoever runs the server decides whether to turn it on, so on plenty of servers every community is invite-only.
 
-??? question "I don't see a 'Create community' button"
-    Some servers turn community creation off on purpose so people join through invites instead. Ask a community admin to invite you, or whoever runs the server to make one for you.
+### My invite link doesn't work
 
-??? question "The email never arrived"
-    Give it a few minutes, then check spam. It is almost always spam.
+Invite links can expire, run out of uses, or be deleted by an admin, and a link made for one person stops working once somebody has used it. None of this is a judgment on you as a person. Ask for a fresh one, which takes them about four seconds.
 
-    If it still hasn't turned up, the server may not have email configured at all — ask whoever runs it. Reset links also go stale, so if yours has been sitting there since Tuesday, request another. See [Signing in](getting-started/signing-in.md).
+### I don't see a "Create Community" button
 
-??? question "I've been signed out and can't get back in"
-    Changing your password signs out every device — that one's deliberate. If you didn't change it, use **Forgot password** on the sign-in screen. If your server uses single sign-on there may be no password to reset; sign in the way you normally do.
+Some servers turn community creation off, so people join through invites instead. Ask a community admin to invite you, or ask whoever runs the server to make a community for you.
 
-??? question "It says password sign-in is turned off"
-    Five wrong passwords or codes within fifteen minutes will do that, whoever typed them. Password and code sign-in switch off for fifteen minutes, and your email addresses get a note saying so. A second time the same day it's an hour; after that, four hours each time.
+### The email never arrived
 
-    Wait it out, or sign in with a passkey, which works the whole time. Or skip the wait: **Forgot password** on the sign-in screen emails you a link, and setting a new password from it turns sign-in straight back on.
+Give it a few minutes, then check your spam folder, which is where it almost always turns out to be.
+
+If it still hasn't turned up, the server may not have email set up, so ask whoever runs it. A password reset link lasts an hour and works once, so if yours has been sitting there since Tuesday, ask for another. See [Signing in](getting-started/signing-in.md).
+
+### I've been signed out everywhere
+
+Changing your password signs out your other devices and switches off your API keys, and setting a new one from a reset link signs out every device. That's on purpose.
+
+If you didn't change it, use **Forgot password?** on the sign-in screen to set a new one. If your server uses single sign-on, you may not have a password to reset, so sign in the way you normally do.
+
+### It says password sign-in is turned off
+
+Five wrong passwords or codes within 15 minutes turn password and code sign-in off for 15 minutes, whoever typed them, and your email addresses get a note saying so. A second lock within a day lasts an hour, and after that it's four hours each time.
+
+You don't have to wait it out. A passkey works the whole time, and so does any device that's already signed in. Or use **Forgot password?**, because setting a new password from the emailed link turns sign-in straight back on. Whoever runs the server can turn it back on for you too.
 
 ## The age question
 
-??? question "Why am I being asked my date of birth?"
-    Because you're joining a community that anyone signed in can find — from the directory, or through an invite into one. Those are open to people you've never met, and you need to be **16 or older** to join one.
+### Why am I being asked my date of birth?
 
-    You're asked once. The answer sticks to your account, so the second community asks nothing.
+Some communities and plug-ins have a minimum age, so a server that checks age asks every account once. That happens when you sign up, or the next time you open Initiative if your account doesn't have a date yet. Once you've answered, you're never asked again.
 
-??? question "What happens to the date?"
-    It's kept, encrypted, and used only to check age limits — a community's, or a plug-in's, which can differ by country. It's never shown back to anyone, you included, and it isn't sold or shared. Deleting your account deletes it.
+### What happens to the date?
 
-??? question "It was just an invite from a friend. Why was I asked?"
-    Because the community it leads to is a listed one — anyone signed in can find it. The question follows the community, not the way in.
+It's kept encrypted and used only to check age limits. It isn't shown to anybody, the people who run the server included, and it's never sold. It's erased along with your account.
 
-    An invite to a community that hasn't listed itself never asks, and neither does anything else on Initiative.
+### What does my age change?
 
-??? question "I've been in this community for months and it's only asking now"
-    Then nobody ever put the question to you: an admin added you, your workplace sign-in did, or the community listed itself after you joined. None of those had anyone at a keyboard to ask.
+On a server that checks age:
 
-    So it asks at the door instead, once. Everything else — your other communities, the rest of Initiative — stays open while you decide.
+| If you're | Then |
+|---|---|
+| Under the minimum age for an account where you live (between 13 and 16, depending on the country) | You can't have an account on that server |
+| Under 16 | You can't join communities that list themselves in the directory, or send private messages |
+| Under a plug-in's minimum age | That plug-in won't open for you, and its minimum can differ by country |
 
-??? question "My account can't reach anybody"
-    <a id="my-account-cant-message-anyone"></a>
+A community you were invited to that hasn't listed itself works the same at any age.
 
-    If you can't join communities you can see, it's almost always the age question. Two things look alike:
+### I entered the wrong date
 
-    | What you see | What it is | What to do |
-    |---|---|---|
-    | A date-of-birth box when you click Join | You haven't answered yet | Answer it. Once. |
-    | A box saying you told us you're not old enough | Your account answered as under 16 | Whoever runs the server can reset it — see below |
+The answer stands, because a question you can retry until it comes out right isn't much of a question. Whoever runs your server can reset it for you, which also erases the date you gave, and the reset is recorded. Where your server takes help requests, the message telling you you're not old enough has **Ask for help** on it.
 
-    Either way, everything inside the communities you already belong to still works, and so does the rest of Initiative. What the question stands in front of is joining a *listed* community.
+This is extremely common, and nobody is mad at you.
 
-    Extremely common, entirely fixable, and nobody is cross with you. Ask whoever runs your server to **reset the age question** — the box has an **Ask for help** button where the server takes help requests. Anyone on the support tier or above can do it, and it's recorded in the audit log like every other action taken on somebody's account.
+### A community I'm in says I'm not old enough
 
-    They can't see what you typed, incidentally, because it was never kept. Resetting simply lets you have another go.
+That community has listed itself in the directory, which opens it to anyone signed in, and listed communities are for people 16 and older. If your account answered under 16, that community stays closed to you while it's listed. Your other communities and the rest of Initiative carry on as normal. If the date you gave was wrong, see the answer above.
 
-    !!! info "Why you can't simply re-answer"
-        A question you can retry until it comes out right isn't really a question. So the answer stands, and undoing it takes somebody else — which is why the reset is logged.
+### Can the age check be switched off?
 
-??? question "Can this be switched off?"
-    Yes, by the platform owner under **Settings › Platform › Community**. Switching it off is the owner confirming that every account on the deployment belongs to someone 18 or older — which a company or school rollout knows and a public server doesn't. See [Data & compliance](security/data-and-compliance.md).
+Yes, by the server's owner, with **Check members' age** under **Platform Settings** › **Community**. Turning it off is the owner confirming that everyone on the server is 18 or older, which a company or a school knows and a public server doesn't. See [Data & compliance](security/data-and-compliance.md).
 
 ## Finding things
 
-??? question "I can't find a project or file I know exists"
-    Two likely reasons: you're in a **different community** (check the rail down the far-left edge), or it hasn't been **shared** with you. Fastest way to check is search — ++cmd+k++ / ++ctrl+k++ and type its name. See [Search & shortcuts](guides/search-and-shortcuts.md).
+### I can't find a project or file I know exists
 
-??? question "A link to something says 'not found' and I know it's there"
-    If you're not a member of the initiative it lives in, Initiative hides it completely — so a direct link says "not found" rather than "access denied". Ask to be added to the initiative. See [Sharing & access](sharing/index.md).
+Usually you're in a different community (check the rail down the left edge), or it hasn't been shared with you. The fastest check is search: press ++cmd+k++ or ++ctrl+k++ and type its name. If it might be archived, turn on **Include archived**. See [Search & shortcuts](guides/search-and-shortcuts.md).
 
-??? question "My Tools doesn't show everything in my community"
-    It isn't meant to. My Tools and My Calendar show what has reached *you*: shared with you, shared with a role you hold, or shared with everyone in an initiative you're in. It's a working list, not an inventory. Open a single initiative to see all of its work. See [Your space](guides/your-space.md#my-tools).
+### A link says "not found" and I know the thing exists
 
-??? question "I'm a community admin. Why isn't every initiative in my sidebar?"
-    Because navigation follows what you're *in*, not what you *may reach* — otherwise a community with a hundred initiatives buries the three you actually work in. Your authority hasn't changed: open any initiative and you see all of it. To keep one to hand, join it from the community front page (you walk straight in). See [Community admins join like everyone else](guides/initiatives.md#community-admins-join-like-everybody-else).
+If you're not in the initiative it lives in, Initiative hides it completely, so a direct link says "not found" rather than "access denied". Ask to be added to the initiative.
+
+If you are in the initiative and the thing just hasn't been shared with you, the link says **You need access** instead, and **Request access** asks whoever can share it. See [Sharing & access](sharing/index.md).
+
+### My Tools doesn't show everything in my community
+
+It isn't meant to. **My Tools** and **My Calendar** show what has reached you: things shared with you, with a role you hold, or with everyone in an initiative you're in. They're a list of your work rather than an inventory of the community, and being an admin doesn't widen them.
+
+To see everything in one initiative, open the initiative. See [Your space](guides/your-space.md#my-tools).
+
+### I'm a community admin. Why isn't every initiative in my sidebar?
+
+Your sidebar follows what you're in, rather than everything you could open, so a community with a hundred initiatives doesn't bury the three you work in. You can still open any initiative and see all of it.
+
+To keep one in your sidebar, join it. **Join** on the community front page lets you straight in, even where other people have to ask. Invite-only initiatives aren't listed there, so for one of those, make yourself one of its **Project managers** under **Community Settings** › **Initiatives**. See [Initiatives](guides/initiatives.md).
 
 ## Tasks and projects
 
-??? question "Can a task have more than one person on it?"
-    Yes, as many as you like. See [Projects & tasks](guides/projects-and-tasks.md).
+### Can a task have more than one person on it?
 
-??? question "I moved a task to another project and its status changed"
-    Expected. Projects can each have their own statuses, so a moved task lands on the new project's default status. Set the one you want and carry on.
+Yes, as many as you like, as long as each of them can open the project. See [Projects & tasks](guides/projects-and-tasks.md).
 
-??? question "How do I clear out finished tasks without deleting them?"
-    **Archive** them. There's a one-click "Archive done tasks", and you can filter archived tasks back into view whenever you want. Nothing is lost.
+### I moved a task to another project and its status changed
 
-??? question "I deleted something by accident"
-    It's fine. It's in the **Trash** — Community settings for shared things, your own Trash for your own items — and it sits there for a good while before going anywhere permanent.
+That's expected. Each project can have its own statuses, so a moved task lands on the new project's default one. Set the status you want and carry on.
 
-    Go and get it back, and then go and have a cup of tea. See [Trash and retention](guides/communities.md#trash-and-retention).
+A move also takes off anybody assigned who can't open the new project, and a task moved into another initiative leaves its custom fields behind.
 
-??? question "An import didn't match people to their accounts"
-    Exports and imports identify people by **handle** (`foobar#1234`), because a handle is the same in every community and an email address isn't. A file that names people by email address won't match anyone, so export it from Initiative again. See [Exporting a project](guides/projects-and-tasks.md#exporting-a-project).
+### How do I clear out finished tasks without deleting them?
+
+Archive them. **Archive done tasks** sits under the task table and at the bottom of each done column on the board, and it asks before it does anything.
+
+To see archived tasks again, open **Filters** and turn on **Show archived**. Nothing is lost.
+
+### I deleted something by accident
+
+It's fine. Everything you deleted is under **My Settings** › **Trash**, ready to restore. Community admins also have the community's whole trash, under **Community Settings** › **Trash**.
+
+Things wait there for 90 days unless the community chose a different period, and you can put them back any time before then. Go get it, and then go get a coffee. See [Bring back something deleted](guides/running-a-community.md#trash-and-retention).
+
+### An import didn't match people to their accounts
+
+Initiative's own exports name people by their handle (`jordan#1234`), because a handle is the same in every community and an email address isn't. An import matches people by exact handle, so a file that names them some other way won't match anyone. Export it from Initiative again and import that file. See [Projects & tasks](guides/projects-and-tasks.md).
 
 ## Your account
 
-??? question "Can I change my username?"
-    Not on your own — your handle is how people find and mention you, so changing it is a job for whoever runs the server. What you *can* change any time is your **display name**, one per community — see [Your name in a community](guides/communities.md#your-name-in-a-community).
+### Can I change my username?
 
-??? question "Why does my name show in one community and not another?"
-    A display name belongs to the community you set it in. Every other community shows your handle until you set one there too, with **Set your display name** at the top of its **Members** page.
+Not by yourself. Your handle is how people find and mention you, so changing it is up to the server's staff, and the number after it stays the same. The one exception is an account that was given a username automatically, whose owner gets to pick a name once.
 
-??? question "Due dates and reminders are a few hours off"
-    Your **timezone** is wrong. It's almost always the timezone. Fix it in **My Settings → Preferences** and everything snaps back into place.
+What you can change any time is your display name, which you set separately in each community. See [Choose your name in a community](guides/communities.md#your-name-in-a-community).
 
-??? question "I'm getting too many (or too few) emails"
-    Tune them row by row in **My Settings → Notifications**, one row for each way something involves you, each with its own **Bell**, **Email**, **Mobile** and **Desktop** switch, and there's no minimum. A community you'd rather hear less from has its own switches, and **Mute**. **Do not disturb**, further down, has **Quiet hours** and **Pause notifications**. See [Notifications](guides/notifications.md).
+### Why does my name show in one community and not another?
 
-??? question "How do I leave a group?"
-    On the community rail, open the community's menu and choose **Leave community**. Members and admins leave freely. If you're the community's only **superadmin**, you'll be made to hand the seat to somebody else first — you can't simply slip out and leave nobody holding the keys.
+A display name belongs to the community you set it in. Every other community shows your handle until you set one there too, with **Set your display name** at the top of its **Members** page.
 
-??? question "My account says it's suspended"
-    You can sign in, and you get one screen: that you're suspended, the reason the moderator gave if they gave one, and how to appeal. Nothing else opens while it lasts — not your communities, not your own settings.
+### Due dates and reminders are a few hours off
 
-    Where the server takes appeals, **Appeal** on that screen sends one to its moderators. You follow it on the same screen, and they can write back to you there; you can have one appeal open at a time, and appeal again once it's closed. Where the server takes none, the screen gives the address to write to instead.
+Check your time zone, because it's almost always the time zone. Fix it under **My Settings** › **Preferences** › **Timezone** and everything snaps back into place.
 
-    Nothing is taken away. Memberships, work, everything you wrote stays exactly where it is, and lifting the suspension hands the account back whole.
+### I'm getting too many (or too few) emails
 
-??? question "One of my communities has a lock on it"
-    It's suspended. Nobody in it can open it while that lasts, its admins included, which is why you're looking at a lock rather than the usual front page. Opening it says who to contact, with **Ask for help** where the server takes help requests.
+Tune them under **My Settings** › **Notifications**. **What you hear about** has a row for each way something can involve you, and each row has its own **Bell**, **Email**, **Mobile** and **Desktop** switch. **Email arrives** can gather your email into one message an hour, a day or a week.
 
-    Nothing inside has been changed or deleted, and it all comes back as it was when the suspension is lifted. Members don't see the community at all in the meantime, so if people ask where it went, now you know.
+A community you'd rather hear less from has its own row under **Per community**, with **Mute**. **Do not disturb** holds **Quiet hours** and **Pause notifications**. See [Notifications](guides/notifications.md).
 
-??? question "What's the difference between deactivating and deleting my account?"
-    **Deactivating** is reversible — switched off, data kept. **Deleting** is permanent, and you choose whether your past contributions are anonymized or removed outright. See [Closing your account](account/profile-and-preferences.md#closing-your-account).
+### How do I leave a community?
+
+Right-click the community on the rail, or press and hold it on a phone, and choose **Leave community**. Anything you owned there is left for an admin to hand on.
+
+If you're the community's only superadmin, you'll need to make somebody else superadmin first, unless nobody else is in it. See [Communities](guides/communities.md).
+
+### My account says it's suspended
+
+You can still sign in, and you'll see one screen: that you're suspended, the reason if the moderator gave one, and how to appeal. Nothing else opens while it lasts, your communities and your own settings included.
+
+Where the server takes appeals, **Appeal** on that screen sends one to its moderators. You follow it on the same screen, and they can write back to you there. You can have one appeal open at a time, and appeal again once it's closed. Where the server takes none, the screen tells you who to contact instead.
+
+Nothing is taken away. Your memberships and your work stay where they are, and lifting the suspension hands the account back whole.
+
+### One of my communities has a lock on it
+
+It's suspended, and nobody can open it while that lasts, its admins included. Opening it says who to contact, with **Ask for help** where the server takes help requests.
+
+If you can see the lock, you're one of its admins. Everybody else doesn't see the community at all for now, so if people ask where it went, now you know. Nothing inside has been changed or deleted, and it all comes back as it was when the suspension is lifted.
+
+### What's the difference between deactivating and deleting my account?
+
+**Deactivating** switches your account off and keeps it. Your name, email and work stay put, but you're taken out of every community, and only whoever runs the server can switch the account back on.
+
+**Deleting** makes your account disappear for everyone straight away, and erases it after a while (30 days, unless your server says otherwise). Sign back in before then and the deletion is called off. Once it's erased, your projects pass to other people, and your comments and files stay under "Deleted user".
+
+Both are at the bottom of **My Settings** › **Account**, under **Close your account**. See [Profile & preferences](account/profile-and-preferences.md).
 
 ## Privacy and data
 
-??? question "Can everyone in my community see everything in it?"
-    No. Being in a community doesn't hand you its contents.
+### Can everyone in my community see everything in it?
 
-    An **initiative** is only visible to the people added to it, and individual projects and files narrow it down further still. The one exception is a **community admin**, who can see everything in their own community, because somebody has to be able to. See [Sharing & access](sharing/index.md).
+No. An initiative's work is visible only to the people in it, and each project or file can be narrowed further. The exception is community admins, who can open everything in their own community, because somebody has to be able to. See [Sharing & access](sharing/index.md).
 
-??? question "How do I keep something visible to just two or three people?"
-    Put it in an initiative with only those people in it.
+### How do I keep something visible to just two or three people?
 
-    That's the strongest everyday boundary in the whole app, and it needs no configuration whatsoever — everybody else simply doesn't have it. To narrow further inside an initiative, share the specific project or file.
+Put it in an initiative with only those people in it. That's the strongest everyday boundary in Initiative, and it needs no setup, because everybody else isn't in the initiative to begin with.
 
-??? question "Can other groups on the same server see our stuff?"
-    No. Each community's data is separated at the database level. See [How your data is kept separate](security/how-your-data-is-kept-separate.md).
+To narrow something down inside an initiative, change its sharing. New things start out readable by everyone in the initiative, so switch it to **Restricted** and add the people you want. See [Sharing](sharing/sharing-projects-and-files.md).
 
-??? question "Can a community admin, or whoever runs the server, read our private initiative?"
-    A **community admin** can see everything in their own community — that's part of running it. Platform staff on a hosted service get in only through **temporary, recorded** access that expires on its own. See [Platform roles](running-a-server/platform-roles.md).
+### Can other groups on the same server see our stuff?
 
-??? question "Can a community admin read my direct messages?"
-    No. Messages are end-to-end encrypted, so they're readable on the devices in the conversation and nowhere else — not by an admin, not by whoever runs the server, not by us. They're also not community content, so they're not in exports or search. See [Private messages](security/private-messages.md).
+No. Each community's data is kept apart at the database level. See [How your data is kept separate](security/how-your-data-is-kept-separate.md).
 
-??? question "Can I message more than one person at once?"
-    Yes — start a conversation and keep adding people. Everyone is asked before anything reaches them, nobody can be added to it afterwards, and it's called by who's on it rather than having a name. See [Talking to a few people at once](guides/messages.md#talking-to-a-few-people-at-once).
+### Can a community admin, or whoever runs the server, read our private initiative?
 
-??? question "Why don't my messages show up on my new phone?"
-    Because there's no copy on the server for it to catch up from — that's what end-to-end encryption costs. Each device keeps its own history from the moment it joined a conversation, and signing out of a browser takes its copy with it. See [Your messages live on your devices](guides/messages.md#your-messages-live-on-your-devices).
+A community admin can open everything in their own community, which is part of running it. Server staff get in only through a grant that has a time limit, leaves a record and expires on its own. See [Platform roles](running-a-server/platform-roles.md).
 
-??? question "Somebody posted something that shouldn't be there"
-    Use **Report** on it. It's on comments, notices, pictures, profiles and directory listings, and it goes to the right people by itself: anything a community holds reaches that community's moderators, and anything about an account reaches whoever runs the server.
+### Can a community admin read my private messages?
 
-    Private messages are never moderated, so they carry no Report. To stop hearing from somebody there, ignore them under **My Settings → Privacy → Ignored accounts**.
+No. Messages are end-to-end encrypted, so they can be read on the devices in the conversation and nowhere else. That rules out an admin, whoever runs the server, and us. They aren't community content either, so they never turn up in an export or in search. See [Private messages](security/private-messages.md).
 
-??? question "Where is my data stored?"
-    If you host Initiative yourself: wherever your server runs, and that's your call. If we host it: where our service runs. Either way it stays yours. See [Data & compliance](security/data-and-compliance.md).
+### Can I message more than one person at once?
 
-??? question "Can I get my data out?"
-    Yes. Every tool you own exports from its **Settings → Advanced**: projects to a portable file, spreadsheets to CSV or Excel, calendars to `.ics`, and so on. See [Getting your data out](security/data-and-compliance.md#getting-your-data-out).
+Yes, up to 40 people in one conversation. Everyone has to be somebody the others can message, everyone is asked before anything reaches them, and nobody can be added once it has started. See [Messages](guides/messages.md).
+
+### Why aren't my messages on my new phone?
+
+There's no copy on the server for it to catch up from, which is what end-to-end encryption means. When a new device signs in, your other devices ask you to verify it, and choosing **Send it my message history** there brings it up to date. Signing out of a browser deletes that browser's copy. See [Your messages live on your devices](guides/messages.md#your-messages-live-on-your-devices).
+
+### Somebody posted something that shouldn't be there
+
+Use **Report** on it. You'll find it on comments, posts, events, wiki pages, profiles, community listings in the directory, and the marketplace.
+
+A report finds the right people by itself. Anything inside an initiative goes to that initiative's moderators, and anything about an account, a community listing or the marketplace goes to whoever runs the server.
+
+Private messages can't be reported, because nobody outside the conversation can read them. To stop hearing from somebody there, choose **Ignore** on them. Everyone you've ignored is listed under **My Settings** › **Privacy** › **Ignored accounts**.
+
+### Where is my data stored?
+
+If you host Initiative yourself, it's wherever your server runs, and uploads go to a folder or to S3-compatible storage, whichever you set up. On Initiative Cloud, it's with us. Either way it stays yours. See [Data & compliance](security/data-and-compliance.md).
+
+### Can I get my data out?
+
+Yes. Each project, file and other tool exports from its own **Settings** › **Advanced** › **Export**, for whoever can delete it. Projects come out as an importable file, PDF, CSV or Excel, spreadsheets as CSV, Excel or JSON, calendars as iCalendar (`.ics`), and text documents as PDF, Markdown or Word.
+
+A community's superadmin can also export the whole community at once, from **Community Settings** › **Data**. See [Data & compliance](security/data-and-compliance.md).
 
 ## If you run the server
 
-??? question "How do I update to a new version?"
-    Back up, then `docker compose pull` and `docker compose up -d`. Migrations run themselves. See [Backups & updates](running-a-server/backups-and-updates.md).
+### How do I update to a new version?
 
-??? question "What do I need to back up?"
-    The database and the uploads, together and regularly — plus keep your `SECRET_KEY` somewhere safe so a restore can actually decrypt.
+Back up first, then run `docker compose pull` and `docker compose up -d`. Database changes run on their own when the new version starts. See [Backups & updates](running-a-server/backups-and-updates.md).
 
-??? question "Can I connect our company login?"
-    Yes — Initiative speaks OIDC, including mapping your provider's groups to communities and roles. See [Single sign-on](running-a-server/single-sign-on.md).
+### What do I need to back up?
+
+The database and the uploads (a folder, or your S3-compatible storage), together and regularly. Keep your `SECRET_KEY` somewhere safe too, because some stored data is encrypted with it, and a restore can't read that data without the same key.
+
+### Can people sign in with our company's accounts?
+
+Yes, through any identity provider that speaks OpenID Connect (OIDC). The groups people belong to there can decide which communities and roles they land in, and a community's superadmin can connect a provider for just that community. See [Single sign-on](running-a-server/single-sign-on.md).
 
 ## Still stuck?
 
-Look at the bottom of the sidebar. The question mark opens these pages, and where there's somebody to ask — a server that takes help requests, or one with an address to write to — the lifebuoy beside it is **Ask for help**.
+Inside the app, open **Help** from your account menu (under your name and picture at the bottom of the sidebar), from search, or from the question mark in the desktop app's title bar. It searches these pages without taking you away from what you were doing. If nothing answers it, **No answer here?** under the results shows how to ask, either with **Ask the team** or with an address to write to, depending on your server.
 
-To tell the people who run the server what you think — an idea, something that got in your way, or praise — choose **Send feedback** in your account menu or the command palette.
+To send an idea, a gripe or some praise to the people who make Initiative, choose **Send feedback** in your account menu or in search, where your server offers it.
 
-If it looks like the software rather than your account, see [Reporting a problem](security/reporting-a-problem.md).
+If it's about one community (who's in it, what you can reach, why something vanished), ask that community's admins first. They can see and fix far more of it than whoever runs the server, and they usually answer faster.
 
-If it's about one specific community — who's in it, what you can reach, why something's vanished — ask that community's admins first. They can see and fix far more of it than whoever runs the server can, and they're usually quicker to answer.
+If it looks like a bug in Initiative itself, tell us on [GitHub](https://github.com/beyonders-studio/initiative/issues). For anything to do with security, see [Reporting a problem](security/reporting-a-problem.md) instead.

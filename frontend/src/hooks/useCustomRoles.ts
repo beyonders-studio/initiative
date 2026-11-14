@@ -1,4 +1,3 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -6,25 +5,21 @@ import {
   assignCustomRole,
   createCustomRole,
   deleteCustomRole,
-  getListCustomRoleHoldersQueryKey,
-  getListCustomRolesQueryKey,
-  getReadHeldSurfacesQueryKey,
-  listCustomRoleHolders,
-  listCustomRoles,
-  readHeldSurfaces,
   updateCustomRole,
+  useListCustomRoleHolders,
+  useListCustomRoles,
+  useReadHeldSurfaces,
 } from "@/api/generated/custom-roles/custom-roles";
 import {
   AdminSurface,
   type CustomRoleCreate,
-  type CustomRoleHolder,
   type CustomRoleRead,
   type CustomRoleUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 /** Every part of running a community, in the order the editor lists them. */
@@ -51,27 +46,19 @@ const SETTINGS_GRANT_SURFACES: readonly AdminSurface[] = [
   AdminSurface.roles,
 ];
 
-const STALE_TIME = 30 * 1000;
-
 /** The community's custom roles. Anybody in it may read them. */
 export const useCustomRoles = (options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CustomRoleRead[]>({
-    queryKey: getListCustomRolesQueryKey(communityId),
-    queryFn: () => listCustomRoles(communityId),
-    enabled: communityId > 0 && (options?.enabled ?? true),
-    staleTime: STALE_TIME,
+  return useListCustomRoles(communityId, {
+    query: { enabled: communityId > 0 && (options?.enabled ?? true) },
   });
 };
 
 /** Who holds which custom role. */
 export const useCustomRoleHolders = (options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CustomRoleHolder[]>({
-    queryKey: getListCustomRoleHoldersQueryKey(communityId),
-    queryFn: () => listCustomRoleHolders(communityId),
-    enabled: communityId > 0 && (options?.enabled ?? true),
-    staleTime: STALE_TIME,
+  return useListCustomRoleHolders(communityId, {
+    query: { enabled: communityId > 0 && (options?.enabled ?? true) },
   });
 };
 
@@ -80,6 +67,8 @@ export interface HeldSurfaces {
   isLoading: boolean;
   /** Whether the reader holds `surface` in the community. */
   holds: (surface: AdminSurface) => boolean;
+  /** Whether the reader holds one installed plug-in's community permission. */
+  holdsPluginPermission: (installId: number, permission: string) => boolean;
   /** Whether the reader holds any part of running it. */
   holdsAny: boolean;
   /** Whether the reader may change what they hold, not only read it. */
@@ -97,9 +86,10 @@ export interface HeldSurfaces {
 }
 
 /**
- * The parts of running a community the reader holds: every one for an admin
- * with no custom role, a role's otherwise, none for a plain member. A live
- * settings grant answers for the configuration parts at the rung it lends.
+ * The parts of running a community the reader holds, and the plug-ins'
+ * community permissions: every one for an admin with no custom role, a role's
+ * otherwise, none for a plain member. A live settings grant answers for the
+ * configuration parts at the rung it lends, and gives any plug-in permission.
  *
  * Until the server answers (or where it cannot), the rung answers: an admin
  * holds every part, a member none. A caller that must not show an admin a part
@@ -116,13 +106,12 @@ export const useHeldSurfaces = (
   const communityId = entry?.id ?? 0;
   // A community reached only by a grant has no membership to hold a role by.
   const asked = communityId > 0 && entry?.accessType !== "grant" && (options?.enabled ?? true);
-  const query = useQuery({
-    queryKey: getReadHeldSurfacesQueryKey(communityId),
-    queryFn: () => readHeldSurfaces(communityId),
-    enabled: asked,
-    staleTime: STALE_TIME,
-    // Never another community's answer while this one's is on its way.
-    placeholderData: undefined,
+  const query = useReadHeldSurfaces(communityId, {
+    query: {
+      enabled: asked,
+      // Never another community's answer while this one's is on its way.
+      placeholderData: undefined,
+    },
   });
 
   const administers = Boolean(entry?.can.administer);
@@ -138,14 +127,28 @@ export const useHeldSurfaces = (
       own.includes(surface) || (lent && SETTINGS_GRANT_SURFACES.includes(surface)),
     [own, lent]
   );
+  const ownPlugins = query.data ? (query.data.plugin_permissions ?? []) : null;
+  const holdsPluginPermission = useCallback(
+    (installId: number, permission: string) =>
+      lent ||
+      (ownPlugins === null
+        ? Boolean(rungAnswer)
+        : ownPlugins.some((one) => one.install_id === installId && one.permission === permission)),
+    [ownPlugins, lent, rungAnswer]
+  );
   const holdsAny = ADMIN_SURFACES.some(holds);
   // What the server allows, so nobody is offered a change it must refuse. A
   // settings grant answers for itself.
   const managesAdmins = lent || ADMIN_SURFACES.every(holds);
   const gives = useCallback(
     (role: CustomRoleRead) =>
-      lent || (role.surfaces.every(holds) && (role.base_rung !== "admin" || administers)),
-    [lent, holds, administers]
+      lent ||
+      (role.surfaces.every(holds) &&
+        (role.plugin_permissions ?? []).every((one) =>
+          holdsPluginPermission(one.install_id, one.permission)
+        ) &&
+        (role.base_rung !== "admin" || administers)),
+    [lent, holds, holdsPluginPermission, administers]
   );
   const takesOff = useCallback(
     (role: CustomRoleRead) => gives(role) && (role.base_rung !== "admin" || managesAdmins),
@@ -154,6 +157,7 @@ export const useHeldSurfaces = (
   return {
     isLoading: asked && query.isPending,
     holds,
+    holdsPluginPermission,
     holdsAny,
     // The admin rung writes where the server says it may; a member writes
     // what their role gives them.
@@ -166,64 +170,57 @@ export const useHeldSurfaces = (
 
 export const useCreateCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: (data: CustomRoleCreate) => createCustomRole(communityId, data),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (communityId: number, data: CustomRoleCreate) =>
+      createCustomRole(communityId, data),
+    invalidate: () => {
       toast.success(t("customRoles.created"));
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.createError"));
-    },
+    errorKey: "settings:customRoles.createError",
   });
 };
 
 export const useUpdateCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: ({ roleId, data }: { roleId: number; data: CustomRoleUpdate }) =>
-      updateCustomRole(communityId, roleId, data),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (
+      communityId: number,
+      { roleId, data }: { roleId: number; data: CustomRoleUpdate }
+    ) => updateCustomRole(communityId, roleId, data),
+    invalidate: () => {
       toast.success(t("customRoles.updated"));
-      // The reader may hold the role they changed.
-      void invalidate(q.customRoles());
+      // The reader may hold the role they changed, and with it plug-in pages.
+      return invalidate(q.customRoles(), q.plugins());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.updateError"));
-    },
+    errorKey: "settings:customRoles.updateError",
   });
 };
 
 export const useDeleteCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: (roleId: number) => deleteCustomRole(communityId, roleId),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (communityId: number, roleId: number) => deleteCustomRole(communityId, roleId),
+    invalidate: () => {
       toast.success(t("customRoles.deleted"));
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles(), q.plugins());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.deleteError"));
-    },
+    errorKey: "settings:customRoles.deleteError",
   });
 };
 
 /** Give a member a custom role in place of theirs, or take theirs off (`null`). */
 export const useAssignCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: ({ userId, roleId }: { userId: number; roleId: number | null }) =>
-      assignCustomRole(communityId, userId, { role_id: roleId }),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (
+      communityId: number,
+      { userId, roleId }: { userId: number; roleId: number | null }
+    ) => assignCustomRole(communityId, userId, { role_id: roleId }),
+    invalidate: () => {
       toast.success(t("customRoles.assigned"));
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles(), q.plugins());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.assignError"));
-    },
+    errorKey: "settings:customRoles.assignError",
   });
 };

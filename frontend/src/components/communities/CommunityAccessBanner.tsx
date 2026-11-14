@@ -1,8 +1,12 @@
 import { Clock, Lock } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useCommunities } from "@/hooks/useCommunities";
-import { minutesLeft } from "@/lib/formatDate";
+import { formatDateTime, minutesLeft } from "@/ui/lib/formatDate";
+
+/** The longest a browser timer waits. */
+const MAX_TIMER_MS = 2_147_483_647;
 
 /**
  * Banner shown across community pages when the active community is reached via a
@@ -13,9 +17,42 @@ import { minutesLeft } from "@/lib/formatDate";
  */
 export const CommunityAccessBanner = () => {
   const { t } = useTranslation("communities");
-  const { activeCommunity, activeCommunityReadOnly } = useCommunities();
+  const { activeCommunity, activeCommunityReadOnly, refreshCommunities } = useCommunities();
+  const timedOutUntil = activeCommunity?.timed_out_until ?? null;
+
+  // A timeout ends by itself. Re-read the community then, so the write
+  // controls come back without a reload; an end further off than one timer
+  // can wait is waited for in several.
+  useEffect(() => {
+    if (!timedOutUntil) return;
+    const end = new Date(timedOutUntil).getTime();
+    let timer: ReturnType<typeof setTimeout>;
+    const wait = () => {
+      const left = end - Date.now();
+      timer =
+        left > MAX_TIMER_MS
+          ? setTimeout(wait, MAX_TIMER_MS)
+          : setTimeout(() => void refreshCommunities(), Math.max(0, left) + 1000);
+    };
+    wait();
+    return () => clearTimeout(timer);
+  }, [timedOutUntil, refreshCommunities]);
 
   if (activeCommunity?.accessType !== "grant") {
+    // Timed out here: they read, and change nothing, until it ends.
+    if (timedOutUntil) {
+      return (
+        <div className="flex items-center gap-2 border-amber-500/30 border-b bg-amber-500/10 px-4 py-2 text-amber-700 text-sm dark:text-amber-300">
+          <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {t("timeOut.banner", {
+              community: activeCommunity?.name,
+              time: formatDateTime(timedOutUntil),
+            })}
+          </span>
+        </div>
+      );
+    }
     // Real membership in a frozen community: writes are disabled server-side, so
     // say so plainly. The banner discloses the effect, not the reason — the
     // lifecycle status itself only reaches community admins (settings page).

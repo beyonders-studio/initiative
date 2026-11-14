@@ -11,8 +11,6 @@
     "all": "Toutes les communautés",
     "none": "Vous ne faites encore partie d'aucune communauté."
   },
-  "loading": "Chargement…",
-  "loadError": "Impossible de charger cet outil. Veuillez réessayer plus tard.",
   "empty": {
     "title": "Rien ici pour l'instant",
     "description": "Rien de ce type ne vous parvient dans vos communautés.",

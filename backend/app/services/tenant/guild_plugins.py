@@ -33,11 +33,11 @@ row behind.
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Iterable, Optional
+from typing import Any
 
 from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -48,17 +48,15 @@ from app.core.audit_events import AuditEventType
 from app.core.messages import GuildPluginMessages
 from app.core.plugin_scopes import ordered_scopes, plugin_scope, plugin_scope_target
 from app.core.tools import Tool
+from app.db.guild_standing import GuildContext
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import MarketplaceListing
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.contact import Contact
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_secret import GuildPluginSecret
-from app.models.tenant.initiative import (
-    BUILTIN_ROLES,
-    Initiative,
-    InitiativeRoleModel,
-)
+from app.models.tenant.initiative import Initiative
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.tenant.resource_grant import initiative_readable
@@ -71,7 +69,11 @@ from app.services.marketplace import (
     registration_lookup,
 )
 from app.services.marketplace.manifest_values import is_unique_setting_value
-from app.services.marketplace.service_plugins import is_admin_only
+from app.services.marketplace.service_plugins import (
+    declared_permissions,
+    members_hold,
+    surface_permission,
+)
 from app.services.platform import guilds as guilds_service
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import plugin_config as plugin_config_service
@@ -86,40 +88,39 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "ARTIFACT_HANDLERS",
-    "BUILTIN_ROLE_NAMES",
     "ArtifactHandler",
     "PlacementError",
-    "PlacementRoleError",
     "SurfaceAccess",
     "SurfaceOpenability",
-    "plugin_artifacts",
     "apply_static_config",
     "artifacts_by_install",
     "assign_settings",
     "claim_newly_unique",
     "clear_static_connection",
-    "declared_surfaces",
     "create_plugin_artifacts",
+    "declared_permission_ids",
+    "declared_surfaces",
+    "definition_public_id",
     "find_mounting_plugin",
     "has_initiative_surfaces",
+    "holds_permission",
     "initiative_surface_ids",
     "install_plugin",
-    "definition_public_id",
     "install_public_id",
     "installed_plugin_ids",
     "is_placed",
+    "item_openability",
     "load_secrets",
     "lock_install",
     "offered_scopes",
-    "place_in_every_initiative",
-    "place_with_roles",
     "placed_initiative_ids",
-    "placement_role_ids",
+    "placed_installs",
     "placements_by_install",
+    "plugin_artifacts",
     "plugin_callers",
+    "record_config_change",
     "set_granted_scopes",
     "set_placed_initiatives",
-    "set_placement_roles",
     "set_plugin_callers",
     "set_setting",
     "store_secrets",
@@ -145,7 +146,7 @@ class ArtifactHandler:
     """
 
     remove: Callable[..., Awaitable[None]]
-    create: Optional[Callable[..., Awaitable[None]]] = None
+    create: Callable[..., Awaitable[None]] | None = None
 
 
 async def _create_calendar(
@@ -156,6 +157,7 @@ async def _create_calendar(
         # and writes what it holds, exactly as for an initiative calendar.
         initiative_id=None,
         created_by=plugin.created_by,
+        created_by_kind=plugin.created_by_kind,
         name=name,
     )
     session.add(calendar)
@@ -172,15 +174,15 @@ async def _create_calendar(
     )
 
 
-def _trash(model: type[Calendar] | type[Contact]) -> Callable[..., Awaitable[None]]:
+def _trash(model: type[Calendar | Contact]) -> Callable[..., Awaitable[None]]:
     """Removal that sends one of ``model``'s rows to the trash."""
 
     async def remove(
         session: AsyncSession,
         artifact_id: int,
         *,
-        deleted_by_user_id: Optional[int],
-        retention_days: Optional[int],
+        deleted_by_user_id: int | None,
+        retention_days: int | None,
     ) -> None:
         row = (await session.exec(select(model).where(model.id == artifact_id))).first()
         if row is None:
@@ -246,7 +248,7 @@ async def plugin_artifacts(
     return (await artifacts_by_install(session, [plugin.id]))[plugin.id]
 
 
-async def lock_install(session: AsyncSession, plugin_id: int) -> Optional[GuildPlugin]:
+async def lock_install(session: AsyncSession, plugin_id: int) -> GuildPlugin | None:
     """Hold one install's row for the rest of this transaction.
 
     Several things on this row are values rewritten whole rather than appended
@@ -321,7 +323,7 @@ async def store_secrets(
 
 async def find_mounting_plugin(
     session: AsyncSession, *, tool: str
-) -> Optional[GuildPlugin]:
+) -> GuildPlugin | None:
     """The install that mounts ``tool`` at guild scope, if this guild has one.
 
     A tool-instance install is the container for what it mounts, so this is the
@@ -393,12 +395,12 @@ async def install_plugin(
     listing_version: str,
     definition: dict,
     guild_id: int,
-    created_by: int,
     name: str,
-    actor_user_id: Optional[int] = None,
+    created_by: int | None = None,
+    actor_user_id: int | None = None,
     via: str = "install",
     granted_scopes: Sequence[str] = (),
-    allowed_callers: Optional[Collection[int]] = (),
+    allowed_callers: Collection[int] | None = (),
 ) -> GuildPlugin:
     """Create the install row, and whatever the plug-in mounts alongside it.
 
@@ -431,6 +433,7 @@ async def install_plugin(
         config={},
         granted_scopes=sorted(set(granted_scopes)),
         created_by=created_by,
+        created_by_kind=None if created_by is None else ActorKind.member,
     )
     session.add(plugin)
     await session.flush()
@@ -636,7 +639,7 @@ async def apply_static_config(
     """
     config = dict(plugin.config or {})
     secrets = await load_secrets(session, plugin)
-    before = _config_fields(config, secrets)
+    before = (dict(config), dict(secrets))
 
     for connection_id, submitted in values.items():
         connection = plugin_config_service.connection_by_id(
@@ -671,11 +674,32 @@ async def apply_static_config(
     plugin.config = config
     await store_secrets(session, plugin, secrets)
     _unverified(plugin)
-    # Which fields hold something different now, by name. A configuration value
-    # is the plug-in's credential to the vendor, so none of it reaches the record.
-    moved = audit_service.changed_fields(before, _config_fields(config, secrets))[
-        "changed"
-    ]
+    await record_config_change(
+        session,
+        plugin,
+        before=before,
+        after=(config, secrets),
+        connection_ids=values,
+        actor_user_id=actor_user_id,
+    )
+
+
+async def record_config_change(
+    session: AsyncSession,
+    plugin: GuildPlugin,
+    *,
+    before: tuple[dict, dict],
+    after: tuple[dict, dict],
+    connection_ids: Iterable[str],
+    actor_user_id: int,
+) -> None:
+    """Record which configuration fields hold something different now, by
+    name, from the ``(config, secrets)`` maps before and after. A configuration
+    value is the plug-in's credential to the vendor, so none of it reaches the
+    record."""
+    moved = audit_service.changed_fields(
+        _config_fields(*before), _config_fields(*after)
+    )["changed"]
     if moved:
         await audit_service.record(
             session,
@@ -687,7 +711,7 @@ async def apply_static_config(
             detail={
                 "area": "config",
                 "changed": moved,
-                "connection_ids": sorted(values),
+                "connection_ids": sorted(connection_ids),
             },
         )
 
@@ -702,7 +726,7 @@ def _unverified(plugin: GuildPlugin) -> None:
 
 
 def touch(plugin: GuildPlugin) -> None:
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
 
 
 # --- settings ---------------------------------------------------------------
@@ -875,63 +899,14 @@ async def set_setting(
 # --- placement --------------------------------------------------------------
 #
 # Where a plug-in's initiative-scoped surfaces appear: one ``plugin_placements`` row
-# per initiative, carrying the initiative roles allowed to open the plug-in there.
-# An initiative with no row is one the plug-in is not placed in. Placement is the
-# seat's answer to "where does this belong", so it applies to everyone
-# including guild admins — unlike the roles on a row, which an admin always
-# clears.
+# per initiative. An initiative with no row is one the plug-in is not placed in.
+# Placement is the seat's answer to "where does this belong", so it applies to
+# everyone including guild admins. Who reaches the plug-in where it appears is
+# the initiative's roles' answer (:func:`holds_permission`).
 
 
 class PlacementError(ValueError):
     """A placement that names something this guild cannot place a plug-in in."""
-
-
-class PlacementRoleError(PlacementError):
-    """A placement naming a role that is not one of its initiative's."""
-
-
-#: The built-in initiative roles, by name. Every initiative is created with
-#: each of them, so a name here resolves to one role in any initiative.
-BUILTIN_ROLE_NAMES: tuple[str, ...] = tuple(spec.name for spec in BUILTIN_ROLES)
-
-
-async def _builtin_role_ids(
-    session: AsyncSession, initiative_ids: Iterable[int], names: Iterable[str]
-) -> dict[int, list[int]]:
-    """Each initiative's built-in roles of those names, keyed by initiative.
-
-    One query for every initiative. An initiative missing one of the roles
-    (renamed or deleted) is placed with the ones it has.
-    """
-    ids = list(initiative_ids)
-    wanted = sorted(set(names))
-    if not ids or not wanted:
-        return {}
-    rows = await session.exec(
-        select(InitiativeRoleModel.initiative_id, InitiativeRoleModel.id)
-        .where(
-            InitiativeRoleModel.initiative_id.in_(ids),
-            InitiativeRoleModel.name.in_(wanted),
-            InitiativeRoleModel.is_builtin.is_(True),
-        )
-        .order_by(InitiativeRoleModel.id)
-    )
-    roles: dict[int, list[int]] = {}
-    for initiative_id, role_id in rows.all():
-        roles.setdefault(initiative_id, []).append(role_id)
-    return roles
-
-
-async def _moderator_role_ids(
-    session: AsyncSession, initiative_ids: Iterable[int]
-) -> dict[int, list[int]]:
-    """Each initiative's built-in moderator role, keyed by initiative."""
-    return await _builtin_role_ids(session, initiative_ids, ("moderator",))
-
-
-def _default_role_ids(roles: dict[int, list[int]], initiative_id: int) -> list[int]:
-    """The role set a new placement starts with: the initiative's moderators."""
-    return sorted(roles.get(initiative_id, []))
 
 
 async def placements_by_install(
@@ -952,6 +927,33 @@ async def placements_by_install(
     return grouped
 
 
+async def placed_installs(
+    session: AsyncSession, initiative_id: int
+) -> list[GuildPlugin]:
+    """The installs placed in one initiative, in install order."""
+    rows = await session.exec(
+        select(GuildPlugin)
+        .join(PluginPlacement, col(PluginPlacement.install_id) == GuildPlugin.id)
+        .where(PluginPlacement.initiative_id == initiative_id)
+        .order_by(col(GuildPlugin.id))
+    )
+    return list(rows.all())
+
+
+async def declared_permission_ids(
+    session: AsyncSession, level: str
+) -> set[tuple[int, str]]:
+    """Every installed plug-in's permissions at ``level``, as ``(install id,
+    permission id)``: what a role's answer may name."""
+    rows = await session.exec(select(GuildPlugin.id, GuildPlugin.definition))
+    return {
+        (int(install_id), entry["id"])
+        for install_id, definition in rows.all()
+        for entry in declared_permissions(definition)
+        if entry["level"] == level
+    }
+
+
 async def placed_initiative_ids(session: AsyncSession, install_id: int) -> set[int]:
     """The initiatives this install is placed in."""
     rows = await session.exec(
@@ -963,7 +965,7 @@ async def placed_initiative_ids(session: AsyncSession, install_id: int) -> set[i
 
 
 async def is_placed(
-    session: AsyncSession, install_id: int, initiative_id: Optional[int]
+    session: AsyncSession, install_id: int, initiative_id: int | None
 ) -> bool:
     """Whether this install offers its initiative surfaces in that initiative.
 
@@ -982,106 +984,29 @@ async def is_placed(
     return row is not None
 
 
-async def placement_role_ids(
-    session: AsyncSession, install_id: int, initiative_id: int
-) -> Optional[list[int]]:
-    """The roles allowed to open this install's surfaces in one initiative.
-
-    ``None`` when the install is not placed there, which is a different answer
-    from a placement allowing no role: the first has no surface to open, the
-    second has one that only admins open.
-    """
-    row = (
-        await session.exec(
-            select(PluginPlacement.role_ids).where(
-                PluginPlacement.install_id == install_id,
-                PluginPlacement.initiative_id == initiative_id,
-            )
-        )
-    ).first()
-    return None if row is None else list(row or [])
-
-
-async def set_placement_roles(
-    session: AsyncSession,
-    plugin: GuildPlugin,
-    initiative_id: int,
-    role_ids: Iterable[int],
-) -> PluginPlacement:
-    """Place the install in one initiative with exactly these roles.
-
-    Creates the placement or replaces its roles. The initiative must be one of
-    this guild's, and every role one of *that* initiative's, both read on the
-    same routed session; anything else raises :class:`PlacementError`.
-    """
-    wanted: set[int] = set()
-    for entry in role_ids:
-        if isinstance(entry, bool) or not isinstance(entry, int):
-            raise PlacementError("roles must be a list of role ids")
-        wanted.add(entry)
-    initiative = (
-        await session.exec(select(Initiative.id).where(Initiative.id == initiative_id))
-    ).first()
-    if initiative is None:
-        raise PlacementError(f"initiative {initiative_id} is not one of this guild's")
-    if wanted:
-        known = set(
-            (
-                await session.exec(
-                    select(InitiativeRoleModel.id).where(
-                        InitiativeRoleModel.initiative_id == initiative_id,
-                        InitiativeRoleModel.id.in_(sorted(wanted)),
-                    )
-                )
-            ).all()
-        )
-        foreign = sorted(wanted - known)
-        if foreign:
-            raise PlacementRoleError(
-                f"role {foreign[0]} is not a role of initiative {initiative_id}"
-            )
-
-    placement = (
-        await session.exec(
-            select(PluginPlacement).where(
-                PluginPlacement.install_id == plugin.id,
-                PluginPlacement.initiative_id == initiative_id,
-            )
-        )
-    ).first()
-    if placement is None:
-        placement = PluginPlacement(
-            install_id=plugin.id, initiative_id=initiative_id, role_ids=sorted(wanted)
-        )
-        await show_on_saved_layouts(session, plugin, [initiative_id])
-    else:
-        placement.role_ids = sorted(wanted)
-        placement.updated_at = datetime.now(timezone.utc)
-    session.add(placement)
-    await session.flush()
-    return placement
-
-
 async def set_placed_initiatives(
-    session: AsyncSession, plugin: GuildPlugin, initiative_ids: set[int]
-) -> None:
-    """Place the install in exactly these initiatives.
+    session: AsyncSession, plugin: GuildPlugin, initiative_ids: set[int] | None
+) -> list[int]:
+    """Place the install in exactly these initiatives, ``None`` being every
+    initiative that exists now, and answer the ones it is newly placed in.
 
     Every id must be one of this guild's initiatives, read on the same routed
-    session. A placement that stays keeps the roles it had; one that is new
-    starts with the initiative's built-in moderator role; one not listed is
-    removed.
+    session; anything else raises :class:`PlacementError` before anything is
+    written. A placement not listed is removed. What installing a mandatory
+    plug-in does, with ``None``; where it appears afterwards, new initiatives
+    included, is the seat's to decide.
     """
-    for entry in initiative_ids:
+    for entry in initiative_ids or ():
         if isinstance(entry, bool) or not isinstance(entry, int):
             raise PlacementError("placement must be a list of initiative ids")
     known = set((await session.exec(select(Initiative.id))).all())
-    unknown = sorted(initiative_ids - known)
+    wanted = known if initiative_ids is None else set(initiative_ids)
+    unknown = sorted(wanted - known)
     if unknown:
         raise PlacementError(f"initiative {unknown[0]} is not one of this guild's")
 
     current = await placed_initiative_ids(session, plugin.id)
-    removed = current - initiative_ids
+    removed = current - wanted
     if removed:
         await session.exec(
             delete(PluginPlacement).where(
@@ -1089,87 +1014,12 @@ async def set_placed_initiatives(
                 PluginPlacement.initiative_id.in_(sorted(removed)),
             )
         )
-    added = sorted(initiative_ids - current)
-    roles = await _moderator_role_ids(session, added)
+    added = sorted(wanted - current)
     for initiative_id in added:
-        session.add(
-            PluginPlacement(
-                install_id=plugin.id,
-                initiative_id=initiative_id,
-                role_ids=_default_role_ids(roles, initiative_id),
-            )
-        )
+        session.add(PluginPlacement(install_id=plugin.id, initiative_id=initiative_id))
     await show_on_saved_layouts(session, plugin, added)
     await session.flush()
-
-
-async def place_in_every_initiative(session: AsyncSession, plugin: GuildPlugin) -> None:
-    """Place the install in every initiative that exists now.
-
-    What installing a mandatory plug-in does. Where it appears afterwards, new
-    initiatives included, is the seat's to decide.
-    """
-    every = set((await session.exec(select(Initiative.id))).all())
-    current = await placed_initiative_ids(session, plugin.id)
-    added = sorted(every - current)
-    roles = await _moderator_role_ids(session, added)
-    for initiative_id in added:
-        session.add(
-            PluginPlacement(
-                install_id=plugin.id,
-                initiative_id=initiative_id,
-                role_ids=_default_role_ids(roles, initiative_id),
-            )
-        )
-    await show_on_saved_layouts(session, plugin, added)
-    await session.flush()
-
-
-async def place_with_roles(
-    session: AsyncSession,
-    plugin: GuildPlugin,
-    initiative_ids: Optional[Iterable[int]],
-    role_names: Iterable[str],
-) -> list[int]:
-    """Place a new install in these initiatives, each with these built-in roles.
-
-    What the install dialog does. ``None`` is every initiative that exists now,
-    the same set "every current initiative" places from the placement panel;
-    an initiative created afterwards is placed only if the seat places it.
-    Each name must be a built-in role, resolved to that initiative's own role
-    of the name. Anything else raises :class:`PlacementError`, before anything
-    is written. Answers the initiatives placed, sorted.
-    """
-    names = list(role_names)
-    for name in names:
-        if name not in BUILTIN_ROLE_NAMES:
-            raise PlacementRoleError(f"{name!r} is not a built-in role")
-    known = set((await session.exec(select(Initiative.id))).all())
-    if initiative_ids is None:
-        chosen = known
-    else:
-        chosen = set()
-        for entry in initiative_ids:
-            if isinstance(entry, bool) or not isinstance(entry, int):
-                raise PlacementError("placement must be a list of initiative ids")
-            chosen.add(entry)
-        unknown = sorted(chosen - known)
-        if unknown:
-            raise PlacementError(f"initiative {unknown[0]} is not one of this guild's")
-
-    placed = sorted(chosen)
-    roles = await _builtin_role_ids(session, placed, names)
-    for initiative_id in placed:
-        session.add(
-            PluginPlacement(
-                install_id=plugin.id,
-                initiative_id=initiative_id,
-                role_ids=sorted(roles.get(initiative_id, [])),
-            )
-        )
-    await show_on_saved_layouts(session, plugin, placed)
-    await session.flush()
-    return placed
+    return added
 
 
 def _declared_on(definition: Any, block: str, id_key: str, kind: str) -> list[str]:
@@ -1201,7 +1051,7 @@ async def show_on_saved_layouts(
     initiative_ids: Iterable[int],
     *,
     previous: Any = None,
-    only: Optional[tool_layouts_service.Target] = None,
+    only: tool_layouts_service.Target | None = None,
 ) -> None:
     """Show the install's fields, then its parts, on the saved details of these
     initiatives, for each kind of item whose page draws plug-ins, and its task
@@ -1341,9 +1191,7 @@ def grantable_scopes(
     ]
 
 
-async def definition_public_id(
-    definition: dict, listing_uid: Optional[str]
-) -> Optional[str]:
+async def definition_public_id(definition: dict, listing_uid: str | None) -> str | None:
     """The public id of the plug-in a pinned definition is, for one that is
     installed or about to be: the registration's when this deployment has
     one, else the ``service.public_id`` the definition pinned, which is what
@@ -1357,7 +1205,7 @@ async def definition_public_id(
     return registration_lookup.service_public_id(definition)
 
 
-async def install_public_id(plugin: GuildPlugin) -> Optional[str]:
+async def install_public_id(plugin: GuildPlugin) -> str | None:
     """The public id of the plug-in an existing install is of: what names it,
     acts for it and keys its references, whether or not its registration still
     stands. The registration's when it speaks for this install (its listing,
@@ -1392,7 +1240,7 @@ async def installed_plugin_ids(session: AsyncSession) -> frozenset[str]:
 
 
 async def plugin_callers(
-    session: AsyncSession, public_id: str, *, exclude_id: Optional[int] = None
+    session: AsyncSession, public_id: str, *, exclude_id: int | None = None
 ) -> list[GuildPlugin]:
     """The installs here that may be let use ``public_id``: their pinned version
     requests ``plugins:<public_id>`` and their registration's ceiling allows it.
@@ -1420,7 +1268,7 @@ async def set_granted_scopes(
     plugin: GuildPlugin,
     scopes: Iterable[str],
     *,
-    actor_user_id: Optional[int],
+    actor_user_id: int | None,
     guild_id: int,
 ) -> None:
     """Grant the install exactly ``scopes``, recording the change when there is
@@ -1430,7 +1278,7 @@ async def set_granted_scopes(
     if before == after:
         return
     plugin.granted_scopes = after
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     session.add(plugin)
     await audit_service.record(
         session,
@@ -1452,10 +1300,10 @@ async def set_granted_scopes(
 async def set_plugin_callers(
     session: AsyncSession,
     public_id: str,
-    allowed: Optional[Collection[int]],
+    allowed: Collection[int] | None,
     *,
-    exclude_id: Optional[int] = None,
-    actor_user_id: Optional[int],
+    exclude_id: int | None = None,
+    actor_user_id: int | None,
     guild_id: int,
 ) -> None:
     """Let exactly the ``allowed`` installs use ``public_id`` (``None`` lets every
@@ -1574,31 +1422,42 @@ def surface_renders_in(page: dict[str, Any], scope: str) -> bool:
 ITEM_SURFACE: dict[str, Any] = {"scopes": ["initiative"]}
 
 
+def holds_permission(
+    context: GuildContext,
+    plugin: Any,
+    permission: str,
+    *,
+    initiative_id: int | None,
+) -> bool:
+    """Whether the reader holds one of an install's permissions where they are:
+    at the community level (``initiative_id`` ``None``) as an admin surface is
+    held, inside an initiative as a tool's key is, with the default the
+    plug-in declared for members (:meth:`GuildContext.holds_plugin_permission`).
+    """
+    return context.holds_plugin_permission(
+        int(plugin.id or 0),
+        permission,
+        initiative_id=initiative_id,
+        members=initiative_id is not None
+        and members_hold(plugin.definition, permission),
+    )
+
+
 def surface_access(
+    plugin: Any,
     page: dict[str, Any],
     *,
-    initiative_id: Optional[int],
-    placement_role_ids: Optional[Collection[int]],
-    is_guild_admin: bool,
-    member_role_ids: Collection[int],
+    context: GuildContext,
+    initiative_id: int | None,
+    placed: bool,
     age_allows: bool = True,
 ) -> SurfaceAccess:
     """Whether a viewer may open ``page`` where it is being opened.
 
-    ``initiative_id`` is where: ``None`` is the community level. For an
-    initiative, ``placement_role_ids`` is that placement's roles, or ``None``
-    when the install is not placed there.
-
-    * In an initiative, the install must be placed there, and the viewer is a
-      guild admin or holds one of the placement's roles.
-    * At the community level, the viewer is a guild admin.
-    * A surface marked ``admin_only`` is opened by guild admins alone,
-      wherever it is (read by :func:`is_admin_only`, which also honours the
-      earlier contract's term on a definition pinned before it).
-
-    ``member_role_ids`` are the viewer's initiative roles across the community.
-    A role belongs to one initiative and a placement names only its own
-    initiative's roles, so meeting one of them here is holding it here.
+    ``initiative_id`` is where: ``None`` is the community level. In an
+    initiative the install must be ``placed`` there. Either way the viewer
+    holds the permission the page names there, or ``use``
+    (:func:`holds_permission`).
 
     ``age_allows`` is :func:`~app.services.tenant.plugin_age.age_allows` for
     this viewer and plug-in, and it binds admins too: an age limit is about the
@@ -1607,16 +1466,13 @@ def surface_access(
     scope = "community" if initiative_id is None else "initiative"
     if not surface_renders_in(page, scope):
         return SurfaceAccess.not_here
-    if initiative_id is not None and placement_role_ids is None:
+    if initiative_id is not None and not placed:
         return SurfaceAccess.not_here
     if not age_allows:
         return SurfaceAccess.too_young
-    if is_guild_admin:
-        return SurfaceAccess.open
-    if initiative_id is None or is_admin_only(page):
-        return SurfaceAccess.refused
-    allowed = set(placement_role_ids or ())
-    if allowed.intersection(member_role_ids):
+    if holds_permission(
+        context, plugin, surface_permission(page), initiative_id=initiative_id
+    ):
         return SurfaceAccess.open
     return SurfaceAccess.refused
 
@@ -1632,11 +1488,11 @@ class SurfaceOpenability:
 
 @dataclass(frozen=True)
 class ItemOpenability:
-    """Where one viewer meets a plug-in on items, and what of it they meet."""
+    """What of a plug-in one viewer meets on the items of one initiative."""
 
-    #: The initiatives whose items show the viewer the plug-in's values.
-    initiatives: tuple[int, ...]
-    #: The declared fields and parts whose connections hold what they need.
+    initiative_id: int
+    #: The declared fields and parts the viewer holds the permission of, whose
+    #: connections hold what they need.
     fields: tuple[str, ...]
     parts: tuple[str, ...]
     #: The declared actions the viewer may run on those items.
@@ -1656,37 +1512,24 @@ def item_openability(
     plugin: Any,
     *,
     placements: Sequence[PluginPlacement],
-    is_guild_admin: bool,
-    member_role_ids: Collection[int],
+    context: GuildContext,
     age_allows: bool = True,
     frozen: bool = False,
-) -> ItemOpenability:
-    """:data:`ITEM_SURFACE` measured against each placement, as
-    :func:`surface_openability` measures a page. A field, a part or an action
-    is offered while the community's connections it requires hold a value
+) -> list[ItemOpenability]:
+    """What of the plug-in the viewer meets on items, in each initiative it is
+    placed in where they meet anything: each field, part and action whose
+    permission they hold there (:func:`holds_permission`), and the permission
+    an action's endpoint names too, when it names one. A field, a part or an action is offered
+    while the community's connections it requires hold a value
     (:func:`~app.services.tenant.plugin_config.installation_meets`), and an
     action while those its endpoint requires do too. A member's own connection
     an action requires is theirs to make when they run it, and so is one a
     declarative plug-in's endpoint requires, whose call may run on it; a
-    container's endpoint is called as the installation. An admin-only action,
-    or one whose endpoint is admin-only, is the community's admins' alone, and
-    a frozen community runs none."""
+    container's endpoint is called as the installation. A frozen community
+    runs none, and a viewer too young for the plug-in meets none of it."""
+    if not age_allows:
+        return []
     definition = plugin.definition if isinstance(plugin.definition, dict) else {}
-    initiatives = tuple(
-        row.initiative_id
-        for row in sorted(placements, key=lambda row: row.initiative_id)
-        if surface_access(
-            ITEM_SURFACE,
-            initiative_id=row.initiative_id,
-            placement_role_ids=list(row.role_ids or []),
-            is_guild_admin=is_guild_admin,
-            member_role_ids=member_role_ids,
-            age_allows=age_allows,
-        )
-        is SurfaceAccess.open
-    )
-    if not initiatives:
-        return ItemOpenability(initiatives=(), fields=(), parts=(), actions=())
 
     def met(entry: dict, members_connect: bool = False) -> bool:
         return plugin_config_service.installation_meets(
@@ -1698,39 +1541,50 @@ def item_openability(
         endpoint["id"]: endpoint
         for endpoint in _declared(definition, "endpoints", "id")
     }
-    return ItemOpenability(
-        initiatives=initiatives,
-        fields=tuple(
-            f["key"] for f in _declared(definition, "fields", "key") if met(f)
-        ),
-        parts=tuple(p["id"] for p in _declared(definition, "parts", "id") if met(p)),
-        actions=()
+    fields = [f for f in _declared(definition, "fields", "key") if met(f)]
+    parts = [p for p in _declared(definition, "parts", "id") if met(p)]
+    actions = (
+        []
         if frozen
-        else tuple(
-            action["id"]
+        else [
+            action
             for action in _declared(definition, "actions", "id")
             if met(action, members_connect=True)
             and met(
                 endpoints.get(action.get("endpoint")) or {},
                 members_connect=declarative,
             )
-            and (
-                is_guild_admin
-                or not (
-                    is_admin_only(action)
-                    or is_admin_only(endpoints.get(action.get("endpoint")))
-                )
-            )
-        ),
+        ]
     )
+    answers: list[ItemOpenability] = []
+    for row in sorted(placements, key=lambda row: row.initiative_id):
+
+        def holds(permission: str | None, here: int = row.initiative_id) -> bool:
+            return permission is None or holds_permission(
+                context, plugin, permission, initiative_id=here
+            )
+
+        answer = ItemOpenability(
+            initiative_id=row.initiative_id,
+            fields=tuple(f["key"] for f in fields if holds(surface_permission(f))),
+            parts=tuple(p["id"] for p in parts if holds(surface_permission(p))),
+            actions=tuple(
+                a["id"]
+                for a in actions
+                if holds(surface_permission(a))
+                and holds((endpoints.get(a.get("endpoint")) or {}).get("permission"))
+            ),
+        )
+        if answer.fields or answer.parts or answer.actions:
+            answers.append(answer)
+    return answers
 
 
 def surface_openability(
-    definition: Any,
+    plugin: Any,
     *,
     placements: Sequence[PluginPlacement],
-    is_guild_admin: bool,
-    member_role_ids: Collection[int],
+    context: GuildContext,
     age_allows: bool = True,
 ) -> list[SurfaceOpenability]:
     """Every declared surface, with where this viewer may open it.
@@ -1738,35 +1592,32 @@ def surface_openability(
     Measured with :func:`surface_access` against each placement the install
     has, which is the same decision the handoff makes.
     """
-    ordered = sorted(placements, key=lambda row: row.initiative_id)
-    answers: list[SurfaceOpenability] = []
-    for page in declared_surfaces(definition):
-        guild_wide = surface_access(
-            page,
-            initiative_id=None,
-            placement_role_ids=None,
-            is_guild_admin=is_guild_admin,
-            member_role_ids=member_role_ids,
-            age_allows=age_allows,
-        )
-        initiatives = tuple(
-            row.initiative_id
-            for row in ordered
-            if surface_access(
+    ordered = sorted(row.initiative_id for row in placements)
+    return [
+        SurfaceOpenability(
+            surface_id=page["id"],
+            openable_guild_wide=surface_access(
+                plugin,
                 page,
-                initiative_id=row.initiative_id,
-                placement_role_ids=list(row.role_ids or []),
-                is_guild_admin=is_guild_admin,
-                member_role_ids=member_role_ids,
+                context=context,
+                initiative_id=None,
+                placed=True,
                 age_allows=age_allows,
             )
-            is SurfaceAccess.open
+            is SurfaceAccess.open,
+            openable_initiatives=tuple(
+                initiative_id
+                for initiative_id in ordered
+                if surface_access(
+                    plugin,
+                    page,
+                    context=context,
+                    initiative_id=initiative_id,
+                    placed=True,
+                    age_allows=age_allows,
+                )
+                is SurfaceAccess.open
+            ),
         )
-        answers.append(
-            SurfaceOpenability(
-                surface_id=page["id"],
-                openable_guild_wide=guild_wide is SurfaceAccess.open,
-                openable_initiatives=initiatives,
-            )
-        )
-    return answers
+        for page in declared_surfaces(plugin.definition)
+    ]

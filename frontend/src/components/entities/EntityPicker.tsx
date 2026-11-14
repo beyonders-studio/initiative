@@ -6,10 +6,10 @@ import {
   SearchEntityType,
   type SearchSuggestion,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import type { ItemEndKind } from "@/lib/relationships";
 import { hitIcon } from "@/lib/searchResults";
+import { Combobox } from "@/ui/combobox";
 
 /**
  * The kinds a relation picker offers, derived from the generated enum so a kind
@@ -57,7 +57,10 @@ interface EntityPickerProps {
  * — inside a single initiative it is the same word on every row, which is
  * noise rather than context.
  */
-const whereItLives = (item: SearchSuggestion, initiativeId: number | null): string | undefined => {
+export const whereItLives = (
+  item: SearchSuggestion,
+  initiativeId: number | null
+): string | undefined => {
   const parts = [initiativeId == null ? item.initiative_name : null, item.tool_title].filter(
     (part): part is string => Boolean(part?.trim())
   );
@@ -120,7 +123,7 @@ export const EntityPicker = ({
   );
 
   return (
-    <AsyncCombobox
+    <Combobox
       items={items}
       value={value ? `${value.entity_type}:${value.entity_id}` : null}
       // What was picked, said the same way the row said it — otherwise the

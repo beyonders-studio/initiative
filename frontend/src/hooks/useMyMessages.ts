@@ -54,6 +54,7 @@ import {
   verificationView,
   wantThreadHistory,
 } from "@/crypto/messaging";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import {
   useDirectMessagesEnabled,
   useDmSettings,
@@ -123,7 +124,6 @@ export function useConversations() {
     queryKey: messageKeys.conversations,
     queryFn: () => listConversations(),
     enabled: useDirectMessagesEnabled(),
-    staleTime: 30_000,
   });
 }
 
@@ -331,8 +331,8 @@ export function useVerificationActions() {
         void queryClient.invalidateQueries({ queryKey: messageKeys.ownDevice });
       },
     }),
-    confirm: useMutation({ mutationFn: confirmMatch, onError }),
-    reject: useMutation({ mutationFn: rejectMatch, onError }),
+    confirm: useApiMutation({ mutationFn: confirmMatch, errorKey: "messages:verification.error" }),
+    reject: useApiMutation({ mutationFn: rejectMatch, errorKey: "messages:verification.error" }),
     cancel: useMutation({ mutationFn: cancelVerification }),
     dismiss: dismissVerification,
   };
@@ -365,7 +365,7 @@ export function useOwnDeviceWaiting() {
  */
 export function useAnswerNewDevice() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useApiMutation({
     mutationFn: ({
       change,
       mine,
@@ -375,10 +375,8 @@ export function useAnswerNewDevice() {
       mine: boolean;
       sendHistory: boolean;
     }) => answerNewDevice(change, { mine, sendHistory }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: messageKeys.all });
-    },
-    onError: (error) => toast.error(getErrorMessage(error, "messages:newDevice.error")),
+    invalidate: () => queryClient.invalidateQueries({ queryKey: messageKeys.all }),
+    errorKey: "messages:newDevice.error",
   });
 }
 
@@ -557,21 +555,21 @@ export function useAnswerInvitation(conversationId: string) {
   // An invitation goes stale -- somebody proposes the roster again, or it is
   // answered on another device -- so both of these can be refused, and a button
   // that quietly becomes pressable again reads as having been ignored.
-  const accept = useMutation({
+  const accept = useApiMutation({
     mutationFn: () => acceptInvitation(conversationId),
-    onSuccess: () => {
+    invalidate: () => {
       // Nothing was kept for somebody who had not answered, so the thread up
       // to this moment has to be asked for. Recorded here and sent by the next
       // collection, which is also what retries it.
       void wantThreadHistory(conversationId);
       settle();
     },
-    onError: (error) => toast.error(getErrorMessage(error, "errors:DM_NO_INVITATION")),
+    errorKey: "errors:DM_NO_INVITATION",
   });
-  const decline = useMutation({
+  const decline = useApiMutation({
     mutationFn: () => leaveConversation(conversationId),
-    onSuccess: settle,
-    onError: (error) => toast.error(getErrorMessage(error, "errors:DM_CONVERSATION_NOT_FOUND")),
+    invalidate: settle,
+    errorKey: "errors:DM_CONVERSATION_NOT_FOUND",
   });
   return { accept, decline };
 }

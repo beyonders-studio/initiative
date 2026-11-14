@@ -8,13 +8,18 @@
  * These notices belong to the person rather than to any community, so the
  * server sends no community with them.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildNotification } from "@/__tests__/factories/notification.factory";
 import { asPhoneThatMayNotSell } from "@/__tests__/helpers/storeSelling";
 import type { NotificationType } from "@/api/generated/initiativeAPI.schemas";
 
-import { notificationLink, notificationText } from "./notificationLine";
+import { notificationLink, notificationText, openNotification } from "./notificationLine";
+
+const announcements = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock("@/components/announcements/AnnouncementCenter", () => ({
+  openAnnouncement: announcements.open,
+}));
 
 // The real strings are asserted through i18n keys rather than English, so a
 // reworded translation doesn't fail this; what matters is that a key was
@@ -159,14 +164,6 @@ describe("notificationLink — a target_path without a community", () => {
     );
   });
 
-  it("rewrites the route that never existed", () => {
-    // Rows already written carry `/settings/profile`, which is not a page.
-    // The server stopped minting it; these are the ones already sent.
-    expect(notificationLink(notice("username_changed", { target_path: "/settings/profile" }))).toBe(
-      "/profile/account"
-    );
-  });
-
   it("keeps scoping a path that does name a community", () => {
     expect(
       notificationLink(notice("post_published", { community_id: 7, target_path: "/posts/3" }))
@@ -222,6 +219,63 @@ describe("notificationText — mentions", () => {
 
     expect(notificationText(mention, t)).toContain("Flight plan");
     expect(notificationLink(mention)).toBe("/go/file/9");
+  });
+});
+
+describe("an announcement the reader dismissed", () => {
+  const line = notice("announcement", {
+    announcement_key: "builtin:settings-moved",
+    title: "Settings have moved",
+    target_path: "/",
+  });
+
+  it("names the announcement", () => {
+    expect(notificationText(line, t)).toBe(
+      `notifications.announcement(${JSON.stringify({ title: "Settings have moved" })})`
+    );
+  });
+
+  it("opens the announcement again rather than a page", () => {
+    const navigate = vi.fn();
+    expect(openNotification(line, { markRead: vi.fn(), navigate, t })).toBe(true);
+    expect(announcements.open).toHaveBeenCalledWith("builtin:settings-moved");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe("a request to join a community", () => {
+  const requested = notice("community_join_requested", {
+    community_id: 4,
+    requester_name: "ada#0007",
+    target_path: "/settings/users",
+  });
+
+  it("names who asked, and opens the queue in that community", () => {
+    expect(notificationText(requested, t)).toBe(
+      `notifications.communityJoinRequested(${JSON.stringify({
+        requester: "ada#0007",
+        community: "notifications.plain.community",
+      })})`
+    );
+    expect(notificationLink(requested)).toBe("/c/4/settings/users");
+  });
+
+  it("opens the community an approval let the asker into", () => {
+    const approved = notice("community_join_approved", { community_id: 4, target_path: "/" });
+
+    expect(notificationText(approved, t)).toMatch(/^notifications\.communityJoinApproved\(/);
+    expect(notificationLink(approved)).toBe("/c/4/");
+  });
+
+  it("takes a turned-down asker back to the directory, outside the community", () => {
+    const denied = notice("community_join_denied", {
+      community_id: 4,
+      target_path: "/communities",
+      smart_link: "https://example.test/navigate?community_id=4&target=%2Fcommunities",
+    });
+
+    expect(notificationText(denied, t)).toMatch(/^notifications\.communityJoinDenied\(/);
+    expect(notificationLink(denied)).toBe("/communities");
   });
 });
 
@@ -326,7 +380,15 @@ describe("notificationText — cases", () => {
 
   it("counts the replies on a case nobody has taken", () => {
     expect(
-      notificationText(notice("case_replied", { task_id: 4, commenter_name: "asker" }), t)
+      notificationText(
+        notice("case_replied", {
+          task_id: 4,
+          commenters: [{ name: "asker" }],
+          commenter_count: 1,
+          comment_count: 1,
+        }),
+        t
+      )
     ).toContain("notifications.caseReplied");
     expect(
       notificationText(

@@ -1,4 +1,5 @@
 import {
+  ActorKind,
   WikiPageKind,
   WikiPageOrder,
   type WikiPageRead,
@@ -23,6 +24,8 @@ export function buildWiki(overrides: Partial<WikiRead> = {}): WikiRead {
     initiative_id: 1,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",
     archived_at: null,
@@ -58,6 +61,8 @@ export function buildWikiPage(overrides: Partial<WikiPageRead> = {}): WikiPageRe
     title: `Page ${counter}`,
     slug: `page-${counter}`,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",
     headings: [],

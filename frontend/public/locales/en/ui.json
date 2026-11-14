@@ -1,0 +1,288 @@
+{
+  "loading": "Loading…",
+  "loadError": "Couldn't load this.",
+  "tryAgain": "Try again",
+  "loadMore": "Show more",
+  "clear": "Clear",
+  "next": "Next",
+  "previous": "Previous",
+  "selectAll": "Select all",
+  "combobox": {
+    "placeholder": "Select an option",
+    "search": "Search",
+    "noResults": "No results found"
+  },
+  "copy": {
+    "label": "Copy",
+    "copied": "Copied!",
+    "unavailable": "Could not copy — copy it by hand"
+  },
+  "dateRange": {
+    "any": "Any date",
+    "fromOnly": "From {{date}}",
+    "untilOnly": "Until {{date}}",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "thisQuarter": "This quarter",
+    "thisYear": "This year",
+    "fromLabel": "From",
+    "untilLabel": "Until",
+    "open": "Open",
+    "fromRemove": "Remove the start date",
+    "untilRemove": "Remove the end date",
+    "clear": "Clear dates"
+  },
+  "datePicker": {
+    "pickDate": "Pick a date",
+    "pickDateTime": "Pick a date and time",
+    "typeDate": "Type or pick a date",
+    "time": "Time",
+    "invalidDate": "Enter a valid calendar date.",
+    "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval."
+  },
+  "days": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "emojiPicker": {
+    "pick": "Pick an emoji",
+    "searchPlaceholder": "Search emoji…",
+    "empty": "No emoji found.",
+    "prompt": "Select an emoji…"
+  },
+  "fileDrop": {
+    "release": "Drop it here",
+    "unsupported": "That kind of file can't be uploaded here."
+  },
+  "imagePicker": {
+    "chooseImage": "Choose an image",
+    "takePhoto": "Take a photo",
+    "chooseFromLibrary": "Choose from library",
+    "chooseFile": "Choose a file",
+    "permission": "Initiative needs permission to use your camera and photos. Allow it in your device settings, then try again.",
+    "unavailable": "This device has no camera to take a photo with.",
+    "failed": "That photo could not be read. Try again."
+  },
+  "lightbox": {
+    "open": "View this picture full size",
+    "openNamed": "View {{name}} full size",
+    "title": "Picture",
+    "description": "Use the arrow keys or swipe to move between pictures. Pinch, double-tap or scroll with Ctrl to zoom.",
+    "position": "{{current}} / {{total}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "close": "Close"
+  },
+  "memberPicker": {
+    "userWithId": "User #{{id}}",
+    "you": "You",
+    "remove": "Remove {{name}}",
+    "clearAll": "Clear assignees"
+  },
+  "multiSelect": {
+    "empty": "No options available",
+    "allSelected": "All selected",
+    "countSelected": "{{count}} selected",
+    "clearAll": "Clear all"
+  },
+  "pagination": {
+    "perPage": "Per page:",
+    "rangeOf": "{{start}}–{{end}} of {{total}}"
+  },
+  "pullToRefresh": {
+    "pull": "Pull to refresh",
+    "release": "Release to refresh",
+    "refreshing": "Refreshing…"
+  },
+  "rowActions": {
+    "label": "Actions",
+    "labelFor": "Actions for {{subject}}"
+  },
+  "table": {
+    "select": "Select",
+    "exitSelection": "Exit Selection",
+    "enableSelectionMode": "Enable Selection Mode",
+    "exitSelectionMode": "Exit Selection Mode",
+    "resetSorting": "Reset Sorting",
+    "groupBy": "Group by",
+    "chooseGrouping": "Choose grouping",
+    "none": "None",
+    "columns": "Columns",
+    "options": "Table Options",
+    "selectRow": "Select row",
+    "rowsSelected": "{{selected}} of {{total}} row(s) selected",
+    "rowsSelectedFiltered": "{{selected}} selected ({{total}} match filter)",
+    "noResults": "No results.",
+    "filter": "Filter…"
+  },
+  "wizard": {
+    "stepOf": "Step {{current}} of {{total}}"
+  },
+  "cancel": "Cancel",
+  "close": "Close",
+  "done": "Done",
+  "save": "Save",
+  "breadcrumb": "Breadcrumb",
+  "confirm": {
+    "continue": "Continue",
+    "working": "Please wait…"
+  },
+  "carousel": {
+    "previous": "Previous slide",
+    "next": "Next slide"
+  },
+  "colorPicker": {
+    "pick": "Pick a color",
+    "mode": "Mode"
+  },
+  "iconPicker": {
+    "search": "Search for an icon…",
+    "placeholder": "Select an icon",
+    "empty": "No icon found",
+    "other": "Other"
+  },
+  "fieldSave": {
+    "saving": "Saving…",
+    "saved": "Saved",
+    "failed": "Couldn't save",
+    "changed": "This changed while you were editing"
+  },
+  "boardColumn": {
+    "collapse": "Collapse {{name}}",
+    "expand": "Expand {{name}}"
+  },
+  "recurrence": {
+    "repeat": "Repeat",
+    "doesNotRepeat": "Does not repeat",
+    "daily": "Daily",
+    "everyWeekday": "Every weekday (Mon–Fri)",
+    "weeklyOn": "Weekly on {{day}}",
+    "monthlyOnDay": "Monthly on day {{day}}",
+    "annuallyOn": "Annually on {{month}} {{day}}",
+    "custom": "Custom…",
+    "frequency": "Frequency",
+    "frequencyDaily": "Daily",
+    "frequencyWeekly": "Weekly",
+    "frequencyMonthly": "Monthly",
+    "frequencyYearly": "Yearly",
+    "repeatEvery": "Repeat every",
+    "repeatEveryDays": "days",
+    "repeatEveryWeeks": "weeks",
+    "repeatEveryMonths": "months",
+    "repeatEveryYears": "years",
+    "repeatOn": "Repeat on",
+    "on": "On",
+    "position": "Position",
+    "positionFirst": "First",
+    "positionSecond": "Second",
+    "positionThird": "Third",
+    "positionFourth": "Fourth",
+    "positionFifth": "Fifth",
+    "positionLast": "Last",
+    "weekday": "Weekday",
+    "ends": "Ends",
+    "endsNever": "Never",
+    "endsOnDate": "On date",
+    "endsAfterCount": "After number of occurrences",
+    "repeatStrategy": "Repeat strategy",
+    "selectStrategy": "Select strategy",
+    "strategyOnSchedule": "On schedule",
+    "strategyAfterCompletion": "After completion",
+    "strategyOnScheduleDescription": "A new task is created on a fixed schedule based on dates.",
+    "strategyAfterCompletionDescription": "A new task is created a fixed interval after the previous one is completed.",
+    "mode": {
+      "day_of_month": "Days of the month",
+      "weekday": "A weekday of the month",
+      "weekdays": "Every chosen weekday",
+      "set": "The first or last of chosen days"
+    },
+    "lastDay": "Last",
+    "months": "Months",
+    "nextDates": "Next:",
+    "hourlyAfterCompletion": "Hourly (after completion)",
+    "everyHour": "Every hour",
+    "frequencyHourly": "Hourly",
+    "repeatEveryHours": "hours",
+    "dailyLimit": "Maximum per day (optional)",
+    "unlimited": "Unlimited",
+    "hourlyCompletionHelp": "Each completion schedules the next task after the selected number of hours. Leave the maximum blank to repeat continuously. With a maximum, reaching it or crossing midnight starts the next day at the first task’s time, delayed if needed to preserve the gap. Daily counts use the timezone of the person completing the task.",
+    "limitInvalid": "Not saved. Enter a whole daily maximum from 1 to 24, or leave it blank for no limit.",
+    "hourlyNeedsDueDate": "Set a due date and time for the first task before saving an hourly repeat.",
+    "weekdays": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "weekdaysShort": {
+      "monday": "Mon",
+      "tuesday": "Tue",
+      "wednesday": "Wed",
+      "thursday": "Thu",
+      "friday": "Fri",
+      "saturday": "Sat",
+      "sunday": "Sun"
+    },
+    "summary": {
+      "doesNotRepeat": "Does not repeat",
+      "repeats": "Repeats {{schedule}}",
+      "everySingular": "every {{unit}}",
+      "everyPlural": "every {{count}} {{unit}}",
+      "day": "day",
+      "days": "days",
+      "week": "week",
+      "weeks": "weeks",
+      "month": "month",
+      "months": "months",
+      "year": "year",
+      "years": "years",
+      "onWeekdays": "on {{weekdays}}",
+      "onDay": "on day {{day}}",
+      "onPositionWeekday": "on the {{position}} {{weekday}}",
+      "detailOfMonth": "{{detail}} of {{month}}",
+      "inMonth": "in {{month}}",
+      "afterCompletion": "after completion",
+      "untilDate": "until {{date}}",
+      "forOccurrences": "for {{count}} occurrences",
+      "custom": "Repeats on a custom schedule",
+      "onDays": "on days {{days}}",
+      "onLastDay": "on the last day",
+      "lastDayItem": "the last day",
+      "onEveryWeekdays": "on every {{weekdays}}",
+      "onFirstWorkDay": "on the first weekday",
+      "onLastWorkDay": "on the last weekday",
+      "onFirstOf": "on the first {{weekdays}}",
+      "onLastOf": "on the last {{weekdays}}",
+      "hour": "hour",
+      "hours": "hours",
+      "everyHour": "every hour",
+      "dailyLimit_one": "at most once per day",
+      "dailyLimit_other": "at most {{count}} times per day",
+      "positions": {
+        "first": "first",
+        "second": "second",
+        "third": "third",
+        "fourth": "fourth",
+        "fifth": "fifth",
+        "last": "last"
+      },
+      "monthNames": {
+        "1": "January",
+        "2": "February",
+        "3": "March",
+        "4": "April",
+        "5": "May",
+        "6": "June",
+        "7": "July",
+        "8": "August",
+        "9": "September",
+        "10": "October",
+        "11": "November",
+        "12": "December"
+      }
+    }
+  }
+}

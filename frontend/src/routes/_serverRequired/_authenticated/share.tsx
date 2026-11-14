@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SharePage } from "@/pages/share/SharePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/share")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/SharePage").then((m) => ({ default: m.SharePage }))
-  ),
+  component: SharePage,
 });

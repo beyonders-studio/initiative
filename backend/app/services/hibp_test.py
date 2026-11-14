@@ -1,6 +1,6 @@
 """Unit tests for the HaveIBeenPwned k-anonymity client.
 
-These tests stub the outbound HTTP call with ``httpx.MockTransport`` so
+These tests stub the outbound HTTP call with ``httpx2.MockTransport`` so
 they don't touch the real HIBP API.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 
-import httpx
+import httpx2
 import pytest
 
 from app.services import hibp
@@ -37,19 +37,19 @@ def enable_hibp(monkeypatch):
 
 
 def _install_transport(monkeypatch, handler):
-    """Patch ``httpx.AsyncClient`` to use a ``MockTransport`` so the
+    """Patch ``httpx2.AsyncClient`` to use a ``MockTransport`` so the
     real HIBP API is never contacted.
 
     The HIBP client constructs the AsyncClient inline; patching at the
     class level forwards our handler into that instance.
     """
-    original_init = httpx.AsyncClient.__init__
+    original_init = httpx2.AsyncClient.__init__
 
     def init_with_transport(self, *args, **kwargs):
-        kwargs["transport"] = httpx.MockTransport(handler)
+        kwargs["transport"] = httpx2.MockTransport(handler)
         original_init(self, *args, **kwargs)
 
-    monkeypatch.setattr(httpx.AsyncClient, "__init__", init_with_transport)
+    monkeypatch.setattr(httpx2.AsyncClient, "__init__", init_with_transport)
 
 
 class TestIsPasswordBreached:
@@ -63,11 +63,13 @@ class TestIsPasswordBreached:
         expected_prefix = _sha1(password)[:5]
         captured: dict[str, object] = {}
 
-        def handler(request: httpx.Request) -> httpx.Response:
+        def handler(request: httpx2.Request) -> httpx2.Response:
             captured["url"] = str(request.url)
             captured["headers"] = dict(request.headers)
             # No match for the suffix → not breached.
-            return httpx.Response(200, text="0000000000000000000000000000000000A:5\r\n")
+            return httpx2.Response(
+                200, text="0000000000000000000000000000000000A:5\r\n"
+            )
 
         _install_transport(monkeypatch, handler)
 
@@ -89,9 +91,9 @@ class TestIsPasswordBreached:
         password = "supersecretvalue"
         suffix = _sha1(password)[5:]
 
-        def handler(request: httpx.Request) -> httpx.Response:
+        def handler(request: httpx2.Request) -> httpx2.Response:
             body = f"{suffix}:42\r\n"
-            return httpx.Response(200, text=body)
+            return httpx2.Response(200, text=body)
 
         _install_transport(monkeypatch, handler)
         assert await hibp.is_password_breached(password) is True
@@ -105,8 +107,8 @@ class TestIsPasswordBreached:
         password = "supersecretvalue"
         suffix = _sha1(password)[5:]
 
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, text=f"{suffix}:0\r\n")
+        def handler(request: httpx2.Request) -> httpx2.Response:
+            return httpx2.Response(200, text=f"{suffix}:0\r\n")
 
         _install_transport(monkeypatch, handler)
         assert await hibp.is_password_breached(password) is False
@@ -114,9 +116,9 @@ class TestIsPasswordBreached:
     async def test_returns_false_when_no_suffix_match(self, enable_hibp, monkeypatch):
         password = "supersecretvalue"
 
-        def handler(request: httpx.Request) -> httpx.Response:
+        def handler(request: httpx2.Request) -> httpx2.Response:
             # Plausible-looking but non-matching suffix.
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 text="0000000000000000000000000000000000A:5\r\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE:1\r\n",
             )
@@ -128,15 +130,15 @@ class TestIsPasswordBreached:
         """A flaky HIBP outage must not block password changes — the
         length floor still applies as a hard gate."""
 
-        def handler(request: httpx.Request) -> httpx.Response:
-            raise httpx.ConnectError("unreachable")
+        def handler(request: httpx2.Request) -> httpx2.Response:
+            raise httpx2.ConnectError("unreachable")
 
         _install_transport(monkeypatch, handler)
         assert await hibp.is_password_breached("anything-long-enough") is False
 
     async def test_fails_open_on_http_error(self, enable_hibp, monkeypatch):
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(500, text="oops")
+        def handler(request: httpx2.Request) -> httpx2.Response:
+            return httpx2.Response(500, text="oops")
 
         _install_transport(monkeypatch, handler)
         assert await hibp.is_password_breached("anything-long-enough") is False

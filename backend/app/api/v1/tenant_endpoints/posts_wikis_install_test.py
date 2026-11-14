@@ -10,8 +10,9 @@ collection's files under the files scopes.
 from __future__ import annotations
 
 import io
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import pytest
 from sqlmodel import select
@@ -21,21 +22,21 @@ from app.main import plugin_openapi
 from app.models.tenant.post import Post
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
-    create_resource_grant,
-    guild_url,
     create_post,
     create_post_poll,
+    create_resource_grant,
     create_wiki,
     create_wiki_page,
     guild_of,
+    guild_url,
     lexical_body,
     png_bytes,
     route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
 
@@ -429,6 +430,17 @@ async def test_uploads_pictures_into_a_collection_with_the_files_scopes(
     )
     assert refused.status_code == 403, refused.text
     assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
+
+    # Binning it dates it by the community's retention, the one setting an
+    # install reads.
+    binned = await client.delete(
+        guild_url(guild_id, f"/collections/{collection_id}"), headers=headers
+    )
+    assert binned.status_code == 204, binned.text
+    gone = await client.get(
+        guild_url(guild_id, f"/collections/{collection_id}"), headers=headers
+    )
+    assert gone.status_code == 404, gone.text
 
 
 async def test_pins_the_posts_it_may_write(client, session, acting_user, role_session):

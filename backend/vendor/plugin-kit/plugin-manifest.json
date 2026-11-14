@@ -233,6 +233,24 @@
         "$ref": "#/$defs/page"
       }
     },
+    "sign_in": {
+      "type": "object",
+      "required": [
+        "page",
+        "return_path"
+      ],
+      "properties": {
+        "page": {
+          "$ref": "#/$defs/identifier",
+          "description": "The id of one of this plug-in's pages: the page somebody lands in after signing in at the plug-in's own address. Who may open it is decided as for that page inside Initiative, so somebody signs in only to a place where they could open it there."
+        },
+        "return_path": {
+          "$ref": "#/$defs/path",
+          "description": "Where Initiative sends somebody back with an authorization code: this path on the origin the deployment serves the plug-in's pages from. Matched exactly."
+        }
+      },
+      "description": "Sign in with Initiative: people may also open the plug-in at its own address, full-window, signing in with their Initiative account through OpenID Connect's authorization code flow. The ID token carries what the page handoff carries for the place they chose, and renews against Initiative. Needs 'pages'. Absent: the plug-in's pages open only inside Initiative."
+    },
     "dashboards": {
       "type": "array",
       "maxItems": 8,
@@ -272,6 +290,14 @@
         "$ref": "#/$defs/setting"
       },
       "description": "Values the community's admins set on the install, which the plug-in's expressions and its parts' text read. At most 16."
+    },
+    "permissions": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/permission"
+      },
+      "description": "What the community decides who may do with this plug-in, at most 16. Every page, field, part, action and endpoint answers to one: the one it names, or 'use' at its level. Absent: 'use' alone, at each level, which inside an initiative members start without."
     },
     "help": {
       "type": "object",
@@ -403,7 +429,7 @@
         "managed": {
           "type": "boolean",
           "default": false,
-          "description": "Returned by the plug-in's after_connect hook when a flow finishes; it is not typed into the settings form."
+          "description": "Returned by the plug-in's after_connect hook, when a flow finishes or when an admin saves a connection that declares 'after_connect'; it is not typed into the settings form."
         }
       },
       "if": {
@@ -726,11 +752,16 @@
           "items": {
             "$ref": "#/$defs/connectionField"
           },
-          "description": "Without a 'flow', what an admin types. With one, only the values the plug-in's after_connect hook returns, and every field is 'managed'. The tokens a flow obtains are held apart from these, under reserved keys the plug-in never declares."
+          "description": "Without a 'flow', what an admin types, and the managed values its 'after_connect' returns. With one, only the values the plug-in's after_connect hook returns, and every field is 'managed'. The tokens a flow obtains are held apart from these, under reserved keys the plug-in never declares."
         },
         "flow": {
           "$ref": "#/$defs/connectionFlow",
           "description": "How the connection is established. Initiative runs it: the redirect, the code exchange, refreshing and revoking. The plug-in never holds the vendor client's secret or a refresh token."
+        },
+        "after_connect": {
+          "type": "boolean",
+          "default": false,
+          "description": "Static connections without a 'flow', container plug-ins only. True: when an admin saves the connection, Initiative sends what they typed to the plug-in's after_connect hook before storing anything, and stores it with the managed values and account label the hook answers; when the hook refuses, nothing is stored. When the connection is cleared or replaced, Initiative sends the plug-in's revoke hook with the values it held, so it can remove what it made at the vendor."
         },
         "token": {
           "$ref": "#/$defs/connectionToken",
@@ -903,7 +934,7 @@
     },
     "webhooks": {
       "type": "object",
-      "description": "The vendor's webhooks, received by Initiative at one address per plug-in on the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, finds the communities it belongs to by a value in its body, and forwards it to the plug-in's webhook hook once for each. A container plug-in's hook receives each delivery; a declarative plug-in maps it with 'events' and 'status' instead.",
+      "description": "The vendor's webhooks, received by Initiative at one address per plug-in on the deployment, '/api/v1/plugin-hooks/<public_id>'. Initiative checks each delivery's signature, drops one it has already delivered, by its id or its body, finds the communities it belongs to by a value in its body, and forwards it to the plug-in's webhook hook once for each. A container plug-in's hook receives each delivery; a declarative plug-in maps it with 'events' and 'status' instead.",
       "required": [
         "verify",
         "dedup",
@@ -918,7 +949,7 @@
           "minLength": 1,
           "maxLength": 64,
           "pattern": "^[\\-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]+$",
-          "description": "The header carrying the vendor's id for one delivery, such as 'X-GitHub-Delivery'. A delivery with an id already forwarded to a community is not forwarded to it again."
+          "description": "The header carrying the vendor's id for one delivery, such as 'X-GitHub-Delivery'. A delivery with an id already forwarded to a community, or with the body of one, is not forwarded to it again."
         },
         "route": {
           "$ref": "#/$defs/webhookRoute"
@@ -945,7 +976,7 @@
     },
     "webhookVerify": {
       "type": "object",
-      "description": "How a delivery's signature is checked: an HMAC over the raw body under a vendor value.",
+      "description": "How a delivery's signature is checked: an HMAC over the raw body, under a vendor value or under the routed connection's own secret.",
       "required": [
         "scheme",
         "header",
@@ -982,7 +1013,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 300,
-          "description": "The signing secret, as one vendor value: '{vendor.<key>}'."
+          "description": "The signing secret: one vendor value, written '{vendor.<key>}', which signs every community's deliveries; or a managed 'secret' field of the connection 'route' names, written '{<key>}', which that connection's after_connect hook returned. With a connection's secret, a delivery is routed first and checked under the secret of each connection its route value names; one that none of them verifies is refused."
         }
       }
     },
@@ -1123,10 +1154,9 @@
           },
           "description": "Whose credential the call runs on, best first. Read and write only. An endpoint offering only 'member' refuses when that member has connected nothing, rather than quietly acting as the plug-in instead."
         },
-        "admin_only": {
-          "type": "boolean",
-          "default": false,
-          "description": "Only the community's admins read or call this endpoint — a figure for the community's settings page, say. Anyone who can see where it is used may otherwise."
+        "permission": {
+          "$ref": "#/$defs/identifier",
+          "description": "Read and write only. The initiative permission a reader holds, in the initiative it is read in, to read or call this through a widget, an action or a form: one this manifest declares at the initiative level, or 'use'. Absent: whoever can see where it is used. Another plug-in calling it for a member is held to that member's permission, the one named or 'use', where its token is confined to an initiative or else in one this plug-in is placed in; one calling it as the community, to what the community granted it."
         },
         "public": {
           "type": "boolean",
@@ -1250,10 +1280,9 @@
           ],
           "description": "Where the page renders. Declaring both gives it a community-wide entry and an entry inside each initiative."
         },
-        "admin_only": {
-          "type": "boolean",
-          "default": false,
-          "description": "Only the community's admins open this page, whatever roles a placement allows — a settings page, say. Who else may open a page is chosen in the community, per initiative and per role, not declared here."
+        "permission": {
+          "$ref": "#/$defs/identifier",
+          "description": "The permission that opens it, at each level it renders in: one this manifest declares at that level, or 'use'. Absent: 'use'. Who holds it is the community's to decide, never the plug-in's."
         },
         "capabilities": {
           "type": "array",
@@ -1389,6 +1418,10 @@
             "$ref": "#/$defs/identifier"
           },
           "description": "Declarative plug-ins, on a list field: actions offered on each of its elements, by id, each one offered on every item kind this field is. An action run from an element reads that element's 'ref' as 'element'."
+        },
+        "permission": {
+          "$ref": "#/$defs/identifier",
+          "description": "The initiative permission a reader holds to see it: one this manifest declares at the initiative level, or 'use'. Absent: 'use'."
         },
         "requires": {
           "$ref": "#/$defs/requires"
@@ -1802,6 +1835,10 @@
           "$ref": "#/$defs/localizedText",
           "description": "The one line the view editor's Add picker shows beside the name."
         },
+        "permission": {
+          "$ref": "#/$defs/identifier",
+          "description": "The initiative permission a reader holds to see it: one this manifest declares at the initiative level, or 'use'. Absent: 'use'."
+        },
         "requires": {
           "$ref": "#/$defs/requires"
         }
@@ -1866,13 +1903,60 @@
           "default": false,
           "description": "Also offered in the item's own menu."
         },
-        "admin_only": {
-          "type": "boolean",
-          "default": false,
-          "description": "Only the community's admins run this action, whatever roles a placement allows. Who else may run it is chosen in the community, per initiative and per role, not declared here."
+        "permission": {
+          "$ref": "#/$defs/identifier",
+          "description": "The initiative permission a reader holds to run it: one this manifest declares at the initiative level, or 'use'. Absent: 'use'."
         },
         "requires": {
           "$ref": "#/$defs/requires"
+        }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "description": "Something the community decides who may do with the plug-in, at one level. Inside an initiative, its roles hold it as they hold a tool's permissions, and its managers and the community's admins always do. At the community level, its admins hold it as they hold the parts of administering the community, and a custom role on the admin rung keeps some of them. The plug-in names a permission and says whether members start with it; who holds it is the community's to decide.",
+      "required": [
+        "id",
+        "name",
+        "level"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Unique among this manifest's permissions of its level. 'use' is every plug-in's at each level, declared or not: declaring it names it, and inside an initiative says whether members start with it."
+        },
+        "name": {
+          "$ref": "#/$defs/localizedText",
+          "description": "What the community's role pages call it."
+        },
+        "level": {
+          "enum": [
+            "community",
+            "initiative"
+          ],
+          "description": "Where it is held: 'initiative' by an initiative's roles, 'community' by the community's admins."
+        },
+        "members": {
+          "type": "boolean",
+          "default": false,
+          "description": "An initiative permission's only: whether a role holds it where nobody in the community said otherwise. Absent: only the roles the community chooses."
+        }
+      },
+      "if": {
+        "properties": {
+          "level": {
+            "const": "community"
+          }
+        },
+        "required": [
+          "level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "members": {
+            "const": false
+          }
         }
       }
     },
@@ -2428,7 +2512,7 @@
               "$ref": "#/$defs/actorConnections"
             }
           ],
-          "description": "Which connection's credential the request carries: one connection for every call, or, on a write endpoint's requests, one per actor ('actorConnections'), so a call made as the member carries the member's own credential and one made as the installation the community's. A static connection's credential is the community's, an interactive one's the acting member's, which a call made as the installation does not have. A call made as a member carries a static connection's credential only when the endpoint's 'requires' names that connection, and is refused otherwise. Required on an endpoint's requests. Absent on 'after_connect' and 'health', which carry the credential of the connection they belong to."
+          "description": "Which connection's credential the request carries: one connection for every call, or one per actor ('actorConnections'), so a call made as the member carries the member's own credential and one made as the installation the community's. A static connection's credential is the community's, an interactive one's the acting member's, which a call made as the installation does not have. A call made as a member carries a static connection's credential only when the endpoint's 'requires' names that connection, and is refused otherwise. Required on an endpoint's requests. Absent on 'after_connect' and 'health', which carry the credential of the connection they belong to."
         },
         "paging": {
           "$ref": "#/$defs/paging"
@@ -2458,7 +2542,7 @@
     },
     "actorConnections": {
       "type": "object",
-      "description": "One connection per actor, on a write endpoint's requests: a call carries the credential of the connection named for the actor it is made as. Names exactly the actors the endpoint's 'actors' declare. The member's connection need not be named in 'requires': a call made as the member requires the connection its requests name for the member.",
+      "description": "One connection per actor, on a read or write endpoint's requests: a call carries the credential of the connection named for the actor it is made as. Names exactly the actors the endpoint's 'actors' declare. The member's connection need not be named in 'requires': a call made as the member requires the connection its requests name for the member.",
       "minProperties": 1,
       "properties": {
         "member": {

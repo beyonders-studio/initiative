@@ -18,15 +18,15 @@ from app.testing import create_user
 
 
 def _registered(**overrides) -> passkeys.RegisteredCredential:
-    base = dict(
-        credential_id=b"credential-one",
-        public_key=b"public-key-bytes",
-        sign_count=0,
-        aaguid="00000000-0000-0000-0000-000000000000",
-        user_verified=True,
-        backed_up=False,
-        transports=["internal", "hybrid"],
-    )
+    base = {
+        "credential_id": b"credential-one",
+        "public_key": b"public-key-bytes",
+        "sign_count": 0,
+        "aaguid": "00000000-0000-0000-0000-000000000000",
+        "user_verified": True,
+        "backed_up": False,
+        "transports": ["internal", "hybrid"],
+    }
     base.update(overrides)
     return passkeys.RegisteredCredential(**base)
 

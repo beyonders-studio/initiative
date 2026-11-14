@@ -11,7 +11,19 @@
       "privacy": "Confidentialité"
     },
     "loginRequired": "Vous devez être connecté pour gérer votre profil.",
-    "goToLogin": "Aller à la connexion"
+    "goToLogin": "Aller à la connexion",
+    "version": "Initiative v{{version}}"
+  },
+  "settingsSection": {
+    "whenYouSave": "À l'enregistrement",
+    "change": "Modifier",
+    "changeRule": "Modifier {{rule}}",
+    "on": "Activé",
+    "off": "Désactivé",
+    "days_one": "{{count}} jour",
+    "days_other": "{{count}} jours",
+    "hours_one": "{{count}} heure",
+    "hours_other": "{{count}} heures"
   },
   "communityLayout": {
     "title": "Paramètres de la communauté",
@@ -72,8 +84,6 @@
   "addresses": {
     "title": "Adresses e-mail",
     "description": "Toute adresse confirmée vous connecte, et le courrier de votre compte arrive sur toutes.",
-    "loadFailed": "Vos adresses n'ont pas pu être chargées.",
-    "retry": "Réessayer",
     "primary": "Principale",
     "unverified": "Non confirmée",
     "makePrimary": "Définir comme principale",
@@ -117,10 +127,7 @@
     "waits": "Cette modification attend jusqu'au {{date}}. Chaque adresse de votre compte a reçu un e-mail à ce sujet."
   },
   "security": {
-    "loadingDevices": "Chargement des appareils…",
-    "devicesError": "Impossible de charger les appareils.",
     "unknownDevice": "Appareil inconnu",
-    "revokeDialogCancel": "Annuler",
     "revoking": "Révocation en cours…",
     "revokeError": "Impossible de révoquer l'accès de l'appareil",
     "newKeyTitle": "Nouvelle clé d'API",
@@ -143,8 +150,6 @@
     "nameRequired": "Le nom est obligatoire",
     "createSuccess": "Clé d'API créée",
     "createError": "Impossible de créer la clé d'API",
-    "loadingKeys": "Chargement des clés API…",
-    "keysError": "Impossible de charger les clés d'API.",
     "noKeys": "Aucune clé d'API pour l'instant.",
     "statusExpired": "Expirée",
     "statusDisabled": "Désactivée",
@@ -193,10 +198,6 @@
     "deleteDialogDescription": "Tout ce qui utilise {{name}} cesse de fonctionner immédiatement."
   },
   "ai": {
-    "loading": "Chargement des paramètres d'IA…",
-    "loadError": "Impossible de charger les paramètres d'IA.",
-    "enabled": "Actif",
-    "disabled": "Désactivé",
     "providerFieldLabel": "Fournisseur",
     "providerPlaceholder": "Sélectionnez un fournisseur",
     "modelLabel": "Modèle",
@@ -211,16 +212,9 @@
   "communityAI": {
     "title": "IA de la communauté",
     "adminOnly": "Seuls les administrateurs de la communauté peuvent gérer les connexions d'IA.",
-    "connectionsTitle": "Connexions de la communauté",
-    "connectionsDescription": "Définissez les connexions d'IA que les membres de cette communauté peuvent utiliser.",
     "disabledDescription": "Les fonctionnalités d'IA sont désactivées pour la plateforme.",
-    "managedByPlatform": "Les connexions d'IA sont gérées au niveau de la plateforme. Les membres définissent leur propre clé dans les paramètres de leur profil.",
-    "managedByServer": "La personne qui gère ce serveur s'occupe de l'IA de cette communauté.",
-    "switchTitle": "L'IA dans cette communauté",
-    "switchLabel": "Autoriser les fonctions d'IA",
-    "switchHelp": "Désactivée, rien de cette communauté n'est envoyé à un fournisseur d'IA, quelle que soit la connexion configurée par le serveur ou la communauté.",
-    "switchSaved": "Paramètre d'IA enregistré",
-    "switchError": "Impossible d'enregistrer le paramètre d'IA."
+    "managedByPlatform": "Les connexions d'IA sont gérées au niveau de la plateforme.",
+    "managedByServer": "La personne qui gère ce serveur s'occupe de l'IA de cette communauté."
   },
   "platformAI": {
     "title": "IA de la plateforme",
@@ -236,9 +230,7 @@
     "saveMode": "Enregistrer",
     "savingMode": "Enregistrement…",
     "modeSaved": "Paramètres d'IA mis à jour",
-    "modeSaveError": "Impossible de mettre à jour les paramètres d'IA",
-    "connectionsTitle": "Connexions de la plateforme",
-    "connectionsDescription": "Définissez les connexions d'IA utilisées par chaque communauté."
+    "modeSaveError": "Impossible de mettre à jour les paramètres d'IA"
   },
   "marketplaceRegistry": {
     "title": "Registre du catalogue",
@@ -276,6 +268,11 @@
   },
   "interface": {
     "colorTheme": "Thème de couleurs",
+    "mode": "Clair ou sombre",
+    "eventThemes": {
+      "label": "Thèmes d'événements",
+      "description": "Habille l'application pour les fêtes et les événements."
+    },
     "colorThemeDescription": "Choisissez un thème de couleurs pour l'application.",
     "weekStartsOn": "Début de la semaine",
     "weekStartsOnDescription": "Choisissez le jour affiché en premier dans les calendriers et les sélecteurs de date.",
@@ -296,13 +293,32 @@
     "updateError": "Impossible de mettre à jour les préférences d'interface",
     "themeDescriptions": {
       "kobold": "Le thème classique d'Initiative, aux tons indigo profonds.",
-      "displacer": "Thème pastel apaisant inspiré de Catppuccin (Latte/Macchiato).",
-      "strahd": "Thème gothique sombre aux accents violets (Dracula/Alucard).",
+      "catppuccin": "Pastels apaisants : Latte en mode clair, et Frappé, Macchiato ou Mocha en mode sombre.",
+      "dracula": "Accents violets : Alucard en mode clair, Dracula en mode sombre.",
       "unicorn": "Arc-en-ciel néon sur tout le spectre — haut en couleur et fier de l'être.",
       "darkKnight": "Thème noir AMOLED aux accents rouge foncé et jaunes.",
       "orc": "Thème vert terreux aux accents vert vif de peau d'orc. ORC ORC ORC !",
-      "aboleth": "Antre sombre inspiré de Monokai, aux vifs accents bioluminescents."
+      "monokai": "Vifs accents citron vert, cyan, violet, orange et rose sur des neutres chauds.",
+      "nord": "Bleus arctiques et gris givrés : Snow Storm en mode clair, Polar Night en mode sombre.",
+      "elemental": "Un éclat métallique dans toute l'application, dans l'élément de votre choix."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Cuivre",
+        "silver": "Argent",
+        "gold": "Or",
+        "roseGold": "Or rose",
+        "lapis": "Lapis-lazuli",
+        "cobalt": "Cobalt",
+        "emerald": "Émeraude",
+        "garnet": "Grenat",
+        "amethyst": "Améthyste",
+        "obsidian": "Obsidienne"
+      }
+    },
+    "themeVariantGroup": "Variantes de {{theme}}",
+    "useVariantForDark": "Utiliser {{variant}} en mode sombre",
+    "useVariant": "Utiliser {{variant}}",
     "taskCompletionVisualFeedback": {
       "label": "Effet à la fin d'une tâche",
       "description": "Un peu de fun quand vous terminez une tâche qui vous était assignée.",
@@ -550,8 +566,6 @@
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres d'image de marque.",
     "colorsTitle": "Couleurs de la marque",
     "colorsDescription": "Personnalisez les couleurs d'accent des modes clair et sombre.",
-    "loadingInterface": "Chargement des paramètres d'interface…",
-    "interfaceError": "Impossible de charger les paramètres d'interface.",
     "lightModeLabel": "Accent du mode clair",
     "lightModeHelp": "Les boutons, les surbrillances et les états de focus utilisent cette couleur lorsque l'application est en mode clair.",
     "darkModeLabel": "Accent du mode sombre",
@@ -626,8 +640,6 @@
   "email": {
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres e-mail.",
     "title": "E-mail SMTP",
-    "loading": "Chargement des paramètres e-mail…",
-    "loadError": "Impossible de charger les paramètres d'e-mail.",
     "hostLabel": "Hôte",
     "hostPlaceholder": "smtp.fournisseurmail.com",
     "portLabel": "Port",
@@ -655,8 +667,6 @@
   },
   "push": {
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres des notifications push.",
-    "loading": "Chargement des paramètres des notifications push…",
-    "loadError": "Impossible de charger les paramètres des notifications push.",
     "title": "Firebase Cloud Messaging",
     "description": "Facultatif. Sans clé de compte de service, les notifications push passent par le relais push de BeyondersStudio et ces champs peuvent rester vides. Avec une clé, les notifications Android passent par votre propre projet Firebase ; celles de l'iPhone passent toujours par le relais.",
     "enabledLabel": "Envoyer des notifications push",
@@ -691,8 +701,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "Une vérification que la personne qui s'inscrit, ou qui demande un code de connexion par e-mail, n'est pas un robot.",
-    "on": "Activé",
-    "off": "Désactivé",
     "providerLabel": "Fournisseur",
     "providers": {
       "off": "Aucun",
@@ -705,15 +713,12 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Laissez vide pour conserver la clé secrète enregistrée.",
     "incomplete": "Le captcha s'active une fois le fournisseur, la clé du site et la clé secrète enregistrés.",
-    "save": "Enregistrer les paramètres du captcha",
-    "saving": "Enregistrement…",
+    "missingKeys": "inactif tant que la clé du site et la clé secrète ne sont pas enregistrées",
     "saved": "Paramètres du captcha enregistrés",
     "error": "Impossible d'enregistrer les paramètres du captcha"
   },
   "auth": {
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres d'authentification.",
-    "loading": "Chargement des paramètres d'authentification…",
-    "loadError": "Impossible de charger les paramètres d'authentification.",
     "postLoginRedirect": "Redirection après connexion :",
     "mobileCallback": "Rappel de l'application mobile :",
     "deploymentTitle": "Cette installation",
@@ -740,7 +745,7 @@
       "communitiesRequire_one": "{{count}} communauté exige une connexion via un fournisseur qui lui est propre.",
       "communitiesRequire_other": "{{count}} communautés exigent une connexion via un fournisseur qui leur est propre.",
       "totp": {
-        "label": "Activer l'authentification à deux facteurs",
+        "label": "Application d'authentification",
         "help": "Permettez aux gens de protéger leur compte avec un code issu d'une application d'authentification. Chacun l'active pour soi ; ici, il s'agit de savoir si le serveur la propose."
       },
       "passkey": {
@@ -753,7 +758,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "Durée pendant laquelle les gens restent connectés",
+      "title": "Durée de session",
       "description": "Le temps maximal avant de devoir se reconnecter, quelle que soit l'utilisation de l'application. À distinguer de la déconnexion pour inactivité.",
       "label": "Heures",
       "placeholder": "Aucune limite",
@@ -762,21 +767,23 @@
       "error": "Nous n'avons pas pu enregistrer la limite de session.",
       "idleLabel": "Minutes d'inactivité",
       "idlePlaceholder": "Aucune limite",
+      "idleDetail_one": "les sessions inactives se terminent après {{count}} minute",
+      "idleDetail_other": "les sessions inactives se terminent après {{count}} minutes",
+      "idleDefault": "les sessions inactives se terminent selon la fenêtre définie au déploiement",
       "idleHint": "Combien de temps une session peut rester intouchée avant de se terminer. Laissez vide pour conserver la fenêtre définie au déploiement. Utiliser l'application compte comme y toucher : le délai ne s'écoule qu'une fois arrêté. Une communauté tenue au standard de conformité le raccourcit davantage pour ses membres."
     },
     "breachedPasswordCheck": {
-      "title": "Mots de passe compromis",
-      "description": "Refuser un nouveau mot de passe déjà apparu dans une fuite de données.",
-      "label": "Vérifier les nouveaux mots de passe parmi les fuites connues",
-      "onHelp": "Seuls les cinq premiers caractères de l'empreinte du mot de passe quittent ce serveur. Jamais le mot de passe lui-même.",
-      "offHelp": "Les nouveaux mots de passe ne sont pas vérifiés. Désactivez-le uniquement si ce serveur ne peut pas accéder à internet.",
+      "title": "Vérification des mots de passe compromis",
+      "description": "Refuse un nouveau mot de passe déjà apparu dans une fuite de données. Seuls les cinq premiers caractères de son empreinte quittent ce serveur, jamais le mot de passe lui-même.",
+      "onLabel": "Vérifier les nouveaux mots de passe parmi les fuites connues",
+      "offLabel": "Ne pas vérifier, pour un serveur sans accès à internet",
       "enabledToast": "Les nouveaux mots de passe sont vérifiés parmi les fuites connues.",
       "disabledToast": "Les nouveaux mots de passe ne sont plus vérifiés parmi les fuites connues.",
       "error": "Nous n'avons pas pu modifier la vérification des mots de passe compromis."
     },
     "secondFactorRequirement": {
-      "title": "Authentification à deux facteurs",
-      "description": "Si les personnes ici doivent posséder un second facteur — une application d'authentification ou une clé d'accès — en plus d'un moyen de se connecter.",
+      "title": "Second facteur",
+      "description": "Qui doit posséder un second facteur, une application d'authentification ou une clé d'accès, en plus d'un moyen de se connecter.",
       "levels": {
         "nobody": {
           "label": "Personne n'y est tenu",
@@ -798,23 +805,22 @@
       "present": "Saisir un code",
       "saved": "Enregistré. Les personnes concernées seront sollicitées à leur prochaine requête.",
       "error": "Nous n'avons pas pu enregistrer cela.",
-      "noMethod": "Autorisez d'abord l'application d'authentification ou les clés d'accès : sans l'une ou l'autre, il n'y a rien à exiger.",
+      "noMethod": "Proposez d'abord l'application d'authentification ou les clés d'accès. Sans l'une ou l'autre, il n'y a rien à demander.",
       "providers": {
         "title": "Fournisseurs dont la connexion compte",
         "help": "Une connexion via l’un d’eux satisfait l’exigence ci-dessus, car le fournisseur indique avoir appliqué son propre second facteur. La même réponse que sur la page du fournisseur."
       }
     },
     "factorMethods": {
-      "title": "Authentification à deux facteurs",
-      "description": "Ce que ce serveur propose comme second facteur. Savoir si quelqu'un doit en détenir un est le réglage suivant.",
+      "title": "Seconds facteurs proposés",
+      "description": "Les seconds facteurs que les gens peuvent configurer. La règle Second facteur décide si quelqu'un doit en détenir un.",
       "saved": "Authentification à deux facteurs mise à jour.",
       "saveError": "Impossible de modifier l'authentification à deux facteurs.",
-      "followsWaysIn": "Une clé d'accès prouve l'appareil et la personne d'un seul geste : elle répond donc à ceci en plus d'ouvrir une session. L'activation des clés d'accès se décide sous « Moyens d'accès »."
+      "setUnderWaysIn": "Défini sous Moyens d'accès",
+      "none": "Aucun"
     }
   },
   "platformUsers": {
-    "loading": "Chargement des utilisateurs…",
-    "loadError": "Impossible de charger les utilisateurs.",
     "filterPlaceholder": "Filtrer par identifiant…",
     "columnId": "ID utilisateur",
     "columnHandle": "Identifiant",
@@ -846,8 +852,8 @@
     },
     "roleDescriptions": {
       "member": "Accès standard à ses propres communautés. Aucun privilège au niveau de la plateforme.",
-      "support": "Visibilité en lecture seule de la plateforme (utilisateurs, communautés) et peut demander un accès temporaire à une communauté.",
-      "moderator": "Tout ce que peut faire le support, plus la gestion des utilisateurs (suspendre/réactiver) et la modération du contenu.",
+      "support": "Tout ce que peut faire un modérateur, plus la récupération de comptes (connexion, second facteur, réactivation), et peut demander un accès temporaire en lecture ou en lecture et écriture à une communauté.",
+      "moderator": "Voit les utilisateurs et les communautés de la plateforme, modère les comptes et le contenu, suspend des comptes et peut demander un accès de modération temporaire à une communauté.",
       "operator": "Gère les utilisateurs, les communautés et les rôles sur toute la plateforme, avec accès aux données inter-communautés et approuve les demandes d'accès.",
       "owner": "Contrôle total, y compris la configuration de toute la plateforme (authentification, personnalisation, email, IA). Le seul rôle pouvant gérer la configuration."
     },
@@ -937,8 +943,6 @@
         "title": "Cas",
         "count_one": "{{count}} cas ouvert déposé par cette personne ou la concernant.",
         "count_other": "{{count}} cas ouverts déposés par cette personne ou la concernant.",
-        "loading": "Chargement des cas…",
-        "loadError": "Impossible de charger ses cas.",
         "filed": "Déposé par la personne",
         "about": "La concernant",
         "help": "Pour ouvrir un cas, il vous faut l’accès au projet où il est tenu."
@@ -1019,7 +1023,7 @@
     "requestDescription": "Demandez un accès temporaire et limité à une communauté. Les approbateurs l'accordent et il expire automatiquement.",
     "breakGlass": {
       "title": "Accès d'urgence",
-      "description": "Accordez-vous un accès d'urgence à une communauté — approuvé instantanément, limité à cette communauté et expirant automatiquement. Lecture et écriture agit comme un administrateur de communauté complet. Chaque accès d'urgence est enregistré.",
+      "description": "Accordez-vous un accès d'urgence à une communauté — approuvé instantanément, limité à cette communauté et expirant automatiquement. Il vous permet de modifier le contenu existant et de changer les paramètres de la communauté. Chaque accès d'urgence est enregistré.",
       "reasonPlaceholder": "Pourquoi vous avez besoin d'un accès d'urgence (p. ex. incident n° 123)",
       "submit": "Accès d'urgence",
       "activated": "Accès d'urgence activé",
@@ -1068,7 +1072,6 @@
     "actionError": "Échec de l'action",
     "expiresIn": "expire dans {{minutes}} min",
     "minutes": "{{minutes}} min",
-    "loadMore": "Charger plus",
     "status": {
       "pending": "En attente",
       "approved": "Approuvé",
@@ -1120,15 +1123,12 @@
   },
   "pluginServices": {
     "platformOnly": "Seuls les propriétaires de la plateforme peuvent gérer les services de plug-in.",
-    "loading": "Chargement des services de plug-in…",
-    "loadError": "Impossible de charger les services de plug-in.",
     "title": "Services de plug-in",
     "description": "Les plug-ins que cette instance exécute. La fiche d'un plug-in dit ce qu'il est et ce qu'il peut faire ; ici, vous indiquez où il répond et les clés avec lesquelles il signe.",
     "empty": "Aucun service de plug-in pour l'instant. Un plug-in apparaît ici quand sa fiche arrive, ou quand vous l'ajoutez.",
     "addService": "Ajouter un service de plug-in",
     "edit": "Modifier",
     "delete": "Supprimer",
-    "cancel": "Annuler",
     "save": "Enregistrer",
     "saving": "Enregistrement…",
     "enabledLabel": "Actif",
@@ -1251,8 +1251,6 @@
   },
   "providerPlacement": {
     "description": "Affectez les personnes qu'un fournisseur de connexion connecte — selon le groupe ou l'annuaire qu'il indique — à une communauté, et à une initiative de celle-ci si vous en nommez une.",
-    "loading": "Chargement des règles d'affectation…",
-    "loadError": "Impossible de charger les règles d'affectation. Veuillez réessayer.",
     "platformOnly": "L'affectation à la connexion est gérée par les opérateurs et propriétaires de la plateforme.",
     "everywhere": {
       "label": "Appliquer les règles d'affectation à toutes les communautés",
@@ -1321,8 +1319,6 @@
     "title": "Limites par communauté",
     "description": "Définissez des limites par communauté pour le stockage et le nombre d'utilisateurs. Abaisser une limite en dessous de l'utilisation actuelle bloque les nouveaux téléversements ou membres, mais ne supprime jamais les fichiers ni les membres existants.",
     "platformOnly": "Vous devez avoir un rôle d’équipe de la plateforme pour voir les communautés.",
-    "loading": "Chargement des communautés…",
-    "loadError": "Impossible de charger les communautés. Veuillez réessayer.",
     "filterByName": "Filtrer les communautés par nom",
     "unlimitedPlaceholder": "Illimité",
     "helpText": "Les limites de stockage sont en Go ; les limites d'utilisateurs correspondent à un nombre de membres. Les deux sont enregistrées automatiquement — laissez un champ vide pour illimité.",
@@ -1402,7 +1398,6 @@
       "storageLabel": "Limite de stockage",
       "decidesForItself": "Ce qu'elle décide elle-même",
       "deleted": "Supprimée",
-      "pluginSummariesUnavailable": "L'utilisation des plug-ins n'a pas pu être chargée.",
       "narrowings": {
         "title": "Qui elle compte comme les siens",
         "help": "Cette communauté indique quelles arrivées via un fournisseur sont les siennes. Elle nomme elle-même les valeurs : votre accord est ce qui permet l’adhésion automatique — d’ici là, la connexion ne sert qu’aux personnes déjà présentes.",
@@ -1454,8 +1449,6 @@
   },
   "storage": {
     "platformOnly": "Seuls les propriétaires de la plateforme peuvent configurer le stockage.",
-    "loading": "Chargement des paramètres de stockage…",
-    "loadError": "Échec du chargement des paramètres de stockage.",
     "title": "Stockage d'objets",
     "description": "Choisissez où sont stockés les fichiers téléversés et les pièces jointes. Par défaut, le système de fichiers local ; passez à un stockage compatible S3 pour des déploiements évolutifs ou partagés.",
     "backendLabel": "Backend de stockage",
@@ -1463,7 +1456,7 @@
     "backendS3": "Compatible S3",
     "backendHelp": "Local stocke les fichiers sur le disque du serveur. S3 fonctionne avec tout stockage compatible S3, comme une instance Garage ou MinIO auto-hébergée, ou Cloudflare R2.",
     "cutoverTitle": "Passer à S3 ne déplace pas les fichiers existants",
-    "cutoverHelp": "Enregistrez ces paramètres, lancez Tester la connexion, puis utilisez Migration ci-dessous pour copier les fichiers locaux existants dans le bucket. Ne basculez le backend sur S3 qu'une fois la migration terminée — vous pouvez laisser « Servir les objets manquants depuis le local » activé pendant une période de vérification.",
+    "cutoverHelp": "Lancez d'abord Tester la connexion. Enregistrez ensuite avec « Servir les objets manquants depuis le local » activé : les nouveaux fichiers vont dans le bucket, et un fichier qui n'y est pas encore est lu depuis le disque. Copiez les fichiers existants avec la migration ci-dessous, puis désactivez cette option une fois qu'elle s'est terminée sans échec.",
     "bucketLabel": "Bucket",
     "bucketPlaceholder": "my-initiative-uploads",
     "regionLabel": "Région",
@@ -1488,7 +1481,7 @@
     "testSuccess": "Connexion réussie.",
     "testError": "Échec de la connexion.",
     "backfillTitle": "Migrer les fichiers locaux vers S3",
-    "backfillHelp": "Copie chaque téléversement local existant dans le bucket configuré. Idempotent et sûr à relancer ; exécutez-le avant de basculer le backend sur S3.",
+    "backfillHelp": "Copie chaque téléversement local existant dans le bucket en sautant ce qui s'y trouve déjà ; vous pouvez donc la relancer sans risque. Elle s'exécute une fois S3 enregistré comme backend.",
     "startBackfill": "Démarrer la migration",
     "backfillRunning": "Migration en cours…",
     "backfillStarted": "Migration démarrée.",
@@ -1505,19 +1498,19 @@
     "setByDeployment": "La personne qui gère ce serveur définit ce réglage pour ta communauté.",
     "shareUrl": {
       "title": "Lien de connexion des membres",
-      "description": "Partagez ce lien avec les membres — il propose les fournisseurs de connexion de cette communauté et les amène directement dans la communauté.",
-      "copy": "Copier le lien",
+      "description": "Propose ces fournisseurs et amène les gens directement dans {{community}}.",
+      "copy": "Copier",
       "copied": "Lien de connexion copié"
     },
     "policy": {
-      "title": "Exigence de connexion",
-      "description": "Contrôlez avec quelle connexion une session doit s'être authentifiée avant de pouvoir accéder à cette communauté.",
-      "openLabel": "Ouvert",
-      "openHelp": "Tout membre connecté peut accéder à cette communauté.",
-      "requiredLabel": "Exiger l'authentification unique",
-      "requiredHelp": "Les membres ne peuvent accéder à cette communauté qu'après s'être connectés avec le fournisseur sélectionné.",
+      "title": "Connexion des membres",
+      "description": "Ce dont les membres ont besoin avant de pouvoir ouvrir {{community}}.",
+      "openLabel": "Tout compte connecté",
+      "openHelp": "Les membres se connectent comme ce serveur le permet.",
+      "requiredLabel": "Via nos fournisseurs",
+      "requiredHelp": "Seule une connexion via le fournisseur choisi compte.",
       "providerPlaceholder": "Choisir un fournisseur…",
-      "noProviders": "Connectez d'abord un fournisseur sous « Qui entre ».",
+      "noProviders": "Connectez d'abord un fournisseur sous « Fournisseurs de connexion ».",
       "saved": "Exigence de connexion enregistrée",
       "error": "Impossible d'enregistrer l'exigence de connexion",
       "selfUnsatisfied": "Votre session actuelle ne s'est pas encore connectée avec {{providerName}}. Connectez-vous une fois avec pour confirmer son fonctionnement avant de l'exiger.",
@@ -1528,22 +1521,44 @@
       "presentPasskey": "Présenter la clé d'accès",
       "anyProvider": "L'un de nos fournisseurs de connexion",
       "anyProviderHelp": "Les membres peuvent entrer par n'importe quel fournisseur configuré par cette communauté. Se connecter ailleurs sur cette installation ne compte pas.",
-      "requireFactor": "Exiger aussi un second facteur",
-      "requireFactorHelp": "Les membres doivent avoir présenté un code de leur application d'authentification dans cette session. Ils peuvent l'ajouter sans se déconnecter.",
       "requirePasskey": "Exiger aussi une clé d'accès",
       "requirePasskeyHelp": "Les membres doivent s'être connectés avec une clé d'accès, ou en avoir présenté une, dans cette session. Ils peuvent l'ajouter sans se déconnecter.",
-      "factorRequiredByPlatform": "Votre serveur demande déjà un second facteur à tout le monde : il n'y a rien à ajouter ici."
+      "save": "Enregistrer l'exigence",
+      "value": {
+        "through": "Via {{provider}}",
+        "throughWithPasskey": "Via {{provider}}, avec une clé d'accès",
+        "any": "Via l'un de nos fournisseurs",
+        "anyWithPasskey": "Via l'un de nos fournisseurs, avec une clé d'accès",
+        "passkey": "Avec une clé d'accès"
+      },
+      "impact": {
+        "provider": "Les membres arrivés autrement devront se connecter via {{provider}} la prochaine fois qu'ils ouvriront {{community}}. Personne n'est déconnecté.",
+        "anyProvider": "Les membres arrivés autrement devront se connecter via l'un de vos fournisseurs la prochaine fois qu'ils ouvriront {{community}}. Personne n'est déconnecté.",
+        "passkey": "Les membres qui n'ont pas utilisé de clé d'accès dans cette session devront en présenter une la prochaine fois qu'ils ouvriront {{community}}. Personne n'est déconnecté.",
+        "selfProvider": "Si votre propre session n'a pas encore utilisé {{provider}}, vous vous connectez une fois avec avant l'enregistrement.",
+        "selfOther": "Si votre propre session ne la remplit pas encore, on vous le demandera avant l'enregistrement.",
+        "neverThrough_one": "{{count}} membre sur {{total}} ne s'est jamais connecté via {{provider}}.",
+        "neverThrough_other": "{{count}} membres sur {{total}} ne se sont jamais connectés via {{provider}}.",
+        "neverThroughAny_one": "{{count}} membre sur {{total}} ne s'est jamais connecté via l'un de vos fournisseurs.",
+        "neverThroughAny_other": "{{count}} membres sur {{total}} ne se sont jamais connectés via l'un de vos fournisseurs.",
+        "noPasskey_one": "{{count}} membre sur {{total}} n'a pas encore de clé d'accès.",
+        "noPasskey_other": "{{count}} membres sur {{total}} n'ont pas encore de clé d'accès."
+      }
     },
     "sessionLimit": {
-      "title": "Durée de session",
-      "allowLabel": "Se reconnecter toutes les douze heures",
+      "title": "Se reconnecter toutes les 12 heures",
       "saved": "Limite de session enregistrée",
       "error": "Impossible d'enregistrer la limite de session",
-      "help": "Pour les communautés à qui l’on a demandé de limiter la durée de connexion. Cela s’applique à vos membres partout, pas seulement ici."
+      "description": "Pour les communautés à qui l'on a demandé de limiter la durée de connexion.",
+      "offLabel": "Désactivé",
+      "onLabel": "Se reconnecter toutes les 12 heures",
+      "onDetail": "ces membres se reconnectent partout sur ce serveur",
+      "offDetail": "la durée de session de votre serveur s'applique",
+      "impact": "Cela s'applique à ces membres dans chaque communauté de ce serveur, pas seulement ici."
     },
     "connections": {
-      "title": "Quelles connexions sont les vôtres",
-      "description": "On se connecte à cette installation. Dites lesquels de ses fournisseurs comptent comme ceux de votre communauté, et qui chez eux compte comme les vôtres.",
+      "title": "Fournisseurs de connexion",
+      "description": "Les fournisseurs avec lesquels vos membres se connectent, et lesquels de leurs comptes comptent comme les vôtres.",
       "connect": "Connecter un fournisseur",
       "connected": "Fournisseur connecté",
       "connectError": "Impossible de modifier cette connexion",
@@ -1551,15 +1566,10 @@
       "disconnected": "Fournisseur déconnecté",
       "disconnectTitle": "Déconnecter {{name}} ?",
       "disconnectDescription": "Elle cesse de compter comme la vôtre : le bouton disparaît de votre page de connexion et personne de nouveau n’entre par là. Personne n’est déconnecté et aucun compte ne change. Si vous exigez une connexion par ce biais, levez-la d’abord.",
-      "empty": "Aucun fournisseur connecté pour l’instant — vos membres se connectent comme d’habitude.",
       "noneOffered": "Qui gère cette installation n’a encore proposé aucun fournisseur à connecter.",
       "notReady": "Indisponible",
-      "narrowedTo": "Uniquement les comptes dont le {{claim}} est {{values}}",
+      "narrowedTo": "{{claim}} : {{values}}",
       "anyoneItVouchesFor": "Toute personne dont ce fournisseur se porte garant",
-      "dialogTitle": "Connecter un fournisseur de connexion",
-      "dialogDescription": "Choisissez le fournisseur que vos membres utilisent, puis dites quels comptes chez lui sont les vôtres.",
-      "providerLabel": "Fournisseur",
-      "providerPlaceholder": "Choisissez-en un",
       "claimLabel": "Quels comptes comptent comme les vôtres",
       "claimHelp": "Les communautés sont distinctes ici : indiquez quels comptes de ce fournisseur sont les vôtres — un domaine Google Workspace, un locataire Entra, un groupe. Seules ces personnes comptent comme votre communauté.",
       "claimPlaceholder": "Choisissez ce qui identifie vos membres",
@@ -1567,7 +1577,7 @@
       "claimValuesPlaceholder": "example.com, example.org",
       "autoJoinLabel": "Les ajouter à cette communauté",
       "autoJoinHelp": "Toute personne considérée comme des vôtres devient membre à sa première connexion. Laissez désactivé pour inviter vous-même.",
-      "joinsOnArrival": "Les nouveaux arrivants rejoignent automatiquement",
+      "joinsOnArrival": "les nouveaux arrivants rejoignent",
       "claimOptions": {
         "hd": "Domaine Google Workspace",
         "tid": "Locataire Microsoft Entra",
@@ -1575,26 +1585,26 @@
         "domain": "Domaine",
         "other": "Une autre revendication…"
       },
-      "inherited": "Du déploiement",
+      "inherited": "De votre serveur",
       "makeItOurs": "En faire la nôtre",
       "claimNameLabel": "Nom de la revendication",
       "claimNamePlaceholder": "p. ex. org, realm",
       "joinsOnceAgreed": "Les arrivées correspondantes rejoindront aussitôt dès que la personne qui gère ce serveur confirme que ces valeurs sont les vôtres. D’ici là, elles sont admises et l’adhésion se fait sur invitation.",
-      "acceptsPlacementLabel": "Laisser le déploiement affecter les personnes de ce fournisseur",
-      "acceptsPlacementHelp": "Les règles d'affectation du déploiement pour ce fournisseur peuvent ajouter des personnes ici, en plus de vos propres règles."
+      "acceptsPlacementLabel": "Laisser votre serveur affecter les personnes",
+      "saved": "Connexion enregistrée",
+      "turnOff": "Désactiver",
+      "turnOn": "Activer"
     },
     "rules": {
-      "title": "Où arrivent vos membres",
-      "description": "Votre fournisseur indique les groupes auxquels appartient chaque personne. Dites ici ce que ces groupes signifient : qui rejoint comme membre, qui comme administrateur, et dans quelle initiative.",
+      "title": "Où arrivent les gens",
       "add": "Ajouter une règle",
       "added": "Règle ajoutée",
       "addError": "Impossible d'ajouter cette règle",
       "empty": "Aucune règle pour l'instant : les personnes arrivant par vos fournisseurs rejoignent sans affectation particulière.",
-      "connectFirst": "Connectez d'abord un fournisseur, puis dites ce que ses groupes signifient.",
       "noGroupsBadge": "Aucun groupe signalé",
       "noGroupsHint": "L'équipe qui gère ce déploiement n'a pas indiqué à ce fournisseur où se trouvent ses groupes : cette règle ne s'appliquera à personne tant que ce n'est pas fait.",
-      "landsInCommunity": "Arrive par {{provider}} — rejoint comme {{role}}",
-      "landsInInitiative": "Arrive par {{provider}} — rejoint comme {{role}}, et {{initiative}} comme {{initiativeRole}}",
+      "landsInCommunity": "Via {{provider}}, rejoint comme {{role}}",
+      "landsInInitiative": "Via {{provider}}, rejoint comme {{role}}, et {{initiative}} comme {{initiativeRole}}",
       "dialogDescription": "Nommez un groupe signalé par votre fournisseur et dites où appartiennent ses membres.",
       "providerLabel": "Fournisseur",
       "providerPlaceholder": "En choisir un",
@@ -1616,14 +1626,14 @@
       "removeTitle": "Supprimer cette règle ?",
       "removeDescription": "Les personnes portant {{group}} ne seront plus affectées ici, et celles qui sont ici grâce à cette règle perdront ce statut à leur prochaine connexion via ce fournisseur.",
       "deployment": {
-        "title": "Définies par le déploiement",
-        "description": "Règles d'affectation que l'équipe qui gère ce déploiement a écrites pour ses fournisseurs et qui nomment cette communauté. Elles affectent des personnes ici en plus de vos propres règles, dès que vous acceptez les règles d'un fournisseur sur sa connexion.",
-        "everywhere": "Le déploiement applique ses règles d'affectation à toutes les communautés."
-      }
-    },
-    "sections": {
-      "whoGetsIn": "Qui entre",
-      "onWhatTerms": "À quelles conditions"
+        "description": "Règles que votre serveur a écrites pour ses fournisseurs et qui nomment cette communauté. Elles affectent des personnes ici en plus de vos propres règles dès que la connexion de ce fournisseur laisse votre serveur affecter les personnes.",
+        "everywhere": "Votre serveur applique ses règles d'affectation à toutes les communautés.",
+        "count_one": "{{count}} règle de votre serveur",
+        "count_other": "{{count}} règles de votre serveur"
+      },
+      "saved": "Règle enregistrée",
+      "saveError": "Impossible d'enregistrer cette règle",
+      "editTitle": "Modifier la règle"
     },
     "emptyState": {
       "title": "Rien de connecté pour l’instant",
@@ -1649,7 +1659,6 @@
           "prompt": "Si cela devient la seule façon d'entrer."
         }
       },
-      "skip": "Passer",
       "ruleTitle": "Un premier groupe",
       "ruleHelp": "Facultatif. Nommez un groupe signalé par votre fournisseur et l'endroit où ses membres arrivent. Vous pourrez en ajouter d'autres ensuite.",
       "requireLabel": "Exiger que les membres passent par ce fournisseur",
@@ -1657,46 +1666,73 @@
     },
     "secondFactor": {
       "title": "Second facteur",
-      "description": "Si l’accès à cette communauté en demande un.",
-      "allowLabel": "Exiger un second facteur",
-      "help": "Les membres doivent avoir présenté un second facteur dans cette session. Quels types comptent relève du serveur, pas de cette communauté : ils peuvent en ajouter un sans se déconnecter.",
-      "askedByPlatform": "Votre serveur demande déjà un second facteur à tout le monde ici ; il n’y a rien à ajouter.",
+      "description": "Si l'ouverture de {{community}} demande un second facteur à chaque session.",
       "saved": "Second facteur enregistré.",
-      "error": "Impossible d’enregistrer l’exigence de second facteur."
+      "error": "Impossible d’enregistrer l’exigence de second facteur.",
+      "offLabel": "Non exigé",
+      "onLabel": "Exigé à chaque session",
+      "guestsToo": "invités compris",
+      "impact": "Toute personne qui ouvre {{community}}, invités compris, présente un code d'application d'authentification ou une clé d'accès à chaque session. Elle peut en ajouter un sans se déconnecter.",
+      "withoutFactor_one": "{{count}} personne sur {{total}} ici n'a pas encore d'authentificateur ni de clé d'accès.",
+      "withoutFactor_other": "{{count}} personnes sur {{total}} ici n'ont pas encore d'authentificateur ni de clé d'accès."
     },
     "guestPolicy": {
-      "title": "Exigence de connexion des invités",
-      "description": "Contrôlez quelle connexion la session d'un invité doit avoir utilisée avant d'atteindre cette communauté. Vous n'avez pas à la remplir vous-même.",
-      "openHelp": "Tout invité connecté peut atteindre ce qui lui a été donné.",
-      "requiredHelp": "Les invités ne peuvent atteindre cette communauté qu'après s'être connectés avec le fournisseur sélectionné.",
+      "title": "Connexion des invités",
+      "description": "Ce dont les invités ont besoin avant de pouvoir ouvrir {{community}}. Vous n'avez pas à la remplir vous-même.",
+      "openHelp": "Les invités se connectent comme ce serveur le permet.",
       "anyProviderHelp": "Les invités peuvent entrer par n'importe quel fournisseur configuré par cette communauté. Se connecter ailleurs sur cette installation ne compte pas.",
       "requirePasskeyHelp": "Les invités doivent s'être connectés avec une clé d'accès, ou en avoir présenté une, dans cette session. Ils peuvent l'ajouter sans se déconnecter.",
       "saved": "Exigence de connexion des invités enregistrée",
       "error": "Impossible d'enregistrer l'exigence de connexion des invités",
-      "save": "Enregistrer l'exigence de connexion des invités"
+      "impact": {
+        "provider": "Les invités arrivés autrement devront se connecter via {{provider}} la prochaine fois qu'ils ouvriront {{community}}. Personne n'est déconnecté.",
+        "anyProvider": "Les invités arrivés autrement devront se connecter via l'un de vos fournisseurs la prochaine fois qu'ils ouvriront {{community}}. Personne n'est déconnecté.",
+        "passkey": "Les invités qui n'ont pas utilisé de clé d'accès dans cette session devront en présenter une la prochaine fois qu'ils ouvriront {{community}}. Personne n'est déconnecté.",
+        "neverThrough_one": "{{count}} invité sur {{total}} ne s'est jamais connecté via {{provider}}.",
+        "neverThrough_other": "{{count}} invités sur {{total}} ne se sont jamais connectés via {{provider}}.",
+        "neverThroughAny_one": "{{count}} invité sur {{total}} ne s'est jamais connecté via l'un de vos fournisseurs.",
+        "neverThroughAny_other": "{{count}} invités sur {{total}} ne se sont jamais connectés via l'un de vos fournisseurs.",
+        "noPasskey_one": "{{count}} invité sur {{total}} n'a pas encore de clé d'accès.",
+        "noPasskey_other": "{{count}} invités sur {{total}} n'ont pas encore de clé d'accès."
+      }
     },
     "guestStay": {
-      "title": "Séjour des invités",
+      "title": "Séjour maximal des invités",
       "description": "Les invitations d'invité et les prolongations ne durent jamais plus longtemps que cela. Les invités déjà présents gardent leur date de fin.",
       "label": "Séjour maximal d'un invité (jours)",
       "hint_one": "Laissez vide pour utiliser la limite du serveur de {{count}} jour, qui est aussi le maximum que vous pouvez définir.",
       "hint_other": "Laissez vide pour utiliser la limite du serveur de {{count}} jours, qui est aussi le maximum que vous pouvez définir.",
       "saved": "Séjour maximal des invités enregistré",
       "error": "Impossible d'enregistrer le séjour maximal des invités",
-      "save": "Enregistrer le séjour maximal des invités"
+      "value_one": "{{count}} jour",
+      "value_other": "{{count}} jours",
+      "defaultDetail": "la limite de votre serveur",
+      "ceilingDetail": "votre serveur permet jusqu'à {{days}}"
+    },
+    "setByServer": "Défini par votre serveur",
+    "intro": "Comment on se connecte à {{community}}, ce qu'il faut pour entrer et ce qui sort de la communauté.",
+    "signInRules": {
+      "title": "Règles de connexion",
+      "description": "Ce qu'il faut avant de pouvoir ouvrir {{community}}.",
+      "members": "Membres",
+      "guests": "Invités"
+    },
+    "groupRules": {
+      "title": "Règles de groupe",
+      "description": "Ce que les groupes signalés par vos fournisseurs signifient ici. Chacune s'applique à la prochaine connexion.",
+      "add": "Ajouter"
     }
   },
   "authProviders": {
     "title": "Fournisseurs d'identité",
     "description": "Les fournisseurs d'authentification unique avec lesquels les personnes se connectent. Chacun dispose de son propre bouton sur la page de connexion.",
     "addProvider": "Ajouter un fournisseur",
-    "loading": "Chargement des fournisseurs…",
     "empty": "Aucun fournisseur configuré pour l'instant.",
-    "disabledBadge": "Désactivé",
     "editTitle": "Modifier le fournisseur de connexion",
     "dialogDescription": "Détails du fournisseur OpenID Connect. L'URL de callback pour votre IdP est /api/v1/auth/{slug}/callback sur ce serveur.",
     "slugLabel": "Identifiant",
     "slugHelp": "Minuscules, chiffres et tirets. Fixe après la création — il forme les URL de connexion.",
+    "slugFixed": "Fixe une fois le fournisseur ajouté, car ses adresses de connexion en sont formées.",
     "slugInvalid": "Utilisez des minuscules, des chiffres et des tirets ; pas de tiret au début ni à la fin.",
     "displayNameLabel": "Nom affiché",
     "issuerLabel": "URL de l'émetteur",
@@ -1778,11 +1814,12 @@
   },
   "aiConnections": {
     "title": "Connexions",
-    "subtitle": "Chaque connexion est une destination : un fournisseur, un modèle et une clé partagée facultative.",
+    "subtitle_community": "Les fournisseurs et modèles d'IA que les membres de cette communauté peuvent utiliser.",
+    "subtitle_platform": "Les fournisseurs et modèles d'IA que les communautés de ce serveur peuvent utiliser.",
+    "locked": "Activez l'IA dans Sécurité pour utiliser ces connexions.",
     "add": "Ajouter une connexion",
+    "toggleLabel": "Utiliser {{label}}",
     "empty": "Aucune connexion pour le moment. Ajoutez-en une pour activer les fonctionnalités d'IA.",
-    "loading": "Chargement des connexions…",
-    "loadError": "Impossible de charger les connexions.",
     "defaultBadge": "Par défaut",
     "keySet": "Clé partagée définie",
     "noKey": "Aucune clé partagée",
@@ -1814,13 +1851,10 @@
     "modelHintPick": "Choisissez un modèle pour finir de configurer cette connexion.",
     "needsModel": "Modèle à choisir",
     "customHint": "Tout serveur qui parle l'API d'OpenAI : vLLM, llama.cpp, LM Studio, LocalAI, ou une passerelle comme LiteLLM. Indiquez l'adresse jusqu'à /v1.",
-    "enabledLabel": "Activée",
-    "enabledDescription": "Autoriser les membres à utiliser cette connexion.",
     "defaultLabel": "Connexion par défaut",
     "defaultDescription": "Les membres utilisent cette connexion à moins d'en choisir une autre.",
     "save": "Enregistrer la connexion",
     "saving": "Enregistrement…",
-    "cancel": "Annuler",
     "communitiesLabel": "Communautés",
     "communitiesPlaceholder": "L'attribuer à une communauté…",
     "communitiesSearch": "Rechercher des communautés…",
@@ -1849,6 +1883,7 @@
     "ageGateOffConfirm": "Tout le monde ici a 18 ans ou plus",
     "defaultDmLabel": "Messages privés pour les nouveaux comptes",
     "defaultDmHelpText": "Le réglage avec lequel un compte démarre. Il est lu une seule fois, à la création du compte : le modifier n'ouvre aucun compte existant et n'en ferme aucun. « Privé » est la valeur livrée ; avec elle, chacun devient joignable au moment où il le décide.",
+    "whileMessagesOff": "s'applique une fois les messages directs activés",
     "directMessagesLabel": "Autoriser les membres à s'écrire",
     "directMessagesHelpText": "Mes messages, ainsi que les connexions et les demandes qui le font fonctionner. Les messages sont chiffrés de bout en bout : personne qui administre cette installation ne peut les lire — désactivez ceci là où la messagerie privée n'a pas sa place, pas pour la surveiller.",
     "directMessagesReversibleNote": "Désactiver masque Mes messages et refuse les nouveaux ; rien n'est supprimé. Les conversations, les connexions et les réglages sont toujours là si vous le réactivez.",
@@ -1866,8 +1901,7 @@
       "neverHint": "Rien n'est supprimé à l'échéance d'un délai. Une communauté reste en attente jusqu'à ce que quelqu'un lève l'attente ou la supprime.",
       "saved_one": "Les communautés en attente sont supprimées après {{count}} jour.",
       "saved_other": "Les communautés en attente sont supprimées après {{count}} jours.",
-      "savedNever": "Les communautés en attente ne sont jamais supprimées automatiquement.",
-      "save": "Enregistrer la durée d'attente des communautés"
+      "savedNever": "Les communautés en attente ne sont jamais supprimées automatiquement."
     },
     "retention": {
       "title": "Conservation des communautés supprimées",
@@ -1878,8 +1912,7 @@
       "neverHint": "Rien n'est détruit à l'échéance d'un délai. Les communautés supprimées restent dans la liste ci-dessous jusqu'à ce que quelqu'un en restaure une.",
       "saved_one": "Les communautés supprimées sont conservées {{count}} jour.",
       "saved_other": "Les communautés supprimées sont conservées {{count}} jours.",
-      "savedNever": "Les communautés supprimées sont conservées indéfiniment.",
-      "save": "Enregistrer la durée de conservation des communautés"
+      "savedNever": "Les communautés supprimées sont conservées indéfiniment."
     },
     "accountRetention": {
       "title": "Conservation des comptes supprimés",
@@ -1890,8 +1923,7 @@
       "neverHint": "Rien n'est effacé à l'échéance d'un délai. Les comptes supprimés restent dans la table des utilisateurs jusqu'à ce que quelqu'un revienne ou en restaure un.",
       "saved_one": "Les comptes supprimés sont conservés {{count}} jour.",
       "saved_other": "Les comptes supprimés sont conservés {{count}} jours.",
-      "savedNever": "Les comptes supprimés sont conservés indéfiniment.",
-      "save": "Enregistrer la durée de conservation des comptes"
+      "savedNever": "Les comptes supprimés sont conservés indéfiniment."
     },
     "engagementRankingLabel": "Permettre aux communautés de classer les résultats par engagement",
     "engagementRankingHelpText": "Désactivé, aucune communauté de ce serveur ne classe par engagement, quel que soit son propre réglage.",
@@ -1901,9 +1933,10 @@
     "guestsEnabledHelpText": "Les communautés peuvent inviter des personnes pour un nombre de jours défini. Les invités n'occupent pas de place et ne voient que ce qui leur a été donné. Tant que c'est désactivé, aucun invité n'entre.",
     "guestsEnabledToast": "Les communautés peuvent avoir des invités.",
     "guestsDisabledToast": "Les invités sont désactivés.",
+    "maxGuestDaysTitle": "Séjour maximal des invités",
     "maxGuestDaysLabel": "Séjour maximal d'un invité (jours)",
     "maxGuestDaysHelpText": "Aucun invité ne reste plus longtemps que cela, quel que soit le réglage d'une communauté.",
-    "maxGuestDaysSave": "Enregistrer le séjour maximal des invités",
+    "whileGuestsOff": "s'applique une fois les invités autorisés",
     "maxGuestDaysSaved_one": "Les invités restent {{count}} jour au plus.",
     "maxGuestDaysSaved_other": "Les invités restent {{count}} jours au plus.",
     "joinAndCreateTitle": "Qui peut rejoindre et créer",
@@ -1915,18 +1948,24 @@
     "communityCreationHelpText": "Désactivé, seules les personnes qui gèrent les communautés de ce serveur peuvent en créer une, et seules les personnes invitées peuvent s'inscrire.",
     "communityCreationEnabledToast": "Tout le monde peut créer une communauté.",
     "communityCreationDisabledToast": "Seules les personnes qui gèrent les communautés peuvent en créer une.",
+    "creationDailyLimitTitle": "Limite quotidienne par compte",
     "creationDailyLimitLabel": "Communautés qu'un compte peut créer par jour",
     "creationDailyLimitHelpText": "0 signifie aucune limite. Les personnes qui gèrent les communautés n'y sont pas soumises.",
-    "creationDailyLimitSave": "Enregistrer la limite quotidienne de communautés",
+    "whileCreationOff": "s'applique une fois que tout le monde peut créer une communauté",
+    "creationDailyLimitValue_one": "{{count}} communauté par jour",
+    "creationDailyLimitValue_other": "{{count}} communautés par jour",
     "creationDailyLimitSaved_one": "Chaque compte peut créer {{count}} communauté par jour.",
     "creationDailyLimitSaved_other": "Chaque compte peut créer {{count}} communautés par jour.",
     "creationDailyLimitSavedNone": "Il n'y a pas de limite quotidienne pour les nouvelles communautés.",
+    "exportAndDeletionTitle": "Exports et suppression",
     "exportCooldownLabel": "Heures entre deux exports d'une communauté",
     "exportCooldownHelpText": "Le temps qu'une communauté attend avant de pouvoir tout exporter à nouveau. 0 signifie aucune attente.",
-    "exportCooldownSave": "Enregistrer le délai entre les exports de communauté",
     "exportCooldownSaved_one": "Les communautés attendent {{count}} heure entre deux exports.",
     "exportCooldownSaved_other": "Les communautés attendent {{count}} heures entre deux exports.",
-    "exportCooldownSavedNone": "Les communautés peuvent exporter sans attendre."
+    "exportCooldownSavedNone": "Les communautés peuvent exporter sans attendre.",
+    "noLimit": "Aucune limite",
+    "noWait": "Aucune attente",
+    "exportCooldownTitle": "Délai entre deux exports"
   },
   "account": {
     "passwordTitle": "Mot de passe",
@@ -2013,7 +2052,6 @@
   "twoFactor": {
     "title": "Double authentification",
     "description": "Demander un code d'une application d'authentification après un mot de passe ou un code envoyé par e-mail, et chaque fois qu'une communauté ou ce serveur demande un second facteur.",
-    "loading": "Vérification…",
     "on": "Activée",
     "notSetUp": "La connexion ne demande pas de code d'une application.",
     "setUp": "Configurer la double authentification",
@@ -2049,7 +2087,6 @@
     "regenerateError": "Impossible de créer de nouveaux codes.",
     "disableError": "Impossible de désactiver.",
     "codePlaceholder": "123456",
-    "statusError": "Impossible de vérifier si la double authentification est activée. Rechargez la page.",
     "copyUnavailable": "Copie impossible — notez les codes à la main.",
     "notOffered": "Cette installation ne propose pas l'application d'authentification.",
     "passwordlessCodes": "Votre compte se connecte sans mot de passe. Ces codes vous permettent d'en redéfinir un si vous perdez votre clé d'accès."
@@ -2057,8 +2094,6 @@
   "passkeys": {
     "title": "Clés d'accès",
     "description": "Connectez-vous avec l'empreinte, le visage ou le verrouillage d'écran de votre appareil plutôt qu'avec votre mot de passe.",
-    "loading": "Vérification…",
-    "listError": "Impossible de vérifier les clés d'accès de ce compte. Rechargez la page.",
     "empty": "Pas encore de clé d'accès.",
     "emptyHint": "Une clé d'accès reste sur votre téléphone, votre ordinateur ou dans votre gestionnaire de mots de passe, et ne fonctionne que sur ce site.",
     "add": "Ajouter une clé d'accès",
@@ -2091,7 +2126,6 @@
     "unsupported": "Ce navigateur ne peut pas créer de clé d'accès. Ouvrez cette page dans un navigateur à jour.",
     "siteUnsupported": "Les clés d'accès exigent que ce site ait un vrai nom de domaine et https. La personne qui gère le site peut y remédier.",
     "limitReached": "Ce compte a autant de clés d'accès qu'il peut en avoir ({{limit}}). Supprimez-en une pour en ajouter une autre.",
-    "addFromBrowser": "Une clé d'accès s'ajoute depuis un navigateur connecté à ce site. « Ajouter une clé d'accès » en ouvre un pour vous.",
     "notOffered": "Ce site ne propose pas de clés d'accès. Celles que vous avez sont conservées.",
     "error": "Cela n'a pas fonctionné. Réessayez."
   },
@@ -2114,7 +2148,11 @@
     "valuesHint": "Séparez-en plusieurs par des virgules. La connexion propre d'une communauté remplace ceci entièrement : rien d'ici n'est fusionné avec ce qu'elle dit."
   },
   "platformSecurity": {
-    "description": "Combien de temps quelqu'un peut rester connecté, le captcha demandé aux nouveaux venus, et ce qu'une notification emporte en quittant l'application."
+    "description": "Combien de temps quelqu'un peut rester connecté, le captcha demandé aux nouveaux venus, et ce qu'une notification emporte en quittant l'application.",
+    "signInRules": {
+      "title": "Règles de connexion",
+      "description": "Ce qui est demandé à chaque compte de ce serveur lorsqu'il se connecte."
+    }
   },
   "notificationDelivery": {
     "title": "Notifications qui quittent l'application",
@@ -2137,37 +2175,38 @@
       "offHelp": "Une notification qui quitte l'application indique de quoi il s'agit : qui a agi, et sur quoi."
     }
   },
-  "communityNotifications": {
-    "title": "Notifications qui quittent l'application",
-    "description": "Ce que les notifications de cette communauté emportent en partant. Le serveur répond aux trois mêmes questions pour tout le monde, et la réponse la plus stricte s'applique.",
-    "saved": "Paramètres de notification enregistrés",
-    "error": "Impossible d'enregistrer les paramètres de notification",
+  "communityPrivacy": {
+    "title": "Confidentialité",
+    "description": "Ce qui sort de {{community}}, et ce qu'elle conserve sur l'activité.",
+    "saved": "Paramètre de confidentialité enregistré",
+    "error": "Impossible d'enregistrer ce paramètre",
     "push": {
       "label": "Notifications sur téléphone et ordinateur",
       "onHelp": "Les notifications de cette communauté atteignent les téléphones et les applications de bureau des membres.",
       "offHelp": "Rien de cette communauté n'est envoyé à un téléphone ni à l'application de bureau. Les membres gardent la cloche, et l'e-mail s'il est actif.",
-      "platformHelp": "Ce serveur n'envoie rien à un téléphone ni à l'application de bureau : il n'y a rien à décider ici."
+      "platformHelp": "votre serveur n'envoie rien aux téléphones ni à l'application de bureau"
     },
     "email": {
       "label": "Notifications par e-mail",
       "onHelp": "Les notifications de cette communauté atteignent les boîtes aux lettres des membres.",
       "offHelp": "Aucun e-mail de notification n'est envoyé au sujet de cette communauté. Les codes de connexion et les réinitialisations de mot de passe appartiennent au compte et partent toujours.",
-      "platformHelp": "Ce serveur n'envoie pas d'e-mail de notification : il n'y a rien à décider ici."
+      "platformHelp": "votre serveur n'envoie pas d'e-mails de notification"
     },
     "redact": {
       "label": "Masquer les détails des notifications",
       "onHelp": "Les notifications concernant cette communauté indiquent le type d'événement une fois sorties de l'application. Ici, les membres voient tout.",
       "offHelp": "Les notifications concernant cette communauté indiquent de quoi il s'agit une fois sorties de l'application.",
-      "platformHelp": "Ce serveur masque les détails partout : cette communauté est déjà couverte."
+      "platformHelp": "votre serveur masque les détails des notifications partout"
+    },
+    "ai": {
+      "label": "Fonctions d'IA",
+      "help": "Permet aux membres d'utiliser les fonctions d'IA dans cette communauté. Désactivée, rien d'ici n'est envoyé à un fournisseur d'IA."
+    },
+    "ranking": {
+      "label": "Classer la recherche par engagement",
+      "help": "La recherche place plus haut ce que davantage de membres ont récemment ouvert ou modifié. Seul un niveau approximatif est conservé pour chaque élément, jamais qui l'a ouvert ni combien de fois, et il n'est jamais partagé en dehors de cette communauté.",
+      "platformHelp": "votre serveur a désactivé le classement par engagement pour toutes les communautés"
     }
-  },
-  "communityEngagementRanking": {
-    "title": "Ordre de recherche",
-    "label": "Classer les résultats de recherche selon l'engagement de la communauté",
-    "help": "La recherche place plus haut ce que davantage de membres ont récemment ouvert ou modifié. Seul un niveau approximatif est conservé pour chaque élément, jamais qui l'a ouvert ni combien de fois, et il n'est jamais partagé en dehors de cette communauté.",
-    "platformHelp": "Ce serveur a désactivé le classement par engagement pour toutes les communautés.",
-    "saved": "Ordre de recherche enregistré.",
-    "error": "Impossible d'enregistrer l'ordre de recherche."
   },
   "billingInsights": {
     "title": "Indicateurs de facturation",
@@ -2227,11 +2266,10 @@
     },
     "rungFixed": "À qui s'adresse un rôle ne peut plus changer une fois qu'il est créé.",
     "surfacesLabel": "Ce qu'il comprend",
+    "pluginsLabel": "Ce qu'il comprend des plug-ins",
     "notYours": "Vous ne l'avez pas vous-même, vous ne pouvez donc pas le donner.",
     "holdsNothing": "Ne comprend encore rien.",
     "builtIn": "Intégré",
-    "loading": "Chargement des rôles",
-    "loadError": "Impossible de charger les rôles.",
     "closed": "La personne qui gère ce serveur a désactivé les rôles personnalisés pour cette communauté. Les rôles qu'elle a continuent de s'appliquer.",
     "deleteTitle": "Supprimer {{name}} ?",
     "deleteDescription": "Les personnes qui l'ont reviennent à leur rôle de base.",
@@ -2295,8 +2333,7 @@
     "setByDeployment": "Ce rôle est défini par la personne qui gère ce serveur. Vous pouvez l'attribuer ici, mais pas le modifier ni le supprimer."
   },
   "customRoleRules": {
-    "title": "Rôles personnalisés par groupe",
-    "description": "Donnez un rôle personnalisé à quiconque se connecte avec un groupe. Une connexion lit ces règles dans l'ordre et le premier groupe correspondant décide ; un rôle donné à la main est conservé.",
+    "title": "Rôles personnalisés · la première correspondance décide",
     "add": "Ajouter une règle de rôle",
     "empty": "Aucun groupe ne donne encore de rôle personnalisé.",
     "gives": "Via {{provider}}, donne {{role}}",
@@ -2305,7 +2342,7 @@
     "remove": "Supprimer la règle",
     "removeTitle": "Supprimer cette règle ?",
     "removeDescription": "Les personnes de {{group}} gardent le rôle jusqu'à leur prochaine connexion.",
-    "dialogDescription": "Quiconque se connecte via ce fournisseur avec ce groupe reçoit le rôle, sauf si une règle précédente correspond d'abord.",
+    "dialogDescription": "Quiconque se connecte via ce fournisseur avec ce groupe reçoit le rôle, sauf si une règle précédente correspond d'abord. Un rôle donné à la main est conservé.",
     "roleLabel": "Rôle personnalisé",
     "rolePlaceholder": "Choisir un rôle",
     "added": "Règle ajoutée",
@@ -2313,8 +2350,8 @@
     "orderError": "Impossible de réordonner les règles",
     "removeError": "Impossible de supprimer la règle",
     "closed": "Votre serveur a désactivé les rôles personnalisés pour cette communauté. Ces règles continuent de s'appliquer ; personne ici ne peut les modifier.",
-    "loading": "Chargement des règles…",
-    "loadError": "Impossible de charger les règles.",
-    "retry": "Réessayer"
+    "editTitle": "Modifier la règle de rôle",
+    "saved": "Règle enregistrée",
+    "saveError": "Impossible d'enregistrer la règle"
   }
 }

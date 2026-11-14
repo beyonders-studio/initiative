@@ -9,8 +9,9 @@ it out — the same verdict its own page reaches.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

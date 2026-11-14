@@ -1,7 +1,8 @@
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
-import { useSidebar } from "@/components/ui/sidebar";
+import { useHelpOpen } from "@/components/help/helpStore";
+import { useSidebar } from "@/components/sidebar/sidebar";
 
 /**
  * Automatically closes the sidebar on mobile devices after navigation.
@@ -16,18 +17,24 @@ import { useSidebar } from "@/components/ui/sidebar";
  * sidebar that loads its translations, say — and that is not a navigation.
  */
 export const useAutoCloseSidebar = () => {
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const { setOpenMobile, isMobile, consumeAutoCloseSuppression } = useSidebar();
-  const lastPath = useRef(location.pathname);
+  const lastPath = useRef(pathname);
 
   useEffect(() => {
-    if (lastPath.current === location.pathname) return;
-    lastPath.current = location.pathname;
+    if (lastPath.current === pathname) return;
+    lastPath.current = pathname;
     // Always consume so a suppression set on desktop can't leak to a later
     // mobile navigation.
     const suppressed = consumeAutoCloseSuppression();
     if (isMobile && !suppressed) {
       setOpenMobile(false);
     }
-  }, [location.pathname, isMobile, setOpenMobile, consumeAutoCloseSuppression]);
+  }, [pathname, isMobile, setOpenMobile, consumeAutoCloseSuppression]);
+
+  // Help opens over the page, so the sidebar is not left open under it.
+  const helpOpen = useHelpOpen();
+  useEffect(() => {
+    if (helpOpen && isMobile) setOpenMobile(false);
+  }, [helpOpen, isMobile, setOpenMobile]);
 };

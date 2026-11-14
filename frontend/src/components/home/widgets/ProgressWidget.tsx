@@ -10,9 +10,10 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useUserStats } from "@/hooks/useUserStats";
-import { numberFormat } from "@/lib/intl";
+import { numberFormat } from "@/ui/lib/intl";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const Stat = ({
   icon: Icon,
@@ -34,7 +35,7 @@ const Stat = ({
 
 export const ProgressWidget = () => {
   const { t, i18n } = useTranslation(["home", "stats"]);
-  const { data: stats, isLoading, isError } = useUserStats();
+  const { data: stats, isLoading, isError, refetch } = useUserStats();
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const count = numberFormat(locale);
   const percent = numberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
@@ -49,7 +50,7 @@ export const ProgressWidget = () => {
           ))}
         </div>
       ) : isError || !stats ? (
-        <p className="text-destructive text-sm">{t("widgets.progress.loadError")}</p>
+        <StatusMessage onRetry={refetch} />
       ) : stats.tasks_completed_total === 0 ? (
         // Four zeros say nothing to somebody who has only just arrived.
         <HomeWidgetNotice icon={Flame}>{t("widgets.progress.firstTask")}</HomeWidgetNotice>

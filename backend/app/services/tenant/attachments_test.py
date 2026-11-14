@@ -3,6 +3,7 @@
 import pytest
 from fastapi import UploadFile
 
+from app.models.tenant._mixins import ActorKind
 from app.services.tenant.attachments import (
     FileTooLargeError,
     read_upload_bounded,
@@ -91,16 +92,8 @@ class _RecordingSession:
         self.added.append(row)
 
 
-@pytest.mark.parametrize(
-    ("content_type", "written_as"),
-    [("image/png", "image/png"), (None, "application/octet-stream")],
-)
-async def test_store_upload_writes_the_bytes_and_records_them(
-    monkeypatch, content_type, written_as
-) -> None:
-    """The bytes land under the given name and the row describes them. A file
-    whose type an import could not name is written as octet-stream, and its
-    row keeps no type rather than claiming one."""
+async def test_store_upload_writes_the_bytes_and_records_them(monkeypatch) -> None:
+    """The bytes land under the given name and the row describes them."""
     from app.services.tenant import attachments
 
     storage = _RecordingStorage()
@@ -112,18 +105,19 @@ async def test_store_upload_writes_the_bytes_and_records_them(
         guild_id=7,
         filename="abc.png",
         data=b"bytes",
-        content_type=content_type,
+        content_type="image/png",
         created_by=3,
+        created_by_kind=ActorKind.member,
     )
 
     assert url == "/uploads/7/abc.png"
-    assert storage.writes == [("abc.png", b"bytes", written_as)]
+    assert storage.writes == [("abc.png", b"bytes", "image/png")]
     [row] = session.added
     assert (row.filename, row.created_by, row.size_bytes, row.content_type) == (
         "abc.png",
         3,
         5,
-        content_type,
+        "image/png",
     )
     assert row.content_hash == attachments.compute_content_hash(b"bytes")
 
@@ -282,9 +276,9 @@ def test_a_program_is_refused_whatever_it_is_named(content, filename):
 @pytest.mark.parametrize(
     ("name", "shown"),
     [
-        ("report‮gnp.exe", "reportgnp.exe"),
+        ("report\u202egnp.exe", "reportgnp.exe"),
         ("  notes.txt. ", "notes.txt"),
-        ("​", None),
+        ("\u200b", None),
         ("a" * 300 + ".pdf", "a" * 251 + ".pdf"),
     ],
 )

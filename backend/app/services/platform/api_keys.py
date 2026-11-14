@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from secrets import token_urlsafe
-from typing import Optional, Sequence, Tuple
 
 from sqlalchemy import ColumnElement, and_, func, or_
 from sqlmodel import select
@@ -45,12 +45,12 @@ async def create_api_key(
     *,
     user: User,
     name: str,
-    expires_at: Optional[datetime] = None,
+    expires_at: datetime | None = None,
     read_only: bool = False,
-    guild_id: Optional[int] = None,
-    resource_type: Optional[Tool] = None,
-    resource_id: Optional[int] = None,
-) -> Tuple[str, UserApiKey]:
+    guild_id: int | None = None,
+    resource_type: Tool | None = None,
+    resource_id: int | None = None,
+) -> tuple[str, UserApiKey]:
     if not user.id:
         raise ValueError("User must be persisted before creating API keys")
 
@@ -111,7 +111,7 @@ async def _record_key_event(
     *,
     user_id: int,
     api_key: UserApiKey,
-    actor_user_id: Optional[int] = None,
+    actor_user_id: int | None = None,
 ) -> None:
     """Record one key's arrival or departure.
 
@@ -157,7 +157,7 @@ async def delete_api_key(session: AsyncSession, *, user: User, api_key_id: int) 
 
 async def authenticate_api_key(
     session: AsyncSession, token: str
-) -> Optional[Tuple[User, UserApiKey]]:
+) -> tuple[User, UserApiKey] | None:
     """Resolve a ``ppk_`` token to its ``(user, key)`` pair, or ``None``.
 
     Returns the key alongside the user so callers can enforce its scope
@@ -182,7 +182,7 @@ async def authenticate_api_key(
         if not api_key:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if api_key.expires_at and api_key.expires_at <= now:
             return None
 
@@ -247,14 +247,14 @@ async def live_counts(session: AsyncSession, *, user_ids: list[int]) -> dict[int
     for the whole page."""
     rows = await session.exec(
         select(UserApiKey.user_id, func.count())
-        .where(UserApiKey.user_id.in_(user_ids), _live(datetime.now(timezone.utc)))
+        .where(UserApiKey.user_id.in_(user_ids), _live(datetime.now(UTC)))
         .group_by(UserApiKey.user_id)
     )
     return {user_id: count for user_id, count in rows.all()}
 
 
 async def deactivate_user_api_keys(
-    session: AsyncSession, *, user_id: int, revoked_by: Optional[int] = None
+    session: AsyncSession, *, user_id: int, revoked_by: int | None = None
 ) -> int:
     """Switch off every key of ``user_id`` that still works, and return the count.
 
@@ -263,7 +263,7 @@ async def deactivate_user_api_keys(
     is recorded against them. Does not commit — the caller owns the transaction.
     """
     statement = select(UserApiKey).where(
-        UserApiKey.user_id == user_id, _live(datetime.now(timezone.utc))
+        UserApiKey.user_id == user_id, _live(datetime.now(UTC))
     )
     result = await session.exec(statement)
     keys = result.all()

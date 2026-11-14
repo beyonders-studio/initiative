@@ -48,10 +48,15 @@ at call time is still the caller's route, which is the same schema.
 """
 
 from __future__ import annotations
+
+import hashlib
 from collections.abc import Iterable
-from app.db import gucs
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
 from app.core.tools import Tool
+from app.db import gucs
 from app.models.platform.access_grant import (
     AccessGrantPurpose,
     AccessGrantStatus,
@@ -66,10 +71,6 @@ from app.models.tenant.resource_grant import (
     ResourceAccessLevel,
 )
 
-import hashlib
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -80,29 +81,29 @@ DEPENDENT_OBJECTS_STILL_EXIST_SQLSTATE = "2BP01"
 __all__ = [
     "AUTHORIZATION_FUNCTIONS",
     "CURRENT_STANDING",
+    "GUEST_MEMBERSHIP_LIVE",
     "GUILD_AUTHORIZATION_FUNCTIONS",
+    "GUILD_FUNCTION_SIGNATURES",
+    "GUILD_SUPERADMIN",
     "IN_BODY",
     "IN_POLICY",
-    "Legs",
+    "READ_FUNCTIONS",
+    "RETIRED_GUILD_FUNCTION_SIGNATURES",
     "STANDING",
     "STANDING_FIELDS",
-    "READ_FUNCTIONS",
-    "GUILD_FUNCTION_SIGNATURES",
-    "RETIRED_GUILD_FUNCTION_SIGNATURES",
-    "GUILD_SUPERADMIN",
-    "GUEST_MEMBERSHIP_LIVE",
     "DropReport",
-    "plugin_narrowed",
-    "plugin_refused",
-    "plugin_scope",
+    "Legs",
     "apply_authorization_functions",
     "authorization_functions_digest",
     "drop_public_copies",
     "ensure_authorization_functions",
-    "live_membership",
     "ensure_public_copies_dropped",
-    "render_guild_authorization_functions",
     "in_body",
+    "live_membership",
+    "plugin_narrowed",
+    "plugin_refused",
+    "plugin_scope",
+    "render_guild_authorization_functions",
     "standing_arg",
 ]
 
@@ -439,6 +440,14 @@ HELD_SURFACES = (
 )
 
 
+#: For a member token, the admin surfaces its member holds; NULL for an
+#: install acting as itself, which no member's surfaces narrow.
+MEMBER_SURFACES = (
+    f"(CASE WHEN {gucs.USER_ID.text} IS NULL THEN NULL::text[]"
+    f" ELSE {gucs.MEMBER_SURFACES.sql} END)"
+)
+
+
 def holds(surface: AdminSurface) -> str:
     """The reader holds ``surface`` here: :data:`GUILD_ADMIN`'s counterpart for
     a leg that guards one part of administering the community rather than
@@ -451,9 +460,19 @@ EVERY_SURFACE = (
     f"ARRAY[{', '.join(f"'{surface.value}'" for surface in AdminSurface)}]::text[]"
 )
 
-#: The reader holds every surface here: an admin with no custom role, or one
-#: whose role keeps every one. What making or unmaking an admin asks.
-HOLDS_EVERY_SURFACE = f"({HELD_SURFACES} @> {EVERY_SURFACE})"
+#: The installed plug-ins' community permissions the reader holds in this
+#: community: ``*`` for every one.
+HELD_PLUGIN_PERMISSIONS = (
+    f"(CASE WHEN {STANDING_IS_THIS_GUILD} THEN {gucs.HELD_PLUGIN_PERMISSIONS.sql}"
+    " ELSE ARRAY[]::text[] END)"
+)
+
+#: The reader holds everything the admin rung holds here, every surface and
+#: every plug-in permission: an admin with no custom role. What making or
+#: unmaking an admin asks, since either widens somebody to all of it.
+HOLDS_EVERY_SURFACE = (
+    f"({HELD_SURFACES} @> {EVERY_SURFACE} AND '*' = ANY ({HELD_PLUGIN_PERMISSIONS}))"
+)
 
 
 #: This request administers the community's configuration: a live settings
@@ -576,8 +595,11 @@ STANDING_FIELDS: tuple[tuple[str, str, str], ...] = (
     _read(gucs.CLOSED_SURFACES),
     # The tool switches the community set for every initiative.
     _read(gucs.COMMUNITY_TOOLS),
-    # The admin surfaces the reader holds. Last, as ``ALTER TYPE`` appends.
+    # The admin surfaces the reader holds.
     ("held_surfaces", "text[]", HELD_SURFACES),
+    # For a member token, the ones its member holds. Last, as ``ALTER TYPE``
+    # appends.
+    ("member_surfaces", "text[]", MEMBER_SURFACES),
 )
 _STANDING_NAMES = frozenset(name for name, _type, _expr in STANDING_FIELDS)
 
@@ -676,9 +698,22 @@ class Legs:
         return f"('{surface.value}' = ANY ({self.field('held_surfaces')}))"
 
     @property
+    def held_plugin_permissions(self) -> str:
+        """The plug-ins' community permissions the reader holds here: ``*``
+        for every one."""
+        return (
+            f"(CASE WHEN {self.this_guild}"
+            f" THEN {gucs.HELD_PLUGIN_PERMISSIONS.once} ELSE ARRAY[]::text[] END)"
+        )
+
+    @property
     def holds_every_surface(self) -> str:
-        """The reader holds the whole catalog (:data:`HOLDS_EVERY_SURFACE`)."""
-        return f"({self.field('held_surfaces')} @> {EVERY_SURFACE})"
+        """The reader holds everything the admin rung holds
+        (:data:`HOLDS_EVERY_SURFACE`)."""
+        return (
+            f"({self.field('held_surfaces')} @> {EVERY_SURFACE}"
+            f" AND '*' = ANY ({self.held_plugin_permissions}))"
+        )
 
     @property
     def auth_ok(self) -> str:
@@ -730,23 +765,27 @@ class Legs:
     def system_or_admin(self) -> str:
         return f"({self.system} OR {self.admin})"
 
-    @property
-    def unnarrowed_install(self) -> str:
+    def unnarrowed_install(self, surface: AdminSurface) -> str:
         """An installed plug-in acting in this community on a token that is not
-        narrowed to one initiative."""
+        narrowed to one initiative, for a part of the community ``surface``
+        administers: as itself, or for a member who holds ``surface``."""
+        member_surfaces = self.field("member_surfaces")
         return (
             f"({self.install_id} IS NOT NULL AND {self.scope} IS NULL"
-            f" AND {self.this_guild} AND {self.auth_ok})"
+            f" AND {self.this_guild} AND {self.auth_ok}"
+            f" AND ({member_surfaces} IS NULL"
+            f" OR '{surface.value}' = ANY ({member_surfaces})))"
         )
 
     def guild_row_writer(self, surface: AdminSurface) -> str:
         """Who makes and changes a row that belongs to the whole community
         rather than one initiative (:data:`COMMUNITY_ROWS`): the system, a
         holder of ``surface``, a live write grant, or an installed plug-in on
-        a token not narrowed to one initiative."""
+        a token not narrowed to one initiative, as itself or for a member
+        holding ``surface``."""
         return (
             f"({self.system} OR {self.holds(surface)}"
-            f" OR {self.pam_write} OR {self.unnarrowed_install})"
+            f" OR {self.pam_write} OR {self.unnarrowed_install(surface)})"
         )
 
 
@@ -1208,12 +1247,14 @@ $function$
 def _author_arms() -> str:
     return "\n".join(
         f"      WHEN '{tool.value}' THEN\n"
-        f"        SELECT created_by INTO v_author FROM {tool.plural} WHERE id = p_resource_id;"
+        f"        SELECT created_by INTO v_author FROM {tool.plural}"
+        f" WHERE id = p_resource_id AND created_by_kind = 'member';"
         for tool in Tool
     )
 
 
-#: Whether ``p_user_id`` wrote this resource and nobody owns it now. Lets an
+#: Whether ``p_user_id`` wrote this resource (a ``member`` author) and nobody
+#: owns it now. Lets an
 #: owner row be written that gives unowned content back to its author (trash
 #: restore does this), by someone who is not its owner.
 RESOURCE_RECLAIMABLE = f"""\
@@ -1593,7 +1634,7 @@ def authorization_functions_digest() -> str:
     return digest.hexdigest()[:16]
 
 
-async def apply_authorization_functions(conn: "AsyncConnection") -> None:
+async def apply_authorization_functions(conn: AsyncConnection) -> None:
     """Create or replace every function in :data:`AUTHORIZATION_FUNCTIONS`.
 
     Idempotent, and cheap enough to run unconditionally on boot: eight
@@ -1641,7 +1682,7 @@ WHERE d.refclassid = 'pg_proc'::regclass
 """
 
 
-async def drop_public_copies(engine: "AsyncEngine") -> DropReport:
+async def drop_public_copies(engine: AsyncEngine) -> DropReport:
     """Retire the ``public`` copies of the seven guild functions.
 
     Runs after the guild back-fill. Each drop is its own transaction: a copy

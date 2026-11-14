@@ -20,11 +20,11 @@ import type {
   TaskStatusCategory,
 } from "@/api/generated/initiativeAPI.schemas";
 import { TaskPriority } from "@/api/generated/initiativeAPI.schemas";
-import type { DueFilterOption } from "@/components/projects/projectTasksConfig";
+import type { DueFilterOption } from "@/components/tools/projects/projectTasksConfig";
 import type {
   PluginFilterCondition,
   PropertyFilterCondition,
-} from "@/components/properties/PropertyFilter";
+} from "@/ui/properties/PropertyFilter";
 
 /** The due-window tokens a view can hold. `null` is "any due date". */
 export type DueToken = Exclude<DueFilterOption, "all">;

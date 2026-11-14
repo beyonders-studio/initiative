@@ -16,15 +16,14 @@ from functools import partial
 import pytest
 
 from app.db.public_rls import platform_tier, role_name
+from app.db.request_context import Platform
 from app.db.schema_provisioning import (
     GuildRoleKind,
     guild_role_name,
     guild_schema_name,
 )
-from app.db.request_context import Platform
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
-
 
 _GUILD_ID_BUILDERS = {
     "schema": guild_schema_name,
@@ -58,7 +57,7 @@ def test_guild_name_builders_reject_or_sanitize_hostile_ids(builder, hostile):
     to a digits-only name (a float truncates to its integer part)."""
     try:
         name = builder(hostile)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return  # rejected outright — the common case
     assert re.fullmatch(r"[A-Za-z0-9_]*guild_[0-9]+[a-z_]*", name), name
 

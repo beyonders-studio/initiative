@@ -12,12 +12,11 @@ import socket
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.testing import emitted
-
 
 _WEBHOOK_HOST = "hooks.example.com"
 _TARGET_URL = f"https://{_WEBHOOK_HOST}/in/secret-path"

@@ -19,18 +19,20 @@ in the ``support`` stream, and the binding says which project that is.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import COMMUNITY_SUPPORT_TOPICS, IntakeStream, SupportTopic
-from app.services.platform import rules
-from app.models.platform.user import User
 from app.db import cohorts
+from app.models.platform.user import User
+from app.services.platform import rules
 from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
 if TYPE_CHECKING:
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: Longest a request's summary and its body may be. The case is a task, whose
@@ -101,21 +103,23 @@ def offered_topics(
 
 async def request_help(
     *,
-    guild_id: Optional[int],
+    guild_id: int | None,
     requester: User,
     subject: str,
     body: str,
     topic: SupportTopic = SupportTopic.community,
-    evidence: Sequence["PreparedEvidence"] = (),
-    now: Optional[datetime] = None,
+    context: DeviceContext | None = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    now: datetime | None = None,
 ) -> int:
     """File one help request as a support case. Returns the case's task id.
 
     The case names who asked, and for a question about a community which one,
     as the weak refs every case carries, and records them as its filer: their
     subject and their words open the case, said to them, so the conversation
-    starts where they started it. The description is the platform's summary.
-    What they attached is stored with it.
+    starts where they started it. The description is the platform's summary,
+    with the device and page they asked from where they sent it. What they
+    attached is stored with it.
 
     A question about a community is held to what that community lets them
     ask (:func:`community_topics`); a question about themselves is not about
@@ -128,7 +132,7 @@ async def request_help(
         raise SupportUnavailable
     subject_guild = guild_id if about_community else None
 
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     summary = f"Help request ({topic.value}) from account {requester.id}"
     outcome = await open_case(
         IntakeStream.support,
@@ -145,6 +149,7 @@ async def request_help(
         ),
         now=moment,
         filer=CaseFiler(user_id=requester.id, subject=subject, words=body),
+        device=context,
         evidence=evidence,
         topic=topic.value,
     )

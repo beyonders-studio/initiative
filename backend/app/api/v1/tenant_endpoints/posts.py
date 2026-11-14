@@ -29,11 +29,10 @@ Two things here are the board's own rather than the generic tool shape:
   together.
 """
 
-from datetime import datetime, timezone
-from typing import Annotated, List, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
@@ -42,55 +41,57 @@ from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
 from app.core.messages import PostMessages
+from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.post import Post, board_time
 from app.models.tenant.post_poll import PostPoll
 from app.schemas.tenant.post import (
     PostCreate,
+    PostPinUpdate,
+    PostReactionSettings,
+    PostRead,
+    PostReaders,
     PostReadMarks,
     PostReadReceipt,
-    PostReaders,
-    PostPinUpdate,
-    PostRead,
-    PostReactionSettings,
     PostUpdate,
     post_body_too_long,
     post_reader,
 )
-from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.post_poll import (
-    PollVoteWrite,
-    PollVoters,
     PollOptionVoters,
+    PollVoters,
+    PollVoteWrite,
     PollWrite,
     poll_voter,
     serialize_poll,
 )
 from app.schemas.tenant.timeline import TimelineResponse
+from app.schemas.tenant.tool import serialize_tool
 from app.services import notifications as notifications_service
 from app.services import rls as rls_service
 from app.services.notifications import PluginAuthor
-from app.core.search import SearchEntityType
 from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import comments as comments_service
-from app.services.tenant import required_fields
-from app.services.tenant import content_references
-from app.services.tenant import post_polls as post_polls_service
-from app.services.tenant import post_publication
-from app.services.tenant import posts as posts_service
+from app.services.tenant import (
+    content_references,
+    post_publication,
+    required_fields,
+    tool_listing,
+)
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import post_polls as post_polls_service
+from app.services.tenant import posts as posts_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import timeline as timeline_service
-from app.services.tenant import tool_listing
 from app.services.tenant.relationships import Endpoint
 
 #: How many notices a board hands over at once. A post carries its body and
@@ -138,9 +139,7 @@ def _validated_poll(poll_in: PollWrite) -> PollWrite:
     answers with a code the composer can put into words rather than a
     validation error nobody can read.
     """
-    if poll_in.closes_at is not None and poll_in.closes_at <= datetime.now(
-        timezone.utc
-    ):
+    if poll_in.closes_at is not None and poll_in.closes_at <= datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=PostMessages.POLL_CLOSES_IN_PAST,
@@ -215,7 +214,7 @@ async def annotate_post_rows(
 async def read_after_write(
     session: RLSSessionDep,
     post_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> PostRead:
     """The notice a write answers with: re-read after the commit and annotated
@@ -244,11 +243,11 @@ def board_conditions(
     user_id: int | None,
     *,
     context: ActorContext,
-    initiative_id: Optional[int] = None,
-    search: Optional[str] = None,
-    tag_ids: Optional[List[int]] = None,
+    initiative_id: int | None = None,
+    search: str | None = None,
+    tag_ids: list[int] | None = None,
     unread: bool = False,
-    archived: Optional[bool] = None,
+    archived: bool | None = None,
 ) -> list:
     """Which notices this reader may see on a board — the whole rule, once.
 
@@ -291,18 +290,18 @@ async def get_post_timeline(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    initiative_id: Optional[int] = Query(default=None),
-    search: Optional[str] = Query(default=None),
-    tag_ids: Optional[List[int]] = Query(default=None),
-    property_filters: Optional[str] = Query(
+    initiative_id: int | None = Query(default=None),
+    search: str | None = Query(default=None),
+    tag_ids: list[int] | None = Query(default=None),
+    property_filters: str | None = Query(
         default=None,
         description="The feed's property-value filters, JSON-encoded as it takes them.",
     ),
     unread: bool = Query(default=False),
-    archived: Optional[bool] = Query(
+    archived: bool | None = Query(
         default=None, description=archive_service.ARCHIVED_QUERY_DESCRIPTION
     ),
-    tz: Optional[str] = Query(
+    tz: str | None = Query(
         default=None,
         description=(
             "IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. "
@@ -372,7 +371,7 @@ async def create_post(
         session, Tool.post, post_in.initiative_id, current_user, guild_context
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # A schedule in the past is somebody asking for it now, which is what an
     # omitted one means too — so both take the same branch rather than one of
     # them being an error.
@@ -383,7 +382,6 @@ async def create_post(
     )
     post = Post(
         initiative_id=initiative.id,
-        created_by=guild_context.user_id,
         name=post_in.name.strip(),
         body=_validated_body(post_in.body),
         scheduled_for=scheduled,
@@ -465,7 +463,7 @@ async def update_post(
     )
     updated = False
     publish_now = False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     update_data = post_in.model_dump(exclude_unset=True)
 
     if "name" in update_data and update_data["name"] is not None:
@@ -564,7 +562,7 @@ async def set_post_pin(
                 detail=PostMessages.PIN_MANAGER_REQUIRED,
             )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if pin_in.pinned:
         if pin_in.expires_at is not None and pin_in.expires_at <= now:
             raise HTTPException(
@@ -618,7 +616,7 @@ async def set_post_reaction_settings(
         session, Tool.post, post_id, current_user, guild_context, access="write"
     )
     post.reactions_enabled = settings_in.reactions_enabled
-    post.updated_at = datetime.now(timezone.utc)
+    post.updated_at = datetime.now(UTC)
     session.add(post)
     await session.commit()
     return PostReactionSettings(reactions_enabled=post.reactions_enabled)
@@ -771,7 +769,7 @@ async def set_post_poll(
                     detail=PostMessages.POLL_MULTIPLE_LOCKED,
                 )
     session.add(post_polls_service.write_poll(post, data, poll=existing))
-    post.updated_at = datetime.now(timezone.utc)
+    post.updated_at = datetime.now(UTC)
     session.add(post)
     await session.commit()
     return await read_after_write(session, post_id, current_user, guild_context)
@@ -796,7 +794,7 @@ async def delete_post_poll(
     poll = _poll_of(post)
     await session.delete(poll)
     post.poll = None
-    post.updated_at = datetime.now(timezone.utc)
+    post.updated_at = datetime.now(UTC)
     session.add(post)
     await session.commit()
     return await read_after_write(session, post_id, current_user, guild_context)

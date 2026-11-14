@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
-from enum import Enum
 import json
-from typing import Any, List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Optional
 
+from pydantic import ConfigDict
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -14,16 +15,17 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.sql import text
-from sqlmodel import Field, Index, SQLModel, Enum as SQLEnum, Relationship
-from pydantic import ConfigDict
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, Index, Relationship, SQLModel
 
 from app.core.encryption import FERNET_SALT, SALT_EMAIL, decrypt_field
 
 if TYPE_CHECKING:  # pragma: no cover
-    from app.models.platform.user_profile_view import MemberProfile
     from app.models.platform.guild_administration import GuildAdministration
+    from app.models.platform.user_profile_view import MemberProfile
 
 
 #: The longest name a member may give themselves in one community.
@@ -161,6 +163,23 @@ UNLISTED_STATUSES: frozenset[CommunityStatus] = frozenset(
 LIVE_STATUS_VALUES: frozenset[str] = frozenset(s.value for s in LIVE_STATUSES)
 
 
+class CommunityJoinPolicy(str, Enum):
+    """How somebody who is not in a community comes to join it.
+
+    The same three words as ``InitiativeJoinPolicy``. An invite and a sign-in
+    rule bring people into a community whatever its policy.
+
+    - ``private``: not in the directory; invite only. The default.
+    - ``request``: listed; somebody asks and an admin answers
+      (``community_join_requests``).
+    - ``open``: listed; anyone signed in joins.
+    """
+
+    private = "private"
+    request = "request"
+    open = "open"
+
+
 class CommunityCategory(str, Enum):
     """A subject a guild can file itself under in the community directory.
 
@@ -242,14 +261,13 @@ DEFAULT_BANNER: dict[str, str] = {
     "fade": BannerFade.strong.value,
 }
 
-#: The keys a banner has, and the only ones it may have.
-BANNER_KEYS: tuple[str, ...] = tuple(DEFAULT_BANNER)
-
 
 class Guild(SQLModel, table=True):
     __tablename__ = "guilds"
     __allow_unmapped__ = True
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True, ignored_types=(hybrid_property,)
+    )
     __table_args__ = (
         # The community directory's only query shape: listed guilds, optionally
         # narrowed to one category. Partial on the opt-in so the index stays
@@ -258,15 +276,17 @@ class Guild(SQLModel, table=True):
             "ix_guilds_community_categories",
             "categories",
             postgresql_using="gin",
-            postgresql_where=text("is_community"),
+            postgresql_where=text("join_policy <> 'private'"),
+        ),
+        CheckConstraint(
+            "join_policy IN ('private', 'request', 'open')",
+            name="ck_guilds_join_policy",
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(nullable=False)
-    description: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     banner: dict[str, str] = Field(
         default_factory=lambda: dict(DEFAULT_BANNER),
         sa_column=Column(
@@ -278,16 +298,16 @@ class Guild(SQLModel, table=True):
     # Where the community is (see ``GuildLocation`` in the guild schemas for the
     # parts), or NULL for one that has not said — the default, and the answer
     # for most guilds. One value, replaced whole, like the banner.
-    location: Optional[dict[str, Any]] = Field(
+    location: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB(none_as_null=True), nullable=True)
     )
-    created_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    created_by: int | None = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     # Lifecycle status (see CommunityStatus). Stored as a plain string with a CHECK
@@ -304,35 +324,35 @@ class Guild(SQLModel, table=True):
         ),
     )
     # When the status last changed; NULL until the first operator change.
-    status_changed_at: Optional[datetime] = Field(
+    status_changed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # When a purge asked the community's plug-ins to erase what they hold. The
     # row is deleted once each has answered or been given up on
     # (``guild_purge``); until then the community cannot be restored or moved,
     # and no plug-in is given a new name in it. NULL while no purge has begun.
-    purge_started_at: Optional[datetime] = Field(
+    purge_started_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # Where a suspended guild was before it was suspended, so lifting the
     # suspension puts it back there — ``deleted`` included, which a suspension
     # pulls out of its purge countdown. NULL while it is not suspended, and for
     # a suspension made before this was recorded.
-    status_before_suspension: Optional[str] = Field(
+    status_before_suspension: str | None = Field(
         default=None, sa_column=Column(String(16), nullable=True)
     )
-    # Community directory opt-in. False means the guild is reachable only by
-    # invite; True publishes its name, description, icon, categories, and roster
-    # size to the signed-in directory and lets anyone join without one. Set by
-    # the guild's own admins, alongside the identity columns above.
-    is_community: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    # How somebody comes to join (see CommunityJoinPolicy). Anything but
+    # ``private`` is the community-directory opt-in: it publishes the name,
+    # description, icon, categories and roster size to the signed-in directory.
+    # Set by the guild's own admins, alongside the identity columns above.
+    join_policy: str = Field(
+        default="private",
+        sa_column=Column(String(16), nullable=False, server_default="private"),
     )
     # Which shelves the guild files itself under (see CommunityCategory). A listed
     # guild must be on at least one — a card nobody can find by browsing is not
     # a listing — which the ck_guilds_community_categories CHECK enforces.
-    categories: List[str] = Field(
+    categories: list[str] = Field(
         default_factory=list,
         sa_column=Column(
             ARRAY(String(32)), nullable=False, server_default=text("'{}'::varchar[]")
@@ -346,9 +366,15 @@ class Guild(SQLModel, table=True):
     # publishing. True and an unanswered NULL both keep the guild out, which is
     # one CHECK (ck_guilds_community_adult_content) rather than an app rule,
     # because ``IS FALSE`` is false for NULL too.
-    has_adult_content: Optional[bool] = Field(
+    has_adult_content: bool | None = Field(
         default=None, sa_column=Column(Boolean, nullable=True)
     )
+
+    @hybrid_property
+    def listed(self) -> bool:
+        """Whether the guild opted into the directory, in Python and in SQL."""
+        return self.join_policy != CommunityJoinPolicy.private.value
+
     # The operator-set caps, plan label, and sign-in entitlement — everything
     # this row is NOT. See GuildAdministration for why they live apart.
     administration: Optional["GuildAdministration"] = Relationship(
@@ -359,7 +385,7 @@ class Guild(SQLModel, table=True):
         },
     )
 
-    members: List["GuildMembership"] = Relationship(
+    members: list["GuildMembership"] = Relationship(
         back_populates="guild",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
@@ -534,7 +560,7 @@ class GuildMembership(SQLModel, table=True):
         ),
     )
     joined_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     position: int = Field(
@@ -544,7 +570,7 @@ class GuildMembership(SQLModel, table=True):
     #: What this person is called in this community, set by them or by its
     #: administrators. NULL — the usual case — leaves their handle.
     #: ``guild_member_profiles`` answers with it (0438).
-    display_name: Optional[str] = Field(
+    display_name: str | None = Field(
         default=None,
         sa_column=Column(String(MEMBER_DISPLAY_NAME_MAX_LENGTH), nullable=True),
     )
@@ -553,7 +579,7 @@ class GuildMembership(SQLModel, table=True):
     #: an invite, a join request, an admin adding somebody — which group sync
     #: neither grants nor reclaims. ``ON DELETE SET NULL``: removing a provider
     #: ends its claim on the row, it does not end the membership.
-    oidc_provider_id: Optional[int] = Field(
+    oidc_provider_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -566,11 +592,11 @@ class GuildMembership(SQLModel, table=True):
     #: When a guest's membership ends; ``NULL`` for a member. A row with it
     #: set is a guest's: it admits them only until then, and no seat count or
     #: member list includes it.
-    guest_until: Optional[datetime] = Field(
+    guest_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
-    guild: Optional[Guild] = Relationship(back_populates="members")
+    guild: Guild | None = Relationship(back_populates="members")
     user: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": "foreign(GuildMembership.user_id) == MemberProfile.id",
@@ -591,44 +617,87 @@ class GuildInvite(SQLModel, table=True):
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # SHA-256 of the code, in hex. The code itself is shown once, when the
     # invite is made.
     code_hash: str = Field(index=True, unique=True, nullable=False, max_length=64)
     guild_id: int = Field(foreign_key="guilds.id", ondelete="CASCADE", nullable=False)
     # The invite outlives the admin who issued it.
-    created_by: Optional[int] = Field(
+    created_by: int | None = Field(
         foreign_key="users.id", ondelete="SET NULL", nullable=True
     )
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: ``None`` for no limit.
-    max_uses: Optional[int] = Field(default=1, sa_column=Column(Integer, nullable=True))
+    max_uses: int | None = Field(default=1, sa_column=Column(Integer, nullable=True))
     uses: int = Field(default=0, nullable=False)
-    invitee_email_encrypted: Optional[str] = Field(
+    invitee_email_encrypted: str | None = Field(
         default=None,
         sa_column=Column(String(2000), nullable=True, info={FERNET_SALT: SALT_EMAIL}),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     # A guest invite: redeeming it makes a guest with ``guest_role`` for
     # ``guest_days``. Both are NULL on a member invite.
-    guest_days: Optional[int] = Field(
+    guest_days: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
-    guest_role: Optional[CommunityRole] = Field(
+    guest_role: CommunityRole | None = Field(
         default=None,
         sa_column=Column(SQLEnum(CommunityRole, name="guild_role"), nullable=True),
     )
 
     @property
-    def invitee_email(self) -> Optional[str]:
+    def invitee_email(self) -> str | None:
         """Return the decrypted invitee email, or None if not set."""
         if not self.invitee_email_encrypted:
             return None
         return decrypt_field(self.invitee_email_encrypted, SALT_EMAIL)
 
-    guild: Optional[Guild] = Relationship()
+    guild: Guild | None = Relationship()
+
+
+class CommunityJoinRequest(SQLModel, table=True):
+    """Somebody asking to join a ``request`` community, while nobody has answered.
+
+    In ``public`` because the asker is in no community to route into, and the
+    directory shows them their own requests across communities. Answering or
+    withdrawing deletes the row; the audit stream records each answer. A
+    request outlives a change of policy, as an initiative's does: the admins
+    can still answer it.
+    """
+
+    __tablename__ = "community_join_requests"
+    __table_args__ = (
+        Index(
+            "uq_community_join_requests_guild_user",
+            "guild_id",
+            "user_id",
+            unique=True,
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    guild_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("guilds.id", ondelete="CASCADE"), nullable=False
+        )
+    )
+    user_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    # The asker's note to the community's admins: often the only way they can
+    # say who they are.
+    message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

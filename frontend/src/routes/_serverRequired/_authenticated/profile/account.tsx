@@ -1,24 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
-
-const UserSettingsAccountPage = lazy(() =>
-  import("@/pages/user/settings/UserSettingsAccountPage").then((m) => ({
-    default: m.UserSettingsAccountPage,
-  }))
-);
+import { AccountPage } from "@/pages/my/settings/account/AccountPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/profile/account")({
-  component: AccountPage,
+  component: AccountRoute,
 });
 
-function AccountPage() {
+function AccountRoute() {
   const { user, logout } = useAuth();
   if (!user) return null;
-  return (
-    <Suspense fallback={null}>
-      <UserSettingsAccountPage user={user} logout={logout} />
-    </Suspense>
-  );
+  return <AccountPage user={user} logout={logout} />;
 }

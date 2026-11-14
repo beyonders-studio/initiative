@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from app.core.config import settings
 from app.core.cookie_categories import (
     CATEGORY_IN_USE,

@@ -22,8 +22,9 @@ writer. The member's own export runs before, on their own session.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -36,9 +37,9 @@ from app.models.platform.marketplace import (
     MarketplaceListing,
     MarketplaceListingVersion,
 )
-from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace import catalog as catalog_service
-from app.services.marketplace.catalog import CatalogError, DEFAULT_AVATAR_URL
+from app.services.marketplace import vendor_values as vendor_values_service
+from app.services.marketplace.catalog import DEFAULT_AVATAR_URL, CatalogError
 from app.services.marketplace.definitions import LOCAL_SOURCE
 from app.services.marketplace.tool_listings import ListingTooLargeError
 
@@ -87,14 +88,14 @@ async def submit_share(
     *,
     tool: Tool,
     envelope: dict[str, Any],
-    example: Optional[dict[str, Any]],
+    example: dict[str, Any] | None,
     name: str,
     description: str,
-    long_description: Optional[str],
-    release_notes: Optional[str],
+    long_description: str | None,
+    release_notes: str | None,
     publisher: str,
     submitter_id: int,
-    listing_uid: Optional[str],
+    listing_uid: str | None,
     hold_for_review: bool,
     images: Sequence[str] = (),
 ) -> tuple[MarketplaceListing, MarketplaceListingVersion]:
@@ -254,7 +255,7 @@ async def approve_version(
     session.add(row)
     listing.latest_version_id = row.id
     listing.available = True
-    listing.updated_at = datetime.now(timezone.utc)
+    listing.updated_at = datetime.now(UTC)
     session.add(listing)
     await session.flush()
     await vendor_values_service.sync_required_for_listing(
@@ -333,6 +334,6 @@ async def withdraw_share(session: AsyncSession, uid: str, user_id: int) -> None:
         await session.delete(listing)
     else:
         listing.available = False
-        listing.updated_at = datetime.now(timezone.utc)
+        listing.updated_at = datetime.now(UTC)
         session.add(listing)
     await session.flush()

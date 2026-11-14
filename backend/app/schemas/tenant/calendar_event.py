@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, List, Mapping, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import (
     AliasChoices,
@@ -14,6 +15,8 @@ from pydantic import (
 
 from app.core import recurrence
 from app.core.identity_boundary import GuildId, PersonId
+from app.core.user_display import display_name
+from app.models.tenant.calendar_event import RSVPStatus
 from app.schemas.base import (
     MentionStr,
     RichMentionStr,
@@ -21,20 +24,18 @@ from app.schemas.base import (
     TitleStr,
     reject_null,
 )
+from app.schemas.platform.user import PersonShape, PluginPerson, UserPublic
 from app.schemas.recurrence import EventRule, OccurrenceScope
-
-from app.models.tenant.calendar_event import RSVPStatus
+from app.schemas.tenant.archive import ContentCan
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertiesOnUpdate,
     PropertySummary,
     annotated_properties,
 )
-from app.schemas.tenant.archive import ContentCan
 from app.schemas.tenant.tag import TagSummary, annotated_tags
 from app.schemas.tenant.tool import from_row
-from app.schemas.platform.user import PluginPerson, PersonShape, UserPublic
-from app.core.user_display import display_name
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -52,7 +53,7 @@ class CalendarEventAttendeeRead(SanitizedBaseModel):
     )
 
     user_id: PersonId
-    user: Optional[UserPublic] = None
+    user: UserPublic | None = None
     rsvp_status: RSVPStatus
     created_at: datetime
 
@@ -62,7 +63,7 @@ class CalendarEventRSVPUpdate(SanitizedBaseModel):
     #: An answer is for one event: on a repeating one, the occurrence it is
     #: for, by its start in the series. An occurrence with a row of its own is
     #: answered on that row.
-    occurrence: Optional[AwareDatetime] = None
+    occurrence: AwareDatetime | None = None
 
 
 class OccurrenceRequest(SanitizedBaseModel):
@@ -77,8 +78,8 @@ class OccurrenceRequest(SanitizedBaseModel):
 
 class CalendarEventBase(SanitizedBaseModel):
     title: str = Field(..., min_length=1, max_length=255)
-    description: Optional[RichMentionStr] = None
-    location: Optional[MentionStr] = Field(default=None, max_length=500)
+    description: RichMentionStr | None = None
+    location: MentionStr | None = Field(default=None, max_length=500)
     start_at: datetime
     end_at: datetime
     all_day: bool = False
@@ -86,10 +87,10 @@ class CalendarEventBase(SanitizedBaseModel):
     #: Closed, only those already on its list answer, and only someone who
     #: may edit it adds people. An occurrence follows its series.
     rsvp_open: bool = True
-    recurrence: Optional[str] = None
+    recurrence: str | None = None
 
     @model_validator(mode="after")
-    def validate_dates(self) -> "CalendarEventBase":
+    def validate_dates(self) -> CalendarEventBase:
         if self.end_at < self.start_at:
             raise ValueError("end_at must be after start_at")
         return self
@@ -102,43 +103,43 @@ class CalendarEventCreate(CalendarEventBase, PropertiesOnCreate):
     start_at: AwareDatetime
     end_at: AwareDatetime
     calendar_id: int
-    recurrence: Optional[EventRule] = None
+    recurrence: EventRule | None = None
     #: The zone ``recurrence``'s days were picked in, and ``recurrence_shift``
     #: is taken from it; an all-day event's days are UTC dates already.
     #: Omitted, the rule's days are UTC days.
-    tz: Optional[str] = Field(default=None, max_length=64)
-    attendee_ids: Optional[List[PersonId]] = None
-    tag_ids: Optional[List[int]] = None
+    tz: str | None = Field(default=None, max_length=64)
+    attendee_ids: list[PersonId] | None = None
+    tag_ids: list[int] | None = None
 
 
 class CalendarEventUpdate(PropertiesOnUpdate):
-    title: Optional[TitleStr] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[RichMentionStr] = None
+    title: TitleStr | None = Field(default=None, min_length=1, max_length=255)
+    description: RichMentionStr | None = None
     #: The description this ``description`` was written over, as the event
     #: being changed holds it. Given and no longer the stored one, the update
     #: is refused with ``DESCRIPTION_CHANGED``.
-    description_base: Optional[RichMentionStr] = None
-    location: Optional[MentionStr] = Field(default=None, max_length=500)
-    start_at: Optional[AwareDatetime] = None
-    end_at: Optional[AwareDatetime] = None
-    all_day: Optional[bool] = None
-    rsvp_open: Optional[bool] = None
-    recurrence: Optional[EventRule] = None
+    description_base: RichMentionStr | None = None
+    location: MentionStr | None = Field(default=None, max_length=500)
+    start_at: AwareDatetime | None = None
+    end_at: AwareDatetime | None = None
+    all_day: bool | None = None
+    rsvp_open: bool | None = None
+    recurrence: EventRule | None = None
     #: The zone ``recurrence``'s days were picked in, and ``recurrence_shift``
     #: is taken from it; an all-day event's days are UTC dates already.
     #: Omitted, the rule's days are UTC days.
-    tz: Optional[str] = Field(default=None, max_length=64)
+    tz: str | None = Field(default=None, max_length=64)
     # Move the event to another calendar (requires write on both calendars).
-    calendar_id: Optional[int] = None
+    calendar_id: int | None = None
     #: Replaces every tag on the event; omitted leaves them as they are.
-    tag_ids: Optional[List[int]] = Field(default=None, max_length=100)
+    tag_ids: list[int] | None = Field(default=None, max_length=100)
     #: For a repeating event: change one occurrence, it and every later one
     #: (a new series from there), or all of them. Omitted, the event's own row:
     #: the series, or an occurrence opened on its own.
-    scope: Optional[OccurrenceScope] = None
+    scope: OccurrenceScope | None = None
     #: The occurrence, by its start in the series. Its new times for "all"
     #: move every occurrence by as much.
-    occurrence: Optional[AwareDatetime] = None
+    occurrence: AwareDatetime | None = None
 
     _required = reject_null(
         "title", "start_at", "end_at", "all_day", "rsvp_open", "calendar_id"
@@ -160,12 +161,12 @@ class CalendarEventAttendeePreview(PersonShape):
 
     user_id: PersonId
     name: str
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     #: The person ``name`` was drawn from, for an installed plug-in's response.
-    _person: Optional[PluginPerson] = PrivateAttr(default=None)
+    _person: PluginPerson | None = PrivateAttr(default=None)
 
     @classmethod
-    def of(cls, user: Any) -> "CalendarEventAttendeePreview":
+    def of(cls, user: Any) -> CalendarEventAttendeePreview:
         """The preview of ``user``, an attendee's person row."""
         preview = cls(
             user_id=user.id, name=display_name(user), avatar_url=user.avatar_url
@@ -177,7 +178,7 @@ class CalendarEventAttendeePreview(PersonShape):
         return self._person or PluginPerson(id=self.user_id)
 
 
-class CalendarEventFields(CalendarEventBase):
+class CalendarEventFields(CalendarEventBase, CreatedByRead):
     """What every read of an event carries."""
 
     model_config = ConfigDict(
@@ -191,20 +192,19 @@ class CalendarEventFields(CalendarEventBase):
     #: The occurrence of a repeating event this is, by the start it has in the
     #: series; None for an event that does not repeat, and for the series
     #: itself.
-    original_start: Optional[datetime] = None
+    original_start: datetime | None = None
     #: The series an occurrence with a row of its own belongs to.
-    series_id: Optional[int] = None
+    series_id: int | None = None
     calendar_id: int
     # Derived from the parent calendar — kept on the summary so list views can
     # filter/group by initiative without another fetch. NULL when the parent is
     # a guild-level calendar.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     community_id: GuildId = Field(
         validation_alias=AliasChoices("community_id", "guild_id")
     )
-    created_by: PersonId | None = None
-    properties: List[PropertySummary] = Field(default_factory=list)
-    tags: List[TagSummary] = Field(default_factory=list)
+    properties: list[PropertySummary] = Field(default_factory=list)
+    tags: list[TagSummary] = Field(default_factory=list)
     #: What the caller may do to this event — its calendar's edit, since events
     #: hold no grants of their own.
     can: ContentCan = Field(default_factory=ContentCan)
@@ -213,16 +213,23 @@ class CalendarEventFields(CalendarEventBase):
 
 
 class CalendarEventSummary(CalendarEventFields):
-    attendee_previews: List[CalendarEventAttendeePreview] = Field(default_factory=list)
+    attendee_previews: list[CalendarEventAttendeePreview] = Field(default_factory=list)
 
 
 class CalendarEventRead(CalendarEventFields):
-    attendees: List[CalendarEventAttendeeRead] = Field(default_factory=list)
+    attendees: list[CalendarEventAttendeeRead] = Field(default_factory=list)
     #: What an occurrence changed; the rest follows its series.
-    overridden_fields: List[str] = Field(default_factory=list)
+    overridden_fields: list[str] = Field(default_factory=list)
     #: A series' skipped starts and extra starts.
-    skipped_starts: List[datetime] = Field(default_factory=list)
-    extra_starts: List[datetime] = Field(default_factory=list)
+    skipped_starts: list[datetime] = Field(default_factory=list)
+    extra_starts: list[datetime] = Field(default_factory=list)
+    #: When a repeating event next starts: its first event at or after this
+    #: read, one moved on its own at its new time. None for an event that does
+    #: not repeat, and once none is still to come.
+    next_start: datetime | None = None
+    #: That event by its start in the series, which ``occurrence`` takes to
+    #: name it.
+    next_occurrence: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +238,7 @@ class CalendarEventRead(CalendarEventFields):
 
 
 def _event_fields(
-    event: "CalendarEvent", *, context: ActorContext, user_id: Optional[int]
+    event: CalendarEvent, *, context: ActorContext, user_id: int | None
 ) -> dict[str, Any]:
     """What every read of ``event`` works out rather than reads off it by name.
     Access is inherited from the parent calendar, eager-loaded with its level;
@@ -252,11 +259,11 @@ def _event_fields(
 
 
 def serialize_calendar_event_summary(
-    event: "CalendarEvent",
+    event: CalendarEvent,
     *,
     context: ActorContext,
-    user_id: Optional[int] = None,
-    guild_id: Optional[int] = None,
+    user_id: int | None = None,
+    guild_id: int | None = None,
 ) -> CalendarEventSummary:
     return from_row(
         CalendarEventSummary,
@@ -272,14 +279,16 @@ def serialize_calendar_event_summary(
 
 
 def serialize_calendar_event(
-    event: "CalendarEvent",
+    event: CalendarEvent,
     *,
     context: ActorContext,
-    user_id: Optional[int] = None,
+    user_id: int | None = None,
     answers: Mapping[int, RSVPStatus],
+    upcoming: tuple[datetime, datetime] | None = None,
 ) -> CalendarEventRead:
     """``answers`` are what was answered to the event, or to the one
-    occurrence shown; someone with none is still to answer."""
+    occurrence shown; someone with none is still to answer. ``upcoming`` is a
+    repeating event's next event, as ``(start, occurrence)``."""
     skipped, extra = (
         recurrence.exception_starts(
             event.recurrence, event.start_at, event.recurrence_shift
@@ -303,4 +312,6 @@ def serialize_calendar_event(
         overridden_fields=list(event.overridden_fields or []),
         skipped_starts=skipped,
         extra_starts=extra,
+        next_start=upcoming[0] if upcoming else None,
+        next_occurrence=upcoming[1] if upcoming else None,
     )

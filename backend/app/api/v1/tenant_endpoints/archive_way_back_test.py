@@ -6,7 +6,8 @@ somewhere to see what has been put away, and an answer to "may I take this
 back", which the capped permission level cannot give.
 """
 
-from httpx import AsyncClient
+from fastapi.routing import iter_route_contexts
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
@@ -14,7 +15,6 @@ from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.schemas.tenant.archive import ArchivableType
 from app.testing import create_counter_group, create_file
-
 
 #: The wire name of every archivable tool (and the collection, a sub-tool with
 #: a list of its own), paired with the list route that has to be able to show
@@ -39,9 +39,9 @@ def test_every_archivable_tool_has_somewhere_to_be_found():
 
     offered = {
         route.path.rsplit("/", 2)[-2]: {p.name for p in route.dependant.query_params}
-        for route in app.routes
+        for route in iter_route_contexts(app.routes)
         if getattr(route, "path", "").startswith("/api/v1/c/{community_id}/")
-        and "GET" in getattr(route, "methods", set())
+        and "GET" in (getattr(route, "methods", None) or set())
         and getattr(route, "path", "").endswith("/")
     }
     missing = [

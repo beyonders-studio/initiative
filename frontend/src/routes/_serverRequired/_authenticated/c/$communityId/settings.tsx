@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsLayout } from "@/pages/community/settings/SettingsLayout";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/settings")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/CommunitySettingsLayout").then((m) => ({ default: m.CommunitySettingsLayout }))
-  ),
+  component: SettingsLayout,
 });

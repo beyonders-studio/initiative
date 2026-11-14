@@ -57,7 +57,9 @@ export const telHref = (value: string): string => {
   return `tel:${digits}${ext ? `;ext=${ext}` : ""}`;
 };
 
-export const mailtoHref = (value: string): string => `mailto:${value}`;
+/** A mail link to one address: the address is encoded, so it carries no headers of its own. */
+export const mailtoHref = (value: string): string =>
+  `mailto:${encodeURIComponent(value.trim()).replace(/%40/g, "@")}`;
 
 /** Where a chip's reading takes a tap: its phone dials and its email writes.
  *  Every other fact opens the thing it is about. */

@@ -3,11 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import { createCommunityInvite } from "@/api/generated/communities/communities";
 import { PATH_SCENES, PATH_TINTS, PixelScene } from "@/components/start/PixelScene";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
 
 /** A burst of confetti for a finished community, for anybody who has not
  *  asked their system for less motion. */
@@ -69,15 +69,14 @@ export const PeopleStep = ({
           >
             <PixelScene scene={PATH_SCENES.invite} className="w-10" />
           </span>
-          <div className="min-w-0 flex-1 space-y-2">
-            <Label htmlFor="start-invite-link">{t("start.people.linkLabel")}</Label>
+          <Field label={t("start.people.linkLabel")} className="min-w-0 flex-1">
             <div className="flex gap-2">
-              <Input id="start-invite-link" value={link ?? ""} readOnly className="min-w-0" />
+              <Input value={link ?? ""} readOnly className="min-w-0" />
               <Button type="button" variant="outline" onClick={() => void copy()} disabled={!link}>
                 {t("common:copy")}
               </Button>
             </div>
-          </div>
+          </Field>
         </div>
       )}
       {planButton ? (

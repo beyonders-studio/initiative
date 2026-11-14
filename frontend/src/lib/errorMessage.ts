@@ -2,8 +2,8 @@ import type { AxiosError } from "axios";
 import { isAxiosError } from "axios";
 
 import i18n from "@/i18n";
-import { listFormat } from "@/lib/intl";
 import { kindNames } from "@/lib/tools";
+import { listFormat } from "@/ui/lib/intl";
 
 /** Loose translation function that accepts dynamic keys without strict type checking. */
 const translate = i18n.t.bind(i18n) as (key: string, options?: Record<string, unknown>) => string;

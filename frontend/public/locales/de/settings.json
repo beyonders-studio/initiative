@@ -11,7 +11,19 @@
       "privacy": "Privatsphäre"
     },
     "loginRequired": "Du musst angemeldet sein, um dein Profil zu verwalten.",
-    "goToLogin": "Zur Anmeldung"
+    "goToLogin": "Zur Anmeldung",
+    "version": "Initiative v{{version}}"
+  },
+  "settingsSection": {
+    "whenYouSave": "Beim Speichern",
+    "change": "Ändern",
+    "changeRule": "{{rule}} ändern",
+    "on": "An",
+    "off": "Aus",
+    "days_one": "{{count}} Tag",
+    "days_other": "{{count}} Tage",
+    "hours_one": "{{count}} Stunde",
+    "hours_other": "{{count}} Stunden"
   },
   "communityLayout": {
     "title": "Community-Einstellungen",
@@ -72,8 +84,6 @@
   "addresses": {
     "title": "E-Mail-Adressen",
     "description": "Mit jeder bestätigten Adresse melden Sie sich an, und Ihre Kontopost geht an alle.",
-    "loadFailed": "Ihre Adressen konnten nicht geladen werden.",
-    "retry": "Erneut versuchen",
     "primary": "Hauptadresse",
     "unverified": "Nicht bestätigt",
     "makePrimary": "Als Hauptadresse festlegen",
@@ -117,10 +127,7 @@
     "waits": "Diese Änderung wartet bis {{date}}. Alle Adressen deines Kontos haben eine E-Mail dazu bekommen."
   },
   "security": {
-    "loadingDevices": "Geräte werden geladen…",
-    "devicesError": "Geräte konnten nicht geladen werden.",
     "unknownDevice": "Unbekanntes Gerät",
-    "revokeDialogCancel": "Abbrechen",
     "revoking": "Wird widerrufen…",
     "revokeError": "Gerätezugriff konnte nicht widerrufen werden",
     "newKeyTitle": "Neuer API-Schlüssel",
@@ -143,8 +150,6 @@
     "nameRequired": "Name ist erforderlich",
     "createSuccess": "API-Schlüssel erstellt",
     "createError": "API-Schlüssel konnte nicht erstellt werden",
-    "loadingKeys": "API-Schlüssel werden geladen…",
-    "keysError": "API-Schlüssel konnten nicht geladen werden.",
     "noKeys": "Noch keine API-Schlüssel.",
     "statusExpired": "Abgelaufen",
     "statusDisabled": "Deaktiviert",
@@ -193,10 +198,6 @@
     "deleteDialogDescription": "Alles, was {{name}} verwendet, funktioniert sofort nicht mehr."
   },
   "ai": {
-    "loading": "KI-Einstellungen werden geladen…",
-    "loadError": "KI-Einstellungen konnten nicht geladen werden.",
-    "enabled": "Aktiviert",
-    "disabled": "Deaktiviert",
     "providerFieldLabel": "Anbieter",
     "providerPlaceholder": "Anbieter auswählen",
     "modelLabel": "Modell",
@@ -211,16 +212,9 @@
   "communityAI": {
     "title": "Community-KI",
     "adminOnly": "Nur Community-Admins können KI-Verbindungen verwalten.",
-    "connectionsTitle": "Community-Verbindungen",
-    "connectionsDescription": "Definiere die KI-Verbindungen, die Mitglieder dieser Community verwenden können.",
     "disabledDescription": "KI-Funktionen sind für die Plattform deaktiviert.",
-    "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet. Mitglieder legen ihren eigenen Schlüssel in ihren Profileinstellungen fest.",
-    "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community.",
-    "switchTitle": "KI in dieser Community",
-    "switchLabel": "KI-Funktionen erlauben",
-    "switchHelp": "Ausgeschaltet wird nichts aus dieser Community an einen KI-Anbieter gesendet, egal welche Verbindung der Server oder die Community einrichtet.",
-    "switchSaved": "KI-Einstellung gespeichert",
-    "switchError": "Die KI-Einstellung konnte nicht gespeichert werden."
+    "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet.",
+    "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community."
   },
   "platformAI": {
     "title": "Plattform-KI",
@@ -236,9 +230,7 @@
     "saveMode": "Speichern",
     "savingMode": "Wird gespeichert…",
     "modeSaved": "KI-Einstellungen aktualisiert",
-    "modeSaveError": "KI-Einstellungen konnten nicht aktualisiert werden",
-    "connectionsTitle": "Plattform-Verbindungen",
-    "connectionsDescription": "Definiere die KI-Verbindungen, die jede Community verwendet."
+    "modeSaveError": "KI-Einstellungen konnten nicht aktualisiert werden"
   },
   "marketplaceRegistry": {
     "title": "Marketplace-Registry",
@@ -276,6 +268,11 @@
   },
   "interface": {
     "colorTheme": "Farbdesign",
+    "mode": "Hell oder dunkel",
+    "eventThemes": {
+      "label": "Event-Designs",
+      "description": "Die App zu Feiertagen und Anlässen schmücken."
+    },
     "colorThemeDescription": "Wähle ein Farbdesign für die Anwendung.",
     "weekStartsOn": "Woche beginnt am",
     "weekStartsOnDescription": "Wähle, welcher Tag in Kalendern und Datumsauswahlfeldern zuerst angezeigt wird.",
@@ -296,13 +293,32 @@
     "updateError": "Oberflächeneinstellungen konnten nicht aktualisiert werden",
     "themeDescriptions": {
       "kobold": "Das klassische Initiative-Design in tiefen Indigotönen.",
-      "displacer": "Beruhigendes Pastelldesign nach dem Vorbild von Catppuccin (Latte/Macchiato).",
-      "strahd": "Dunkles Gothic-Design mit violetten Akzenten (Dracula/Alucard).",
+      "catppuccin": "Beruhigende Pastelltöne: Latte im hellen Modus, Frappé, Macchiato oder Mocha im dunklen.",
+      "dracula": "Violette Akzente: Alucard im hellen Modus, Dracula im dunklen.",
       "unicorn": "Neon-Regenbogen im ganzen Spektrum – laut und stolz.",
       "darkKnight": "AMOLED-Schwarz mit dunkelroten und gelben Akzenten.",
       "orc": "Erdiges Grün mit leuchtend orkhautgrünen Akzenten. ORK ORK ORK!",
-      "aboleth": "Dunkler Unterschlupf nach dem Vorbild von Monokai, mit leuchtenden biolumineszenten Akzenten."
+      "monokai": "Leuchtende Akzente in Limette, Cyan, Violett, Orange und Pink auf warmen Neutraltönen.",
+      "nord": "Arktisches Blau und frostiges Grau: Snow Storm im hellen Modus, Polar Night im dunklen.",
+      "elemental": "Metallischer Glanz in der ganzen App, im Element deiner Wahl."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Kupfer",
+        "silver": "Silber",
+        "gold": "Gold",
+        "roseGold": "Roségold",
+        "lapis": "Lapislazuli",
+        "cobalt": "Kobalt",
+        "emerald": "Smaragd",
+        "garnet": "Granat",
+        "amethyst": "Amethyst",
+        "obsidian": "Obsidian"
+      }
+    },
+    "themeVariantGroup": "Varianten von {{theme}}",
+    "useVariantForDark": "{{variant}} für den dunklen Modus verwenden",
+    "useVariant": "{{variant}} verwenden",
     "taskCompletionVisualFeedback": {
       "label": "Effekt beim Abschließen einer Aufgabe",
       "description": "Ein bisschen Spaß, wenn du eine dir zugewiesene Aufgabe abschließt.",
@@ -550,8 +566,6 @@
     "platformOnly": "Nur der Plattform-Eigentümer kann die Branding-Einstellungen verwalten.",
     "colorsTitle": "Markenfarben",
     "colorsDescription": "Passe die Akzentfarben für den hellen und dunklen Modus an.",
-    "loadingInterface": "Oberflächeneinstellungen werden geladen…",
-    "interfaceError": "Oberflächeneinstellungen konnten nicht geladen werden.",
     "lightModeLabel": "Akzent im hellen Modus",
     "lightModeHelp": "Schaltflächen, Hervorhebungen und Fokuszustände verwenden diese Farbe, während sich die App im hellen Modus befindet.",
     "darkModeLabel": "Akzent im dunklen Modus",
@@ -626,8 +640,6 @@
   "email": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die E-Mail-Einstellungen verwalten.",
     "title": "SMTP-E-Mail",
-    "loading": "E-Mail-Einstellungen werden geladen…",
-    "loadError": "E-Mail-Einstellungen konnten nicht geladen werden.",
     "hostLabel": "Host",
     "hostPlaceholder": "smtp.mailprovider.com",
     "portLabel": "Port",
@@ -655,8 +667,6 @@
   },
   "push": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die Einstellungen für Push-Benachrichtigungen verwalten.",
-    "loading": "Einstellungen für Push-Benachrichtigungen werden geladen…",
-    "loadError": "Einstellungen für Push-Benachrichtigungen konnten nicht geladen werden.",
     "title": "Firebase Cloud Messaging",
     "description": "Optional. Ohne Dienstkontoschlüssel laufen Push-Benachrichtigungen über das Push-Relay von BeyondersStudio, und diese Felder können leer bleiben. Mit einem laufen Android-Pushes über dein eigenes Firebase-Projekt; iPhone-Pushes nutzen immer das Relay.",
     "enabledLabel": "Push-Benachrichtigungen senden",
@@ -691,8 +701,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "Eine Prüfung, dass die Person, die sich registriert oder einen Anmeldecode per E-Mail anfordert, kein Bot ist.",
-    "on": "An",
-    "off": "Aus",
     "providerLabel": "Anbieter",
     "providers": {
       "off": "Keiner",
@@ -705,15 +713,12 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Leer lassen, um den gespeicherten geheimen Schlüssel zu behalten.",
     "incomplete": "Das Captcha ist aktiv, sobald Anbieter, Websiteschlüssel und geheimer Schlüssel gespeichert sind.",
-    "save": "Captcha-Einstellungen speichern",
-    "saving": "Speichern…",
+    "missingKeys": "erst aktiv, wenn Websiteschlüssel und geheimer Schlüssel gespeichert sind",
     "saved": "Captcha-Einstellungen gespeichert",
     "error": "Captcha-Einstellungen konnten nicht gespeichert werden"
   },
   "auth": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die Authentifizierungseinstellungen verwalten.",
-    "loading": "Authentifizierungseinstellungen werden geladen…",
-    "loadError": "Authentifizierungseinstellungen konnten nicht geladen werden.",
     "postLoginRedirect": "Weiterleitung nach Anmeldung:",
     "mobileCallback": "Callback der mobilen App:",
     "deploymentTitle": "Diese Installation",
@@ -740,7 +745,7 @@
       "communitiesRequire_one": "{{count}} Community verlangt eine Anmeldung über einen eigenen Anbieter.",
       "communitiesRequire_other": "{{count}} Communities verlangen eine Anmeldung über einen eigenen Anbieter.",
       "totp": {
-        "label": "Zwei-Faktor-Authentifizierung aktivieren",
+        "label": "Authenticator-App",
         "help": "Lass Leute ihr Konto mit einem Code aus einer Authenticator-App schützen. Einschalten tut das jede Person für sich; hier geht es darum, ob der Server es überhaupt anbietet."
       },
       "passkey": {
@@ -753,7 +758,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "Wie lange Personen angemeldet bleiben",
+      "title": "Sitzungsdauer",
       "description": "Die längste Zeit, die jemand ohne erneute Anmeldung auskommt, unabhängig von der Nutzung. Unabhängig davon, bei Nichtnutzung abgemeldet zu werden.",
       "label": "Stunden",
       "placeholder": "Kein Limit",
@@ -762,21 +767,23 @@
       "error": "Das Sitzungslimit konnte nicht gespeichert werden.",
       "idleLabel": "Leerlauf (Minuten)",
       "idlePlaceholder": "Kein Limit",
+      "idleDetail_one": "ungenutzte Sitzungen enden nach {{count}} Minute",
+      "idleDetail_other": "ungenutzte Sitzungen enden nach {{count}} Minuten",
+      "idleDefault": "ungenutzte Sitzungen enden nach dem beim Deployment gesetzten Fenster",
       "idleHint": "Wie lange eine Sitzung unberührt bleiben darf, bevor sie endet. Leer lassen, um das beim Deployment gesetzte Fenster zu behalten. Die App zu benutzen zählt als Berührung, die Zeit läuft also erst, wenn jemand aufhört. Eine Community, die dem Compliance-Standard folgt, verkürzt es für ihre Mitglieder weiter."
     },
     "breachedPasswordCheck": {
-      "title": "Kompromittierte Passwörter",
-      "description": "Ein neues Passwort ablehnen, das bereits in einem Datenleck aufgetaucht ist.",
-      "label": "Neue Passwörter mit bekannten Datenlecks abgleichen",
-      "onHelp": "Nur die ersten fünf Zeichen des Passwort-Hashes verlassen diesen Server. Das Passwort selbst nie.",
-      "offHelp": "Neue Passwörter werden nicht geprüft. Schalte dies nur aus, wenn dieser Server das Internet nicht erreichen kann.",
+      "title": "Prüfung auf kompromittierte Passwörter",
+      "description": "Lehnt ein neues Passwort ab, das bereits in einem Datenleck aufgetaucht ist. Nur die ersten fünf Zeichen seines Hashes verlassen diesen Server, das Passwort selbst nie.",
+      "onLabel": "Neue Passwörter mit bekannten Datenlecks abgleichen",
+      "offLabel": "Nicht prüfen, für einen Server ohne Internetzugang",
       "enabledToast": "Neue Passwörter werden mit bekannten Datenlecks abgeglichen.",
       "disabledToast": "Neue Passwörter werden nicht mehr mit bekannten Datenlecks abgeglichen.",
       "error": "Die Prüfung auf kompromittierte Passwörter konnte nicht geändert werden."
     },
     "secondFactorRequirement": {
-      "title": "Zwei-Faktor-Authentifizierung",
-      "description": "Ob Personen hier zusätzlich zur Anmeldung einen zweiten Faktor besitzen müssen — eine Authenticator-App oder einen Passkey.",
+      "title": "Zweiter Faktor",
+      "description": "Wer zusätzlich zur Anmeldung einen zweiten Faktor besitzen muss, eine Authenticator-App oder einen Passkey.",
       "levels": {
         "nobody": {
           "label": "Niemand muss",
@@ -798,23 +805,22 @@
       "present": "Code eingeben",
       "saved": "Gespeichert. Betroffene werden bei ihrer nächsten Anfrage gefragt.",
       "error": "Das konnte nicht gespeichert werden.",
-      "noMethod": "Erlaube zuerst die Authenticator-App oder Passkeys — ohne eines von beiden gibt es nichts zu verlangen.",
+      "noMethod": "Biete zuerst die Authenticator-App oder Passkeys an. Ohne eines von beiden gibt es nichts zu verlangen.",
       "providers": {
         "title": "Anbieter, deren Anmeldung zählt",
         "help": "Eine Anmeldung über einen davon erfüllt die obige Anforderung, da der Anbieter meldet, selbst einen zweiten Faktor geprüft zu haben. Dieselbe Angabe wie auf der Seite des Anbieters."
       }
     },
     "factorMethods": {
-      "title": "Zwei-Faktor-Authentifizierung",
-      "description": "Was dieser Server als zweiten Faktor anbietet. Ob ihn jemand haben muss, ist die nächste Einstellung.",
+      "title": "Angebotene zweite Faktoren",
+      "description": "Welche zweiten Faktoren Personen einrichten können. Ob ihn jemand haben muss, legt die Regel „Zweiter Faktor“ fest.",
       "saved": "Zwei-Faktor-Authentifizierung aktualisiert.",
       "saveError": "Zwei-Faktor-Authentifizierung konnte nicht geändert werden.",
-      "followsWaysIn": "Ein Passkey weist Gerät und Person in einem Schritt nach und beantwortet dies daher ebenso, wie er eine Sitzung eröffnet. Ob Passkeys angeboten werden, wird unter „Zugangswege“ entschieden."
+      "setUnderWaysIn": "Festgelegt unter Zugangswege",
+      "none": "Keine"
     }
   },
   "platformUsers": {
-    "loading": "Benutzer werden geladen…",
-    "loadError": "Benutzer konnten nicht geladen werden.",
     "filterPlaceholder": "Nach Handle filtern…",
     "columnId": "Benutzer-ID",
     "columnHandle": "Handle",
@@ -849,8 +855,8 @@
     },
     "roleDescriptions": {
       "member": "Standardzugriff auf die eigenen Communitys. Keine plattformweiten Berechtigungen.",
-      "support": "Schreibgeschützte Plattformeinsicht (Benutzer, Communitys) und kann zeitlich begrenzten Zugriff auf eine Community anfordern.",
-      "moderator": "Alles, was Support kann, plus Benutzerverwaltung (Sperren/Wiederaktivieren) und Inhaltsmoderation.",
+      "support": "Alles, was Moderator kann, plus Kontowiederherstellung (Anmeldung, zweiter Faktor, Wiederaktivierung), und kann zeitlich begrenzten Lese- oder Lese- & Schreibzugriff auf eine Community anfordern.",
+      "moderator": "Sieht die Benutzer und Communitys der Plattform, moderiert Konten und Inhalte, sperrt Konten und kann zeitlich begrenzten Moderationszugriff auf eine Community anfordern.",
       "operator": "Verwaltet Benutzer, Communitys und Rollen plattformweit, mit Community-übergreifendem Datenzugriff, und genehmigt Zugriffsanfragen.",
       "owner": "Vollständige Kontrolle, einschließlich der app-weiten Konfiguration (Authentifizierung, Branding, E-Mail, KI). Die einzige Rolle, die die Konfiguration verwalten kann."
     },
@@ -937,8 +943,6 @@
         "title": "Vorgänge",
         "count_one": "{{count}} offener Vorgang, den die Person eingereicht hat oder der sie betrifft.",
         "count_other": "{{count}} offene Vorgänge, die die Person eingereicht hat oder die sie betreffen.",
-        "loading": "Vorgänge werden geladen…",
-        "loadError": "Die Vorgänge konnten nicht geladen werden.",
         "filed": "Von der Person eingereicht",
         "about": "Betrifft die Person",
         "help": "Um einen Vorgang zu öffnen, brauchst du Zugriff auf das Projekt, in dem er geführt wird."
@@ -1019,7 +1023,7 @@
     "requestDescription": "Fordere temporären, eingeschränkten Zugriff auf eine Community an. Genehmiger gewähren ihn und er läuft automatisch ab.",
     "breakGlass": {
       "title": "Notfallzugriff",
-      "description": "Notfallzugriff auf eine Community selbst gewähren – sofort genehmigt, auf diese Community beschränkt und automatisch ablaufend. Lese- & Schreibzugriff entspricht einem vollen Community-Admin. Jeder Notfallzugriff wird protokolliert.",
+      "description": "Notfallzugriff auf eine Community selbst gewähren – sofort genehmigt, auf diese Community beschränkt und automatisch ablaufend. Damit kannst du vorhandene Inhalte bearbeiten und die Einstellungen der Community ändern. Jeder Notfallzugriff wird protokolliert.",
       "reasonPlaceholder": "Warum du Notfallzugriff brauchst (z. B. Vorfall #123)",
       "submit": "Notfallzugriff",
       "activated": "Notfallzugriff aktiviert",
@@ -1068,7 +1072,6 @@
     "actionError": "Aktion fehlgeschlagen",
     "expiresIn": "läuft in {{minutes}} Min. ab",
     "minutes": "{{minutes}} Min.",
-    "loadMore": "Mehr laden",
     "status": {
       "pending": "Ausstehend",
       "approved": "Genehmigt",
@@ -1120,15 +1123,12 @@
   },
   "pluginServices": {
     "platformOnly": "Nur Plattform-Eigentümer können Plug-in-Dienste verwalten.",
-    "loading": "Plug-in-Dienste werden geladen…",
-    "loadError": "Plug-in-Dienste konnten nicht geladen werden.",
     "title": "Plug-in-Dienste",
     "description": "Die Plug-ins, die diese Instanz ausführt. Das Listing eines Plug-ins sagt, was es ist und darf; hier gibst du an, wo es antwortet und mit welchen Schlüsseln es signiert.",
     "empty": "Noch keine Plug-in-Dienste. Ein Plug-in erscheint hier, sobald sein Listing eintrifft oder du es hinzufügst.",
     "addService": "Plug-in-Dienst hinzufügen",
     "edit": "Bearbeiten",
     "delete": "Löschen",
-    "cancel": "Abbrechen",
     "save": "Speichern",
     "saving": "Wird gespeichert…",
     "enabledLabel": "Aktiv",
@@ -1251,8 +1251,6 @@
   },
   "providerPlacement": {
     "description": "Ordne die Leute, die ein Anmeldeanbieter anmeldet – nach der Gruppe oder dem Verzeichnis, das er meldet –, einer Community zu, und dort einer Initiative, wenn du eine nennst.",
-    "loading": "Zuordnungsregeln werden geladen…",
-    "loadError": "Zuordnungsregeln konnten nicht geladen werden. Bitte versuche es erneut.",
     "platformOnly": "Die Zuordnung bei Anmeldung verwalten Plattform-Operatoren und -Owner.",
     "everywhere": {
       "label": "Zuordnungsregeln auf jede Community anwenden",
@@ -1321,8 +1319,6 @@
     "title": "Community-Limits",
     "description": "Lege pro Community Obergrenzen für Speicher und Benutzeranzahl fest. Ein Limit unter die aktuelle Nutzung zu senken, blockiert neue Uploads oder Mitglieder, entfernt aber nie vorhandene Dateien oder Mitglieder.",
     "platformOnly": "Du benötigst eine Plattform-Mitarbeiterrolle, um Communities zu sehen.",
-    "loading": "Communitys werden geladen…",
-    "loadError": "Communitys konnten nicht geladen werden. Bitte versuche es erneut.",
     "filterByName": "Communitys nach Namen filtern",
     "unlimitedPlaceholder": "Unbegrenzt",
     "helpText": "Speicherlimits sind in GB; Benutzerlimits sind eine Mitgliederzahl. Beide werden automatisch gespeichert – lass ein Feld leer für unbegrenzt.",
@@ -1402,7 +1398,6 @@
       "storageLabel": "Speicherlimit",
       "decidesForItself": "Was sie selbst entscheidet",
       "deleted": "Gelöscht",
-      "pluginSummariesUnavailable": "Die Plug-in-Nutzung konnte nicht geladen werden.",
       "narrowings": {
         "title": "Wen sie als ihre Leute zählt",
         "help": "Diese Community gibt an, welche Anmeldungen über einen Anbieter zu ihr gehören. Sie benennt die Werte selbst; erst Ihre Zustimmung erlaubt den automatischen Beitritt — bis dahin funktioniert die Verbindung nur für vorhandene Mitglieder.",
@@ -1454,8 +1449,6 @@
   },
   "storage": {
     "platformOnly": "Nur Plattform-Eigentümer können den Speicher konfigurieren.",
-    "loading": "Speichereinstellungen werden geladen…",
-    "loadError": "Speichereinstellungen konnten nicht geladen werden.",
     "title": "Objektspeicher",
     "description": "Lege fest, wo hochgeladene Dateien und Anhänge gespeichert werden. Standard ist das lokale Dateisystem; wechsle zu einem S3-kompatiblen Speicher für skalierbare oder geteilte Deployments.",
     "backendLabel": "Speicher-Backend",
@@ -1463,7 +1456,7 @@
     "backendS3": "S3-kompatibel",
     "backendHelp": "Lokal speichert Dateien auf der Serverfestplatte. S3 funktioniert mit jedem S3-kompatiblen Speicher, etwa einer selbst gehosteten Garage- oder MinIO-Instanz oder Cloudflare R2.",
     "cutoverTitle": "Der Wechsel zu S3 verschiebt vorhandene Dateien nicht",
-    "cutoverHelp": "Speichere diese Einstellungen, führe „Verbindung testen“ aus und kopiere dann mit „Backfill“ unten die vorhandenen lokalen Dateien in den Bucket. Wechsle das Backend erst auf S3, wenn der Backfill abgeschlossen ist – optional „Fehlende Objekte lokal ausliefern“ während eines Prüfzeitraums aktiviert lassen.",
+    "cutoverHelp": "Führe zuerst „Verbindung testen“ aus. Speichere dann mit aktiviertem „Fehlende Objekte lokal ausliefern“: Neue Dateien landen im Bucket, und eine Datei, die dort noch fehlt, wird von der Festplatte gelesen. Kopiere die vorhandenen Dateien mit dem Abschnitt unten hinüber und schalte die Rückfallebene ab, sobald er ohne Fehler abgeschlossen ist.",
     "bucketLabel": "Bucket",
     "bucketPlaceholder": "my-initiative-uploads",
     "regionLabel": "Region",
@@ -1488,7 +1481,7 @@
     "testSuccess": "Verbindung erfolgreich.",
     "testError": "Verbindung fehlgeschlagen.",
     "backfillTitle": "Lokale Dateien nach S3 übertragen",
-    "backfillHelp": "Kopiert jeden vorhandenen lokalen Upload in den konfigurierten Bucket. Idempotent und sicher erneut ausführbar; führe es vor dem Wechsel des Backends auf S3 aus.",
+    "backfillHelp": "Kopiert jeden vorhandenen lokalen Upload in den Bucket und überspringt, was schon dort liegt, kann also gefahrlos erneut laufen. Es läuft, sobald S3 als Backend gespeichert ist.",
     "startBackfill": "Backfill starten",
     "backfillRunning": "Backfill läuft…",
     "backfillStarted": "Backfill gestartet.",
@@ -1505,19 +1498,19 @@
     "setByDeployment": "Wer diesen Server betreibt, legt das für deine Community fest.",
     "shareUrl": {
       "title": "Anmeldelink für Mitglieder",
-      "description": "Teile diesen Link mit Mitgliedern — er bietet die Anmeldeanbieter dieser Community an und führt sie direkt in die Community.",
-      "copy": "Link kopieren",
+      "description": "Bietet diese Anbieter an und bringt Leute direkt zu {{community}}.",
+      "copy": "Kopieren",
       "copied": "Anmeldelink kopiert"
     },
     "policy": {
-      "title": "Anmeldeanforderung",
-      "description": "Lege fest, mit welcher Anmeldung eine Sitzung erfolgt sein muss, bevor sie auf diese Community zugreifen kann.",
-      "openLabel": "Offen",
-      "openHelp": "Jedes angemeldete Mitglied kann auf diese Community zugreifen.",
-      "requiredLabel": "Single Sign-on erforderlich",
-      "requiredHelp": "Mitglieder können erst nach der Anmeldung über den ausgewählten Anbieter auf diese Community zugreifen.",
+      "title": "Anmeldung der Mitglieder",
+      "description": "Was Mitglieder brauchen, bevor sie {{community}} öffnen können.",
+      "openLabel": "Jedes angemeldete Konto",
+      "openHelp": "Mitglieder melden sich so an, wie dieser Server es erlaubt.",
+      "requiredLabel": "Über unsere Anbieter",
+      "requiredHelp": "Nur eine Anmeldung über den gewählten Anbieter zählt.",
       "providerPlaceholder": "Anbieter auswählen …",
-      "noProviders": "Verbindet zuerst einen Anbieter unter „Wer hereinkommt“.",
+      "noProviders": "Verbindet zuerst einen Anbieter unter „Anmeldeanbieter“.",
       "saved": "Anmeldeanforderung gespeichert",
       "error": "Anmeldeanforderung konnte nicht gespeichert werden",
       "selfUnsatisfied": "Deine aktuelle Sitzung hat sich noch nicht über {{providerName}} angemeldet. Melde dich einmal damit an, um zu bestätigen, dass es funktioniert, bevor du es verpflichtend machst.",
@@ -1528,22 +1521,44 @@
       "presentPasskey": "Passkey vorlegen",
       "anyProvider": "Einer unserer Anmeldeanbieter",
       "anyProviderHelp": "Mitglieder können über jeden Anbieter kommen, den diese Community eingerichtet hat. Eine Anmeldung anderswo auf dieser Installation zählt nicht.",
-      "requireFactor": "Zusätzlich einen zweiten Faktor verlangen",
-      "requireFactorHelp": "Mitglieder müssen in dieser Sitzung einen Code aus ihrer Authenticator-App vorgelegt haben. Sie können ihn ohne Abmelden nachreichen.",
       "requirePasskey": "Zusätzlich einen Passkey verlangen",
       "requirePasskeyHelp": "Mitglieder müssen sich in dieser Sitzung mit einem Passkey angemeldet oder einen vorgelegt haben. Sie können ihn ohne Abmelden nachreichen.",
-      "factorRequiredByPlatform": "Dein Server verlangt bereits von allen einen zweiten Faktor — hier gibt es nichts hinzuzufügen."
+      "save": "Anforderung speichern",
+      "value": {
+        "through": "Über {{provider}}",
+        "throughWithPasskey": "Über {{provider}}, mit Passkey",
+        "any": "Über einen unserer Anbieter",
+        "anyWithPasskey": "Über einen unserer Anbieter, mit Passkey",
+        "passkey": "Mit Passkey"
+      },
+      "impact": {
+        "provider": "Mitglieder, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über {{provider}} anzumelden. Niemand wird abgemeldet.",
+        "anyProvider": "Mitglieder, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über einen eurer Anbieter anzumelden. Niemand wird abgemeldet.",
+        "passkey": "Mitglieder, die in dieser Sitzung keinen Passkey verwendet haben, werden beim nächsten Öffnen von {{community}} nach einem gefragt. Niemand wird abgemeldet.",
+        "selfProvider": "Hat deine eigene Sitzung {{provider}} noch nicht verwendet, meldest du dich einmal damit an, bevor das gespeichert wird.",
+        "selfOther": "Erfüllt deine eigene Sitzung das noch nicht, wirst du vor dem Speichern darum gebeten.",
+        "neverThrough_one": "{{count}} von {{total}} Mitgliedern hat sich noch nie über {{provider}} angemeldet.",
+        "neverThrough_other": "{{count}} von {{total}} Mitgliedern haben sich noch nie über {{provider}} angemeldet.",
+        "neverThroughAny_one": "{{count}} von {{total}} Mitgliedern hat sich noch nie über einen eurer Anbieter angemeldet.",
+        "neverThroughAny_other": "{{count}} von {{total}} Mitgliedern haben sich noch nie über einen eurer Anbieter angemeldet.",
+        "noPasskey_one": "{{count}} von {{total}} Mitgliedern hat noch keinen Passkey.",
+        "noPasskey_other": "{{count}} von {{total}} Mitgliedern haben noch keinen Passkey."
+      }
     },
     "sessionLimit": {
-      "title": "Sitzungsdauer",
-      "allowLabel": "Alle zwölf Stunden neu anmelden",
+      "title": "Alle 12 Stunden neu anmelden",
       "saved": "Sitzungslimit gespeichert",
       "error": "Sitzungslimit konnte nicht gespeichert werden",
-      "help": "Für Communities, die angehalten wurden, die Anmeldedauer zu begrenzen. Es gilt überall für eure Mitglieder, nicht nur hier."
+      "description": "Für Communities, die angehalten wurden, die Anmeldedauer zu begrenzen.",
+      "offLabel": "Aus",
+      "onLabel": "Alle 12 Stunden neu anmelden",
+      "onDetail": "diese Mitglieder melden sich überall auf diesem Server neu an",
+      "offDetail": "es gilt die Sitzungsdauer deines Servers",
+      "impact": "Es gilt für diese Mitglieder in jeder Community auf diesem Server, nicht nur hier."
     },
     "connections": {
-      "title": "Welche Anmeldungen eure sind",
-      "description": "Angemeldet wird sich bei dieser Installation. Sagt, welche ihrer Anmeldeanbieter zu eurer Community zählen und wer darauf als eure Leute gilt.",
+      "title": "Anmeldeanbieter",
+      "description": "Die Anbieter, über die sich eure Mitglieder anmelden, und welche ihrer Konten als eure zählen.",
       "connect": "Anbieter verbinden",
       "connected": "Anbieter verbunden",
       "connectError": "Diese Verbindung konnte nicht geändert werden",
@@ -1551,15 +1566,10 @@
       "disconnected": "Anbieter getrennt",
       "disconnectTitle": "{{name}} trennen?",
       "disconnectDescription": "Sie zählt nicht mehr als eure: Der Button verschwindet von eurer Anmeldeseite und niemand kommt mehr neu darüber herein. Niemand wird abgemeldet, kein Konto ändert sich. Wenn ihr eine Anmeldung darüber verlangt, hebt das zuerst auf.",
-      "empty": "Noch keine Anbieter verbunden — eure Mitglieder melden sich wie gewohnt an.",
       "noneOffered": "Wer diese Installation betreibt, hat noch keine Anbieter zum Verbinden angeboten.",
       "notReady": "Nicht verfügbar",
-      "narrowedTo": "Nur Konten, deren {{claim}} {{values}} ist",
+      "narrowedTo": "{{claim}}: {{values}}",
       "anyoneItVouchesFor": "Alle, für die dieser Anbieter bürgt",
-      "dialogTitle": "Anmeldeanbieter verbinden",
-      "dialogDescription": "Wähle den Anbieter, den eure Mitglieder nutzen, und sage dann, welche Konten darauf euch gehören.",
-      "providerLabel": "Anbieter",
-      "providerPlaceholder": "Einen auswählen",
       "claimLabel": "Wessen Konten als eure gelten",
       "claimHelp": "Communitys sind hier getrennt, also gib an, welche Konten bei diesem Anbieter deine sind – eine Google-Workspace-Domain, ein Entra-Mandant, eine Gruppe. Nur diese Leute zählen als deine Community.",
       "claimPlaceholder": "Wähle, was deine Leute kennzeichnet",
@@ -1567,7 +1577,7 @@
       "claimValuesPlaceholder": "example.com, example.org",
       "autoJoinLabel": "Sie dieser Community hinzufügen",
       "autoJoinHelp": "Wer als eure Leute zählt, wird bei der ersten Anmeldung Mitglied. Lasst es aus, wenn ihr selbst einladen wollt.",
-      "joinsOnArrival": "Neue treten automatisch bei",
+      "joinsOnArrival": "Neue treten bei",
       "claimOptions": {
         "hd": "Google-Workspace-Domain",
         "tid": "Microsoft-Entra-Mandant",
@@ -1575,26 +1585,26 @@
         "domain": "Domain",
         "other": "Ein anderer Claim …"
       },
-      "inherited": "Von der Installation",
+      "inherited": "Von deinem Server",
       "makeItOurs": "Zu unserer machen",
       "claimNameLabel": "Claim-Name",
       "claimNamePlaceholder": "z. B. org, realm",
       "joinsOnceAgreed": "Passende Ankommende treten sofort bei, sobald die Serverbetreiberin bestätigt, dass diese Werte Ihnen gehören. Bis dahin werden sie hereingelassen, und der Beitritt erfolgt per Einladung.",
-      "acceptsPlacementLabel": "Die Installation Leute von diesem Anbieter zuordnen lassen",
-      "acceptsPlacementHelp": "Die Zuordnungsregeln der Installation für diesen Anbieter können hier Leute hinzufügen, neben euren eigenen Regeln."
+      "acceptsPlacementLabel": "Server Leute zuordnen lassen",
+      "saved": "Verbindung gespeichert",
+      "turnOff": "Ausschalten",
+      "turnOn": "Einschalten"
     },
     "rules": {
-      "title": "Wo eure Leute landen",
-      "description": "Euer Anbieter meldet, in welchen Gruppen jemand ist. Legt hier fest, was diese Gruppen bedeuten – wer als Mitglied beitritt, wer als Admin, und in welcher Initiative sie starten.",
+      "title": "Wo Leute landen",
       "add": "Regel hinzufügen",
       "added": "Regel hinzugefügt",
       "addError": "Regel konnte nicht hinzugefügt werden",
       "empty": "Noch keine Regeln – wer über eure Anbieter kommt, tritt ohne besondere Zuordnung bei.",
-      "connectFirst": "Verbindet zuerst einen Anbieter, dann legt fest, was seine Gruppen bedeuten.",
       "noGroupsBadge": "Keine Gruppen gemeldet",
       "noGroupsHint": "Die Betreiber dieser Installation haben diesem Anbieter nicht mitgeteilt, wo seine Gruppen stehen. Bis dahin trifft diese Regel auf niemanden zu.",
-      "landsInCommunity": "Ankunft über {{provider}} – tritt bei als {{role}}",
-      "landsInInitiative": "Ankunft über {{provider}} – tritt bei als {{role}}, und {{initiative}} als {{initiativeRole}}",
+      "landsInCommunity": "Über {{provider}}, tritt bei als {{role}}",
+      "landsInInitiative": "Über {{provider}}, tritt bei als {{role}}, und {{initiative}} als {{initiativeRole}}",
       "dialogDescription": "Nennt eine Gruppe, die euer Anbieter meldet, und legt fest, wohin ihre Leute gehören.",
       "providerLabel": "Anbieter",
       "providerPlaceholder": "Einen auswählen",
@@ -1616,14 +1626,14 @@
       "removeTitle": "Diese Regel entfernen?",
       "removeDescription": "Wer {{group}} trägt, wird hier nicht mehr zugeordnet, und wer durch diese Regel hier ist, verliert diese Stellung bei der nächsten Anmeldung über diesen Anbieter.",
       "deployment": {
-        "title": "Von der Installation festgelegt",
-        "description": "Zuordnungsregeln, die die Betreiber dieser Installation für ihre Anbieter geschrieben haben und die diese Community nennen. Sie ordnen Leute hier neben euren eigenen Regeln zu, sobald ihr die Regeln eines Anbieters in seiner Verbindung zulasst.",
-        "everywhere": "Die Installation wendet ihre Zuordnungsregeln auf jede Community an."
-      }
-    },
-    "sections": {
-      "whoGetsIn": "Wer hereinkommt",
-      "onWhatTerms": "Zu welchen Bedingungen"
+        "description": "Regeln, die dein Server für seine Anbieter geschrieben hat und die diese Community nennen. Sie ordnen Leute hier neben euren eigenen Regeln zu, sobald die Verbindung dieses Anbieters deinen Server Leute zuordnen lässt.",
+        "everywhere": "Dein Server wendet seine Zuordnungsregeln auf jede Community an.",
+        "count_one": "{{count}} Regel von deinem Server",
+        "count_other": "{{count}} Regeln von deinem Server"
+      },
+      "saved": "Regel gespeichert",
+      "saveError": "Regel konnte nicht gespeichert werden",
+      "editTitle": "Regel bearbeiten"
     },
     "emptyState": {
       "title": "Noch nichts verbunden",
@@ -1649,7 +1659,6 @@
           "prompt": "Ob dies der einzige Weg herein wird."
         }
       },
-      "skip": "Überspringen",
       "ruleTitle": "Eine erste Gruppe",
       "ruleHelp": "Optional. Nennen Sie eine Gruppe, die Ihr Anbieter meldet, und wo ihre Leute landen. Weitere können Sie später hinzufügen.",
       "requireLabel": "Mitglieder müssen über diesen Anbieter kommen",
@@ -1657,46 +1666,73 @@
     },
     "secondFactor": {
       "title": "Zweiter Faktor",
-      "description": "Ob der Zugang zu dieser Community einen verlangt.",
-      "allowLabel": "Zweiten Faktor verlangen",
-      "help": "Mitglieder müssen in dieser Sitzung einen zweiten Faktor vorgelegt haben. Welche Arten zählen, entscheidet die Serverbetreiberin, nicht diese Community — ein Faktor lässt sich ohne Abmeldung hinzufügen.",
-      "askedByPlatform": "Ihr Server verlangt bereits von allen hier einen zweiten Faktor; es gibt nichts hinzuzufügen.",
+      "description": "Ob das Öffnen von {{community}} in jeder Sitzung einen zweiten Faktor verlangt.",
       "saved": "Zweiter Faktor gespeichert.",
-      "error": "Die Anforderung für den zweiten Faktor konnte nicht gespeichert werden."
+      "error": "Die Anforderung für den zweiten Faktor konnte nicht gespeichert werden.",
+      "offLabel": "Nicht verlangt",
+      "onLabel": "In jeder Sitzung verlangt",
+      "guestsToo": "auch für Gäste",
+      "impact": "Alle, die {{community}} öffnen, Gäste eingeschlossen, legen in jeder Sitzung einen Code aus einer Authenticator-App oder einen Passkey vor. Sie können einen ohne Abmeldung hinzufügen.",
+      "withoutFactor_one": "{{count}} von {{total}} Personen hier hat noch keinen Authenticator und keinen Passkey.",
+      "withoutFactor_other": "{{count}} von {{total}} Personen hier haben noch keinen Authenticator und keinen Passkey."
     },
     "guestPolicy": {
-      "title": "Anmeldeanforderung für Gäste",
-      "description": "Lege fest, welche Anmeldung die Sitzung eines Gastes verwendet haben muss, bevor sie diese Community erreicht. Du musst sie nicht selbst erfüllen.",
-      "openHelp": "Jeder angemeldete Gast erreicht, was ihm gegeben wurde.",
-      "requiredHelp": "Gäste erreichen diese Community erst nach der Anmeldung über den ausgewählten Anbieter.",
+      "title": "Anmeldung der Gäste",
+      "description": "Was Gäste brauchen, bevor sie {{community}} öffnen können. Du selbst musst es nicht erfüllen.",
+      "openHelp": "Gäste melden sich so an, wie dieser Server es erlaubt.",
       "anyProviderHelp": "Gäste können über jeden Anbieter kommen, den diese Community eingerichtet hat. Eine Anmeldung anderswo auf dieser Installation zählt nicht.",
       "requirePasskeyHelp": "Gäste müssen sich in dieser Sitzung mit einem Passkey angemeldet oder einen vorgelegt haben. Sie können ihn ohne Abmelden nachreichen.",
       "saved": "Anmeldeanforderung für Gäste gespeichert",
       "error": "Die Anmeldeanforderung für Gäste konnte nicht gespeichert werden",
-      "save": "Anmeldeanforderung für Gäste speichern"
+      "impact": {
+        "provider": "Gäste, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über {{provider}} anzumelden. Niemand wird abgemeldet.",
+        "anyProvider": "Gäste, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über einen eurer Anbieter anzumelden. Niemand wird abgemeldet.",
+        "passkey": "Gäste, die in dieser Sitzung keinen Passkey verwendet haben, werden beim nächsten Öffnen von {{community}} nach einem gefragt. Niemand wird abgemeldet.",
+        "neverThrough_one": "{{count}} von {{total}} Gästen hat sich noch nie über {{provider}} angemeldet.",
+        "neverThrough_other": "{{count}} von {{total}} Gästen haben sich noch nie über {{provider}} angemeldet.",
+        "neverThroughAny_one": "{{count}} von {{total}} Gästen hat sich noch nie über einen eurer Anbieter angemeldet.",
+        "neverThroughAny_other": "{{count}} von {{total}} Gästen haben sich noch nie über einen eurer Anbieter angemeldet.",
+        "noPasskey_one": "{{count}} von {{total}} Gästen hat noch keinen Passkey.",
+        "noPasskey_other": "{{count}} von {{total}} Gästen haben noch keinen Passkey."
+      }
     },
     "guestStay": {
-      "title": "Aufenthalt von Gästen",
+      "title": "Längster Gastaufenthalt",
       "description": "Gasteinladungen und Verlängerungen laufen nie länger als das. Gäste, die schon da sind, behalten ihr Enddatum.",
       "label": "Längster Aufenthalt eines Gastes (Tage)",
       "hint_one": "Leer lassen, um das Limit des Servers von {{count}} Tag zu verwenden. Mehr kannst du auch nicht festlegen.",
       "hint_other": "Leer lassen, um das Limit des Servers von {{count}} Tagen zu verwenden. Mehr kannst du auch nicht festlegen.",
       "saved": "Längster Gastaufenthalt gespeichert",
       "error": "Der längste Gastaufenthalt konnte nicht gespeichert werden",
-      "save": "Längsten Gastaufenthalt speichern"
+      "value_one": "{{count}} Tag",
+      "value_other": "{{count}} Tage",
+      "defaultDetail": "das Limit deines Servers",
+      "ceilingDetail": "dein Server erlaubt bis zu {{days}}"
+    },
+    "setByServer": "Von deinem Server festgelegt",
+    "intro": "Wie man sich bei {{community}} anmeldet, was man zum Hereinkommen braucht und was die Community verlässt.",
+    "signInRules": {
+      "title": "Anmelderegeln",
+      "description": "Was man braucht, bevor man {{community}} öffnen kann.",
+      "members": "Mitglieder",
+      "guests": "Gäste"
+    },
+    "groupRules": {
+      "title": "Gruppenregeln",
+      "description": "Was die Gruppen, die eure Anbieter melden, hier bedeuten. Jede greift bei der nächsten Anmeldung.",
+      "add": "Hinzufügen"
     }
   },
   "authProviders": {
     "title": "Identitätsanbieter",
     "description": "Die Single-Sign-on-Anbieter, mit denen sich Personen anmelden. Jeder erhält eine eigene Schaltfläche auf der Anmeldeseite.",
     "addProvider": "Anbieter hinzufügen",
-    "loading": "Anbieter werden geladen…",
     "empty": "Noch keine Anbieter konfiguriert.",
-    "disabledBadge": "Deaktiviert",
     "editTitle": "Anmeldeanbieter bearbeiten",
     "dialogDescription": "OpenID-Connect-Anbieterdetails. Die Callback-URL für Ihren IdP lautet /api/v1/auth/{slug}/callback auf diesem Server.",
     "slugLabel": "Kürzel",
     "slugHelp": "Kleinbuchstaben, Zahlen und Bindestriche. Nach dem Erstellen unveränderlich — es bildet die Anmelde-URLs.",
+    "slugFixed": "Unveränderlich, sobald der Anbieter hinzugefügt ist, weil seine Anmeldeadressen daraus gebildet werden.",
     "slugInvalid": "Nur Kleinbuchstaben, Zahlen und Bindestriche; kein Bindestrich am Anfang oder Ende.",
     "displayNameLabel": "Anzeigename",
     "issuerLabel": "Issuer-URL",
@@ -1778,11 +1814,12 @@
   },
   "aiConnections": {
     "title": "Verbindungen",
-    "subtitle": "Jede Verbindung ist ein Ziel – ein Anbieter, ein Modell und ein optionaler gemeinsamer Schlüssel.",
+    "subtitle_community": "Die KI-Anbieter und -Modelle, die Mitglieder dieser Community nutzen können.",
+    "subtitle_platform": "Die KI-Anbieter und -Modelle, die Communities auf diesem Server nutzen können.",
+    "locked": "Schalte KI unter Sicherheit ein, um diese Verbindungen zu nutzen.",
     "add": "Verbindung hinzufügen",
+    "toggleLabel": "{{label}} verwenden",
     "empty": "Noch keine Verbindungen. Füge eine hinzu, um KI-Funktionen zu aktivieren.",
-    "loading": "Verbindungen werden geladen…",
-    "loadError": "Verbindungen konnten nicht geladen werden.",
     "defaultBadge": "Standard",
     "keySet": "Gemeinsamer Schlüssel gesetzt",
     "noKey": "Kein gemeinsamer Schlüssel",
@@ -1814,13 +1851,10 @@
     "modelHintPick": "Wähle ein Modell, um diese Verbindung fertig einzurichten.",
     "needsModel": "Braucht ein Modell",
     "customHint": "Jeder Server, der die OpenAI-API spricht: vLLM, llama.cpp, LM Studio, LocalAI oder ein Gateway wie LiteLLM. Gib die Adresse bis einschließlich /v1 an.",
-    "enabledLabel": "Aktiviert",
-    "enabledDescription": "Mitgliedern erlauben, diese Verbindung zu verwenden.",
     "defaultLabel": "Standardverbindung",
     "defaultDescription": "Mitglieder verwenden diese Verbindung, sofern sie keine andere wählen.",
     "save": "Verbindung speichern",
     "saving": "Wird gespeichert…",
-    "cancel": "Abbrechen",
     "communitiesLabel": "Communities",
     "communitiesPlaceholder": "Einer Community zuweisen…",
     "communitiesSearch": "Communities suchen…",
@@ -1849,6 +1883,7 @@
     "ageGateOffConfirm": "Hier sind alle mindestens 18",
     "defaultDmLabel": "Direktnachrichten für neue Konten",
     "defaultDmHelpText": "Die Einstellung, mit der ein Konto startet. Sie wird einmal gelesen, wenn das Konto erstellt wird – eine Änderung öffnet kein bestehendes Konto und schließt auch keines. „Privat“ ist die Voreinstellung; damit werden Personen nach und nach erreichbar, sobald sie es selbst wählen.",
+    "whileMessagesOff": "gilt, sobald Direktnachrichten an sind",
     "directMessagesLabel": "Direktnachrichten zwischen Mitgliedern erlauben",
     "directMessagesHelpText": "Meine Nachrichten sowie die dahinterliegenden Verbindungen und Anfragen. Nachrichten sind Ende-zu-Ende-verschlüsselt, niemand im Betrieb dieser Installation kann sie lesen – deaktivieren Sie dies dort, wo private Nachrichten nicht hingehören, nicht um sie zu beaufsichtigen.",
     "directMessagesReversibleNote": "Deaktivieren blendet Meine Nachrichten aus und weist neue ab; gelöscht wird nichts. Unterhaltungen, Verbindungen und Einstellungen sind beim Wiedereinschalten unverändert vorhanden.",
@@ -1866,8 +1901,7 @@
       "neverHint": "Nichts wird nach Ablauf einer Frist gelöscht. Eine Community bleibt pausiert, bis jemand die Pause aufhebt oder sie löscht.",
       "saved_one": "Pausierte Communitys werden nach {{count}} Tag gelöscht.",
       "saved_other": "Pausierte Communitys werden nach {{count}} Tagen gelöscht.",
-      "savedNever": "Pausierte Communitys werden nie automatisch gelöscht.",
-      "save": "Frist für pausierte Communitys speichern"
+      "savedNever": "Pausierte Communitys werden nie automatisch gelöscht."
     },
     "retention": {
       "title": "Gelöschte Communitys aufbewahren",
@@ -1878,8 +1912,7 @@
       "neverHint": "Nichts wird nach Ablauf einer Frist entfernt. Gelöschte Communitys bleiben in der Liste unten, bis jemand eine wiederherstellt.",
       "saved_one": "Gelöschte Communitys werden {{count}} Tag aufbewahrt.",
       "saved_other": "Gelöschte Communitys werden {{count}} Tage aufbewahrt.",
-      "savedNever": "Gelöschte Communitys werden unbegrenzt aufbewahrt.",
-      "save": "Aufbewahrungsdauer für Communitys speichern"
+      "savedNever": "Gelöschte Communitys werden unbegrenzt aufbewahrt."
     },
     "accountRetention": {
       "title": "Gelöschte Konten aufbewahren",
@@ -1890,8 +1923,7 @@
       "neverHint": "Nichts wird nach Ablauf einer Frist gelöscht. Gelöschte Konten bleiben in der Nutzertabelle, bis jemand zurückkommt oder eines wiederherstellt.",
       "saved_one": "Gelöschte Konten werden {{count}} Tag aufbewahrt.",
       "saved_other": "Gelöschte Konten werden {{count}} Tage aufbewahrt.",
-      "savedNever": "Gelöschte Konten werden unbegrenzt aufbewahrt.",
-      "save": "Aufbewahrungsdauer für Konten speichern"
+      "savedNever": "Gelöschte Konten werden unbegrenzt aufbewahrt."
     },
     "engagementRankingLabel": "Communities erlauben, Ergebnisse nach Beteiligung zu ordnen",
     "engagementRankingHelpText": "Ausgeschaltet ordnet keine Community auf diesem Server nach Beteiligung, unabhängig von ihrer eigenen Einstellung.",
@@ -1901,9 +1933,10 @@
     "guestsEnabledHelpText": "Communities können Personen für eine festgelegte Anzahl von Tagen einladen. Gäste belegen keinen Platz und sehen nur, was ihnen gegeben wurde. Solange dies aus ist, kommt kein Gast hinein.",
     "guestsEnabledToast": "Communities können Gäste haben.",
     "guestsDisabledToast": "Gäste sind ausgeschaltet.",
+    "maxGuestDaysTitle": "Längster Gastaufenthalt",
     "maxGuestDaysLabel": "Längster Aufenthalt eines Gastes (Tage)",
     "maxGuestDaysHelpText": "Kein Gast bleibt länger als das, egal was eine Community einstellt.",
-    "maxGuestDaysSave": "Längsten Gastaufenthalt speichern",
+    "whileGuestsOff": "gilt, sobald Gäste erlaubt sind",
     "maxGuestDaysSaved_one": "Gäste bleiben höchstens {{count}} Tag.",
     "maxGuestDaysSaved_other": "Gäste bleiben höchstens {{count}} Tage.",
     "joinAndCreateTitle": "Wer beitreten und erstellen darf",
@@ -1915,18 +1948,24 @@
     "communityCreationHelpText": "Wenn aus, können nur Personen, die auf diesem Server Communities verwalten, eine erstellen, und nur Eingeladene können sich registrieren.",
     "communityCreationEnabledToast": "Jeder kann eine Community erstellen.",
     "communityCreationDisabledToast": "Nur Personen, die Communities verwalten, können eine erstellen.",
+    "creationDailyLimitTitle": "Tageslimit pro Konto",
     "creationDailyLimitLabel": "Communities pro Konto und Tag",
     "creationDailyLimitHelpText": "0 bedeutet kein Limit. Für Personen, die Communities verwalten, gilt es nicht.",
-    "creationDailyLimitSave": "Tageslimit für Communities speichern",
+    "whileCreationOff": "gilt, sobald alle eine Community erstellen dürfen",
+    "creationDailyLimitValue_one": "{{count}} Community pro Tag",
+    "creationDailyLimitValue_other": "{{count}} Communities pro Tag",
     "creationDailyLimitSaved_one": "Jedes Konto kann {{count}} Community pro Tag erstellen.",
     "creationDailyLimitSaved_other": "Jedes Konto kann {{count}} Communities pro Tag erstellen.",
     "creationDailyLimitSavedNone": "Für neue Communities gibt es kein Tageslimit.",
+    "exportAndDeletionTitle": "Exporte und Löschung",
     "exportCooldownLabel": "Stunden zwischen Community-Exporten",
     "exportCooldownHelpText": "Wie lange eine Community wartet, bevor sie wieder alles exportieren kann. 0 bedeutet keine Wartezeit.",
-    "exportCooldownSave": "Zeit zwischen Community-Exporten speichern",
     "exportCooldownSaved_one": "Communities warten {{count}} Stunde zwischen Exporten.",
     "exportCooldownSaved_other": "Communities warten {{count}} Stunden zwischen Exporten.",
-    "exportCooldownSavedNone": "Communities können ohne Wartezeit exportieren."
+    "exportCooldownSavedNone": "Communities können ohne Wartezeit exportieren.",
+    "noLimit": "Kein Limit",
+    "noWait": "Keine Wartezeit",
+    "exportCooldownTitle": "Zeit zwischen Exporten"
   },
   "account": {
     "passwordTitle": "Passwort",
@@ -2013,7 +2052,6 @@
   "twoFactor": {
     "title": "Zwei-Faktor-Authentifizierung",
     "description": "Nach einem Passwort oder E-Mail-Code einen Code aus einer Authenticator-App abfragen, und immer dann, wenn eine Community oder dieser Server einen zweiten Faktor verlangt.",
-    "loading": "Wird geprüft …",
     "on": "Aktiv",
     "notSetUp": "Bei der Anmeldung wird kein Code aus einer App abgefragt.",
     "setUp": "Zwei-Faktor-Authentifizierung einrichten",
@@ -2049,7 +2087,6 @@
     "regenerateError": "Neue Codes konnten nicht erstellt werden.",
     "disableError": "Das konnte nicht deaktiviert werden.",
     "codePlaceholder": "123456",
-    "statusError": "Es ließ sich nicht prüfen, ob die Zwei-Faktor-Authentifizierung aktiv ist. Lade die Seite neu.",
     "copyUnavailable": "Kopieren nicht möglich – schreibe die Codes stattdessen auf.",
     "notOffered": "Diese Installation bietet die Authenticator-App nicht an.",
     "passwordlessCodes": "Dein Konto meldet sich ohne Passwort an. Mit diesen Codes legst du wieder eines fest, falls du deinen Passkey verlierst."
@@ -2057,8 +2094,6 @@
   "passkeys": {
     "title": "Passkeys",
     "description": "Melde dich mit Fingerabdruck, Gesicht oder Bildschirmsperre deines Geräts an – statt mit deinem Passwort.",
-    "loading": "Wird geprüft …",
-    "listError": "Es ließ sich nicht prüfen, welche Passkeys dieses Konto hat. Lade die Seite neu.",
     "empty": "Noch keine Passkeys.",
     "emptyHint": "Ein Passkey liegt auf deinem Telefon, deinem Laptop oder in deinem Passwort-Manager und funktioniert nur auf dieser Seite.",
     "add": "Passkey hinzufügen",
@@ -2091,7 +2126,6 @@
     "unsupported": "Dieser Browser kann keine Passkeys erstellen. Öffne diese Seite in einem aktuellen Browser.",
     "siteUnsupported": "Passkeys brauchen für diese Seite einen richtigen Domainnamen und https. Wer die Seite betreibt, kann das einrichten.",
     "limitReached": "Dieses Konto hat so viele Passkeys, wie es haben kann ({{limit}}). Entferne einen, um einen neuen hinzuzufügen.",
-    "addFromBrowser": "Ein Passkey wird in einem Browser hinzugefügt, der auf dieser Seite angemeldet ist. „Passkey hinzufügen“ öffnet einen für dich.",
     "notOffered": "Diese Seite bietet keine Passkeys an. Die vorhandenen bleiben erhalten.",
     "error": "Das hat nicht geklappt. Versuche es erneut."
   },
@@ -2114,7 +2148,11 @@
     "valuesHint": "Mehrere durch Kommas trennen. Die eigene Verbindung einer Community ersetzt dies vollständig; nichts hiervon wird mit ihren Angaben zusammengeführt."
   },
   "platformSecurity": {
-    "description": "Wie lange jemand angemeldet bleiben darf, welches Captcha neuen Personen gestellt wird und was eine Benachrichtigung mitnimmt, wenn sie die App verlässt."
+    "description": "Wie lange jemand angemeldet bleiben darf, welches Captcha neuen Personen gestellt wird und was eine Benachrichtigung mitnimmt, wenn sie die App verlässt.",
+    "signInRules": {
+      "title": "Anmelderegeln",
+      "description": "Was jedes Konto auf diesem Server bei der Anmeldung gefragt wird."
+    }
   },
   "notificationDelivery": {
     "title": "Benachrichtigungen, die die App verlassen",
@@ -2137,37 +2175,38 @@
       "offHelp": "Eine Benachrichtigung, die die App verlässt, nennt, worum es geht: wer gehandelt hat und woran."
     }
   },
-  "communityNotifications": {
-    "title": "Benachrichtigungen, die die App verlassen",
-    "description": "Was die Benachrichtigungen dieser Community mitnehmen, wenn sie die App verlassen. Der Server beantwortet dieselben drei Fragen für alle; es gilt die strengere Antwort.",
-    "saved": "Benachrichtigungseinstellungen gespeichert",
-    "error": "Benachrichtigungseinstellungen konnten nicht gespeichert werden",
+  "communityPrivacy": {
+    "title": "Datenschutz",
+    "description": "Was {{community}} verlässt und was über Aktivität gespeichert wird.",
+    "saved": "Datenschutzeinstellung gespeichert",
+    "error": "Die Einstellung konnte nicht gespeichert werden",
     "push": {
       "label": "Benachrichtigungen auf Telefon und Desktop",
       "onHelp": "Die Benachrichtigungen dieser Community erreichen die Telefone und Desktop-Apps der Mitglieder.",
       "offHelp": "Zu dieser Community wird nichts an ein Telefon oder die Desktop-App gesendet. Die Glocke bleibt, und E-Mail ebenfalls, falls sie aktiv ist.",
-      "platformHelp": "Dieser Server sendet nichts an ein Telefon oder die Desktop-App – hier gibt es nichts zu entscheiden."
+      "platformHelp": "dein Server sendet nichts an Telefone oder die Desktop-App"
     },
     "email": {
       "label": "E-Mail-Benachrichtigungen",
       "onHelp": "Die Benachrichtigungen dieser Community erreichen die Postfächer der Mitglieder.",
       "offHelp": "Zu dieser Community wird keine Benachrichtigungs-E-Mail gesendet. Anmeldecodes und Passwort-Zurücksetzungen gehören zum Konto und gehen weiterhin raus.",
-      "platformHelp": "Dieser Server sendet keine Benachrichtigungs-E-Mail – hier gibt es nichts zu entscheiden."
+      "platformHelp": "dein Server sendet keine Benachrichtigungs-E-Mails"
     },
     "redact": {
       "label": "Details in Benachrichtigungen ausblenden",
       "onHelp": "Benachrichtigungen zu dieser Community nennen nur die Art des Ereignisses, sobald sie die App verlassen. Hier sehen Mitglieder alles.",
       "offHelp": "Benachrichtigungen zu dieser Community nennen, worum es geht, sobald sie die App verlassen.",
-      "platformHelp": "Dieser Server blendet Details überall aus – diese Community ist bereits abgedeckt."
+      "platformHelp": "dein Server blendet Benachrichtigungsdetails überall aus"
+    },
+    "ai": {
+      "label": "KI-Funktionen",
+      "help": "Lässt Mitglieder KI-Funktionen in dieser Community nutzen. Ausgeschaltet wird nichts von hier an einen KI-Anbieter gesendet."
+    },
+    "ranking": {
+      "label": "Suche nach Beteiligung ordnen",
+      "help": "Die Suche zeigt weiter oben, was mehr Mitglieder in letzter Zeit geöffnet oder bearbeitet haben. Für jedes Element wird nur eine grobe Stufe gespeichert, nie wer es geöffnet hat oder wie oft, und sie wird nie außerhalb dieser Community geteilt.",
+      "platformHelp": "dein Server hat die Ordnung nach Beteiligung für alle Communities ausgeschaltet"
     }
-  },
-  "communityEngagementRanking": {
-    "title": "Suchreihenfolge",
-    "label": "Suchergebnisse nach Beteiligung in der Community ordnen",
-    "help": "Die Suche zeigt weiter oben, was mehr Mitglieder in letzter Zeit geöffnet oder bearbeitet haben. Für jedes Element wird nur eine grobe Stufe gespeichert, nie wer es geöffnet hat oder wie oft, und sie wird nie außerhalb dieser Community geteilt.",
-    "platformHelp": "Dieser Server hat die Ordnung nach Beteiligung für alle Communities ausgeschaltet.",
-    "saved": "Suchreihenfolge gespeichert.",
-    "error": "Die Suchreihenfolge konnte nicht gespeichert werden."
   },
   "billingInsights": {
     "title": "Abrechnungskennzahlen",
@@ -2227,11 +2266,10 @@
     },
     "rungFixed": "Für wen eine Rolle ist, lässt sich nach dem Anlegen nicht mehr ändern.",
     "surfacesLabel": "Was sie umfasst",
+    "pluginsLabel": "Was sie von den Plug-ins umfasst",
     "notYours": "Das hast du selbst nicht, also kannst du es nicht vergeben.",
     "holdsNothing": "Umfasst noch nichts.",
     "builtIn": "Integriert",
-    "loading": "Rollen werden geladen",
-    "loadError": "Die Rollen konnten nicht geladen werden.",
     "closed": "Wer diesen Server betreibt, hat eigene Rollen für diese Community geschlossen. Die vorhandenen Rollen gelten weiter.",
     "deleteTitle": "{{name}} löschen?",
     "deleteDescription": "Wer sie hat, kehrt zu seiner einfachen Rolle zurück.",
@@ -2295,8 +2333,7 @@
     "setByDeployment": "Diese Rolle wird von den Serverbetreibenden festgelegt. Du kannst sie hier vergeben, aber nicht ändern oder löschen."
   },
   "customRoleRules": {
-    "title": "Eigene Rollen nach Gruppe",
-    "description": "Gib allen, die sich mit einer Gruppe anmelden, eine eigene Rolle. Eine Anmeldung liest diese Regeln der Reihe nach, und die erste passende Gruppe entscheidet. Eine von Hand vergebene Rolle bleibt bestehen.",
+    "title": "Eigene Rollen · die erste Übereinstimmung entscheidet",
     "add": "Rollenregel hinzufügen",
     "empty": "Noch keine Gruppe vergibt eine eigene Rolle.",
     "gives": "Über {{provider}}: {{role}}",
@@ -2305,7 +2342,7 @@
     "remove": "Regel entfernen",
     "removeTitle": "Diese Regel entfernen?",
     "removeDescription": "Wer in {{group}} ist, behält die Rolle bis zur nächsten Anmeldung.",
-    "dialogDescription": "Wer sich über diesen Anbieter mit der Gruppe anmeldet, bekommt die Rolle, sofern keine frühere Regel zuerst passt.",
+    "dialogDescription": "Wer sich über diesen Anbieter mit der Gruppe anmeldet, bekommt die Rolle, sofern keine frühere Regel zuerst passt. Eine von Hand vergebene Rolle bleibt bestehen.",
     "roleLabel": "Eigene Rolle",
     "rolePlaceholder": "Rolle wählen",
     "added": "Regel hinzugefügt",
@@ -2313,8 +2350,8 @@
     "orderError": "Die Regeln konnten nicht neu sortiert werden",
     "removeError": "Die Regel konnte nicht entfernt werden",
     "closed": "Dein Server hat eigene Rollen für diese Community abgeschaltet. Diese Regeln gelten weiter; hier kann sie niemand ändern.",
-    "loading": "Regeln werden geladen …",
-    "loadError": "Die Regeln konnten nicht geladen werden.",
-    "retry": "Erneut versuchen"
+    "editTitle": "Rollenregel bearbeiten",
+    "saved": "Regel gespeichert",
+    "saveError": "Die Regel konnte nicht gespeichert werden"
   }
 }

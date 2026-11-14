@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, loadEnv } from "vite";
 
+import { contentPolicy } from "./electron/content-policy";
 import { buildNotices } from "./scripts/third-party-notices.mjs";
 
 // Load VITE_* vars from .env files (checks backend/.env and frontend/)
@@ -27,6 +28,12 @@ const getVersion = () => {
     return "0.0.0";
   }
 };
+
+// Initiative Cloud's address, from the CLOUD_ORIGIN file at the project root,
+// which the backend reads too.
+const CLOUD_ORIGIN = fs
+  .readFileSync(path.resolve(import.meta.dirname, "../CLOUD_ORIGIN"), "utf-8")
+  .trim();
 
 const createProxyConfig = (supportsWebSocket = false) => ({
   target: devProxyTarget,
@@ -216,6 +223,7 @@ export default defineConfig({
   base: isCapacitorBuild ? "" : "/",
   define: {
     __APP_VERSION__: JSON.stringify(getVersion()),
+    __CLOUD_ORIGIN__: JSON.stringify(CLOUD_ORIGIN),
     __IS_CAPACITOR__: JSON.stringify(isCapacitorBuild),
     // Absolute, on native too: the Capacitor WebView serves index.html from
     // its origin root, so a relative URL would resolve against whatever route
@@ -230,12 +238,32 @@ export default defineConfig({
     // generator skips them rather than treating each as a missing route.
     // Each route's component loads with the route, so the entry carries only
     // the route tree and what every page needs.
-    tanstackRouter({ autoCodeSplitting: true, routeFileIgnorePattern: "\\.test\\.[jt]sx?$" }),
+    // A route's loader travels with its page, so neither sits in the entry and
+    // one fetch brings both.
+    tanstackRouter({
+      autoCodeSplitting: true,
+      codeSplittingOptions: {
+        defaultBehavior: [["loader", "component"], ["errorComponent"], ["notFoundComponent"]],
+      },
+      routeFileIgnorePattern: "\\.test\\.[jt]sx?$",
+    }),
     react(),
     tailwindcss(),
     emojibasePlugin(),
     pdfjsPlugin(),
     thirdPartyNoticesPlugin(),
+    // The device apps load index.html from the bundle, so it carries their
+    // content policy, ahead of everything the page loads.
+    isCapacitorBuild && {
+      name: "device-content-policy",
+      transformIndexHtml: () => [
+        {
+          tag: "meta",
+          attrs: { "http-equiv": "Content-Security-Policy", content: contentPolicy },
+          injectTo: "head-prepend" as const,
+        },
+      ],
+    },
   ],
   resolve: {
     alias: [
@@ -274,13 +302,6 @@ export default defineConfig({
               name: "app",
               tags: ["$initial"],
               priority: 2,
-            },
-            // The icon picker imports every icon on demand; one chunk instead
-            // of one file per icon. Icons the entry uses stay in the entry.
-            {
-              name: "lucide-react",
-              test: /\/lucide-react\//,
-              priority: 1,
             },
           ],
         },

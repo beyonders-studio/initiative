@@ -9,23 +9,22 @@ record names them; the boot sweep runs as nobody and the record names nobody.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.services.tenant.mandatory_plugins import backfill_mandatory_plugins
 from app.testing import (
-    create_plugin_service_registration,
     create_guild,
     create_guild_membership,
     create_marketplace_listing,
+    create_plugin_service_registration,
     create_user,
     emitted,
     get_auth_headers,
     marketplace_uid,
 )
-
 
 PROVIDED_ID = "platform.auditprovided"
 PROVIDED_UID = marketplace_uid("auditprovided")

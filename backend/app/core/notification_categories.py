@@ -41,9 +41,9 @@ write no bell line: what they gather is already there, told as it happened.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Mapping
 
 from app.models.platform.notification import NotificationType
 
@@ -209,6 +209,8 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.initiative_added,
                 NotificationType.initiative_join_approved,
                 NotificationType.initiative_join_denied,
+                NotificationType.community_join_approved,
+                NotificationType.community_join_denied,
                 NotificationType.share_granted,
                 NotificationType.share_declined,
             }
@@ -224,6 +226,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         types=frozenset(
             {
                 NotificationType.initiative_join_requested,
+                NotificationType.community_join_requested,
                 NotificationType.share_requested,
                 NotificationType.access_grant_requested,
                 NotificationType.plugin_consent_requested,
@@ -297,10 +300,12 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         guild_scoped=True,
         mutable_channels=_ALL_MUTABLE,
     ),
-    # Somebody else acted on this account. Being told is not a preference.
+    # Somebody else acted on this account, or the platform told it something.
+    # Being told is not a preference.
     NotificationCategory.account: CategorySpec(
         types=frozenset(
             {
+                NotificationType.announcement,
                 NotificationType.avatar_removed,
                 NotificationType.username_changed,
                 NotificationType.profile_field_cleared,
@@ -315,6 +320,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.access_grant_denied,
                 NotificationType.access_grant_revoked,
                 NotificationType.ticket_updated,
+                NotificationType.idea_updated,
             }
         ),
         group=CategoryGroup.account,
@@ -371,7 +377,7 @@ def sample_type(category: NotificationCategory) -> NotificationType:
     but is sent and stored by type — the summary when a hold lifts. Sorted so
     the choice is stable rather than dependent on set ordering.
     """
-    return sorted(CATEGORY_SPECS[category].types, key=lambda t: t.value)[0]
+    return min(CATEGORY_SPECS[category].types, key=lambda t: t.value)
 
 
 def category_of(notification_type: NotificationType) -> NotificationCategory:
@@ -382,7 +388,3 @@ def category_of(notification_type: NotificationType) -> NotificationCategory:
 
 def spec_of(notification_type: NotificationType) -> CategorySpec:
     return CATEGORY_SPECS[CATEGORY_OF[notification_type]]
-
-
-def is_personal(notification_type: NotificationType) -> bool:
-    return notification_type in PERSONAL_TYPES

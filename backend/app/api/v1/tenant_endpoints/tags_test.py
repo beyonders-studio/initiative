@@ -2,7 +2,9 @@
 endpoint, soft-delete interaction, and the cross-initiative isolation gate.
 """
 
-from httpx import AsyncClient
+from datetime import UTC
+
+from httpx2 import AsyncClient
 from sqlmodel import select
 
 from app.core.relationships import node_id
@@ -340,7 +342,7 @@ async def test_a_tags_page_leaves_out_the_archive(
 ):
     """The page lists what each tool's own list shows by default: an archived
     project is in its archive, and so is everything inside it."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.testing import assign_tag, create_project
 
@@ -351,11 +353,11 @@ async def test_a_tags_page_leaves_out_the_archive(
     live_task = await create_task(session, a.project, title="live")
     await assign_tag(session, live_task, tag, commit=True)
     archived_task = await create_task(
-        session, a.project, title="put away", archived_at=datetime.now(timezone.utc)
+        session, a.project, title="put away", archived_at=datetime.now(UTC)
     )
     await assign_tag(session, archived_task, tag, commit=True)
     shelved = await create_project(
-        session, a.initiative, a.user, archived_at=datetime.now(timezone.utc)
+        session, a.initiative, a.user, archived_at=datetime.now(UTC)
     )
     await assign_tag(session, shelved, tag, commit=True)
     inside = await create_task(session, shelved, title="inside")

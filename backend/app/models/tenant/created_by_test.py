@@ -28,7 +28,6 @@ from app.db import base  # noqa: F401  # populates SQLModel.metadata with every 
 from app.db.tenancy import CREATED_BY_EXEMPT_TABLES, GUILD_SCOPED_TABLES, SHARED_TABLES
 from app.models.tenant._mixins import created_by_models
 
-
 #: Spellings this mixin replaced. A table may not reintroduce one.
 RETIRED_SPELLINGS = (
     "author_id",
@@ -100,10 +99,10 @@ def test_nothing_carries_a_last_editor_column():
     to be written on six paths and read on none.
     """
     carriers = {
-        f"{name}.{column}"
+        f"{name}.{column.key}"
         for name, table in SQLModel.metadata.tables.items()
-        for column in table.columns.keys()
-        if _LAST_EDITOR.search(column)
+        for column in table.columns
+        if _LAST_EDITOR.search(column.key)
     }
     assert not carriers, (
         f"Last-editor columns: {sorted(carriers)}. Who changed a row is "

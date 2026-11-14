@@ -1,6 +1,6 @@
 """The bounds around one upstream call, and the parameter contract.
 
-Everything here is driven by an injected `httpx.MockTransport`, so nothing
+Everything here is driven by an injected `httpx2.MockTransport`, so nothing
 touches the network. What it pins is the part of the proxy that has to hold when
 a plug-in misbehaves rather than merely being absent: a response that never ends, a
 response far too large, a response that is not JSON, and a response that is JSON
@@ -14,14 +14,15 @@ is refused here rather than forwarded for the plug-in to puzzle over.
 
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from app.core.messages import PluginDataMessages
-from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.marketplace import plugin_data as service
-from app.services.marketplace.registration_lookup import service_public_id
-
+from app.services.marketplace.registration_lookup import (
+    RegistrationSnapshot,
+    service_public_id,
+)
 
 URL = "http://127.0.0.1:9100/v1/endpoints"
 
@@ -49,9 +50,9 @@ SOURCE = {
 
 async def _read(handler, endpoint=SOURCE) -> tuple[list, dict]:
     return await service._read_answer(
-        httpx.Request("POST", URL),
+        httpx2.Request("POST", URL),
         endpoint=endpoint,
-        transport=httpx.MockTransport(handler),
+        transport=httpx2.MockTransport(handler),
     )
 
 
@@ -67,7 +68,7 @@ def _answer(result) -> dict:
 class TestUpstreamBounds:
     async def test_an_answer_is_read_through_the_endpoints_returns(self):
         rows, values = await _read(
-            lambda request: httpx.Response(
+            lambda request: httpx2.Response(
                 200,
                 json=_answer({"ids": [1, 2], "titles": ["a", "b"], "count": 2}),
             )
@@ -79,14 +80,16 @@ class TestUpstreamBounds:
         # From a dashboard's side "this plug-in is not answering" is true whether
         # the service is down or talking a shape this build does not accept.
         with pytest.raises(service.PluginDataError) as excinfo:
-            await _read(lambda request: httpx.Response(200, json={"rows": [{"id": 1}]}))
+            await _read(
+                lambda request: httpx2.Response(200, json={"rows": [{"id": 1}]})
+            )
         assert excinfo.value.code == PluginDataMessages.SERVICE_UNAVAILABLE
 
     async def test_a_response_past_the_ceiling_is_abandoned(self):
         oversized = "x" * (service.MAX_RESPONSE_BYTES + 1024)
         with pytest.raises(service.PluginDataError) as excinfo:
             await _read(
-                lambda request: httpx.Response(
+                lambda request: httpx2.Response(
                     200, json=_answer({"titles": [oversized]})
                 )
             )
@@ -94,8 +97,8 @@ class TestUpstreamBounds:
         assert excinfo.value.status_code == 502
 
     async def test_a_response_that_never_arrives_is_the_plugin_being_unavailable(self):
-        def _stall(request: httpx.Request) -> httpx.Response:
-            raise httpx.ReadTimeout("timed out", request=request)
+        def _stall(request: httpx2.Request) -> httpx2.Response:
+            raise httpx2.ReadTimeout("timed out", request=request)
 
         with pytest.raises(service.PluginDataError) as excinfo:
             await _read(_stall)
@@ -103,8 +106,8 @@ class TestUpstreamBounds:
         assert excinfo.value.status_code == 502
 
     async def test_a_refused_connection_is_the_plugin_being_unavailable(self):
-        def _refuse(request: httpx.Request) -> httpx.Response:
-            raise httpx.ConnectError("refused", request=request)
+        def _refuse(request: httpx2.Request) -> httpx2.Response:
+            raise httpx2.ConnectError("refused", request=request)
 
         with pytest.raises(service.PluginDataError) as excinfo:
             await _read(_refuse)
@@ -113,13 +116,13 @@ class TestUpstreamBounds:
     @pytest.mark.parametrize("status", [400, 401, 404, 500, 503])
     async def test_an_error_status_is_not_passed_through_as_data(self, status):
         with pytest.raises(service.PluginDataError) as excinfo:
-            await _read(lambda request: httpx.Response(status, json=_answer({})))
+            await _read(lambda request: httpx2.Response(status, json=_answer({})))
         assert excinfo.value.code == PluginDataMessages.SERVICE_UNAVAILABLE
 
     async def test_a_body_that_is_not_json_is_refused(self):
         with pytest.raises(service.PluginDataError) as excinfo:
             await _read(
-                lambda request: httpx.Response(
+                lambda request: httpx2.Response(
                     200,
                     text="<html>hello</html>",
                     headers={"content-type": "text/html"},
@@ -132,7 +135,7 @@ class TestUpstreamBounds:
     )
     async def test_json_that_is_not_a_data_response_is_refused(self, body):
         with pytest.raises(service.PluginDataError) as excinfo:
-            await _read(lambda request: httpx.Response(200, json=body))
+            await _read(lambda request: httpx2.Response(200, json=body))
         assert excinfo.value.code == PluginDataMessages.SERVICE_UNAVAILABLE
 
     async def test_the_timeout_is_the_documented_budget(self):

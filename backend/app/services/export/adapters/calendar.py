@@ -28,12 +28,12 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.tenant.ical_service import files_for_events
 from app.core.tools import Tool, tool_envelope_type
+from app.core.user_input_validators import resolve_zone
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, RSVPStatus
-from app.services.tenant import calendar_occurrences as occurrences_service
+from app.schemas.tenant.tag import annotated_tags
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
@@ -41,11 +41,11 @@ from app.services.export.adapters._common import (
     export_stem,
     related_reach,
 )
-from app.core.user_input_validators import resolve_zone
-from app.schemas.tenant.tag import annotated_tags
 from app.services.export.contract import RenderItem
 from app.services.export.filters import narrow, parse_filters
 from app.services.export.property_values import exported_properties
+from app.services.tenant import calendar_occurrences as occurrences_service
+from app.services.tenant.ical_service import files_for_events
 
 
 class EventWindow(BaseModel):
@@ -286,7 +286,7 @@ def _optional_int(params: dict, key: str) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         from app.core.messages import ExportMessages
         from app.services.export.engine import ExportError
 

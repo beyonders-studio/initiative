@@ -18,6 +18,7 @@ from app.core.file_types import type_of_media
 from app.core.image_headers import read_image_header
 from app.core.tools import Tool
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -26,7 +27,6 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import file_versions
 from app.services.tenant import metadata as metadata_service
-
 from seed.common import Community, days_ago, photo, share, tag
 
 #: Each collection, its pictures shared with the initiative for reading.
@@ -403,6 +403,7 @@ async def seed(c: Community) -> None:
             if "cover" in d
             else None,
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
             created_at=min(added for _, added, _, _ in held),
             updated_at=max(max(f.updated_at, added) for f, added, _, _ in held),
         )
@@ -457,6 +458,7 @@ async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> Fi
         content={},
         file_type=type_of_media(_MEDIA_TYPE),
         created_by=uploader,
+        created_by_kind=ActorKind.member,
         created_at=created_at,
     )
     c.session.add(file)
@@ -479,6 +481,7 @@ async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> Fi
             data=data,
             content_type=_MEDIA_TYPE,
             created_by=uploader,
+            created_by_kind=ActorKind.member,
             initiative_id=initiative_id,
         )
         version_at = created_at + timedelta(days=3 * (number - 1))
@@ -492,6 +495,7 @@ async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> Fi
             width=header.width,
             height=header.height,
             created_by=uploader,
+            created_by_kind=ActorKind.member,
             created_at=version_at,
         )
         # The next rendition is numbered after this one, which it reads back.

@@ -12,9 +12,9 @@ import type {
   TaskTypeRead,
   TaskUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
-import { rulePayload, shiftFor, toRRule } from "@/lib/recurrence";
 import type { TitlePerson, TitleReading } from "@/lib/smartTitle";
 import { startedFrom } from "@/lib/taskTypeStart";
+import { rulePayload, shiftFor, toRRule } from "@/ui/recurrence/recurrence";
 
 /** What a title last set on a task being added, and what each field held
  *  before it did, which it goes back to when the words are taken out. */

@@ -67,12 +67,6 @@ export type Spec = {
   personalExact?: readonly string[];
   /** Non-community path prefixes: `/api/v1/me/tasks`. */
   personalPrefix?: readonly string[];
-  /**
-   * Hand-written keys named by their first element and carrying their community in
-   * the second (`["community-plugin", communityId, pluginId]`). Scoped to the active community by
-   * that element, like every other community key.
-   */
-  communityNamed?: readonly string[];
   /** Hand-written keys matched by their first element alone (`["dm", …]`). */
   named?: readonly string[];
 };
@@ -83,7 +77,6 @@ type Matcher = {
   communityPrefix: string[];
   personalExact: Set<string>;
   personalPrefix: string[];
-  communityNamed: Set<string>;
   named: Set<string>;
 };
 
@@ -93,13 +86,11 @@ const merge = (specs: readonly Spec[]): Matcher => {
     communityPrefix: [],
     personalExact: new Set(),
     personalPrefix: [],
-    communityNamed: new Set(),
     named: new Set(),
   };
   for (const spec of specs) {
     for (const path of spec.communityExact ?? []) matcher.communityExact.add(path);
     for (const path of spec.personalExact ?? []) matcher.personalExact.add(path);
-    for (const name of spec.communityNamed ?? []) matcher.communityNamed.add(name);
     for (const name of spec.named ?? []) matcher.named.add(name);
     // Prefixes stay a list: there are only ever a handful, and each has to be
     // tested against the path rather than looked up.
@@ -136,9 +127,6 @@ const matches = (matcher: Matcher, queryKey: readonly unknown[]): boolean => {
     return false;
   }
 
-  if (matcher.communityNamed.has(first)) {
-    return scopedCommunityId === null || queryKey[1] === scopedCommunityId;
-  }
   if (matcher.named.has(first)) return true;
   if (matcher.personalExact.has(first)) return true;
   for (const prefix of matcher.personalPrefix) {
@@ -177,7 +165,6 @@ export const compose = (...specs: Spec[]): Spec => ({
   communityPrefix: specs.flatMap((spec) => spec.communityPrefix ?? []),
   personalExact: specs.flatMap((spec) => spec.personalExact ?? []),
   personalPrefix: specs.flatMap((spec) => spec.personalPrefix ?? []),
-  communityNamed: specs.flatMap((spec) => spec.communityNamed ?? []),
   named: specs.flatMap((spec) => spec.named ?? []),
 });
 
@@ -401,13 +388,9 @@ const pluginServices = (): Spec => ({ personalPrefix: ["/api/v1/plugin-services"
 // One description for every read of an install, because one write moves all of
 // them — the sidebar's list, the settings dialog's detail, the members view —
 // and because the bus names the install community-wide, with no parent to carry it.
-// Two key shapes: the list is Orval's URL key, while the detail and members
-// reads are hand-written and keyed by name. The named pair carries its community in
-// element 1, so it is scoped like every other community key rather than by name.
-const plugins = (): Spec => ({
-  communityPrefix: ["/api/v1/plugins"],
-  communityNamed: ["community-plugin", "community-plugin-members"],
-});
+// Every one is keyed by its path, so one prefix reaches them all, and the
+// widget catalog, which is read under the same path, with them.
+const plugins = (): Spec => ({ communityPrefix: ["/api/v1/plugins"] });
 
 // ── AI Settings (platform config is personal; community/resolved are community) ──
 
@@ -444,10 +427,15 @@ const operatorUsers = (): Spec => ({ personalPrefix: ["/api/v1/operator"] });
 // membership *mutations* go through the platform `/api/v1/communities/{id}/members/…`
 // path. It must stay in the community bucket. The member search rides along: the
 // pickers read each person's community role from it. So does the sidebar's people
-// roster.
+// roster, and the community's bans, which a removal can add to.
 
 const communityMembers = (): Spec => ({
-  communityExact: ["/api/v1/users/", "/api/v1/users/search", "/api/v1/users/roster"],
+  communityExact: [
+    "/api/v1/users/",
+    "/api/v1/users/search",
+    "/api/v1/users/roster",
+    "/api/v1/users/bans",
+  ],
 });
 
 // ── Communities (personal / platform) ─────────────────────────────────────────────
@@ -456,6 +444,10 @@ const allCommunities = (): Spec => ({ personalPrefix: ["/api/v1/communities"] })
 
 const communityInvites = (communityId: number): Spec => ({
   personalExact: [`/api/v1/communities/${communityId}/invites`],
+});
+
+const communityJoinRequests = (communityId: number): Spec => ({
+  personalExact: [`/api/v1/communities/${communityId}/join-requests`],
 });
 
 // ── Custom roles (community) ─────────────────────────────────────────────────────
@@ -723,6 +715,7 @@ export const q = {
   communityAIConnections,
   communityContent,
   communityInvites,
+  communityJoinRequests,
   communityMembers,
   ignoredAccounts,
   initiative,

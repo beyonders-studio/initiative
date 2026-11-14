@@ -55,12 +55,12 @@ def test_an_audit_line_is_the_bare_envelope_and_nothing_else(capfd):
     assert capfd.readouterr().out.splitlines() == ['{"a":1}']
 
 
-def test_the_audit_stream_does_not_reach_the_root_handlers(caplog):
+def test_the_audit_stream_does_not_reach_the_root_handlers():
     """One envelope, one line, one place: the audit logger stops at its own
-    handler rather than propagating up."""
-    with caplog.at_level(logging.INFO):
-        logging.getLogger(AUDIT_LOGGER_NAME).info('{"a":1}')
-    assert [r for r in caplog.records if r.name == AUDIT_LOGGER_NAME] == []
+    handler rather than propagating up. (pytest's own capture attaches to the
+    audit logger directly, so it would see the line either way.)"""
+    configure_logging()
+    assert logging.getLogger(AUDIT_LOGGER_NAME).propagate is False
 
 
 def test_application_lines_go_to_stderr_as_json_naming_their_job(capfd):

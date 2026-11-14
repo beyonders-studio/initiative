@@ -161,6 +161,11 @@ _ALLOWED: dict[tuple[str, str], str] = {
     ),
     # --- The caller's own community, behind its settings gate -------------
     # --- Joining and creating ----------------------------------------------
+    (f"{_ENDPOINTS}/community_join_requests.py", "ask_to_join_community"): (
+        "queues a join request's notice for the people in the community who "
+        "answer it; the asker is not a member, so the seam has no standing "
+        "to route them by"
+    ),
     (f"{_SERVICES}/guilds.py", "provision_new_guild"): (
         "seeds a community just created, for the create endpoint, registration "
         "and first boot"
@@ -204,6 +209,18 @@ _ALLOWED: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/intake.py", "claim_subject_guild"): (
         "intake: settles the community a case is about, as an access grant for "
         "it is asked for"
+    ),
+    (f"{_SERVICES}/ideas.py", "joined_into"): (
+        "ideas: reads which published idea a joined idea now is, so its old "
+        "page opens it"
+    ),
+    (f"{_SERVICES}/ideas.py", "join_sent"): (
+        "ideas: joins feedback just filed to the published idea its sender "
+        "voted for, once a read through the ideas role has shown it published"
+    ),
+    (f"{_SERVICES}/ideas.py", "vote"): (
+        "ideas: writes a vote into the operations community once a read "
+        "through the ideas role has shown the idea is published and open"
     ),
     (f"{_SERVICES}/grant_cases.py", "_as_reader"): (
         "grant cases: routes the person naming a case into the operations "
@@ -298,7 +315,7 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "checks and writes the initiative a new or changed sign-in rule "
         "places people in, in the community it names"
     ),
-    (f"{_SERVICES}/provider_placement.py", "update_rule"): (
+    (f"{_SERVICES}/provider_placement.py", "rewrite_rule"): (
         "reads a provider placement rule's initiative before a change, and "
         "drops it when the rule no longer names one"
     ),

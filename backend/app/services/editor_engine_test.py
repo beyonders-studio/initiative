@@ -151,18 +151,6 @@ async def test_a_document_with_no_content_starts_with_an_empty_paragraph():
     assert rendered["root"]["children"][0]["children"] == []
 
 
-async def test_legacy_nodes_come_back_as_the_browser_shows_them():
-    hashtag = {**_text("#idea"), "type": "hashtag"}
-
-    rendered = await editor_engine.render(
-        await editor_engine.bootstrap(_document(_paragraph(_text("An "), hashtag)))
-    )
-
-    (paragraph,) = rendered["root"]["children"]
-    assert [node["type"] for node in paragraph["children"]] == ["text"]
-    assert paragraph["children"][0]["text"] == "An #idea"
-
-
 def _merged(*updates: bytes) -> bytes:
     doc = Doc()
     for update in updates:

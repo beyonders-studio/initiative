@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import ColumnElement, and_, or_
+from sqlalchemy import ColumnElement, and_, not_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -78,7 +78,7 @@ def can_serve_login_clause() -> ColumnElement[bool]:
     return and_(
         login_ready_clause(),
         or_(
-            ~is_platform_row,
+            not_(is_platform_row),
             select(AuthProviderSecret.provider_id)
             .where(
                 AuthProviderSecret.provider_id == AuthProvider.id,

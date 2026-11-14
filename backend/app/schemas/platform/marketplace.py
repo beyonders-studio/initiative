@@ -12,7 +12,7 @@ agreement.
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict, Field
 
@@ -55,8 +55,8 @@ class MarketplaceVersionRead(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     version: str
-    release_notes: Optional[str] = None
-    min_app_version: Optional[str] = None
+    release_notes: str | None = None
+    min_app_version: str | None = None
     published_at: datetime
     #: Whether this deployment can install it: new enough, and serving the
     #: plug-in API contract it needs. A version it cannot run is shown, not
@@ -76,6 +76,52 @@ class ListingUnavailableReason(str, Enum):
     term_full = "term_full"
 
 
+class ListingOfferCharge(str, Enum):
+    """How a paid plug-in is charged for, as billing sells it."""
+
+    #: One of ``lines`` at a time, renewing.
+    subscription = "subscription"
+    #: Any of ``lines``, each paid once.
+    one_time = "one_time"
+
+
+class ListingOfferWay(str, Enum):
+    """How the asking community gets a paid plug-in on the plan it is on."""
+
+    #: The seat buys it in the billing portal.
+    buy = "buy"
+    #: Not on this plan; ``upgrade`` says whether a plan above sells it.
+    none = "none"
+
+
+class ListingOfferLine(SanitizedBaseModel):
+    """One plan or item a paid plug-in is sold as, worded by billing."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    id: str
+    name: str
+    #: Its price as billing words it; ``None`` where the deployment takes no
+    #: payments.
+    display: str | None = None
+
+
+class ListingOffer(SanitizedBaseModel):
+    """How the asking community gets a paid plug-in, as this deployment's
+    billing answered it in the reader's language. Shown, never reasoned
+    about: the deployment's catalog terms decide it, on billing's side."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    charge: ListingOfferCharge
+    way: ListingOfferWay
+    #: ``way`` is ``none``, and a plan above, which the community can get
+    #: onto, sells paid plug-ins.
+    upgrade: bool = False
+    #: Plans for a subscription, items for a one-time charge.
+    lines: list[ListingOfferLine] = []
+
+
 class ListingUnavailable(SanitizedBaseModel):
     """A listing the asking community is shown and cannot install yet."""
 
@@ -84,7 +130,12 @@ class ListingUnavailable(SanitizedBaseModel):
     reason: ListingUnavailableReason
     #: Where the community can do something about it, when this deployment
     #: has somewhere: a page of its billing portal, opened with a handoff.
-    action_url: Optional[str] = None
+    action_url: str | None = None
+    #: How billing sells it to this community, for ``entitlement_required``
+    #: on a listing's own page; ``None`` where billing has no answer (none
+    #: configured, unreachable, or the listing isn't sold as an app of its
+    #: own) and on every browse card.
+    offer: ListingOffer | None = None
 
 
 class MarketplaceListingSummary(SanitizedBaseModel):
@@ -109,16 +160,16 @@ class MarketplaceListingSummary(SanitizedBaseModel):
     first_party: bool
     description: str
     avatar_url: str
-    images: List[str] = []
+    images: list[str] = []
     installs_count: int = 0
     available: bool = True
-    latest_version: Optional[MarketplaceVersionRead] = None
+    latest_version: MarketplaceVersionRead | None = None
     #: False when nothing about this listing can be installed on this build —
     #: withdrawn, or its only versions need a newer app.
     installable: bool = True
     #: Set when the asking community cannot install it yet, and why. Absent on
     #: every surface that is not asked from a community.
-    unavailable: Optional[ListingUnavailable] = None
+    unavailable: ListingUnavailable | None = None
     updated_at: datetime
 
 
@@ -127,11 +178,11 @@ class MarketplaceListingDetail(MarketplaceListingSummary):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    long_description: Optional[str] = None
+    long_description: str | None = None
     #: The reference definition at the latest version — the preview the detail
     #: page renders. Installing does not send this back; the server re-reads the
     #: catalog, so nothing a client holds decides what gets stored.
-    definition: Optional[Dict[str, Any]] = None
+    definition: dict[str, Any] | None = None
     #: What the preview's Example toggle shows. For a tool made of content,
     #: the same envelope filled in, when the listing carries one, and what
     #: "start from the example" installs. For a dashboard, sample answers by
@@ -139,26 +190,26 @@ class MarketplaceListingDetail(MarketplaceListingSummary):
     #: surface's shape): generated from its queries unless the publisher
     #: supplied their own, always present, and never installable. Display
     #: data, like the definition above.
-    example: Optional[Dict[str, Any]] = None
+    example: dict[str, Any] | None = None
     #: For a plug-in: the scopes its latest version asks a community to grant,
     #: in vocabulary order. Using a plug-in the community does not have is left
     #: out. Empty for every other kind.
-    requested_scopes: List[str] = []
+    requested_scopes: list[str] = []
     #: The requested scopes this deployment's registration lets a community
     #: grant. What the install dialog offers ticked; the rest are shown
     #: disabled.
-    grantable_scopes: List[str] = []
+    grantable_scopes: list[str] = []
     #: For each requested ``plugins:`` scope, the name the plug-in it lets this one
     #: use goes by, keyed by that plug-in's public id. Its public id when the
     #: catalog has no name for it.
-    plugin_names: Dict[str, str] = {}
+    plugin_names: dict[str, str] = {}
     #: Whether the plug-in offers a surface inside initiatives — a page there,
     #: or fields, sections or actions on items — and so has somewhere to be
     #: placed.
     has_initiative_surfaces: bool = False
     #: For a plug-in: the installs here that ask to use it, which the install
     #: dialog asks the seat about.
-    callers: List["MarketplaceListingCaller"] = []
+    callers: list[MarketplaceListingCaller] = []
 
 
 class MarketplaceListingCaller(SanitizedBaseModel):
@@ -182,7 +233,7 @@ class MarketplaceInstallRequest(SanitizedBaseModel):
     start_from: ListingStartFrom = ListingStartFrom.blank
     #: Where the listing's dates land: its earliest one falls on this day, and
     #: the rest keep their distance from it. Today when omitted.
-    starts_on: Optional[date] = None
+    starts_on: date | None = None
 
 
 class MarketplaceInstallResult(SanitizedBaseModel):
@@ -209,12 +260,12 @@ class MarketplaceShareRequest(SanitizedBaseModel):
     kind: ListingKind  # type: ignore[valid-type]
     entity_id: int
     #: The same tool's item, filled in, shown beside the listing as its example.
-    example_entity_id: Optional[int] = None
+    example_entity_id: int | None = None
     name: TitleStr = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1, max_length=500)
-    long_description: Optional[str] = Field(default=None, max_length=10_000)
-    release_notes: Optional[str] = Field(default=None, max_length=2_000)
-    listing_uid: Optional[str] = Field(default=None, max_length=14)
+    long_description: str | None = Field(default=None, max_length=10_000)
+    release_notes: str | None = Field(default=None, max_length=2_000)
+    listing_uid: str | None = Field(default=None, max_length=14)
 
 
 class MarketplaceShareResult(SanitizedBaseModel):
@@ -234,7 +285,7 @@ class MarketplaceSharedListingRead(MarketplaceListingSummary):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     #: Versions submitted and not yet approved, oldest first.
-    pending_versions: List[str] = []
+    pending_versions: list[str] = []
 
 
 class MarketplacePendingVersionRead(SanitizedBaseModel):
@@ -250,20 +301,20 @@ class MarketplacePendingVersionRead(SanitizedBaseModel):
     publisher: str
     description: str
     version: str
-    release_notes: Optional[str] = None
+    release_notes: str | None = None
     submitted_at: datetime
     #: Whether this is the listing's first version, or a new one of a listing
     #: already on the shelf.
     is_new_listing: bool
-    definition: Dict[str, Any]
-    example: Optional[Dict[str, Any]] = None
+    definition: dict[str, Any]
+    example: dict[str, Any] | None = None
 
 
 class ListingUploadRequest(SanitizedBaseModel):
     """A listing file the owner uploads: the manifest a catalog directory or a
     registry carries, published as a ``local`` listing."""
 
-    manifest: Dict[str, Any]
+    manifest: dict[str, Any]
 
 
 class ListingMediaRead(SanitizedBaseModel):
@@ -294,12 +345,12 @@ class MarketplaceLocalSettings(SanitizedBaseModel):
 
 
 class MarketplaceListingPage(PageMeta):
-    items: List[MarketplaceListingSummary]
+    items: list[MarketplaceListingSummary]
 
 
 def serialize_version(
-    version: Optional["MarketplaceListingVersion"],
-) -> Optional[MarketplaceVersionRead]:
+    version: MarketplaceListingVersion | None,
+) -> MarketplaceVersionRead | None:
     # Local import avoids a schema -> service import cycle.
     from app.services.marketplace.catalog import version_runs_here
 
@@ -315,8 +366,8 @@ def serialize_version(
 
 
 def serialize_listing_summary(
-    listing: "MarketplaceListing",
-    latest: Optional["MarketplaceListingVersion"],
+    listing: MarketplaceListing,
+    latest: MarketplaceListingVersion | None,
 ) -> MarketplaceListingSummary:
     """One browse card. Shared by every surface that lists or reads a listing,
     so a card and the page it opens describe the same thing."""
@@ -374,4 +425,4 @@ class OperatorCatalogScanResult(SanitizedBaseModel):
     #: Listings retired because no manifest in the directory publishes them.
     withdrawn: int = 0
     skipped: int = 0
-    problems: List[OperatorCatalogProblem] = []
+    problems: list[OperatorCatalogProblem] = []

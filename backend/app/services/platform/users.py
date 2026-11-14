@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
-from datetime import date, datetime, timezone
-from typing import TYPE_CHECKING, List, TypeVar
-
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ColumnElement, Select, String, and_, cast, func, or_, update
-from sqlmodel import col, select, delete
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
-from app.core.messages import AuthMessages, GuildMessages, UserMessages
+from app.core import usernames
 from app.core.audit_events import AuditEventType
 from app.core.capabilities import (
     Capability,
@@ -18,16 +16,19 @@ from app.core.capabilities import (
     standing_capabilities,
 )
 from app.core.config import settings
-from app.core import usernames
-from app.core.security import has_usable_password
 from app.core.encryption import (
     SALT_BIRTHDATE,
     decrypt_field,
     encrypt_field,
     hash_email,
 )
+from app.core.errors import CodedError
+from app.core.messages import AuthMessages, GuildMessages, UserMessages
+from app.core.security import has_usable_password
 from app.db import cohorts, post_commit
 from app.db.session import set_rls_context
+from app.models.platform.guild import CommunityRole, GuildMembership
+from app.models.platform.notification import Notification
 from app.models.platform.user import (
     ABSENT_STATUSES,
     User,
@@ -37,37 +38,33 @@ from app.models.platform.user import (
 from app.models.platform.user_birthdate import UserBirthdate
 from app.models.platform.user_notification_prefs import UserNotificationPrefs
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.platform.guild import GuildMembership, CommunityRole
-from app.services import audit as audit_service
-from app.services import email as email_service
-from app.services.auth import addresses
-from app.services.membership import live_membership_clause
-from app.services.auth import identity as identity_service
-from app.services.auth import sessions as session_service
-from app.services.auth import challenges as challenge_service
-from app.services.auth import totp as totp_service
-from app.services.platform import api_keys as api_keys_service
-from app.services.platform import identity_refs, rules
-from app.services.platform.rules import Values
-from app.services.platform.retention import ACCOUNT_DELETION
-from app.services.platform import user_avatars as user_avatars_service
+from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.share_request import ShareRequest
 from app.models.tenant.task import TaskAssignee
-from app.models.platform.notification import Notification
-from app.models.tenant.personal_item import PersonalItem
+from app.services import audit as audit_service
+from app.services import email as email_service
+from app.services.auth import addresses
+from app.services.auth import challenges as challenge_service
+from app.services.auth import identity as identity_service
+from app.services.auth import sessions as session_service
+from app.services.auth import totp as totp_service
+from app.services.membership import live_membership_clause
+from app.services.platform import api_keys as api_keys_service
+from app.services.platform import identity_refs, rules
+from app.services.platform import user_avatars as user_avatars_service
+from app.services.platform.retention import ACCOUNT_DELETION
+from app.services.platform.rules import Values
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.models.platform.sign_in_lock import SignInLock
     from app.schemas.platform.user import OperatorUserRead, UserRead, UserSummary
-from app.models.platform.api_key import UserApiKey
+from app.db.request_context import SystemGuild, SystemMaintenance
 from app.models.platform.account_change_hold import AccountChangeHold
+from app.models.platform.api_key import UserApiKey
 from app.models.platform.user_token import UserToken
 from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
-from app.db.request_context import SystemGuild, SystemMaintenance
-
-_S = TypeVar("_S", bound=Select)
 
 
 class SeatWouldBeEmptied(CodedError):
@@ -79,7 +76,7 @@ class SeatWouldBeEmptied(CodedError):
     seeing the other.
     """
 
-    def __init__(self, guild_names: List[str]) -> None:
+    def __init__(self, guild_names: list[str]) -> None:
         super().__init__(GuildMessages.CANNOT_VACATE_LAST_SUPERADMIN)
         self.guild_names = guild_names
 
@@ -110,7 +107,7 @@ async def _hold_seats_or_refuse(session: AsyncSession, user_id: int) -> None:
         raise SeatWouldBeEmptied([name for _, name in stranded])
 
 
-async def is_last_guild_superadmin(session: AsyncSession, user_id: int) -> List[str]:
+async def is_last_guild_superadmin(session: AsyncSession, user_id: int) -> list[str]:
     """Names of the communities where this account holds the only superadmin
     seat.
 
@@ -238,8 +235,7 @@ async def _erase_in_guild(
     # Written under the guild role that staged them, before the switch below.
     await guild_session.flush()
 
-    # Scrub the display name out of content that embedded it as literal text
-    # (@-mentions in comments, file mention nodes, digest name snapshots).
+    # Scrub the display name out of the digest lines that snapshot it.
     await set_rls_context(guild_session, SystemMaintenance(guild_id))
     await anonymize_user_mentions(guild_session, user_id=user_id)
     await set_rls_context(guild_session, SystemGuild(guild_id))
@@ -292,6 +288,27 @@ async def _erase_in_guild(
     await guild_session.exec(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id)
     )
+    # The operations community alone names people from outside it: its votes
+    # for ideas, which go, and the cases they filed, which stay with nobody to
+    # tell about them.
+    # A case or an idea in the trash or archived is frozen; clearing a person
+    # out of it is not an edit of it, and writes it as a purge does.
+    from app.db import gucs
+    from app.db.session import raise_flag
+    from app.models.tenant.intake import IdeaVote, IntakeCase
+    from app.services.tenant.cases import holds_cases
+
+    if await holds_cases(guild_session):
+        await raise_flag(guild_session, gucs.PURGING)
+        await guild_session.exec(
+            delete(IdeaVote).where(col(IdeaVote.user_id) == user_id)
+        )
+        await guild_session.exec(
+            update(IntakeCase)
+            .where(col(IntakeCase.filer_user_id) == user_id)
+            .values(filer_user_id=None)
+        )
+        await raise_flag(guild_session, gucs.PURGING, False)
     await guild_session.exec(
         delete(CalendarEventAttendee).where(CalendarEventAttendee.user_id == user_id)
     )
@@ -388,7 +405,7 @@ async def deactivate_user(
     # inside ``_drop_user_memberships`` above.
     user.status = UserStatus.deactivated
     user.token_version += 1
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,
@@ -438,11 +455,11 @@ async def request_account_deletion(
     # connections gone, and reconnects them.
     await _end_plugin_access_everywhere(session, user_id=user_id)
     user.status = UserStatus.deleted
-    user.status_changed_at = datetime.now(timezone.utc)
+    user.status_changed_at = datetime.now(UTC)
     # Every session this account holds ends here. Getting back in is what calls
     # the deletion off, so the way back has to start from a sign-in.
     user.token_version += 1
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,
@@ -491,7 +508,7 @@ async def refuse_account_for_age(session: AsyncSession, user: User) -> None:
     one keystroke from a mistyped year, and an account with years of work in
     it should survive that long enough for a ticket. Commits.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user.age_below_minimum_at = now
     user.age_below_account_minimum_at = now
     # One question, one answer (``ck_users_age_answer``).
@@ -530,8 +547,8 @@ async def cancel_account_deletion(
     if via == "sign_in" and user.age_below_account_minimum_at is not None:
         raise DeletionStands(user_id)
     user.status = UserStatus.active
-    user.status_changed_at = datetime.now(timezone.utc)
-    user.updated_at = datetime.now(timezone.utc)
+    user.status_changed_at = datetime.now(UTC)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,
@@ -682,6 +699,7 @@ async def soft_delete_user(
     This is irreversible — there is no undo.
     """
     import secrets
+
     from app.models.platform.push_token import PushToken
 
     user = await _drop_user_memberships(
@@ -749,7 +767,7 @@ async def soft_delete_user(
         delete(UserNotificationPrefs).where(UserNotificationPrefs.user_id == user_id)
     )
 
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
 
     # Revoke auth artifacts. Whatever short-lived tokens existed are now
@@ -879,8 +897,8 @@ async def hard_delete_user(
         user_id: ID of user to delete
         actor_user_id: Who asked for it, for the record
     """
-    from app.models.platform.push_token import PushToken
     from app.models.platform.guild import Guild, GuildInvite
+    from app.models.platform.push_token import PushToken
 
     # Phase 1 — each guild's half, the same erasure ``soft_delete_user`` runs,
     # in EVERY guild schema, committed guild by guild; then the membership rows
@@ -952,7 +970,7 @@ async def summaries_with_guild_role(
     session: AsyncSession,
     guild_id: int,
     users,
-) -> List["UserSummary"]:
+) -> list[UserSummary]:
     """``UserSummary`` per user, with the guild role actually filled in.
 
     ``UserSummary`` defaults ``guild_role`` to ``None``, and
@@ -972,7 +990,7 @@ async def summaries_with_guild_role(
     roles = await membership_service.guild_role_map(
         session, guild_id, [user.id for user in users]
     )
-    summaries: List[UserSummary] = []
+    summaries: list[UserSummary] = []
     for user in users:
         summary = UserSummary.model_validate(user)
         role = roles.get(user.id)
@@ -1075,7 +1093,7 @@ def visible_to_other_people(status_column=None):
     return column.notin_(sorted(ABSENT_STATUSES, key=lambda s: s.value))
 
 
-def guild_members(statement: _S, *, guild_id: int, guests: bool = False) -> _S:
+def guild_members[S: Select](statement: S, *, guild_id: int, guests: bool = False) -> S:
     """``statement`` narrowed to the people listed as members of one community.
     Its guests are listed only with ``guests``, and only while they are in: a
     picker for content a guest can reach names them, and the roster does not.
@@ -1092,20 +1110,20 @@ def guild_members(statement: _S, *, guild_id: int, guests: bool = False) -> _S:
     )
 
 
-def guild_guests(statement: _S, *, guild_id: int) -> _S:
+def guild_guests[S: Select](statement: S, *, guild_id: int) -> S:
     """``statement`` narrowed to one community's guests, as
     :func:`guild_members` narrows it to its members: every guest membership,
     whether or not it admits its holder now, for the people who run them."""
     return _in_guild(statement, guild_id, GuildMembership.guest_until.is_not(None))
 
 
-def _in_guild(statement: _S, guild_id: int, rows: ColumnElement[bool]) -> _S:
+def _in_guild[S: Select](statement: S, guild_id: int, rows: ColumnElement[bool]) -> S:
     return statement.join(
         GuildMembership, GuildMembership.user_id == MemberProfile.id
     ).where(GuildMembership.guild_id == guild_id, rows, visible_to_other_people())
 
 
-async def _reach(user_ids: List[int]) -> tuple[dict[int, str], set[int]]:
+async def _reach(user_ids: list[int]) -> tuple[dict[int, str], set[int]]:
     """Each account's address and whether it has proved one.
 
     On its own system-engine session: ``user_emails`` carries no request-path
@@ -1130,8 +1148,8 @@ async def _reach(user_ids: List[int]) -> tuple[dict[int, str], set[int]]:
 
 
 async def _credential_state(
-    user_ids: List[int],
-) -> tuple[dict[int, "SignInLock"], set[int], dict[int, int]]:
+    user_ids: list[int],
+) -> tuple[dict[int, SignInLock], set[int], dict[int, int]]:
     """The sign-in locks standing on these accounts, which of them hold a
     second factor, and how many working API keys each holds, on the system
     engine.
@@ -1151,7 +1169,7 @@ async def _credential_state(
         )
 
 
-async def to_self_read(session: AsyncSession, user: User) -> "UserRead":
+async def to_self_read(session: AsyncSession, user: User) -> UserRead:
     """An account's own record, with the address it is reached at, in full.
 
     For handing somebody their *own* account and nothing else — the address is
@@ -1203,7 +1221,7 @@ async def to_self_read(session: AsyncSession, user: User) -> "UserRead":
     return payload
 
 
-async def _birthdates_on_file(user_ids: List[int]) -> set[int]:
+async def _birthdates_on_file(user_ids: list[int]) -> set[int]:
     """Which of these accounts have a date of birth kept. One query for the
     page, on the system engine, and never the dates."""
     from app.db.session import SystemSessionLocal
@@ -1229,7 +1247,7 @@ async def _birthdate_on_file(user_id: int) -> bool:
         return await birthdate_of(system_session, user_id=user_id) is not None
 
 
-async def to_operator_read(users: List[User]) -> List["OperatorUserRead"]:
+async def to_operator_read(users: list[User]) -> list[OperatorUserRead]:
     """The same, for staff reading other people's accounts.
 
     The shape masks the address itself.
@@ -1246,7 +1264,7 @@ async def to_operator_read(users: List[User]) -> List["OperatorUserRead"]:
         else None
     )
     dated = await _birthdates_on_file([u.id for u in users])
-    out: List[OperatorUserRead] = []
+    out: list[OperatorUserRead] = []
     for user in users:
         payload = OperatorUserRead.model_validate(user)
         payload.email = primary.get(user.id) or ""
@@ -1273,11 +1291,6 @@ async def _deployment_rules() -> Values:
 
     async with SystemSessionLocal() as system_session:
         return await rules.platform_values(system_session)
-
-
-async def to_operator_read_one(user: User) -> "OperatorUserRead":
-    """``to_operator_read`` for the routes that return one account."""
-    return (await to_operator_read([user]))[0]
 
 
 #: The age below which somebody may not take part in the parts of the platform
@@ -1352,7 +1365,7 @@ def below_account_minimum(birthdate: date, country: str | None) -> bool:
     from app.services.tenant.plugin_age import minimum_in
 
     minimum = minimum_in(ACCOUNT_MINIMUM_AGE, country) or 0
-    return _years_since(birthdate, datetime.now(timezone.utc).date()) < minimum
+    return _years_since(birthdate, datetime.now(UTC).date()) < minimum
 
 
 class InvalidBirthdateError(ValueError):
@@ -1361,7 +1374,7 @@ class InvalidBirthdateError(ValueError):
 
 def check_birthdate(birthdate: date) -> None:
     """Raise :class:`InvalidBirthdateError` for a date nobody was born on."""
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     if birthdate > today or birthdate < today.replace(
         year=today.year - MAX_PLAUSIBLE_AGE_YEARS
     ):
@@ -1377,14 +1390,14 @@ def record_age_answer(user: User, birthdate: date) -> bool:
     the system engine.
     """
     check_birthdate(birthdate)
-    if _years_since(birthdate, datetime.now(timezone.utc).date()) < MINIMUM_AGE_YEARS:
-        user.age_below_minimum_at = datetime.now(timezone.utc)
+    if _years_since(birthdate, datetime.now(UTC).date()) < MINIMUM_AGE_YEARS:
+        user.age_below_minimum_at = datetime.now(UTC)
         # One question, one answer (``ck_users_age_answer``): an under-age
         # answer replaces any confirmation.
         user.age_confirmed_at = None
         return False
     if user.age_confirmed_at is None:
-        user.age_confirmed_at = datetime.now(timezone.utc)
+        user.age_confirmed_at = datetime.now(UTC)
     return True
 
 
@@ -1406,7 +1419,7 @@ async def keep_birthdate(
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     check_birthdate(birthdate)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ciphertext = encrypt_field(birthdate.isoformat(), SALT_BIRTHDATE)
     kept = await session.exec(
         pg_insert(UserBirthdate)
@@ -1449,4 +1462,4 @@ async def forget_birthdate(
 
 def years_old(birthdate: date) -> int:
     """Whole years since ``birthdate`` as of today (UTC)."""
-    return _years_since(birthdate, datetime.now(timezone.utc).date())
+    return _years_since(birthdate, datetime.now(UTC).date())

@@ -3,12 +3,12 @@ name = "initiative-backend"
 version = "0.1.0"
 description = "FastAPI backend for Initiative project management app"
 authors = [{ name = "Jordan", email = "jordan@morels.me" }]
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.136.1,<0.163",
     "uvicorn[standard]>=0.41.0,<0.55",
     "sqlmodel>=0.0.38,<0.0.49",
-    "sqlalchemy>=2.0.49,<3",
+    "sqlalchemy>=2.1,<3",
     "greenlet>=3.0",                     # SQLAlchemy async; its own marker skips macOS arm64, so require explicitly
     "asyncpg>=0.31.0,<0.33",
     # >=2.13.0: fixes the 2026 PyJWKClient cluster (CVE-2026-48522 JWKS-URI SSRF,
@@ -19,11 +19,11 @@ dependencies = [
     "argon2-cffi>=25.1.0,<26",
     "pyotp>=2.9.0,<3",                   # RFC 6238 TOTP arithmetic
     "webauthn>=2.5.0,<4",                # WebAuthn/FIDO2 ceremony verification
-    "bcrypt==5.0.0",
     "pydantic-settings>=2.14.2,<3",
-    "python-multipart>=0.0.31,<0.0.33",
+    "python-multipart>=0.0.31,<0.0.34",
     "email-validator>=2.3.0,<3",
-    "httpx>=0.28.1,<0.29",
+    "httpx2>=2.16.0,<3",
+    "httpx>=0.28.1,<0.29",               # fastmcp's client, which app/mcp_server.py hooks into
     "google-auth>=2.53.0",
     "requests>=2.34.2",                  # required by google-auth for requests transport
     "alembic>=1.18.4,<2",
@@ -33,9 +33,7 @@ dependencies = [
     "python-magic>=0.4.27",             # MIME type detection for file uploads
     "icalendar>=7.1.3",                  # iCal import/export
     "nh3>=0.3.5,<0.4",                   # HTML sanitization for schema inputs
-    # Collaboration (Yjs CRDT): pycrdt-websocket 0.16.1 requires pycrdt>=0.13,<0.14; keep aligned.
-    "pycrdt>=0.13.0,<0.15",
-    "pycrdt-websocket>=0.16.1,<0.17",
+    "pycrdt>=0.14,<0.15",                # Yjs documents for collaborative editing (app/services/tenant/collaboration.py)
     "mini-racer>=0.14.1",                # the document editor on the server (app/services/editor_engine.py)
     "premailer>=3.10.0",
     "fastmcp>=3.4.2",
@@ -76,10 +74,53 @@ dev = [
 # Application, not a distributable package — sync dependencies only, never build/install the project itself.
 package = false
 
+[tool.ruff.per-file-target-version]
+# A merged revision is never edited (AGENTS.md), so ruff formats every revision
+# as the 3.12 code the older ones were written as, which 3.14 runs all the same.
+"alembic/versions/*.py" = "py312"
+
 [tool.ruff.lint]
 # Ruff's default rules, plus the logging-format rules (arguments passed to the
 # logger rather than formatted into the message).
 extend-select = ["G"]
+ignore = [
+    # Where a failure must not spread (a sweep, a socket, an export's optional
+    # part), the app catches every exception on purpose and logs its type, not
+    # its text; BLE001, S110 and S112 flag exactly that.
+    "BLE001",
+    "S110",
+    "S112",
+    # A type check on decoded input (JSON, a form field) is invalid input, so it
+    # raises ValueError: pydantic validators and the parsers' callers catch that.
+    "TRY004",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Pydantic copies a field's default for each instance, so `tags: list[str] = []`
+# is not shared state. Ruff only recognises a model whose BaseModel base is in
+# the same file, and these subclass SanitizedBaseModel from app/schemas/base.py.
+"app/schemas/**" = ["RUF012"]
+"app/services/import_engine/{backup,contract}.py" = ["RUF012"]
+# SQLModel resolves a relationship from its annotation's text, so
+# `Optional["User"]` and `list["Tag"]` stay as written rather than becoming
+# `User | None`, which it would look up as one name.
+"app/models/**" = ["UP037", "UP045"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI declares where a parameter comes from as its default.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+    # Frozen dataclasses, so one default instance is safe to share.
+    "app.services.tenant.search.Filters",
+    "upgrade_from_release.Setup",
+]
 
 [tool.ty.rules]
 # Full default rule set is enforced (CI runs `scripts/ci/check ty`).
@@ -106,3 +147,11 @@ include = ["app/models/**"]
 
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+# A merged revision is never edited (AGENTS.md, "Never edit a migration"), so
+# a deprecation ty learns of later stays where the revision froze it.
+include = ["alembic/versions/**"]
+
+[tool.ty.overrides.rules]
+deprecated = "ignore"

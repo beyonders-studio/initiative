@@ -14,31 +14,30 @@ import struct
 import zipfile
 import zlib
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 import docx
 import pytest
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 from openpyxl import load_workbook
 from pypdf import PdfReader
 from sqlalchemy import delete as sa_delete
 from sqlmodel import select
 
-from app.services.platform import rules
-from app.core.rules import PLATFORM_RULES
 from app.api import deps as api_deps
 from app.core.config import settings
-from app.core.relationships import RelationshipType
+from app.core.file_types import FileType
 from app.core.login_methods import LoginMethod
+from app.core.relationships import RelationshipType
+from app.core.rules import PLATFORM_RULES
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.core.user_display import handle_of
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.guild_image import GuildImage, GuildImageVariant
 from app.models.platform.notification import Notification, NotificationType
-from app.core.file_types import FileType
 from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.models.tenant.metadata import MetadataType
@@ -46,11 +45,13 @@ from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.services import data_jobs
 from app.services import storage as storage_module
+from app.services.export import limits as export_limits
 from app.services.export import worker as export_worker
 from app.services.guild_sweeps import Scope, each_guild
+from app.services.platform import rules
 from app.services.storage import get_guild_storage
 from app.services.tenant import ical_service
-from app.testing import create_resource_grant, route_session_to_guild, drain_notices
+from app.testing import create_resource_grant, drain_notices, route_session_to_guild
 from app.testing.factories import (
     assign_tag,
     checklist_items,
@@ -60,8 +61,9 @@ from app.testing.factories import (
     create_counter,
     create_counter_group,
     create_dashboard,
-    create_file,
     create_export_job,
+    create_file,
+    create_guild_auth_policy,
     create_guild_plugin,
     create_initiative,
     create_post,
@@ -70,14 +72,11 @@ from app.testing.factories import (
     create_property_value,
     create_relationship,
     create_tag,
-    create_guild_auth_policy,
     create_task,
     create_tool_entity,
     create_upload,
     enable_all_tools,
 )
-from app.services.export import limits as export_limits
-
 
 # ---------------------------------------------------------------------------
 # Asking for an export
@@ -115,7 +114,7 @@ async def _run_worker() -> None:
     """Render the queued jobs the way the worker does. It re-queries as the
     creator on a read session from the community's cohort, which the standard
     harness points at the test database."""
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
 
 async def _download(client: AsyncClient, a, job_id: int) -> Response:
@@ -508,7 +507,7 @@ async def test_task_export_groups_by_each_kind_of_field(
             {"value": "south", "label": "South"},
         ],
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     late = await create_task(
         session,
         a.project,
@@ -756,7 +755,7 @@ async def test_an_export_is_served_while_its_initiatives_are_reached(
     await _download(client, a, job_id)
 
     initiative = await session.get(Initiative, initiative_id)
-    initiative.deleted_at = datetime.now(timezone.utc)
+    initiative.deleted_at = datetime.now(UTC)
     session.add(initiative)
     await session.commit()
     dl = await client.get(a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers)
@@ -880,7 +879,7 @@ async def test_project_report_formats_render_the_live_tasks_only(
     rather than the backup one."""
     a = await _actor_with_tasks(acting_user, session)
     await create_task(
-        session, a.project, title="Old news", archived_at=datetime.now(timezone.utc)
+        session, a.project, title="Old news", archived_at=datetime.now(UTC)
     )
     resp = await _export(client, a, "project", ids=[a.project.id], format=fmt)
     _assert_export(
@@ -900,7 +899,7 @@ async def test_an_archived_projects_report_carries_the_tasks_archived_with_it(
     a task archived on its own beforehand."""
     a = await _actor_with_tasks(acting_user, session)
     await create_task(
-        session, a.project, title="Old news", archived_at=datetime.now(timezone.utc)
+        session, a.project, title="Old news", archived_at=datetime.now(UTC)
     )
     archived = await client.post(
         a.g(f"/archive/project/{a.project.id}"), headers=a.headers
@@ -938,16 +937,28 @@ async def test_project_export_job_path_renders_json(
 # ---------------------------------------------------------------------------
 
 _SHEET_CONTENT = {
-    "schema_version": 2,
-    "dimensions": {"rows": 2, "cols": 2},
-    # "=SUM(...)" is the author's own formula and first-class content;
-    # "+not-a-formula" is a plain string that happens to open with a trigger
-    # character, and the app exports it as the text it is.
-    "cells": {"0:0": "Item", "0:1": "=SUM(B2:B9)", "1:0": "+not-a-formula", "1:1": 42},
-    "cellStyles": {"0:0": {"style": {"bold": True, "fill": "#ff0000"}}},
-    "columns": {"0": {"width": 140}},
-    "rows": {},
-    "frozen": {"rows": 1, "cols": 0},
+    "schema_version": 3,
+    "kind": "spreadsheet",
+    "sheets": [
+        {
+            "id": "s1",
+            "name": "Q3",
+            "dimensions": {"rows": 2, "cols": 2},
+            # "=SUM(...)" is the author's own formula and first-class content;
+            # "+not-a-formula" is a plain string that happens to open with a
+            # trigger character, and the app exports it as the text it is.
+            "cells": {
+                "0:0": "Item",
+                "0:1": "=SUM(B2:B9)",
+                "1:0": "+not-a-formula",
+                "1:1": 42,
+            },
+            "cellStyles": {"0:0": {"style": {"bold": True, "fill": "#ff0000"}}},
+            "columns": {"0": {"width": 140}},
+            "rows": {},
+            "frozen": {"rows": 1, "cols": 0},
+        }
+    ],
 }
 
 # One file per type, holding the payload that type stores.
@@ -1184,7 +1195,7 @@ def _workbook_keeps_the_grid_typed(resp: Response, subject: Any) -> None:
     """Sheet name, styling, formulas, literal strings, numbers and frozen panes
     each land as themselves."""
     sheet = _sheet(resp)
-    assert sheet.title == "Budget Q3"  # forbidden ":" stripped
+    assert sheet.title == "Q3"
     assert sheet.cell(row=1, column=1).value == "Item"
     assert sheet.cell(row=1, column=1).font.bold is True
     assert sheet.cell(row=1, column=2).value == "=SUM(B2:B9)"
@@ -1247,10 +1258,19 @@ async def test_file_export_spreadsheet_survives_corrupt_snapshot(
         name="Odd",
         file_type=FileType.sheet,
         content={
-            "schema_version": 2,
-            "dimensions": {"rows": 1, "cols": 1},
-            "cells": {"0:0": "ok", "corrupt": "x", "1:2:3": "y", ":": "z"},
-            "cellStyles": {"0:0": {"style": {"fill": "#fff", "color": "not-a-color"}}},
+            "schema_version": 3,
+            "kind": "spreadsheet",
+            "sheets": [
+                {
+                    "id": "s1",
+                    "name": "Odd",
+                    "dimensions": {"rows": 1, "cols": 1},
+                    "cells": {"0:0": "ok", "corrupt": "x", "1:2:3": "y", ":": "z"},
+                    "cellStyles": {
+                        "0:0": {"style": {"fill": "#fff", "color": "not-a-color"}}
+                    },
+                }
+            ],
         },
     )
     resp = await _export(client, a, "file", ids=[doc.id], format="xlsx")
@@ -1396,7 +1416,7 @@ async def test_gc_expires_the_job_row_and_releases_its_artifact(
         a.user,
         status=DataJobStatus.done,
         file_ref=key,
-        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
     guild = await session.get(Guild, a.guild.id)
     guild.status = CommunityStatus.suspended.value
@@ -1432,7 +1452,7 @@ async def test_an_artifact_past_its_expiry_is_not_served(
     storage = get_guild_storage(a.guild.id)
     key = "exports/515151.pdf"
     storage.write(key, b"%PDF-fake", content_type="application/pdf")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     due = await create_export_job(
         session,
         a.guild,
@@ -1486,9 +1506,9 @@ async def _counter_group_with_counters(acting_user, session):
         group,
         name="Torches",
         count=Decimal("5.0000000000"),
-        min=Decimal("0"),
-        max=Decimal("10"),
-        position=Decimal("1"),
+        min=Decimal(0),
+        max=Decimal(10),
+        position=Decimal(1),
     )
     await create_counter(
         session,
@@ -1496,7 +1516,7 @@ async def _counter_group_with_counters(acting_user, session):
         name="Rations",
         count=Decimal("2.5"),
         step=Decimal("0.5"),
-        position=Decimal("2"),
+        position=Decimal(2),
     )
     return a, group
 
@@ -1993,7 +2013,11 @@ async def test_bulk_file_selection_exports_as_zip(
         a.user,
         name="Budget",
         file_type=FileType.sheet,
-        content={"schema_version": 2, "cells": {"0:0": "x"}},
+        content={
+            "schema_version": 3,
+            "kind": "spreadsheet",
+            "sheets": [{"id": "s1", "name": "Sheet1", "cells": {"0:0": "x"}}],
+        },
     )
     twin = await create_file(session, a.initiative, a.user, name="Session Notes")
 
@@ -2167,7 +2191,7 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
     calendar = await create_calendar(session, a.initiative, a.user, name="Raid Nights")
     # Mondays and Wednesdays at 00:30, picked in Berlin: Sundays and Tuesdays
     # in UTC.
-    session_start = datetime(2026, 10, 4, 22, 30, tzinfo=timezone.utc)
+    session_start = datetime(2026, 10, 4, 22, 30, tzinfo=UTC)
     weekly = "RRULE:FREQ=WEEKLY;BYDAY=MO,WE"
     recurring_event = await create_calendar_event(
         session,
@@ -2189,8 +2213,8 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
         a.user,
         title="Guild meeting",
         all_day=True,
-        start_at=datetime(2026, 10, 12, tzinfo=timezone.utc),
-        end_at=datetime(2026, 10, 12, 23, 59, 59, tzinfo=timezone.utc),
+        start_at=datetime(2026, 10, 12, tzinfo=UTC),
+        end_at=datetime(2026, 10, 12, 23, 59, 59, tzinfo=UTC),
         recurrence=monthly,
     )
     definition = await create_property_definition(session, a.initiative, name="Table")
@@ -2229,7 +2253,7 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
     assert body.count("BEGIN:VEVENT") == 4
     assert body.count(f"UID:event-{recurring_event.id}@initiative") == 2
     imported, errors, _ = ical_service.build_calendar_events(
-        body, calendar.id, a.guild.id, a.user.id, tz="Europe/Berlin"
+        body, calendar.id, a.guild.id, tz="Europe/Berlin"
     )
     assert errors == []
     by_title = {event.title: event for event in imported}
@@ -2248,8 +2272,8 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
     )
     meeting = by_title["Guild meeting"]
     assert (meeting.start_at, meeting.end_at, meeting.recurrence) == (
-        datetime(2026, 10, 12, tzinfo=timezone.utc),
-        datetime(2026, 10, 12, 23, 59, 59, tzinfo=timezone.utc),
+        datetime(2026, 10, 12, tzinfo=UTC),
+        datetime(2026, 10, 12, 23, 59, 59, tzinfo=UTC),
         monthly,
     )
     # Another app's file: a rule in its own zone comes into UTC terms, a
@@ -2267,7 +2291,6 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
         "END:VCALENDAR\r\n",
         calendar.id,
         a.guild.id,
-        a.user.id,
         tz="America/New_York",
     )
     assert errors == []
@@ -2276,11 +2299,11 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
     } == {
         "Standup": (session_start, "RRULE:FREQ=WEEKLY;BYDAY=MO", 1440),
         "Month end": (
-            datetime(2026, 10, 31, 13, 0, tzinfo=timezone.utc),
+            datetime(2026, 10, 31, 13, 0, tzinfo=UTC),
             "RRULE:FREQ=MONTHLY;BYMONTHDAY=-1",
             0,
         ),
-        "Ticker": (datetime(2026, 10, 5, 9, 0, tzinfo=timezone.utc), None, 0),
+        "Ticker": (datetime(2026, 10, 5, 9, 0, tzinfo=UTC), None, 0),
     }
 
     js = await _export(client, a, "calendar", format="json")
@@ -2439,7 +2462,7 @@ async def test_calendar_export_narrows_by_initiative_and_date_range(
     assert {e["title"] for e in envelope["events"]} == {"Main event"}
 
     def at(month: int, day: int = 10) -> dict:
-        start = datetime(2026, month, day, 18, tzinfo=timezone.utc)
+        start = datetime(2026, month, day, 18, tzinfo=UTC)
         return {"start_at": start, "end_at": start + timedelta(hours=2)}
 
     await create_calendar_event(session, side_cal, a.user, title="Spring", **at(3))
@@ -3078,14 +3101,14 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
         a.initiative,
         a.user,
         name="Shelved",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
     await create_counter_group(session, a.initiative, a.user, name="Plain")
     for group in (tagged, shelved):
         await assign_tag(session, group, tag)
     calendar = await create_calendar(session, a.initiative, a.user, name="Raids")
     for title, month in (("Spring", 3), ("Summer", 7)):
-        start = datetime(2026, month, 10, 18, tzinfo=timezone.utc)
+        start = datetime(2026, month, 10, 18, tzinfo=UTC)
         await create_calendar_event(
             session, calendar, a.user, title=title, start_at=start, end_at=start
         )
@@ -3099,7 +3122,7 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
         session, a.project, title="Shipped", status_category=TaskStatusCategory.done
     )
     await create_task(
-        session, a.project, title="Put away", archived_at=datetime.now(timezone.utc)
+        session, a.project, title="Put away", archived_at=datetime.now(UTC)
     )
     await create_relationship(
         session,
@@ -3304,7 +3327,7 @@ async def test_guild_backup_carries_the_community_itself(
     # The colour is the point: envelopes reference tags by name alone, so the
     # definition is what a round trip would otherwise lose.
     assert {"worldbuilding"} <= {t["name"] for t in tags}
-    assert [t for t in tags if t["name"] == "worldbuilding"][0]["color"] == "#ff0000"
+    assert next(t for t in tags if t["name"] == "worldbuilding")["color"] == "#ff0000"
 
     members = json.loads(archive.read("guild/members.json"))["members"]
     assert a.user.id in {m["user_id"] for m in members}
@@ -3623,7 +3646,7 @@ async def test_guild_export_status_says_who_took_the_last_one_and_when(
 
     refused = await _export(client, a, "community")
     assert refused.status_code == 429
-    left = (available_at - datetime.now(timezone.utc)).total_seconds()
+    left = (available_at - datetime.now(UTC)).total_seconds()
     assert abs(int(refused.headers["Retry-After"]) - left) <= 5
 
 

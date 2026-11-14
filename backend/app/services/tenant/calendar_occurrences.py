@@ -20,16 +20,20 @@ moving an event moves its answers, which its editors may do.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from types import EllipsisType
-from typing import Iterable
 
 from fastapi import HTTPException, status
 from sqlalchemy import (
     ColumnElement,
-    delete as sa_delete,
     exists,
     func,
+)
+from sqlalchemy import (
+    delete as sa_delete,
+)
+from sqlalchemy import (
     update as sa_update,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -58,7 +62,7 @@ _TAGS = tags_service.EXTRA_TAG_LINKS["calendar_event"]
 
 
 def _utc(value: datetime) -> datetime:
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def mark(override: CalendarEvent, fields: Iterable[str]) -> None:
@@ -116,6 +120,39 @@ async def overrides(
             )
         ).all()
     )
+
+
+def next_event(
+    series: CalendarEvent, rows: Iterable[CalendarEvent], now: datetime
+) -> tuple[datetime, datetime] | None:
+    """A repeating series' first event at or after ``now``, as ``(start,
+    occurrence)``: when it starts, a moved one at its new time, and its start
+    in the series, which names it. None once none is still to come."""
+    if not series.recurrence:
+        return None
+    moved = {
+        _utc(row.original_start): _utc(row.start_at)
+        for row in rows
+        if row.original_start is not None
+    }
+    plain = next(
+        (
+            start
+            for start in recurrence.starting(
+                series.recurrence,
+                series.start_at,
+                series.recurrence_shift,
+                now,
+                len(moved) + 1,
+            )
+            if start not in moved
+        ),
+        None,
+    )
+    events = [(start, at) for at, start in moved.items() if start >= now]
+    if plain is not None:
+        events.append((plain, plain))
+    return min(events, default=None)
 
 
 def has_plain_from(
@@ -329,6 +366,7 @@ async def occurrence(
         series_id=series.id,
         original_start=at,
         created_by=series.created_by,
+        created_by_kind=series.created_by_kind,
     )
     session.add(override)
     await session.flush()
@@ -386,7 +424,7 @@ async def _join(session: AsyncSession, event: CalendarEvent, user_id: int) -> No
         .values(
             calendar_event_id=event.id,
             user_id=user_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(index_elements=["calendar_event_id", "user_id"])
     )
@@ -616,6 +654,7 @@ async def split(
         recurrence=tail,
         recurrence_shift=series.recurrence_shift,
         created_by=series.created_by,
+        created_by_kind=series.created_by_kind,
     )
     session.add(rest)
     await session.flush()

@@ -8,8 +8,6 @@ rows would make every thread O(reactions) for nothing the client uses.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import ConfigDict, Field, field_validator
 
 from app.core.emoji import validate_emoji
@@ -41,8 +39,8 @@ class ReactionUser(PersonShape):
     id: PersonId
     username: str
     discriminator: int
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
 
 
 class ReactionGroup(SanitizedBaseModel):

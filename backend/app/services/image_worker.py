@@ -20,7 +20,8 @@ from __future__ import annotations
 import base64
 import io
 import warnings
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from PIL import Image, ImageOps
 
@@ -46,7 +47,7 @@ def answer(request: dict[str, Any], edge: int) -> dict[str, Any]:
                 picture.save(out, format="WEBP", quality=80, method=4)
     except MemoryError:
         return {"error": "the picture ran out of memory", "replace": True}
-    except Exception as error:  # noqa: BLE001 - every decode failure is one answer
+    except Exception as error:  # every decode failure is one answer
         return {"error": str(error) or type(error).__name__}
     return {
         "thumbnail": base64.b64encode(out.getvalue()).decode("ascii"),
@@ -63,6 +64,6 @@ def start(arguments: list[str]) -> Callable[[dict[str, Any]], dict[str, Any]]:
         import resource
 
         resource.setrlimit(resource.RLIMIT_AS, (address_space, address_space))
-    except (ImportError, ValueError, OSError):
+    except ImportError, ValueError, OSError:
         pass
     return lambda request: answer(request, edge)

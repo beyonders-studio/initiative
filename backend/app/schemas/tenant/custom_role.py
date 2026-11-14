@@ -1,8 +1,8 @@
 """A community's custom roles, as its settings read and write them."""
 
-from typing import Optional
+from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field, StringConstraints, field_validator
 
 from app.core.rules import SetBy
 from app.models.platform.guild import AdminSurface, CommunityRole
@@ -13,12 +13,22 @@ from app.models.tenant.custom_role import (
 from app.schemas.base import SanitizedBaseModel, TitleStr
 
 
+class PluginPermissionRef(SanitizedBaseModel):
+    """One installed plug-in's community permission."""
+
+    install_id: int
+    permission: str = Field(min_length=1, max_length=64)
+
+
 class CustomRoleRead(SanitizedBaseModel):
     id: int
     name: str
     #: The rung the role applies on: ``member`` or ``admin``.
     base_rung: CommunityRole
     surfaces: list[AdminSurface]
+    #: The plug-ins' community permissions a role on the admin rung keeps, as
+    #: ``surfaces`` keeps parts of administering the community.
+    plugin_permissions: list[PluginPermissionRef] = []
     #: Who defined the role. The community gives a role the deployment
     #: defined, and does not change or delete it.
     set_by: SetBy
@@ -29,6 +39,9 @@ class CustomRoleCreate(SanitizedBaseModel):
     #: ``member`` or ``admin`` (``CUSTOM_ROLE_RUNGS``).
     base_rung: CommunityRole
     surfaces: list[AdminSurface] = Field(default_factory=list)
+    plugin_permissions: list[PluginPermissionRef] = Field(
+        default_factory=list, max_length=1000
+    )
 
     @field_validator("base_rung")
     @classmethod
@@ -39,15 +52,19 @@ class CustomRoleCreate(SanitizedBaseModel):
 
 
 class CustomRoleUpdate(SanitizedBaseModel):
-    name: Optional[TitleStr] = Field(
+    name: TitleStr | None = Field(
         default=None, min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH
     )
-    surfaces: Optional[list[AdminSurface]] = None
+    surfaces: list[AdminSurface] | None = None
+    #: The whole set of plug-ins' community permissions the role keeps.
+    plugin_permissions: list[PluginPermissionRef] | None = Field(
+        default=None, max_length=1000
+    )
 
 
 class CustomRoleAssignment(SanitizedBaseModel):
     #: The role to give, or ``None`` to take the person's role off.
-    role_id: Optional[int] = None
+    role_id: int | None = None
 
 
 class CustomRoleHolder(SanitizedBaseModel):
@@ -59,6 +76,14 @@ class HeldSurfacesRead(SanitizedBaseModel):
     #: The admin surfaces the reader holds in the community, as the request's
     #: standing computed them.
     surfaces: list[AdminSurface]
+    #: The installed plug-ins' community permissions they hold, likewise.
+    plugin_permissions: list[PluginPermissionRef] = []
+
+
+#: A group as a provider spells it, without the spaces around it.
+GroupName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+]
 
 
 class CustomRoleClaimRuleCreate(SanitizedBaseModel):
@@ -66,8 +91,16 @@ class CustomRoleClaimRuleCreate(SanitizedBaseModel):
     provider_id: int
     #: The group the provider asserts, as the community's other claim rules
     #: name it.
-    claim_value: str = Field(min_length=1, max_length=500)
+    claim_value: GroupName
     role_id: int
+
+
+class CustomRoleClaimRuleUpdate(SanitizedBaseModel):
+    """Change the group a rule reads or the role it gives. Its provider and
+    its place in the order are not changed here."""
+
+    claim_value: GroupName | None = None
+    role_id: int | None = None
 
 
 class CustomRoleClaimRuleRead(SanitizedBaseModel):

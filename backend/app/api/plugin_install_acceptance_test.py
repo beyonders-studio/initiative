@@ -10,10 +10,12 @@ revocation, authorship, the identity boundary, route opt-in and round trips.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
+from fastapi.routing import iter_route_contexts
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
@@ -23,35 +25,36 @@ from app.api import actor_route
 from app.api.actor_route import ActorRoute
 from app.api.deps import route_plugin_scopes
 from app.core.identity_boundary import BoundaryPhase
-from app.core.plugin_scopes import ALL_SCOPES
+from app.core.image_headers import validate_image
 from app.core.messages import PluginMessages
+from app.core.plugin_scopes import ALL_SCOPES
 from app.db.search_index import COMMENT_PREVIEW_CHARS
 from app.main import app
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.notification import Notification, NotificationType
-from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.platform.user_avatar import AVATAR_SPEC
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.metadata import MetadataType
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.marketplace import plugin_refs
-from app.core.image_headers import validate_image
-from app.models.platform.user_avatar import AVATAR_SPEC
 from app.services.platform import user_avatars
 from app.services.platform.user_avatars_test import png
 from app.testing import (
-    create_resource_grant,
-    guild_url,
     create_comment,
     create_file,
-    create_post,
     create_guild_calendar,
+    create_post,
     create_project,
     create_property_definition,
     create_property_value,
+    create_resource_grant,
     create_task,
     drain_notices,
+    guild_url,
     lexical_body,
     route_as,
     route_as_install,
@@ -60,12 +63,11 @@ from app.testing import (
 from app.testing.plugin_clients import (
     CLIENT,
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
     share_with_members,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -80,7 +82,7 @@ async def _seat_session(installed: Any, role_session: Any) -> Any:
 
 
 @contextmanager
-def _counting() -> Iterator[list[str]]:
+def _counting() -> Generator[list[str]]:
     """Every statement any engine runs meanwhile, in order."""
     statements: list[str] = []
 
@@ -162,6 +164,8 @@ async def test_what_it_creates_is_its_own_and_names_nobody(
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["created_by"] is None
+    assert body["created_by_kind"] == "plugin"
+    assert body["created_by_install"] == installed.plugin.id
     assert isinstance(body["community_id"], str)
     assert body["can"]["delete"] is True
     assert_names_nobody(created.text, [installed.seat.user.id, installed.guild.id])
@@ -179,7 +183,11 @@ async def test_what_it_creates_is_its_own_and_names_nobody(
         (ResourceAccessLevel.owner, installed.plugin.id, None)
     ]
     file = await session.get(File, body["id"])
-    assert file is not None and file.created_by is None
+    assert file is not None
+    assert (file.created_by_kind, file.created_by) == (
+        ActorKind.plugin,
+        installed.plugin.id,
+    )
 
 
 async def test_a_file_a_person_made_names_them_by_reference(
@@ -304,7 +312,7 @@ async def test_it_cannot_create_a_project(client, session, acting_user, role_ses
     assert response.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
-async def test_the_role_refuses_guild_settings_outright(
+async def test_the_role_refuses_the_communitys_settings(
     session, acting_user, role_session
 ):
     installed = await install_plugin(
@@ -319,7 +327,7 @@ async def test_the_role_refuses_guild_settings_outright(
         scopes=["files:read"],
     )
     with pytest.raises(DBAPIError, match="permission denied"):
-        await s.exec(text("SELECT count(*) FROM guild_settings"))
+        await s.exec(text("SELECT * FROM guild_settings"))
 
 
 # ---------------------------------------------------------------------------
@@ -492,7 +500,9 @@ async def test_an_unmarked_route_refuses_an_installation_token(
 
 
 def test_every_marked_route_names_scopes_in_the_vocabulary():
-    marked = [route for route in app.routes if route_plugin_scopes(route)]
+    marked = [
+        route for route in iter_route_contexts(app.routes) if route_plugin_scopes(route)
+    ]
     assert marked, "no route names a plug-in scope"
     unknown = {
         (getattr(route, "path", "?"), scope)
@@ -501,7 +511,7 @@ def test_every_marked_route_names_scopes_in_the_vocabulary():
         if scope not in ALL_SCOPES
     }
     assert not unknown, unknown
-    assert all(isinstance(route, ActorRoute) for route in marked)
+    assert all(isinstance(route.original_route, ActorRoute) for route in marked)
 
 
 # ---------------------------------------------------------------------------
@@ -510,7 +520,7 @@ def test_every_marked_route_names_scopes_in_the_vocabulary():
 
 
 @contextmanager
-def _handler_start(monkeypatch: Any, statements: list[str]) -> Iterator[list[int]]:
+def _handler_start(monkeypatch: Any, statements: list[str]) -> Generator[list[int]]:
     """Record how many statements had run when the route's own code began."""
     seen: list[int] = []
     original = actor_route._enter

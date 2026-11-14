@@ -26,13 +26,14 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import exists, func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.file_types import spec_of, type_of_media
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File, FileVersion
 from app.services.storage import get_guild_storage
 from app.services.tenant import attachments
@@ -54,7 +55,7 @@ _HANDLER = Path(__file__).parent.parent / "image_worker.py"
 _IDLE_SECONDS = 300
 _ADDRESS_SPACE_BYTES = 1536 * 1024 * 1024
 
-_pool: Optional[Pool] = None
+_pool: Pool | None = None
 _pool_lock = threading.Lock()
 
 
@@ -121,6 +122,7 @@ async def _keep(
         data=base64.b64decode(reply["thumbnail"]),
         content_type="image/webp",
         created_by=None,
+        created_by_kind=ActorKind.system,
         initiative_id=initiative_id,
     )
     version.thumbnail_state = "ready"
@@ -181,7 +183,7 @@ async def _draw_one(session: AsyncSession, guild_id: int) -> bool:
         if picture_format is None or key is None:
             raise PoolError("not a picture the app draws")
         reply = await asyncio.to_thread(_draw, guild_id, key, picture_format)
-    except Exception as exc:  # noqa: BLE001 - a picture that cannot be drawn fails
+    except Exception as exc:  # a picture that cannot be drawn fails
         reply = {"error": str(exc) or type(exc).__name__}
     if "thumbnail" in reply:
         await _keep(session, guild_id, version, reply, initiative_id)

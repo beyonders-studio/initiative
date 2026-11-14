@@ -9,14 +9,14 @@ foreign server can misbehave becomes a code rather than prose.
 
 import base64
 import io
+from datetime import UTC
 
-import httpx
+import httpx2
 import pytest
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import atlassian
 from app.services.import_engine.contract import ImportEngineError
-
 
 CREDENTIAL = atlassian.AtlassianCredential(
     site_url="https://acme.atlassian.net",
@@ -39,13 +39,13 @@ def waits(monkeypatch) -> list[float]:
 
 def _response(status_code: int, payload=None, *, text: str | None = None):
     if text is not None:
-        return httpx.Response(status_code, text=text)
-    return httpx.Response(status_code, json=payload if payload is not None else {})
+        return httpx2.Response(status_code, text=text)
+    return httpx2.Response(status_code, json=payload if payload is not None else {})
 
 
 async def answered(
-    method: str, url: str, response: httpx.Response, kw: dict
-) -> httpx.Response:
+    method: str, url: str, response: httpx2.Response, kw: dict
+) -> httpx2.Response:
     """``response`` as ``request_public_target`` hands one back for the
     keyword arguments ``kw`` it was called with: bounded, and its body written
     to the sink when there is one."""
@@ -53,7 +53,7 @@ async def answered(
 
     if kw.get("max_bytes") is None:
         return response
-    response.request = httpx.Request(method, url)
+    response.request = httpx2.Request(method, url)
     return await _read_bounded(response, kw["max_bytes"], kw.get("sink"))
 
 
@@ -161,7 +161,7 @@ async def test_a_private_address_is_refused_not_fetched(monkeypatch):
 
 async def test_a_site_that_will_not_answer_is_unreachable(monkeypatch):
     async def fake_request(*a, **kw):
-        raise httpx.ConnectTimeout("too slow")
+        raise httpx2.ConnectTimeout("too slow")
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     with pytest.raises(ImportEngineError) as exc:
@@ -296,7 +296,7 @@ async def test_a_huge_site_is_cut_rather_than_refused(monkeypatch):
 
 def _throttled(retry_after: str | None = None):
     headers = {"Retry-After": retry_after} if retry_after is not None else {}
-    return httpx.Response(429, json={}, headers=headers)
+    return httpx2.Response(429, json={}, headers=headers)
 
 
 def _sequence(*responses):
@@ -352,16 +352,16 @@ async def test_a_wait_longer_than_the_policy_allows_is_a_block(monkeypatch, wait
 
 async def test_retry_after_may_be_a_date(monkeypatch, waits):
     """The header's other form. A date in the past means "now"."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from email.utils import format_datetime
 
-    soon = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=3))
+    soon = format_datetime(datetime.now(UTC) + timedelta(seconds=3))
     _stub(monkeypatch, _sequence(_throttled(soon), _response(200, {})))
     await atlassian.get_json(CREDENTIAL, "/rest/api/3/myself")
     assert 0.0 < waits[0] <= 3.0 * (1 + atlassian.JITTER_FRACTION)
 
     waits.clear()
-    past = format_datetime(datetime.now(timezone.utc) - timedelta(minutes=5))
+    past = format_datetime(datetime.now(UTC) - timedelta(minutes=5))
     _stub(monkeypatch, _sequence(_throttled(past), _response(200, {})))
     await atlassian.get_json(CREDENTIAL, "/rest/api/3/myself")
     assert waits == [0.0]
@@ -407,7 +407,7 @@ async def test_the_probe_waits_briefly_because_someone_is_watching(monkeypatch, 
 async def test_a_file_arrives_with_the_retry_a_json_call_gets(monkeypatch, waits):
     calls = _stub(
         monkeypatch,
-        _sequence(_throttled("1"), httpx.Response(200, content=b"\x89PNG")),
+        _sequence(_throttled("1"), httpx2.Response(200, content=b"\x89PNG")),
     )
     data = await _download("/rest/api/3/attachment/content/10", max_bytes=100)
     assert data == b"\x89PNG"
@@ -416,7 +416,7 @@ async def test_a_file_arrives_with_the_retry_a_json_call_gets(monkeypatch, waits
 
 
 async def test_a_file_bigger_than_its_bound_is_refused(monkeypatch):
-    _stub(monkeypatch, lambda m, u, j: httpx.Response(200, content=b"x" * 101))
+    _stub(monkeypatch, lambda m, u, j: httpx2.Response(200, content=b"x" * 101))
     with pytest.raises(ImportEngineError) as exc:
         await _download("/f", max_bytes=100)
     assert exc.value.code == ImportEngineMessages.IMPORT_TOO_LARGE
@@ -435,7 +435,7 @@ async def test_a_file_the_site_will_not_hand_over_is_a_code(
 ):
     """A redirect is not followed: the content endpoint is asked for the
     bytes directly, and a hop elsewhere is not an answer."""
-    _stub(monkeypatch, lambda m, u, j: httpx.Response(status_code, content=b""))
+    _stub(monkeypatch, lambda m, u, j: httpx2.Response(status_code, content=b""))
     with pytest.raises(ImportEngineError) as exc:
         await _download("/f", max_bytes=100)
     assert exc.value.code == code
@@ -448,9 +448,9 @@ async def test_a_download_follows_its_one_hop_without_the_token(monkeypatch):
     calls = _stub(
         monkeypatch,
         lambda m, u, j: (
-            httpx.Response(302, headers={"location": MEDIA})
+            httpx2.Response(302, headers={"location": MEDIA})
             if "acme.atlassian.net" in u
-            else httpx.Response(200, content=b"%PDF")
+            else httpx2.Response(200, content=b"%PDF")
         ),
     )
     data = await _download("/wiki/download", max_bytes=100, follow_redirect=True)
@@ -467,7 +467,7 @@ async def test_a_download_follows_its_one_hop_without_the_token(monkeypatch):
 async def test_a_hop_that_is_not_https_is_not_followed(monkeypatch):
     calls = _stub(
         monkeypatch,
-        lambda m, u, j: httpx.Response(
+        lambda m, u, j: httpx2.Response(
             302, headers={"location": "http://media.example.com/f"}
         ),
     )
@@ -483,7 +483,7 @@ async def test_a_hop_to_a_private_address_is_refused(monkeypatch):
     async def fake_request(method, url, **kw):
         if url == MEDIA:
             raise WebhookTargetUrlPrivateError("private")
-        return httpx.Response(302, headers={"location": MEDIA})
+        return httpx2.Response(302, headers={"location": MEDIA})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     with pytest.raises(ImportEngineError) as exc:
@@ -494,7 +494,7 @@ async def test_a_hop_to_a_private_address_is_refused(monkeypatch):
 async def test_a_second_hop_is_not_followed(monkeypatch):
     _stub(
         monkeypatch,
-        lambda m, u, j: httpx.Response(302, headers={"location": MEDIA}),
+        lambda m, u, j: httpx2.Response(302, headers={"location": MEDIA}),
     )
     with pytest.raises(ImportEngineError) as exc:
         await _download("/wiki/download", max_bytes=100, follow_redirect=True)

@@ -39,13 +39,15 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional, Sequence
+from typing import Any
 from urllib.parse import urlparse
 
-import httpx
-from fastapi import HTTPException, status as http_status
+import httpx2
+from fastapi import HTTPException
+from fastapi import status as http_status
 from jwt import PyJWK
 from jwt.exceptions import InvalidKeyError, PyJWKError
 from sqlalchemy import update
@@ -53,10 +55,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
 from app.core.audit_events import AuditEventType
+from app.core.clock import utcnow
 from app.core.config import settings
 from app.core.messages import PluginServiceMessages
+from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
 from app.core.security import plugin_platform_signing_enabled
 from app.db.errors import dbapi_constraint
 from app.models.platform.plugin_install import EXCLUSIVE_ROUTE_INDEX, PluginInstall
@@ -73,16 +76,16 @@ from app.models.platform.publisher import (
     publisher_prefix,
 )
 from app.services import audit as audit_service
+from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace.plugin_keys import (
     PRIVATE_JWK_MEMBERS,
-    is_plugin_key,
     KeySetUnreadableError,
+    is_plugin_key,
     jwk_thumbprint,
     jwks_uri_allowed,
     key_set_url,
     read_key_set,
 )
-from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace.publishers import ensure_publisher
 from app.services.marketplace.registration_lookup import (
     invalidate_registrations,
@@ -90,7 +93,6 @@ from app.services.marketplace.registration_lookup import (
     live_registration_clause,
     service_public_id,
 )
-from app.core.clock import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -132,20 +134,20 @@ __all__ = [
     "delete_registration",
     "filled_compose",
     "get_registration",
-    "row_browser_base",
     "list_registrations",
     "normalize_base_url",
     "normalize_jwks",
     "normalize_jwks_uri",
-    "normalize_page_origin",
     "normalize_origin",
     "normalize_origins",
+    "normalize_page_origin",
     "normalize_public_id",
     "origin_of",
     "published_keys",
     "read_listing_registration",
     "reconcile_from_config",
     "registration_views",
+    "row_browser_base",
     "update_registration",
 ]
 
@@ -164,7 +166,7 @@ def _bad_request(code: str, detail: str) -> HTTPException:
     return HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=code)
 
 
-def row_browser_base(row: PluginServiceRegistration) -> Optional[str]:
+def row_browser_base(row: PluginServiceRegistration) -> str | None:
     """Where a browser loads the plug-in's surfaces, or ``None`` for a plug-in that
     has no location yet."""
     return row.page_origin or row.base_url
@@ -285,9 +287,7 @@ def normalize_origin(value: str) -> str:
     return origin_of(cleaned)
 
 
-def normalize_origins(
-    values: Optional[Iterable[str]], *, browser_base: str
-) -> list[str]:
+def normalize_origins(values: Iterable[str] | None, *, browser_base: str) -> list[str]:
     """Canonicalize the origin list, defaulting to the browser base's own origin.
 
     Derived from the browser base rather than the wire surface because these are
@@ -309,7 +309,7 @@ def normalize_origins(
     return normalized
 
 
-def normalize_jwks(value: Optional[dict]) -> Optional[dict]:
+def normalize_jwks(value: dict | None) -> dict | None:
     """Check a plug-in's key set holds public verification keys, each carrying
     the ``kid`` a JWT names.
 
@@ -387,7 +387,7 @@ def normalize_jwks(value: Optional[dict]) -> Optional[dict]:
     return value
 
 
-def normalize_jwks_uri(value: Optional[str], *, base_url: str) -> Optional[str]:
+def normalize_jwks_uri(value: str | None, *, base_url: str) -> str | None:
     """Where the plug-in publishes its key set: https, on ``base_url``'s own
     origin, with no query, fragment or credentials. Empty clears it."""
     cleaned = (value or "").strip()
@@ -435,7 +435,7 @@ class RegistrationView:
 
 
 async def registration_views(
-    session: AsyncSession, registration_id: Optional[int] = None
+    session: AsyncSession, registration_id: int | None = None
 ) -> list[RegistrationView]:
     """Every registration, or the one ``registration_id`` names, each with its
     publisher and whether it is live, in one statement."""
@@ -467,7 +467,7 @@ async def get_registration(
 
 async def _by_public_id(
     session: AsyncSession, public_id: str
-) -> Optional[PluginServiceRegistration]:
+) -> PluginServiceRegistration | None:
     result = await session.exec(
         select(PluginServiceRegistration).where(
             PluginServiceRegistration.public_id == public_id
@@ -484,14 +484,14 @@ async def create_registration(
     *,
     public_id: str,
     base_url: str,
-    page_origin: Optional[str] = None,
-    allowed_origins: Optional[Iterable[str]] = None,
-    jwks: Optional[dict] = None,
-    jwks_uri: Optional[str] = None,
+    page_origin: str | None = None,
+    allowed_origins: Iterable[str] | None = None,
+    jwks: dict | None = None,
+    jwks_uri: str | None = None,
     mandatory: bool = False,
     operations_only: bool = False,
     enabled: bool = True,
-    vendor_values: Optional[dict[str, Optional[str]]] = None,
+    vendor_values: dict[str, str | None] | None = None,
     actor_user_id: int | None = None,
 ) -> PluginServiceRegistration:
     """Set up a plug-in service's deployment facts before its listing arrives.
@@ -553,7 +553,7 @@ async def create_registration(
 async def _apply_vendor(
     session: AsyncSession,
     row: PluginServiceRegistration,
-    submitted: Optional[dict[str, Optional[str]]],
+    submitted: dict[str, str | None] | None,
 ) -> list[str]:
     """Set the vendor values the form sent, against the fields the listing's
     manifest declares. Returns the keys that changed, never their values."""
@@ -571,16 +571,16 @@ async def update_registration(
     session: AsyncSession,
     registration_id: int,
     *,
-    base_url: Optional[str] = None,
-    page_origin: Optional[str] = None,
-    allowed_origins: Optional[Iterable[str]] = None,
-    jwks: Optional[dict] = None,
-    jwks_uri: Optional[str] = None,
-    mandatory: Optional[bool] = None,
-    operations_only: Optional[bool] = None,
-    shared_routes: Optional[bool] = None,
-    enabled: Optional[bool] = None,
-    vendor_values: Optional[dict[str, Optional[str]]] = None,
+    base_url: str | None = None,
+    page_origin: str | None = None,
+    allowed_origins: Iterable[str] | None = None,
+    jwks: dict | None = None,
+    jwks_uri: str | None = None,
+    mandatory: bool | None = None,
+    operations_only: bool | None = None,
+    shared_routes: bool | None = None,
+    enabled: bool | None = None,
+    vendor_values: dict[str, str | None] | None = None,
     actor_user_id: int | None = None,
 ) -> PluginServiceRegistration:
     """Edit a registration's deployment facts.
@@ -681,11 +681,11 @@ async def _write_exclusive(
 def _write_placement(
     row: PluginServiceRegistration,
     *,
-    base_url: Optional[str],
-    page_origin: Optional[str],
-    allowed_origins: Optional[Iterable[str]],
-    jwks: Optional[dict],
-    jwks_uri: Optional[str],
+    base_url: str | None,
+    page_origin: str | None,
+    allowed_origins: Iterable[str] | None,
+    jwks: dict | None,
+    jwks_uri: str | None,
 ) -> None:
     """Write where a plug-in runs, the origins that may frame it, and its keys.
 
@@ -763,7 +763,7 @@ class PublishedKey:
 
 
 async def _served_key_set(
-    base_url: Optional[str], transport: Optional[httpx.AsyncBaseTransport]
+    base_url: str | None, transport: httpx2.AsyncBaseTransport | None
 ) -> tuple[dict, list[PublishedKey]]:
     """The key set the plug-in serves under ``base_url``, held to what a pasted
     set must be, with each key's fingerprint."""
@@ -804,7 +804,7 @@ async def published_keys(
     session: AsyncSession,
     registration_id: int,
     *,
-    transport: Optional[httpx.AsyncBaseTransport] = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> list[PublishedKey]:
     """The keys the plug-in serves, for the operator to compare with the
     fingerprints its container logged. Writes nothing."""
@@ -819,7 +819,7 @@ async def connect_registration(
     *,
     keys: Sequence[PublishedKey],
     actor_user_id: int | None = None,
-    transport: Optional[httpx.AsyncBaseTransport] = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> PluginServiceRegistration:
     """Pin the key set the plug-in serves as the registration's ``jwks``, and
     clear its ``jwks_uri`` so the pinned set is the only one it is verified
@@ -897,10 +897,10 @@ class ListingRegistration:
     source: str
     #: ``container`` or ``declarative`` (``RegistrationKind``).
     kind: str
-    image: Optional[str]
+    image: str | None
     scope_ceiling: list[str]
     #: The Compose service its publisher wrote, placeholders unfilled.
-    compose: Optional[dict[str, str]] = None
+    compose: dict[str, str] | None = None
 
 
 def _image_reference(value: Any) -> str:
@@ -925,7 +925,7 @@ def _image_reference(value: Any) -> str:
     return value
 
 
-def _compose(value: Any, *, image: Optional[str]) -> dict[str, str]:
+def _compose(value: Any, *, image: str | None) -> dict[str, str]:
     """A listing's Compose service: ``service``, YAML text whose only
     placeholders are ``${IMAGE}`` (only beside an image) and
     ``${INITIATIVE_URL}``, and ``base_url``, an http(s) address with a host, an
@@ -960,7 +960,7 @@ def _compose(value: Any, *, image: Optional[str]) -> dict[str, str]:
         )
     try:
         parsed = urlparse(base_url)
-        parsed.port
+        _ = parsed.port  # a port that is not a number raises
     except ValueError as exc:
         raise ListingRegistrationError("compose.base_url is not a usable URL") from exc
     if (
@@ -974,7 +974,7 @@ def _compose(value: Any, *, image: Optional[str]) -> dict[str, str]:
     return {"service": service, "base_url": base_url}
 
 
-def filled_compose(row: PluginServiceRegistration) -> Optional[str]:
+def filled_compose(row: PluginServiceRegistration) -> str | None:
     """The registration's Compose service as the operator copies it: its
     image pinned by digest and Initiative's public address filled in."""
     service = (row.compose or {}).get("service")
@@ -1182,13 +1182,13 @@ class DeploymentFacts:
     ones it leaves out.
     """
 
-    base_url: Optional[str] = None
-    page_origin: Optional[str] = None
-    jwks: Optional[dict] = None
-    jwks_uri: Optional[str] = None
-    allowed_origins: Optional[list[str]] = None
-    mandatory: Optional[bool] = None
-    operations_only: Optional[bool] = None
+    base_url: str | None = None
+    page_origin: str | None = None
+    jwks: dict | None = None
+    jwks_uri: str | None = None
+    allowed_origins: list[str] | None = None
+    mandatory: bool | None = None
+    operations_only: bool | None = None
     vendor_env: Any = None
 
     @property
@@ -1244,7 +1244,7 @@ def _deployment_facts(entry: dict[str, Any]) -> DeploymentFacts:
     )
 
 
-def configured_facts(public_id: str) -> Optional[DeploymentFacts]:
+def configured_facts(public_id: str) -> DeploymentFacts | None:
     """The facts ``PLUGIN_SERVICES_CONFIG`` gives for ``public_id``, or ``None``.
 
     Read when a listing apply creates the registration, so an entry written
@@ -1256,7 +1256,7 @@ def configured_facts(public_id: str) -> Optional[DeploymentFacts]:
         return None
     try:
         entries = _load_entries(Path(configured))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     for entry in entries:
         if str(entry.get("public_id", "")).strip().lower() != public_id:
@@ -1324,10 +1324,6 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
     ``enabled`` is not reconciled: turning a registration off is an operator
     action, and a restart must not reverse it.
 
-    An entry naming ``grants`` is read without it, and the pass logs that it
-    was: the field is no longer part of a registration, and a file written for
-    an earlier release still boots.
-
     A malformed file or an unreadable path costs that file, and a refused entry
     costs that entry, and nothing else — the caller keeps booting.
     """
@@ -1359,12 +1355,6 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
             )
             skipped += 1
             continue
-        if "grants" in entry:
-            logger.warning(
-                "plug-in services: entry %r names grants, which a registration no "
-                "longer has; the field is ignored",
-                public_id,
-            )
         if public_id in seen:
             logger.warning(
                 "plug-in services: %r appears more than once in %s — later entry skipped",

@@ -10,13 +10,19 @@ names. Two things exist there alone:
   community runs (``app.services.guild_sweeps.Scope.OPERATIONS``). Their
   presence is how a session tells it is in the operations community
   (:func:`holds_operations`).
-* **The filer role**, ``guild_<ops>_filer``, below.
+* **Its reader roles**: the filer role, ``guild_<ops>_filer``, and the ideas
+  role, ``guild_<ops>_ideas``, below.
 
 Choosing the operations community creates both. Moving the choice to another
 community drops both from the one it leaves, with the files its cases held.
-Clearing it drops the filer role and keeps the tables, so choosing the same
+Clearing it drops the reader roles and keeps the tables, so choosing the same
 community again finds its streams where they were. Boot re-asserts them and
 removes what a move left behind.
+
+Everybody signed in, and anybody signed out, reads the published ideas through
+the ideas role, the same way: column grants and one pair of policies per table,
+over the tasks the Ideas board published and the votes for them, and nothing
+else in the community.
 
 What the person who filed a case may read of it is held by the database. A
 filer is not a member of the operations community. They reach the cases they
@@ -44,9 +50,9 @@ case is theirs.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
-from typing import Optional
+from dataclasses import dataclass, field
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -54,8 +60,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.db import gucs
-from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
+from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db.tenancy import OPERATIONS_TABLES
 
 logger = logging.getLogger(__name__)
@@ -63,9 +69,6 @@ logger = logging.getLogger(__name__)
 #: The operations table whose presence :func:`holds_operations` reads.
 OPERATIONS_MARKER = "intake_cases"
 
-#: The filer role's suffix. Not a ``GuildRoleKind``: those exist in every
-#: community, and this one exists only in the operations community.
-FILER_ROLE_SUFFIX = "_filer"
 
 #: What a filer reads, by table and column. The case and what they called it;
 #: its task's status, never its title or description; the statuses' kinds;
@@ -89,6 +92,7 @@ FILER_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
         "task_id",
         "content",
         "created_by",
+        "created_by_kind",
         "created_at",
         "updated_at",
         "audience",
@@ -106,6 +110,7 @@ FILER_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
         "content_type",
         "size_bytes",
         "created_by",
+        "created_by_kind",
         "created_at",
     ),
 }
@@ -146,29 +151,191 @@ FILER_ROWS: dict[str, str] = {
         " WHERE c.stream = intake_bindings.stream)"
     ),
     "comments": f"audience = 'filer' AND task_id = ANY ({_CASES})",
-    "evidence": f"created_by = {_UID} AND case_task_id = ANY ({_CASES})",
+    "evidence": (
+        f"created_by_kind = 'member' AND created_by = {_UID}"
+        f" AND case_task_id = ANY ({_CASES})"
+    ),
 }
 
-#: The policies that hold a filer to those rows, on each table: one
-#: PERMISSIVE that admits them, and one RESTRICTIVE that admits nothing else.
-#: The second is what keeps a child table's read shortcut — "whoever reads the
-#: parent reads its rows" — from handing a filer the staff's comments on a
-#: task they may read.
-FILER_POLICY = "filer_read"
-FILER_ONLY_POLICY = "filer_only"
+#: What anybody reads of the published ideas: each one's title, description
+#: and status, and the values of the two fields the board's binding names,
+#: never its assignees, other fields or tags; the Ideas board's statuses; the
+#: category field's options, for their labels; and the votes, as counts.
+IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
+    "tasks": (
+        "id",
+        "project_id",
+        "task_type_id",
+        "title",
+        "description",
+        "task_status_id",
+        "created_at",
+        "updated_at",
+        "archived_at",
+        "deleted_at",
+    ),
+    "task_statuses": (
+        "id",
+        "project_id",
+        "name",
+        "color",
+        "icon",
+        "category",
+        "position",
+    ),
+    "intake_bindings": (
+        "id",
+        "stream",
+        "project_id",
+        "task_type_id",
+        "category_field_id",
+        "release_field_id",
+        "shipped_status_id",
+    ),
+    "idea_votes": ("task_id", "user_id"),
+    "metadata_definitions": ("id", "options"),
+    "metadata_values": ("entity_type", "entity_id", "property_id", "value_text"),
+}
+
+#: Columns the community's own policies on the metadata tables read while
+#: deciding the ideas role's statement: whether the thing a value is on can be
+#: read, for every kind of thing, and the value's definition. Granted, as
+#: :data:`POLICY_READS` are, so those policies can be evaluated; the role's
+#: own policies on each admit no row of it.
+IDEAS_POLICY_READS: dict[str, tuple[str, ...]] = {
+    "metadata_definitions": ("install_id", "shown_on"),
+    "initiative_members": ("initiative_id", "user_id"),
+    "collection_files": ("collection_id", "file_id"),
+    **{
+        table: ("id",)
+        for table in (
+            "calendar_events",
+            "collections",
+            "contacts",
+            "counters",
+            "dashboards",
+            "files",
+            "posts",
+            "wiki_pages",
+        )
+    },
+    **{
+        table: ("id", "initiative_id")
+        for table in ("calendars", "counter_groups", "wikis")
+    },
+}
+
+
+IDEAS_ROWS: dict[str, str] = {
+    # A published idea: a task on the board bound to ``ideas``, of the type
+    # that binding names, and neither archived nor trashed. Every holdable
+    # table's ``held_restrict`` already keeps a held one out.
+    "tasks": (
+        'EXISTS (SELECT 1 FROM "{s}".intake_bindings b'
+        " WHERE b.stream = 'ideas' AND b.project_id = tasks.project_id"
+        " AND b.task_type_id = tasks.task_type_id)"
+        " AND archived_at IS NULL AND deleted_at IS NULL"
+    ),
+    "task_statuses": (
+        'project_id IN (SELECT b.project_id FROM "{s}".intake_bindings b'
+        " WHERE b.stream = 'ideas')"
+    ),
+    "intake_bindings": "stream = 'ideas'",
+    "idea_votes": (
+        'EXISTS (SELECT 1 FROM "{s}".tasks t WHERE t.id = idea_votes.task_id)'
+    ),
+    # The category field, whose options name each idea's category.
+    "metadata_definitions": (
+        'id IN (SELECT b.category_field_id FROM "{s}".intake_bindings b'
+        " WHERE b.stream = 'ideas')"
+    ),
+    # A published idea's category, and the release it shipped in once it is
+    # in the shipped status.
+    "metadata_values": (
+        "entity_type = 'task' AND EXISTS (SELECT 1"
+        ' FROM "{s}".tasks t, "{s}".intake_bindings b'
+        " WHERE t.id = metadata_values.entity_id AND b.stream = 'ideas'"
+        " AND (metadata_values.property_id = b.category_field_id"
+        " OR (metadata_values.property_id = b.release_field_id"
+        " AND t.task_status_id = b.shipped_status_id)))"
+    ),
+    # Read only for the community's own policies to be evaluated.
+    **{
+        table: "false"
+        for table in IDEAS_POLICY_READS
+        if table not in IDEAS_TABLE_ACCESS
+    },
+}
+
+
+@dataclass(frozen=True)
+class OperationsRole:
+    """A role that reads part of the operations community for people who are
+    not its members. Not a ``GuildRoleKind``: those exist in every community,
+    and these exist only in the operations community."""
+
+    #: Its suffix on the community's role, e.g. ``_filer``.
+    suffix: str
+    #: What it reads, by table and column.
+    tables: Mapping[str, tuple[str, ...]]
+    #: The row each of those tables admits it to, as SQL over the table, with
+    #: ``{s}`` for the community's schema: a policy binds the tables it names
+    #: when it is created, not when it is read.
+    rows: Mapping[str, str]
+    #: Its policies on each of those tables: one PERMISSIVE that admits it,
+    #: and one RESTRICTIVE that admits nothing else. The second is what keeps
+    #: a child table's read shortcut ("whoever reads the parent reads its
+    #: rows") from handing it rows its own policy would not.
+    permissive: str
+    restrictive: str
+    #: Columns read only so the community's own policies on those tables can
+    #: be evaluated for it, beside :data:`POLICY_READS`.
+    policy_reads: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def name(self, guild_id: int) -> str:
+        """The role for ``guild_id``, e.g. ``guild_7_filer``."""
+        return f"{settings.GUILD_ROLE_PREFIX}guild_{int(guild_id)}{self.suffix}"
+
+
+FILER = OperationsRole(
+    "_filer", FILER_TABLE_ACCESS, FILER_ROWS, "filer_read", "filer_only"
+)
+IDEAS = OperationsRole(
+    "_ideas",
+    IDEAS_TABLE_ACCESS,
+    IDEAS_ROWS,
+    "ideas_read",
+    "ideas_only",
+    IDEAS_POLICY_READS,
+)
+
+#: Every reader role the operations community has.
+OPERATIONS_ROLES: tuple[OperationsRole, ...] = (FILER, IDEAS)
 
 
 def filer_role_name(guild_id: int) -> str:
     """The filer role for ``guild_id``, e.g. ``guild_7_filer``."""
-    return f"{settings.GUILD_ROLE_PREFIX}guild_{int(guild_id)}{FILER_ROLE_SUFFIX}"
+    return FILER.name(guild_id)
+
+
+def ideas_role_name(guild_id: int) -> str:
+    """The ideas role for ``guild_id``, e.g. ``guild_7_ideas``."""
+    return IDEAS.name(guild_id)
 
 
 def filer_role_pattern() -> str:
     """A Postgres regex matching every community's filer role."""
-    return f"^{settings.GUILD_ROLE_PREFIX}guild_[0-9]+{FILER_ROLE_SUFFIX}$"
+    return f"^{settings.GUILD_ROLE_PREFIX}guild_[0-9]+{FILER.suffix}$"
 
 
-def _grant_statements(schema: str, role: str) -> list[str]:
+def _roles_pattern() -> str:
+    """A Postgres regex matching every community's reader roles, the
+    community's id its one group."""
+    suffixes = "|".join(role.suffix for role in OPERATIONS_ROLES)
+    return f"^{settings.GUILD_ROLE_PREFIX}guild_([0-9]+)({suffixes})$"
+
+
+def _grant_statements(schema: str, spec: OperationsRole, role: str) -> list[str]:
     from app.db.schema_provisioning import APP_LOGIN_ROLE
 
     stmts = [
@@ -179,7 +346,7 @@ def _grant_statements(schema: str, role: str) -> list[str]:
         f'GRANT USAGE ON SCHEMA public TO "{role}"',
     ]
     readable: dict[str, tuple[str, ...]] = {}
-    for source in (FILER_TABLE_ACCESS, POLICY_READS):
+    for source in (spec.tables, POLICY_READS, spec.policy_reads):
         for table, columns in source.items():
             seen = readable.get(table, ())
             readable[table] = seen + tuple(c for c in columns if c not in seen)
@@ -190,15 +357,15 @@ def _grant_statements(schema: str, role: str) -> list[str]:
     return stmts
 
 
-def _policy_statements(schema: str, role: str) -> list[str]:
+def _policy_statements(schema: str, spec: OperationsRole, role: str) -> list[str]:
     # The setting functions a policy reads resolve in the community's schema,
     # bound when the policy is created.
     stmts: list[str] = [f'SET search_path TO "{schema}", public']
-    for table, template in sorted(FILER_ROWS.items()):
+    for table, template in sorted(spec.rows.items()):
         rows = template.replace("{s}", schema)
         for name, kind in (
-            (FILER_POLICY, "PERMISSIVE"),
-            (FILER_ONLY_POLICY, "RESTRICTIVE"),
+            (spec.permissive, "PERMISSIVE"),
+            (spec.restrictive, "RESTRICTIVE"),
         ):
             stmts.append(f'DROP POLICY IF EXISTS {name} ON "{schema}"."{table}"')
             stmts.append(
@@ -221,17 +388,28 @@ async def _provision(conn: AsyncConnection, guild_id: int) -> None:
     from app.db.schema_provisioning import _exec_batch, guild_schema_name
 
     schema = guild_schema_name(guild_id)
-    role = filer_role_name(guild_id)
     await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
     statements = []
-    if not await _role_exists(conn, role):
-        statements.append(f'CREATE ROLE "{role}" NOLOGIN')
-    statements += _grant_statements(schema, role)
-    statements += _policy_statements(schema, role)
+    for spec in OPERATIONS_ROLES:
+        role = spec.name(guild_id)
+        if not await _role_exists(conn, role):
+            statements.append(f'CREATE ROLE "{role}" NOLOGIN')
+        statements += _grant_statements(schema, spec, role)
+        statements += _policy_statements(schema, spec, role)
     await _exec_batch(conn, statements)
 
 
-async def _deprovision(conn: AsyncConnection, role: str, schema: Optional[str]) -> None:
+async def _deprovision(
+    conn: AsyncConnection, guild_id: int, schema: str | None
+) -> None:
+    """Drop every reader role ``guild_id`` has, their policies first."""
+    for spec in OPERATIONS_ROLES:
+        await _deprovision_role(conn, spec, spec.name(guild_id), schema)
+
+
+async def _deprovision_role(
+    conn: AsyncConnection, spec: OperationsRole, role: str, schema: str | None
+) -> None:
     from app.db.schema_provisioning import _exec_batch
 
     if not await _role_exists(conn, role):
@@ -243,8 +421,8 @@ async def _deprovision(conn: AsyncConnection, role: str, schema: Optional[str]) 
     ):
         statements += [
             f'DROP POLICY IF EXISTS {name} ON "{schema}"."{table}"'
-            for table in sorted(FILER_ROWS)
-            for name in (FILER_POLICY, FILER_ONLY_POLICY)
+            for table in sorted(spec.rows)
+            for name in (spec.permissive, spec.restrictive)
         ]
     statements += [
         # DROP OWNED needs the role's privileges, not only ADMIN OPTION on it.
@@ -285,7 +463,7 @@ async def operations_schemas(conn: AsyncConnection) -> set[str]:
 async def provision_operations(guild_id: int) -> None:
     """Make ``guild_id``'s schema the operations community's: its tables, with
     everything provisioning applies to them, where they are not there yet, and
-    the filer role re-asserted. Idempotent."""
+    the reader roles re-asserted. Idempotent."""
     from app.db.schema_provisioning import PARTS, _apply_parts, guild_schema_name
 
     schema = guild_schema_name(guild_id)
@@ -298,7 +476,7 @@ async def provision_operations(guild_id: int) -> None:
 
 async def deprovision_operations(guild_id: int) -> None:
     """Take from ``guild_id``'s schema what only the operations community has:
-    the files its cases held, the filer role, the operations community's own
+    the files its cases held, the reader roles, the operations community's own
     sweep triggers, and the operations tables. Safe where there are none.
 
     One transaction: the tables are locked first, so whoever is writing a
@@ -322,8 +500,9 @@ async def deprovision_operations(guild_id: int) -> None:
                 f"LOCK TABLE {', '.join(tables)} IN ACCESS EXCLUSIVE MODE"
             )
             gone = await _drop_case_files(conn, schema)
-        # The filer's policies first: some are on the tables that go next.
-        await _deprovision(conn, filer_role_name(guild_id), schema)
+        # The reader roles' policies first: some are on the tables that go
+        # next.
+        await _deprovision(conn, guild_id, schema)
         if holds:
             statements = [
                 f'SET LOCAL search_path TO "{schema}", public',
@@ -399,7 +578,7 @@ async def _drop_case_files(conn: AsyncConnection, schema: str) -> list[str]:
 
 
 @asynccontextmanager
-async def choice_turn() -> AsyncIterator[None]:
+async def choice_turn() -> AsyncGenerator[None]:
     """The deployment's one turn at the choice of operations community: who
     changes it, and who makes the tables follow it, holds this throughout, so
     neither acts on a choice another has since replaced."""
@@ -413,7 +592,7 @@ async def choice_turn() -> AsyncIterator[None]:
 
 
 async def reconcile_operations() -> None:
-    """Make the operations tables and the filer role follow the choice as it
+    """Make the operations tables and the reader roles follow the choice as it
     stands: boot's half, after the guild back-fill, which finishes a move the
     process did not."""
     from app.services.platform.intake import configured_operations_guild_id
@@ -422,11 +601,11 @@ async def reconcile_operations() -> None:
         await follow_choice(await configured_operations_guild_id())
 
 
-async def follow_choice(operations_guild_id: Optional[int]) -> None:
-    """Make the operations tables and the filer role exist where
+async def follow_choice(operations_guild_id: int | None) -> None:
+    """Make the operations tables and the reader roles exist where
     ``operations_guild_id`` is, holding :func:`choice_turn`: re-assert them
     there, and take them from every other community. With no operations
-    community, only the filer role goes: the tables stay for the community
+    community, only the reader roles go: the tables stay for the community
     that had them, until another is chosen.
     """
     from app.db.schema_provisioning import guild_schema_name
@@ -434,16 +613,18 @@ async def follow_choice(operations_guild_id: Optional[int]) -> None:
     keep = guild_schema_name(operations_guild_id) if operations_guild_id else None
     async with db_session.provisioning_engine.begin() as conn:
         holders = await operations_schemas(conn)
-        roles = (
+        role_guilds = (
             await conn.execute(
-                text("SELECT rolname FROM pg_roles WHERE rolname ~ :p"),
-                {"p": filer_role_pattern()},
+                text(
+                    "SELECT (regexp_match(rolname, :p))[1]::int FROM pg_roles"
+                    " WHERE rolname ~ :p"
+                ),
+                {"p": _roles_pattern()},
             )
         ).scalars()
-        prefix = len(settings.GUILD_ROLE_PREFIX) + len("guild_")
-        left = {int(schema.removeprefix("guild_")) for schema in holders} | {
-            int(role[prefix : -len(FILER_ROLE_SUFFIX)]) for role in roles
-        }
+        left = {int(schema.removeprefix("guild_")) for schema in holders} | set(
+            role_guilds
+        )
         exists = operations_guild_id is not None and bool(
             await conn.scalar(
                 text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": keep}
@@ -452,9 +633,7 @@ async def follow_choice(operations_guild_id: Optional[int]) -> None:
     for guild_id in sorted(left - {operations_guild_id}):
         if operations_guild_id is None:
             async with db_session.provisioning_engine.begin() as conn:
-                await _deprovision(
-                    conn, filer_role_name(guild_id), guild_schema_name(guild_id)
-                )
+                await _deprovision(conn, guild_id, guild_schema_name(guild_id))
             continue
         logger.info(
             "operations: leaving community %s, no longer the operations one",

@@ -16,7 +16,6 @@ import re
 
 import pytest
 
-
 from app.db.guild_ddl import render_guild_rls_ddl
 from app.db.initiative_rls import INITIATIVE_PATHS, parent_answers_for_reads
 
@@ -25,7 +24,7 @@ pytestmark = pytest.mark.always
 
 _SELECT_POLICY = re.compile(
     r"^CREATE POLICY (\w+) ON (\w+) AS (PERMISSIVE|RESTRICTIVE) FOR SELECT$",
-    re.M,
+    re.MULTILINE,
 )
 
 

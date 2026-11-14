@@ -12,11 +12,13 @@ model behind them; columns resolve to the field's own column. The statement
 handed back is written out from the parsed tree rather than forwarded, so it
 carries only names the registry produced.
 
-**Read spreadsheets as relations.** ``sheet(file, range)`` in ``FROM`` names a
-range of a spreadsheet the way a dataset is named. Its columns are what the
-range read, so a statement that names one resolves fully only once the cells
-are read (:mod:`app.services.query.sheets`); the cells are then bound into the
-statement as one parameter, and nothing of the sheet reaches the SQL text.
+**Read spreadsheets and plug-ins as relations.** ``sheet(file, range)`` in
+``FROM`` names a range of a spreadsheet the way a dataset is named, and
+``plugin(public id, endpoint, name => value, …)`` one of an installed plug-in's
+read endpoints. Their columns are what was read, so a statement that names one
+resolves fully only once its rows are read (:mod:`app.services.query.sheets`,
+:mod:`app.services.query.plugins`); the rows are then bound into the statement
+as one parameter, and nothing of them reaches the SQL text.
 
 **Refuse what is structurally expensive.** A join whose condition pairs nothing
 pairs every row with every row; a statement may name only so many relations.
@@ -36,19 +38,24 @@ server reads it is what lets the rules below be written against what will run.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Sequence
+from datetime import datetime
+from itertools import islice
+from typing import Any
 
 from fastapi import status
 from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind, SetOperation
-from pglast.parser import ParseError
+from pglast.parser import ParseError, scan
 from pglast.stream import RawStream
 from pglast.visitors import Visitor
 from sqlalchemy import column as sql_column
+from sqlalchemy.dialects import postgresql
 
 from app.core.errors import CodedError
 from app.core.messages import QueryMessages
+from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.db import gucs
 from app.services.fields import dataset
@@ -90,10 +97,11 @@ class QueryError(CodedError):
         return f"{self.code}: {self.subject}" if self.subject else self.code
 
 
-#: The function a statement reads a spreadsheet with, and the name the range is
-#: read under when the call gives itself no alias, as Postgres names a function
-#: in ``FROM`` after itself.
+#: The functions a statement reads a spreadsheet and a plug-in with, and the
+#: name each is read under when the call gives itself no alias, as Postgres
+#: names a function in ``FROM`` after itself.
 SHEET = "sheet"
+PLUGIN = "plugin"
 
 #: What each type a range's column may hold is in the statement: the control
 #: that filters it, and the Postgres type its cells are read as.
@@ -106,21 +114,48 @@ _SHEET_TYPES: dict[str, tuple[ControlKind, str]] = {
 }
 
 
+#: The same for each type a plug-in endpoint's return may declare.
+_PLUGIN_TYPES: dict[str, tuple[ControlKind, str]] = {
+    "bool": _SHEET_TYPES["boolean"],
+    "datetime": (ControlKind.date, "timestamptz"),
+    "int": _SHEET_TYPES["number"],
+    "string": _SHEET_TYPES["text"],
+    "url": _SHEET_TYPES["text"],
+}
+
+
 @dataclass(frozen=True)
 class SheetCall:
     """``sheet(file, range)`` as a statement wrote it: the spreadsheet by id or
     by name, and the range, or none for the first visible sheet."""
 
     file: int | str
-    range: Optional[str] = None
+    range: str | None = None
+
+
+@dataclass(frozen=True)
+class PluginCall:
+    """``plugin(public id, endpoint, name => value, …)`` as a statement wrote
+    it: the plug-in by its public id, its read endpoint by the name after the
+    plug-in's prefix, and the parameters, by name. A list parameter's values
+    are a tuple."""
+
+    plugin: str
+    endpoint: str
+    params: tuple[tuple[str, Any], ...] = ()
+
+    @property
+    def endpoint_id(self) -> str:
+        """The endpoint's id, as the plug-in's manifest declares it."""
+        return f"plugin.{self.plugin}.{self.endpoint}"
 
 
 class _SheetNames(dict):
-    """A range's columns by name, matched ignoring case.
+    """A recordset's columns by name, matched ignoring case.
 
-    A name two columns share is refused when a statement names it. A range
-    whose cells are not read yet holds every name, as text, so a statement can
-    be checked before its file is opened.
+    A name two columns share is refused when a statement names it. A
+    recordset not read yet holds every name, as text, so a statement can be
+    checked before its rows are read.
     """
 
     def __init__(self, fields: Sequence[FieldSpec], read: bool) -> None:
@@ -147,44 +182,61 @@ class _SheetNames(dict):
 
 
 @dataclass(frozen=True)
-class Sheet(Dataset):
-    """A range of a spreadsheet, as a dataset a statement names.
+class Recordset(Dataset):
+    """Rows a statement reads that are not a table's, as a dataset it names.
 
-    Its fields are the range's columns, named by its header row or by their
-    letters. Each is read as ``c1``, ``c2``, … of the recordset the cells are
-    bound into, so a header never reaches the SQL. Governed by the files tool,
-    whose rows it is read from.
+    Each column is read as ``c1``, ``c2``, … of the recordset the rows are
+    bound into, so a name a column was given never reaches the SQL.
     """
 
-    call: Optional[SheetCall] = None
-    #: The Postgres type each column's cells are read as, in order.
+    call: Any = None
+    #: The Postgres type each column's values are read as, in order.
     types: tuple[str, ...] = ()
     rows: tuple[tuple[Any, ...], ...] = ()
-    #: The workbook's visible sheets, for somebody picking one.
-    sheet_names: tuple[str, ...] = ()
-    #: Whether the cells were read. A statement is checked before they are,
-    #: and runs only after.
+    #: Whether the rows were read. A statement is checked before they are, and
+    #: runs only after.
     read: bool = True
 
+    @property
+    def by_name(self) -> dict[str, FieldSpec]:
+        return _SheetNames(self.fields, self.read)
+
+    @property
+    def offered(self) -> tuple[FieldSpec, ...]:
+        """Every column, in order."""
+        return self.fields
+
+
+def _columns(
+    names: Sequence[str], kinds: Sequence[ControlKind]
+) -> tuple[FieldSpec, ...]:
+    return tuple(
+        column(str(name), sql_column(f"c{index}"), kind=kind, sortable=True)
+        for index, (name, kind) in enumerate(zip(names, kinds), start=1)
+    )
+
+
+@dataclass(frozen=True)
+class Sheet(Recordset):
+    """A range of a spreadsheet: its columns named by its header row or by
+    their letters. Governed by the files tool, whose rows it is read from."""
+
+    #: The workbook's visible sheets, for somebody picking one.
+    sheet_names: tuple[str, ...] = ()
+
     @classmethod
-    def unread(cls, call: SheetCall) -> "Sheet":
+    def unread(cls, call: SheetCall) -> Sheet:
         return cls(model=None, fields=(), tool=Tool.file, call=call, read=False)
 
     @classmethod
-    def from_range(cls, call: SheetCall, answer: Mapping[str, Any]) -> "Sheet":
+    def from_range(cls, call: SheetCall, answer: Mapping[str, Any]) -> Sheet:
         """The sheet a range read (``lib/spreadsheet/range.ts``)."""
         columns = answer.get("columns") or ()
         kinds = [_SHEET_TYPES[entry["type"]] for entry in columns]
         return cls(
             model=None,
-            fields=tuple(
-                column(
-                    str(entry["name"]),
-                    sql_column(f"c{index}"),
-                    kind=kind,
-                    sortable=True,
-                )
-                for index, (entry, (kind, _)) in enumerate(zip(columns, kinds), start=1)
+            fields=_columns(
+                [entry["name"] for entry in columns], [kind for kind, _ in kinds]
             ),
             tool=Tool.file,
             call=call,
@@ -193,14 +245,63 @@ class Sheet(Dataset):
             sheet_names=tuple(answer.get("sheets") or ()),
         )
 
-    @property
-    def by_name(self) -> dict[str, FieldSpec]:
-        return _SheetNames(self.fields, self.read)
 
-    @property
-    def offered(self) -> tuple[FieldSpec, ...]:
-        """Every column, in the range's order."""
-        return self.fields
+def _plugin_value(value: Any, postgres: str) -> Any:
+    """One value a plug-in answered with, as its column reads it: ``None``
+    where it is not of the column's type."""
+    if value is None:
+        return None
+    if postgres == "boolean":
+        return value if isinstance(value, bool) else None
+    if postgres == "numeric":
+        return (
+            value
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+            else None
+        )
+    if postgres == "timestamptz":
+        try:
+            datetime.fromisoformat(value)
+        except TypeError, ValueError:
+            return None
+        return value
+    return value if isinstance(value, str) else json.dumps(value)
+
+
+@dataclass(frozen=True)
+class PluginRows(Recordset):
+    """The rows one of a plug-in's read endpoints answered with: a column for
+    each return it declares as a list, named by its key."""
+
+    @classmethod
+    def unread(cls, call: PluginCall) -> PluginRows:
+        return cls(
+            model=None, fields=(), name_override="plugins", call=call, read=False
+        )
+
+    @classmethod
+    def from_rows(
+        cls,
+        call: PluginCall,
+        columns: Sequence[tuple[str, str]],
+        rows: Sequence[Mapping[str, Any]],
+    ) -> PluginRows:
+        """The rows, under *columns*: each return's key and declared type."""
+        kinds = [_PLUGIN_TYPES.get(kind, _SHEET_TYPES["text"]) for _, kind in columns]
+        return cls(
+            model=None,
+            fields=_columns([key for key, _ in columns], [kind for kind, _ in kinds]),
+            name_override="plugins",
+            call=call,
+            types=tuple(postgres for _, postgres in kinds),
+            rows=tuple(
+                tuple(
+                    _plugin_value(row.get(key), postgres)
+                    for (key, _), (_, postgres) in zip(columns, kinds)
+                )
+                for row in rows
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -228,24 +329,34 @@ class ResolvedQuery:
     #: thing in the language that makes a statement answer differently per
     #: person.
     names_the_reader: bool = False
-    #: The spreadsheets the statement reads, by the name each is read under.
-    #: Until every one is :attr:`Sheet.read`, the statement is checked but
-    #: not runnable.
+    #: The spreadsheets and plug-ins the statement reads, by the name each is
+    #: read under. Until every one is :attr:`Recordset.read`, the statement is
+    #: checked but not runnable.
     sheets: tuple[tuple[str, Sheet], ...] = ()
-    #: The statement as written, kept while it has sheets to read: once they
-    #: are read it is resolved again with what they read.
+    plugins: tuple[tuple[str, PluginRows], ...] = ()
+    #: The statement as written, kept while it has rows to read: once they are
+    #: read it is resolved again with what they read.
     source: str = ""
 
     @property
-    def unread(self) -> tuple[SheetCall, ...]:
-        """The calls whose cells still have to be read before it runs."""
+    def unread(self) -> tuple[SheetCall | PluginCall, ...]:
+        """The calls whose rows still have to be read before it runs."""
         return tuple(
             dict.fromkeys(
-                sheet.call
-                for _, sheet in self.sheets
-                if not sheet.read and sheet.call is not None
+                recordset.call
+                for _, recordset in (*self.sheets, *self.plugins)
+                if not recordset.read
             )
         )
+
+    @property
+    def read(self) -> dict[Any, Recordset]:
+        """What the calls already read, by call."""
+        return {
+            recordset.call: recordset
+            for _, recordset in (*self.sheets, *self.plugins)
+            if recordset.read
+        }
 
     def explain(self) -> str:
         """This statement, asking for its plan instead of its rows.
@@ -405,7 +516,20 @@ def _physical_table(dataset_name: str) -> tuple[str | None, str]:
     return table.schema, table.name
 
 
-def _physical_column(source: Dataset, field_name: str) -> str:
+def _derived(source: Dataset, spec: Any) -> bool:
+    """Whether a field is read through an expression over its table's columns
+    rather than as one of them: the author, a person only where its kind is
+    ``member``."""
+    return (
+        not isinstance(source, Recordset)
+        and spec.column is not None
+        and not hasattr(spec.column, "property")
+    )
+
+
+def _physical_column(source: Dataset, field_name: str, handle: str) -> Any:
+    """The column a field names, or for a derived field its expression as a
+    statement node, its columns read from ``handle``."""
     spec = source.by_name.get(field_name)
     if spec is None:
         raise QueryError(QueryMessages.UNKNOWN_FIELD, f"{source.name}.{field_name}")
@@ -413,9 +537,21 @@ def _physical_column(source: Dataset, field_name: str) -> str:
         raise QueryError(
             QueryMessages.FIELD_NOT_SELECTABLE, f"{source.name}.{field_name}"
         )
-    if isinstance(source, Sheet):
+    if isinstance(source, Recordset):
         return spec.column.name
-    return spec.column.property.columns[0].name
+    if not _derived(source, spec):
+        return spec.column.property.columns[0].name
+    compiled = spec.column.compile(
+        dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+    )
+    expression = parse_sql(f"SELECT {compiled}")[0].stmt.targetList[0].val
+
+    class Qualify(Visitor):
+        def visit_ColumnRef(self, ancestors: Any, ref: ast.ColumnRef) -> None:
+            ref.fields = (ast.String(sval=handle), *(ref.fields or ())[-1:])
+
+    Qualify()(expression)
+    return expression
 
 
 def _parse(sql: str) -> ast.SelectStmt:
@@ -464,16 +600,59 @@ def _swap(node: Any, swaps: Mapping[int, ast.Node]) -> Any:
     return node
 
 
-def _take_sheets(select: ast.SelectStmt) -> dict[int, tuple[str, SheetCall]]:
-    """The ``sheet()`` calls in ``FROM``, each replaced by a relation named
-    ``sheet`` under the call's own alias, so the rest of the statement is read
-    the way any other is. Keyed by that relation, which is how the call is
-    found again once its cells are read, with the handle it is read under.
+def _sheet_call(args: Sequence[Any]) -> SheetCall:
+    """``sheet()``'s arguments: the file, and the range if there is one."""
+    values = [
+        _value(arg) for arg in args if isinstance(arg, ast.A_Const) and not arg.isnull
+    ]
+    if (
+        not 1 <= len(args) <= 2
+        or len(values) != len(args)
+        or isinstance(values[0], (bool, float))
+        or (len(values) == 2 and not isinstance(values[1], str))
+    ):
+        raise QueryError(QueryMessages.SHEET_ARGUMENTS, SHEET)
+    return SheetCall(file=values[0], range=values[1] if len(values) == 2 else None)
 
-    ``sheet()`` is the only function ``FROM`` takes, called plainly with
-    constants: the file, and the range if there is one.
+
+def _plugin_call(args: Sequence[Any]) -> PluginCall:
+    """``plugin()``'s arguments: the plug-in's public id and the endpoint's
+    name, then its parameters by name, each a constant or an ``ARRAY`` of
+    them."""
+
+    def constant(node: Any, *, listed: bool = False) -> Any:
+        if isinstance(node, ast.A_Const) and not node.isnull:
+            return _value(node)
+        if listed and isinstance(node, ast.A_ArrayExpr) and node.elements:
+            return tuple(constant(element) for element in node.elements)
+        raise QueryError(QueryMessages.PLUGIN_ARGUMENTS, PLUGIN)
+
+    named = [arg for arg in args[2:] if isinstance(arg, ast.NamedArgExpr)]
+    if len(args) < 2 or len(named) != len(args) - 2:
+        raise QueryError(QueryMessages.PLUGIN_ARGUMENTS, PLUGIN)
+    plugin, endpoint = (constant(arg) for arg in args[:2])
+    params = {arg.name: constant(arg.arg, listed=True) for arg in named}
+    if (
+        not isinstance(plugin, str)
+        or not isinstance(endpoint, str)
+        or len(params) != len(named)
+    ):
+        raise QueryError(QueryMessages.PLUGIN_ARGUMENTS, PLUGIN)
+    return PluginCall(plugin, endpoint, tuple(sorted(params.items())))
+
+
+def _take_calls(
+    select: ast.SelectStmt,
+) -> dict[int, tuple[str, SheetCall | PluginCall]]:
+    """The ``sheet()`` and ``plugin()`` calls in ``FROM``, each replaced by a
+    relation named after its function under the call's own alias, so the rest
+    of the statement is read the way any other is. Keyed by that relation,
+    which is how the call is found again once its rows are read, with the
+    handle it is read under.
+
+    They are the only functions ``FROM`` takes, called plainly with constants.
     """
-    calls: dict[int, tuple[str, SheetCall]] = {}
+    calls: dict[int, tuple[str, SheetCall | PluginCall]] = {}
     swaps: dict[int, ast.Node] = {}
 
     def walk(node: Any) -> None:
@@ -493,35 +672,35 @@ def _take_sheets(select: ast.SelectStmt) -> dict[int, tuple[str, SheetCall]]:
                 raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, name)
         call, definitions = functions[0]
         names = _name_parts(call.funcname) if isinstance(call, ast.FuncCall) else []
-        if names != [SHEET]:
+        if names not in ([SHEET], [PLUGIN]):
             raise QueryError(
                 QueryMessages.UNSUPPORTED_FUNCTION,
                 ".".join(names) or type(call).__name__,
             )
-        args = tuple(call.args or ())
-        shaped = (
-            not definitions
-            and not (call.agg_star or call.agg_distinct or call.func_variadic)
-            and call.agg_order is None
-            and call.agg_filter is None
-            and call.over is None
-            and 1 <= len(args) <= 2
-            and all(isinstance(arg, ast.A_Const) and not arg.isnull for arg in args)
-        )
-        values = [_value(arg) for arg in args] if shaped else []
+        name = names[0]
         if (
-            not shaped
-            or isinstance(values[0], (bool, float))
-            or (len(values) == 2 and not isinstance(values[1], str))
+            definitions
+            or call.agg_star
+            or call.agg_distinct
+            or call.func_variadic
+            or call.agg_order is not None
+            or call.agg_filter is not None
+            or call.over is not None
         ):
-            raise QueryError(QueryMessages.SHEET_ARGUMENTS, SHEET)
-        handle = node.alias.aliasname if node.alias else SHEET
+            raise QueryError(
+                QueryMessages.SHEET_ARGUMENTS
+                if name == SHEET
+                else QueryMessages.PLUGIN_ARGUMENTS,
+                name,
+            )
+        args = tuple(call.args or ())
+        handle = node.alias.aliasname if node.alias else name
         standing = ast.RangeVar(
-            relname=SHEET, inh=True, alias=ast.Alias(aliasname=handle)
+            relname=name, inh=True, alias=ast.Alias(aliasname=handle)
         )
         calls[id(standing)] = (
             handle,
-            SheetCall(file=values[0], range=values[1] if len(values) == 2 else None),
+            _sheet_call(args) if name == SHEET else _plugin_call(args),
         )
         swaps[id(node)] = standing
 
@@ -638,16 +817,17 @@ def _expand_relations(select: ast.SelectStmt) -> None:
 
 
 def _relations(
-    select: ast.SelectStmt, sheets: Mapping[int, Sheet] | None = None
+    select: ast.SelectStmt, recordsets: Mapping[int, Recordset] | None = None
 ) -> dict[str, Dataset]:
     """The relations in scope, by the name a column may qualify with.
 
     Rewrites each dataset to the table behind it as it goes, so the tree
-    carries physical names by the time it is written out. *sheets* holds the
-    relations :func:`_take_sheets` stood in for ``sheet()`` calls, and what
+    carries physical names by the time it is written out. *recordsets* holds the
+    relations :func:`_take_calls` stood in for ``sheet()`` and ``plugin()``
+    calls, and what
     each read.
     """
-    sheets = sheets or {}
+    recordsets = recordsets or {}
     if not select.fromClause:
         raise QueryError(QueryMessages.MISSING_RELATION)
     if len(select.fromClause) > 1:
@@ -677,16 +857,16 @@ def _relations(
             raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(node).__name__)
         if node.schemaname or node.catalogname:
             raise QueryError(QueryMessages.QUALIFIED_RELATION, node.relname)
-        sheet = sheets.get(id(node))
-        if sheet is None and node.relname not in known:
+        recordset = recordsets.get(id(node))
+        if recordset is None and node.relname not in known:
             raise QueryError(QueryMessages.UNKNOWN_RELATION, node.relname)
         handle = node.alias.aliasname if node.alias else node.relname
         if handle == VIEWER:
             raise QueryError(QueryMessages.RESERVED_NAME, VIEWER)
         if handle in scope:
             raise QueryError(QueryMessages.DUPLICATE_ALIAS, handle)
-        if sheet is not None:
-            scope[handle] = sheet
+        if recordset is not None:
+            scope[handle] = recordset
             return {handle}
         scope[handle] = dataset(node.relname)
         node.schemaname, node.relname = _physical_table(node.relname)
@@ -751,7 +931,9 @@ def _join_is_bound(join: ast.JoinExpr, left: set[str], right: set[str]) -> bool:
 
 def _check_nodes(select: ast.SelectStmt) -> None:
     class Check(Visitor):
-        def visit(self, ancestors: Any, node: Any) -> None:
+        # pglast's stub declares ``visit`` an optional callable attribute; its
+        # visitors define it as a method, the default for every node.
+        def visit(self, ancestors: Any, node: Any) -> None:  # ty: ignore[invalid-mutable-override]
             if type(node) not in _ALLOWED_NODES:
                 raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(node).__name__)
 
@@ -828,8 +1010,8 @@ def _holder(scope: dict[str, Dataset], field_name: str) -> str | None:
     one does — the caller says which of those it is.
 
     Counted per relation in scope, not per dataset: the same table joined to
-    itself is two relations, and a bare column of it names both. A sheet not
-    read yet holds every name, so it holds one only when nothing read does.
+    itself is two relations, and a bare column of it names both. A recordset
+    not read yet holds every name, so it holds one only when nothing read does.
     """
     holders = [
         handle for handle, source in scope.items() if field_name in source.by_name
@@ -837,7 +1019,7 @@ def _holder(scope: dict[str, Dataset], field_name: str) -> str | None:
     read = [
         handle
         for handle in holders
-        if not (isinstance(scope[handle], Sheet) and not scope[handle].read)
+        if not (isinstance(scope[handle], Recordset) and not scope[handle].read)
     ]
     if read:
         return read[0] if len(read) == 1 else None
@@ -907,11 +1089,14 @@ def _field_named(scope: dict[str, Dataset], node: Any) -> Any:
     return source.by_name.get(field_name) if source is not None else None
 
 
-def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
+def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> set[int]:
+    """Name every field by its column, and return the constants of the
+    expressions a derived field was replaced with: the surface wrote them,
+    so they are not bound as the reader's."""
     ordinals = _alias_ordinals(select, scope)
     for target in select.targetList or ():
-        # A sheet's column is read as ``c1``, so an output that is one keeps
-        # the header it was named by.
+        # A recordset's column is read as ``c1``, so an output that is one
+        # keeps the name it was given.
         if not isinstance(target, ast.ResTarget) or target.name is not None:
             continue
         names = _name_parts(getattr(target.val, "fields", None))
@@ -919,8 +1104,16 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
         if len(names) == 1:
             handle = _holder(scope, names[0])
         spec = _field_named(scope, target.val)
-        if spec is not None and isinstance(scope.get(handle or ""), Sheet):
+        source = scope.get(handle or "")
+        # A derived field is read as an expression, which would otherwise
+        # name the output after itself.
+        if spec is not None and (
+            isinstance(source, Recordset)
+            or (source is not None and _derived(source, spec))
+        ):
             target.name = spec.name
+
+    written: set[int] = set()
 
     class Resolve(Visitor):
         def visit_ColumnRef(self, ancestors: Any, node: ast.ColumnRef) -> Any:
@@ -933,7 +1126,10 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
                 source = scope.get(names[0])
                 if source is None:
                     raise QueryError(QueryMessages.UNKNOWN_RELATION, names[0])
-                column = _physical_column(source, names[1])
+                column = _physical_column(source, names[1], names[0])
+                if not isinstance(column, str):
+                    written.update(_constants_in(column))
+                    return column
                 node.fields = (ast.String(sval=names[0]), ast.String(sval=column))
                 return
             if names[0] == VIEWER:
@@ -955,17 +1151,23 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
                     else QueryMessages.UNKNOWN_FIELD,
                     names[0],
                 )
-            column = _physical_column(scope[holder], names[0])
-            # A sheet's columns are all named ``c<n>``, so one is always
+            column = _physical_column(scope[holder], names[0], holder)
+            if not isinstance(column, str):
+                written.update(_constants_in(column))
+                return column
+            # A recordset's columns are all named ``c<n>``, so one is always
             # written with the handle it is read under.
             node.fields = tuple(
                 ast.String(sval=part)
                 for part in (
-                    (holder, column) if isinstance(scope[holder], Sheet) else (column,)
+                    (holder, column)
+                    if isinstance(scope[holder], Recordset)
+                    else (column,)
                 )
             )
 
     Resolve()(select)
+    return written
 
 
 def _is_viewer(node: Any) -> bool:
@@ -1192,8 +1394,8 @@ def _literal_positions(select: ast.SelectStmt) -> set[int]:
     return marked
 
 
-def _bind_literals(select: ast.SelectStmt) -> tuple[Any, ...]:
-    ordinals = _literal_positions(select)
+def _bind_literals(select: ast.SelectStmt, written: set[int]) -> tuple[Any, ...]:
+    ordinals = _literal_positions(select) | written
     values: list[Any] = []
 
     class Bind(Visitor):
@@ -1220,59 +1422,59 @@ def _value(node: ast.A_Const) -> Any:
     raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(held).__name__)
 
 
-def resolve(sql: str, read: Mapping[SheetCall, Sheet] | None = None) -> ResolvedQuery:
+def resolve(
+    sql: str, read: Mapping[SheetCall | PluginCall, Recordset] | None = None
+) -> ResolvedQuery:
     """Read *sql*, and return the statement this surface will run instead.
 
-    *read* holds what each ``sheet()`` call read. A call it does not hold is
-    left unread: its columns are taken on trust and the statement is checked
-    but not runnable (:attr:`ResolvedQuery.unread`).
+    *read* holds what each ``sheet()`` and ``plugin()`` call read. A call it
+    does not hold is left unread: its columns are taken on trust and the
+    statement is checked but not runnable (:attr:`ResolvedQuery.unread`).
 
     Raises :class:`QueryError` naming what has to change.
     """
     select = _parse(sql)
-    calls = _take_sheets(select)
-    sheets = {
-        key: (read or {}).get(call) or Sheet.unread(call)
-        for key, (_, call) in calls.items()
-    }
+    calls = _take_calls(select)
+    recordsets = {key: _read_by(read, call) for key, (_, call) in calls.items()}
     _check_nodes(select)
     _expand_relations(select)
-    scope = _relations(select, sheets)
+    scope = _relations(select, recordsets)
     column_types = _output_types(select, scope)
     column_grains = _output_grains(select)
     _check_viewer(select, scope)
-    _resolve_columns(select, scope)
-    parameters = list(_bind_literals(select))
+    written = _resolve_columns(select, scope)
+    parameters = list(_bind_literals(select, written))
     names_the_reader = _resolve_viewer(select)
-    # A read sheet is its cells, bound as one parameter and read as a recordset
-    # of ``c1``, ``c2``, … typed as the range's columns. An empty range is one
+    # A read recordset is its rows, bound as one parameter and read as a
+    # recordset of ``c1``, ``c2``, … typed as its columns. An empty one is one
     # column and no rows.
     swaps: dict[int, ast.Node] = {}
-    for key, sheet in sheets.items():
-        if not sheet.read:
+    for key, recordset in recordsets.items():
+        if not recordset.read:
             continue
         parameters.append(
             json.dumps(
                 [
                     {f"c{index}": value for index, value in enumerate(row, start=1)}
-                    for row in sheet.rows
+                    for row in recordset.rows
                 ]
             )
         )
         columns = ", ".join(
             f"c{index} {postgres}"
-            for index, postgres in enumerate(sheet.types or ("text",), start=1)
+            for index, postgres in enumerate(recordset.types or ("text",), start=1)
         )
-        recordset = parse_sql(
+        bound = parse_sql(
             f"SELECT FROM pg_catalog.json_to_recordset(${len(parameters)}) "
             f"AS h({columns})"
         )[0].stmt.fromClause[0]
-        recordset.alias.aliasname = calls[key][0]
-        swaps[key] = recordset
+        bound.alias.aliasname = calls[key][0]
+        swaps[key] = bound
     if swaps:
         select.fromClause = tuple(
             _swap(node, swaps) for node in select.fromClause or ()
         )
+    named = [(calls[key][0], recordset) for key, recordset in recordsets.items()]
     return ResolvedQuery(
         sql=RawStream()(select),
         parameters=tuple(parameters),
@@ -1280,6 +1482,109 @@ def resolve(sql: str, read: Mapping[SheetCall, Sheet] | None = None) -> Resolved
         column_types=column_types,
         column_grains=column_grains,
         names_the_reader=names_the_reader,
-        sheets=tuple((calls[key][0], sheet) for key, sheet in sheets.items()),
-        source=sql if any(not sheet.read for sheet in sheets.values()) else "",
+        sheets=tuple(entry for entry in named if isinstance(entry[1], Sheet)),
+        plugins=tuple(entry for entry in named if isinstance(entry[1], PluginRows)),
+        source=sql if any(not entry.read for entry in recordsets.values()) else "",
     )
+
+
+def _read_by(
+    read: Mapping[SheetCall | PluginCall, Recordset] | None,
+    call: SheetCall | PluginCall,
+) -> Recordset:
+    """What *call* read, or the call unread."""
+    found = (read or {}).get(call)
+    if found is not None:
+        return found
+    return (
+        Sheet.unread(call) if isinstance(call, SheetCall) else PluginRows.unread(call)
+    )
+
+
+def remap_ids(sql: str, remap: Callable[[SearchEntityType, int], int]) -> str:
+    """*sql*, with each row id it names as a constant put through *remap*.
+
+    A constant names a row where it is compared with ``=``, ``<>`` or ``IN`` to
+    a column that is a table's own id or a key into one, and where it is the
+    file ``sheet()`` reads; the row is of the kind that table holds
+    (:data:`~app.db.search_index.SEARCH_SOURCES`), so a person, who is not one,
+    is left alone. Each constant is replaced where it is written, so the rest
+    of the text, comments included, stays as it was. A statement that does not
+    resolve, and a constant written in a shape this does not read (a cast, a
+    comparison with the constant first), come back unchanged.
+    """
+    from app.db.search_index import SEARCH_SOURCES
+
+    numbers = [token for token in scan(sql) if token.name == "ICONST"]
+    # Where each constant to replace starts, its kind, and its value: found by
+    # what it is written after, since a parsed constant keeps no position.
+    found: list[tuple[int, SearchEntityType, int]] = []
+
+    def after(location: Any, values: Sequence[Any], kind: SearchEntityType) -> None:
+        if not isinstance(location, int):
+            # A join the resolver wrote in, which nobody typed.
+            return
+        # Each integer a value holds is written as one number token, in order,
+        # so a value takes as many tokens as it holds integers, and only a
+        # value that is one integer names a row.
+        tokens = iter([token for token in numbers if token.start > location])
+        for value in values:
+            held = 0
+
+            class Count(Visitor):
+                def visit_A_Const(self, ancestors: Any, constant: ast.A_Const) -> None:
+                    nonlocal held
+                    held += isinstance(constant.val, ast.Integer)
+
+            Count()(value)
+            taken = list(islice(tokens, held))
+            if (
+                isinstance(value, ast.A_Const)
+                and isinstance(value.val, ast.Integer)
+                and len(taken) == 1
+                and sql[taken[0].start : taken[0].end + 1] == str(value.val.ival)
+            ):
+                found.append((taken[0].start, kind, value.val.ival))
+
+    class Sheets(Visitor):
+        def visit_FuncCall(self, ancestors: Any, call: ast.FuncCall) -> None:
+            if _name_parts(call.funcname) == [SHEET] and call.args:
+                after(call.location, call.args[:1], SearchEntityType.file)
+
+    try:
+        select = _parse(sql)
+        Sheets()(select)
+        recordsets = {
+            key: _read_by(None, call) for key, (_, call) in _take_calls(select).items()
+        }
+        _expand_relations(select)
+        scope = _relations(select, recordsets)
+    except QueryError:
+        return sql
+
+    class Ids(Visitor):
+        def visit_A_Expr(self, ancestors: Any, node: ast.A_Expr) -> None:
+            if node.kind == A_Expr_Kind.AEXPR_IN:
+                values = tuple(node.rexpr or ())
+            elif _name_parts(node.name) in (["="], ["<>"]):
+                values = (node.rexpr,)
+            else:
+                return
+            spec = _field_named(scope, node.lexpr)
+            try:
+                column = spec.column.property.columns[0]
+            except AttributeError:
+                return
+            tables = (
+                [column.table.name]
+                if column.primary_key
+                else [key.column.table.name for key in column.foreign_keys]
+            )
+            source = SEARCH_SOURCES.get(tables[0]) if len(tables) == 1 else None
+            if source is not None:
+                after(node.lexpr.location, values, source.entity_type)
+
+    Ids()(select)
+    for start, kind, value in sorted(found, key=lambda entry: entry[0], reverse=True):
+        sql = f"{sql[:start]}{remap(kind, value)}{sql[start + len(str(value)) :]}"
+    return sql

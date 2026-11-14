@@ -1,13 +1,13 @@
 """The platform's sign-in placement rules, written on a provider."""
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.oidc_claim_mapping import ClaimRuleAuthor, OIDCClaimMapping
-from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.platform.user import UserRole
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.services.platform import rules
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
@@ -19,7 +19,6 @@ from app.testing.factories import (
     get_auth_headers,
 )
 from app.testing.schema_harness import route_session_to_guild
-
 
 BASE = "/api/v1/settings/placement"
 
@@ -283,7 +282,7 @@ async def test_the_initiative_picker_reads_a_placeable_community_only(
 async def test_the_community_search_says_which_communities_accept(
     client: AsyncClient, session: AsyncSession
 ):
-    owner, guild, provider = await _accepting(session)
+    owner, _guild, provider = await _accepting(session)
     await create_guild(session, creator=owner, name="Engine room")
     headers = await _headers(session, UserRole.operator)
 

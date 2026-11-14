@@ -4,40 +4,52 @@ icon: lucide/mail
 
 # Email
 
-Initiative sends email for account verification, password resets, invitations, and the overdue and coming-up digests. Point it at an **SMTP** mail server from **Settings → Platform → Email**, as the [owner](platform-roles.md).
+Initiative sends mail through an SMTP server you point it at: your own, or a transactional email service. The [owner](platform-roles.md) sets it up under **Settings → Platform → Email**, and it takes effect when saved.
 
-!!! info "Without email, the email things don't happen"
-    Initiative works perfectly well without SMTP — it simply can't send verification links, password resets, or email notifications. In-app bell notifications carry on regardless, so nobody is cut off.
+Set it up before anybody forgets a password, rather than after. Without it Initiative works fine, and the bell in the app carries every notification, but nothing below gets sent.
 
-    Worth setting up before anyone forgets a password, rather than after.
+## What Initiative sends
 
-## What you'll need
+| Kind | What | Follows notification settings |
+|---|---|---|
+| Account mail | Sign-up and sign-in codes, address confirmations, password resets, and notices an account gets about itself: a password, passkey, second factor or address changed, recovery codes issued, sign-in locked, the account erased | No. It always goes. |
+| Community notices | A community you run deleted, or put on hold with the date it will be deleted | No |
+| Notifications | Mentions, assignments, reactions, direct messages, being added to an initiative or project, access requests, join requests | Yes |
+| Digests | The coming-up and overdue summaries people choose for themselves | Yes |
 
-Outgoing mail credentials — your own mail server, or a transactional email service. Specifically: host, port, username, password, and a "from" address.
+Notification mail follows each person's own choices, and the server-wide **Email notifications** switch in [What notifications may carry](configuration.md#what-notifications-may-carry) can turn all of it off. Account mail ignores both, so nobody is ever locked out of their own account. Mail goes out in each person's language, with your branding's accent color and the logo built in rather than fetched.
+
+**Ways in** refuses **Email OTP** until a mail server is set up, since the code has nowhere to go. See [Single sign-on](single-sign-on.md).
 
 ## Settings
 
-In **Settings → Platform → Email**:
+![The Email tab under Settings → Platform](../images/running-a-server/email-settings.png)
 
-| Field | Notes |
+| Field | What it takes |
 |---|---|
-| **Host** | Your SMTP server, e.g. `smtp.mailprovider.com`. |
-| **Port** | Commonly `587` (STARTTLS), `465` (TLS), or `25`. |
-| **Secure (TLS) connection** | Turn **on** for port `465`. Leave **off** for `587`/`25` (they use STARTTLS when available). |
-| **Reject unauthorized certificates** | Keep **on**. Turn off only if you fully trust the server and understand the risk (for example, a self-signed certificate on an internal relay). |
-| **Username** / **Password** | Your SMTP credentials. (Leave the password blank when editing to keep the existing one.) |
-| **From address** | The sender shown to recipients, e.g. `Initiative <no-reply@example.com>`. |
+| **Host** | Your SMTP server, such as `smtp.mailprovider.com`. Required. |
+| **Port** | Usually `587`, `465` or `25`. Blank means `465` with **Secure (TLS) connection** on and `587` with it off. |
+| **Secure (TLS) connection** | On, the connection is encrypted from its first byte, which is what port `465` expects. Off, Initiative connects in the clear and switches to encryption with STARTTLS when the server offers it, which is what `587` and `25` expect. |
+| **Reject unauthorized certificates** | On, the server's certificate must be valid for its name. Turn it off only for a relay you fully trust that has a certificate nothing vouches for, such as a self-signed one on your own network. |
+| **Username** / **Password** | Your SMTP credentials. Initiative signs in only when both are filled in. The password is stored encrypted and never shown again; leave it blank when editing to keep the saved one. |
+| **From address** | The sender people see, such as `Initiative <no-reply@example.com>`. Required. |
+| **Test email recipient** | Where **Send test email** sends to. |
+
+Until **Host** and **From address** are both saved, Initiative sends nothing and queues nothing.
 
 ## Test it before you rely on it
 
-**Send test email**, pick a recipient, send. If it arrives, you're finished.
+1. Fill in the fields and select **Save email settings**.
+2. Type your own address in **Test email recipient**.
+3. Select **Send test email**.
 
-If it doesn't, check the host/port/TLS combination before anything else. It is almost always the host/port/TLS combination. Credentials come second.
+The test uses the saved settings, so save first. If **Test email sent** appears and the mail arrives, you're done.
 
-![SMTP email settings](../images/running-a-server/email-settings.png)
+If it says **Unable to send test email**, check the host, port and TLS combination before anything else. It is almost always the host, port and TLS combination. Credentials come second. The server log has a line naming the error's type and the mail server's reply code, never the message itself.
 
-## Related
+!!! tip "Arrived, but in spam?"
+    That's your mail domain's SPF, DKIM and DMARC records, which your mail service's own instructions cover. Initiative only hands the message over.
 
-- [Configuration](configuration.md) — foundational server settings.
-- [Notifications](../guides/notifications.md) — what gets emailed, from the user's side.
-- [Push notifications](push-notifications.md) — the mobile equivalent.
+## Setting it from the environment
+
+On a server's first start, the `SMTP_*` variables fill these fields in, so a deployment tool can bring it up with mail working. After that the tab owns them and the variables are ignored. See [Read on the first start only](configuration.md#read-on-the-first-start-only).

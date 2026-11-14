@@ -7,7 +7,7 @@ contract declares a field, the normalizer does not read it, and the field is
 dropped on publish.
 
 It matters because several of them are not descriptions — they are restrictions
-an author is asking this build to enforce. ``admin_only``, ``requires``,
+an author is asking this build to enforce. ``permission``, ``requires``,
 ``actors`` and ``connection.scope`` all narrow who or what reaches something,
 and a narrowing that is dropped does not fail loudly at the moment it is lost.
 
@@ -149,6 +149,7 @@ def maximal_manifest() -> dict:
                 "fields": [
                     {"key": "token", "type": "secret", "label": {"en": "Token"}}
                 ],
+                "after_connect": True,
             },
         ],
         "webhooks": {
@@ -215,7 +216,7 @@ def maximal_manifest() -> dict:
                 "actors": ["member", "installation"],
                 "requires": {"all_of": ["vendor"]},
                 "cache_ttl_seconds": 60,
-                "admin_only": True,
+                "permission": "prices",
                 "public": True,
             },
             {
@@ -255,10 +256,21 @@ def maximal_manifest() -> dict:
                 "path": "/panel",
                 "name": {"en": "Panel"},
                 "scopes": ["community", "initiative"],
-                "admin_only": True,
+                "permission": "settings",
                 "capabilities": ["camera"],
                 "requires": {"all_of": ["other"]},
             }
+        ],
+        "sign_in": {"page": "panel", "return_path": "/signed-in"},
+        "permissions": [
+            {
+                "id": "prices",
+                "name": {"en": "Prices"},
+                "level": "initiative",
+                "members": True,
+            },
+            {"id": "settings", "name": {"en": "Settings"}, "level": "initiative"},
+            {"id": "settings", "name": {"en": "Settings"}, "level": "community"},
         ],
         "fields": [
             {
@@ -277,6 +289,7 @@ def maximal_manifest() -> dict:
                         },
                     }
                 },
+                "permission": "prices",
                 "requires": {"all_of": ["vendor"]},
             },
             {
@@ -305,7 +318,7 @@ def maximal_manifest() -> dict:
                 "on": ["task"],
                 "confirm": {"en": "Make a new link?"},
                 "menu": True,
-                "admin_only": True,
+                "permission": "prices",
                 "requires": {"any_of": ["vendor"]},
             }
         ],
@@ -316,6 +329,7 @@ def maximal_manifest() -> dict:
                 "name": {"en": "Demo"},
                 "on": ["task"],
                 "description": {"en": "The task's demo"},
+                "permission": "use",
                 "requires": {"all_of": ["other"]},
                 "tree": {
                     "type": "section",
@@ -373,7 +387,7 @@ def maximal_declarative_manifest() -> dict:
 
     A request sends a body or a GraphQL query, a cursor goes in a parameter or
     a variable, and a route reads a body path or a header, so those are spread
-    over several requests. Only a write's request names a connection per actor.
+    over several requests.
     """
     api = '"https://api.tracker.example/issues"'
     paged = {
@@ -694,7 +708,7 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
     value_node, text = stack["children"]
     return [
         ("manifest", {**published, **declarative}),
-        ("connection", {**connection, **workspace}),
+        ("connection", {**connection, **other, **workspace}),
         ("connectionField", connection["fields"][0]),
         ("connectionFlow", connection["flow"]),
         ("connectionToken", connection["token"]),
@@ -762,6 +776,9 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("stateFacet", published["fields"][0]["states"]["status"]),
         ("stateValue", published["fields"][0]["states"]["status"]["values"]["open"]),
         ("setting", published["settings"][0]),
+        # Members start with an initiative permission or not; a community one
+        # says nothing of it.
+        ("permission", published["permissions"][0]),
         # Only a declarative plug-in's action carries a write.
         ("action", {**published["actions"][0], **declarative["actions"][0]}),
         ("part", part),
@@ -796,10 +813,12 @@ def test_nothing_is_stored_that_the_contract_does_not_declare(nodes):
 
 
 def test_every_service_field_survives_a_publish(published):
-    """``service`` is written inline rather than as a named object, so the
-    inventory above does not reach it; its fields are measured here."""
-    declared = contract.manifest_schema()["properties"]["service"]["properties"]
-    assert set(declared) == set(published["service"])
+    """``service`` and ``sign_in`` are written inline rather than as named
+    objects, so the inventory above does not reach them; their fields are
+    measured here."""
+    properties = contract.manifest_schema()["properties"]
+    assert set(properties["service"]["properties"]) == set(published["service"])
+    assert set(properties["sign_in"]["properties"]) == set(published["sign_in"])
     assert published["service"]["scopes"] == [
         "comments:read",
         "plugins:acme.github",
@@ -848,7 +867,7 @@ def test_an_emitting_endpoint_keeps_what_describes_it(published):
         "requires",
         "cache_ttl_seconds",
         "actors",
-        "admin_only",
+        "permission",
         "public",
     ):
         assert caller_side not in emitted
@@ -1176,7 +1195,7 @@ def _labelled_on(connection) -> dict:
         _with(
             maximal_declarative_manifest,
             lambda b: b["endpoints"][0]["request"].update(
-                connection={"installation": "workspace"}
+                connection={"member": "profile", "installation": "workspace"}
             ),
         ),
         _labelled_on({"member": "profile"}),
@@ -1259,7 +1278,7 @@ def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
     plug-in's list field offers actions on its elements, each declared and
     offered wherever the field is, and an action asks for the params of an
     endpoint it names. A request on a member's connection is one its endpoint
-    requires and the installation does not make; a write's request naming a
+    requires and the installation does not make; a request naming a
     connection per actor names one for each of its actors, the member's own
     for the member and the community's for the installation. An endpoint is
     closed: a misspelt term is refused, not dropped."""
@@ -1267,6 +1286,17 @@ def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
 
     with pytest.raises(ListingDefinitionError):
         normalize_listing_definition("plugin", body, public_id=DECLARATIVE_ID)
+
+
+def test_a_reads_request_names_a_connection_per_actor():
+    """A read made as the member carries the member's own credential, and one
+    made as the installation the community's, as a write's does."""
+    body = maximal_declarative_manifest()
+    body["endpoints"][0]["actors"] = ["member", "installation"]
+    per_actor = {"member": "profile", "installation": "workspace"}
+    body["endpoints"][0]["request"]["connection"] = per_actor
+    normalized = normalize_listing_definition("plugin", body, public_id=DECLARATIVE_ID)
+    assert normalized["endpoints"][0]["request"]["connection"] == per_actor
 
 
 def test_a_declarative_manifest_is_named_by_its_listing():

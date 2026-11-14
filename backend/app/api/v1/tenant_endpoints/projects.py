@@ -1,24 +1,28 @@
-from datetime import datetime, timezone
-from typing import Annotated, List, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import case, func
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
 
-from app.services.tenant import attachments as attachments_service
+from app.api import resource_access, tool_copy
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
     SessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
+from app.core.messages import ProjectMessages
+from app.core.tools import Tool
+from app.db.session import require_actor_context
+from app.models.platform.user import User
 from app.models.tenant.project import (
     Project,
 )
@@ -30,33 +34,27 @@ from app.models.tenant.task import (
     TaskStatus,
     TaskStatusCategory,
 )
-from app.models.platform.user import User
-from app.api import resource_access, tool_copy
-from app.core.tools import Tool
-from app.db.session import require_actor_context
-from app.services import notifications as notifications_service
-from app.services.tenant import ownership as ownership_service
-from app.services import permissions as permissions_service
-from app.services import reachability
-from app.services.tenant import named_people
-from app.services.tenant import metadata as metadata_service
-from app.services.tenant import personal_items as personal_items_service
-from app.services.tenant import tags as tags_service
-from app.services.tenant import archive as archive_service
-from app.services.tenant import tool_listing
-from app.services.tenant import task_statuses as task_statuses_service
-from app.services.tenant import task_types as task_types_service
-from app.core.messages import ProjectMessages
 from app.schemas.tenant.project import (
-    project_can,
     ProjectCreate,
     ProjectRead,
-    ProjectTaskSummary,
     ProjectReorderRequest,
+    ProjectTaskSummary,
     ProjectUpdate,
+    project_can,
 )
-from app.services.tenant import project_grants
 from app.schemas.tenant.tool import serialize_tool
+from app.services import notifications as notifications_service
+from app.services import permissions as permissions_service
+from app.services import reachability
+from app.services.tenant import archive as archive_service
+from app.services.tenant import attachments as attachments_service
+from app.services.tenant import metadata as metadata_service
+from app.services.tenant import named_people, project_grants, tool_listing
+from app.services.tenant import ownership as ownership_service
+from app.services.tenant import personal_items as personal_items_service
+from app.services.tenant import tags as tags_service
+from app.services.tenant import task_statuses as task_statuses_service
+from app.services.tenant import task_types as task_types_service
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -65,7 +63,7 @@ ProjectsRead = Annotated[ActorContext, Depends(plugin_scope("projects:read"))]
 ProjectsWrite = Annotated[ActorContext, Depends(plugin_scope("projects:write"))]
 
 
-async def _attach_task_summaries(session: SessionDep, projects: List[Project]) -> None:
+async def _attach_task_summaries(session: SessionDep, projects: list[Project]) -> None:
     if not projects:
         return
     project_ids = [project.id for project in projects if project.id is not None]
@@ -150,11 +148,11 @@ def visible_project_conditions(
     user_id: int | None,
     *,
     context: ActorContext,
-    archived: Optional[bool],
-    is_template: Optional[bool],
-    search: Optional[str] = None,
-    tag_ids: Optional[List[int]] = None,
-    initiative_id: Optional[int] = None,
+    archived: bool | None,
+    is_template: bool | None,
+    search: str | None = None,
+    tag_ids: list[int] | None = None,
+    initiative_id: int | None = None,
 ) -> list:
     """WHERE clauses for the guild's DAC-visible projects.
 
@@ -182,8 +180,8 @@ def visible_project_conditions(
 async def _project_reads(
     session: SessionDep,
     user_id: int | None,
-    projects: List[Project],
-) -> List[ProjectRead]:
+    projects: list[Project],
+) -> list[ProjectRead]:
     """``ProjectRead`` for each project, in the order given."""
     if not projects:
         return []
@@ -200,8 +198,8 @@ async def _project_reads(
 
 
 def _slim_project_reads(
-    projects: List[Project], user_id: int | None, *, context: ActorContext
-) -> List[ProjectRead]:
+    projects: list[Project], user_id: int | None, *, context: ActorContext
+) -> list[ProjectRead]:
     """Build lightweight ``ProjectRead`` rows for the slim projection.
 
     Carries only ``{id, name, icon, initiative_id, can}``, its dates, plus
@@ -211,7 +209,7 @@ def _slim_project_reads(
     serialized. ``description`` is dropped too (it would run rich-text
     sanitization for no picker benefit).
     """
-    reads: List[ProjectRead] = []
+    reads: list[ProjectRead] = []
     for project in projects:
         reads.append(
             ProjectRead(
@@ -223,6 +221,8 @@ def _slim_project_reads(
                 end_date=project.end_date,
                 owner_id=ownership_service.owner_user_id_of(project),
                 initiative_id=project.initiative_id,
+                created_by=project.created_by,
+                created_by_kind=project.created_by_kind,
                 created_at=project.created_at,
                 updated_at=project.updated_at,
                 is_template=project.is_template,
@@ -242,10 +242,10 @@ def _slim_project_reads(
 async def serialize_project_page(
     session: SessionDep,
     user_id: int | None,
-    projects: List[Project],
+    projects: list[Project],
     *,
     slim: bool,
-) -> List[ProjectRead]:
+) -> list[ProjectRead]:
     """Serialize one page of the projects list.
 
     The order is already settled in SQL. The slim projection is a plain
@@ -402,11 +402,11 @@ async def update_project(
     if "pinned" in update_data:
         permissions_service.require_project_configure(project, context=guild_context)
         pinned = update_data.pop("pinned")
-        project.pinned_at = datetime.now(timezone.utc) if pinned else None
+        project.pinned_at = datetime.now(UTC) if pinned else None
 
     for field, value in update_data.items():
         setattr(project, field, value)
-    project.updated_at = datetime.now(timezone.utc)
+    project.updated_at = datetime.now(UTC)
 
     session.add(project)
     await attachments_service.claim_uploads(session, project)
@@ -469,7 +469,7 @@ async def reorder_projects(
 async def read_after_write(
     session: RLSSessionDep,
     project_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> ProjectRead:
     """The project a write answers with: re-read after the commit, serialized.

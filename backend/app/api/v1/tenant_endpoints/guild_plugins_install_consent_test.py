@@ -7,18 +7,17 @@ placement routes apply, and anything refused leaves no install behind.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import GuildPluginMessages, GuildMessages
+from app.core.messages import GuildMessages, GuildPluginMessages, MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.services.tenant.initiatives import get_role_by_name
 from app.testing import (
-    create_plugin_service_registration,
     create_initiative,
     create_marketplace_listing,
+    create_plugin_service_registration,
     marketplace_uid,
     route_session_to_guild,
 )
@@ -36,7 +35,6 @@ def _definition(*, inside: bool = True) -> dict:
             "id": "board",
             "path": "/page/board",
             "scopes": ["initiative"] if inside else ["guild"],
-            "admin_only": False,
             "name": {"en": "Board"},
         }
     ]
@@ -80,13 +78,6 @@ async def _install(client: AsyncClient, actor, **body):
     )
 
 
-async def _role_id(session: AsyncSession, guild_id: int, initiative_id: int, name: str):
-    await route_session_to_guild(session, guild_id)
-    role = await get_role_by_name(session, initiative_id=initiative_id, role_name=name)
-    assert role is not None
-    return role.id
-
-
 async def _installs(session: AsyncSession, guild_id: int) -> list[GuildPlugin]:
     session.expunge_all()
     await route_session_to_guild(session, guild_id)
@@ -94,7 +85,7 @@ async def _installs(session: AsyncSession, guild_id: int) -> list[GuildPlugin]:
 
 
 class TestConsentAtInstall:
-    async def test_scopes_placements_and_roles_land_with_the_install(
+    async def test_scopes_and_placements_land_with_the_install(
         self, client: AsyncClient, acting_user, session: AsyncSession, listing
     ):
         a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
@@ -105,26 +96,14 @@ class TestConsentAtInstall:
             a,
             granted_scopes=["projects:read", "comments:read"],
             placements="all",
-            role_kinds=["moderator", "project_manager"],
         )
 
         assert response.status_code == 201, response.text
         body = response.json()
         assert body["granted_scopes"] == ["comments:read", "projects:read"]
-        expected = []
-        for initiative_id in sorted([a.initiative.id, second.id]):
-            roles = sorted(
-                [
-                    await _role_id(session, a.guild.id, initiative_id, "moderator"),
-                    await _role_id(
-                        session, a.guild.id, initiative_id, "project_manager"
-                    ),
-                ]
-            )
-            expected.append({"initiative_id": initiative_id, "role_ids": roles})
-        assert body["placements"] == expected
+        assert body["placed_initiative_ids"] == sorted([a.initiative.id, second.id])
 
-    async def test_picked_initiatives_start_with_their_moderators(
+    async def test_picked_initiatives_are_placed_alone(
         self, client: AsyncClient, acting_user, session: AsyncSession, listing
     ):
         a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
@@ -133,10 +112,7 @@ class TestConsentAtInstall:
         response = await _install(client, a, placements=[a.initiative.id])
 
         assert response.status_code == 201, response.text
-        moderator = await _role_id(session, a.guild.id, a.initiative.id, "moderator")
-        assert response.json()["placements"] == [
-            {"initiative_id": a.initiative.id, "role_ids": [moderator]}
-        ]
+        assert response.json()["placed_initiative_ids"] == [a.initiative.id]
         assert response.json()["granted_scopes"] == []
 
     async def test_an_install_with_no_answers_is_what_it_was(
@@ -148,7 +124,7 @@ class TestConsentAtInstall:
 
         assert response.status_code == 201, response.text
         assert response.json()["granted_scopes"] == []
-        assert response.json()["placements"] == []
+        assert response.json()["placed_initiative_ids"] == []
 
     @pytest.mark.parametrize(
         ("body", "code"),
@@ -162,10 +138,6 @@ class TestConsentAtInstall:
                 GuildPluginMessages.SCOPE_ABOVE_CEILING,
             ),
             ({"placements": [987654]}, GuildPluginMessages.PLACEMENT_INVALID),
-            (
-                {"placements": "all", "role_kinds": ["owner"]},
-                GuildPluginMessages.PLACEMENT_ROLE_INVALID,
-            ),
         ],
     )
     async def test_a_refused_answer_installs_nothing(
@@ -463,7 +435,6 @@ def _wider(*, surfaces: bool = False) -> dict:
                 "id": "planner",
                 "path": "/page/planner",
                 "scopes": ["initiative"],
-                "admin_only": False,
                 "name": {"en": "Planner"},
             },
         ]
@@ -487,7 +458,7 @@ class TestUpgradeConsent:
         )
         return response.json()["id"]
 
-    async def test_the_detail_says_what_the_version_asks_for(
+    async def test_the_detail_says_what_the_version_asks_for_or_why_it_cannot_run(
         self, client: AsyncClient, acting_user, session: AsyncSession, listing
     ):
         a = await acting_user(guild_role=CommunityRole.superadmin)
@@ -505,6 +476,27 @@ class TestUpgradeConsent:
             "added_scopes": ["tags:read"],
             "added_surfaces": [{"id": "planner", "name": {"en": "Planner"}}],
             "declined": False,
+        }
+        assert read["update_refused"] is None
+
+        await create_marketplace_listing(
+            session,
+            uid=SERVICE_UID,
+            public_id=SERVICE_ID,
+            kind="plugin",
+            name="ConsentCo",
+            version="1.2.0",
+            definition=_wider(surfaces=True),
+            min_plugin_api="99.0",
+        )
+        read = (
+            await client.get(a.g(f"/plugins/{plugin_id}"), headers=a.headers)
+        ).json()
+
+        assert (read["update_version"], read["pending_update"]) == (None, None)
+        assert read["update_refused"] == {
+            "version": "1.2.0",
+            "reason": MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE,
         }
 
     async def test_without_consent_it_answers_with_what_it_asks(

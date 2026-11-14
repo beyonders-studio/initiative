@@ -7,9 +7,9 @@ offering a month the feed then shows as empty is worse than no rail.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
@@ -21,9 +21,9 @@ from app.testing import (
     create_tag,
 )
 
-_JANUARY = datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
-_FEBRUARY = datetime(2026, 2, 10, 12, 0, tzinfo=timezone.utc)
-_MARCH = datetime(2026, 3, 5, 12, 0, tzinfo=timezone.utc)
+_JANUARY = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+_FEBRUARY = datetime(2026, 2, 10, 12, 0, tzinfo=UTC)
+_MARCH = datetime(2026, 3, 5, 12, 0, tzinfo=UTC)
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
@@ -76,7 +76,7 @@ async def test_a_months_count_is_its_notices(client: AsyncClient, acting_user, s
             a.initiative,
             a.user,
             name=f"March {day}",
-            published_at=datetime(2026, 3, day, tzinfo=timezone.utc),
+            published_at=datetime(2026, 3, day, tzinfo=UTC),
         )
 
     response = await client.get(
@@ -130,7 +130,7 @@ async def test_the_month_boundary_is_cut_in_the_readers_zone(
         a.initiative,
         a.user,
         name="Late",
-        published_at=datetime(2026, 1, 31, 23, 0, tzinfo=timezone.utc),
+        published_at=datetime(2026, 1, 31, 23, 0, tzinfo=UTC),
     )
 
     utc = await client.get(
@@ -161,7 +161,7 @@ async def test_the_rail_shows_only_months_the_reader_can_open(
         a.user,
         name="Draft",
         published_at=None,
-        scheduled_for=datetime.now(timezone.utc) + timedelta(days=40),
+        scheduled_for=datetime.now(UTC) + timedelta(days=40),
     )
     reader = await acting_user(
         guild_role=CommunityRole.member, guild=a.guild, initiative=a.initiative
@@ -240,7 +240,7 @@ async def test_the_rail_follows_the_archive_view(
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     made = await _board(session, a)
-    made["jan"].archived_at = datetime.now(timezone.utc)
+    made["jan"].archived_at = datetime.now(UTC)
     session.add(made["jan"])
     await session.commit()
 
@@ -287,7 +287,7 @@ async def test_an_anchored_board_is_strictly_chronological(
         },
     )
 
-    assert [p["name"] for p in unanchored.json()["items"]][0] == "mar"
+    assert next(p["name"] for p in unanchored.json()["items"]) == "mar"
     assert [p["name"] for p in anchored.json()["items"]] == ["feb", "jan"]
 
 
@@ -303,7 +303,7 @@ async def test_the_anchor_is_inclusive(client: AsyncClient, acting_user, session
         params={"initiative_id": a.initiative.id, "until": _FEBRUARY.isoformat()},
     )
 
-    assert [p["name"] for p in response.json()["items"]][0] == "feb"
+    assert next(p["name"] for p in response.json()["items"]) == "feb"
 
 
 async def test_anchoring_keeps_the_other_filters(

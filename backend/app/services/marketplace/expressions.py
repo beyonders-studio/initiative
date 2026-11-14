@@ -26,14 +26,14 @@ import asyncio
 import atexit
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, final
 
 import jsonata
 from jsonata.parser import Parser
 
 from app.core.config import settings
-from app.services.worker_pool import Pool, PoolError
 from app.services.marketplace import contract
+from app.services.worker_pool import Pool, PoolError
 
 __all__ = [
     "DEPTH",
@@ -62,12 +62,13 @@ _IDLE_SECONDS = 300
 _ADDRESS_SPACE_BYTES = 256 * 1024 * 1024
 
 
+@final
 class _Undefined:
     """JSONata's ``undefined``: no answer, which is not ``null``."""
 
-    _instance: Optional["_Undefined"] = None
+    _instance: _Undefined | None = None
 
-    def __new__(cls) -> "_Undefined":
+    def __new__(cls) -> _Undefined:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -87,7 +88,7 @@ class ExpressionError(Exception):
     """
 
     def __init__(
-        self, message: str, position: Optional[int] = None, *, transient: bool = False
+        self, message: str, position: int | None = None, *, transient: bool = False
     ) -> None:
         super().__init__(message)
         self.position = position
@@ -107,7 +108,7 @@ def parse(text: str) -> Any:
     ``text`` is not a JSONata expression."""
     try:
         return jsonata.Jsonata(text).ast
-    except Exception as error:  # noqa: BLE001 - every parser failure is one answer
+    except Exception as error:
         raise _failure(error) from error
 
 
@@ -145,7 +146,7 @@ def step_reads(tree: Any) -> set[str]:
 
 # --- evaluating, in the pool ------------------------------------------------
 
-_pool: Optional[Pool] = None
+_pool: Pool | None = None
 _pool_lock = threading.Lock()
 
 
@@ -181,7 +182,7 @@ def shutdown() -> None:
 
 
 async def _evaluate(
-    text: str, document: Any, millis: Optional[int], predicate: bool
+    text: str, document: Any, millis: int | None, predicate: bool
 ) -> dict[str, Any]:
     request: dict[str, Any] = {"expression": text, "predicate": predicate}
     if document is not UNDEFINED:
@@ -201,7 +202,7 @@ async def _evaluate(
     return reply
 
 
-async def evaluate(text: str, document: Any, *, millis: Optional[int] = None) -> Any:
+async def evaluate(text: str, document: Any, *, millis: int | None = None) -> Any:
     """Evaluate one expression over ``document``, within the contract's bounds.
 
     ``millis`` fixes what ``$now()`` and ``$millis()`` answer; absent, they
@@ -212,7 +213,7 @@ async def evaluate(text: str, document: Any, *, millis: Optional[int] = None) ->
     return UNDEFINED if reply.get("undefined") else reply["value"]
 
 
-async def holds(text: str, document: Any, *, millis: Optional[int] = None) -> bool:
+async def holds(text: str, document: Any, *, millis: int | None = None) -> bool:
     """Whether a predicate holds: JSONata's ``$boolean`` of its answer is true."""
     reply = await _evaluate(text, document, millis, True)
     return reply.get("value") is True

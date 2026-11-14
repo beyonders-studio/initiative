@@ -15,9 +15,11 @@ anywhere and a dataset declaration can live beside the thing it describes.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dataclass_field
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from enum import Enum
-from typing import Any, Callable, Mapping, Optional, Protocol
+from typing import Any, Protocol
 
 from app.core.tools import Tool
 from app.schemas.query import FilterOp
@@ -148,7 +150,7 @@ class SortContext:
     ends up quietly filtering as user zero.
     """
 
-    tz: Optional[str] = None
+    tz: str | None = None
 
 
 @dataclass(frozen=True)
@@ -161,7 +163,7 @@ class FieldContext:
 
     guild_id: int
     #: The person asking; ``None`` for an installed plug-in, which is nobody.
-    user_id: Optional[int]
+    user_id: int | None
     #: Custom property definitions by id, for the fields that dispatch on one.
     property_definitions: Mapping[int, Any] = dataclass_field(default_factory=dict)
     #: The plug-in fields the person may filter by, by field id.
@@ -169,7 +171,7 @@ class FieldContext:
     #: IANA timezone, for sorts that group by the reader's local day rather than
     #: the server's. Present here too so one context serves a request that both
     #: filters and orders.
-    tz: Optional[str] = None
+    tz: str | None = None
 
 
 class Resolver(Protocol):
@@ -204,11 +206,11 @@ class FieldSpec:
     ops: frozenset[FilterOp]
     #: The column this field is, when it is one. Mutually exclusive with
     #: ``resolve`` — a field is either a column or a computation, never both.
-    column: Optional[Any] = None
-    resolve: Optional[Resolver] = None
+    column: Any | None = None
+    resolve: Resolver | None = None
     #: How this field orders, when it is not simply its column — a grouping
     #: whose expression depends on the reader's timezone, say.
-    sort: Optional[SortExpression] = None
+    sort: SortExpression | None = None
     #: Whether a consumer may offer this field for filtering. A column can exist
     #: and still be nobody's business to filter on.
     filterable: bool = True
@@ -237,7 +239,7 @@ class FieldSpec:
     buckets: bool = False
     #: How a list is grouped by it, for a field that is neither a column nor
     #: a declared relation (the task a task is part of).
-    groups: Optional[GroupReader] = None
+    groups: GroupReader | None = None
 
     @property
     def type(self) -> FieldType:
@@ -280,7 +282,8 @@ class FieldSpec:
 
 #: Columns no dataset offers as a filter, by convention rather than per model.
 #:
-#: Soft-delete, hold, moderation and purge bookkeeping, the surrogate key, the
+#: Soft-delete, hold, moderation and purge bookkeeping, the actor kinds (the
+#: author filter asks for members itself), the surrogate key, the
 #: tenant key (a request is already scoped to one guild, so filtering by it
 #: narrows nothing), and the drag-ordering float. None of these means anything
 #: to somebody building a filter, and every table has them.
@@ -291,6 +294,8 @@ HIDDEN_EVERYWHERE: frozenset[str] = frozenset(
         "position",
         "deleted_at",
         "deleted_by",
+        "deleted_by_kind",
+        "created_by_kind",
         "purge_at",
         "held_at",
         "hold_id",
@@ -360,9 +365,9 @@ class Dataset:
 
     model: Any
     fields: tuple[FieldSpec, ...]
-    tool: Optional[Tool] = None
+    tool: Tool | None = None
     #: Overrides the name derived from ``tool``. Required when there is no tool.
-    name_override: Optional[str] = None
+    name_override: str | None = None
     #: The datasets this one can be read alongside, by the name a reader uses
     #: for each. Empty means a query about it names it and nothing else.
     relations: tuple[Relation, ...] = ()
@@ -408,7 +413,7 @@ def column(
     col: Any,
     *,
     kind: ControlKind,
-    ops: Optional[frozenset[FilterOp]] = None,
+    ops: frozenset[FilterOp] | None = None,
     filterable: bool = True,
     sortable: bool = False,
     nullable: bool = True,

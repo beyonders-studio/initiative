@@ -22,12 +22,13 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Optional
+from typing import Any
 from urllib.parse import urlparse
 
-import httpx
+import httpx2
 from jwt import PyJWK
 
 from app.services.marketplace.registration_lookup import (
@@ -45,12 +46,12 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "JWKS_MAX_BYTES",
     "KEY_SET_PATH",
-    "KeySetUnreadableError",
-    "PRIVATE_JWK_MEMBERS",
     "PLUGIN_KEY_CURVE",
     "PLUGIN_KEY_TYPE",
-    "is_plugin_key",
+    "PRIVATE_JWK_MEMBERS",
+    "KeySetUnreadableError",
     "clear_fetched_keys",
+    "is_plugin_key",
     "jwk_thumbprint",
     "jwks_uri_allowed",
     "key_for",
@@ -88,14 +89,14 @@ def is_plugin_key(entry: Mapping[str, Any]) -> bool:
 KEY_SET_PATH = "/.well-known/jwks.json"
 
 #: Per-fetch budget, connect and read capped separately.
-_TIMEOUT = httpx.Timeout(5.0, connect=5.0)
+_TIMEOUT = httpx2.Timeout(5.0, connect=5.0)
 
 
 class KeySetUnreadableError(Exception):
     """A key set address that did not answer 200 with a JSON document."""
 
 
-def _origin(url: str) -> Optional[tuple[str, str, Optional[int]]]:
+def _origin(url: str) -> tuple[str, str, int | None] | None:
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.hostname:
         return None
@@ -173,7 +174,7 @@ def _parse(document: Any, source: str) -> Mapping[str, Any]:
 
 
 async def read_key_set(
-    url: str, *, transport: httpx.AsyncBaseTransport | None = None
+    url: str, *, transport: httpx2.AsyncBaseTransport | None = None
 ) -> Any:
     """The JSON document a plug-in serves at ``url``.
 
@@ -194,7 +195,7 @@ async def read_key_set(
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,
         ResponseTooLargeError,
-        httpx.HTTPError,
+        httpx2.HTTPError,
     ) as exc:
         raise KeySetUnreadableError(str(exc) or type(exc).__name__) from exc
     if response.status_code != 200:
@@ -206,7 +207,7 @@ async def read_key_set(
 
 
 async def _fetch(
-    jwks_uri: str, transport: httpx.AsyncBaseTransport | None
+    jwks_uri: str, transport: httpx2.AsyncBaseTransport | None
 ) -> Mapping[str, Any]:
     """Read one published key set. A failure is an empty set, logged."""
     try:
@@ -221,7 +222,7 @@ async def _published_keys(
     registration: RegistrationSnapshot,
     *,
     now: float,
-    transport: httpx.AsyncBaseTransport | None,
+    transport: httpx2.AsyncBaseTransport | None,
 ) -> Mapping[str, Any]:
     jwks_uri = registration.jwks_uri
     if not jwks_uri:
@@ -244,8 +245,8 @@ async def key_for(
     registration: RegistrationSnapshot,
     kid: str,
     *,
-    transport: httpx.AsyncBaseTransport | None = None,
-) -> Optional[Any]:
+    transport: httpx2.AsyncBaseTransport | None = None,
+) -> Any | None:
     """The public key ``kid`` names in this registration's key sets, or
     ``None``: the pasted set first, then the published one."""
     if not kid:

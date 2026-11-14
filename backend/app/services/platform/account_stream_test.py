@@ -7,12 +7,11 @@ reaching a socket.
 
 import pytest
 
-from app.models.platform.guild import CommunityRole
-from app.services.platform import account_stream, user_stream
-from app.services.platform import rules
+from app.models.platform.guild import CommunityJoinPolicy, CommunityRole
+from app.services.platform import account_stream, rules, user_stream
 from app.services.platform import guilds as guilds_service
-from app.testing.sockets import settle
 from app.testing import create_guild, create_guild_membership, create_user
+from app.testing.sockets import settle
 
 
 @pytest.fixture
@@ -181,7 +180,7 @@ async def test_listing_a_community_pokes_every_member(
         description=None,
         retention_days=None,
         retention_days_provided=False,
-        is_community=True,
+        join_policy=CommunityJoinPolicy.open,
         categories=["other"],
         categories_provided=True,
         has_adult_content=False,
@@ -196,6 +195,28 @@ async def test_listing_a_community_pokes_every_member(
     # until they navigated.
     assert away.id in published_remotely
     assert here.id in published_remotely
+
+
+async def test_changing_a_communitys_plan_pokes_every_member(
+    session, account_socket
+) -> None:
+    """The plan is on every member's community list, and the operator who
+    changed it is not one of them."""
+    member = await create_user(session)
+    guild = await create_guild(session)
+    await create_guild_membership(session, user=member, guild=guild)
+    await session.commit()
+    tab = account_socket(member.id)
+
+    await guilds_service.update_guild(
+        session, guild_id=guild.id, max_users=None, max_users_provided=True
+    )
+    await session.commit()
+    await settle()
+
+    assert [(frame["resource"], frame["action"]) for frame in tab.sent] == [
+        ("account", "community")
+    ]
 
 
 async def test_deleting_a_guild_tells_the_people_who_were_in_it(

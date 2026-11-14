@@ -47,8 +47,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Row, delete, func, or_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -70,8 +71,8 @@ from app.services.marketplace.registration_lookup import (
 )
 from app.services.marketplace.service_plugins import schedule_minutes
 from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant import plugin_connection_flows as flows
 from app.services.tenant import metadata
+from app.services.tenant import plugin_connection_flows as flows
 from app.services.tenant.plugin_channels import (
     PluginChannelError,
     owns_install,
@@ -95,7 +96,7 @@ JITTER = 0.1
 BACKOFF_CAP = 10
 
 
-def _declared(definition: Optional[Mapping[str, Any]]) -> dict[str, timedelta]:
+def _declared(definition: Mapping[str, Any] | None) -> dict[str, timedelta]:
     """Each schedule the definition declares, by id, with its interval, and
     the health checks of a declarative plug-in's community connections, by
     connection id, which no schedule's id is."""
@@ -111,7 +112,7 @@ def _declared(definition: Optional[Mapping[str, Any]]) -> dict[str, timedelta]:
     return declared
 
 
-def _declarative_schedules(definition: Optional[Mapping[str, Any]]) -> dict[str, dict]:
+def _declarative_schedules(definition: Mapping[str, Any] | None) -> dict[str, dict]:
     """A declarative plug-in's schedules, by id: each names the read it makes
     and the ``write`` that answers the changes made from it."""
     if not is_declarative(definition):
@@ -122,7 +123,7 @@ def _declarative_schedules(definition: Optional[Mapping[str, Any]]) -> dict[str,
     }
 
 
-def _health_checks(definition: Optional[Mapping[str, Any]]) -> dict[str, dict]:
+def _health_checks(definition: Mapping[str, Any] | None) -> dict[str, dict]:
     """Each community connection's ``health``, by connection id."""
     return {
         connection["id"]: connection["health"]
@@ -140,9 +141,9 @@ def _jitter(every: timedelta) -> timedelta:
 async def reconcile(
     guild_id: int,
     install_id: int,
-    definition: Optional[Mapping[str, Any]],
+    definition: Mapping[str, Any] | None,
     *,
-    session: Optional[AsyncSession] = None,
+    session: AsyncSession | None = None,
 ) -> None:
     """Give the install a row for each schedule ``definition`` declares, and
     none for any other. A new schedule is due at once, give or take its
@@ -158,7 +159,7 @@ async def reconcile(
             await own.commit()
         return
     declared = _declared(definition)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         delete(PluginScheduleRun).where(
             col(PluginScheduleRun.install_id) == install_id,
@@ -182,10 +183,10 @@ async def reconcile(
         )
 
 
-async def _claim(session: AsyncSession, live_listings: list[str]) -> Optional[Row]:
+async def _claim(session: AsyncSession, live_listings: list[str]) -> Row | None:
     """Lease the community's next due row whose install is switched on and
     whose registration is live, or return ``None``."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     due = (
         select(PluginScheduleRun.install_id, PluginScheduleRun.schedule_id)
         .join(GuildPlugin, col(GuildPlugin.id) == PluginScheduleRun.install_id)
@@ -228,15 +229,15 @@ async def _settle(
     *,
     every: timedelta,
     started: datetime,
-    succeeded: Optional[bool],
-    checked: Optional[str] = None,
+    succeeded: bool | None,
+    checked: str | None = None,
 ) -> None:
     """Settle a claimed row. A health check (``checked``, the state it read)
     is next due one interval later whatever it read, and counts the answers
     other than ``ok`` in a row as its failures. A run that was skipped
     (``succeeded`` is ``None``) is next due one interval later, with its
     failures and last success as they were."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if checked is not None:
         values: dict[str, Any] = {
             "failures": 0 if checked == "ok" else run.failures + 1,
@@ -314,7 +315,7 @@ async def run_due(session: AsyncSession, guild_id: int) -> datetime | None:
         ):
             # Left to its lease: the install changed since the row was written.
             continue
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         since = run.last_success_at.isoformat() if run.last_success_at else None
         # A declarative registration has no hook to call, whatever version
         # an install is still pinned to.
@@ -384,9 +385,9 @@ async def _run_schedule(
     registration: RegistrationSnapshot,
     schedule: Mapping[str, Any],
     *,
-    since: Optional[str],
+    since: str | None,
     guild_id: int,
-) -> Optional[bool]:
+) -> bool | None:
     """Run one of a declarative plug-in's schedules and make the changes its
     ``write`` answers, as the install. Whether it succeeded: a read that
     answers unavailable or cannot be made, an expression that fails, and
@@ -423,7 +424,7 @@ async def _check_health(
     run: Row,
     *,
     guild_id: int,
-) -> Optional[str]:
+) -> str | None:
     """Run one community connection's health check and report what it read:
     ``ok`` at once, any other state once two checks in a row have read
     something other than ``ok``. A connection not yet made is not checked,

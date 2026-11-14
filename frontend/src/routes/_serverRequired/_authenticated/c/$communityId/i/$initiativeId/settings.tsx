@@ -1,4 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsLayout } from "@/pages/community/initiatives/settings/SettingsLayout";
 
 /**
  * Layout for one initiative's settings: the header, the tab bar, and whichever
@@ -8,9 +10,5 @@ import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/settings"
 )({
-  component: lazyRouteComponent(() =>
-    import("@/pages/InitiativeSettingsLayout").then((m) => ({
-      default: m.InitiativeSettingsLayout,
-    }))
-  ),
+  component: SettingsLayout,
 });

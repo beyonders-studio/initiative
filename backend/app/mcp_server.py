@@ -32,7 +32,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Any, Iterator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastmcp import FastMCP
@@ -44,9 +45,9 @@ from fastmcp.utilities.openapi.models import HTTPRoute
 
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
 from app.core.config import PROJECT_NAME
+from app.core.tools import Tool
 from app.mcp_descriptions import describe as describe_tool
 from app.models.tenant.task import TaskStatusCategory
-from app.core.tools import Tool
 from app.services import fields as fields_registry
 from app.services.compact import trim
 
@@ -760,7 +761,7 @@ class ArgumentDefaultsMiddleware(Middleware):
         return await call_next(context.copy(message=message))
 
 
-def build_mcp_server(app: "FastAPI") -> FastMCP:
+def build_mcp_server(app: FastAPI) -> FastMCP:
     """Build the route-backed MCP server from the FastAPI ``app``.
 
     The app must already have its routers included so the RouteMap can see them.

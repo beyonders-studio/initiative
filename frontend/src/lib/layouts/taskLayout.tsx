@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import {
+  ActorKind,
   SearchEntityType,
   type TaskListRead,
   type TaskPriority,
@@ -22,11 +23,9 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
-import type { Written } from "@/components/layouts/AddItemDialog";
-import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
+import { usePersonMention } from "@/components/comments/usePersonMention";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { TagsField } from "@/components/tags/TagsField";
 import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
 import { PART_MARK, SmartTitleParts } from "@/components/tasks/SmartTitleParts";
 import { TaskChecklist } from "@/components/tasks/TaskChecklist";
@@ -35,24 +34,13 @@ import { TaskReminderField } from "@/components/tasks/TaskReminderField";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useActorName } from "@/hooks/useActorName";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
-import { useDateLocale } from "@/hooks/useDateLocale";
-import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import { itemSaves } from "@/hooks/useFieldSave";
+import { useFillRequired } from "@/hooks/useFillRequired";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import {
   TASK_SAVES,
@@ -62,31 +50,25 @@ import {
   useTaskSaveOptions,
   useUpdateTask,
 } from "@/hooks/useTasks";
-import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { dateRangeBounds } from "@/lib/dateRange";
-import { fromPickerValue, toPickerValue } from "@/lib/localDateTime";
 import { toast } from "@/lib/mascotToast";
-import {
-  fromStored,
-  isHourlyRule,
-  isValidTaskRecurrence,
-  rulePayload,
-  type TaskRecurrenceValue,
-} from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
 import { type Applied, NOTHING_APPLIED, readingEdit } from "@/lib/smartTaskTitle";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { startedFrom, startsWith } from "@/lib/taskTypeStart";
-import { dateTimePattern } from "@/lib/timeFormat";
-import { taskRoute } from "@/lib/tools";
 import {
   getAvatarSrc,
   getInitialsForUser,
   getUserDisplayName,
   isAnonymizedUser,
+  toMember,
 } from "@/lib/userDisplay";
-
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
 import {
   filledBy,
   hasAny,
@@ -95,10 +77,37 @@ import {
   requiredKeys,
   type StoredRegions,
   sentOr,
-} from "./detailLayout";
-import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
-import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
-import { PROPERTY_FIELD_PREFIX } from "./fields";
+} from "@/ui/layouts/detailLayout";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  type ItemEdit,
+  sameIds,
+  sameJson,
+  useFieldDraft,
+  type Written,
+} from "@/ui/layouts/editing";
+import { TitleField, type TypeaheadField } from "@/ui/layouts/fieldEditors";
+import { PROPERTY_FIELD_PREFIX } from "@/ui/layouts/fields";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
+import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
+import { dateTimePattern } from "@/ui/lib/timeFormat";
+import { useDateLocale } from "@/ui/lib/useDateLocale";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { MemberPicker } from "@/ui/member-picker";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
+import {
+  fromStored,
+  isHourlyRule,
+  isValidTaskRecurrence,
+  rulePayload,
+  type TaskRecurrenceValue,
+} from "@/ui/recurrence/recurrence";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+
+import { DescriptionField } from "./DescriptionField";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
 
 /** What the task's detail shares with its parts, beside the task itself. */
@@ -191,6 +200,13 @@ const SmartTitleEditor = ({ item: task, label }: EditorProps) => {
       return save.save({ patch: { ...edit.patch, title }, shows: edit.shows }, undo);
     },
   };
+  // `@` offers the project's people, and writes the picked one's handle.
+  const usePeople = (field: TypeaheadField) =>
+    usePersonMention({
+      ...field,
+      members: { type: "canOpen", tool: Tool.project, id: task.project_id },
+      onPick: smart.picked,
+    });
   const parts = smart.reading?.parts ?? [];
   return (
     <TitleField
@@ -203,10 +219,7 @@ const SmartTitleEditor = ({ item: task, label }: EditorProps) => {
       marks={parts.map((part) => ({ ...part, className: PART_MARK[part.type] }))}
       below={<SmartTitleParts reading={smart.reading} onKeep={smart.keep} className="px-3 pt-1" />}
       trailing={<SmartTitleHints />}
-      mention={{
-        members: { type: "canOpen", tool: Tool.project, id: task.project_id },
-        onPick: smart.picked,
-      }}
+      useTypeahead={usePeople}
     />
   );
 };
@@ -537,9 +550,10 @@ const PriorityEditor = ({ item: task, label }: EditorProps) => {
 };
 
 const AssigneesEditor = ({ item: task, label }: EditorProps) => {
-  const { t } = useTranslation("tasks");
+  const { t } = useTranslation(["tasks", "projects"]);
   const { readOnly, currentUserId, askScope } = useTaskLayout();
   const save = useTaskFieldSave(task, label, askScope);
+  const searchMembers = useSearchMembers();
   const saved = task.assignees.map((assignee) => assignee.id);
   // Who is added shows from the draft until the task comes back naming them.
   const edit = (ids: number[]): TaskEdit => ({
@@ -559,12 +573,15 @@ const AssigneesEditor = ({ item: task, label }: EditorProps) => {
   );
   return (
     <FieldFrame label={label} save={save}>
-      <MemberMultiSelect
+      <MemberPicker
+        multiple
+        searchMembers={searchMembers}
         scope={{ type: "canOpen", tool: Tool.project, id: task.project_id }}
-        selectedIds={draft.value}
-        selectedUsers={task.assignees}
+        value={draft.value}
+        selected={task.assignees.map(toMember)}
         onChange={draft.edit}
         disabled={readOnly}
+        placeholder={t("projects:assignee.searchPlaceholder")}
         emptyMessage={t("taskForm.assigneesEmptyMessage")}
         currentUserId={currentUserId}
       />
@@ -763,20 +780,21 @@ const Byline = ({ task }: { task: TaskRead }) => {
   const dateLocale = useDateLocale();
   const createdAt = useMemo(() => new Date(task.created_at), [task.created_at]);
   const relative = useRelativeTime(createdAt);
+  const actorName = useActorName();
   const creator = task.creator;
   const anonymized = isAnonymizedUser(creator);
+  const member = task.created_by_kind === ActorKind.member;
   // A creator who has since left the community is named by id.
-  const name =
-    creator || task.created_by != null
-      ? getUserDisplayName(creator ?? { id: task.created_by })
-      : null;
+  const name = member
+    ? getUserDisplayName(creator ?? { id: task.created_by })
+    : actorName(task.created_by_kind, task.created_by_install);
   const avatarSrc = creator && !anonymized ? getAvatarSrc(creator) : undefined;
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex w-fit items-center gap-2 text-muted-foreground text-xs">
-            {name ? (
+            {member ? (
               <Avatar className="h-5 w-5 border text-3xs">
                 {avatarSrc ? <AvatarImage src={avatarSrc} alt={name} /> : null}
                 <AvatarFallback userId={anonymized ? null : (creator?.id ?? null)}>
@@ -784,11 +802,7 @@ const Byline = ({ task }: { task: TaskRead }) => {
                 </AvatarFallback>
               </Avatar>
             ) : null}
-            <span>
-              {name
-                ? t("edit.createdBy", { name, time: relative })
-                : t("edit.createdAt", { time: relative })}
-            </span>
+            <span>{t("edit.createdBy", { name, time: relative })}</span>
           </div>
         </TooltipTrigger>
         <TooltipContent>
@@ -808,13 +822,19 @@ const Notice = () => {
   ) : null;
 };
 
-const Case = ({ task }: { task: TaskRead }) => (
-  <CasePanel
-    taskId={task.id}
-    canEdit={!useTaskLayout().readOnly}
-    assigneeIds={task.assignees.map((assignee) => assignee.id)}
-  />
-);
+// The operations case behind the task; a task that is none shows nothing here.
+// Its type can make it a published idea, so the panel asks again when it changes.
+const Case = ({ task }: { task: TaskRead }) => {
+  const { readOnly } = useTaskLayout();
+  return (
+    <CasePanel
+      key={task.task_type_id}
+      taskId={task.id}
+      canEdit={!readOnly}
+      assigneeIds={task.assignees.map((assignee) => assignee.id)}
+    />
+  );
+};
 
 const Comments = ({ task }: { task: TaskRead }) => {
   const { t } = useTranslation("tasks");
@@ -847,7 +867,7 @@ const Comments = ({ task }: { task: TaskRead }) => {
 
 /** A task's detail: its fields, its own parts and where it lives. A task is
  *  addressed inside its project, so that is the tool its links refresh. */
-export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = {
+export const TASK_DETAIL: InitiativeDetail<TaskRead, TaskLayoutContext, TaskUpdate> = {
   spec: TASK_LAYOUT,
   // Each type of task has its own page, drawn as its shape until it is changed.
   typed: {
@@ -875,7 +895,7 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     comments: (_node, task) => <Comments task={task} />,
   },
   home: (task, context) => ({
-    saves: TASK_SAVES,
+    saves: itemSaves(TASK_SAVES, task.id),
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
     canOpen: { tool: Tool.project, id: task.project_id },
@@ -888,7 +908,7 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     },
     actions: context.actions,
   }),
-  taskRoute: (task, context, taskId) => taskRoute(context.initiativeId, task.project_id, taskId),
+  useExtension: useInitiativeExtension,
   Shell: TaskShell,
   addingParts: ["status", "dates"],
   // The type picks the page the rest is laid out as.
@@ -942,6 +962,8 @@ export const blankTask = (
   position: 0,
   archived_at: null,
   created_by: null,
+  created_by_kind: ActorKind.system,
+  created_by_install: null,
   creator: null,
   assignees: [],
   comment_count: 0,

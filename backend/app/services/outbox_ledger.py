@@ -18,8 +18,8 @@ share the rules here:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Sequence, TypeVar
 
 from sqlalchemy import (
     ColumnElement,
@@ -49,9 +49,6 @@ LEASE = timedelta(minutes=5)
 #: second, and so on.
 BACKOFF_SECONDS: tuple[int, ...] = (5, 30, 120, 600, 1800, 3600)
 
-#: The queues claimed by recipient.
-RowT = TypeVar("RowT", EmailOutboxItem, NoticeOutboxItem)
-
 
 def _due(
     table: Table, *, now: datetime, still_open: Sequence[ColumnElement[bool]]
@@ -64,7 +61,7 @@ def _due(
     )
 
 
-async def due_recipients(
+async def due_recipients[RowT: (EmailOutboxItem, NoticeOutboxItem)](
     session: AsyncSession,
     model: type[RowT],
     *,
@@ -91,7 +88,7 @@ async def due_recipients(
     return list(rows.scalars().all())
 
 
-async def claim(
+async def claim[RowT: (EmailOutboxItem, NoticeOutboxItem)](
     session: AsyncSession,
     model: type[RowT],
     user_ids: Sequence[int],

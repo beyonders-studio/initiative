@@ -19,7 +19,6 @@ from app.models.platform.access_grant import (
     AccessLevel,
 )
 from app.models.platform.user import User
-
 from seed.common import NOW
 
 #: ``requested_delta``/``decided_delta``/``expires_delta`` are relative to now;

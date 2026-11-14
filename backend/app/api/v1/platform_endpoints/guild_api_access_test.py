@@ -6,12 +6,12 @@ setting on the roster, the mint, and every path that reaches the guild's
 content with a key in hand.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing.schema_harness import route_session_to_guild
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.testing.factories import (
     create_access_grant,
     create_calendar,
@@ -24,6 +24,7 @@ from app.testing.factories import (
     get_auth_headers,
     guild_administration,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 async def _key_headers(client: AsyncClient, headers: dict, **body) -> dict[str, str]:
@@ -329,7 +330,9 @@ async def test_an_upload_is_not_served_to_a_key_the_guild_declines(
         Upload(
             filename="note.txt",
             created_by=admin.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()

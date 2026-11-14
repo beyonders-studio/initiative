@@ -196,7 +196,6 @@ async function inflate(compressed: ArrayBuffer, compression: number): Promise<Ui
  * server's post-upload plan is the authoritative version. */
 export interface PeekedManifest {
   type?: string;
-  kind?: string;
   schema_version?: number;
   app_version?: string;
   exported_at?: string;
@@ -240,8 +239,7 @@ export async function peekBackupManifest(file: File): Promise<PeekedManifest> {
     throw new BackupPeekError("not_backup");
   }
   const manifest = parsed as PeekedManifest;
-  const discriminator = manifest.type ?? manifest.kind;
-  if (discriminator !== "initiative-backup" && discriminator !== "guild-backup") {
+  if (manifest.type !== "initiative-backup" && manifest.type !== "guild-backup") {
     throw new BackupPeekError("not_backup");
   }
   return manifest;

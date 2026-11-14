@@ -134,10 +134,10 @@ class TestCaptureChangeBindsTheRoutedSchema:
     ):
         """``capture_change`` resolves a task's initiative through the guild's
         own ``projects``, so the event is scoped like the row it describes."""
-        _, guild, first, second, project, task = workspace
+        _, _guild, first, second, project, task = workspace
         await routed.exec(
             text(
-                f"CREATE TEMP TABLE projects AS "  # noqa: S608
+                f"CREATE TEMP TABLE projects AS "
                 f"SELECT {project.id}::int AS id, {second.id}::int AS initiative_id"
             )
         )

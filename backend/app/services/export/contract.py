@@ -14,8 +14,8 @@ keeps cell text from being read as a formula).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 

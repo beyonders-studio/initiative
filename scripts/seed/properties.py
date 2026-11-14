@@ -8,7 +8,6 @@ from datetime import timedelta
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.schemas.tenant.property import PropertyValueInput
 from app.services.tenant import metadata as metadata_service
-
 from seed.common import NOW, Community
 
 #: Each initiative's definitions, in position order. ``options`` — ``(value,

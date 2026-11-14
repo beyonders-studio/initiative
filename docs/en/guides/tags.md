@@ -4,42 +4,91 @@ icon: lucide/tags
 
 # Tags
 
-**Tags** are labels you stick on things so that future-you can find them again.
+**Tags** are labels you stick on things so that future you can find them again.
 
-The same tag works on every [tool](tools.md) and most of what's inside them — tasks, events, pictures, wiki pages — so `urgent`, `client-acme` or `idea` rounds up everything on that subject, regardless of what kind of thing each one happens to be.
-
-## Adding one
-
-Wherever you see an **Add tags…** box:
-
-1. Start typing a name.
-2. Pick an existing tag, or choose **Create "your-tag"** to invent one on the spot.
-
-Done. It's attached, and now available everywhere else too.
+A tag belongs to the whole community, and the same one works on every [tool](tools.md) and on most of what's inside them: tasks, events, wiki pages and collections. So `urgent`, `spring-gala` or `ideas` rounds up everything on that subject, whatever kind of thing each one happens to be. The one exception is a single counter, which can't be tagged, though its counter group can.
 
 !!! tip "Six good tags beat sixty bad ones"
-    A handful you actually use will serve you far better than a sprawling taxonomy invented during one enthusiastic afternoon in February and never touched again.
+    A handful you actually use will serve you far better than a sprawling system invented during one enthusiastic afternoon in February and never touched again. Name them for how you'll want to search later, not for how you feel about the thing right now.
 
-    Name them for how you'll want to *search* later, not for how you feel about the thing right now.
+## Tag something
 
-## Finding things by tag
+You need edit access to the thing you're tagging.
 
-- **Filter by tag** on a list — tasks in a **Table** view, and most tool lists under **Filters**.
-- The **Tags** view on a tool's list browses it by the tag tree. See [Tools](tools.md#lists).
-- The **Tags** tab in the sidebar lists every tag in the community.
-- A tag's **detail page** shows everything carrying it, with one tab per kind of tool and how many are in each. A tab has a table of the tools themselves, which you can search and sort, and one for each kind of thing inside them: a tagged task is in **Tasks** on the **Projects** tab, a tagged page in **Pages** on **Wikis**. Every table shows a page at a time, so a tag on thousands of things opens as quickly as one on a few.
+1. Find where it takes tags. On a tool, that's the **Add tags...** box under **Tags** in the strip at the top of its page. On a task, it's the **Tags** field.
+2. Start typing the tag's name.
+3. Pick the tag from the list.
 
-![Everything sharing a tag](../images/tags/tag-detail.png)
+It's saved as soon as you pick it. To take a tag off, select the **×** on it.
 
-## Managing them
+## Make a new tag
 
-From a tag's detail page you can **rename** it — which updates it everywhere at once, so there's no find-and-replace and no forgotten stragglers — or **delete** it.
+Anyone in the community can make a tag.
 
-Deleted tags go to the **Trash**, so a mis-click is fixable for a while.
+1. Wherever you'd add a tag, type the new tag's name.
+2. Select **Create "your-tag"**.
+3. Pick a color, or keep the one it suggests.
+4. Select **Create**.
 
-You can also **add or remove tags on lots of things at once**: select several tasks and edit their tags together.
+The tag goes onto the thing you were tagging, and from then on it's offered everywhere in the community.
 
-## Related
+## File tags under other tags
 
-- [Projects & tasks](projects-and-tasks.md) — tagging and filtering tasks.
-- [Files](files.md) — tagging files.
+Put a slash in a tag's name and it files itself under the part before the slash: `books/fiction` and `books/poetry` sit under `books`. Lists and the sidebar show them as a tree you can open and close, and choosing `books` includes everything filed under it.
+
+Renaming `books` doesn't move the tags under it, because they're filed by their own names. Rename those too if you want them to follow.
+
+## Find things by tag
+
+- **Filter a list.** On a tool's tab, select **Filters** and pick tags under **Tags**. In a project, use **Filter by tag** under **Filters**. You get everything carrying any of the tags you picked.
+- **Browse a list by tag.** On a tool's tab, choose **Tags** under **View**. The tag tree sits beside the list (or along the top, on a phone). Select a tag to see what carries it, and ++ctrl++-click more (++cmd++-click on a Mac) to add them. **Not tagged** shows what has none.
+- **Open the tag's page.** Select **Tags** next to **Initiatives** at the top of the sidebar, then select a tag.
+
+A tag's page shows how many things carry it, with a tab for each kind of tool. A tab counts the tools and the tagged things inside them, so a tag on three projects and eight of their tasks reads "Projects (11)". Each tab has a table of the tools themselves, which you can search and sort, and below it the things inside them that carry the tag: a tagged task is under **Tasks** on the **Projects** tab, a tagged wiki page under **Pages** on **Wikis**.
+
+![A tag's page, with a tab for each kind of tool](../images/tags/tag-page.webp#only-light)
+![A tag's page, with a tab for each kind of tool](../images/tags/tag-page.dark.webp#only-dark)
+
+## Rename or recolor a tag
+
+From the tag's page:
+
+1. Select **Edit**.
+2. Change the name or the color.
+3. Select **Save**.
+
+Or from the sidebar:
+
+1. Select **Tags** in the sidebar.
+2. Select **Edit tags** (the pencil).
+3. Select the pencil beside the tag.
+4. Change the name or the **Color**, then select **Save**.
+5. Select **Done editing**.
+
+Renaming updates the tag everywhere at once, so there's no find-and-replace and no forgotten stragglers. Any member of the community can do this, so it's worth agreeing who looks after the tags before anybody renames `urgent` to `URGENT!!!`.
+
+## Tag lots of things at once
+
+1. On a tool's tab, open **More actions** and select **Select items**. In a project's table, select **Select** instead.
+2. Tick everything you want to tag.
+3. Select **Edit tags** (**Edit Tags** in a project).
+4. On the **Add** tab, pick the tags to add. On the **Remove** tab, pick the ones to take off.
+5. Select **Apply**.
+
+You need edit access to everything you picked.
+
+## Delete a tag
+
+From the tag's page:
+
+1. Select **Delete**.
+2. Select **Delete** again to confirm.
+
+To delete one or several from the sidebar:
+
+1. Select **Tags** in the sidebar, then **Edit tags**.
+2. Tick the tags, or **Select all tags**.
+3. Select **Delete selected**.
+4. Select **Delete** to confirm.
+
+A deleted tag disappears from everything that had it and goes to the trash. Restore it from **Trash** in your own settings before the retention period ends and it comes back on everything it was on. See [Trash](../account/profile-and-preferences.md#trash).

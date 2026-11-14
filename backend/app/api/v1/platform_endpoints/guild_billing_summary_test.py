@@ -1,6 +1,6 @@
-import httpx
+import httpx2
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
@@ -14,7 +14,6 @@ from app.testing.factories import (
     get_auth_headers,
 )
 
-
 _ANSWER = billing_ping.PlanSummary.model_validate(
     {
         "tier_name": "Gold",
@@ -23,6 +22,8 @@ _ANSWER = billing_ping.PlanSummary.model_validate(
         "next_charge": {"total": 1250, "currency": "USD"},
         "scheduled_change": None,
         "payment_failed": False,
+        "can_upgrade": False,
+        "can_cancel": True,
     },
     strict=False,
 )
@@ -78,6 +79,8 @@ async def test_the_seat_gets_billings_answer(
         "next_charge": {"total": 1250, "currency": "USD"},
         "scheduled_change": None,
         "payment_failed": False,
+        "can_upgrade": False,
+        "can_cancel": True,
     }
     assert billing_answers["asked"] == [guild.id]
 
@@ -119,21 +122,23 @@ async def test_billing_without_an_answer_is_unavailable(
         "next_charge": None,
         "scheduled_change": None,
         "payment_failed": False,
+        "can_upgrade": False,
+        "can_cancel": False,
     }
 
 
-def _down(request: httpx.Request) -> httpx.Response:
-    raise httpx.ConnectError("down")
+def _down(request: httpx2.Request) -> httpx2.Response:
+    raise httpx2.ConnectError("down")
 
 
 @pytest.mark.parametrize(
     "handler",
     [
         _down,
-        lambda request: httpx.Response(503, json={"detail": "maintenance"}),
-        lambda request: httpx.Response(200, json={"payment_failed": "yes"}),
-        lambda request: httpx.Response(200, json={"renews_on": "soon"}),
-        lambda request: httpx.Response(200, content=b"<html>gateway</html>"),
+        lambda request: httpx2.Response(503, json={"detail": "maintenance"}),
+        lambda request: httpx2.Response(200, json={"payment_failed": "yes"}),
+        lambda request: httpx2.Response(200, json={"renews_on": "soon"}),
+        lambda request: httpx2.Response(200, content=b"<html>gateway</html>"),
     ],
 )
 async def test_billing_down_or_malformed_is_unavailable_end_to_end(
@@ -141,10 +146,10 @@ async def test_billing_down_or_malformed_is_unavailable_end_to_end(
 ):
     """Through the real outbound call: billing unreachable, or its answer
     refused."""
-    real_client = httpx.AsyncClient
+    real_client = httpx2.AsyncClient
 
     def _client(*args, **kwargs):
-        kwargs["transport"] = httpx.MockTransport(handler)
+        kwargs["transport"] = httpx2.MockTransport(handler)
         return real_client(*args, **kwargs)
 
     async def _known_ref(**kwargs):
@@ -153,7 +158,7 @@ async def test_billing_down_or_malformed_is_unavailable_end_to_end(
     monkeypatch.setattr(settings, "BILLING_URL", "https://billing.example")
     configure_outbound(monkeypatch, "https://billing.internal")
     monkeypatch.setattr(billing_ping, "existing_ref", _known_ref)
-    monkeypatch.setattr(billing_ping.httpx, "AsyncClient", _client)
+    monkeypatch.setattr(billing_ping.httpx2, "AsyncClient", _client)
     guild, seat, _, _ = await _guild_with_seat(session)
     response = await client.get(_url(guild.id), headers=get_auth_headers(seat))
     assert response.status_code == 200, response.text

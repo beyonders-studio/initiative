@@ -1,29 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { EntityType, TrashItem } from "@/api/generated/initiativeAPI.schemas";
-import { PaginationBar } from "@/components/PaginationBar";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ActorKind, type EntityType, type TrashItem } from "@/api/generated/initiativeAPI.schemas";
 import {
   useCommunityTrashList,
   useMyTrashList,
   usePurgeTrashEntity,
   useRestoreTrashEntity,
 } from "@/hooks/useTrash";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
+import { RelativeTime } from "@/ui/relative-time";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 /**
  * `user` — the viewer's own deletions across every community (personal settings).
@@ -44,6 +36,7 @@ interface TrashTableProps {
 
 export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
   const { t } = useTranslation("trash");
+  const { t: tCommon } = useTranslation("common");
   // Hooks must run unconditionally; pick the active query by variant. The
   // unused one is disabled so it never fires a request.
   const [page, setPage] = useState(1);
@@ -74,18 +67,12 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
     onSuccess: () => {
       toast.success(t("restoreSuccess"));
     },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "trash:restoreError"));
-    },
   });
 
   const purgeMutation = usePurgeTrashEntity({
     onSuccess: () => {
       toast.success(t("purgeSuccess"));
       setPurgeConfirm({ open: false });
-    },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "trash:purgeError"));
     },
   });
 
@@ -141,7 +128,11 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
                   <Badge variant="secondary">{t(`entityType.${item.entity_type}` as const)}</Badge>
                 </TableCell>
                 <TableCell className="font-medium">{item.name || `#${item.entity_id}`}</TableCell>
-                <TableCell className="text-muted-foreground">{item.deleted_by_display}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {item.deleted_by_kind === ActorKind.system
+                    ? tCommon("appName")
+                    : item.deleted_by_display || tCommon("aPlugin")}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   <RelativeTime date={item.deleted_at} fallback={item.deleted_at} />
                 </TableCell>
@@ -187,16 +178,14 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
           </TableBody>
         </Table>
       </div>
-      {data.has_prev || data.has_next ? (
-        <PaginationBar
-          className="mt-4"
-          page={data.page}
-          pageSize={data.page_size}
-          totalCount={data.total_count}
-          hasNext={data.has_next}
-          onPageChange={setPage}
-        />
-      ) : null}
+      <PaginationBar
+        className="mt-4"
+        page={data.page}
+        pageSize={data.page_size}
+        totalCount={data.total_count}
+        hasNext={data.has_next}
+        onPageChange={setPage}
+      />
 
       {purgeConfirm.open && (
         <ConfirmDialog

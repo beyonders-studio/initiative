@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import json
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.user import UserRole
 from app.testing import emitted
 from app.testing.factories import create_auth_provider, create_user, get_auth_headers
-
 
 BASE = "/api/v1/settings/auth/providers/"
 SECRET = "s3cret-value"

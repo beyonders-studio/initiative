@@ -36,19 +36,17 @@ caller's RLS session.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
+from fastapi import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from dataclasses import replace
-
-from fastapi import HTTPException
-
 from app.core.errors import CodedError
+from app.core.file_types import FileType, is_stored
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
-from app.core.file_types import FileType, is_stored
 from app.models.tenant.file import File
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.tenant.tag import annotated_tags
@@ -103,7 +101,7 @@ class WikiAdapter(ToolExportAdapter):
                         session, user, guild_id, linked.id, access=access
                     )
                 )
-            except (HTTPException, CodedError):
+            except HTTPException, CodedError:
                 # Not theirs to export: it stays out of the download.
                 continue
         return wiki, pages, files

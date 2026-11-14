@@ -9,24 +9,20 @@ import {
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CounterView } from "@/components/initiativeTools/counters/views/CounterView";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CounterView } from "@/components/tools/counterGroups/views/CounterView";
+import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
-import { type ItemFieldSave, useItemFieldSave } from "@/hooks/useFieldSave";
+import { itemSaves, useItemFieldSave } from "@/hooks/useFieldSave";
 import { isAtMax, isAtMin } from "@/lib/counter-math";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { FieldFrame, type ItemFieldSave, ReadField, useFieldDraft } from "@/ui/layouts/editing";
+import { ColorField, TitleField } from "@/ui/layouts/fieldEditors";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { type COUNTER_FIELDS, COUNTER_LAYOUT, counterFields } from "./counters";
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { FieldFrame, ReadField, useFieldDraft } from "./editing";
-import { ColorField, TitleField } from "./fieldEditors";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 
 /** What a counter's detail shares with its parts, beside the counter itself. */
 export interface CounterLayoutContext {
@@ -65,7 +61,7 @@ const NameEditor = ({ item: counter, label }: EditorProps) => {
       save={useSave(counter, label)}
       readOnly={useCounterLayout().readOnly}
       placeholder={t("counterNamePlaceholder")}
-      subscribe={{ kind: "counter", id: counter.id }}
+      beside={<SubscribeButton kind="counter" entityId={counter.id} className="mt-0.5" />}
     />
   );
 };
@@ -226,7 +222,7 @@ const Count = ({ counter }: { counter: CounterRead }) => {
 };
 
 /** A counter's detail: its fields, its count and where it lives. */
-export const COUNTER_DETAIL: DetailKind<CounterRead, CounterLayoutContext, CounterUpdate> = {
+export const COUNTER_DETAIL: InitiativeDetail<CounterRead, CounterLayoutContext, CounterUpdate> = {
   spec: COUNTER_LAYOUT,
   fields: counterFields,
   namespaces: ["counterGroups", "common"],
@@ -241,7 +237,7 @@ export const COUNTER_DETAIL: DetailKind<CounterRead, CounterLayoutContext, Count
   } satisfies Record<keyof typeof COUNTER_FIELDS, ComponentType<EditorProps>>,
   parts: { count: (_node, counter) => <Count counter={counter} /> },
   home: (counter, context) => ({
-    saves: counterSaves(context.groupId),
+    saves: itemSaves(counterSaves(context.groupId), counter.id),
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
     canOpen: { tool: Tool.counter_group, id: context.groupId },
@@ -252,6 +248,7 @@ export const COUNTER_DETAIL: DetailKind<CounterRead, CounterLayoutContext, Count
     },
     actions: context.actions,
   }),
+  useExtension: useInitiativeExtension,
 };
 
 /** A counter not yet added, in `color`, as its detail draws it while it is. */

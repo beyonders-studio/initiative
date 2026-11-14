@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { syncFaviconWithTheme } from "@/lib/favicon";
 import { getItem, setFirstPaintHint, setItem } from "@/lib/storage";
 
-type Theme = "light" | "dark" | "system";
+export type Theme = "light" | "dark" | "system";
 type ResolvedTheme = Exclude<Theme, "system">;
 
 interface ThemeState {

@@ -69,7 +69,7 @@ def from_checkout(root: Path) -> dict[str, str | None]:
 
 def _fetch(ref: str, remote: str) -> str:
     url = f"{RAW}/{ref}/{remote}"
-    with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=30) as response:
         return response.read().decode("utf-8")
 
 
@@ -100,7 +100,7 @@ def stamp(root: Path | None, ref: str | None) -> dict[str, str]:
             check=True,
         ).stdout.strip()
         return {"KIT_VERSION": version, "KIT_REVISION": revision}
-    with urllib.request.urlopen(f"{RAW}/{ref}/package.json", timeout=30) as response:  # noqa: S310
+    with urllib.request.urlopen(f"{RAW}/{ref}/package.json", timeout=30) as response:
         version = json.loads(response.read().decode("utf-8"))["version"]
     return {"KIT_VERSION": version, "KIT_REVISION": ref or ""}
 

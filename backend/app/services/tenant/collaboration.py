@@ -20,16 +20,17 @@ import hashlib
 import json
 import logging
 from contextlib import suppress
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from pycrdt import Doc
 from sqlalchemy import func
 from sqlalchemy import update as sa_update
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import cohorts
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.services import editor_engine
 from app.services.content_sockets import resource_room, sockets
@@ -41,7 +42,6 @@ from app.services.tenant.collaborative_resources import (
     YJS_UPDATED_COLUMN,
     resource_for,
 )
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class CollaborationRoom:
         #: The digest of the stored state this room last read or wrote. A row
         #: holding another one was written since — by a room in another
         #: process, or a write outside any room — and that is merged in.
-        self.stored_digest: Optional[str] = None
+        self.stored_digest: str | None = None
         # A room dropped from the registry. Nothing should reach one — the
         # registry only drops rooms with no connections — but a write that does
         # would go nowhere, so it says so instead of swallowing it.
@@ -93,7 +93,7 @@ class CollaborationRoom:
         self._persisted_revision = 0
         #: How the body moves between its views, for a body with a live
         #: editor: the server makes its Yjs state and renders its content.
-        self.body: Optional[BodyState] = None
+        self.body: BodyState | None = None
 
     @property
     def renders_content(self) -> bool:
@@ -167,7 +167,7 @@ class CollaborationRoom:
                 await self.initialize_from_db(yjs_state=state)
             self._loaded = True
 
-    async def initialize_from_db(self, yjs_state: Optional[bytes]) -> None:
+    async def initialize_from_db(self, yjs_state: bytes | None) -> None:
         """Initialize the Y.Doc from database state.
 
         An editor body arrives with a state the server made; any other body
@@ -234,12 +234,12 @@ class CollaborationRoom:
         if user_id is not None:
             self.writers.add(user_id)
 
-    async def rendering(self) -> Optional[dict]:
+    async def rendering(self) -> dict | None:
         """What this body reads as now, rendered from its live document."""
         assert self.body is not None
         return await self.body.render(self.get_state())
 
-    async def write(self, content: dict, version: str, user_id: Optional[int]) -> bool:
+    async def write(self, content: dict, version: str, user_id: int | None) -> bool:
         """Write ``content`` into this body's live document, as its editor
         makes it read, if the body still reads as ``version``,
         and hand the change to everyone in the room. It is saved as their
@@ -279,7 +279,7 @@ class CollaborationRoom:
             bytes([MSG_UPDATE]) + bytes(self.doc.get_update(before)),
         )
 
-    def snapshot(self) -> Tuple[int, bytes]:
+    def snapshot(self) -> tuple[int, bytes]:
         """The revision being written, and the state it is."""
         return self._revision, self.get_state()
 
@@ -289,11 +289,10 @@ class CollaborationRoom:
         Only moves forward: an edit that landed while the write was in flight
         leaves the room dirty, so the next sweep picks it up.
         """
-        if revision > self._persisted_revision:
-            self._persisted_revision = revision
+        self._persisted_revision = max(self._persisted_revision, revision)
 
 
-def _digest(state: Optional[bytes]) -> Optional[str]:
+def _digest(state: bytes | None) -> str | None:
     """A stored state's digest, as Postgres's ``md5`` gives it."""
     return hashlib.md5(state, usedforsecurity=False).hexdigest() if state else None
 
@@ -307,7 +306,7 @@ def _merged(state: bytes, update: bytes) -> bytes:
 
 async def _bootstrapped(
     guild_id: int, resource_type: str, resource_id: int, body: BodyState
-) -> Optional[bytes]:
+) -> bytes | None:
     """A body's Yjs state, made from its content by the server when the row
     has none, or has one that holds no body.
 
@@ -341,7 +340,7 @@ async def _bootstrapped(
                 .values(
                     {
                         YJS_STATE_COLUMN: state,
-                        YJS_UPDATED_COLUMN: datetime.now(timezone.utc),
+                        YJS_UPDATED_COLUMN: datetime.now(UTC),
                     }
                 )
             )
@@ -350,8 +349,8 @@ async def _bootstrapped(
 
 
 async def written_into(
-    body: BodyState, state: Optional[bytes], content: dict
-) -> Optional[bytes]:
+    body: BodyState, state: bytes | None, content: dict
+) -> bytes | None:
     """A body's stored Yjs state with ``content`` written into it.
 
     Only what changed is rewritten, so the state keeps the history its editors
@@ -408,7 +407,7 @@ async def versioned(read: Any, guild_id: int, resource_type: str) -> Any:
 # is a single process-global structure, so neither the id nor the pair without
 # the guild identifies a body. Never key collaboration state by a
 # guild-schema-local id alone.
-RoomKey = Tuple[int, str, int]
+RoomKey = tuple[int, str, int]
 
 # How often the sweeper writes rooms that have changed.
 PERSISTENCE_INTERVAL_SECONDS = 30
@@ -425,10 +424,10 @@ class CollaborationManager:
     """
 
     def __init__(self):
-        self._rooms: Dict[RoomKey, CollaborationRoom] = {}
+        self._rooms: dict[RoomKey, CollaborationRoom] = {}
         self._lock = asyncio.Lock()
         self._persistence_interval = PERSISTENCE_INTERVAL_SECONDS
-        self._persistence_task: Optional[asyncio.Task] = None
+        self._persistence_task: asyncio.Task | None = None
 
     async def get_or_create_room(
         self,
@@ -620,8 +619,8 @@ class CollaborationManager:
             return
         revision, state = room.snapshot()
         content = await room.body.render(state) if room.body is not None else None
-        now = datetime.now(timezone.utc)
-        values: Dict[str, Any] = {YJS_STATE_COLUMN: state, YJS_UPDATED_COLUMN: now}
+        now = datetime.now(UTC)
+        values: dict[str, Any] = {YJS_STATE_COLUMN: state, YJS_UPDATED_COLUMN: now}
         if content is not None:
             # Imported here rather than at module scope: the sync reaches back
             # into this registry to retire idle rooms.
@@ -766,15 +765,9 @@ class CollaborationManager:
                     "collaboration persistence sweep failed (%s)", type(exc).__name__
                 )
 
-    def has_active_collaborators(
-        self, guild_id: int, resource_type: str, resource_id: int
-    ) -> bool:
-        """Check if a document has any live connection."""
-        return self.live_room(guild_id, resource_type, resource_id) is not None
-
     def live_room(
         self, guild_id: int, resource_type: str, resource_id: int
-    ) -> Optional[CollaborationRoom]:
+    ) -> CollaborationRoom | None:
         """The room a body is being edited in, if anyone is connected to it."""
         room = self._rooms.get((guild_id, resource_type, resource_id))
         return room if room is not None and not room.is_empty() else None
@@ -788,7 +781,7 @@ def room_roster(guild_id: int, resource_type: str, resource_id: int) -> list[dic
     is about people, and a person is here if any of their connections is. They
     can write if any of those connections may.
     """
-    by_user: Dict[int, dict] = {}
+    by_user: dict[int, dict] = {}
     for member in sockets.room_members(
         resource_room(guild_id, resource_type, resource_id)
     ):

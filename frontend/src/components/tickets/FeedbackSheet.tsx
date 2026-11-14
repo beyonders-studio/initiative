@@ -1,33 +1,51 @@
 /**
- * The feedback sheet: telling whoever runs this server what you think, from
- * wherever you are.
+ * The feedback sheet: telling the team that makes Initiative about an idea,
+ * something that got in the way, or something somebody loves, from wherever
+ * they are.
  *
  * Opened by the account menu and the command palette, and drawn once by the
- * app shell, so it knows the page it was opened on: that page's route, with
- * every id left out, travels with the feedback beside the app's version, the
- * platform, the language, the theme and the window's width — all shown before
- * sending, and removable.
+ * app shell. On Initiative Cloud, where feedback lands, it is the sheet, with
+ * the form in `FeedbackForm`. From any other server it is Cloud's own page,
+ * opened in the browser once Cloud is open, with the device and page it was
+ * sent from in the link's fragment, which no server reads until the page
+ * sends it.
+ *
+ * On a wide screen the sheet docks beside the page, which stays in view and in
+ * reach; on a phone it is a sheet from the bottom. Closing it keeps what was
+ * written until it is sent or discarded.
  *
  * Where feedback is not taken here but an address is set, the sheet is that
  * address; where there is neither, nothing offers it.
  */
 
-import { Capacitor } from "@capacitor/core";
-import { useMatches } from "@tanstack/react-router";
-import { Suspense, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FeedbackContext } from "@/api/generated/initiativeAPI.schemas";
+import { type DeviceContext, TicketMode } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
-import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
+import { useDeviceContext } from "@/components/tickets/DeviceContext";
+import {
+  EMPTY_DRAFT,
+  type FeedbackDraft,
+  FeedbackForm,
+  feedbackTicket,
+} from "@/components/tickets/FeedbackForm";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useTheme } from "@/hooks/useTheme";
-import { useTicketAvailability } from "@/hooks/useTickets";
-import { useWidthClass } from "@/hooks/useWidthClass";
+import { useAuth } from "@/hooks/useAuth";
+import { useServer } from "@/hooks/useServer";
+import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
+import { CLOUD_OPEN, CLOUD_ORIGIN } from "@/lib/cloud";
+import { openExternal } from "@/lib/openExternal";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Sheet, SheetContent, SheetTitle } from "@/ui/sheet";
 
-// Whether the sheet is open, kept outside React so a menu item and the
-// command palette can open the one drawn by the shell.
+// Whether the sheet is open, and what is written in it, kept outside React so
+// a menu item and the command palette can open the one drawn by the shell and
+// closing it keeps the draft. The draft is its writer's: it opens again only
+// for the same account on the same server.
 let sheetOpen = false;
+let draft: { owner: string; form: FeedbackDraft } | null = null;
 const listeners = new Set<() => void>();
 const setSheetOpen = (open: boolean) => {
   sheetOpen = open;
@@ -38,35 +56,30 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** Open the feedback sheet over whatever page is showing. */
-export const openFeedback = () => setSheetOpen(true);
+/** Initiative Cloud's feedback page, carrying where it was sent from. */
+export const cloudFeedbackLink = (context: DeviceContext): string => {
+  const fields = Object.entries(context).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""
+  );
+  return `${CLOUD_ORIGIN}/feedback#${new URLSearchParams(fields)}`;
+};
 
-/** Whether this server offers anywhere to send feedback: a form or an address. */
-export const useFeedbackOffered = () => {
+/**
+ * Whether this server offers feedback, and what opening it does: the sheet
+ * where feedback lands here or an address is set, and Initiative Cloud's page
+ * from any other server once Cloud is open.
+ */
+export const useFeedback = () => {
   const { data } = useTicketAvailability(null);
-  const mode = data?.feedback.mode;
-  return mode === "form" || (mode === "email" && Boolean(data?.feedback.contact));
-};
-
-/** A route id as a template: the pathless layout segments dropped, every id
- *  left as the parameter that names it. */
-export const routeTemplate = (routeId: string): string => {
-  const kept = routeId.split("/").filter((segment) => segment && !segment.startsWith("_"));
-  return `/${kept.join("/")}`;
-};
-
-const useFeedbackContext = (): FeedbackContext => {
-  const { i18n } = useTranslation();
-  const { theme } = useTheme();
-  const width = useWidthClass();
-  const route = useMatches({ select: (matches) => matches.at(-1)?.routeId ?? "" });
+  const context = useDeviceContext();
+  const feedback = data?.feedback;
+  const toCloud = feedback?.mode === TicketMode.cloud && CLOUD_OPEN;
   return {
-    app_version: __APP_VERSION__,
-    platform: Capacitor.getPlatform(),
-    locale: i18n.language,
-    theme,
-    route: routeTemplate(route),
-    viewport: width,
+    offered:
+      toCloud ||
+      feedback?.mode === TicketMode.form ||
+      (feedback?.mode === TicketMode.email && Boolean(feedback.contact)),
+    open: () => (toCloud ? openExternal(cloudFeedbackLink(context)) : setSheetOpen(true)),
   };
 };
 
@@ -75,7 +88,7 @@ export const FeedbackHost = () => {
   const open = useSyncExternalStore(subscribe, () => sheetOpen);
   if (!open) return null;
   return (
-    // Its own boundary: the first opening loads the dialog's translations.
+    // Its own boundary: the first opening loads the sheet's translations.
     <Suspense fallback={null}>
       <FeedbackSheet />
     </Suspense>
@@ -83,23 +96,82 @@ export const FeedbackHost = () => {
 };
 
 const FeedbackSheet = () => {
+  const { t } = useTranslation("intake");
   const communityId = useActiveCommunityId();
-  // Read as the sheet opens, so the page is the one it was opened on.
-  const context = useFeedbackContext();
+  const context = useDeviceContext();
   const { data } = useTicketAvailability(communityId);
+  const wide = atLeast(useWidthClass(), "sm");
+  const { user } = useAuth();
+  const { serverUrl } = useServer();
+  const owner = `${serverUrl ?? ""} ${user?.id ?? ""}`;
+  const [form, setForm] = useState(draft?.owner === owner ? draft.form : EMPTY_DRAFT);
+  const [sent, setSent] = useState(false);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const thanks = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    draft = { owner, form };
+  }, [owner, form]);
+  useEffect(() => {
+    if (sent) thanks.current?.focus();
+  }, [sent]);
+
+  const file = useFileTicket(
+    {
+      onSuccess: () => {
+        setSent(true);
+        setForm(EMPTY_DRAFT);
+      },
+    },
+    "intake:feedback.error"
+  );
+  const pending = file.isPending;
+
   const feedback = data?.feedback;
-  if (feedback?.mode === "form") {
-    return (
-      <FileTicketDialog
-        open
-        onOpenChange={setSheetOpen}
-        ticket={{ stream: "feedback", context }}
-        communityId={communityId}
-      />
-    );
-  }
-  if (feedback?.mode === "email" && feedback.contact) {
+  if (feedback?.mode === TicketMode.email && feedback.contact) {
     return <ContactDialog open onOpenChange={setSheetOpen} contact={feedback.contact} />;
   }
-  return null;
+  if (feedback?.mode !== TicketMode.form) return null;
+
+  return (
+    // Open until the send settles, so what is being sent is not sent twice.
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!pending) setSheetOpen(open);
+      }}
+      modal={!wide}
+    >
+      <SheetContent
+        side={wide ? "bottom-right" : "bottom"}
+        aria-describedby={undefined}
+        className={cn("flex flex-col gap-0 p-0", !wide && "max-h-[85dvh] rounded-t-2xl")}
+        style={wide ? undefined : { paddingBottom: "var(--safe-area-inset-bottom)" }}
+        // Docked beside the page, it stays open while the page is used.
+        onInteractOutside={wide ? (event) => event.preventDefault() : undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          box.current?.focus();
+        }}
+      >
+        <FeedbackForm
+          Title={SheetTitle}
+          draft={form}
+          onChange={(next) => setForm((current) => ({ ...current, ...next }))}
+          onDiscard={() => setForm(EMPTY_DRAFT)}
+          context={context}
+          evidence={feedback.evidence}
+          pagePicture={{ hidePeople: true }}
+          help={{ communityId }}
+          pending={pending}
+          sent={sent}
+          submitLabel={t("feedback.submit")}
+          onSend={() => file.mutate({ ticket: feedbackTicket(form, context), files: form.files })}
+          onDone={() => setSheetOpen(false)}
+          box={box}
+          thanks={thanks}
+        />
+      </SheetContent>
+    </Sheet>
+  );
 };

@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import pytest_summary  # noqa: E402
+import pytest_summary
 
 LOG = """\
 [gw1] [ 10%] PASSED app/a_test.py::test_ok

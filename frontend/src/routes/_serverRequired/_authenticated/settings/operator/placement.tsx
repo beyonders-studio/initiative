@@ -1,11 +1,9 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { PlacementPage } from "@/pages/operator/PlacementPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/operator/placement")(
   {
-    component: lazyRouteComponent(() =>
-      import("@/pages/OperatorDashboardPlacementPage").then((m) => ({
-        default: m.OperatorDashboardPlacementPage,
-      }))
-    ),
+    component: PlacementPage,
   }
 );

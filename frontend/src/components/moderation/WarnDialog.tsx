@@ -4,10 +4,9 @@
  * What is typed here is sent to them as it is. It never says who reported
  * the thing, or how many people did.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,9 +14,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
 const MESSAGE_MAX = 2000;
@@ -33,9 +32,11 @@ export const WarnDialog = ({ open, onOpenChange, pending = false, onConfirm }: W
   const { t } = useTranslation(["moderation", "common"]);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) setMessage("");
-  }, [open]);
+  }
 
   const said = message.trim();
 
@@ -46,25 +47,21 @@ export const WarnDialog = ({ open, onOpenChange, pending = false, onConfirm }: W
           <DialogTitle>{t("warn.title")}</DialogTitle>
           <DialogDescription>{t("warn.description")}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="warning-message">{t("warn.messageLabel")}</Label>
+        <Field label={t("warn.messageLabel")}>
           <Textarea
-            id="warning-message"
             value={message}
             maxLength={MESSAGE_MAX}
             rows={4}
             placeholder={t("warn.messagePlaceholder")}
             onChange={(e) => setMessage(e.target.value)}
           />
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button disabled={!said || pending} onClick={() => onConfirm(said)}>
-            {t("warn.submit")}
-          </Button>
-        </DialogFooter>
+        </Field>
+        <DialogFooter
+          submitLabel={t("warn.submit")}
+          onSubmit={() => onConfirm(said)}
+          pending={pending}
+          disabled={!said}
+        />
       </DialogContent>
     </Dialog>
   );

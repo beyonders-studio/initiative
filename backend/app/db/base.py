@@ -17,7 +17,7 @@ from sqlmodel import SQLModel
 import app.models.platform
 import app.models.tenant
 
-__all__ = ["MODEL_PACKAGES", "MODELS_BY_TABLE", "import_modules"]
+__all__ = ["MODELS_BY_TABLE", "MODEL_PACKAGES", "import_modules"]
 
 #: The packages the table models live in.
 MODEL_PACKAGES: tuple[ModuleType, ...] = (app.models.platform, app.models.tenant)

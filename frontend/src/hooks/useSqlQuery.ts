@@ -27,9 +27,10 @@ import type { QueryOpts } from "@/types/query";
 export const sqlQueryKey = (communityId: number, sql: string, initiativeId?: number) =>
   ["query", communityId, sql, initiativeId ?? null] as const;
 
-/** A canvas's query widgets, answered together. Keyed by the dashboard rather
- *  than by what its widgets ask, because the statements are the server's to
- *  look up — the whole point of the endpoint behind it. */
+/** A canvas's widgets, answered together. Keyed by the dashboard rather than
+ *  by what its widgets ask, because the statements and a plug-in widget's
+ *  parameters are the server's to look up — the whole point of the endpoint
+ *  behind it. */
 export const dashboardDataKey = (communityId: number, dashboardId: number) =>
   ["query", "dashboard", communityId, dashboardId] as const;
 
@@ -65,14 +66,16 @@ export const useSqlQuery = (
 };
 
 /**
- * The statement stored on one widget of one dashboard, as its canvas answered it.
+ * What one widget of one dashboard reads, as its canvas answered it: a
+ * statement's rows in `data`, or a plug-in widget's rows and values in `plugin`.
  *
- * A canvas is read as a whole: one request answers every query widget on it,
- * run by the server as one statement, so the tiles read the same moment and
- * share the work. Each tile selects its own entry from that answer. The request
- * names the dashboard and nothing else: what runs is each widget's stored
- * statement, looked up server-side. That is what lets a dashboard show rows a
- * reader could not otherwise reach — the question is the one somebody
+ * A canvas is read as a whole: one request answers every widget on it that
+ * reads data, its statements run by the server as one statement, so the tiles
+ * read the same moment and share the work. Each tile selects its own entry from
+ * that answer. The request names the dashboard and nothing else: what runs is
+ * each widget's stored statement, and each plug-in widget's endpoint with its
+ * stored parameters, looked up server-side. That is what lets a dashboard show
+ * rows a reader could not otherwise reach — the question is the one somebody
  * published, and a reader has no way to ask a different one of the same grants.
  */
 export const useWidgetQuery = (
@@ -103,8 +106,9 @@ export const useWidgetQuery = (
   const entry = canvas.data;
   return {
     data: entry?.result ?? undefined,
+    plugin: entry?.plugin ?? undefined,
     isLoading: canvas.isLoading,
-    // A widget the answer has nothing for has no statement stored, and one
+    // A widget the answer has nothing for has nothing stored to read, and one
     // with an error was refused on its own: both read as this tile's failure,
     // not the canvas's.
     isError: canvas.isError || (canvas.isSuccess && (entry === null || Boolean(entry?.error))),

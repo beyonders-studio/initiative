@@ -6,14 +6,13 @@
  * thing's own moderation menu and from a report card, which pre-fills the
  * reason it was reported for.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
   RemovalReason,
   type RemovalReason as RemovalReasonValue,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -21,16 +20,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
 const NOTE_MAX = 2000;
@@ -68,82 +61,71 @@ export interface RemovalDialogProps {
   onConfirm: (removal: Removal) => void;
 }
 
-export const RemovalDialog = ({
-  open,
-  onOpenChange,
+export const RemovalDialog = ({ open, onOpenChange, ...props }: RemovalDialogProps) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent>
+      <RemovalForm {...props} />
+    </DialogContent>
+  </Dialog>
+);
+
+// Drawn only while the dialog is open, so each opening starts from what the
+// caller knows, not from last time.
+const RemovalForm = ({
   targetType,
   initialReason = null,
   initialNote = "",
   pending = false,
   onConfirm,
-}: RemovalDialogProps) => {
+}: Omit<RemovalDialogProps, "open" | "onOpenChange">) => {
   const { t } = useTranslation(["moderation", "common"]);
   const [reason, setReason] = useState<RemovalReasonValue | "">(initialReason ?? "");
   const [note, setNote] = useState(initialNote);
 
-  // Each opening starts from what the caller knows, not from last time.
-  useEffect(() => {
-    if (open) {
-      setReason(initialReason ?? "");
-      setNote(initialNote);
-    }
-  }, [open, initialReason, initialNote]);
-
   const comment = targetType === "comment";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("remove.title")}</DialogTitle>
-          <DialogDescription>
-            {comment ? t("remove.commentDescription") : t("remove.description")}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="removal-reason">{t("remove.reasonLabel")}</Label>
-            <Select value={reason} onValueChange={(v) => setReason(v as RemovalReasonValue)}>
-              <SelectTrigger id="removal-reason">
-                <SelectValue placeholder={t("remove.reasonPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {REMOVAL_REASONS.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {t(`removalReasons.${value}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">{t("remove.reasonHelp")}</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="removal-note">{t("remove.noteLabel")}</Label>
-            <Textarea
-              id="removal-note"
-              value={note}
-              maxLength={NOTE_MAX}
-              rows={2}
-              placeholder={t("remove.notePlaceholder")}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={reason === "" || pending}
-            onClick={() => {
-              if (reason !== "") onConfirm({ reason, note: note.trim() || null });
-            }}
-          >
-            {t("remove.submit")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("remove.title")}</DialogTitle>
+        <DialogDescription>
+          {comment ? t("remove.commentDescription") : t("remove.description")}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4">
+        <Field label={t("remove.reasonLabel")} hint={t("remove.reasonHelp")}>
+          <Select value={reason} onValueChange={(v) => setReason(v as RemovalReasonValue)}>
+            <SelectTrigger>
+              <SelectValue placeholder={t("remove.reasonPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {REMOVAL_REASONS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(`removalReasons.${value}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label={t("remove.noteLabel")}>
+          <Textarea
+            value={note}
+            maxLength={NOTE_MAX}
+            rows={2}
+            placeholder={t("remove.notePlaceholder")}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </Field>
+      </div>
+      <DialogFooter
+        submitLabel={t("remove.submit")}
+        onSubmit={() => {
+          if (reason !== "") onConfirm({ reason, note: note.trim() || null });
+        }}
+        pending={pending}
+        disabled={reason === ""}
+        destructive
+      />
+    </>
   );
 };

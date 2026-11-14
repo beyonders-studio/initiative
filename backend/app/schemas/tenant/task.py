@@ -1,11 +1,14 @@
 from datetime import datetime
 from string import ascii_letters, digits
-from typing import Final, List, Optional
+from typing import Final
 from uuid import uuid4
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
 from app.core.identity_boundary import GuildId, PersonId
+from app.core.intake import Conversation, IntakeStream
+from app.models.platform.user import UserStatus
+from app.models.tenant.task import RecurrenceStrategy, TaskPriority, TaskStatusCategory
 from app.schemas.base import (
     MentionStr,
     RichMentionStr,
@@ -14,25 +17,21 @@ from app.schemas.base import (
     TitleStr,
     reject_null,
 )
-from app.schemas.query import PageMeta
-from app.schemas.recurrence import OccurrenceScope, TaskRule, validate_task_recurrence
-
 from app.schemas.platform.access_grant import AccessGrantRead
 from app.schemas.platform.user import PersonShape, UserPublic
+from app.schemas.query import PageMeta
+from app.schemas.recurrence import OccurrenceScope, TaskRule, validate_task_recurrence
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.evidence import EvidenceRead
 from app.schemas.tenant.initiative import InitiativeSummary
-from app.schemas.tenant.task_status import TaskStatusRead
-from app.schemas.tenant.task_type import TaskTypeRead
-from app.schemas.tenant.tag import TagSummary
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertiesOnUpdate,
     PropertySummary,
 )
-
-from app.core.intake import Conversation, IntakeStream
-from app.models.tenant.task import RecurrenceStrategy, TaskPriority, TaskStatusCategory
-from app.models.platform.user import UserStatus
+from app.schemas.tenant.tag import TagSummary
+from app.schemas.tenant.task_status import TaskStatusRead
+from app.schemas.tenant.task_type import TaskTypeRead
 
 
 class TaskAssigneeSummary(PersonShape):
@@ -51,8 +50,8 @@ class TaskAssigneeSummary(PersonShape):
     id: PersonId
     username: str
     discriminator: int
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
     status: UserStatus = UserStatus.active
 
 
@@ -75,12 +74,12 @@ class ChecklistItemInput(SanitizedBaseModel):
     """One checklist line as written. ``id`` is optional: an item that arrives
     without one is given a fresh id."""
 
-    id: Optional[str] = Field(default=None, max_length=_MAX_ITEM_ID_LENGTH)
+    id: str | None = Field(default=None, max_length=_MAX_ITEM_ID_LENGTH)
     text: MentionStr = Field(min_length=1, max_length=2000)
     done: bool = False
 
     @field_validator("id")
-    def id_is_an_identifier(cls, value: Optional[str]) -> Optional[str]:
+    def id_is_an_identifier(cls, value: str | None) -> str | None:
         if value is not None and (not value or set(value) - _ITEM_ID_CHARS):
             raise ValueError(INVALID_CHECKLIST_ITEM_ID)
         return value
@@ -128,32 +127,32 @@ MAX_CHECKLIST_ITEMS: Final = 100
 class TaskBase(SanitizedBaseModel):
     title: str
     priority: TaskPriority = TaskPriority.medium
-    start_date: Optional[datetime] = None
-    due_date: Optional[datetime] = None
-    recurrence: Optional[str] = None
+    start_date: datetime | None = None
+    due_date: datetime | None = None
+    recurrence: str | None = None
     recurrence_strategy: RecurrenceStrategy = RecurrenceStrategy.fixed
-    recurrence_limit: Optional[int] = Field(default=None, ge=1, le=24, strict=True)
+    recurrence_limit: int | None = Field(default=None, ge=1, le=24, strict=True)
 
 
 class TaskCreate(TaskBase, PropertiesOnCreate):
     title: TitleStr
-    description: Optional[RichMentionStr] = None
+    description: RichMentionStr | None = None
     project_id: int
-    recurrence: Optional[TaskRule] = None
+    recurrence: TaskRule | None = None
     #: The zone ``recurrence``'s days were picked in, and ``recurrence_shift``
     #: is taken from it. Omitted, the rule's days are UTC days.
-    tz: Optional[str] = Field(default=None, max_length=64)
-    assignee_ids: List[PersonId] = Field(default_factory=list)
-    task_status_id: Optional[int] = None
+    tz: str | None = Field(default=None, max_length=64)
+    assignee_ids: list[PersonId] = Field(default_factory=list)
+    task_status_id: int | None = None
     #: One of the project's task types; its default when not given.
-    task_type_id: Optional[int] = None
-    tag_ids: List[int] = Field(default_factory=list, max_length=100)
-    checklist: List[ChecklistItemInput] = Field(default_factory=list)
+    task_type_id: int | None = None
+    tag_ids: list[int] = Field(default_factory=list, max_length=100)
+    checklist: list[ChecklistItemInput] = Field(default_factory=list)
     #: The task this one is part of, written as its ``part_of`` edge.
-    parent_task_id: Optional[int] = None
+    parent_task_id: int | None = None
 
     @model_validator(mode="after")
-    def _valid_recurrence(self) -> "TaskCreate":
+    def _valid_recurrence(self) -> TaskCreate:
         validate_task_recurrence(
             rule=self.recurrence,
             strategy=self.recurrence_strategy,
@@ -164,56 +163,58 @@ class TaskCreate(TaskBase, PropertiesOnCreate):
 
 
 class TaskUpdate(PropertiesOnUpdate):
-    title: Optional[TitleStr] = None
-    description: Optional[RichMentionStr] = None
+    title: TitleStr | None = None
+    description: RichMentionStr | None = None
     #: The description this ``description`` was written over. Given and no
     #: longer the stored one, the update is refused with
     #: ``DESCRIPTION_CHANGED``.
-    description_base: Optional[RichMentionStr] = None
-    task_status_id: Optional[int] = None
+    description_base: RichMentionStr | None = None
+    task_status_id: int | None = None
     #: Another of the project's task types. Nothing the task holds is lost:
     #: what the new type's page does not show is kept, not cleared.
-    task_type_id: Optional[int] = None
+    task_type_id: int | None = None
     #: Move the task to its project's column of this category (the nearest
     #: one before it where the project has none), for a caller that knows
     #: "done" but not which column that is. Ignored with ``task_status_id``,
     #: and a task already in this category stays in its column.
-    status_category: Optional[TaskStatusCategory] = None
-    priority: Optional[TaskPriority] = None
-    assignee_ids: Optional[List[PersonId]] = None
+    status_category: TaskStatusCategory | None = None
+    priority: TaskPriority | None = None
+    assignee_ids: list[PersonId] | None = None
     #: People put on the task beside whoever is on it when the change is
     #: written, rather than a list that replaces them all. Not with
     #: ``assignee_ids``.
-    add_assignee_ids: Optional[List[PersonId]] = Field(default=None, max_length=100)
+    add_assignee_ids: list[PersonId] | None = Field(default=None, max_length=100)
     #: People taken off the task, leaving whoever else is on it. Not with
     #: ``assignee_ids``.
-    remove_assignee_ids: Optional[List[PersonId]] = Field(default=None, max_length=100)
-    start_date: Optional[datetime] = None
-    due_date: Optional[datetime] = None
-    recurrence: Optional[TaskRule] = None
+    remove_assignee_ids: list[PersonId] | None = Field(default=None, max_length=100)
+    start_date: datetime | None = None
+    due_date: datetime | None = None
+    recurrence: TaskRule | None = None
     #: The zone ``recurrence``'s days were picked in, and ``recurrence_shift``
-    #: is taken from it. Omitted, the rule's days are UTC days.
-    tz: Optional[str] = Field(default=None, max_length=64)
-    recurrence_strategy: Optional[RecurrenceStrategy] = None
-    recurrence_limit: Optional[int] = Field(default=None, ge=1, le=24, strict=True)
+    #: is taken from it. Omitted, the rule's days are UTC days. An installed
+    #: plug-in has no zone of its own, so for one this is also the zone a
+    #: rolling repeat it completes counts its days in.
+    tz: str | None = Field(default=None, max_length=64)
+    recurrence_strategy: RecurrenceStrategy | None = None
+    recurrence_limit: int | None = Field(default=None, ge=1, le=24, strict=True)
     #: ``properties`` writes only the values it names, leaving the rest: what
     #: a change of type (or a move) sends for the fields the new page requires.
     merge_properties: bool = False
     # PATCH semantics: None = "leave unchanged"; a list (incl. []) = replace-all.
-    tag_ids: Optional[List[int]] = Field(default=None, max_length=100)
-    checklist: Optional[List[ChecklistItemInput]] = None
+    tag_ids: list[int] | None = Field(default=None, max_length=100)
+    checklist: list[ChecklistItemInput] | None = None
     #: The task this one is part of, written as its ``part_of`` edge in place
     #: of the one it has; null takes it out of its parent.
-    parent_task_id: Optional[int] = None
+    parent_task_id: int | None = None
     #: Which tasks of a repeating series the edit is for (``task_series``).
     #: Omitted, it carries forward from this task ("following"). The repeat
     #: itself always changes from this task on.
-    scope: Optional[OccurrenceScope] = None
+    scope: OccurrenceScope | None = None
 
     _required = reject_null("title", "priority")
 
     @model_validator(mode="after")
-    def _one_way_to_change_assignees(self) -> "TaskUpdate":
+    def _one_way_to_change_assignees(self) -> TaskUpdate:
         if self.assignee_ids is not None and (
             self.add_assignee_ids is not None or self.remove_assignee_ids is not None
         ):
@@ -228,7 +229,7 @@ class TaskMoveRequest(SanitizedBaseModel):
     target_project_id: int = Field(gt=0)
     #: Written to the task once it is in the destination, in the same
     #: request: the fields its page there requires that it does not fill.
-    changes: Optional[TaskUpdate] = None
+    changes: TaskUpdate | None = None
 
 
 class TaskProjectSummary(SanitizedBaseModel):
@@ -238,19 +239,19 @@ class TaskProjectSummary(SanitizedBaseModel):
 
     id: int
     name: str
-    icon: Optional[str] = None
-    initiative_id: Optional[int] = None
-    initiative: Optional[InitiativeSummary] = None
-    archived_at: Optional[datetime] = None
-    is_template: Optional[bool] = None
+    icon: str | None = None
+    initiative_id: int | None = None
+    initiative: InitiativeSummary | None = None
+    archived_at: datetime | None = None
+    is_template: bool | None = None
 
 
-class TaskRead(TaskBase):
+class TaskRead(TaskBase, CreatedByRead):
     model_config = ConfigDict(
         from_attributes=True, json_schema_serialization_defaults_required=True
     )
 
-    description: Optional[RichMentionStr] = None
+    description: RichMentionStr | None = None
     id: int
     project_id: int
     task_status_id: int
@@ -260,22 +261,21 @@ class TaskRead(TaskBase):
     task_type: TaskTypeRead
     created_at: datetime
     updated_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     position: float
-    archived_at: Optional[datetime] = None
-    created_by: Optional[PersonId] = None
+    archived_at: datetime | None = None
     # Author summary — lets the detail view render "Created by …" without
     # fetching the whole guild roster to resolve ``created_by``.
-    creator: Optional[UserPublic] = None
-    assignees: List[UserPublic] = []
+    creator: UserPublic | None = None
+    assignees: list[UserPublic] = []
     recurrence_occurrence_count: int = 0
     recurrence_shift: int = 0
-    recurrence_anchor: Optional[datetime] = None
+    recurrence_anchor: datetime | None = None
     recurrence_anchor_count: int = Field(default=0, ge=0)
     #: No occurrence of the series starts after this; None while it goes on.
-    recurrence_until: Optional[datetime] = None
+    recurrence_until: datetime | None = None
     #: The first task of the repeating series; None until the series moves on.
-    series_id: Optional[int] = None
+    series_id: int | None = None
     #: How many live tasks the series holds, this one included.
     series_size: int = 1
     comment_count: int = 0
@@ -283,20 +283,20 @@ class TaskRead(TaskBase):
     #: edges whose far end has not finished. Only kinds with a reading of
     #: "finished" count — see :mod:`app.db.blocking`.
     blocked_by_open_count: int = 0
-    project: Optional[TaskProjectSummary] = None
-    checklist: List[ChecklistItem] = []
-    checklist_progress: Optional[ChecklistProgress] = None
+    project: TaskProjectSummary | None = None
+    checklist: list[ChecklistItem] = []
+    checklist_progress: ChecklistProgress | None = None
     #: The task this one is part of, where it is part of one the reader can
     #: open (``app.services.tenant.task_hierarchy``).
-    parent: Optional[TaskParentSummary] = None
+    parent: TaskParentSummary | None = None
     #: How many of the tasks that are part of this one are done, of those
     #: not archived; None for a task with none.
-    subtask_progress: Optional[ChecklistProgress] = None
-    tags: List[TagSummary] = []
-    properties: List[PropertySummary] = []
+    subtask_progress: ChecklistProgress | None = None
+    tags: list[TagSummary] = []
+    properties: list[PropertySummary] = []
 
 
-class TaskListRead(TaskBase):
+class TaskListRead(TaskBase, CreatedByRead):
     """Lightweight schema for task list endpoints - excludes heavy nested data"""
 
     model_config = ConfigDict(
@@ -306,7 +306,7 @@ class TaskListRead(TaskBase):
     #: The description's opening words as plain text, ending on a word
     #: boundary with an ellipsis when cut, and a mention as its markdown,
     #: ``@[](42)``. The whole text is on ``TaskRead``.
-    description_excerpt: Optional[MentionStr] = None
+    description_excerpt: MentionStr | None = None
     has_description: bool = False
     id: int
     project_id: int
@@ -317,41 +317,40 @@ class TaskListRead(TaskBase):
     task_type: TaskTypeRead
     created_at: datetime
     updated_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     position: float
-    archived_at: Optional[datetime] = None
-    created_by: Optional[PersonId] = None
-    assignees: List[TaskAssigneeSummary] = []
+    archived_at: datetime | None = None
+    assignees: list[TaskAssigneeSummary] = []
     recurrence_occurrence_count: int = 0
     recurrence_shift: int = 0
-    recurrence_anchor: Optional[datetime] = None
+    recurrence_anchor: datetime | None = None
     recurrence_anchor_count: int = Field(default=0, ge=0)
     #: No occurrence of the series starts after this; None while it goes on.
-    recurrence_until: Optional[datetime] = None
+    recurrence_until: datetime | None = None
     comment_count: int = 0
     #: How many things are still holding this task up: live ``depends_on``
     #: edges whose far end has not finished. Only kinds with a reading of
     #: "finished" count — see :mod:`app.db.blocking`.
     blocked_by_open_count: int = 0
-    community_id: Optional[GuildId] = Field(
+    community_id: GuildId | None = Field(
         default=None, validation_alias=AliasChoices("community_id", "guild_id")
     )
-    community_name: Optional[str] = Field(
+    community_name: str | None = Field(
         default=None, validation_alias=AliasChoices("community_name", "guild_name")
     )
-    project_name: Optional[str] = None
-    initiative_id: Optional[int] = None
-    initiative_name: Optional[str] = None
-    initiative_color: Optional[str] = None
-    checklist_progress: Optional[ChecklistProgress] = None
+    project_name: str | None = None
+    initiative_id: int | None = None
+    initiative_name: str | None = None
+    initiative_color: str | None = None
+    checklist_progress: ChecklistProgress | None = None
     #: The task this one is part of, where it is part of one the reader can
     #: open (``app.services.tenant.task_hierarchy``).
-    parent: Optional[TaskParentSummary] = None
+    parent: TaskParentSummary | None = None
     #: How many of the tasks that are part of this one are done, of those
     #: not archived; None for a task with none.
-    subtask_progress: Optional[ChecklistProgress] = None
-    tags: List[TagSummary] = []
-    properties: List[PropertySummary] = []
+    subtask_progress: ChecklistProgress | None = None
+    tags: list[TagSummary] = []
+    properties: list[PropertySummary] = []
 
 
 class ColumnFillRead(SanitizedBaseModel):
@@ -365,8 +364,8 @@ class ColumnFillRead(SanitizedBaseModel):
 
 
 class TaskListResponse(PageMeta):
-    items: List[TaskListRead]
-    sorting: Optional[str] = None
+    items: list[TaskListRead]
+    sorting: str | None = None
 
 
 class TaskReorderItem(SanitizedBaseModel):
@@ -389,7 +388,7 @@ class CaseMessageRead(SanitizedBaseModel):
 
     id: int
     #: Who wrote it: the requester, or the person on the team who answered.
-    author: Optional[UserPublic] = None
+    author: UserPublic | None = None
     from_requester: bool
     #: Kept as written, like any comment body.
     content: RichTextStr
@@ -400,9 +399,22 @@ class CaseEvidenceRead(EvidenceRead):
     """A file attached to a case, and where in the conversation it came."""
 
     #: The message it came with, where it came with one.
-    comment_id: Optional[int] = None
+    comment_id: int | None = None
     #: Sent by whoever filed the case.
     from_requester: bool = False
+
+
+class CaseIdeaRead(SanitizedBaseModel):
+    """The idea a feedback case is joined to."""
+
+    task_id: int
+    title: str
+
+
+class IdeaJoin(SanitizedBaseModel):
+    """The idea on the Ideas board to join a case or another idea to."""
+
+    idea_task_id: int
 
 
 class TaskCaseRead(SanitizedBaseModel):
@@ -411,29 +423,36 @@ class TaskCaseRead(SanitizedBaseModel):
     stream: IntakeStream
     opened_at: datetime
     #: Who filed it, where somebody did. Not necessarily a member here.
-    filer: Optional[UserPublic] = None
+    filer: UserPublic | None = None
     #: What they called it when they filed it. The task's title is the team's.
-    filer_subject: Optional[str] = None
+    filer_subject: str | None = None
     #: What it is about within its stream, as they chose: a support topic,
     #: a security topic, ``appeal``.
-    topic: Optional[str] = None
+    topic: str | None = None
     #: What the case allows with the filer: ``open``, ``staff_first`` (the
     #: team speaks first), or ``none`` — also where nobody filed it.
     conversation: Conversation
     #: The binding's statuses that mean "waiting on the filer" and "being
     #: worked", where it names them.
-    awaiting_filer_status_id: Optional[int] = None
-    active_status_id: Optional[int] = None
+    awaiting_filer_status_id: int | None = None
+    active_status_id: int | None = None
     #: The conversation with the requester, oldest first. Kept apart from the
     #: task's comments: it is what they read, and only that.
-    messages: List[CaseMessageRead] = Field(default_factory=list)
+    messages: list[CaseMessageRead] = Field(default_factory=list)
     #: What was attached to the case, oldest first.
-    evidence: List[CaseEvidenceRead] = Field(default_factory=list)
+    evidence: list[CaseEvidenceRead] = Field(default_factory=list)
     #: The access grants asked for this case, newest first: who holds each,
     #: on which community, at what level, and where it stands.
-    grants: List[AccessGrantRead] = Field(default_factory=list)
+    grants: list[AccessGrantRead] = Field(default_factory=list)
+    #: How many voted for it, on a published idea; absent on any other case.
+    votes: int | None = None
+    #: The Ideas board's project, on a feedback case or an idea where the board
+    #: is set up: what it may be joined to.
+    ideas_board_id: int | None = None
+    #: The idea a feedback case is joined to.
+    joined_idea: CaseIdeaRead | None = None
     #: What the case is about, as it was opened with: the community, and the
     #: kind and id of the thing in it, where it names them.
-    subject_community_id: Optional[int] = None
-    resource_type: Optional[str] = None
-    resource_id: Optional[int] = None
+    subject_community_id: int | None = None
+    resource_type: str | None = None
+    resource_id: int | None = None

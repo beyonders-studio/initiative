@@ -1,7 +1,7 @@
-import type {
-  CalendarEventAttendeeRead,
-  CalendarEventRead,
-  CalendarEventSummary,
+import {
+  ActorKind,
+  type CalendarEventRead,
+  type CalendarEventSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 
 let counter = 0;
@@ -30,6 +30,8 @@ export function buildCalendarEvent(overrides: Partial<CalendarEventRead> = {}): 
     initiative_id: 1,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     properties: [],
     tags: [],
     can: { edit: true },
@@ -39,6 +41,8 @@ export function buildCalendarEvent(overrides: Partial<CalendarEventRead> = {}): 
     overridden_fields: [],
     skipped_starts: [],
     extra_starts: [],
+    next_start: null,
+    next_occurrence: null,
     ...overrides,
   };
 }
@@ -48,17 +52,4 @@ export function buildCalendarEventSummary(
   overrides: Partial<CalendarEventSummary> = {}
 ): CalendarEventSummary {
   return { ...buildCalendarEvent(), attendee_previews: [], ...overrides };
-}
-
-/** One person asked to an event, not yet answered. */
-export function buildEventAttendee(
-  overrides: Partial<CalendarEventAttendeeRead> = {}
-): CalendarEventAttendeeRead {
-  return {
-    user_id: 1,
-    user: null,
-    rsvp_status: "pending",
-    created_at: "2026-10-01T00:00:00.000Z",
-    ...overrides,
-  };
 }

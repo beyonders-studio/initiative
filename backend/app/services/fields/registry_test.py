@@ -17,16 +17,17 @@ from sqlalchemy.dialects import postgresql
 from app.core.tools import Tool
 from app.models.tenant.task import Task, TaskAssignee
 from app.schemas.query import FilterOp
-from app.services.fields.derive import derive_fields
 from app.services.fields import (
     FieldContext,
     allowed_fields,
     allowed_ops,
-    default_filters,
     dataset,
+    default_filters,
     describe,
     sort_fields,
 )
+from app.services.fields.derive import derive_fields
+from app.services.fields.grouping import groupable
 from app.services.fields.registry import dataset_names
 from app.services.query.resolve import resolve
 
@@ -304,6 +305,12 @@ class TestDescription:
     def test_the_offered_set_is_the_old_one_plus_the_agreed_additions(self):
         offered = {entry["name"] for entry in describe(dataset("tasks"))}
         assert offered == set(PREVIOUSLY_OFFERED) | NEWLY_OFFERED | LATER_OFFERED
+
+    def test_the_author_groups_by_member(self):
+        """``created_by`` is read only where its kind is ``member``, and still
+        groups by the member it names."""
+        tasks = dataset("tasks")
+        assert groupable(tasks, tasks.by_name["created_by"])
 
     def test_bookkeeping_is_hidden_everywhere_rather_than_per_dataset(self):
         """Soft-delete columns, the surrogate key, the tenant key and the

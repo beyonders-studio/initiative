@@ -1,13 +1,14 @@
 """Tests for the attachment upload endpoint."""
 
 import io
+from datetime import UTC
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
-from app.testing import guild_administration
-from app.services.tenant.attachments import detect_document_image_type
 from app.models.platform.guild import CommunityRole
+from app.services.tenant.attachments import detect_document_image_type
+from app.testing import guild_administration
 
 #: A real 1x1 PNG — the header reader walks IHDR, so a stub signature is not
 #: enough to be identified as one.
@@ -89,8 +90,10 @@ async def test_upload_ignores_a_declared_svg_type(client: AsyncClient, acting_us
         b"\xef\xbb\xbf",
         b'<?xml version="1.0" encoding="UTF-8"?>\n',
         b"<!-- exported by a drawing program -->\n",
-        b'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
-        b'"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n',
+        (
+            b'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
+            b'"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
+        ),
     ],
 )
 async def test_upload_accepts_an_svg_behind_a_prolog(
@@ -140,8 +143,10 @@ async def test_upload_refuses_bytes_that_are_no_image(client: AsyncClient, actin
         b'\xef\xbb\xbf<svg xmlns="x"></svg>',
         b'<?xml version="1.0"?>\n<svg xmlns="x"/>',
         b"<!-- drawn by a program -->\n<svg xmlns='x'/>",
-        b'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
-        b'"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n<svg xmlns="x"/>',
+        (
+            b'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
+            b'"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n<svg xmlns="x"/>'
+        ),
         b'<?xml version="1.0"?><!-- one --><!-- two --><svg/>',
     ],
 )
@@ -445,7 +450,7 @@ async def test_the_sweep_takes_pictures_nobody_saved_once_their_grace_is_over(
 ):
     """A tab closed rather than left never discards what it pasted. A saved
     one is claimed for the initiative that shows it and not looked at again."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlmodel import select
 
@@ -466,7 +471,7 @@ async def test_the_sweep_takes_pictures_nobody_saved_once_their_grace_is_over(
     await session.commit()
 
     await route_session_to_guild(session, a.guild.id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Within the grace period, both stay: the draft may still be saved.
     assert await release_unclaimed_pasted_images(session, now=now) == set()
 
@@ -494,7 +499,7 @@ async def test_the_sweep_copies_a_picture_two_initiatives_show(
 ):
     """The oldest showing row's initiative keeps the file, and the other gets
     a copy of its own that its row shows."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlmodel import select
 
@@ -518,7 +523,7 @@ async def test_the_sweep_copies_a_picture_two_initiatives_show(
     await session.commit()
 
     await route_session_to_guild(session, a.guild.id)
-    later = datetime.now(timezone.utc) + UNCLAIMED_PASTED_IMAGE_GRACE
+    later = datetime.now(UTC) + UNCLAIMED_PASTED_IMAGE_GRACE
     assert (
         await release_unclaimed_pasted_images(session, now=later + timedelta(minutes=1))
         == set()
@@ -816,8 +821,8 @@ async def test_a_plugin_copies_only_a_picture_it_reads_through_content(
     under a scope it was not granted, does not."""
     from sqlmodel import select
 
-    from app.models.tenant.plugin_placement import PluginPlacement
     from app.models.tenant.file import File
+    from app.models.tenant.plugin_placement import PluginPlacement
     from app.testing import (
         create_file,
         create_project,
@@ -826,7 +831,7 @@ async def test_a_plugin_copies_only_a_picture_it_reads_through_content(
         guild_url,
         route_session_to_guild,
     )
-    from app.testing.plugin_clients import install_plugin, install_headers
+    from app.testing.plugin_clients import install_headers, install_plugin
 
     scopes = ["files:read", "files:write"]
     installed = await install_plugin(session, acting_user, role_session, granted=scopes)
@@ -891,7 +896,7 @@ async def test_a_plugin_moving_a_task_carries_its_picture(
         guild_url,
         route_session_to_guild,
     )
-    from app.testing.plugin_clients import install_plugin, install_headers
+    from app.testing.plugin_clients import install_headers, install_plugin
 
     scopes = ["projects:read", "projects:write"]
     installed = await install_plugin(session, acting_user, role_session, granted=scopes)
@@ -931,8 +936,12 @@ async def test_a_task_moved_to_another_initiative_takes_copies_of_its_pictures(
 ):
     """The task and its conversation show one copy kept for the destination;
     the original still serves the initiative it came from."""
-    from app.testing import create_comment, create_initiative, create_project
-    from app.testing import create_task
+    from app.testing import (
+        create_comment,
+        create_initiative,
+        create_project,
+        create_task,
+    )
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import and_, case, exists, func, or_, select
+from sqlalchemy import and_, case, exists, func, not_, or_, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -39,7 +39,11 @@ def _community(key: str):
     """The community's row for ``key``, over an alias of its own so it never
     correlates with a query that reads ``initiative_rules`` too."""
     row = aliased(InitiativeRule)
-    return row, and_(row.initiative_id.is_(None), row.key == key)  # type: ignore[union-attr]
+    return row, and_(
+        row.initiative_id.is_(None),  # type: ignore[union-attr]
+        row.install_id.is_(None),  # type: ignore[union-attr]
+        row.key == key,
+    )
 
 
 def community_switch(context: ActorContext, tool: Tool) -> bool | None:
@@ -96,8 +100,8 @@ def member_permission_sql(
     held = or_(
         and_(role.is_builtin, role.name == BUILTIN_MEMBER_ROLE),
         and_(
-            ~role.is_builtin,
-            ~role.is_manager,
+            not_(role.is_builtin),
+            not_(role.is_manager),
             exists().where(custom_roles, off.enabled.is_(False)),  # type: ignore[union-attr]
         ),
     )

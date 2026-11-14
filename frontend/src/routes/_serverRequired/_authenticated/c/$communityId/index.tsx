@@ -1,7 +1,8 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 
-import { CommunityHomeSkeleton } from "@/components/skeletons/PageSkeletons";
+import { validateId } from "@/lib/routeSearch";
+import { HomePage } from "@/pages/community/home/HomePage";
+import { CommunityHomeSkeleton } from "@/ui/page-skeletons";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/")({
   /** `node` is the rail's open node; comments is the only one. */
@@ -18,27 +19,12 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
   } => ({
     node: typeof search.node === "string" ? search.node : undefined,
     create: search.create === "true" ? "true" : undefined,
-    plugin: pluginIdOf(search.plugin),
+    plugin: validateId(search.plugin),
   }),
-  component: CommunityHome,
+  component: HomePage,
+  // The front page draws its own outline while its code is on the way, rather
+  // than the generic one the layout would otherwise show in its place.
+  pendingComponent: CommunityHomeSkeleton,
+  pendingMs: 0,
+  pendingMinMs: 0,
 });
-
-/** A positive integer id, or nothing. */
-function pluginIdOf(value: unknown): number | undefined {
-  const id = typeof value === "number" ? value : Number(value);
-  return Number.isInteger(id) && id > 0 ? id : undefined;
-}
-
-const LazyCommunityHomePage = lazyRouteComponent(() =>
-  import("@/pages/CommunityHomePage").then((m) => ({ default: m.CommunityHomePage }))
-);
-
-/** The front page draws its own outline while its code is on the way, rather
- *  than the generic one the layout would otherwise show in its place. */
-function CommunityHome() {
-  return (
-    <Suspense fallback={<CommunityHomeSkeleton />}>
-      <LazyCommunityHomePage />
-    </Suspense>
-  );
-}

@@ -13,6 +13,9 @@ each reference as the **ref** of what it named where it was written
   which no reader takes for a reference until the restore puts an id back.
 * editor state: the node keeps its text, carries ``importSourceRef`` and holds
   no id (``0``) until it is placed.
+* a dashboard's statements: they cross as written, and each row id one names
+  is read as the ref of that row where it was exported (``project_id = 12`` is
+  ``project:12``) and placed like any other.
 
 Every row a restore creates registers itself with the job's link collector
 under the ref it had (``task:41``, ``file:7``), so once the last entry has
@@ -20,11 +23,13 @@ flushed :func:`resolve_references` reads each marked body again and places
 every reference: on the row its ref became in this job; on the original, when
 the export came from this same community and the thing did not come over with
 it; and otherwise on nothing — the reference is its title again, never a link
-to whatever holds that id here.
+to whatever holds that id here. A statement's id that names nothing becomes
+``0``, which no row has.
 """
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -32,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import undefer
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import FileType
 from app.core.references import (
     REFERENCE_NODES,
     SOURCE_REF,
@@ -42,7 +48,6 @@ from app.core.references import (
     reference_as_text,
     reference_node_kind,
 )
-from app.core.file_types import FileType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 
@@ -161,10 +166,27 @@ def detach_envelope_references(data: Any, *, guild_id: int) -> None:
 # -- import ------------------------------------------------------------------
 
 
+def _statements(definition: Any) -> list[dict[str, Any]]:
+    """The bindings of a dashboard definition that hold a statement."""
+    widgets = definition.get("widgets") if isinstance(definition, dict) else None
+    return [
+        widget["binding"]
+        for widget in widgets or ()
+        if isinstance(widget, dict)
+        and isinstance(widget.get("binding"), dict)
+        and widget["binding"].get("source") == "query"
+        and isinstance(widget["binding"].get("sql"), str)
+    ]
+
+
 def has_source_references(content: Any) -> bool:
-    """Whether a body holds a reference still waiting to be placed."""
+    """Whether a body holds a reference still waiting to be placed. A
+    dashboard's statements may name rows by id, so a definition holding one
+    does."""
     if isinstance(content, str):
         return _EXPORTED_TEXT_REFERENCE.search(content) is not None
+    if _statements(content):
+        return True
     found = False
 
     def walk(node: Any) -> None:
@@ -225,7 +247,7 @@ def place_editor_references(content: Any, resolve: Callable[[str], int | None]) 
 
 
 def note_or_settle(
-    context: "ImportContext | None",
+    context: ImportContext | None,
     kind: SearchEntityType,
     entity_id: int | None,
     content: Any,
@@ -247,6 +269,16 @@ def note_or_settle(
 def _settle(content: Any, resolve: Callable[[str], int | None]) -> Any:
     if isinstance(content, str):
         return place_markdown_references(content, resolve)
+    if _statements(content):
+        from app.services.query.resolve import remap_ids
+
+        placed = copy.deepcopy(content)
+        for binding in _statements(placed):
+            binding["sql"] = remap_ids(
+                binding["sql"],
+                lambda kind, entity_id: resolve(format_ref(kind, entity_id)) or 0,
+            )
+        return placed
     return place_editor_references(content, resolve)
 
 
@@ -257,11 +289,15 @@ def _body_column(kind: SearchEntityType) -> tuple[type, str] | None:
 
     if kind == SearchEntityType.comment:
         return Comment, "content"
+    if kind == SearchEntityType.dashboard:
+        from app.models.tenant.dashboard import Dashboard
+
+        return Dashboard, "definition"
     return BODY_COLUMNS.get(kind)
 
 
 async def resolve_references(
-    session: AsyncSession, context: "ImportContext", *, author_id: int | None
+    session: AsyncSession, context: ImportContext, *, author_id: int | None
 ) -> int:
     """Place the exported references in every body the job noted, now that
     everything the job carries exists, and record the ``references`` edges
@@ -317,7 +353,7 @@ async def resolve_references(
             else None
         )
         if carry and has_source_references(carry.get("description")):
-            setattr(
+            setattr(  # noqa: B010 - ``row`` is any kind's row; only a task's has it
                 row,
                 "recurrence_carry",
                 {**carry, "description": _settle(carry["description"], resolve)},

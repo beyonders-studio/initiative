@@ -11,8 +11,6 @@
     "all": "Alle Communitys",
     "none": "Du bist noch in keiner Community."
   },
-  "loading": "Wird geladen…",
-  "loadError": "Dieses Werkzeug konnte nicht geladen werden. Bitte versuche es später erneut.",
   "empty": {
     "title": "Hier ist noch nichts",
     "description": "In deinen Communitys erreicht dich davon noch nichts.",

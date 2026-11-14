@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import AbstractAsyncContextManager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -42,10 +42,10 @@ from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services import data_jobs
 from app.services.data_jobs import JobOutcome
 from app.services.export import engine as export_engine
-from app.services.platform import accounts as accounts_service
 from app.services.export import limits as export_limits
 from app.services.import_engine import atlassian
 from app.services.import_engine.atlassian import throttled
+from app.services.platform import accounts as accounts_service
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ async def _render(
         if not await still_ours():
             await session.commit()
             raise _Superseded
-        touched = datetime.now(timezone.utc)
+        touched = datetime.now(UTC)
         job.updated_at = touched
         session.add(job)
         await session.commit()
@@ -177,13 +177,12 @@ async def _render(
         # archive sits in the operator's destination under whatever
         # retention they keep there, and is not ours to sweep up.
         job.expires_at = (
-            datetime.now(timezone.utc)
-            + timedelta(hours=export_limits.EXPORT_ARTIFACT_TTL_HOURS)
+            datetime.now(UTC) + timedelta(hours=export_limits.EXPORT_ARTIFACT_TTL_HOURS)
             if location.artifact_ref
             else None
         )
     _forget_filters(job)
-    job.updated_at = datetime.now(timezone.utc)
+    job.updated_at = datetime.now(UTC)
     session.add(job)
     await session.commit()
     return _outcome(job, guild_id)
@@ -227,12 +226,6 @@ jobs = data_jobs.Dispatcher(
     sweep=_sweep,
     run=_render,
 )
-
-
-async def process_export_jobs() -> None:
-    """Run passes until one starts nothing, waiting for each pass's jobs.
-    Everything queued is dealt with by the time this returns."""
-    await jobs.process()
 
 
 async def _execute(

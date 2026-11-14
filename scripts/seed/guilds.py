@@ -3,29 +3,28 @@ community's own schema before its content is written."""
 
 from __future__ import annotations
 
-from sqlmodel import select
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.image_headers import validate_image
-from app.db.schema_provisioning import provision_guild
 from app.db.request_context import SystemGuild, Unattributed
+from app.db.schema_provisioning import provision_guild
 from app.db.session import set_rls_context
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.guild import (
-    Guild,
     CommunityCategory,
-    GuildMembership,
+    CommunityJoinPolicy,
     CommunityRole,
+    Guild,
+    GuildMembership,
 )
 from app.models.platform.guild_image import IMAGE_SPECS
 from app.models.platform.user import User
-from app.services.platform import guild_images
+from app.services.platform import guild_images, rules
 from app.services.platform import guilds as guilds_service
-from app.services.platform import rules
 from app.services.platform.app_settings import (
     get_or_create_guild_settings,
 )
-
 from seed.common import Community, photo
 
 #: The three communities with real content, in the order they are seeded.
@@ -36,8 +35,11 @@ COMMUNITIES: dict[str, dict] = {
         "title": "Community 1: Primary Community (TTRPG Campaign)",
         "photo": "fantasy-map",
         # kael joins the community but no initiative in it: his view of it
-        # must be empty (initiative RLS hides everything; content 404s).
+        # must be empty (initiative RLS hides everything; content 404s). The
+        # owner made this community on a fresh database, but one that already
+        # held a community (the upgrade check's) finds that one first.
         "members": [
+            "Admin User",
             "Guildmaster Aldric",
             "Archivist Okoro",
             "Dungeon Master",
@@ -163,14 +165,26 @@ async def add_members(
     *,
     admins: list[User] | None = None,
 ) -> None:
-    """Add users to a guild as members, or admins where named.
+    """Add users to a guild as members, or admins where named, leaving anyone
+    already in it as they are.
 
     Membership rows carrying a role are a system-engine write, so any community
     routing left from a previous community is reset first.
     """
     await set_rls_context(session, Unattributed())
     admin_ids = {u.id for u in admins or []}
+    present = set(
+        (
+            await session.exec(
+                select(GuildMembership.user_id).where(
+                    GuildMembership.guild_id == guild.id
+                )
+            )
+        ).all()
+    )
     for user in users:
+        if user.id in present:
+            continue
         role = CommunityRole.admin if user.id in admin_ids else CommunityRole.member
         session.add(GuildMembership(guild_id=guild.id, user_id=user.id, role=role))
     await session.flush()
@@ -218,16 +232,19 @@ async def enable_directory(session: AsyncSession) -> None:
 
 
 async def list_in_directory(
-    session: AsyncSession, guild: Guild, *, categories: list[CommunityCategory]
+    session: AsyncSession,
+    guild: Guild,
+    *,
+    categories: list[CommunityCategory],
+    join_policy: CommunityJoinPolicy = CommunityJoinPolicy.open,
 ) -> None:
-    """Opt a community into the directory.
+    """Opt a community into the directory, open to anyone or asking first.
 
     A listing is the shelves plus the 18+ declaration together — the database
-    refuses a listed guild missing either — and a listed guild shows handles
-    rather than real names (ck_guilds_community_member_names). Writes
+    refuses a listed guild missing either. Writes
     ``public.guilds``, so the session must not be routed into a guild schema.
     """
-    guild.is_community = True
+    guild.join_policy = join_policy.value
     guild.categories = guilds_service.normalize_categories(
         [c.value for c in categories]
     )
@@ -269,3 +286,21 @@ async def seat_superadmin(session: AsyncSession, user: User) -> int:
         seated += 1
     await session.flush()
     return seated
+
+
+async def name_members(session: AsyncSession, users: dict[str, User]) -> None:
+    """Call every seeded account by its seed name in each community it is in,
+    as a member names themselves there. One pass over the memberships, so
+    creators, the seat and communities added later are covered; a name already
+    set is left alone."""
+    await set_rls_context(session, Unattributed())
+    for name, user in users.items():
+        await session.exec(
+            update(GuildMembership)
+            .where(
+                col(GuildMembership.user_id) == user.id,
+                col(GuildMembership.display_name).is_(None),
+            )
+            .values(display_name=name)
+        )
+    await session.flush()

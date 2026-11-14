@@ -1,5 +1,6 @@
 export { Desktop } from "./desktop.mjs";
 export { DesktopUpdater } from "./desktopUpdater.mjs";
+export { Passkeys } from "./passkeys.mjs";
 export { SplashScreen } from "./splashScreen.mjs";
 export { CapacitorUpdater } from "./updater.mjs";
 

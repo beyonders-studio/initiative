@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
@@ -14,9 +14,8 @@ from sqlalchemy import (
 from sqlmodel import Field, Relationship
 
 from app.core.tools import COMMENT_TARGETS
-from app.models.tenant._mixins import CreatedByMixin, HoldMixin, SoftDeleteMixin
 from app.models.platform.user_profile_view import MemberProfile
-
+from app.models.tenant._mixins import CreatedByMixin, HoldMixin, SoftDeleteMixin
 
 #: The comment columns naming a parent — one per tool plus the content-level
 #: extras — as the single-parent CHECK spells them. Derived from the registry
@@ -70,15 +69,15 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     # author has left, the restore goes through and the comment renders as
     # "Deleted user #N" via the existing user-display helpers.
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     content: str = Field(sa_column=Column(Text, nullable=False))
-    task_id: Optional[int] = Field(
+    task_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    file_id: Optional[int] = Field(
+    file_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("files.id", ondelete="CASCADE"), nullable=True
@@ -88,43 +87,43 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     # enum in comments_test), one nullable FK per tool alongside the original
     # task/file pair. ``project_id`` means a comment ON the project itself;
     # a task comment reports its task's project through the read schema only.
-    project_id: Optional[int] = Field(
+    project_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    counter_group_id: Optional[int] = Field(
+    counter_group_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("counter_groups.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    calendar_id: Optional[int] = Field(
+    calendar_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("calendars.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    dashboard_id: Optional[int] = Field(
+    dashboard_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("dashboards.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    post_id: Optional[int] = Field(
+    post_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    wiki_id: Optional[int] = Field(
+    wiki_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("wikis.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    contact_id: Optional[int] = Field(
+    contact_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=True
@@ -133,13 +132,13 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     # A wiki's conversation happens on its pages: a note about the rota belongs
     # on the rota. The wiki's own column above stays a parent so the tool is
     # commentable like every other, but the thread people use is this one.
-    wiki_page_id: Optional[int] = Field(
+    wiki_page_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("wiki_pages.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    collection_id: Optional[int] = Field(
+    collection_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=True
@@ -155,14 +154,14 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     #: something did write it and every guild-content row says what. The two
     #: together are the honest reading: this app's record of who made the row,
     #: and the source's record of who spoke.
-    imported_author_name: Optional[str] = Field(
+    imported_author_name: str | None = Field(
         default=None,
         sa_column=Column(String(200), nullable=True),
     )
     # A pointer to the comment this answers, not a parent: a reply is its
     # writer's words, so it stays when the comment it answers is deleted —
     # under a tombstone — and is never taken to the trash or frozen with it.
-    parent_comment_id: Optional[int] = Field(
+    parent_comment_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("comments.id", ondelete="SET NULL"), nullable=True
@@ -182,7 +181,7 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     #: repeat noted on an operations case, say. Null on everything a person or
     #: a plug-in wrote; it is what tells the platform's notes from a plug-in's, since
     #: neither names an author.
-    system_kind: Optional[str] = Field(
+    system_kind: str | None = Field(
         default=None,
         sa_column=Column(String(length=SYSTEM_KIND_LENGTH), nullable=True),
     )
@@ -190,24 +189,24 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     #: kept for the replies under it. Set by a moderator's removal, and by its
     #: author's own deletion once the trash lets go of it with replies still
     #: under it. Nobody edits a tombstone, or reacts to it.
-    removed_at: Optional[datetime] = Field(
+    removed_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
     #: A ``RemovalReason``. Null on one its author deleted.
-    removed_reason: Optional[str] = Field(
+    removed_reason: str | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
     #: The moderation log row that took it down, where a moderator did; that
     #: row holds the words. Null on one its author deleted.
-    removal_id: Optional[int] = Field(
+    removal_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    updated_at: Optional[datetime] = Field(
+    updated_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -216,7 +215,10 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     # out because the target is a view, which carries no foreign key.
     author: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Comment.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Comment.created_by) == MemberProfile.id,"
+                " Comment.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         },
     )

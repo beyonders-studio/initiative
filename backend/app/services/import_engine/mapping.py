@@ -12,8 +12,8 @@ Pure, like the mappers themselves: no session, no network, no storage.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core import recurrence
 from app.models.tenant.task import RecurrenceStrategy, TaskStatusCategory
@@ -69,7 +69,7 @@ class SourceOption:
     task_count: int
 
 
-def iso_from_date(value: Any) -> Optional[str]:
+def iso_from_date(value: Any) -> str | None:
     """A plain ``YYYY-MM-DD`` to the envelope's datetime, at midnight UTC.
 
     A date with no time is the only thing several of these sources record for
@@ -82,10 +82,10 @@ def iso_from_date(value: Any) -> Optional[str]:
         parsed = datetime.strptime(text[:10], "%Y-%m-%d")
     except ValueError:
         return None
-    return parsed.replace(tzinfo=timezone.utc).isoformat()
+    return parsed.replace(tzinfo=UTC).isoformat()
 
 
-def iso_from_timestamp(value: Any) -> Optional[str]:
+def iso_from_timestamp(value: Any) -> str | None:
     """An ISO 8601 stamp to a normalized one, or ``None`` if it is not one.
 
     Accepts the ``+0000`` and ``Z`` offsets these exports use alongside the
@@ -120,7 +120,7 @@ def repeat_fields(
         )
         if not rolling and recurrence.parse(text).rule.get("FREQ") == ["HOURLY"]:
             return {}
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return {}
     return {
         "recurrence": text,
@@ -171,7 +171,7 @@ _CATEGORY_KEYWORDS: tuple[tuple[TaskStatusCategory, tuple[str, ...]], ...] = (
 )
 
 
-def category_for_name(name: str) -> Optional[TaskStatusCategory]:
+def category_for_name(name: str) -> TaskStatusCategory | None:
     """Which of our four columns a foreign column name reads as, if any.
 
     Checked most-specific first: "done" before "to do", so a column called
@@ -257,7 +257,7 @@ def build_envelope(
         "type": "initiative-project",
         "schema_version": 1,
         "app_version": app_version,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
         "source_instance_url": source_url,
         "project": {
             "name": name.strip() or "Imported project",

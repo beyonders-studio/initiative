@@ -2,8 +2,8 @@
 properties, and a project's, a collection's or a plug-in's metadata."""
 
 from datetime import datetime
-from enum import Enum
-from typing import Any, List, Optional
+from enum import Enum, StrEnum
+from typing import TYPE_CHECKING, Any
 
 from pydantic import (
     ConfigDict,
@@ -17,10 +17,9 @@ from app.core.currencies import CURRENCY_CODES
 from app.core.identity_boundary import names_withheld, responding_to_install
 from app.core.messages import PropertyMessages
 from app.core.tools import PROPERTY_TARGETS
+from app.models.tenant.metadata import PLUGIN_ONLY_TYPES, MetadataType
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import PluginPerson
-
-from app.models.tenant.metadata import PLUGIN_ONLY_TYPES, MetadataType
 
 # Cap on the number of property predicates accepted by list endpoints.
 # Bounds the per-request subquery count against the value table.
@@ -40,8 +39,14 @@ PropertyTarget.__doc__ = (
     "What can carry custom property values: every tool and sub-tool."
 )
 
-CurrencyCode = Enum("CurrencyCode", {code: code for code in CURRENCY_CODES}, type=str)
-CurrencyCode.__doc__ = "The ISO 4217 code a money property's amounts are in."
+if TYPE_CHECKING:
+    # Built below from the ISO list at runtime; to a type checker, a str enum.
+    class CurrencyCode(StrEnum): ...
+else:
+    CurrencyCode = Enum(
+        "CurrencyCode", {code: code for code in CURRENCY_CODES}, type=str
+    )
+    CurrencyCode.__doc__ = "The ISO 4217 code a money property's amounts are in."
 
 
 class PropertyOption(SanitizedBaseModel):
@@ -49,7 +54,7 @@ class PropertyOption(SanitizedBaseModel):
 
     value: str = Field(..., min_length=1, max_length=64, pattern=_SLUG_PATTERN)
     label: str = Field(..., min_length=1, max_length=100)
-    color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
+    color: str | None = Field(default=None, pattern=_HEX_COLOR_PATTERN)
 
 
 class CounterSettings(SanitizedBaseModel):
@@ -60,12 +65,12 @@ class CounterSettings(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     step: float = Field(default=1, gt=0, allow_inf_nan=False)
-    min: Optional[float] = Field(default=None, allow_inf_nan=False)
-    max: Optional[float] = Field(default=None, allow_inf_nan=False)
+    min: float | None = Field(default=None, allow_inf_nan=False)
+    max: float | None = Field(default=None, allow_inf_nan=False)
     initial: float = Field(default=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
-    def _ordered(self) -> "CounterSettings":
+    def _ordered(self) -> CounterSettings:
         if self.min is not None and self.max is not None and self.min > self.max:
             raise ValueError(PropertyMessages.COUNTER_MIN_GREATER_THAN_MAX)
         return self
@@ -75,14 +80,14 @@ class PropertyDefinitionBase(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     type: MetadataType
     position: float = 0.0
-    color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
-    options: Optional[List[PropertyOption]] = None
+    color: str | None = Field(default=None, pattern=_HEX_COLOR_PATTERN)
+    options: list[PropertyOption] | None = None
     #: The currency a money property's amounts are in; required for one, and
     #: dropped for every other type.
-    currency: Optional[CurrencyCode] = None
+    currency: CurrencyCode | None = None
     #: A counter's step, bounds and reset value; a counter left without them
     #: takes the defaults, and every other type drops them.
-    counter: Optional[CounterSettings] = None
+    counter: CounterSettings | None = None
 
     @field_validator("name")
     def _strip_name(cls, v: str) -> str:
@@ -92,7 +97,7 @@ class PropertyDefinitionBase(SanitizedBaseModel):
         return v
 
     @model_validator(mode="after")
-    def _validate_options(self) -> "PropertyDefinitionBase":
+    def _validate_options(self) -> PropertyDefinitionBase:
         if self.type in PLUGIN_ONLY_TYPES:
             raise ValueError("only a plug-in's metadata is of this type")
         if self.type in _SELECT_TYPES:
@@ -121,14 +126,14 @@ class PropertyDefinitionCreate(PropertyDefinitionBase):
     #: Make it this project's metadata rather than one of the initiative's
     #: properties: its values on the project's tasks. The project is in
     #: ``initiative_id``.
-    project_id: Optional[int] = None
+    project_id: int | None = None
     #: Make it this collection's metadata: shown only with the collection,
     #: its values on the collection's files. The collection is in
     #: ``initiative_id``.
-    collection_id: Optional[int] = None
+    collection_id: int | None = None
 
     @model_validator(mode="after")
-    def _one_owner(self) -> "PropertyDefinitionCreate":
+    def _one_owner(self) -> PropertyDefinitionCreate:
         if self.project_id is not None and self.collection_id is not None:
             raise ValueError("a definition has one owner")
         return self
@@ -142,19 +147,19 @@ class PropertyDefinitionUpdate(SanitizedBaseModel):
     in the payload is ignored.
     """
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    position: Optional[float] = None
-    color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
-    options: Optional[List[PropertyOption]] = None
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    position: float | None = None
+    color: str | None = Field(default=None, pattern=_HEX_COLOR_PATTERN)
+    options: list[PropertyOption] | None = None
     #: A money property's currency. Its amounts stay as they are: nothing is
     #: converted.
-    currency: Optional[CurrencyCode] = None
+    currency: CurrencyCode | None = None
     #: A counter's settings, all of them. Its values stay as they are until
     #: they are next written, which holds them to the new bounds.
-    counter: Optional[CounterSettings] = None
+    counter: CounterSettings | None = None
 
     @field_validator("name")
-    def _strip_name(cls, v: Optional[str]) -> Optional[str]:
+    def _strip_name(cls, v: str | None) -> str | None:
         if v is None:
             return v
         v = v.strip()
@@ -164,8 +169,8 @@ class PropertyDefinitionUpdate(SanitizedBaseModel):
 
     @field_validator("options")
     def _unique_slugs(
-        cls, v: Optional[List[PropertyOption]]
-    ) -> Optional[List[PropertyOption]]:
+        cls, v: list[PropertyOption] | None
+    ) -> list[PropertyOption] | None:
         if v is None:
             return v
         slugs = [opt.value for opt in v]
@@ -183,8 +188,8 @@ class PropertyDefinitionRead(PropertyDefinitionBase):
     initiative_id: int
     #: The project or the collection whose metadata it is; neither for an
     #: initiative's property.
-    project_id: Optional[int] = None
-    collection_id: Optional[int] = None
+    project_id: int | None = None
+    collection_id: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -205,26 +210,26 @@ class PropertyDefinitionGroup(SanitizedBaseModel):
 
     owner: MetadataOwnerKind
     #: The project's or the collection's id; none for the initiative.
-    owner_id: Optional[int] = None
+    owner_id: int | None = None
     #: The project's or the collection's name; none for the initiative.
-    name: Optional[str] = None
+    name: str | None = None
     #: Whether the reader may rename, reorder and delete these.
     can_edit: bool
-    definitions: List[PropertyDefinitionRead]
+    definitions: list[PropertyDefinitionRead]
 
 
 class PropertyDefinitionGroups(SanitizedBaseModel):
     """An initiative's metadata, then the properties of each project and each
     collection in it the reader may edit, each under its owner."""
 
-    groups: List[PropertyDefinitionGroup]
+    groups: list[PropertyDefinitionGroup]
 
 
 class PropertyDefinitionBulkDelete(SanitizedBaseModel):
     """Definitions of one initiative to delete together, or none of them."""
 
     initiative_id: int
-    ids: List[int] = Field(..., min_length=1, max_length=100)
+    ids: list[int] = Field(..., min_length=1, max_length=100)
 
 
 class PropertyDefinitionPromote(SanitizedBaseModel):
@@ -232,7 +237,7 @@ class PropertyDefinitionPromote(SanitizedBaseModel):
     collections, merged into one of its metadata, named ``name``."""
 
     initiative_id: int
-    ids: List[int] = Field(..., min_length=1, max_length=100)
+    ids: list[int] = Field(..., min_length=1, max_length=100)
     name: str = Field(..., min_length=1, max_length=100)
 
     @field_validator("name")
@@ -277,8 +282,8 @@ class PropertyOptionsChange(SanitizedBaseModel):
     it, so two people changing different options of it both stand."""
 
     property_id: int
-    add: List[str] = Field(default_factory=list, max_length=100)
-    remove: List[str] = Field(default_factory=list, max_length=100)
+    add: list[str] = Field(default_factory=list, max_length=100)
+    remove: list[str] = Field(default_factory=list, max_length=100)
 
 
 class PropertyStep(SanitizedBaseModel):
@@ -296,18 +301,18 @@ class PropertyValuesSetRequest(SanitizedBaseModel):
     Replacing, an empty list clears every property value on the entity.
     """
 
-    values: List[PropertyValueInput] = Field(default_factory=list)
+    values: list[PropertyValueInput] = Field(default_factory=list)
     #: Write only the properties ``values`` names, and take off the ones
     #: ``removed`` names, leaving every other value on the entity as it is.
     merge: bool = False
-    removed: List[int] = Field(default_factory=list, max_length=100)
+    removed: list[int] = Field(default_factory=list, max_length=100)
     #: With ``merge``, multi-select values to change an option of.
-    options: List[PropertyOptionsChange] = Field(default_factory=list, max_length=100)
+    options: list[PropertyOptionsChange] = Field(default_factory=list, max_length=100)
     #: With ``merge``, counters to step.
-    steps: List[PropertyStep] = Field(default_factory=list, max_length=100)
+    steps: list[PropertyStep] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
-    def removal_merges(self) -> "PropertyValuesSetRequest":
+    def removal_merges(self) -> PropertyValuesSetRequest:
         if (self.removed or self.options or self.steps) and not self.merge:
             raise ValueError("removed, options and steps need merge")
         changed = [
@@ -324,7 +329,7 @@ class PropertiesOnCreate(SanitizedBaseModel):
     """What every tool and sub-tool's create takes beside its own fields: the
     custom property values to write with the row, in the same transaction."""
 
-    properties: List[PropertyValueInput] = Field(default_factory=list)
+    properties: list[PropertyValueInput] = Field(default_factory=list)
 
 
 class PropertiesOnUpdate(SanitizedBaseModel):
@@ -332,7 +337,7 @@ class PropertiesOnUpdate(SanitizedBaseModel):
     values to replace, in the same transaction. Omitted, they stay as they
     are; a list (empty included) replaces them all."""
 
-    properties: Optional[List[PropertyValueInput]] = None
+    properties: list[PropertyValueInput] | None = None
 
 
 class PropertySummary(SanitizedBaseModel):
@@ -353,15 +358,15 @@ class PropertySummary(SanitizedBaseModel):
     #: Who owns the definition, at most one of these: the project or the
     #: collection whose metadata it is, or the installed plug-in that keeps it
     #: under ``key``. None of them for the initiative's property.
-    project_id: Optional[int] = None
-    collection_id: Optional[int] = None
-    install_id: Optional[int] = None
-    key: Optional[str] = None
-    options: Optional[List[PropertyOption]] = None
+    project_id: int | None = None
+    collection_id: int | None = None
+    install_id: int | None = None
+    key: str | None = None
+    options: list[PropertyOption] | None = None
     #: A money property's currency.
-    currency: Optional[CurrencyCode] = None
+    currency: CurrencyCode | None = None
     #: A counter's step, bounds and reset value.
-    counter: Optional[CounterSettings] = None
+    counter: CounterSettings | None = None
     value: Any = Field(
         default=None,
         description=(
@@ -398,7 +403,7 @@ class PropertySummary(SanitizedBaseModel):
         return value
 
 
-def annotated_properties(entity: Any) -> List[PropertySummary]:
+def annotated_properties(entity: Any) -> list[PropertySummary]:
     """The summaries ``metadata_service.annotate_properties`` put on this
     entity — read rather than recomputed, since a page's values are fetched for
     the whole page at once."""

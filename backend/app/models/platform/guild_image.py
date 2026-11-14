@@ -17,7 +17,7 @@ which is decided by ``app.services.platform.guild_images``, not here.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import ConfigDict
@@ -89,6 +89,6 @@ class GuildImage(SQLModel, table=True):
     byte_size: int = Field(sa_column=Column(Integer, nullable=False))
     data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

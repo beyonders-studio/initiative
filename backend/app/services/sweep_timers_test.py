@@ -1,7 +1,7 @@
 """Sweep timers: the write arms them, the worker visits only what is due."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 import asyncpg
@@ -11,19 +11,19 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from conftest import TEST_DATABASE_URL
 from app.core import metrics
 from app.core.config import settings
 from app.db import cohorts, timers
-from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.community_timer import CommunityTimer
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
+from app.models.platform.user_notification_prefs import DigestCadence
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.post import Post
 from app.models.tenant.task import TaskStatus, TaskStatusCategory
-from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
-from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.webhook_subscription import WebhookSubscription
-from app.models.platform.user_notification_prefs import DigestCadence
 from app.services import notifications, sweep_timers
 from app.services.guild_sweeps import Scan, Scope
 from app.services.platform import notify_bus
@@ -35,8 +35,8 @@ from app.testing import (
     create_calendar_event,
     create_guild,
     create_guild_plugin,
-    create_marketplace_listing,
     create_initiative,
+    create_marketplace_listing,
     create_post,
     create_project,
     create_task,
@@ -44,6 +44,7 @@ from app.testing import (
     route_session_to_guild,
     route_system,
 )
+from conftest import TEST_DATABASE_URL
 
 
 async def _community(session: AsyncSession, **guild):
@@ -61,7 +62,7 @@ async def _scheduled(session, initiative, author, *, due_in: timedelta) -> int:
         initiative,
         author,
         published_at=None,
-        scheduled_for=datetime.now(timezone.utc) + due_in,
+        scheduled_for=datetime.now(UTC) + due_in,
     )
     return cast(int, post.id)
 
@@ -111,7 +112,7 @@ async def test_a_routed_write_arms_its_timer_once(session: AsyncSession):
     second = await _scheduled(session, initiative, author, due_in=timedelta(hours=3))
     assert await _timers(session) == []
 
-    soon = datetime.now(timezone.utc) + timedelta(hours=1)
+    soon = datetime.now(UTC) + timedelta(hours=1)
     await _as_community(community_id, _reschedule(first, soon))
     await _as_community(community_id, _reschedule(second, soon + timedelta(hours=1)))
     assert await _timers(session) == [(community_id, "posts", soon)]
@@ -191,11 +192,11 @@ async def test_a_change_arms_the_upkeep_and_the_webhook_backstop(
 async def test_the_worker_runs_what_is_due_and_arms_the_next(session: AsyncSession):
     author, initiative, community_id = await _community(session)
     due = await _scheduled(session, initiative, author, due_in=timedelta(hours=1))
-    later = datetime.now(timezone.utc) + timedelta(hours=3)
+    later = datetime.now(UTC) + timedelta(hours=3)
     pending = await _scheduled(session, initiative, author, due_in=timedelta(hours=3))
     await _as_community(
         community_id,
-        _reschedule(due, datetime.now(timezone.utc) - timedelta(minutes=1)),
+        _reschedule(due, datetime.now(UTC) - timedelta(minutes=1)),
         _reschedule(pending, later),
     )
 
@@ -226,7 +227,7 @@ async def test_a_community_that_cannot_take_the_sweep_keeps_its_timer(
     await sweep_timers.process_due_timers()
 
     [(_c, kind, due)] = await _timers(session)
-    assert kind == "posts" and due > datetime.now(timezone.utc)
+    assert kind == "posts" and due > datetime.now(UTC)
     await route_session_to_guild(session, community_id)
     assert (await session.get(Post, post_id)).published_at is None  # type: ignore[union-attr]
 
@@ -249,7 +250,7 @@ async def test_a_sweep_that_calls_out_runs_in_its_own_lane(
         await sweep_timers.process_due_timers()
         assert drained == []
         [(_c, _k, due)] = await _timers(session, "webhooks")
-        assert due <= datetime.now(timezone.utc)
+        assert due <= datetime.now(UTC)
 
         await sweep_timers.process_due_timers(outward=True)
         assert drained == [community_id]
@@ -269,7 +270,7 @@ async def test_a_failed_visit_keeps_its_timer(session: AsyncSession, monkeypatch
     await sweep_timers.process_due_timers()
 
     [(_c, kind, due)] = await _timers(session)
-    assert kind == "posts" and due > datetime.now(timezone.utc)
+    assert kind == "posts" and due > datetime.now(UTC)
 
 
 async def test_a_failed_send_keeps_its_timer(session: AsyncSession, monkeypatch):
@@ -291,7 +292,7 @@ async def test_a_failed_send_keeps_its_timer(session: AsyncSession, monkeypatch)
     await sweep_timers.process_due_timers()
 
     [(_c, _k, due)] = await _timers(session, "reminders")
-    assert due > datetime.now(timezone.utc)
+    assert due > datetime.now(UTC)
 
 
 async def test_a_next_timer_that_fails_to_save_keeps_the_claimed_one(
@@ -301,7 +302,7 @@ async def test_a_next_timer_that_fails_to_save_keeps_the_claimed_one(
     await _due_now(session, community_id, "reminders")
 
     async def found(_session, _guild_id):
-        return datetime.now(timezone.utc) + timedelta(hours=1)
+        return datetime.now(UTC) + timedelta(hours=1)
 
     async def sent():
         return None
@@ -317,7 +318,7 @@ async def test_a_next_timer_that_fails_to_save_keeps_the_claimed_one(
     await sweep_timers.process_due_timers()
 
     [(_c, _k, due)] = await _timers(session, "reminders")
-    assert due > datetime.now(timezone.utc)
+    assert due > datetime.now(UTC)
 
 
 async def test_arming_skips_a_community_that_is_gone(session: AsyncSession):
@@ -342,9 +343,9 @@ async def test_reconcile_arms_what_no_write_did_and_counts_it(session: AsyncSess
     await sweep_timers.process_due_timers()
 
     [(_c, _k, posts)] = await _timers(session, "posts")
-    assert posts > datetime.now(timezone.utc) + timedelta(hours=1)
+    assert posts > datetime.now(UTC) + timedelta(hours=1)
     [(_c, _k, again)] = await _timers(session, sweep_timers.RECONCILE)
-    assert again > datetime.now(timezone.utc) + timedelta(hours=23)
+    assert again > datetime.now(UTC) + timedelta(hours=23)
     assert metrics.sweep_timer_repairs.labels("posts")._value.get() == repairs + 1
 
 
@@ -389,7 +390,7 @@ async def test_reconcile_arms_the_hooks_for_a_status_no_plugin_was_told(
 async def test_a_community_arms_its_own_timers_and_reads_none(session: AsyncSession):
     _author, _initiative, community_id = await _community(session)
     _other_author, _other, other_id = await _community(session)
-    due = datetime.now(timezone.utc)
+    due = datetime.now(UTC)
 
     async with cohorts.system_session(community_id) as routed:
         await route_system(routed, guild_id=community_id)
@@ -430,13 +431,14 @@ async def test_a_webhook_backlog_keeps_the_drain_due(session: AsyncSession):
     names it."""
     author, initiative, community_id = await _community(session)
     await create_post(session, initiative, author)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     assert await _read_as_community(community_id, outbox_poller.next_due(now)) is None
 
     session.add(
         WebhookSubscription(
             initiative_id=None,
             created_by=author.id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["posts.created"],
@@ -447,7 +449,7 @@ async def test_a_webhook_backlog_keeps_the_drain_due(session: AsyncSession):
     )
     await session.commit()
     owed = await _read_as_community(community_id, outbox_poller.next_due(now))
-    assert owed is not None and owed <= datetime.now(timezone.utc)
+    assert owed is not None and owed <= datetime.now(UTC)
 
 
 async def test_a_kept_tab_is_not_work_but_an_old_view_is(session: AsyncSession):
@@ -455,7 +457,7 @@ async def test_a_kept_tab_is_not_work_but_an_old_view_is(session: AsyncSession):
     project = await create_project(session, initiative, author)
     task = await create_task(session, project)
     project_id, task_id = project.id, task.id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     old = now - personal_items.WINDOW - timedelta(days=1)
     await route_session_to_guild(session, community_id)
     session.add(
@@ -523,7 +525,7 @@ async def test_a_batch_is_armed_for_when_its_items_are_due(session: AsyncSession
 async def test_a_reminder_is_armed_for_its_lead(session: AsyncSession):
     author, initiative, community_id = await _community(session)
     calendar = await create_calendar(session, initiative, author)
-    start = datetime.now(timezone.utc) + timedelta(hours=3)
+    start = datetime.now(UTC) + timedelta(hours=3)
     await create_calendar_event(
         session,
         calendar,
@@ -553,7 +555,7 @@ async def test_a_deadline_still_ahead_stays_armed(session: AsyncSession):
     """With nothing overdue yet, the overdue visit arms the next deadline."""
     author, initiative, community_id = await _community(session)
     project = await create_project(session, initiative, author)
-    due = datetime.now(timezone.utc) + timedelta(hours=3)
+    due = datetime.now(UTC) + timedelta(hours=3)
     await create_task(session, project, assignees=[author], due_date=due)
     await _due_now(session, community_id, "overdue")
 
@@ -624,9 +626,9 @@ async def test_a_preference_that_brings_work_sooner_arms_it(
 
 def test_a_weekly_digest_waits_for_its_day():
     schedule = DigestSchedule(cadence=DigestCadence.weekly, at="09:00", weekday=1)
-    friday = datetime(2026, 10, 16, 9, tzinfo=timezone.utc)
+    friday = datetime(2026, 10, 16, 9, tzinfo=UTC)
 
     slot = digest_slot(schedule, tz_name="UTC", now=friday)
 
     assert not slot.on_today
-    assert slot.following == datetime(2026, 10, 19, 9, tzinfo=timezone.utc)
+    assert slot.following == datetime(2026, 10, 19, 9, tzinfo=UTC)

@@ -8,7 +8,6 @@ emailed codes all count toward the same number.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer
 from sqlmodel import Field, SQLModel
@@ -31,18 +30,18 @@ class SignInLock(SQLModel, table=True):
     failures: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
     )
-    first_failure_at: Optional[datetime] = Field(
+    first_failure_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     #: Password and codes are refused until then.
-    locked_until: Optional[datetime] = Field(
+    locked_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Locks placed since ``first_lock_at``.
     locks: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
     )
-    first_lock_at: Optional[datetime] = Field(
+    first_lock_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

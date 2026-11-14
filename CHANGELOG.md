@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-11-13
+
+### Added
+
+- **Ban and time out members.** Removing someone can ban them until you lift it under **Settings → Users → Banned**. **Time out…** on a member lets them read but not post, comment or react, for an hour, a day, a week or until a date you pick.
+
+  ![The Time out dialog on a member, offering 1 hour, 1 day, 1 week or until a date](docs/images/releases/time-out-member.webp)
+
+- **Nord and Elemental color themes.** Elemental lays a metallic sheen over the app in one of ten elements, from copper and gold to emerald and obsidian, and Catppuccin's dark mode comes in Frappé, Macchiato or Mocha. Pick one under **My Settings → Interface**.
+
+  ![The Elemental theme's tile in the picker, with Gold chosen from a row of ten element swatches](docs/images/releases/elemental-theme.webp)
+  ![A community's Members page in Elemental Gold, with metal borders and a sheen across the sidebar](docs/images/releases/elemental-members.webp)
+
+- **Communities people ask to join.** Choose **Listed: ask to join** in Community settings: people ask from the directory with a note, and admins approve or turn them down on the **Users** tab. In the API, a community's `is_community` is now `join_policy` (`private`, `request` or `open`).
+
+  ![A community's card in the directory with an Ask to join button](docs/images/releases/ask-to-join-card.webp)
+  ![The Ask to join dialog with a note to the community's admins](docs/images/releases/ask-to-join-note.webp)
+
+- **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens an editor to hide or number any part. Help and feedback hide people's names, avatars and contact details for you.
+- **Suggestions and a roadmap on Initiative Cloud.** The **Suggestions** page, in the site's header, lists what the team has written up from feedback, with a roadmap of what's coming. Sign in to vote, and hear each time one you voted for moves.
+- **Drop a file on an import.** Importing a backup, another app's export, an .ics calendar or a registry bundle takes a file dropped on its box.
+- **The phone apps ask for a rating once.** After three days of use, the App Store or Google Play shows its prompt once, after you finish something; from Google Play, **Rate us on Google Play** is in your account menu. Needs the newest app.
+- **Plug-ins add community contacts.** With `contacts:write` on a token not limited to one initiative, a plug-in creates a contact with no `initiative_id`. It joins the community's contacts, held by the Community contacts plug-in and shared with every member.
+- **Plug-ins list and skip calendar events.** A plug-in reads a calendar's events over a span of days, each date of a repeating one included, and can skip one date, which tells its attendees. Automations uses both.
+- **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` joins a plug-in's rows to tasks and spreadsheets, and a tile's **Build** tab offers it as **Plug-in data**. Existing plug-in tiles are rewritten to use it, and follow **Run dashboard as**.
+
+### Changed
+
+- **Plug-ins answer to your roles.** Who uses a plug-in in an initiative is set on its **Roles** page, beside its tools; managers and community admins always can, and the roles each placement allowed carry over. **Plug-in developers:** a page, field, part, action or endpoint names a `permission` your manifest declares in `permissions`, in place of `admin_only`, and a handoff and an ID token carry the ones the person holds.
+- **Old passwords need resetting.** An account that hasn't signed in with a password since 0.44 sets a new one with **Forgot password** (it needs email set up on the server), or signs in with a passkey or single sign-on.
+- **Backups made before 0.78 no longer restore.** Restore one on 0.78 first, then back up again.
+- **Unsigned message devices are removed.** A device that never signed its keys (any on the app since 0.73 has) registers again the next time it opens, without the messages it held.
+- **Help leads with the user guide.** **Help**, in your account menu and the command palette, searches the guide, starting with the page you're on. Where your server takes requests, **Ask the team** starts one; the documentation and lifebuoy icons are gone.
+- **Update waits beside the bell.** Once you close a new version's prompt, **Update** stays beside the bell, or in the desktop app's title bar. The version number and **What's new** moved to the foot of **My Settings**.
+- **A narrower sidebar.** The navigation beside the communities rail starts narrower; drag its edge to widen it.
+- **Event themes replace the Pride choice.** The app dresses up for Pride in June, through Christmas and for the new year. One switch under **My Settings → Interface → This device** turns them off.
+- **Themes go by their real names.** Displacer is **Catppuccin**, Strahd **Dracula** and Aboleth **Monokai**, and you keep yours under its new name.
+- **Closed announcements stay in notifications.** A closed announcement leaves a read line in your notifications that opens it again, in place of the **Past announcements** page.
+- **The desktop app's own title bar.** It shows the app's name, **Help** and **Update** in place of the File, Edit, View and Window menus, and still drags and maximizes the window.
+- **Feedback goes to Initiative's team.** **Send feedback** starts from what you want to say, docks beside the page and keeps your draft. **Server operators:** off Initiative Cloud it opens Cloud's feedback page and your server sends nothing; switch it off under **Settings → Platform → Intake**. A Feedback board on your server stops receiving, and its cases stay as tasks.
+- **Search forgives typos.** The command palette, the icon picker and every list you pick from find a name through a wrong, swapped or extra letter, or words in any order. A table's filter stays exact.
+- **Attach files in the text box.** Help requests, feedback, reports and ticket replies have a paperclip in the text box; drop or paste a picture to attach it as a thumbnail.
+- **Multi-select pickers work from the keyboard.** Filters, tags and options take the arrow keys and Enter, stay open while you tick, and have a search box with **Select all** and **Clear all**.
+- **Press and hold to reorder on phones.** A drag starts after a short hold, so a swipe over a page tree or list scrolls it.
+- **Task tables scroll with the page.** A project's task table keeps its column headings at the top as you scroll, and long collections scroll smoothly.
+- **Loading shows the page's shape.** Lists, pages and panels show their outline while they load, and anything that fails to load says so, with **Try again**.
+- **Dialogs look and behave alike.** Dialogs and side panels keep their title and buttons in view, and Save, Create and Delete show a spinner and can't be pressed twice.
+- **Fields look and read alike.** Every field shares one box and focus ring, is outlined red when invalid, and focuses from its label. A screen reader reads a field's hint and error with it.
+- **Tool cards look alike.** Every tool's cards lift under the pointer, and a name cut short shows in full when you point at it.
+- **Sideways rows scroll alike.** From collections above a file list to an item's links, drag, swipe or use the arrow buttons.
+- **One colour picker everywhere.** A spreadsheet's colours and a profile decoration's colours open the app's own picker, starting on the current colour.
+- **Light or dark in My Settings.** Choose it under **My Settings → Interface → This device**, as well as from your account menu.
+- **Reports thank you in place.** After you send a report, its dialog thanks you, with an address to write to where the server gives one.
+- **Items name the plug-in that made them.** Tasks, posts, comments and trash entries a plug-in or Initiative itself makes say so. Existing items are credited to their plug-in where its install is on record.
+- **On/off switches for AI connections.** Each connection's row under **Integrations** has its own switch. A community's **Allow AI features** moved to the **Security** tab, and turning AI off turns its connections off until it's back on.
+- **Community security rules at a glance.** Each sign-in rule on the **Security** tab shows what it asks, and **Change** says how many members don't meet a new rule before it saves. Settings your server decides say **Set by your server**.
+- **Initiative rules read as sentences.** **Settings › Initiatives** lists your community's rules one line per tool, and **Add a rule** names the initiatives it changes before you save. An initiative's settings show a community-set value with a lock.
+- **A fuller initiatives table.** It shows who runs each initiative and how people join, with archived ones in their own view and Archive and Delete in each row's menu.
+- **Platform settings show each rule's value.** On **Security** and **Community**, each rule states its setting and **Change** opens a dialog; requiring a second factor says how many accounts it will ask.
+- **Server operators: update through 0.75 first.** A server on a release before 0.75.0 starts 0.75.2 once, then this release; its start-up message says so.
+- **Server operators: old first-owner variables are gone.** Use `FIRST_OWNER_EMAIL` and `FIRST_OWNER_PASSWORD` in place of `FIRST_SUPERUSER_EMAIL` and `FIRST_SUPERUSER_PASSWORD`. `S3_KMS_KEY_ID`, which nothing read, is gone too.
+- **Server operators: Python 3.14 everywhere.** The image and both server packages use it; the Debian package carries its own, updated with Initiative's releases, since Debian 13's is 3.13.
+- **Server operators: the host's certificates are trusted.** Connections out of the server trust a certificate authority installed on the machine. `SSL_CERT_FILE` and `SSL_CERT_DIR` still point elsewhere.
+
+### Fixed
+
+- **Repeating tasks a plug-in completes land on the right day.** A task that repeats after completion counts its next due date in the plug-in's or automation's time zone, not UTC. A plug-in reading a repeating event is told when it next starts.
+- **Group rules give their initiative role.** Where a provider connection adds people on arrival, someone a group rule places in an auto-join initiative gets the rule's role there, not a plain member's.
+- **The S3 move in the order that works.** On the storage page, save S3 with **Serve missing objects from local** on, then **Start backfill**, which waits until S3 is saved.
+- **Passkeys work in the apps.** Signing in, adding a passkey, breaking glass, the billing console and every other passkey prompt open your browser and carry on in the app, with no second sign-in.
+- **Single sign-on goes on past an age limit.** Where a listed community's provider connection adds people on arrival, an account its age answer keeps out is left out of it, and the sign-in goes on.
+- **A plug-in acting for you has your community settings, no more.** On a member token, it changes the community's calendars or adds a community-wide webhook only when you could yourself.
+- **Plug-in updates show what they ask for.** Its row in **Settings › Integrations** shows **Update waiting** with what the version asks for, and a version this server can't run says why.
+- **Create from `[[` in wikis and posts.** It asks what kind of thing to make, and links it.
+- **Posts from X and Reddit show.** In a document, on a whiteboard or as a link file, on the web and in the apps.
+- **New plug-in widgets appear at once.** A plug-in's widgets are offered as soon as it's installed or upgraded.
+- **Hidden tabs scroll into reach.** Tabs past the edge of a narrow window scroll with a thin scrollbar under them.
+- **Every color theme's text reads clearly.** Muted text, error text and focus rings in Kobold, Catppuccin, Dracula, Unicorn, Dark Knight, ORC and Monokai meet the WCAG AA contrast standard.
+- **Messages fit the screen.** A conversation fills the page and scrolls on its own, phones included, with the message box always in view. The encryption note is a shield beside the person's name.
+- **Descriptions say what actually happens.** The Support and Moderator roles, moving a task's status, break glass, community AI, the cookie notice and the group-message encryption note read correctly, and dataset names show.
+- **More of the app is translated.** Confirmations, pickers and tables speak your language, down to Cancel, placeholders, filters and screen-reader labels.
+- **Errors show once.** Pinning, reordering projects or tasks, and closing tabs say when they fail.
+- **Switching views keeps your place.** A collection's grid and timeline, and posts, keep your place when you switch to one partway down the page.
+- **Cmd/Ctrl+B and K in documents.** Each does one thing: bold, and make a link.
+- **Arrow keys move through `[[`.** As they do for `@` and `#`.
+- **Focus returns after a confirmation.** Closing one puts you back on the button that opened it.
+- **Screen readers read progress bars.** They say how far along they are.
+- **Members table shows 25 a page.** The page sizes that did nothing are gone.
+- **Widgets stay clear while customizing.** On Home, their name and buttons sit on a solid background.
+- **Task type layouts carry their name.** In the layout editor, a task type's page layout is named for its type.
+
 ## [0.78.0] - 2026-11-06
 
 ### Added
@@ -69,6 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restored dashboards read what was restored with them.** Where a dashboard's SQL names a project, file or other item by id, a backup or import points it at the copy that came with it. An item that didn't come along matches nothing.
 - **Sign-in rules that place people in initiatives.** Each community's rules decide only its own initiatives' members, and a rule whose initiative or role was deleted places people in the community alone.
 - **A full community takes nobody new through sign-in rules.** A group rule that places people in a community stops at its member limit; a sign-in that would pass it is placed everywhere else as usual.
 - **Reaction emails after an account is deleted.** One still waiting to go out names the person as "Deleted user", as an assignment email already did.

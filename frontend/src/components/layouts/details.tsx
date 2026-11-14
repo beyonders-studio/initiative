@@ -7,7 +7,7 @@
  */
 
 import { MoreHorizontal } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReadCounter } from "@/api/generated/counters/counters";
@@ -20,11 +20,9 @@ import {
   type TaskTypeRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyFilter } from "@/components/properties/PropertyFilter";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
-import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
@@ -35,48 +33,26 @@ import { useTask, useTasks } from "@/hooks/useTasks";
 import { type CalendarFilters, EMPTY_CALENDAR_FILTERS } from "@/lib/filters/calendarFilters";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
 import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
-import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { DetailLayoutSpec, StoredRegions } from "@/lib/layouts/detailLayout";
 import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
-import type { FieldDef } from "@/lib/layouts/fields";
+import { CALENDAR_PRESETS } from "@/lib/layouts/events";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
-import { CALENDAR_PRESETS, TASK_PRESETS } from "@/lib/layouts/presets";
 import { TASK_DETAIL } from "@/lib/layouts/taskLayout";
-import { taskLayoutFor } from "@/lib/layouts/tasks";
-import type { LayoutNode } from "@/lib/layouts/tree";
+import { TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/tasks";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { type DetailKind, DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import type { EditableDetail } from "@/ui/layouts/LayoutEditor";
+import { editablePresets } from "@/ui/layouts/LayoutPresets";
+import type { LayoutNode } from "@/ui/layouts/tree";
+import { PropertyFilter } from "@/ui/properties/PropertyFilter";
+import type { PropertyInputProps } from "@/ui/properties/PropertyInput";
 
-import { editablePresets } from "./LayoutPresets";
-import type { LayoutProject } from "./LayoutSettingsPanel";
-
-/** A kind of detail, as the editor lays it out. */
-export type EditableDetail = {
-  spec: DetailLayoutSpec;
-  /** For a page laid out per type of item, which type's, and its name, which
-   *  `words.name` takes as `{{name}}`. */
-  taskTypeId?: number;
-  typeName?: string;
-  /** What the editor says about it, as keys in `projects`, each naming its
-   *  namespace where it is another: its name, what it is, that it is as
-   *  shipped, what its title and its fields are, and where its own parts'
-   *  names (`parts`) and what each does (`partHelp`) are, as the start of their
-   *  keys. */
-  words: {
-    name: string;
-    help: string;
-    shipped: string;
-    titleHelp: string;
-    hiddenHelp: string;
-    parts: string;
-  };
-  /** Its fields, by id: the built-ins, and the plug-ins' where they draw on it. */
-  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
-  /** The detail drawn with one of its own, laid out as `tree` says. */
-  preview: (tree: LayoutNode) => ReactNode;
-};
+import { TaskSortPicker } from "./TaskSortPicker";
+import type { LayoutProject } from "./taskLists";
 
 /** A detail's words, kept under `key` in the layouts namespace. */
 const wordsOf = (key: string): EditableDetail["words"] => ({
@@ -312,7 +288,8 @@ export const taskDetails = (project: LayoutProject): EditableDetail[] =>
       hiddenHelp: "layouts:hiddenHelp",
       parts: "layouts:",
     },
-    fields: TASK_DETAIL.fields,
+    fields: (definitions, plugins) =>
+      TASK_DETAIL.fields([...project.properties, ...definitions], plugins),
     preview: (tree) => <TaskPreview project={project} type={type} tree={tree} />,
   }));
 
@@ -420,12 +397,19 @@ export const taskPresets = (project: LayoutProject) =>
         onChange={onChange}
       />
     ),
-    sortable: (kind) => kind === "table",
+    sortControls: (list, value, onChange, fields) =>
+      list === "table" ? (
+        <TaskSortPicker value={value} onChange={onChange} fields={fields} />
+      ) : null,
   });
 
 /** The initiative calendar's presets: what its tasks are, and the properties
- *  its events and tasks carry, as its page filters them. */
-export const calendarPresets = (initiativeId: number) =>
+ *  its events and tasks carry (the initiative's `definitions`), as its page
+ *  filters them. */
+export const calendarPresets = (
+  definitions: PropertyDefinitionRead[],
+  input: Pick<PropertyInputProps, "appendOption" | "searchMembers">
+) =>
   editablePresets<CalendarFilters>({
     kind: CALENDAR_PRESETS,
     empty: EMPTY_CALENDAR_FILTERS,
@@ -440,11 +424,12 @@ export const calendarPresets = (initiativeId: number) =>
         <PropertyFilter
           value={value.properties}
           onChange={(properties) => onChange({ ...value, properties })}
-          initiativeId={initiativeId}
+          definitions={definitions}
+          appendOption={input.appendOption}
+          searchMembers={input.searchMembers}
         />
       </div>
     ),
-    sortable: () => false,
   });
 
 /** What each tool the whole initiative shares lays out: its item's detail,

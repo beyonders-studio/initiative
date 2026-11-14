@@ -1,4 +1,8 @@
 {
+  "appName": "Initiative",
+  "aPlugin": "Un plug-in",
+  "help": "Aide",
+  "helpDraft": "Brouillon de la demande d'aide",
   "user": "Utilisateur",
   "userWithId": "Utilisateur n° {{id}}",
   "formerMember": "Ancien membre",
@@ -18,32 +22,12 @@
   "submit": "Valider",
   "reset": "Réinitialiser",
   "done": "Terminé",
-  "pullToRefresh": {
-    "pull": "Tirez pour actualiser",
-    "release": "Relâchez pour actualiser",
-    "refreshing": "Actualisation…"
-  },
   "toolViewFilter": {
     "label": "Afficher",
     "all": "Tous",
     "active": "Actifs",
     "templates": "Modèles",
     "archived": "Archivés"
-  },
-  "dateRange": {
-    "any": "Toutes les dates",
-    "fromOnly": "À partir du {{date}}",
-    "untilOnly": "Jusqu’au {{date}}",
-    "thisMonth": "Ce mois-ci",
-    "lastMonth": "Le mois dernier",
-    "thisQuarter": "Ce trimestre",
-    "thisYear": "Cette année",
-    "fromLabel": "Du",
-    "untilLabel": "Au",
-    "open": "Ouvert",
-    "fromRemove": "Retirer la date de début",
-    "untilRemove": "Retirer la date de fin",
-    "clear": "Effacer les dates"
   },
   "yes": "Oui",
   "no": "Non",
@@ -52,7 +36,6 @@
   "success": "Réussite",
   "warning": "Avertissement",
   "info": "Info",
-  "none": "Aucun",
   "all": "Tous",
   "name": "Nom",
   "description": "Description",
@@ -62,47 +45,24 @@
   "optional": "Facultatif",
   "actions": "Actions",
   "adding": "Ajout…",
-  "rowActionsFor": "Actions pour {{subject}}",
   "more": "Plus",
-  "moreOptions": "Plus d’options",
   "less": "Moins",
   "noResults": "Aucun résultat",
   "tryAgain": "Réessayer",
   "learnMore": "En savoir plus",
   "viewAll": "Tout afficher",
   "copyToClipboard": "Copier dans le presse-papiers",
-  "copied": "Copié !",
   "copy": "Copier",
-  "copyUnavailable": "Copie impossible — copiez-le à la main",
   "untitled": "Sans titre",
-  "appName": "initiative",
+  "beta": "Bêta",
   "pageTitle": "{{name}} - Initiative",
   "send": "Envoyer",
   "submitting": "Envoi en cours…",
   "clear": "Effacer",
-  "pickEmoji": "Choisir un emoji",
   "previous": "Précédent",
-  "rowsPerPage": "Lignes par page :",
-  "pageOf": "Page {{current}} sur {{total}}",
-  "stepOf": "Étape {{current}} sur {{total}}",
-  "select": "Sélectionner",
-  "exitSelection": "Quitter la sélection",
-  "enableSelectionMode": "Activer le mode sélection",
-  "exitSelectionMode": "Quitter le mode sélection",
-  "resetSorting": "Réinitialiser le tri",
-  "groupBy": "Regrouper par",
-  "chooseGrouping": "Choisir un regroupement",
-  "columns": "Colonnes",
-  "tableOptions": "Options du tableau",
-  "rowsSelected": "{{selected}} ligne(s) sélectionnée(s) sur {{total}}",
-  "rowsSelectedFiltered": "{{selected}} sélectionnée(s) ({{total}} correspondent au filtre)",
   "selectAll": "Tout sélectionner",
   "selectRow": "Sélectionner la ligne",
   "noResultsDot": "Aucun résultat.",
-  "allSelected": "Tout est sélectionné",
-  "countSelected": "{{count}} sélectionné",
-  "selectEllipsis": "Sélectionner…",
-  "noOptionsAvailable": "Aucune option disponible",
   "clearAll": "Tout effacer",
   "calendar": {
     "today": "Aujourd'hui",
@@ -243,11 +203,6 @@
     "viewTags": "Étiquettes",
     "details": "Détails"
   },
-  "emojiPicker": {
-    "searchPlaceholder": "Rechercher un emoji…",
-    "empty": "Aucun emoji trouvé.",
-    "prompt": "Sélectionnez un emoji…"
-  },
   "reactions": {
     "add": "Ajouter une réaction",
     "quick": "Réagir avec {{emoji}}",
@@ -259,19 +214,6 @@
     "namesAndMore_other": "{{names}} et {{count}} autres",
     "error": "Votre réaction n'a pas pu être enregistrée."
   },
-  "pagination": {
-    "perPage": "Par page :",
-    "rangeOf": "{{start}}–{{end}} sur {{total}}"
-  },
-  "lightbox": {
-    "title": "Image",
-    "description": "Utilisez les flèches ou faites glisser pour passer d’une image à l’autre.",
-    "position": "{{current}} / {{total}}",
-    "zoomIn": "Zoom avant",
-    "zoomOut": "Zoom arrière",
-    "open": "Voir cette image en taille réelle",
-    "openNamed": "Voir {{name}} en taille réelle"
-  },
   "timeline": {
     "label": "Aller à un mois",
     "jumpedTo": "À partir de {{period}}",
@@ -282,17 +224,8 @@
     "lastUpdated": "Dernière mise à jour {{when}}"
   },
   "imagePicker": {
-    "chooseImage": "Choisir une image",
     "takePhoto": "Prendre une photo",
-    "chooseFromLibrary": "Choisir dans la galerie",
-    "chooseFile": "Choisir un fichier",
-    "permission": "Initiative a besoin d'accéder à votre appareil photo et à vos photos. Autorisez-le dans les réglages de l'appareil, puis réessayez.",
-    "unavailable": "Cet appareil n'a pas d'appareil photo pour prendre une photo.",
-    "failed": "Cette photo n'a pas pu être lue. Réessayez."
-  },
-  "fileDrop": {
-    "release": "Dépose-le ici",
-    "unsupported": "Ce type de fichier ne peut pas être envoyé ici."
+    "chooseFromLibrary": "Choisir dans la galerie"
   },
   "archiveError": "Impossible d'archiver cet élément. Veuillez réessayer.",
   "unarchiveError": "Impossible de désarchiver cet élément. Veuillez réessayer.",
@@ -336,7 +269,13 @@
     "ready": "La version {{version}} est prête. Rechargez pour l'utiliser.",
     "reload": "Recharger",
     "updated": "Mis à jour vers la version {{version}}.",
-    "whatsNew": "Nouveautés"
+    "whatsNew": "Nouveautés",
+    "update": "Mettre à jour",
+    "action": {
+      "reload": "Rechargez pour utiliser la nouvelle version",
+      "restart": "Redémarrez pour terminer la mise à jour de l'app",
+      "install": "Obtenez l'app plus récente dont cette version a besoin"
+    }
   },
   "nativeUpdate": {
     "unsigned": "La mise à jour de ce serveur n'a pas été publiée par Initiative, l'application reste donc en version {{version}}.",
@@ -361,15 +300,7 @@
     "none": "Aucun",
     "template": "Modèle"
   },
-  "days": {
-    "today": "Aujourd'hui",
-    "yesterday": "Hier"
-  },
   "fieldSave": {
-    "saving": "Enregistrement…",
-    "saved": "Enregistré",
-    "failed": "Échec de l'enregistrement",
-    "changed": "Cela a changé pendant que vous le modifiiez",
     "overwrite": "Écraser",
     "keepEditing": "Continuer à modifier",
     "discard": "Abandonner",
@@ -458,5 +389,18 @@
       "this": "cette collection",
       "plural": "collections"
     }
+  },
+  "joinRequests": {
+    "messageLabel": "Message (facultatif)",
+    "messagePlaceholder": "Dites pourquoi vous souhaitez la rejoindre…",
+    "send": "Envoyer la demande",
+    "sending": "Envoi…",
+    "queueTitle": "Demandes d’adhésion",
+    "noMessage": "Aucun message",
+    "unknownRequester": "Quelqu’un",
+    "priorDenials_one": "Refusée {{count}} fois auparavant",
+    "priorDenials_other": "Refusée {{count}} fois auparavant",
+    "approve": "Approuver",
+    "deny": "Refuser"
   }
 }

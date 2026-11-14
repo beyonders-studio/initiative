@@ -6,7 +6,7 @@ testing setup are functioning properly.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.security import AUTH_ACCESS_AUDIENCE, TOKEN_ISSUER
@@ -119,8 +119,8 @@ async def test_a_pooled_guild_schema_comes_back_as_built(session: AsyncSession, 
     one whose roles went while it was parked is not handed back."""
     from sqlalchemy import text
 
-    from app.db.guild_migrations import GUILD_SCHEMA_REGEX
     from app.db import schema_provisioning
+    from app.db.guild_migrations import GUILD_SCHEMA_REGEX
     from app.db.schema_provisioning import drop_guild_schema, get_provisioning_bundle
     from app.testing import create_guild, create_initiative, guild_pool
 

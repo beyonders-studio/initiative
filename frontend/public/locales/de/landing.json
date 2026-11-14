@@ -3,6 +3,7 @@
     "home": "Initiative Startseite",
     "download": "Download",
     "pricing": "Preise",
+    "suggestions": "Vorschläge",
     "docs": "Doku",
     "signIn": "Anmelden",
     "signUp": "Registrieren",
@@ -380,10 +381,8 @@
     "readMoreAria": "Ganzen Beitrag zu Initiative {{version}} lesen",
     "older": "Ältere Beiträge zeigen",
     "back": "Alle Beiträge",
-    "loading": "Lädt…",
     "empty": "Hier gibt es noch nichts.",
-    "notFound": "Diese Version wurde nicht gefunden. Vielleicht ist sie noch nicht erschienen.",
-    "error": "Die Neuigkeiten konnten nicht geladen werden. Warte kurz und versuch es noch mal."
+    "notFound": "Diese Version wurde nicht gefunden. Vielleicht ist sie noch nicht erschienen."
   },
   "meta": {
     "homeTitle": "Initiative: deine Gruppe hat viel zu tun, und es ist Zeit, die Initiative zu ergreifen",

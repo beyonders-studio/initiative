@@ -14,11 +14,10 @@ than something nobody noticed.
 """
 
 import json
-from typing import Any, Iterable
-
+from collections.abc import Iterable
+from typing import Any
 
 from app.main import app
-
 
 #: Shapes that carry a stored address in full, each mapped to the routes that
 #: serve it — every one of them returning the caller their own account.

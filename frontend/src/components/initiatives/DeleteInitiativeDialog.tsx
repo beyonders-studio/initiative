@@ -1,6 +1,6 @@
 import { Trans, useTranslation } from "react-i18next";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 interface DeleteInitiativeDialogProps {
   open: boolean;
@@ -52,7 +52,6 @@ export const DeleteInitiativeDialog = ({
       }
       confirmLabel={t("common:delete")}
       loadingLabel={t("settings.deletingInitiative")}
-      cancelLabel={t("common:cancel")}
       onConfirm={onConfirm}
       isLoading={isDeleting}
       destructive

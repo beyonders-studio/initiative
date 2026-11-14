@@ -33,7 +33,7 @@ import secrets
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from typing import Any
 
@@ -52,6 +52,7 @@ from app.core.messages import (
 )
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.pending_upload import PendingUpload
 from app.services.storage import STAGING_PREFIX, get_guild_storage
 from app.services.tenant import attachments
@@ -116,7 +117,7 @@ async def _admit_file(
         initiative = await resource_access.prepare_create(
             session, Tool.file, int(metadata["initiative_id"]), user, guild_context
         )
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST)
     return initiative.id
 
@@ -145,7 +146,7 @@ async def _admit_atlassian_export(
     import_engine.require_writable(guild_context)
     try:
         initiative_id = int(metadata["initiative_id"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST)
     initiative = await atlassian_job.export_initiative(
         session,
@@ -222,7 +223,7 @@ def _metadata(header: str | None) -> dict[str, str]:
         key, _, value = pair.strip().partition(" ")
         try:
             pairs[key] = base64.b64decode(value, validate=True).decode("utf-8")
-        except (binascii.Error, UnicodeDecodeError):
+        except binascii.Error, UnicodeDecodeError:
             raise _refuse(
                 status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST
             )
@@ -267,7 +268,10 @@ async def create(
     live = await session.scalar(
         select(func.count())
         .select_from(PendingUpload)
-        .where(PendingUpload.created_by == user.id)
+        .where(
+            PendingUpload.created_by_kind == ActorKind.member,
+            PendingUpload.created_by == user.id,
+        )
     )
     if (live or 0) >= MAX_LIVE_PER_PERSON:
         raise _refuse(status.HTTP_429_TOO_MANY_REQUESTS, ResumableMessages.TOO_MANY)
@@ -283,10 +287,9 @@ async def create(
     state = await asyncio.to_thread(
         storage.start_parts, key, part_bytes=part_bytes, length=length
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     upload = PendingUpload(
         id=upload_id,
-        created_by=user.id,
         purpose=metadata["purpose"],
         initiative_id=initiative_id,
         filename=filename,
@@ -315,7 +318,7 @@ async def _live(session: AsyncSession, upload_id: str) -> PendingUpload:
     upload = await session.get(PendingUpload, upload_id, populate_existing=True)
     if upload is None:
         raise _refuse(status.HTTP_404_NOT_FOUND, ResumableMessages.NOT_FOUND)
-    if upload.expires_at <= datetime.now(timezone.utc):
+    if upload.expires_at <= datetime.now(UTC):
         raise _refuse(status.HTTP_410_GONE, ResumableMessages.EXPIRED)
     return upload
 
@@ -528,7 +531,7 @@ async def patch(
             arrived, pending = pending, None
             try:
                 chunk = arrived.result()
-            except (StopAsyncIteration, ClientDisconnect):
+            except StopAsyncIteration, ClientDisconnect:
                 break
             if len(chunk) > length - state["stored"] - len(buffer):
                 raise _refuse(

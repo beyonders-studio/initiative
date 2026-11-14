@@ -4,54 +4,55 @@ icon: lucide/server-cog
 
 # Running a server
 
-This section is for whoever **runs** Initiative for their group: installing it, configuring it, and keeping it alive.
+These pages are for whoever runs Initiative for their group: the person who installs it, keeps it current, and gets the message when it's down. If you only use Initiative, skip the whole section with a clear conscience. [Using Initiative](../guides/index.md) has everything you need.
 
-If you only *use* Initiative, you can skip this entire section with a clear conscience. Everything you need is in [Using Initiative](../guides/index.md).
+You don't need to be a server expert. The usual setup is one Docker Compose file and three values in a text file. Everything past [Installation](installation.md) is here for the day you need it, and nobody is checking whether you've read it.
 
-!!! info "You don't need to be a server expert"
-    The recommended setup is Docker Compose, which is largely a matter of copying a file and editing a few values in it. If you can follow a recipe and edit a text file without panicking, you can run Initiative.
+Rather not run a server at all? See [Self-host or let us host it](../self-host-or-hosted.md).
 
-    Everything deeper in this section is here for when you want it, not as a reading list you're behind on.
-
-Not sure you want to run a server at all? A paid hosted service is on the way â€” see [Self-host or let us host it](../self-host-or-hosted.md).
-
-## What's in here
+## The pages
 
 <div class="grid cards" markdown>
 
 -   :material-download-box-outline: __Installation__
 
-    Get Initiative running with Docker Compose.
+    Docker Compose, the database connection, and which image to follow.
 
     [:octicons-arrow-right-24: Installation](installation.md)
 
+-   :material-package-variant: __Native server packages__
+
+    Run it on Debian or Alpine without Docker.
+
+    [:octicons-arrow-right-24: Native server packages](native-packages.md)
+
 -   :material-tune: __Configuration__
 
-    The settings that control how your server behaves.
+    Every environment variable, and the settings under **Settings â†’ Platform**.
 
     [:octicons-arrow-right-24: Configuration](configuration.md)
 
 -   :material-account-key-outline: __Single sign-on__
 
-    Connect your identity provider (OIDC).
+    Connect an OIDC identity provider.
 
     [:octicons-arrow-right-24: Single sign-on](single-sign-on.md)
 
 -   :material-email-outline: __Email__
 
-    Outgoing mail for invites and reminders.
+    Outgoing mail for sign-in codes, password resets and digests.
 
     [:octicons-arrow-right-24: Email](email.md)
 
 -   :material-cellphone-message: __Push notifications__
 
-    Mobile push via Firebase.
+    Notifications on phones and in the desktop app.
 
     [:octicons-arrow-right-24: Push notifications](push-notifications.md)
 
 -   :material-database-outline: __File & object storage__
 
-    Keep uploads on disk, or move them to S3.
+    Local disk or an S3-compatible bucket, plus encryption and upload scanning.
 
     [:octicons-arrow-right-24: Object storage](object-storage.md)
 
@@ -63,13 +64,13 @@ Not sure you want to run a server at all? A paid hosted service is on the way â€
 
 -   :material-package-variant-plus: __Publishing your own listings__
 
-    Add your own dashboards, projects and plug-ins to the marketplace.
+    Add your own projects, home layouts and plug-ins to the marketplace.
 
     [:octicons-arrow-right-24: Publishing listings](publishing-listings.md)
 
 -   :material-shield-crown-outline: __Platform roles__
 
-    Server-wide roles, capabilities, and break-glass access.
+    Server-wide roles, capabilities and break-glass access.
 
     [:octicons-arrow-right-24: Platform roles](platform-roles.md)
 
@@ -81,20 +82,24 @@ Not sure you want to run a server at all? A paid hosted service is on the way â€
 
 -   :material-backup-restore: __Backups & updates__
 
-    Protect your data and stay current.
+    Back up, restore, update, and read a start that failed.
 
     [:octicons-arrow-right-24: Backups & updates](backups-and-updates.md)
 
+-   :material-chart-line: __Logs & monitoring__
+
+    The two log streams, Prometheus metrics and health checks.
+
+    [:octicons-arrow-right-24: Logs & monitoring](configuration.md#logs)
+
 -   :material-book-edit-outline: __Maintaining these docs__
 
-    Build, preview, and publish this help center.
+    Build, preview and publish this help center.
 
     [:octicons-arrow-right-24: Maintaining these docs](maintaining-these-docs.md)
 
 </div>
 
-## The first thing to know
+## The first account is the owner
 
-The **first person to register** on a fresh server automatically becomes the **owner** â€” the top of the platform ladder, and the only role that can change server-wide settings.
-
-So make absolutely sure the first sign-up is you, or whoever is actually going to run this. Not the enthusiastic colleague who wandered past while it was booting. See [Platform roles](platform-roles.md).
+The first person to register on a new server becomes its **owner**, the one account that can change server-wide settings. Make sure that's you, and not the enthusiastic colleague who wandered past while it was booting. See [Platform roles](platform-roles.md).

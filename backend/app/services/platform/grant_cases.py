@@ -27,9 +27,9 @@ operations community is configured, no grant serves a case.
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Collection, Optional, Sequence
 
 from fastapi import status
 from sqlalchemy import Integer, String, any_, cast, func, or_
@@ -96,7 +96,7 @@ class OpenCase:
     title: str
     stream: IntakeStream
     #: The community the case is about, where it names one.
-    subject_guild_id: Optional[int]
+    subject_guild_id: int | None
     #: Assigned to the reader.
     mine: bool
 
@@ -172,7 +172,7 @@ async def _as_reader(user: User):
 
 
 async def readable_open_cases(
-    user: User, *, search: Optional[str] = None
+    user: User, *, search: str | None = None
 ) -> list[OpenCase]:
     """The open cases ``user`` can read that a grant may serve, the ones
     assigned to them first, then the newest. ``search`` narrows them to a
@@ -268,7 +268,7 @@ async def check_case(user: User, *, case_task_id: int, guild_id: int) -> IntakeS
     return IntakeStream(stream)
 
 
-def notice_rule(stream: Optional[IntakeStream]) -> CommunityNoticeRule:
+def notice_rule(stream: IntakeStream | None) -> CommunityNoticeRule:
     """Whether a grant for a case in ``stream`` tells its community, where it
     serves a case at all."""
     if stream is None:
@@ -277,7 +277,7 @@ def notice_rule(stream: Optional[IntakeStream]) -> CommunityNoticeRule:
 
 
 def community_notice(
-    stream: Optional[IntakeStream], asked: Optional[CommunityNotice]
+    stream: IntakeStream | None, asked: CommunityNotice | None
 ) -> CommunityNotice:
     """The notice a grant for a case in ``stream`` carries, given what its
     asker chose: always when it starts for a stream that always tells,
@@ -306,7 +306,7 @@ async def link(task_id: int, grant_ids: Sequence[int]) -> None:
         await session.commit()
 
 
-async def cases_of(grant_ids: Optional[Collection[int]] = None) -> dict[int, int]:
+async def cases_of(grant_ids: Collection[int] | None = None) -> dict[int, int]:
     """The case each grant serves, by grant id: one read of the links in the
     operations community, for ``grant_ids`` or, where ``None``, for every
     grant that serves one."""
@@ -325,7 +325,7 @@ async def cases_of(grant_ids: Optional[Collection[int]] = None) -> dict[int, int
     return {int(grant_id): int(task_id) for grant_id, task_id in rows}
 
 
-async def _case_stream(task_id: Optional[int]) -> Optional[IntakeStream]:
+async def _case_stream(task_id: int | None) -> IntakeStream | None:
     """The stream of case ``task_id``, read as the platform, or ``None`` where
     there is no case to read."""
     guild_id = await configured_operations_guild_id()
@@ -340,7 +340,7 @@ async def _case_stream(task_id: Optional[int]) -> Optional[IntakeStream]:
                 )
             ).first()
             await session.rollback()
-    except Exception:  # noqa: BLE001 — logged; the letter names no kind
+    except Exception:
         logger.exception("grant cases: could not read case %s", task_id)
         return None
     return IntakeStream(stream) if stream is not None else None
@@ -351,8 +351,8 @@ async def tell_community(
     grants: Sequence[AccessGrant],
     *,
     ended: bool,
-    case_task_id: Optional[int],
-    guild_name: Optional[str] = None,
+    case_task_id: int | None,
+    guild_name: str | None = None,
 ) -> None:
     """Email the superadmins of the community ``grants`` reach that platform
     staff were given them (``ended=False``) or had them (``ended=True``).
@@ -405,7 +405,7 @@ async def tell_community(
                     ),
                     session=session,
                 )
-        except Exception:  # noqa: BLE001 — logged; the grant stands
+        except Exception:
             logger.exception(
                 "grant cases: community letter for user %s of community %s "
                 "was not queued",
@@ -422,7 +422,7 @@ async def check_account_case(user: User, *, case_task_id: int) -> None:
 
 
 async def note(
-    task_id: Optional[int], kind: case_activity.ActivityKind, text: str
+    task_id: int | None, kind: case_activity.ActivityKind, text: str
 ) -> bool:
     """Note ``text`` on case ``task_id``, as the platform. Best effort: what the
     note is about stands whether or not its case hears of it."""
@@ -437,7 +437,7 @@ async def note(
             await case_activity.post(session, task_id=task_id, kind=kind, text=text)
             await session.commit()
         return True
-    except Exception:  # noqa: BLE001 — logged; the note is a courtesy to the case
+    except Exception:
         logger.exception("grant cases: could not note on case %s", task_id)
         return False
 
@@ -458,13 +458,13 @@ async def case_exists(task_id: int) -> bool:
                     select_including_deleted(Task.id).where(Task.id == task_id)
                 )
             ).first()
-    except Exception:  # noqa: BLE001 — logged; asked again on the next pass
+    except Exception:
         logger.exception("grant cases: could not read case %s", task_id)
         return True
     return found is not None
 
 
-async def _tell_digest(task_id: int, text: str) -> Optional[bool]:
+async def _tell_digest(task_id: int, text: str) -> bool | None:
     """Note a digest on case ``task_id``: ``True`` once it is told, ``False``
     where it could not be and is worth trying again, and ``None`` where the
     case is gone and never will be."""
@@ -490,7 +490,7 @@ async def unclaim(task_id: int, *, guild_id: int) -> None:
     await release_subject_guild(task_id, guild_id)
 
 
-async def activate(task_id: Optional[int]) -> None:
+async def activate(task_id: int | None) -> None:
     """Move a case still waiting to be picked up to the status its stream's
     binding calls active: access approved for it means somebody is on it."""
     if task_id is None:
@@ -527,23 +527,21 @@ async def activate(task_id: Optional[int]) -> None:
             task.task_status_id = active
             session.add(task)
             await session.commit()
-    except Exception:  # noqa: BLE001 — logged; the approval stands
+    except Exception:
         logger.exception("grant cases: could not move case %s", task_id)
 
 
 # ── What a grant did ─────────────────────────────────────────────────────────
 
 
-def _describe(
-    grant: AccessGrant, guild_name: Optional[str], holder: Optional[User]
-) -> str:
+def _describe(grant: AccessGrant, guild_name: str | None, holder: User | None) -> str:
     who = handle_of(holder) if holder is not None else f"account {grant.user_id}"
     where = f"{guild_name} (#{grant.guild_id})" if guild_name else f"#{grant.guild_id}"
     return f"{who}'s {grant.purpose} grant at {grant.access_level} on {where}"
 
 
 def requested_text(
-    grants: Sequence[AccessGrant], *, guild_name: Optional[str], holder: User
+    grants: Sequence[AccessGrant], *, guild_name: str | None, holder: User
 ) -> str:
     asked = ", ".join(f"{g.purpose} at {g.access_level}" for g in grants)
     first = grants[0]
@@ -557,9 +555,9 @@ def requested_text(
 def decided_text(
     grant: AccessGrant,
     *,
-    guild_name: Optional[str],
-    holder: Optional[User],
-    decided_by: Optional[User],
+    guild_name: str | None,
+    holder: User | None,
+    decided_by: User | None,
 ) -> str:
     by = f" by {handle_of(decided_by)}" if decided_by is not None else ""
     status_ = AccessGrantStatus(grant.status)
@@ -585,11 +583,11 @@ class ActivitySummary:
     write_count: int
     writes: list[AccessGrantActivity]
     #: When the latest request counted was recorded, where any was.
-    latest: Optional[datetime] = None
+    latest: datetime | None = None
 
 
 async def _activity(
-    session: AsyncSession, grant_id: int, since: Optional[datetime]
+    session: AsyncSession, grant_id: int, since: datetime | None
 ) -> ActivitySummary:
     """Count a grant's requests since ``since`` (all of them where ``None``)
     and fetch only the changes a note lists."""
@@ -667,9 +665,7 @@ def digest_text(summary: ActivitySummary, *, heading: str) -> str:
     return "\n".join(lines)
 
 
-async def report_activity(
-    session: AsyncSession, *, now: Optional[datetime] = None
-) -> int:
+async def report_activity(session: AsyncSession, *, now: datetime | None = None) -> int:
     """One pass: tell each case what the grants serving it did. A grant that
     ended is closed out with what it did in all; a live one with something
     new to tell is told once an hour. Returns how many cases were told.
@@ -763,7 +759,7 @@ async def report_activity(
     }
     # Grants closed out this pass whose community is told once they end, by
     # the act that issued them: one letter for a pair issued together.
-    to_tell: dict[tuple[int, int, Optional[datetime]], list[AccessGrant]] = {}
+    to_tell: dict[tuple[int, int, datetime | None], list[AccessGrant]] = {}
     for grant in ended:
         summary = await _activity(session, int(grant.id), None)
         if grant.status == AccessGrantStatus.denied.value:

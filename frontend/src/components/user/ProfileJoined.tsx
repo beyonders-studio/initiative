@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
-import { formatDate } from "@/lib/formatDate";
-import { cn } from "@/lib/utils";
+import { formatDate } from "@/ui/lib/formatDate";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * When the account was made — the one fact a profile states about the account

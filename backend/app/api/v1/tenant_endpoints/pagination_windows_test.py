@@ -17,7 +17,6 @@ import pytest
 from app.models.platform.guild import CommunityRole
 from app.testing import create_file, create_project, create_task
 
-
 WINDOW = 3
 TOTAL = 7  # 3 windows: 3 + 3 + 1
 

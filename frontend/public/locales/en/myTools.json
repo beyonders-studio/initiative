@@ -11,8 +11,6 @@
     "all": "All communities",
     "none": "You're not in any community yet."
   },
-  "loading": "Loading…",
-  "loadError": "Failed to load this tool. Please try again later.",
   "empty": {
     "title": "Nothing here yet",
     "description": "Nothing of this kind reaches you in the communities you're in.",

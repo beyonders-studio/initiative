@@ -26,9 +26,10 @@ Nothing here reads a reader's text.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cache
-from typing import Any, Sequence
+from typing import Any
 
 from pglast import ast, parse_sql
 from pglast.stream import RawStream
@@ -112,9 +113,9 @@ def _columns_read(select: ast.SelectStmt, nodes: _Nodes) -> dict[str, set[str]]:
             if words[1] in tables.get(table, ()):
                 read[table].add(words[1])
         elif len(words) == 1:
-            for table in read:
+            for table, names in read.items():
                 if words[0] in tables.get(table, ()):
-                    read[table].add(words[0])
+                    names.add(words[0])
     return read
 
 

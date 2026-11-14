@@ -7,17 +7,17 @@ writes it as it is, and import only moves a file's rule into UTC terms.
 
 import logging
 import math
-from datetime import date, datetime, time, timedelta, timezone, tzinfo
-from typing import List, Mapping, Optional, Sequence, Tuple
+from collections.abc import Mapping, Sequence
+from datetime import UTC, date, datetime, time, timedelta, timezone, tzinfo
 from zoneinfo import ZoneInfo
 
 import icalendar
 from icalendar.parser import Contentlines
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
 from app.core.relationships import Related
+from app.core.user_display import display_name
 from app.core.user_input_validators import resolve_zone
 from app.models.tenant.calendar_event import CalendarEvent, RSVPStatus
 from app.schemas.tenant.ical import (
@@ -28,7 +28,6 @@ from app.schemas.tenant.ical import (
 )
 from app.services.export.property_values import exported_properties
 from app.services.tenant import calendar_occurrences
-from app.core.user_display import display_name
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ _RSVP_TO_PARTSTAT = {
 
 def event_export_dict(
     event: CalendarEvent,
-    files: "Sequence[Related]" = (),
+    files: Sequence[Related] = (),
     answers: Mapping[int, RSVPStatus] | None = None,
 ) -> dict:
     """One event's JSON-safe export record — the single intermediate both the
@@ -109,7 +108,7 @@ def _dt(value: str) -> datetime:
 
 
 def ical_from_export_dicts(
-    events: List[dict], *, name: Optional[str] = None, tz: Optional[str] = None
+    events: list[dict], *, name: str | None = None, tz: str | None = None
 ) -> bytes:
     """Serialize event export dicts (``event_export_dict`` shape) to iCal
     bytes — the render half of the split, callable from the export engine's
@@ -138,14 +137,14 @@ def ical_from_export_dicts(
             "uid", f"event-{event.get('series_id') or event.get('id')}@initiative"
         )
         if event.get("original_start"):
-            original = _dt(event["original_start"]).astimezone(timezone.utc)
+            original = _dt(event["original_start"]).astimezone(UTC)
             vevent.add(
                 "recurrence-id", original.date() if event.get("all_day") else original
             )
         vevent.add("summary", event.get("title") or "")
 
-        start_at = _dt(event["start_at"]).astimezone(timezone.utc)
-        end_at = _dt(event["end_at"]).astimezone(timezone.utc)
+        start_at = _dt(event["start_at"]).astimezone(UTC)
+        end_at = _dt(event["end_at"]).astimezone(UTC)
         if event.get("all_day"):
             # An all-day event runs to its last day's 23:59:59; DTEND is the
             # day after, exclusive.
@@ -157,7 +156,7 @@ def ical_from_export_dicts(
             # A repeat's days are where it was picked, so the start is written
             # in a fixed offset that puts it on that day.
             zone = _picked_zone(start_at, event.get("recurrence_shift") or 0)
-            if tz and event.get("recurrence") and zone is timezone.utc:
+            if tz and event.get("recurrence") and zone is UTC:
                 if recurrence.of_hours(recurrence.parse(event["recurrence"]).rule):
                     # A rule of hours keeps its exact offset, UTC.
                     anchored_in_utc = True
@@ -165,7 +164,7 @@ def ical_from_export_dicts(
                     # A repeat of days, an hour either side of UTC that keeps
                     # its start on its date: the same days, the same instants.
                     zone = ZoneInfo("Etc/GMT-1" if start_at.hour < 23 else "Etc/GMT+1")
-            if isinstance(zone, timezone) and zone is not timezone.utc:
+            if isinstance(zone, timezone) and zone is not UTC:
                 # datetime.timezone has no IANA name for add_missing_timezones
                 # to resolve. Define its constant offset for other clients too.
                 tzid = str(zone)
@@ -189,30 +188,18 @@ def ical_from_export_dicts(
             vevent.add("location", event["location"])
 
         if event.get("created_at"):
-            vevent.add("created", _dt(event["created_at"]).astimezone(timezone.utc))
+            vevent.add("created", _dt(event["created_at"]).astimezone(UTC))
         if event.get("updated_at"):
-            vevent.add(
-                "last-modified", _dt(event["updated_at"]).astimezone(timezone.utc)
-            )
+            vevent.add("last-modified", _dt(event["updated_at"]).astimezone(UTC))
 
         if event.get("recurrence"):
             repeat = recurrence.parse(event["recurrence"])
             vevent.add("rrule", repeat.rule)
 
-            # A skipped or extra start takes the start's own type.
-            def typed(value: date | datetime) -> date | datetime:
-                if event.get("all_day"):
-                    return value.date() if isinstance(value, datetime) else value
-                if isinstance(value, datetime):
-                    return value
-                offset = timedelta(minutes=event.get("recurrence_shift") or 0)
-                picked_time = (start_at + offset).time()
-                return datetime.combine(value, picked_time, timezone.utc) - offset
-
             for value in repeat.exdates:
-                vevent.add("exdate", typed(value))
+                vevent.add("exdate", _start_typed(value, event, start_at))
             for value in repeat.rdates:
-                vevent.add("rdate", typed(value))
+                vevent.add("rdate", _start_typed(value, event, start_at))
 
         for attendee in event.get("attendees") or []:
             email = attendee.get("email")
@@ -234,11 +221,24 @@ def ical_from_export_dicts(
     return cal.to_ical()
 
 
+def _start_typed(
+    value: date | datetime, event: dict, start_at: datetime
+) -> date | datetime:
+    """A skipped or extra start of ``event``, in the start's own type."""
+    if event.get("all_day"):
+        return value.date() if isinstance(value, datetime) else value
+    if isinstance(value, datetime):
+        return value
+    offset = timedelta(minutes=event.get("recurrence_shift") or 0)
+    picked_time = (start_at + offset).time()
+    return datetime.combine(value, picked_time, UTC) - offset
+
+
 def _picked_zone(start: datetime, shift: int) -> tzinfo:
     """A fixed offset, in whole hours where it can be, whose date for ``start``
     is the one the repeat was picked on (``app.core.recurrence``)."""
     if shift == 0:
-        return timezone.utc
+        return UTC
     if shift % 1440 == 0:
         hours = (
             start - start.replace(hour=0, minute=0, second=0)
@@ -252,8 +252,8 @@ def _picked_zone(start: datetime, shift: int) -> tzinfo:
 
 
 async def files_for_events(
-    session: "AsyncSession", events: List[CalendarEvent]
-) -> "dict[int, list[Related]]":
+    session: AsyncSession, events: list[CalendarEvent]
+) -> dict[int, list[Related]]:
     """Attached files for many events, in two queries.
 
     Here rather than at each caller: the builders above are synchronous and hold
@@ -283,7 +283,7 @@ async def files_for_events(
 # ---------------------------------------------------------------------------
 
 
-def _repeat(component, start: datetime, zone: tzinfo) -> tuple[Optional[str], int]:
+def _repeat(component, start: datetime, zone: tzinfo) -> tuple[str | None, int]:
     """A VEVENT's repeat and its shift, or none when it has none or uses parts
     an event can't repeat by (a minutely rule, say).
 
@@ -299,7 +299,7 @@ def _repeat(component, start: datetime, zone: tzinfo) -> tuple[Optional[str], in
         if not isinstance(value, datetime):
             return value
         aware = value if value.tzinfo else value.replace(tzinfo=picked_in)
-        return aware.astimezone(timezone.utc)
+        return aware.astimezone(UTC)
 
     parts = {key.upper(): list(values) for key, values in rule.items()}
     if until := parts.get("UNTIL"):
@@ -319,7 +319,7 @@ def _repeat(component, start: datetime, zone: tzinfo) -> tuple[Optional[str], in
     return kept, recurrence.shift_for(kept, start, picked_in)
 
 
-def _dates(prop) -> List[date | datetime]:
+def _dates(prop) -> list[date | datetime]:
     lists = prop if isinstance(prop, list) else [prop] if prop else []
     return [value.dt for dates in lists for value in dates.dts]
 
@@ -352,7 +352,7 @@ def _event_components(content: str) -> list[tuple[icalendar.Component, str | Non
 
 def _extract_vevent(
     component, zone: tzinfo, duration_text: str | None = None
-) -> Optional[dict]:
+) -> dict | None:
     """Extract event data from a VEVENT component. An all-day event keeps its
     dates as UTC dates, first midnight to last 23:59:59; a floating time is
     read in ``zone``, the importer's."""
@@ -382,15 +382,15 @@ def _extract_vevent(
             end_val = start_val + nominal
         else:
             aware = start_val if start_val.tzinfo else start_val.replace(tzinfo=zone)
-            end_val = (aware + nominal).astimezone(timezone.utc) + elapsed
+            end_val = (aware + nominal).astimezone(UTC) + elapsed
 
     if all_day:
         if isinstance(end_val, datetime):
             end_val = end_val.date()
         # DTEND is exclusive: the last day is the one before it.
         last_day = max(end_val - timedelta(days=1), start_val)
-        start_dt = datetime.combine(start_val, time(), timezone.utc)
-        end_dt = datetime.combine(last_day, _END_OF_DAY, timezone.utc)
+        start_dt = datetime.combine(start_val, time(), UTC)
+        end_dt = datetime.combine(last_day, _END_OF_DAY, UTC)
     else:
         start_dt = start_val if start_val.tzinfo else start_val.replace(tzinfo=zone)
         end_dt = end_val if end_val.tzinfo else end_val.replace(tzinfo=zone)
@@ -408,10 +408,10 @@ def _extract_vevent(
     }
 
 
-def parse_ical(content: str, tz: Optional[str] = None) -> ICalParseResult:
+def parse_ical(content: str, tz: str | None = None) -> ICalParseResult:
     """Parse an .ics string and return a preview of found events."""
     zone = resolve_zone(tz)
-    events: List[ICalEventPreview] = []
+    events: list[ICalEventPreview] = []
     has_recurring = False
 
     for component, duration_text in _event_components(content):
@@ -442,22 +442,21 @@ def build_calendar_events(
     content: str,
     calendar_id: int,
     guild_id: int,
-    created_by: int,
-    tz: Optional[str] = None,
-) -> Tuple[List[CalendarEvent], List[ICalImportError], int]:
+    tz: str | None = None,
+) -> tuple[list[CalendarEvent], list[ICalImportError], int]:
     """Parse .ics content and build CalendarEvent model instances attached to
     the target calendar.
 
     Returns (events, errors, skipped_count). Does NOT persist — caller handles that.
     """
     zone = resolve_zone(tz)
-    events: List[CalendarEvent] = []
-    errors: List[ICalImportError] = []
+    events: list[CalendarEvent] = []
+    errors: list[ICalImportError] = []
     skipped = 0
     # A repeating event by its UID, for the occurrences the file changed
     # (a VEVENT with its UID and a RECURRENCE-ID), which follow it.
     series: dict[str, CalendarEvent] = {}
-    changed: List[Tuple[CalendarEvent, str, date | datetime]] = []
+    changed: list[tuple[CalendarEvent, str, date | datetime]] = []
 
     components = _event_components(content)
     # Each series before the occurrences that point at it.
@@ -483,7 +482,6 @@ def build_calendar_events(
                 all_day=data["all_day"],
                 recurrence=data["recurrence"],
                 recurrence_shift=data["recurrence_shift"],
-                created_by=created_by,
             )
             uid = str(component.get("uid") or "")
             if (original := component.get("recurrence-id")) is not None and uid:
@@ -512,7 +510,7 @@ def build_calendar_events(
         else:
             at = datetime.combine(original, parent.start_at.timetz())
         event.series = parent
-        event.original_start = at.astimezone(timezone.utc)
+        event.original_start = at.astimezone(UTC)
         # What the file says differently for this occurrence stays its own.
         event.overridden_fields = sorted(
             calendar_occurrences.differences(event, parent)

@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, text
 from sqlmodel import Field, Index, SQLModel
 
 
@@ -16,6 +16,9 @@ class NotificationType(str, Enum):
     initiative_join_requested = "initiative_join_requested"
     initiative_join_approved = "initiative_join_approved"
     initiative_join_denied = "initiative_join_denied"
+    community_join_requested = "community_join_requested"
+    community_join_approved = "community_join_approved"
+    community_join_denied = "community_join_denied"
     share_requested = "share_requested"
     share_granted = "share_granted"
     share_declined = "share_declined"
@@ -71,6 +74,10 @@ class NotificationType(str, Enum):
     #: A community made for this account, by them or by staff on their behalf.
     #: Written once, where billing sets plans, inviting them to set up its plan.
     community_welcome = "community_welcome"
+    #: An announcement the recipient was shown and dismissed. Written read, once
+    #: per announcement, naming its key and title; opening it shows the notice
+    #: again.
+    announcement = "announcement"
     connection_requested = "connection_requested"
     connection_accepted = "connection_accepted"
     message_request_received = "message_request_received"
@@ -89,6 +96,9 @@ class NotificationType(str, Enum):
     #: waiting on them, in progress or closed. Names the case and its state,
     #: never what was said.
     ticket_updated = "ticket_updated"
+    #: An idea the recipient voted for moved to another status. Names the idea
+    #: and the status, both as everybody reads them.
+    idea_updated = "idea_updated"
     #: A community's moderators took down something the recipient wrote.
     #: Names the kind and the reason, never what it said or who reported it.
     moderation_removal = "moderation_removal"
@@ -134,7 +144,7 @@ class Notification(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", nullable=False)
     type: NotificationType = Field(
         sa_column=Column(String(64), nullable=False),
@@ -152,7 +162,7 @@ class Notification(SQLModel, table=True):
     #:
     #: All three are already carried in ``data``; as columns they are indexable,
     #: which is the whole difference.
-    guild_id: Optional[int] = Field(
+    guild_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -162,36 +172,36 @@ class Notification(SQLModel, table=True):
     )
     #: Weak reference: initiatives live in ``guild_<id>``, and provisioning omits
     #: cross-schema foreign keys.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True),
     )
     #: A ``Tool`` value, or NULL where the notification is not about one.
-    tool: Optional[str] = Field(
+    tool: str | None = Field(
         default=None,
         sa_column=Column(String(32), nullable=True),
     )
     #: The row of that tool: the project a task is in, the calendar of an
     #: event, the wiki of a page. Weak, like ``initiative_id``.
-    resource_id: Optional[int] = Field(
+    resource_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True),
     )
     #: What the notification is about, as an ``entity_tables`` kind and its id
     #: — the task, the event, the page. Opening it marks the line read.
-    subject_type: Optional[str] = Field(
+    subject_type: str | None = Field(
         default=None,
         sa_column=Column(String(32), nullable=True),
     )
-    subject_id: Optional[int] = Field(
+    subject_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True),
     )
-    read_at: Optional[datetime] = Field(
+    read_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

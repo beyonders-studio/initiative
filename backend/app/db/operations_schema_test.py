@@ -1,4 +1,6 @@
-"""A filer reads their own cases, and only what of them is theirs to read.
+"""A filer reads their own cases, and only what of them is theirs to read;
+anybody reads the published ideas, and of their fields only the two the
+board's binding names.
 
 Every assertion here runs as the request login, routed into the operations
 community's filer role through the seam — the privilege boundary production
@@ -15,21 +17,30 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
-from app.api.deps import FilerAccessError, establish_filer_access
+from app.api.deps import (
+    FilerAccessError,
+    establish_filer_access,
+    establish_ideas_access,
+)
 from app.core.intake import IntakeStream
 from app.db import operations_schema
-from app.db.tenancy import OPERATIONS_TABLES
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
+from app.db.tenancy import OPERATIONS_TABLES
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
-from app.models.tenant.task import Task
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
+from app.models.tenant.task import Task, TaskStatusCategory, TaskType
 from app.services.platform.intake import CaseFiler, open_case
 from app.testing import (
     create_guild,
     create_initiative,
     create_project,
+    create_property_definition,
+    create_property_value,
+    create_task,
     create_user,
     make_operations_community,
 )
@@ -66,13 +77,19 @@ async def operations(session):
 
     await set_rls_context(session, SystemGuild(guild.id))
     session.add(
-        Comment(task_id=mine.task_id, content="Staff only.", created_by=staff.id)
+        Comment(
+            task_id=mine.task_id,
+            content="Staff only.",
+            created_by=staff.id,
+            created_by_kind=ActorKind.member,
+        )
     )
     session.add(
         Comment(
             task_id=mine.task_id,
             content="Have you tried a recovery code?",
             created_by=staff.id,
+            created_by_kind=ActorKind.member,
             audience=CommentAudience.filer,
         )
     )
@@ -90,6 +107,7 @@ async def operations(session):
             wrapped_dek=b"sealed",
             kek_version=1,
             created_by=by,
+            created_by_kind=ActorKind.member,
         )
 
     session.add(attached(mine.task_id, asker.id, "mine.txt"))
@@ -304,3 +322,147 @@ async def test_with_no_operations_community_there_is_nothing_to_route_into(
 
     with pytest.raises(FilerAccessError):
         await establish_filer_access(routed, user)
+
+
+@pytest.fixture
+async def ideas(session):
+    """An operations community whose Ideas board names its category and
+    release fields and its shipped status, with a shipped idea, an open one
+    and a draft, each with a category and the first two with a release, and
+    the shipped one with a field of the team's own."""
+    staff = await create_user(session)
+    guild = await create_guild(session, creator=staff)
+    initiative = await create_initiative(session, guild, staff)
+    project = await create_project(session, initiative, staff)
+    await make_operations_community(session, guild.id)
+    shipped = await create_task(
+        session, project, title="Shipped", status_category=TaskStatusCategory.done
+    )
+    open_idea = await create_task(session, project, title="Open")
+    await set_rls_context(session, SystemGuild(guild.id))
+    draft_type = (
+        await session.exec(
+            select(TaskType.id)
+            .where(TaskType.project_id == project.id)
+            .where(TaskType.id != shipped.task_type_id)
+        )
+    ).first()
+    draft = await create_task(session, project, title="Draft", task_type_id=draft_type)
+    category = await create_property_definition(
+        session,
+        initiative,
+        name="Category",
+        type=MetadataType.select,
+        options=[{"value": "files", "label": "Files"}],
+        project=project,
+    )
+    release = await create_property_definition(
+        session, initiative, name="Release", project=project
+    )
+    secret = await create_property_definition(
+        session, initiative, name="Secret", project=project
+    )
+    for task in (shipped, open_idea, draft):
+        await create_property_value(session, task, category, value_text="files")
+    for task in (shipped, open_idea):
+        await create_property_value(session, task, release, value_text="1.0.0")
+    await create_property_value(session, shipped, secret, value_text="Internal.")
+    await set_rls_context(session, SystemGuild(guild.id))
+    session.add(
+        IntakeBinding(
+            stream=IntakeStream.ideas,
+            project_id=project.id,
+            task_type_id=shipped.task_type_id,
+            category_field_id=category.id,
+            release_field_id=release.id,
+            shipped_status_id=shipped.task_status_id,
+        )
+    )
+    await session.commit()
+    await set_rls_context(session, Unattributed())
+    yield {
+        "staff": staff,
+        "shipped": shipped.id,
+        "open": open_idea.id,
+        "category": category.id,
+        "release": release.id,
+    }
+    await operations_schema.deprovision_operations(guild.id)
+
+
+async def _read_as_idea_reader(role_session, user, statement, *, kept=False):
+    """Run one read routed as ``user`` reading the published ideas, or nobody
+    signed in; with ``kept``, on a connection that keeps every plan whole."""
+    routed = await role_session("app_user")
+    try:
+        if kept:
+            await routed.exec(text("SET plan_cache_mode = force_generic_plan"))
+            await routed.commit()
+        await establish_ideas_access(routed, user)
+        return (await routed.exec(statement)).all()
+    finally:
+        await routed.close()
+
+
+@pytest.mark.parametrize("kept", [False, True])
+async def test_anybody_reads_an_ideas_category_and_shipped_release_alone(
+    role_session, ideas, kept
+):
+    """The category of each published idea, the release of the one in the
+    shipped status, and the category field's options; no draft's, and no
+    other field's."""
+    values = await _read_as_idea_reader(
+        role_session,
+        None,
+        select(
+            MetadataValue.entity_id, MetadataValue.property_id, MetadataValue.value_text
+        ),
+        kept=kept,
+    )
+    assert sorted(values) == sorted(
+        [
+            (ideas["shipped"], ideas["category"], "files"),
+            (ideas["shipped"], ideas["release"], "1.0.0"),
+            (ideas["open"], ideas["category"], "files"),
+        ]
+    )
+    fields = await _read_as_idea_reader(
+        role_session, None, select(MetadataDefinition.id, MetadataDefinition.options)
+    )
+    assert fields == [(ideas["category"], [{"value": "files", "label": "Files"}])]
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "SELECT value_number FROM metadata_values",
+        "SELECT value_user_id FROM metadata_values",
+        "SELECT name FROM metadata_definitions",
+        "SELECT name FROM files",
+        "SELECT role_id FROM initiative_members",
+    ],
+)
+async def test_an_idea_reader_is_refused_every_other_column(
+    role_session, ideas, statement
+):
+    with pytest.raises(DBAPIError, match="permission denied"):
+        await _read_as_idea_reader(role_session, None, text(statement))
+
+
+@pytest.mark.parametrize(
+    "table",
+    sorted(
+        set(operations_schema.IDEAS_POLICY_READS)
+        - set(operations_schema.IDEAS_TABLE_ACCESS)
+    ),
+)
+async def test_an_idea_reader_reads_no_row_its_policies_only_consult(
+    role_session, ideas, table
+):
+    """Granted so the community's own policies can be evaluated: no row of
+    them reads, even for a member of the community."""
+    column = operations_schema.IDEAS_POLICY_READS[table][0]
+    rows = await _read_as_idea_reader(
+        role_session, ideas["staff"], text(f"SELECT {column} FROM {table}")
+    )
+    assert rows == []

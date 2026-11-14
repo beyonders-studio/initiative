@@ -17,10 +17,10 @@
 import { useTranslation } from "react-i18next";
 
 import { InitiativeJoinPolicy } from "@/api/generated/initiativeAPI.schemas";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Switch } from "@/ui/switch";
 
 /** Every policy, from the most closed to the most open. */
 const SELECTABLE_POLICIES: readonly InitiativeJoinPolicy[] = [
@@ -29,7 +29,7 @@ const SELECTABLE_POLICIES: readonly InitiativeJoinPolicy[] = [
   InitiativeJoinPolicy.open,
 ];
 
-const POLICY_LABEL_KEY: Record<InitiativeJoinPolicy, string> = {
+export const POLICY_LABEL_KEY: Record<InitiativeJoinPolicy, string> = {
   [InitiativeJoinPolicy.private]: "settings.joinPolicy.privateLabel",
   [InitiativeJoinPolicy.request]: "settings.joinPolicy.requestLabel",
   [InitiativeJoinPolicy.open]: "settings.joinPolicy.openLabel",
@@ -73,7 +73,6 @@ export const JoinPolicySection = ({
   const disabled = !canManage || isSaving;
   const radioId = (policy: InitiativeJoinPolicy) =>
     `${idPrefix ? `${idPrefix}-` : ""}join-policy-${policy}`;
-  const autoJoinId = `${idPrefix ? `${idPrefix}-` : ""}auto-join`;
 
   const canSetAutoJoin = Boolean(onChangeAutoJoin);
   const autoJoinAllowed = value === InitiativeJoinPolicy.open;
@@ -114,48 +113,43 @@ export const JoinPolicySection = ({
   }
 
   const autoJoinBlock = canSetAutoJoin ? (
-    <div className="mt-4 space-y-2 border-t pt-4">
-      <div className="flex items-start gap-3">
+    <div className="border-t pt-4">
+      <SettingsRow
+        label={t("settings.autoJoin.label")}
+        description={
+          autoJoinAllowed ? t("settings.autoJoin.help") : t("settings.autoJoin.requiresOpen")
+        }
+        below={
+          autoJoinAllowed ? (
+            // The thing everyone assumes and nobody is told: it starts from here.
+            <p className="text-muted-foreground text-sm">{t("settings.autoJoin.notRetroactive")}</p>
+          ) : null
+        }
+      >
         <Switch
-          id={autoJoinId}
           checked={autoJoin}
           disabled={disabled || !autoJoinAllowed}
           onCheckedChange={(next) => onChangeAutoJoin?.(next)}
-          className="mt-0.5"
         />
-        <Label htmlFor={autoJoinId} className="font-medium">
-          {t("settings.autoJoin.label")}
-        </Label>
-      </div>
-      {autoJoinAllowed ? (
-        <>
-          <p className="text-muted-foreground text-sm">{t("settings.autoJoin.help")}</p>
-          {/* The thing everyone assumes and nobody is told: it starts from here. */}
-          <p className="text-muted-foreground text-sm">{t("settings.autoJoin.notRetroactive")}</p>
-        </>
-      ) : (
-        <p className="text-muted-foreground text-sm">{t("settings.autoJoin.requiresOpen")}</p>
-      )}
+      </SettingsRow>
     </div>
   ) : policyLocked ? (
-    <p className="mt-4 border-t pt-4 text-muted-foreground text-sm">
+    <p className="border-t pt-4 text-muted-foreground text-sm">
       {t("settings.autoJoin.lockedNote")}
     </p>
   ) : null;
 
   return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle>{t("settings.joinPolicy.title")}</CardTitle>
-        <CardDescription>{t("settings.joinPolicy.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {radios}
-        {autoJoinBlock}
-        {canManage ? null : (
-          <p className="mt-3 text-muted-foreground text-sm">{t("settings.editPermissionNote")}</p>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      className="mt-4"
+      title={t("settings.joinPolicy.title")}
+      description={t("settings.joinPolicy.description")}
+    >
+      {radios}
+      {autoJoinBlock}
+      {canManage ? null : (
+        <p className="text-muted-foreground text-sm">{t("settings.editPermissionNote")}</p>
+      )}
+    </SettingsSection>
   );
 };

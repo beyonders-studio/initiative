@@ -10,17 +10,24 @@ import { buildComment, buildUser } from "@/__tests__/factories";
 import { renderPage, renderWithProviders } from "@/__tests__/helpers/render";
 import type { AccessGrantRead, TaskCaseRead } from "@/api/generated/initiativeAPI.schemas";
 
-const state = vi.hoisted(() => ({ found: undefined as TaskCaseRead | undefined }));
+const state = vi.hoisted(() => ({
+  found: undefined as TaskCaseRead | undefined,
+  isError: false,
+}));
 const createComment = vi.fn();
 const updateTask = vi.fn();
 const takeCase = vi.fn();
+const joinIdea = vi.fn();
+const joinInto = vi.fn();
 
 vi.mock("@/hooks/useTickets", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useTickets")>("@/hooks/useTickets");
   return {
     ...actual,
-    useTaskCase: () => ({ data: state.found }),
+    useTaskCase: () => ({ data: state.found, isError: state.isError }),
     useTakeCase: () => ({ mutate: takeCase, isPending: false }),
+    useJoinCaseToIdea: () => ({ mutate: joinIdea, isPending: false }),
+    useJoinIdeaInto: () => ({ mutate: joinInto, isPending: false }),
     refreshTaskCase: vi.fn(),
   };
 });
@@ -30,7 +37,15 @@ vi.mock("@/hooks/useComments", async () => {
 });
 vi.mock("@/hooks/useTasks", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useTasks")>("@/hooks/useTasks");
-  return { ...actual, useUpdateTask: () => ({ mutateAsync: updateTask, isPending: false }) };
+  return {
+    ...actual,
+    useUpdateTask: () => ({ mutateAsync: updateTask, isPending: false }),
+    useCreateTask: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useTasks: () => ({
+      data: { items: [{ id: 50, title: "Recurring events skip holidays" }] },
+      isFetching: false,
+    }),
+  };
 });
 
 // The name links to a profile, which needs a router this test does not mount.
@@ -74,9 +89,12 @@ const renderRouted = (capabilities: string[] = []) =>
 describe("CasePanel", () => {
   beforeEach(() => {
     state.found = undefined;
+    state.isError = false;
     createComment.mockReset().mockResolvedValue(buildComment({ id: 1 }));
     updateTask.mockReset().mockResolvedValue({});
     takeCase.mockReset();
+    joinIdea.mockReset();
+    joinInto.mockReset();
   });
 
   it("renders nothing for a task no stream opened", () => {
@@ -89,6 +107,73 @@ describe("CasePanel", () => {
     renderPanel();
     expect(await screen.findByText("Lost my phone")).toBeInTheDocument();
     expect(screen.getByText(/asker/)).toBeInTheDocument();
+  });
+
+  it("shows a published idea's votes, with nothing to take or ask access for", async () => {
+    state.found = supportCase({
+      stream: "ideas",
+      filer: null,
+      filer_subject: null,
+      conversation: "none",
+      awaiting_filer_status_id: null,
+      active_status_id: null,
+      votes: 3,
+    });
+    renderRouted(["access.request"]);
+    expect(await screen.findByText(/3 votes/)).toBeInTheDocument();
+    expect(screen.getByText("Ideas")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Take this case" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Request access" })).toBeNull();
+  });
+
+  it("renders nothing once the task is no case, though the last answer is cached", () => {
+    // A published idea put back to a draft: the refetch is a 404, and the
+    // query keeps the idea it read before.
+    state.found = supportCase({ stream: "ideas", filer: null, votes: 3 });
+    state.isError = true;
+    const { container } = renderPanel();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows the idea feedback is joined to, and takes it off", async () => {
+    state.found = supportCase({
+      stream: "feedback",
+      ideas_board_id: 9,
+      joined_idea: { task_id: 50, title: "Recurring events skip holidays" },
+    });
+    const user = userEvent.setup();
+    renderRouted();
+    expect(
+      await screen.findByRole("link", { name: "Recurring events skip holidays" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Take off this idea" }));
+    expect(joinIdea).toHaveBeenCalledWith(null);
+  });
+
+  it("joins feedback to an idea picked from the board", async () => {
+    state.found = supportCase({ stream: "feedback", ideas_board_id: 9, joined_idea: null });
+    const user = userEvent.setup();
+    renderRouted();
+    await user.click(await screen.findByRole("combobox"));
+    await user.click(await screen.findByText("Recurring events skip holidays"));
+    expect(joinIdea).toHaveBeenCalledWith(50);
+  });
+
+  it("joins an idea into another once asked to confirm", async () => {
+    state.found = supportCase({
+      stream: "ideas",
+      filer: null,
+      conversation: "none",
+      votes: 3,
+      ideas_board_id: 9,
+    });
+    const user = userEvent.setup();
+    renderRouted();
+    await user.click(await screen.findByRole("combobox"));
+    await user.click(await screen.findByText("Recurring events skip holidays"));
+    expect(joinInto).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: "Join" }));
+    expect(joinInto).toHaveBeenCalledWith(50);
   });
 
   it("lets somebody who works it take it", async () => {

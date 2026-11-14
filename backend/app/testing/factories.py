@@ -20,8 +20,9 @@ import base64
 import functools
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -31,63 +32,63 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core import usernames
+from app.core.file_types import FileType, type_of_media
+from app.core.guild_auth_options import CommunityAuthOption
+from app.core.login_methods import LoginMethod
+from app.core.reactions import ReactionTarget
 from app.core.relationships import EndpointKind, Provenance, RelationshipType
-from app.models.tenant.relationship import EntityRelationship
-from app.services.tenant import relationships as relationships_service
-from app.services.platform import grant_cases, rules
-from app.core.tools import CHILD_KINDS, Tool
+from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
 from app.core.security import (
     get_password_hash,
     mint_access_token,
 )
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
-from app.models.platform.publisher import Publisher, publisher_prefix
-from app.core.reactions import ReactionTarget
-from app.models.tenant.calendar import Calendar
-from app.models.tenant.contact import Contact
+from app.core.tools import CHILD_KINDS, Tool
+from app.models.platform.access_grant import AccessGrant
+from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
+from app.models.platform.federated_identity import FederatedIdentity
+from app.models.platform.guild import CommunityRole, Guild, GuildMembership
+from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.models.platform.marketplace import (
-    MarketplaceListing,
     UID_ALPHABET,
     UID_LENGTH,
+    MarketplaceListing,
 )
-from app.models.tenant.dashboard import Dashboard
-from app.models.tenant.post import Post
+from app.models.platform.oidc_claim_mapping import (
+    OIDCClaimMapping,
+    OIDCMappingTargetType,
+)
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.models.platform.publisher import Publisher, publisher_prefix
+from app.models.platform.user import User, UserRole, UserStatus
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.calendar import Calendar
+from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.collection import Collection, CollectionFile
-from app.models.tenant.wiki import Wiki, WikiPage
-from app.models.tenant.post_poll import PostPoll, PostPollOption
+from app.models.tenant.comment import Comment
+from app.models.tenant.contact import Contact
+from app.models.tenant.counter import Counter, CounterGroup
+from app.models.tenant.dashboard import Dashboard
+from app.models.tenant.data_job import DataJob, DataJobDirection
+from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_secret import GuildPluginSecret
-from app.models.tenant.plugin_connection_secret import PluginConnectionSecret
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
-from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.comment import Comment
-from app.models.tenant.counter import Counter, CounterGroup
-from app.core.file_types import FileType, type_of_media
-from app.models.tenant.file import File
-from app.models.platform.access_grant import AccessGrant
-from app.models.platform.guild import Guild, GuildMembership, CommunityRole
-from app.core.guild_auth_options import CommunityAuthOption
-from app.models.platform.guild_administration import GuildAdministration
-from app.services.marketplace import plugin_installs
-from app.services.marketplace import catalog as marketplace_catalog
-from app.services.marketplace.registration_lookup import invalidate_registrations
-from app.services.tenant import file_versions
-from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant import plugin_schedules
-from app.services.tenant.plugin_config import mint_connection_ref
-from app.services.tenant.dashboard_definition import (
-    normalize_dashboard_definition,
-)
-from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import Initiative, InitiativeMember
-from app.models.tenant.project import Project
-from app.models.tenant.resource_grant import ResourceGrant, ResourceAccessLevel
 from app.models.tenant.metadata import (
     MetadataDefinition,
     MetadataType,
     MetadataValue,
 )
+from app.models.tenant.plugin_connection_secret import PluginConnectionSecret
+from app.models.tenant.post import Post
+from app.models.tenant.post_poll import PostPoll, PostPollOption
+from app.models.tenant.project import Project
 from app.models.tenant.reaction import Reaction
+from app.models.tenant.relationship import EntityRelationship
+from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.tag import Tag
 from app.models.tenant.task import (
     Task,
@@ -98,27 +99,27 @@ from app.models.tenant.task import (
 )
 from app.models.tenant.upload import Upload
 from app.models.tenant.webhook_subscription import WebhookSubscription
-from app.models.tenant.data_job import DataJob, DataJobDirection
-from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
-from app.models.platform.guild_provider_connection import GuildProviderConnection
-from app.models.platform.oidc_claim_mapping import (
-    OIDCClaimMapping,
-    OIDCMappingTargetType,
-)
-from app.models.platform.federated_identity import FederatedIdentity
-from app.core.login_methods import LoginMethod
-from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
-from app.models.platform.user import User, UserRole, UserStatus
-from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
-from app.core import usernames
-from app.services.platform import guilds as guilds_service
-from app.services.tenant.initiatives import create_builtin_roles
+from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.tenant.task import mint_checklist_item_id
+from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
+from app.services.marketplace import catalog as marketplace_catalog
+from app.services.marketplace import plugin_installs
+from app.services.marketplace.registration_lookup import invalidate_registrations
+from app.services.platform import grant_cases, rules
+from app.services.platform import guilds as guilds_service
+from app.services.tenant import file_versions, plugin_schedules
+from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant import relationships as relationships_service
+from app.services.tenant.dashboard_definition import (
+    normalize_dashboard_definition,
+)
+from app.services.tenant.initiatives import create_builtin_roles
+from app.services.tenant.names import slugify
 from app.services.tenant.ownership import tool_for_row
+from app.services.tenant.plugin_config import mint_connection_ref
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_statuses import ensure_default_statuses
 from app.services.tenant.task_types import ensure_default_types
-from app.services.tenant.names import slugify
 from app.testing.schema_harness import guild_of, route_session_to_guild
 
 
@@ -157,9 +158,7 @@ async def create_user(
         )
     """
     email_raw = (
-        overrides.pop(
-            "email", f"user-{datetime.now(timezone.utc).timestamp()}@example.com"
-        )
+        overrides.pop("email", f"user-{datetime.now(UTC).timestamp()}@example.com")
         .lower()
         .strip()
     )
@@ -175,7 +174,7 @@ async def create_user(
         # Answered, for the same reason the handle is chosen: a test that is
         # not about the age gate should never meet it. The gate's own tests
         # pass ``age_confirmed_at=None`` to get an account that has not.
-        "age_confirmed_at": datetime.now(timezone.utc),
+        "age_confirmed_at": datetime.now(UTC),
         "hashed_password": _default_password_hash(),
         "role": UserRole.member,
         "status": UserStatus.active,
@@ -295,9 +294,7 @@ async def create_guild(
 
     guild = await guilds_service.create_guild(
         session,
-        name=overrides.pop(
-            "name", f"Test Guild {datetime.now(timezone.utc).timestamp()}"
-        ),
+        name=overrides.pop("name", f"Test Guild {datetime.now(UTC).timestamp()}"),
         description=overrides.pop(
             "description", "A test guild for integration testing"
         ),
@@ -403,7 +400,7 @@ async def create_access_grant(
     ``case_task_id`` links it to that case in the operations community, as
     asking for it for a case does.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = AccessGrant(
         **{
             "user_id": user.id,
@@ -544,7 +541,7 @@ async def create_guest(
         user=user,
         guild=guild,
         role=role,
-        guest_until=datetime.now(timezone.utc) + ends_in,
+        guest_until=datetime.now(UTC) + ends_in,
     )
     return user
 
@@ -702,7 +699,7 @@ async def create_initiative(
     from app.core.tools import Tool as _Tool
 
     defaults: dict[str, Any] = {
-        "name": f"Test Initiative {datetime.now(timezone.utc).timestamp()}",
+        "name": f"Test Initiative {datetime.now(UTC).timestamp()}",
         "description": "A test initiative",
         # Every tool the initiative can switch on, switched on — derived from
         # the enum, so a new tool is usable the day it exists. A test about a
@@ -780,13 +777,14 @@ async def create_project(
     await route_session_to_guild(session, guild_of(initiative))
 
     defaults = {
-        "name": f"Test Project {datetime.now(timezone.utc).timestamp()}",
+        "name": f"Test Project {datetime.now(UTC).timestamp()}",
         "description": "A test project",
         "initiative_id": initiative.id,
         # Author and owner are different facts that happen to be the same person
         # for a freshly made project: the column below records who made it, the
         # grant further down records who owns it.
         "created_by": owner.id,
+        "created_by_kind": ActorKind.member,
     }
 
     project_data = {**defaults, **overrides}
@@ -885,7 +883,7 @@ async def create_task(
 
     types = await ensure_default_types(session, project.id, locale="en")
     defaults: dict[str, Any] = {
-        "title": title or f"Test Task {datetime.now(timezone.utc).timestamp()}",
+        "title": title or f"Test Task {datetime.now(UTC).timestamp()}",
         "project_id": project.id,
         "task_status_id": status.id,
         "task_type_id": next(t for t in types if t.is_default).id,
@@ -896,7 +894,7 @@ async def create_task(
     # done-ness and completed_at always agree. A ``completed_at`` override on a
     # done task survives (letting a test date a completion), and one on a task
     # that isn't done is dropped rather than persisted as an impossible row.
-    sync_completed_at(task, status.category, now=datetime.now(timezone.utc))
+    sync_completed_at(task, status.category, now=datetime.now(UTC))
     session.add(task)
     if commit:
         await session.commit()
@@ -935,8 +933,9 @@ async def create_initiative_member(
     Returns:
         Created InitiativeMember instance
     """
-    from app.models.tenant.initiative import InitiativeRoleModel
     from sqlmodel import select
+
+    from app.models.tenant.initiative import InitiativeRoleModel
 
     await route_session_to_guild(session, guild_of(initiative))
 
@@ -982,11 +981,12 @@ async def grant_role_permission(
     member has to say that their role may engage that tool, exactly as an
     initiative's settings screen would.
     """
+    from sqlmodel import select
+
     from app.models.tenant.initiative import (
         InitiativeRoleModel,
         InitiativeRule,
     )
-    from sqlmodel import select
 
     await route_session_to_guild(session, guild_of(initiative))
     role = (
@@ -1064,7 +1064,7 @@ async def create_property_definition(
     await route_session_to_guild(session, guild_of(initiative or plugin))
 
     if name is None:
-        name = key or f"Prop {datetime.now(timezone.utc).timestamp()}"
+        name = key or f"Prop {datetime.now(UTC).timestamp()}"
 
     if type in {MetadataType.select, MetadataType.multi_select} and options is None:
         options = [
@@ -1167,7 +1167,8 @@ async def create_calendar(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Calendar {datetime.now(timezone.utc).timestamp()}",
+        "created_by_kind": ActorKind.member,
+        "name": name or f"Calendar {datetime.now(UTC).timestamp()}",
     }
 
     data = {**defaults, **overrides}
@@ -1213,6 +1214,7 @@ async def create_guild_calendar(
         **{
             "initiative_id": None,
             "created_by": creator.id,
+            "created_by_kind": ActorKind.member,
             "name": name or "Community calendar",
             **overrides,
         }
@@ -1273,6 +1275,7 @@ async def create_guild_plugin(
             "name": name,
             "definition": definition,
             "created_by": creator.id,
+            "created_by_kind": ActorKind.member,
             **overrides,
         }
     )
@@ -1326,10 +1329,11 @@ async def create_webhook_subscription(
     """A subscription to ``tasks.created`` against a URL of the creator's own,
     for the whole community unless ``initiative_id`` says otherwise."""
     await route_session_to_guild(session, guild.id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     subscription = WebhookSubscription(
         **{
             "created_by": None if creator is None else creator.id,
+            "created_by_kind": None if creator is None else ActorKind.member,
             "target_url": "https://example.test/hook",
             "hmac_secret": uuid.uuid4().hex,
             "event_types": ["tasks.created"],
@@ -1583,7 +1587,7 @@ def entitlement_statement(
         "community_ref": community_ref,
         "version": version,
         "values": values,
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
         **claims,
     }
     for name in drop:
@@ -1663,7 +1667,8 @@ async def create_dashboard(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Dashboard {datetime.now(timezone.utc).timestamp()}",
+        "created_by_kind": ActorKind.member,
+        "name": name or f"Dashboard {datetime.now(UTC).timestamp()}",
         "definition": definition
         if definition is not None
         else normalize_dashboard_definition(
@@ -1701,16 +1706,6 @@ async def create_dashboard(
         await create_resource_grant(session, dashboard, all_initiative_members=True)
 
     return dashboard
-
-
-#: A collaboration state as the editor's binding writes one: a paragraph,
-#: ``Hi `` and a mention of user 42 holding the name ``Ada``, the way an editor
-#: from before mentions stopped storing names wrote it. Made with ``yjs``.
-MENTIONING_YJS_STATE = base64.b64decode(
-    "AQeWo/S3AwAHAQRyb290BigAlqP0twMABl9fdHlwZQF3CXBhcmFncmFwaAQAlqP0twMAA0hp"
-    "IIeWo/S3AwQDB21lbnRpb24oAJaj9LcDBQZfX3R5cGUBdwdtZW50aW9uKACWo/S3AwUJX19t"
-    "ZW50aW9uAXcDQWRhKACWo/S3AwUPX19tZW50aW9uVXNlcklkAX0qAA=="
-)
 
 
 def lexical_body(
@@ -1786,11 +1781,12 @@ async def create_post(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Post {datetime.now(timezone.utc).timestamp()}",
+        "created_by_kind": ActorKind.member,
+        "name": name or f"Post {datetime.now(UTC).timestamp()}",
         "body": body if body is not None else lexical_body("Notice body."),
         # Live by default, like a notice posted rather than scheduled. Pass
         # ``published_at=None`` with a ``scheduled_for`` to build a draft.
-        "published_at": datetime.now(timezone.utc),
+        "published_at": datetime.now(UTC),
     }
 
     data = {**defaults, **overrides}
@@ -1904,7 +1900,8 @@ async def create_collection(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Collection {datetime.now(timezone.utc).timestamp()}",
+        "created_by_kind": ActorKind.member,
+        "name": name or f"Collection {datetime.now(UTC).timestamp()}",
     }
     collection = Collection(**{**defaults, **overrides})
     session.add(collection)
@@ -1949,10 +1946,11 @@ async def create_calendar_event(
     """
     await route_session_to_guild(session, guild_of(calendar))
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     defaults = {
         "calendar_id": calendar.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "title": title or f"Event {now.timestamp()}",
         "start_at": now,
         "end_at": now + timedelta(hours=1),
@@ -2000,11 +1998,12 @@ async def create_file(
         stored.setdefault("file_content_type", "application/pdf")
     defaults = {
         "initiative_id": initiative.id,
-        "name": name or f"Test File {datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"Test File {datetime.now(UTC).timestamp()}",
         "file_type": (
             type_of_media(stored["file_content_type"]) if stored else FileType.lexical
         ),
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
     }
     file = File(**{**defaults, **overrides})
     session.add(file)
@@ -2020,7 +2019,13 @@ async def create_file(
         session, file, level=ResourceAccessLevel.owner, user=creator, commit=commit
     )
     if stored:
-        await file_versions.add_version(session, file, created_by=creator.id, **stored)
+        await file_versions.add_version(
+            session,
+            file,
+            created_by=creator.id,
+            created_by_kind=ActorKind.member,
+            **stored,
+        )
         await (session.commit() if commit else session.flush())
 
     return file
@@ -2090,6 +2095,7 @@ async def create_comment(
     defaults = {
         "content": content,
         "created_by": author.id,
+        "created_by_kind": ActorKind.member,
         column: parent.id,
     }
     comment = Comment(**{**defaults, **overrides})
@@ -2123,6 +2129,7 @@ async def create_reaction(
         "target_id": comment.id,
         "emoji": emoji,
         "created_by": user.id,
+        "created_by_kind": ActorKind.member,
     }
     reaction = Reaction(**{**defaults, **overrides})
     session.add(reaction)
@@ -2146,7 +2153,7 @@ async def create_tag(
     await route_session_to_guild(session, guild.id)
 
     defaults = {
-        "name": name or f"tag-{datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"tag-{datetime.now(UTC).timestamp()}",
     }
     tag = Tag(**{**defaults, **overrides})
     session.add(tag)
@@ -2224,8 +2231,9 @@ async def create_counter_group(
 
     defaults = {
         "initiative_id": initiative.id,
-        "name": name or f"Test Counters {datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"Test Counters {datetime.now(UTC).timestamp()}",
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
     }
     group = CounterGroup(**{**defaults, **overrides})
     session.add(group)
@@ -2254,7 +2262,7 @@ async def create_counter(
 
     defaults = {
         "counter_group_id": group.id,
-        "name": name or f"Counter {datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"Counter {datetime.now(UTC).timestamp()}",
     }
     counter = Counter(**{**defaults, **overrides})
     session.add(counter)
@@ -2280,8 +2288,10 @@ async def create_upload(
 
     defaults = {
         "created_by": uploader.id,
-        "filename": filename or f"file-{datetime.now(timezone.utc).timestamp()}.txt",
+        "created_by_kind": ActorKind.member,
+        "filename": filename or f"file-{datetime.now(UTC).timestamp()}.txt",
         "size_bytes": 1,
+        "content_type": "text/plain",
     }
     upload = Upload(**{**defaults, **overrides})
     session.add(upload)
@@ -2302,6 +2312,7 @@ async def create_export_job(
     defaults = {
         "direction": DataJobDirection.export,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "source": "tasks",
         "template_id": "task-table",
         "format": "pdf",
@@ -2322,6 +2333,7 @@ async def create_import_job(
         **{
             "direction": DataJobDirection.import_,
             "created_by": creator.id,
+            "created_by_kind": ActorKind.member,
             "source": "backup",
             **overrides,
         }
@@ -2343,7 +2355,8 @@ async def create_auth_provider(
     Defaults to a login-ready OIDC row pointing at the test IdP constants
     (``app.testing.oidc``), so a fake-IdP flow verifies against it as-is.
     """
-    from app.testing.oidc import CLIENT_ID as _TEST_CLIENT_ID, ISSUER as _TEST_ISSUER
+    from app.testing.oidc import CLIENT_ID as _TEST_CLIENT_ID
+    from app.testing.oidc import ISSUER as _TEST_ISSUER
 
     defaults = {
         "slug": "corp",
@@ -2417,7 +2430,7 @@ async def create_guild_provider_connection(
         # Agreed, like the narrowing itself: this makes a connection that
         # works, so a test about what happens before somebody agrees says
         # ``narrowing_approved_at=None`` and means it.
-        "narrowing_approved_at": datetime.now(timezone.utc),
+        "narrowing_approved_at": datetime.now(UTC),
     }
     connection = GuildProviderConnection(**{**defaults, **overrides})
     session.add(connection)
@@ -2431,7 +2444,7 @@ async def create_claim_rule(
     session: AsyncSession,
     *,
     provider: AuthProvider,
-    guild: "Guild",
+    guild: Guild,
     initiative: Initiative | None = None,
     initiative_role_id: int | None = None,
     **overrides: Any,
@@ -2472,8 +2485,8 @@ async def create_claim_rule(
 
 async def create_guild_auth_policy(
     session: AsyncSession,
-    guild: "Guild",
-    provider: "AuthProvider | None" = None,
+    guild: Guild,
+    provider: AuthProvider | None = None,
     *,
     commit: bool = True,
     guest: bool = False,
@@ -2519,7 +2532,7 @@ async def create_federated_identity(
     user: User,
     *,
     subject: str | None = None,
-    provider: "AuthProvider | None" = None,
+    provider: AuthProvider | None = None,
     commit: bool = True,
     **overrides: Any,
 ) -> FederatedIdentity:
@@ -2585,7 +2598,8 @@ async def create_wiki(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Wiki {datetime.now(timezone.utc).timestamp()}",
+        "created_by_kind": ActorKind.member,
+        "name": name or f"Wiki {datetime.now(UTC).timestamp()}",
     }
     wiki = Wiki(**{**defaults, **overrides})
     session.add(wiki)
@@ -2619,11 +2633,12 @@ async def create_wiki_page(
     """
     await route_session_to_guild(session, guild_of(wiki))
 
-    stamp = datetime.now(timezone.utc).timestamp()
+    stamp = datetime.now(UTC).timestamp()
     page_title = title or f"Page {stamp}"
     defaults: dict[str, Any] = {
         "wiki_id": wiki.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "title": page_title,
         "slug": slugify(page_title, fallback=f"page-{stamp}"),
     }
@@ -2656,7 +2671,8 @@ async def create_contact(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Contact {datetime.now(timezone.utc).timestamp()}",
+        "created_by_kind": ActorKind.member,
+        "name": name or f"Contact {datetime.now(UTC).timestamp()}",
     }
     contact = Contact(**{**defaults, **overrides})
     session.add(contact)

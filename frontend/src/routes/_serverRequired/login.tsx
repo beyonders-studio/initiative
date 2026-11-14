@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { LoginPage } from "@/pages/signIn/login/LoginPage";
 
 export const Route = createFileRoute("/_serverRequired/login")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage }))
-  ),
+  component: LoginPage,
 });

@@ -1,8 +1,8 @@
 /**
  * A sign-in the app finishes in the phone's browser.
  *
- * The app cannot hold an identity provider's redirect or a passkey ceremony
- * itself, so it opens the system browser, and the sign-in comes back to
+ * The app cannot hold an identity provider's redirect itself, so it opens the
+ * system browser, and the sign-in comes back to
  * `initiative://oidc/callback` as a one-time code. The code is bound to a PKCE
  * challenge the app made when it began (RFC 8252, RFC 7636): only the verifier
  * kept here redeems it, and a callback that arrives when this app began no
@@ -19,6 +19,8 @@ interface PendingSignIn {
   verifier: string;
   origin: string;
   startedAt: number;
+  /** Where the sign-in was headed, as the web's `next` is. */
+  next?: string;
 }
 
 const base64url = (bytes: Uint8Array): string =>
@@ -27,18 +29,31 @@ const base64url = (bytes: Uint8Array): string =>
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 
+/** A PKCE verifier and its S256 challenge (RFC 7636). */
+export const pkcePair = async (): Promise<{ verifier: string; challenge: string }> => {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return { verifier, challenge: base64url(new Uint8Array(digest)) };
+};
+
 /**
  * Begin a sign-in against `origin` and return the challenge to send with it.
  *
  * The verifier is written before the browser opens: the phone often closes the
  * app while the browser is in front, and the callback then starts it afresh.
+ * So is `next`, where the sign-in was headed: the app, not the server, keeps
+ * it, because the app is where the sign-in comes back to.
  */
-export const beginNativeSignIn = async (origin: string): Promise<string> => {
-  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  const pending: PendingSignIn = { verifier, origin, startedAt: Date.now() };
+export const beginNativeSignIn = async (origin: string, next?: string | null): Promise<string> => {
+  const { verifier, challenge } = await pkcePair();
+  const pending: PendingSignIn = {
+    verifier,
+    origin,
+    startedAt: Date.now(),
+    ...(next ? { next } : {}),
+  };
   await setItem(CREDENTIAL_KEYS.pendingSignIn, JSON.stringify(pending));
-  return base64url(new Uint8Array(digest));
+  return challenge;
 };
 
 /** The sign-in this app began against `origin`, taken so it is answered once. */

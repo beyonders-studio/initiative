@@ -11,12 +11,11 @@ simply not been wired up yet.
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.core.config import settings
 from app.core.messages import PluginServiceMessages
 from app.services.marketplace import context_jwt
-
 
 JWKS_URL = "/api/v1/plugin-platform/jwks.json"
 

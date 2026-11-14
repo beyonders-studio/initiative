@@ -39,9 +39,6 @@ import { ContinueButton } from "@/components/start/stepParts";
 import { useSignUp } from "@/components/start/useSignUp";
 import { type YonderPose, YonderSays } from "@/components/start/YonderSays";
 import { YouStep } from "@/components/start/YouStep";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { WizardFrame } from "@/components/ui/wizard-dialog";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useBillingCatalog } from "@/hooks/useBillingCatalog";
@@ -60,6 +57,7 @@ import { useWizard } from "@/hooks/useWizard";
 import { EMPTY_PLACE, nearOfPlace } from "@/lib/directoryNear";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { returnPath } from "@/lib/returnPath";
 import {
   clearStart,
   findStartedCommunity,
@@ -71,6 +69,9 @@ import {
   savePendingStart,
   saveStartDraft,
 } from "@/lib/startFlow";
+import { Button } from "@/ui/button";
+import { Card } from "@/ui/card";
+import { WizardFrame } from "@/ui/wizard-dialog";
 
 type Step =
   | "choose"
@@ -103,6 +104,9 @@ export interface StartFlowProps {
   onBusy?: (busy: boolean) => void;
   /** Under the steps, inside the card. */
   footer?: ReactNode;
+  /** Where to land once the account is made, in place of where the flow would:
+   *  the page that sent somebody to sign up, such as a plug-in's sign-in. */
+  next?: string;
 }
 
 /** Waits for what decides which paths are offered, then starts the steps. */
@@ -143,6 +147,7 @@ const StartSteps = ({
   inviteCode: urlCode,
   onBusy,
   footer,
+  next: nextParam,
   paths,
 }: StartFlowProps & { signedIn: boolean; paths: StartPath[] }) => {
   const { t } = useTranslation(["auth", "common", "communities"]);
@@ -344,8 +349,10 @@ const StartSteps = ({
   // button instead, which is a click of its own.
   const [planByButton, setPlanByButton] = useState(false);
   const finishing = useRef(false);
+  // The page that sent somebody here, when one did, is where every ending lands.
+  const resumeTo = returnPath(nextParam);
   const leave = async (to: () => Promise<unknown>) => {
-    await to();
+    await (resumeTo ? navigate({ href: resumeTo }) : to());
     onBusy?.(false);
   };
   useEffect(() => {
@@ -436,8 +443,10 @@ const StartSteps = ({
       dropPlanTab();
       const underAge = Boolean(created.age_below_minimum_at);
       await clearStart();
-      if (answers.path !== "invite" && !(answers.path === "join" && underAge)) {
-        await savePendingStart(details.email, withDefaults(answers));
+      // Left for the first sign-in when there is something to finish, or a
+      // page that sent them here to return to.
+      if (resumeTo || (answers.path !== "invite" && !(answers.path === "join" && underAge))) {
+        await savePendingStart(details.email, withDefaults(answers), resumeTo);
       }
       setHeld({ approval: created.status !== "active", underAge });
       commit("checkEmail");
@@ -485,9 +494,11 @@ const StartSteps = ({
             // The address already had an account, so nothing was made: on to
             // the invite, or home.
             void clearStart();
-            void (inviteParam
-              ? navigate({ to: "/invite/$code", params: { code: inviteParam } })
-              : navigate({ to: "/" }));
+            void leave(() =>
+              inviteParam
+                ? navigate({ to: "/invite/$code", params: { code: inviteParam } })
+                : navigate({ to: "/" })
+            );
           }}
         />
       </SignInFrame>

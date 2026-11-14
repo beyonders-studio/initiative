@@ -32,7 +32,7 @@ IMPORTERS = {
 # must map back to a Tool (the engine reads the tool's master switch through
 # that mapping — a permission that gates no tool would otherwise be treated
 # as always-enabled).
-from app.core.tools import tool_for_create_permission as _tool_lookup  # noqa: E402
+from app.core.tools import tool_for_create_permission as _tool_lookup
 
 for _importer in IMPORTERS.values():
     _tool_lookup(_importer.permission.value)

@@ -1,10 +1,8 @@
 import { useQueries } from "@tanstack/react-query";
-import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  InitiativeRoleRead,
   ResourceGrantBulkItem,
   ResourceGrantSchema,
   SearchInitiativeMembersParams,
@@ -13,20 +11,20 @@ import type {
   UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getListInitiativeRolesQueryKey,
-  getSearchInitiativeMembersQueryKey,
-  listInitiativeRoles,
-  searchInitiativeMembers,
+  getListInitiativeRolesQueryOptions,
+  getSearchInitiativeMembersQueryOptions,
 } from "@/api/generated/initiatives/initiatives";
 import { bulkSetResourceGrants } from "@/api/generated/resource-grants/resource-grants";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { useAuth } from "@/hooks/useAuth";
+import { useInitiatives } from "@/hooks/useInitiatives";
+import { USER_ID_LOOKUP_MAX, USER_SEARCH_PAGE_SIZE } from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
+import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Combobox, type ComboboxItem } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -34,26 +32,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAuth } from "@/hooks/useAuth";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useInitiatives } from "@/hooks/useInitiatives";
-import { USER_ID_LOOKUP_MAX, USER_SEARCH_PAGE_SIZE } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
-import type { DialogWithSuccessProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 /** The minimal shape the bulk dialog needs from any tool (project, file, …). */
 export interface BulkAccessItem {
@@ -75,13 +56,6 @@ interface BulkEditAccessDialogProps extends DialogWithSuccessProps {
   invalidate: () => void;
 }
 
-interface SelectableUser {
-  id: number;
-  name: string;
-  /** The line under the name, and what tells two of the same name apart. */
-  handle: string;
-}
-
 interface SelectableRole {
   id: number;
   name: string;
@@ -95,11 +69,13 @@ const MAX_BULK_ITEMS = 200;
 
 type MemberSearchParams = SearchInitiativeMembersParams;
 
-const toSelectableUser = (member: UserSummary): SelectableUser => ({
-  id: member.id,
-  name: getUserDisplayName(member),
-  handle: getUserHandle(member),
-});
+/** A member as a row of the people picker. The handle goes under the name,
+ *  which is what tells two of the same name apart. */
+const toPersonItem = (member: UserSummary): ComboboxItem => {
+  const label = getUserDisplayName(member);
+  const handle = getUserHandle(member);
+  return { value: String(member.id), label, sublabel: handle === label ? undefined : handle };
+};
 
 /**
  * Bulk-edit sharing across many resources of one tool type. Keeps a safe
@@ -126,21 +102,17 @@ export function BulkEditAccessDialog({
     [t, resourceType]
   );
   const [tab, setTab] = useState<"people" | "roles" | "all">("people");
-  const [isPending, setIsPending] = useState(false);
 
   // Individual people state
   const [userMode, setUserMode] = useState<"grant" | "revoke">("grant");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
   const [level, setLevel] = useState<"read" | "write">("read");
-  const [userPickerOpen, setUserPickerOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
 
   // Role state
   const [roleMode, setRoleMode] = useState<"grant" | "revoke">("grant");
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(new Set());
   const [roleLevel, setRoleLevel] = useState<"read" | "write">("read");
-  const [rolePickerOpen, setRolePickerOpen] = useState(false);
-  const [roleSearch, setRoleSearch] = useState("");
 
   // All-initiative-members state (the "all members" share mode, applied in bulk)
   const [allMode, setAllMode] = useState<"share" | "remove">("share");
@@ -166,20 +138,18 @@ export function BulkEditAccessDialog({
 
   // One query per initiative and params: the people matching what was typed
   // (grant), or the people already granted, named by id (revoke).
-  const memberQuery = (initiativeId: number, params: MemberSearchParams, enabled: boolean) => ({
-    queryKey: getSearchInitiativeMembersQueryKey(communityId, initiativeId, params),
-    queryFn: () => searchInitiativeMembers(communityId, initiativeId, params),
-    enabled,
-  });
+  const memberQuery = (initiativeId: number, params: MemberSearchParams, enabled: boolean) =>
+    getSearchInitiativeMembersQueryOptions(communityId, initiativeId, params, {
+      query: { enabled },
+    });
 
   // Granting: each relevant initiative's members matching what was typed,
   // matched on the server.
-  const debouncedUserSearch = useDebouncedValue(userSearch, 250);
   const searchQueries = useQueries({
     queries: initiativeIds.map((id) =>
       memberQuery(
         id,
-        { search: debouncedUserSearch.trim() || undefined, page_size: USER_SEARCH_PAGE_SIZE },
+        { search: userSearch.trim() || undefined, page_size: USER_SEARCH_PAGE_SIZE },
         open && userMode === "grant"
       )
     ),
@@ -217,10 +187,10 @@ export function BulkEditAccessDialog({
   });
 
   const membersById = useMemo(() => {
-    const map = new Map<number, SelectableUser>();
+    const map = new Map<number, ComboboxItem>();
     for (const query of granteeQueries) {
       for (const member of query.data?.items ?? []) {
-        if (!map.has(member.id)) map.set(member.id, toSelectableUser(member));
+        if (!map.has(member.id)) map.set(member.id, toPersonItem(member));
       }
     }
     return map;
@@ -228,12 +198,9 @@ export function BulkEditAccessDialog({
 
   // Fetch roles for each relevant initiative (reuses same query key as useInitiativeRoles)
   const roleQueries = useQueries({
-    queries: initiativeIds.map((id) => ({
-      queryKey: getListInitiativeRolesQueryKey(communityId, id),
-      queryFn: () =>
-        listInitiativeRoles(communityId, id) as unknown as Promise<InitiativeRoleRead[]>,
-      enabled: open,
-    })),
+    queries: initiativeIds.map((id) =>
+      getListInitiativeRolesQueryOptions(communityId, id, { query: { enabled: open } })
+    ),
   });
 
   // Build selectable roles from all relevant initiatives
@@ -287,32 +254,22 @@ export function BulkEditAccessDialog({
 
   const displayRoles = roleMode === "grant" ? availableRoles : revocableRoles;
 
-  const filteredRoles = useMemo(() => {
-    if (!roleSearch.trim()) return displayRoles;
-    const searchLower = roleSearch.toLowerCase();
-    return displayRoles.filter(
-      (r) =>
-        r.displayName.toLowerCase().includes(searchLower) ||
-        r.initiativeName.toLowerCase().includes(searchLower)
-    );
-  }, [displayRoles, roleSearch]);
-
   // People from the initiatives the selected resources belong to
   const availableUsers = useMemo(() => {
-    const map = new Map<number, SelectableUser>();
+    const map = new Map<number, ComboboxItem>();
     for (const query of searchQueries) {
       for (const member of query.data?.items ?? []) {
         if (member.id !== currentUser?.id && !map.has(member.id)) {
-          map.set(member.id, toSelectableUser(member));
+          map.set(member.id, toPersonItem(member));
         }
       }
     }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
   }, [searchQueries, currentUser]);
 
   // People who have non-owner access on at least one selected resource (for revoke)
   const revocableUsers = useMemo(() => {
-    const userMap = new Map<number, SelectableUser>();
+    const userMap = new Map<number, ComboboxItem>();
     for (const item of items) {
       for (const grant of item.grants ?? []) {
         const userId = grant.user_id;
@@ -322,53 +279,15 @@ export function BulkEditAccessDialog({
           userId !== currentUser?.id &&
           !userMap.has(userId)
         ) {
-          const known = membersById.get(userId);
-          userMap.set(userId, {
-            id: userId,
-            name: known?.name || `User ${userId}`,
-            handle: known?.handle || "",
-          });
+          userMap.set(
+            userId,
+            membersById.get(userId) ?? { value: String(userId), label: `User ${userId}` }
+          );
         }
       }
     }
-    return Array.from(userMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(userMap.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [items, membersById, currentUser]);
-
-  const displayUsers = userMode === "grant" ? availableUsers : revocableUsers;
-
-  // Granting searched on the server already; the granted list filters here.
-  const filteredUsers = useMemo(() => {
-    if (userMode === "grant" || !userSearch.trim()) return displayUsers;
-    const searchLower = userSearch.toLowerCase();
-    return displayUsers.filter(
-      (u) =>
-        u.name.toLowerCase().includes(searchLower) || u.handle.toLowerCase().includes(searchLower)
-    );
-  }, [displayUsers, userSearch, userMode]);
-
-  const toggleUser = useCallback((userId: number) => {
-    setSelectedUserIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
-      return next;
-    });
-  }, []);
-
-  const toggleRole = useCallback((roleId: number) => {
-    setSelectedRoleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(roleId)) {
-        next.delete(roleId);
-      } else {
-        next.add(roleId);
-      }
-      return next;
-    });
-  }, []);
 
   const resetState = useCallback(() => {
     setTab("people");
@@ -376,12 +295,9 @@ export function BulkEditAccessDialog({
     setSelectedUserIds(new Set());
     setLevel("read");
     setUserSearch("");
-    setUserPickerOpen(false);
     setRoleMode("grant");
     setSelectedRoleIds(new Set());
     setRoleLevel("read");
-    setRoleSearch("");
-    setRolePickerOpen(false);
     setAllMode("share");
     setAllLevel("read");
   }, []);
@@ -398,8 +314,11 @@ export function BulkEditAccessDialog({
 
   // Persist rebuilt grant lists in one bulk request per chunk (owner preserved
   // server-side). Each entry is one resource's full non-owner grant list.
-  const applyBulk = useCallback(
-    async (entries: { resourceId: number; grants: ResourceGrantSchema[] }[]) => {
+  const { mutate: applyBulk, isPending } = useCommunityMutation({
+    mutationFn: async (
+      communityId,
+      entries: { resourceId: number; grants: ResourceGrantSchema[] }[]
+    ) => {
       for (let i = 0; i < entries.length; i += MAX_BULK_ITEMS) {
         const slice = entries.slice(i, i + MAX_BULK_ITEMS);
         const bulkItems: ResourceGrantBulkItem[] = slice.map((e) => ({
@@ -412,136 +331,130 @@ export function BulkEditAccessDialog({
         });
       }
     },
-    [communityId, resourceType]
-  );
+    // Here rather than in a call's callbacks, which do not run once the dialog
+    // is gone, so the lists refresh even when the page is left mid-write.
+    invalidate,
+  });
 
   const finish = useCallback(() => {
-    invalidate();
     resetState();
     onOpenChange(false);
     onSuccess();
-  }, [invalidate, resetState, onOpenChange, onSuccess]);
+  }, [resetState, onOpenChange, onSuccess]);
 
-  const handleApply = useCallback(async () => {
+  const handleApply = useCallback(() => {
     if (selectedUserIds.size === 0) return;
 
-    setIsPending(true);
-    try {
-      const userIds = new Set(selectedUserIds);
-      const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
+    const userIds = new Set(selectedUserIds);
+    const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
 
-      for (const item of items) {
-        const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
-        if (userMode === "grant") {
-          // Granting specific people switches the resource to "restricted" mode,
-          // so drop any "all initiative members" grant — ShareControl can't
-          // represent a mixed all-members + per-grantee list and would silently
-          // discard it on the next save. Also drop any existing per-user grant for
-          // the targeted people, then add them back at the chosen level.
-          const next = existing.filter(
-            (g) => !g.all_initiative_members && (g.user_id == null || !userIds.has(g.user_id))
-          );
-          for (const userId of userIds) next.push({ user_id: userId, level });
-          entries.push({ resourceId: item.id, grants: next });
-        } else {
-          // Revoke: only touch items that actually grant one of the targeted
-          // people, so the count/toast reflect real changes (not every selection).
-          const hasTarget = existing.some((g) => g.user_id != null && userIds.has(g.user_id));
-          if (!hasTarget) continue;
-          entries.push({
-            resourceId: item.id,
-            grants: existing.filter((g) => g.user_id == null || !userIds.has(g.user_id)),
-          });
-        }
-      }
-
-      await applyBulk(entries);
-
-      const affected = entries.length;
+    for (const item of items) {
+      const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
       if (userMode === "grant") {
-        toast.success(
-          t("bulkAccess.userAccessGranted", { count: affected, items: resourceNoun(affected) })
+        // Granting specific people switches the resource to "restricted" mode,
+        // so drop any "all initiative members" grant — ShareControl can't
+        // represent a mixed all-members + per-grantee list and would silently
+        // discard it on the next save. Also drop any existing per-user grant for
+        // the targeted people, then add them back at the chosen level.
+        const next = existing.filter(
+          (g) => !g.all_initiative_members && (g.user_id == null || !userIds.has(g.user_id))
         );
-      } else if (affected === 0) {
-        toast.info(t("bulkAccess.nothingToUpdate"));
+        for (const userId of userIds) next.push({ user_id: userId, level });
+        entries.push({ resourceId: item.id, grants: next });
       } else {
-        toast.success(
-          t("bulkAccess.userAccessRevoked", { count: affected, items: resourceNoun(affected) })
-        );
+        // Revoke: only touch items that actually grant one of the targeted
+        // people, so the count/toast reflect real changes (not every selection).
+        const hasTarget = existing.some((g) => g.user_id != null && userIds.has(g.user_id));
+        if (!hasTarget) continue;
+        entries.push({
+          resourceId: item.id,
+          grants: existing.filter((g) => g.user_id == null || !userIds.has(g.user_id)),
+        });
       }
-      finish();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "access:bulkAccess.updateError"));
-    } finally {
-      setIsPending(false);
     }
+
+    applyBulk(entries, {
+      onSuccess: () => {
+        const affected = entries.length;
+        if (userMode === "grant") {
+          toast.success(
+            t("bulkAccess.userAccessGranted", { count: affected, items: resourceNoun(affected) })
+          );
+        } else if (affected === 0) {
+          toast.info(t("bulkAccess.nothingToUpdate"));
+        } else {
+          toast.success(
+            t("bulkAccess.userAccessRevoked", { count: affected, items: resourceNoun(affected) })
+          );
+        }
+        finish();
+      },
+      onError: (error) => toast.error(getErrorMessage(error, "access:bulkAccess.updateError")),
+    });
   }, [selectedUserIds, userMode, items, level, applyBulk, finish, resourceNoun, t]);
 
-  const handleApplyRoles = useCallback(async () => {
+  const handleApplyRoles = useCallback(() => {
     if (selectedRoleIds.size === 0) return;
 
-    setIsPending(true);
-    try {
-      const roleIds = [...selectedRoleIds];
-      const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
+    const roleIds = [...selectedRoleIds];
+    const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
 
-      for (const item of items) {
-        const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
-        const grantedRoleIds = new Set(
-          existing.filter((g) => g.role_id != null).map((g) => g.role_id as number)
-        );
+    for (const item of items) {
+      const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
+      const grantedRoleIds = new Set(
+        existing.filter((g) => g.role_id != null).map((g) => g.role_id as number)
+      );
 
-        if (roleMode === "grant") {
-          // Only grant roles that belong to this item's initiative and aren't already granted.
-          const itemRoleIds = availableRoles
-            .filter((r) => r.initiativeId === item.initiative_id && roleIds.includes(r.id))
-            .map((r) => r.id)
-            .filter((id) => !grantedRoleIds.has(id));
-          if (itemRoleIds.length === 0) continue;
-          entries.push({
-            resourceId: item.id,
-            grants: [
-              // Granting specific roles switches the resource to "restricted" mode;
-              // drop any "all initiative members" grant so ShareControl doesn't
-              // receive a mixed list it can't display.
-              ...existing.filter((g) => !g.all_initiative_members),
-              ...itemRoleIds.map((id) => ({ role_id: id, level: roleLevel })),
-            ],
-          });
-        } else {
-          const toRevoke = roleIds.filter((id) => grantedRoleIds.has(id));
-          if (toRevoke.length === 0) continue;
-          const revokeSet = new Set(toRevoke);
-          entries.push({
-            resourceId: item.id,
-            grants: existing.filter((g) => g.role_id == null || !revokeSet.has(g.role_id)),
-          });
-        }
-      }
-
-      await applyBulk(entries);
-      const affected = entries.length;
-      if (affected === 0) {
-        toast.info(t("bulkAccess.rolesAlreadyAssigned"));
+      if (roleMode === "grant") {
+        // Only grant roles that belong to this item's initiative and aren't already granted.
+        const itemRoleIds = availableRoles
+          .filter((r) => r.initiativeId === item.initiative_id && roleIds.includes(r.id))
+          .map((r) => r.id)
+          .filter((id) => !grantedRoleIds.has(id));
+        if (itemRoleIds.length === 0) continue;
+        entries.push({
+          resourceId: item.id,
+          grants: [
+            // Granting specific roles switches the resource to "restricted" mode;
+            // drop any "all initiative members" grant so ShareControl doesn't
+            // receive a mixed list it can't display.
+            ...existing.filter((g) => !g.all_initiative_members),
+            ...itemRoleIds.map((id) => ({ role_id: id, level: roleLevel })),
+          ],
+        });
       } else {
-        toast.success(
-          roleMode === "grant"
-            ? t("bulkAccess.roleAccessGranted", {
-                count: affected,
-                items: resourceNoun(affected),
-              })
-            : t("bulkAccess.roleAccessRevoked", {
-                count: affected,
-                items: resourceNoun(affected),
-              })
-        );
+        const toRevoke = roleIds.filter((id) => grantedRoleIds.has(id));
+        if (toRevoke.length === 0) continue;
+        const revokeSet = new Set(toRevoke);
+        entries.push({
+          resourceId: item.id,
+          grants: existing.filter((g) => g.role_id == null || !revokeSet.has(g.role_id)),
+        });
       }
-      finish();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "access:bulkAccess.roleUpdateError"));
-    } finally {
-      setIsPending(false);
     }
+
+    applyBulk(entries, {
+      onSuccess: () => {
+        const affected = entries.length;
+        if (affected === 0) {
+          toast.info(t("bulkAccess.rolesAlreadyAssigned"));
+        } else {
+          toast.success(
+            roleMode === "grant"
+              ? t("bulkAccess.roleAccessGranted", {
+                  count: affected,
+                  items: resourceNoun(affected),
+                })
+              : t("bulkAccess.roleAccessRevoked", {
+                  count: affected,
+                  items: resourceNoun(affected),
+                })
+          );
+        }
+        finish();
+      },
+      onError: (error) => toast.error(getErrorMessage(error, "access:bulkAccess.roleUpdateError")),
+    });
   }, [
     selectedRoleIds,
     roleMode,
@@ -554,58 +467,62 @@ export function BulkEditAccessDialog({
     t,
   ]);
 
-  const handleApplyAllMembers = useCallback(async () => {
-    setIsPending(true);
-    try {
-      if (allMode === "share") {
-        // Switch every selected resource to "all members" mode: a single
-        // all-members grant. Per-person and per-role grants are dropped so the
-        // resource has one coherent share mode. The owner is preserved
-        // server-side, so we don't send it.
-        await applyBulk(
-          items.map((item) => ({
-            resourceId: item.id,
-            grants: [{ all_initiative_members: true, level: allLevel }],
-          }))
-        );
-        toast.success(
-          t("bulkAccess.allMembersShared", {
-            count: items.length,
-            items: resourceNoun(items.length),
-          })
-        );
-      } else {
-        // Only touch resources that actually have an all-members grant — an
-        // unchanged write is pointless and would let the toast claim removals
-        // that never happened.
-        const affected = items.filter((item) =>
-          (item.grants ?? []).some((g) => g.all_initiative_members)
-        );
-        await applyBulk(
-          affected.map((item) => ({
-            resourceId: item.id,
-            grants: (item.grants ?? []).filter(
-              (g) => g.level !== "owner" && !g.all_initiative_members
-            ),
-          }))
-        );
-        if (affected.length === 0) {
-          toast.info(t("bulkAccess.noAllMembersAccess"));
-        } else {
-          toast.success(
-            t("bulkAccess.allMembersRemoved", {
-              count: affected.length,
-              items: resourceNoun(affected.length),
-            })
-          );
-        }
-      }
-      finish();
-    } catch (error) {
+  const handleApplyAllMembers = useCallback(() => {
+    const onError = (error: Error) =>
       toast.error(getErrorMessage(error, "access:bulkAccess.updateError"));
-    } finally {
-      setIsPending(false);
+    if (allMode === "share") {
+      // Switch every selected resource to "all members" mode: a single
+      // all-members grant. Per-person and per-role grants are dropped so the
+      // resource has one coherent share mode. The owner is preserved
+      // server-side, so we don't send it.
+      applyBulk(
+        items.map((item) => ({
+          resourceId: item.id,
+          grants: [{ all_initiative_members: true, level: allLevel }],
+        })),
+        {
+          onSuccess: () => {
+            toast.success(
+              t("bulkAccess.allMembersShared", {
+                count: items.length,
+                items: resourceNoun(items.length),
+              })
+            );
+            finish();
+          },
+          onError,
+        }
+      );
+      return;
     }
+    // Only touch resources that actually have an all-members grant — an
+    // unchanged write is pointless and would let the toast claim removals
+    // that never happened.
+    const affected = items.filter((item) =>
+      (item.grants ?? []).some((g) => g.all_initiative_members)
+    );
+    applyBulk(
+      affected.map((item) => ({
+        resourceId: item.id,
+        grants: (item.grants ?? []).filter((g) => g.level !== "owner" && !g.all_initiative_members),
+      })),
+      {
+        onSuccess: () => {
+          if (affected.length === 0) {
+            toast.info(t("bulkAccess.noAllMembersAccess"));
+          } else {
+            toast.success(
+              t("bulkAccess.allMembersRemoved", {
+                count: affected.length,
+                items: resourceNoun(affected.length),
+              })
+            );
+          }
+          finish();
+        },
+        onError,
+      }
+    );
   }, [allMode, allLevel, items, applyBulk, finish, resourceNoun, t]);
 
   const selectedUserCount = selectedUserIds.size;
@@ -645,10 +562,7 @@ export function BulkEditAccessDialog({
             setTab(v as "people" | "roles" | "all");
             setSelectedUserIds(new Set());
             setUserSearch("");
-            setUserPickerOpen(false);
             setSelectedRoleIds(new Set());
-            setRoleSearch("");
-            setRolePickerOpen(false);
           }}
         >
           <TabsBar>
@@ -668,7 +582,6 @@ export function BulkEditAccessDialog({
                   setUserMode(v as "grant" | "revoke");
                   setSelectedUserIds(new Set());
                   setUserSearch("");
-                  setUserPickerOpen(false);
                 }}
               >
                 <SelectTrigger id="userMode">
@@ -689,22 +602,20 @@ export function BulkEditAccessDialog({
                   <label htmlFor="userPicker" className="font-medium text-sm">
                     {t("share.people")}
                   </label>
-                  <UserMultiPicker
+                  <Combobox
+                    multiple
                     id="userPicker"
-                    users={filteredUsers}
-                    selectedIds={selectedUserIds}
-                    onToggle={toggleUser}
-                    open={userPickerOpen}
-                    onOpenChange={setUserPickerOpen}
-                    search={userSearch}
-                    onSearchChange={setUserSearch}
+                    items={userMode === "grant" ? availableUsers : revocableUsers}
+                    value={[...selectedUserIds].map(String)}
+                    onValueChange={(next) => setSelectedUserIds(new Set(next.map(Number)))}
+                    // Granting searches the server; the granted are searched here.
+                    onSearchChange={userMode === "grant" ? setUserSearch : undefined}
                     placeholder={
                       userMode === "grant"
                         ? t("bulkAccess.selectPeople")
                         : t("bulkAccess.selectPeopleToRevoke")
                     }
                     emptyMessage={t("share.noPeople")}
-                    selectedMessage={(c) => t("bulkAccess.peopleSelected", { count: c })}
                     searchPlaceholder={t("share.searchPeople")}
                   />
                 </div>
@@ -738,8 +649,6 @@ export function BulkEditAccessDialog({
                 onValueChange={(v) => {
                   setRoleMode(v as "grant" | "revoke");
                   setSelectedRoleIds(new Set());
-                  setRoleSearch("");
-                  setRolePickerOpen(false);
                 }}
               >
                 <SelectTrigger id="roleMode">
@@ -760,26 +669,23 @@ export function BulkEditAccessDialog({
                   <label htmlFor="rolePicker" className="font-medium text-sm">
                     {t("share.roles")}
                   </label>
-                  <ItemMultiPicker
+                  <Combobox
+                    multiple
                     id="rolePicker"
-                    items={filteredRoles.map((r) => ({
-                      id: r.id,
+                    items={displayRoles.map((r) => ({
+                      value: String(r.id),
                       label: r.displayName,
                       sublabel: initiativeIds.length > 1 ? r.initiativeName : undefined,
                     }))}
-                    selectedIds={selectedRoleIds}
-                    onToggle={toggleRole}
-                    open={rolePickerOpen}
-                    onOpenChange={setRolePickerOpen}
-                    search={roleSearch}
-                    onSearchChange={setRoleSearch}
+                    value={[...selectedRoleIds].map(String)}
+                    onValueChange={(next) => setSelectedRoleIds(new Set(next.map(Number)))}
+                    loading={roleMode === "grant" && roleQueries.some((query) => query.isLoading)}
                     placeholder={
                       roleMode === "grant"
                         ? t("bulkAccess.selectRoles")
                         : t("bulkAccess.selectRolesToRevoke")
                     }
                     emptyMessage={t("share.noRoles")}
-                    selectedMessage={(c) => t("bulkAccess.rolesSelected", { count: c })}
                     searchPlaceholder={t("share.searchRoles")}
                   />
                 </div>
@@ -847,264 +753,46 @@ export function BulkEditAccessDialog({
           </TabsContent>
         </Tabs>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
-            {t("common:cancel")}
-          </Button>
-          {tab === "roles" ? (
-            <Button
-              onClick={() => void handleApplyRoles()}
-              disabled={isPending || !canApplyRoles}
-              variant={roleMode === "revoke" ? "destructive" : "default"}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("bulkAccess.applying")}
-                </>
-              ) : roleMode === "grant" ? (
-                t("bulkAccess.grantRoles", { count: selectedRoleCount })
-              ) : (
-                t("bulkAccess.revokeRoles", { count: selectedRoleCount })
-              )}
-            </Button>
-          ) : tab === "people" ? (
-            <Button
-              onClick={() => void handleApply()}
-              disabled={isPending || !canApplyUsers}
-              variant={userMode === "revoke" ? "destructive" : "default"}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("bulkAccess.applying")}
-                </>
-              ) : userMode === "grant" ? (
-                t("bulkAccess.grantPeople", { count: selectedUserCount })
-              ) : (
-                t("bulkAccess.revokePeople", { count: selectedUserCount })
-              )}
-            </Button>
-          ) : (
-            <Button
-              onClick={() => void handleApplyAllMembers()}
-              disabled={isPending}
-              variant={allMode === "remove" ? "destructive" : "default"}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("bulkAccess.applying")}
-                </>
-              ) : allMode === "share" ? (
-                t("bulkAccess.shareAllMembers")
-              ) : (
-                t("bulkAccess.removeAllMembersAccess")
-              )}
-            </Button>
-          )}
-        </DialogFooter>
+        {tab === "roles" ? (
+          <DialogFooter
+            submitLabel={
+              roleMode === "grant"
+                ? t("bulkAccess.grantRoles", { count: selectedRoleCount })
+                : t("bulkAccess.revokeRoles", { count: selectedRoleCount })
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            disabled={!canApplyRoles}
+            destructive={roleMode === "revoke"}
+            onSubmit={handleApplyRoles}
+          />
+        ) : tab === "people" ? (
+          <DialogFooter
+            submitLabel={
+              userMode === "grant"
+                ? t("bulkAccess.grantPeople", { count: selectedUserCount })
+                : t("bulkAccess.revokePeople", { count: selectedUserCount })
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            disabled={!canApplyUsers}
+            destructive={userMode === "revoke"}
+            onSubmit={handleApply}
+          />
+        ) : (
+          <DialogFooter
+            submitLabel={
+              allMode === "share"
+                ? t("bulkAccess.shareAllMembers")
+                : t("bulkAccess.removeAllMembersAccess")
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            destructive={allMode === "remove"}
+            onSubmit={handleApplyAllMembers}
+          />
+        )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-// Reusable multi-select user picker
-function UserMultiPicker({
-  id,
-  users,
-  selectedIds,
-  onToggle,
-  open,
-  onOpenChange,
-  search,
-  onSearchChange,
-  placeholder,
-  emptyMessage,
-  selectedMessage,
-  searchPlaceholder,
-}: {
-  id?: string;
-  users: SelectableUser[];
-  selectedIds: Set<number>;
-  onToggle: (id: number) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  placeholder: string;
-  emptyMessage: string;
-  selectedMessage: (count: number) => string;
-  searchPlaceholder: string;
-}) {
-  const selectedCount = selectedIds.size;
-
-  return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          id={id}
-          type="button"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring",
-            selectedCount === 0 && "text-muted-foreground"
-          )}
-        >
-          <span className="truncate">
-            {selectedCount === 0 ? placeholder : selectedMessage(selectedCount)}
-          </span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={searchPlaceholder}
-            value={search}
-            onValueChange={onSearchChange}
-          />
-          <CommandList>
-            <CommandGroup>
-              {users.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">{emptyMessage}</div>
-              ) : (
-                users.map((user) => {
-                  const isSelected = selectedIds.has(user.id);
-                  return (
-                    <CommandItem
-                      key={user.id}
-                      value={`user-${user.id}`}
-                      onSelect={() => onToggle(user.id)}
-                      className="cursor-pointer"
-                    >
-                      <div
-                        className={cn(
-                          "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "opacity-50 [&_svg]:invisible"
-                        )}
-                      >
-                        <Check className="h-3 w-3" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="truncate text-sm">{user.name}</span>
-                        {user.name !== user.handle && (
-                          <span className="truncate text-muted-foreground text-xs">
-                            {user.handle}
-                          </span>
-                        )}
-                      </div>
-                    </CommandItem>
-                  );
-                })
-              )}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// Reusable multi-select item picker (for roles)
-function ItemMultiPicker({
-  id,
-  items,
-  selectedIds,
-  onToggle,
-  open,
-  onOpenChange,
-  search,
-  onSearchChange,
-  placeholder,
-  emptyMessage,
-  selectedMessage,
-  searchPlaceholder,
-}: {
-  id?: string;
-  items: { id: number; label: string; sublabel?: string }[];
-  selectedIds: Set<number>;
-  onToggle: (id: number) => void;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  placeholder: string;
-  emptyMessage: string;
-  selectedMessage: (count: number) => string;
-  searchPlaceholder: string;
-}) {
-  const selectedCount = selectedIds.size;
-
-  return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          id={id}
-          type="button"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring",
-            selectedCount === 0 && "text-muted-foreground"
-          )}
-        >
-          <span className="truncate">
-            {selectedCount === 0 ? placeholder : selectedMessage(selectedCount)}
-          </span>
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={searchPlaceholder}
-            value={search}
-            onValueChange={onSearchChange}
-          />
-          <CommandList>
-            <CommandGroup>
-              {items.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">{emptyMessage}</div>
-              ) : (
-                items.map((item) => {
-                  const isSelected = selectedIds.has(item.id);
-                  return (
-                    <CommandItem
-                      key={item.id}
-                      value={`item-${item.id}`}
-                      onSelect={() => onToggle(item.id)}
-                      className="cursor-pointer"
-                    >
-                      <div
-                        className={cn(
-                          "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "opacity-50 [&_svg]:invisible"
-                        )}
-                      >
-                        <Check className="h-3 w-3" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="truncate text-sm">{item.label}</span>
-                        {item.sublabel && (
-                          <span className="truncate text-muted-foreground text-xs">
-                            {item.sublabel}
-                          </span>
-                        )}
-                      </div>
-                    </CommandItem>
-                  );
-                })
-              )}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
   );
 }

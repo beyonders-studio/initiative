@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import logging
+import secrets
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
-import logging
-import secrets
 from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import ColumnElement, case, exists, func, or_, text
+from sqlalchemy import ColumnElement, Text, any_, case, exists, func, or_, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import aliased
 from sqlmodel import col, delete, select
@@ -17,32 +18,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
+from app.core.encryption import SALT_EMAIL, encrypt_field, normalize_email
+from app.core.errors import CodedError
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.intake import IntakeStream
-from app.core.tools import Tool
-from app.core.encryption import encrypt_field, normalize_email, SALT_EMAIL
-from app.core.errors import CodedError
 from app.core.messages import GuildMessages
-from app.db import cohorts, post_commit
-from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db.guild_migrations import GUILD_SCHEMA_REGEX
-from app.db.query import apply_pagination, ids_in
-from app.models.platform.guild import (
-    BANNER_TEXT_COLORS,
-    GUILD_ADMIN_ROLES,
-    LIVE_STATUS_VALUES,
-    UNLISTED_STATUSES,
-    DEFAULT_BANNER,
-    DEFAULT_BANNER_TEXT_COLOR,
-    Guild,
-    CommunityCategory,
-    GuildInvite,
-    GuildMembership,
-    CommunityRole,
-    CommunityStatus,
-    restore_status_choices,
-)
-from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
 from app.core.rules import (
     OPTION_RULES,
     SURFACE_AI_CONNECTIONS,
@@ -50,24 +30,48 @@ from app.core.rules import (
     SURFACE_PLUGINS,
     SetBy,
 )
+from app.core.tools import Tool
+from app.db import cohorts, post_commit
+from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.guild_migrations import GUILD_SCHEMA_REGEX
+from app.db.query import apply_pagination, ids_in
+from app.db.request_context import Platform, SystemGuild, Unattributed
+from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
+from app.models.platform.guild import (
+    BANNER_TEXT_COLORS,
+    DEFAULT_BANNER,
+    DEFAULT_BANNER_TEXT_COLOR,
+    GUILD_ADMIN_ROLES,
+    LIVE_STATUS_VALUES,
+    UNLISTED_STATUSES,
+    AdminSurface,
+    CommunityCategory,
+    CommunityJoinPolicy,
+    CommunityJoinRequest,
+    CommunityRole,
+    CommunityStatus,
+    Guild,
+    GuildInvite,
+    GuildMembership,
+    restore_status_choices,
+)
 from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.member_moderation import MemberModeration, ModerationKind
 from app.models.platform.notification import NotificationType
+from app.models.platform.user import User, UserStatus
+from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
+from app.models.tenant.guild_setting import GuildSetting
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.schemas.platform.guild import CommunityInviteGrant
-from app.models.tenant.guild_setting import GuildSetting
-from app.models.platform.user import User, UserStatus
 from app.services import audit as audit_service
-from app.services.marketplace import community_hooks
 from app.services.auth import addresses
-from app.services.platform import billing as billing_service
-
-from app.services.platform import account_stream, user_stream
+from app.services.marketplace import community_hooks
+from app.services.platform import account_stream, rules, user_stream
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import rules
+from app.services.platform import billing as billing_service
 from app.services.platform import contact_grants as contact_grants_service
 from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
-from app.db.request_context import Platform, SystemGuild, Unattributed
 
 if TYPE_CHECKING:
     from app.services.email import EmailPieces
@@ -123,6 +127,12 @@ class CommunityJoinError(CodedError):
     status_code = 404
 
 
+class CommunityJoinRequestError(CodedError):
+    """Raised when a community's join policy does not take this way in."""
+
+    status_code = 409
+
+
 class CommunityListingError(CodedError):
     """Raised when a guild does not qualify to be listed in the directory."""
 
@@ -137,6 +147,22 @@ class AgeConfirmationRequiredError(CodedError):
     """The caller has not confirmed their age and asked to join a listed guild."""
 
     status_code = 403
+
+
+class BannedError(CodedError):
+    """The community has banned this person."""
+
+    status_code = 403
+
+
+#: Why :func:`ensure_membership` refuses somebody new. A sign-in that places
+#: people (its rules, auto-join) leaves a refusing community out and carries
+#: on: one community's refusal is never a reason to refuse the sign-in.
+ADMISSION_REFUSALS: tuple[type[CodedError], ...] = (
+    GuildCapacityError,
+    AgeConfirmationRequiredError,
+    BannedError,
+)
 
 
 class BannerColorError(CodedError):
@@ -293,7 +319,7 @@ async def get_primary_guild(session: AsyncSession) -> Guild:
             user_count,
             schema_count,
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     guild = await _persist_new_guild(
         session,
         Guild(
@@ -346,6 +372,20 @@ async def get_administration(
     return administration
 
 
+async def _refuse_banned(session: AsyncSession, *, guild_id: int, user_id: int) -> None:
+    """Refuse somebody the community has banned."""
+    if (
+        await session.exec(
+            select(MemberModeration.user_id).where(
+                MemberModeration.guild_id == guild_id,
+                MemberModeration.user_id == user_id,
+                MemberModeration.kind == ModerationKind.ban,
+            )
+        )
+    ).first() is not None:
+        raise BannedError(GuildMessages.BANNED_FROM_COMMUNITY)
+
+
 async def ensure_membership(
     session: AsyncSession,
     *,
@@ -358,15 +398,22 @@ async def ensure_membership(
     via: str = "direct",
     invite_id: int | None = None,
     guest_until: datetime | None = None,
+    auto_join: bool = True,
 ) -> GuildMembership:
     """Put ``user_id`` in ``guild_id``, or return the membership they hold.
 
-    ``actor_user_id`` is who brought them in; it defaults to the person joining,
-    which is what every self-service path is. ``via`` names the way in — the
-    value rides the record — and ``invite_id`` says which standing offer was
-    redeemed, where one was. ``guest_until`` makes the new membership a
-    guest's, until then: it takes no seat, so the guest cap applies instead of
-    the member cap, and it joins no initiative on its own.
+    ``actor_user_id`` is who brought them in — the person joining, on a
+    self-service path — and ``None`` where nobody did, as when a sign-in's rules
+    place them. ``via`` names the way in — the value rides the record — and
+    ``invite_id`` says which standing offer was redeemed, where one was.
+    ``guest_until`` makes the new membership a guest's, until then: it takes no
+    seat, so the guest cap applies instead of the member cap, and it joins no
+    initiative on its own. ``auto_join=False``
+    leaves the guild's auto-join initiatives to the caller, for one that places
+    the person in initiatives itself and enrols them afterwards.
+
+    A refusal is one of :data:`ADMISSION_REFUSALS`, raised before anything is
+    written.
     """
     stmt = select(GuildMembership).where(
         GuildMembership.guild_id == guild_id,
@@ -386,10 +433,14 @@ async def ensure_membership(
             session.add(membership)
             await session.flush()
         return membership
+    # Whoever the community has banned stays out, by every way in. Asked under
+    # the lock a removal takes, so a ban and a join made together settle in
+    # order: the join waits for the ban, or the removal removes the join.
+    await lock_guild_seats(session, guild_id)
+    await _refuse_banned(session, guild_id=guild_id, user_id=user_id)
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
-    # blocked. Sign-in sync inserts on a path of its own
-    # (oidc_sync._create_guild_membership) and asks the same cap first.
+    # blocked.
     if guest_until is None:
         await assert_member_capacity(session, guild_id=guild_id)
     else:
@@ -428,7 +479,7 @@ async def ensure_membership(
     await audit_service.record(
         session,
         event_type=AuditEventType.GUILD_MEMBER_ADDED,
-        actor_user_id=actor_user_id if actor_user_id is not None else user_id,
+        actor_user_id=actor_user_id,
         target_user_id=user_id,
         guild_id=guild_id,
         target_type="guild",
@@ -442,7 +493,7 @@ async def ensure_membership(
     account_stream.queue_account_signal(session, user_id, "membership")
     # Nudge billing that this guild's membership changed. No-op unless a
     # hosted deployment configured the outbound billing settings.
-    if guest_until is None:
+    if guest_until is None and auto_join:
         enroll_new_member_in_auto_join_initiatives(
             session, guild_id=guild_id, user_id=user_id, role=role
         )
@@ -598,7 +649,7 @@ async def _refuse_ended_guest(
     if (
         membership is not None
         and membership.guest_until is not None
-        and membership.guest_until <= datetime.now(timezone.utc)
+        and membership.guest_until <= datetime.now(UTC)
     ):
         raise GuestTimeEndedError(GuildMessages.GUEST_TIME_ENDED)
 
@@ -623,11 +674,11 @@ async def extend_guest(
         raise NotAGuestError(GuildMessages.NOT_A_GUEST)
     before = membership.guest_until
     days = await _guest_days(session, guild_id=guild_id, days=days)
-    if before <= datetime.now(timezone.utc):
+    if before <= datetime.now(UTC):
         # An ended guest no longer counts against the cap, so bringing one back
         # takes a place as a new guest does.
         await _assert_guest_capacity(session, guild_id=guild_id)
-    membership.guest_until = datetime.now(timezone.utc) + timedelta(days=days)
+    membership.guest_until = datetime.now(UTC) + timedelta(days=days)
     session.add(membership)
     await session.flush()
     await audit_service.record(
@@ -1009,7 +1060,7 @@ async def may_create_another_guild(session: AsyncSession, *, user_id: int) -> bo
     if not limit:
         return True
     await advisory_lock(session, LockNamespace.GUILD_CREATION, user_id)
-    since = datetime.now(timezone.utc) - timedelta(days=1)
+    since = datetime.now(UTC) - timedelta(days=1)
     created = await session.scalar(
         select(func.count())
         .select_from(Guild)
@@ -1043,7 +1094,7 @@ async def create_guild(
     somebody to pass the seat to only because they hold it first. Every guild
     keeps at least one from here on (:func:`must_keep_superadmin`).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     guild = Guild(
         name=name.strip(),
         description=description.strip()
@@ -1276,7 +1327,7 @@ async def update_guild(
     description: str | None = None,
     retention_days: int | None = None,
     retention_days_provided: bool = False,
-    is_community: bool | None = None,
+    join_policy: CommunityJoinPolicy | None = None,
     categories: Sequence[str] | None = None,
     categories_provided: bool = False,
     has_adult_content: bool | None = None,
@@ -1324,20 +1375,21 @@ async def update_guild(
         if guild.location != normalized_location:
             guild.location = normalized_location
             updated = True
-    # An explicit ``null`` is meaningless for a boolean opt-in (mirroring
-    # ``auth_options`` below), so null and omitted alike are a no-op.
-    if is_community is not None and guild.is_community != is_community:
+    # An explicit ``null`` is a no-op (mirroring ``auth_options`` below).
+    if join_policy is not None and guild.join_policy != join_policy.value:
+        was_listed = guild.listed
+        guild.join_policy = join_policy.value
+        updated = True
         # Only the way in is gated. Un-listing is always available — a guild
         # that opted in while the directory was running must still be able to
         # opt back out after an owner switches it off.
-        if is_community:
+        if guild.listed and not was_listed:
             await assert_community_directory_enabled(session)
-        guild.is_community = is_community
-        updated = True
         # Listing a community — or taking it back off the shelf — changes what
         # is asked of everybody already in it, none of whom did anything. The
         # one fan-out this channel has, and it is addressed to the roster.
-        await _signal_members_present(session, guild_id=guild.id)
+        if guild.listed != was_listed:
+            await signal_members_present(session, guild_id=guild.id)
     if categories_provided:
         normalized = normalize_categories(categories)
         if guild.categories != normalized:
@@ -1356,10 +1408,10 @@ async def update_guild(
     # already-listed guild has to fail for the same reason as one that lists a
     # guild with none. Two of the three rules are also database CHECKs; this is
     # what turns them into an error a person can read.
-    if guild.is_community:
+    if guild.listed:
         await _assert_listable(session, guild)
     if updated:
-        guild.updated_at = datetime.now(timezone.utc)
+        guild.updated_at = datetime.now(UTC)
         session.add(guild)
         await session.flush()
 
@@ -1431,6 +1483,11 @@ async def update_guild(
                 session, key, value, guild_id=guild_id, set_by=SetBy.deployment
             )
         await session.flush()
+        # The plan is on every member's community list: each one reads it again.
+        await signal_members_present(session, guild_id=guild_id)
+        from app.services import ai_settings
+
+        ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
     if retention_days_provided:
         from app.services.platform.app_settings import get_or_create_guild_settings
 
@@ -1469,7 +1526,7 @@ async def set_guild_status(
             guild.status if status is CommunityStatus.suspended else None
         )
         guild.status = status.value
-        guild.status_changed_at = datetime.now(timezone.utc)
+        guild.status_changed_at = datetime.now(UTC)
         session.add(guild)
         await session.flush()
         community_hooks.status_changed(session, guild_id)
@@ -1496,19 +1553,19 @@ async def get_guild_retention_days(session: AsyncSession) -> int | None:
     """Return the trash retention period in days of the guild the session is
     routed to, or None for "never auto-purge".
 
-    Selecting the full row (not the column) is intentional: NULL in
+    Selecting a row (the id beside the column) is intentional: NULL in
     ``retention_days`` is the user's explicit "never" choice, and we must
     distinguish it from "no guild_settings row yet" (which would be a
     setup gap, fall back to the 90-day default). A bare column select
     collapses both to None and silently re-enables auto-purge for guilds
-    that opted out.
+    that opted out. Those two columns are all an installed plug-in may read
+    of the settings, so a row it bins is dated by the same answer.
     """
-    stmt = select(GuildSetting).limit(1)
-    result = await session.exec(stmt)
-    row = result.one_or_none()
+    stmt = select(GuildSetting.id, GuildSetting.retention_days).limit(1)
+    row = (await session.exec(stmt)).one_or_none()
     if row is None:
         return 90
-    return row.retention_days
+    return row[1]
 
 
 def _hash_code(code: str) -> str:
@@ -1577,13 +1634,9 @@ async def create_guild_invite(
         await _assert_guest_capacity(session, guild_id=guild_id, claiming_seat=False)
     code = await _generate_unique_invite_code(session)
     if expires_at is None:
-        expiry = datetime.now(timezone.utc) + timedelta(
-            days=DEFAULT_INVITE_EXPIRATION_DAYS
-        )
+        expiry = datetime.now(UTC) + timedelta(days=DEFAULT_INVITE_EXPIRATION_DAYS)
     else:
-        expiry = (
-            expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
-        )
+        expiry = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=UTC)
     invite = GuildInvite(
         code_hash=_hash_code(code),
         guild_id=guild_id,
@@ -1810,7 +1863,7 @@ async def delete_guild(
     reached.
     """
     guild_id = guild.id
-    await _signal_members_present(session, guild_id=guild_id, action="membership")
+    await signal_members_present(session, guild_id=guild_id, action="membership")
     if actor_user_id is not None:
         await audit_service.record(
             session,
@@ -2174,7 +2227,7 @@ async def soft_delete_guild(
     guild_id = guild.id
     # Read while the roster is still there: a community of one loses it below.
     recipients = await _deletion_recipients(session, guild)
-    await _signal_members_present(session, guild_id=guild_id, action="membership")
+    await signal_members_present(session, guild_id=guild_id, action="membership")
     members = await count_members(session, guild_id=guild_id)
     clear_roster = not keep_roster and members <= 1
     await audit_service.record(
@@ -2192,7 +2245,7 @@ async def soft_delete_guild(
             delete(GuildMembership).where(GuildMembership.guild_id == guild_id)
         )
     guild.status = CommunityStatus.deleted.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     await session.flush()
     community_hooks.status_changed(session, guild_id)
@@ -2282,7 +2335,7 @@ async def restore_guild(
         seated = seat_user_id
 
     guild.status = status.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     community_hooks.status_changed(session, guild_id)
     await audit_service.record(
@@ -2312,11 +2365,9 @@ async def get_invite_by_code(
 
 
 def invite_is_active(invite: GuildInvite) -> bool:
-    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc):
+    if invite.expires_at and invite.expires_at < datetime.now(UTC):
         return False
-    if invite.max_uses is not None and invite.uses >= invite.max_uses:
-        return False
-    return True
+    return not (invite.max_uses is not None and invite.uses >= invite.max_uses)
 
 
 async def _live_invite(
@@ -2391,7 +2442,7 @@ async def redeem_invite_for_user(
             AccessGrant.user_id == user.id,
             AccessGrant.guild_id == invite.guild_id,
             AccessGrant.purpose != AccessGrantPurpose.billing.value,
-            AccessGrant.live(datetime.now(timezone.utc)),
+            AccessGrant.live(datetime.now(UTC)),
         )
         .limit(1)
     )
@@ -2425,12 +2476,13 @@ async def redeem_invite_for_user(
         days = await _guest_days(
             session, guild_id=invite.guild_id, days=invite.guest_days
         )
-        guest_until = datetime.now(timezone.utc) + timedelta(days=days)
+        guest_until = datetime.now(UTC) + timedelta(days=days)
     await ensure_membership(
         session,
         guild_id=invite.guild_id,
         user_id=user.id,
         role=invite.guest_role or CommunityRole.member,
+        actor_user_id=user.id,
         via="invite",
         invite_id=invite.id,
         guest_until=guest_until,
@@ -2443,10 +2495,17 @@ async def redeem_invite_for_user(
     return guild
 
 
-async def _signal_members_present(
-    session: AsyncSession, *, guild_id: int, action: str = "community"
+async def signal_members_present(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    action: str = "community",
+    reader: AsyncSession | None = None,
 ) -> None:
     """Poke this guild's members: what their account says about it has changed.
+
+    The frames go when ``session`` commits. The members are read on ``reader``
+    where ``session``'s role cannot read the membership, as billing's cannot.
 
     Addressed to the whole membership rather than to the sockets this process
     holds. A frame is published on the cross-worker bus, so narrowing to the
@@ -2459,7 +2518,7 @@ async def _signal_members_present(
     no socket. That is the price of the question being unanswerable from one
     process; they would re-read their account on arriving anyway.
     """
-    rows = await session.exec(
+    rows = await (reader or session).exec(
         select(GuildMembership.user_id).where(GuildMembership.guild_id == guild_id)
     )
     user_stream.queue_signals(session, rows.all(), account_stream.RESOURCE, action)
@@ -2519,7 +2578,7 @@ def community_listing_filters() -> list:
     """
     cap = rules.community_rule_sql(Guild.id, "max_users")
     return [
-        Guild.is_community.is_(True),
+        Guild.listed,
         Guild.status == CommunityStatus.active.value,
         # No cap is unlimited, hence the explicit null leg.
         or_(cap.is_(None), cap >= MIN_COMMUNITY_SEATS),
@@ -2669,8 +2728,9 @@ async def list_community_guilds(
     near: NearPlace | None = None,
     page: int = 1,
     page_size: int = 24,
-) -> tuple[list[tuple[Guild, int, bool]], int]:
-    """The community directory: (guild, member_count, already_member) + total.
+) -> tuple[list[tuple[Guild, int, bool, bool]], int]:
+    """The community directory: (guild, member_count, already_member,
+    request_pending) + total.
 
     Which guilds appear is not this function's decision — it is
     ``community_listing_filters()``, so the directory, the join it authorizes,
@@ -2712,6 +2772,10 @@ async def list_community_guilds(
         .correlate(Guild)
         .scalar_subquery()
     )
+    request_pending = exists().where(
+        CommunityJoinRequest.guild_id == Guild.id,
+        CommunityJoinRequest.user_id == user_id,
+    )
 
     filters = community_listing_filters()
     if categories:
@@ -2731,7 +2795,7 @@ async def list_community_guilds(
         filters.append(or_(*matches))
 
     count_statement = select(func.count()).select_from(Guild)
-    statement = select(Guild, member_count, already_member > 0)
+    statement = select(Guild, member_count, already_member > 0, request_pending)
     for condition in filters:
         statement = statement.where(condition)
         count_statement = count_statement.where(condition)
@@ -2745,9 +2809,10 @@ async def list_community_guilds(
         ordering[:0] = proximity_order(near)
     statement = statement.order_by(*ordering)
     rows = (await session.exec(apply_pagination(statement, page, page_size))).all()
-    return [(guild, int(count), bool(joined)) for guild, count, joined in rows], int(
-        total
-    )
+    return [
+        (guild, int(count), bool(joined), bool(requested))
+        for guild, count, joined, requested in rows
+    ], int(total)
 
 
 async def join_community_guild(
@@ -2777,6 +2842,10 @@ async def join_community_guild(
     # joined by asking for it directly either.
     if not await is_listed_in_directory(session, guild_id=guild_id):
         raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_A_COMMUNITY)
+    if guild.join_policy == CommunityJoinPolicy.request.value and not (
+        await get_membership(session, guild_id=guild_id, user_id=user.id)
+    ):
+        raise CommunityJoinRequestError(GuildMessages.COMMUNITY_JOIN_BY_REQUEST)
     # Asked before the seat is taken, so the box is what joins rather than
     # something checked once they are already in.
     await assert_age_confirmed(session, user=user)
@@ -2788,9 +2857,101 @@ async def join_community_guild(
         guild_id=guild_id,
         user_id=user.id,
         role=CommunityRole.member,
+        actor_user_id=user.id,
         via="community",
     )
     return guild
+
+
+async def ask_to_join(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    user: User,
+    message: str | None,
+) -> tuple[Guild, CommunityJoinRequest, bool]:
+    """Ask to join a listed ``request`` community: the join's checks, then a
+    request its admins answer rather than a membership.
+
+    Asked again while one waits, it returns that one (``False``: nothing new
+    to tell anybody). On the system engine, as the join is.
+    """
+    await assert_community_directory_enabled(session)
+    try:
+        guild = await get_guild(session, guild_id=guild_id)
+    except ValueError as exc:
+        raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_FOUND) from exc
+    if not await is_listed_in_directory(session, guild_id=guild_id):
+        raise CommunityJoinError(GuildMessages.COMMUNITY_NOT_A_COMMUNITY)
+    if guild.join_policy != CommunityJoinPolicy.request.value:
+        raise CommunityJoinRequestError(GuildMessages.COMMUNITY_JOIN_NOT_BY_REQUEST)
+    # Nobody the community banned puts a request in front of its admins.
+    await _refuse_banned(session, guild_id=guild_id, user_id=user.id)
+    await _refuse_ended_guest(session, guild_id=guild_id, user_id=user.id)
+    if await get_membership(session, guild_id=guild_id, user_id=user.id):
+        raise CommunityJoinRequestError(GuildMessages.COMMUNITY_ALREADY_A_MEMBER)
+    await assert_age_confirmed(session, user=user)
+    # A full community says so now, rather than when an admin says yes. A
+    # reading only: asking takes no seat, so it does not queue behind joins.
+    await assert_member_capacity(session, guild_id=guild_id, claiming_seat=False)
+    inserted = (
+        await session.exec(
+            pg_insert(CommunityJoinRequest)
+            .values(
+                guild_id=guild_id,
+                user_id=user.id,
+                message=message,
+                created_at=datetime.now(UTC),
+            )
+            .on_conflict_do_nothing(index_elements=["guild_id", "user_id"])
+            .returning(col(CommunityJoinRequest.id))
+        )
+    ).first()
+    request = (
+        await session.exec(
+            select(CommunityJoinRequest).where(
+                CommunityJoinRequest.guild_id == guild_id,
+                CommunityJoinRequest.user_id == user.id,
+            )
+        )
+    ).one()
+    return guild, request, inserted is not None
+
+
+async def join_request_answerer_ids(
+    session: AsyncSession, *, guild_id: int
+) -> list[int]:
+    """Who answers ``guild_id``'s requests to join: the holders of its members
+    surface, as the standing computes it (a custom role given during this
+    membership, on its rung, decides; otherwise the admin rungs hold every
+    surface). On a session routed into the community."""
+    role = aliased(CustomRole)
+    given = aliased(CustomRoleMember)
+    rows = await session.exec(
+        select(GuildMembership.user_id)
+        .outerjoin(
+            given,
+            (given.user_id == GuildMembership.user_id)
+            & (col(given.assigned_at) >= GuildMembership.joined_at),
+        )
+        .outerjoin(
+            role,
+            (role.id == given.role_id)
+            & (role.base_rung == col(GuildMembership.role).cast(Text)),
+        )
+        .where(
+            GuildMembership.guild_id == guild_id,
+            case(
+                (
+                    col(role.id).is_not(None),
+                    AdminSurface.members.value == any_(col(role.surfaces)),
+                ),
+                else_=col(GuildMembership.role).in_(GUILD_ADMIN_ROLES),
+            ),
+        )
+        .order_by(col(GuildMembership.user_id))
+    )
+    return list(rows.all())
 
 
 async def describe_invite_code(
@@ -2810,7 +2971,7 @@ async def describe_invite_code(
         return invite, guild, True, None
 
     reason = GuildMessages.INVITE_INVALID
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if invite.expires_at and invite.expires_at < now:
         reason = GuildMessages.INVITE_EXPIRED
     elif invite.max_uses is not None and invite.uses >= invite.max_uses:
@@ -2829,8 +2990,9 @@ async def lock_guild_seats(session: AsyncSession, guild_id: int) -> None:
     on the other's row.
 
     Every path that can empty the seat, or impose a requirement on it, takes
-    this first, so they order rather than interleave. Held to the end of the
-    transaction; the caller does not release it.
+    this first, so they order rather than interleave. So does every join, before
+    it asks for a ban, so a removal that bans orders against it too. Held to
+    the end of the transaction; the caller does not release it.
     """
     await advisory_lock(session, LockNamespace.GUILD_SEATS, guild_id)
 
@@ -2977,9 +3139,9 @@ async def remove_user_from_guild(
     The session must already be routed into the guild. Revocations are queued on
     it and delivered by the caller after the commit.
     """
+    from app.services.tenant import initiatives as initiatives_service
     from app.services.tenant import plugin_connections as plugin_connections_service
     from app.services.tenant import plugin_member_consents as consents_service
-    from app.services.tenant import initiatives as initiatives_service
 
     if via is None:
         left = actor_user_id == user_id

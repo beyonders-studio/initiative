@@ -8,10 +8,10 @@ the moment it exists.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import col, delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,6 +27,7 @@ from app.services.tenant import expiry
 from app.services.tenant.personal_items import DEFAULT_RECENT_VIEWS, WINDOW
 from app.testing import (
     create_calendar,
+    create_child_entity,
     create_counter_group,
     create_guild,
     create_guild_membership,
@@ -35,10 +36,9 @@ from app.testing import (
     create_project,
     create_resource_grant,
     create_task,
-    create_child_entity,
     create_tool_entity,
-    enable_all_tools,
     create_user,
+    enable_all_tools,
     route_as,
     route_session_to_guild,
 )
@@ -157,7 +157,7 @@ async def test_a_recent_view_is_its_owners_row(
                 user_id=a.user.id,
                 entity_type="project",
                 entity_id=project.id,
-                bookmarked_at=datetime.now(timezone.utc),
+                bookmarked_at=datetime.now(UTC),
             )
         )
         with pytest.raises(DBAPIError, match="row-level security"):
@@ -179,7 +179,7 @@ async def test_recent_tabs_limit_caps_list_and_prune(
         await create_project(session, a.initiative, a.user)
         for _ in range(DEFAULT_RECENT_VIEWS + 1)
     ]
-    past = datetime.now(timezone.utc) - WINDOW - timedelta(hours=1)
+    past = datetime.now(UTC) - WINDOW - timedelta(hours=1)
     for person, count in ((b, len(opened)), (c, 4)):
         for i, project in enumerate(opened[:count]):
             session.add(

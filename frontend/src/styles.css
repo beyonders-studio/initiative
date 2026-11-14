@@ -1,236 +1,24 @@
 /* Self-hosted Outfit variable font (replaces the Google Fonts stylesheet). */
 @import "@fontsource-variable/outfit";
 
-@import "tailwindcss";
+@import "./ui/styles.css";
 
-@plugin "tailwindcss-animate";
-
-@custom-variant dark (&:is(.dark *));
-
-/* The type scale is Tailwind's ramp in Outfit, plus two steps below text-xs
-   for dense surfaces: calendar cells, count badges, initials in small avatars.
-   Use a step rather than a pixel size, so the scale stays one scale. */
-@theme {
-  --text-2xs: 0.6875rem;
-  --text-2xs--line-height: 1rem;
-  --text-3xs: 0.625rem;
-  --text-3xs--line-height: 0.875rem;
+/* The window's height under the desktop app's title bar, which
+   `DesktopTitleBar` sets as `--title-bar-height`, and the whole window
+   everywhere else. A page that fills the window uses these in place of
+   `h-dvh`, `min-h-screen` and `max-h-dvh`, which would run a bar's height
+   past its foot. */
+@utility h-app {
+  height: calc(100dvh - var(--title-bar-height, 0px));
 }
-
-/* The widths. Tailwind's names, set to where devices fall, and published to
-   theme authors as the same four numbers:
-
-     (none)  under 600   phones; a foldable's cover screen
-     sm:     600         an unfolded foldable; a portrait tablet
-     md:     840         a landscape tablet; the sidebar docks
-     lg:     1200        a laptop
-     xl:     1600        a big desktop
-
-   sm: … xl: measure the screen: the sidebar, navigation, header, page padding
-   and type size, and useWidthClass in code. canvas-sm: … canvas-xl: measure
-   the nearest @container (the page area, or the body anywhere else), for
-   where one piece swaps for another, as a side panel for a row of chips;
-   useRegionWidthClass in code. Grids, forms and rows take no width at all:
-   grid-cols-fill-* and grid-cols-pair fill as many columns as fit, and
-   flex-wrap wraps. The no-other-widths Biome rule refuses any other width.
-
-   The breakpoints are static so they reach :root for useWidthClass, which
-   reads them rather than holding a copy. The canvas variants repeat them (a
-   query cannot read a variable); useWidthClass.test.ts holds the two
-   together. */
-@theme {
-  --breakpoint-*: initial;
+@utility min-h-app {
+  min-height: calc(100vh - var(--title-bar-height, 0px));
 }
-
-@theme static {
-  --breakpoint-sm: 37.5rem;
-  --breakpoint-md: 52.5rem;
-  --breakpoint-lg: 75rem;
-  --breakpoint-xl: 100rem;
-}
-
-@custom-variant canvas-sm {
-  /* biome-ignore lint/plugin: the canvas variants are where the widths are defined */
-  @container (width >= 37.5rem) {
-    @slot;
-  }
-}
-@custom-variant canvas-md {
-  /* biome-ignore lint/plugin: the canvas variants are where the widths are defined */
-  @container (width >= 52.5rem) {
-    @slot;
-  }
-}
-@custom-variant canvas-lg {
-  /* biome-ignore lint/plugin: the canvas variants are where the widths are defined */
-  @container (width >= 75rem) {
-    @slot;
-  }
-}
-@custom-variant canvas-xl {
-  /* biome-ignore lint/plugin: the canvas variants are where the widths are defined */
-  @container (width >= 100rem) {
-    @slot;
-  }
-}
-
-/* A row holding an item's actions: as a child, or inside the wrapper the
-   layout editor puts around each part. */
-@custom-variant item-actions-row (
-  &:has(> [data-item-actions], > [data-layout-node] > [data-item-actions])
-);
-
-/* Tiles, as many columns as fit at the given minimum width (a spacing step:
-   grid-cols-fill-60 is 15rem). A tile never overflows a region narrower than
-   its minimum. A modifier caps the columns: grid-cols-fill-60/3 fills like
-   grid-cols-fill-60 but stops at three, so tiles widen on a big screen
-   instead of shrinking to the minimum. It holds each column above a share of
-   the row that one more column would leave. */
-@utility grid-cols-fill-* {
-  grid-template-columns: repeat(auto-fill, minmax(min(--spacing(--value(integer)), 100%), 1fr));
-  grid-template-columns: repeat(
-      auto-fill,
-      minmax(
-        max(min(--spacing(--value(integer)), 100%), calc(100% / (--modifier(integer) + 1) + 1px)),
-        1fr
-      )
-    );
-}
-
-/* Form fields in pairs: two columns once both fit at 16rem, never more than
-   two, so fields paired side by side stay paired on a wide screen. */
-@utility grid-cols-pair {
-  grid-template-columns: repeat(auto-fit, minmax(max(min(16rem, 100%), 40%), 1fr));
-}
-
-@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-
-:root {
-  --accent-light-color: 0.208 0.042 265.755;
-  --accent-light-surface: 0.968 0.007 247.896;
-  --accent-light-foreground: 0.984 0.003 247.858;
-  --accent-dark-color: 0.929 0.013 255.508;
-  --accent-dark-surface: 0.279 0.041 260.031;
-  --accent-dark-foreground: 0.208 0.042 265.755;
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(var(--accent-light-color, 0.208 0.042 265.755));
-  --primary-foreground: oklch(var(--accent-light-foreground, 0.984 0.003 247.858));
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* Finished, and worth noticing. Stated beside --destructive so the three
-     status colours are chosen together and move together. */
-  --success: oklch(0.596 0.145 163.225);
-  --warning: oklch(0.646 0.163 75.834);
-  --warning-foreground: oklch(0.279 0.077 45.635);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: var(--accent-light-color, 0.208 0.042 265.755);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
-}
-
-.dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(var(--accent-dark-color, 0.929 0.013 255.508));
-  --primary-foreground: oklch(var(--accent-dark-foreground, 0.208 0.042 265.755));
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.765 0.148 163.223);
-  --warning: oklch(0.828 0.152 84.429);
-  --warning-foreground: oklch(0.279 0.077 45.635);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(var(--accent-dark-color, 0.929 0.013 255.508));
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+@utility max-h-app {
+  max-height: calc(100dvh - var(--title-bar-height, 0px));
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
   :root {
     /* Safe area insets - set by @capacitor-community/safe-area plugin on native */
     /* Falls back to env() for iOS Safari or 0px on unsupported platforms */
@@ -239,20 +27,9 @@
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
     --safe-area-inset-right: env(safe-area-inset-right, 0px);
   }
-  html {
-    height: 100vh;
-    /* biome-ignore lint: not all browsers support dvh */
-    height: 100dvh;
-    @apply bg-background;
-  }
   body {
     font-family:
       "Outfit Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    min-height: 100%;
-    /* The region a canvas-sm: measures when nothing nearer is one, so it
-       always has something to measure: a dialog, a sign-in page. */
-    container-type: inline-size;
-    @apply bg-background text-foreground;
   }
   /* Non-native platforms (web): apply safe area insets via CSS */
   html:not(.native-platform) body {
@@ -264,26 +41,6 @@
   /* Native iOS: only apply bottom safe area (top is handled by the header component) */
   html.native-ios body {
     padding-bottom: var(--safe-area-inset-bottom);
-  }
-}
-
-/* Thin, rounded scrollbar that matches the Radix ScrollArea thumb styling.
-   Use on native-overflow containers (e.g. virtualized / drag-and-drop lists)
-   where wrapping in a Radix ScrollArea would break scroll measurement. */
-@utility scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    border-radius: 9999px;
-    background-color: var(--color-border);
   }
 }
 
@@ -326,10 +83,147 @@
     radial-gradient(ellipse 60% 40% at 10% 60%, oklch(0.4 0.18 300 / 0.25), transparent);
 }
 
-/* Pride mode — animated rainbow logo, wordmark, and primary-button accents
-   (gated on the `pride` root class set by usePride.tsx). */
-html.pride {
-  --pride-rainbow: linear-gradient(
+/* The metallic finish (the Elemental theme). useColorTheme.tsx sets
+   `data-color-finish` on the root and `--metal`, the chosen metal's color, and
+   the rules below polish what the palette draws: borders catch the light
+   along their length, whatever is filled with the accent is polished, and a
+   glint crosses a primary button under the pointer. The sidebar alone carries
+   a sheen across its face; other surfaces keep their flat fill. Every token's
+   color, and its contrast, stays as the palette sets it. Event themes, below,
+   win where both dress a button. */
+html[data-color-finish="metallic"] {
+  --sheen-high: 16%;
+  --sheen-low: 7%;
+  --sheen-surface: linear-gradient(
+    135deg,
+    color-mix(in oklch, white var(--sheen-high), transparent) 0%,
+    transparent 30%,
+    color-mix(in oklch, var(--metal) 12%, transparent) 55%,
+    color-mix(in oklch, white var(--sheen-low), transparent) 68%,
+    transparent 85%
+  );
+  --sheen-border: linear-gradient(
+    135deg,
+    var(--metal) 0%,
+    var(--border) 35%,
+    color-mix(in oklch, var(--metal) 50%, white) 50%,
+    var(--border) 65%,
+    var(--metal) 100%
+  );
+  --sheen-polish: linear-gradient(
+    180deg,
+    color-mix(in oklch, white 30%, transparent) 0%,
+    color-mix(in oklch, white 6%, transparent) 48%,
+    transparent 52%,
+    color-mix(in oklch, black 12%, transparent) 100%
+  );
+  --sheen-glint: linear-gradient(
+    110deg,
+    transparent 35%,
+    color-mix(in oklch, white 38%, transparent) 50%,
+    transparent 65%
+  );
+}
+
+/* A bordered surface draws its border in metal: its own fill over the padding
+   box, the sheen over the border box, showing only through the transparent
+   border. A surface that changes its fill on hover keeps its plain border, so
+   the hover still shows, and a field or anything focused keeps its own, so
+   its focus border still shows. */
+html[data-color-finish="metallic"] .bg-card {
+  --sheen-fill: var(--card);
+}
+html[data-color-finish="metallic"] .bg-popover {
+  --sheen-fill: var(--popover);
+}
+html[data-color-finish="metallic"] .bg-background {
+  --sheen-fill: var(--background);
+}
+html[data-color-finish="metallic"] .bg-sidebar {
+  --sheen-fill: var(--sidebar);
+  --sheen-over: var(--sheen-surface);
+  background-image: var(--sheen-surface);
+}
+
+html.dark[data-color-finish="metallic"] {
+  --sheen-high: 8%;
+  --sheen-low: 4%;
+}
+
+html[data-color-finish="metallic"]
+  :is(.bg-card, .bg-popover, .bg-background, .bg-sidebar):is(
+    .border,
+    .border-x,
+    .border-y,
+    .border-t,
+    .border-r,
+    .border-b,
+    .border-l
+  ):not([class*="hover:bg-"], input, textarea, select, :focus) {
+  border-color: transparent;
+  background:
+    var(--sheen-over, none) padding-box,
+    linear-gradient(var(--sheen-fill), var(--sheen-fill)) padding-box,
+    var(--sheen-border) border-box;
+}
+
+html[data-color-finish="metallic"]
+  :is(.bg-primary, [role="switch"][data-state="checked"], [role="checkbox"][data-state="checked"]) {
+  background-image: var(--sheen-polish);
+}
+
+html[data-color-finish="metallic"] [data-slot="button"].bg-primary {
+  background-image: var(--sheen-polish), var(--sheen-glint);
+  background-size:
+    100% 100%,
+    300% 100%;
+  background-position:
+    0 0,
+    100% 0;
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, white 35%, transparent),
+    inset 0 -1px 0 color-mix(in oklch, black 18%, transparent);
+  transition:
+    background-position 0.7s ease,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+
+html[data-color-finish="metallic"] [data-slot="button"].bg-primary:hover {
+  background-position:
+    0 0,
+    0% 0;
+}
+
+/* The wordmark in polished metal, while no event dresses it. */
+:where(html[data-color-finish="metallic"]:not([data-event-theme])) .event-wordmark {
+  background-image: linear-gradient(
+    100deg,
+    var(--metal) 0%,
+    color-mix(in oklch, var(--metal) 40%, white) 45%,
+    var(--metal) 55%,
+    color-mix(in oklch, var(--metal) 70%, black) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-color-finish="metallic"] [data-slot="button"].bg-primary {
+    transition: none;
+  }
+}
+
+/* Event themes. useEventTheme.tsx sets `data-event-theme` on the root while
+   an event runs; each event below picks what its wordmark and primary-button
+   border wear (`--event-wordmark`, `--event-border`), and the shared rules
+   after them flow that across. The logo is dressed in LogoIcon. */
+html[data-event-theme="pride"] {
+  /* LogoIcon paints the mark in the same flag colours. */
+  --event-wordmark: linear-gradient(
     90deg,
     #e40303,
     #ff8c00,
@@ -339,9 +233,22 @@ html.pride {
     #750787,
     #e40303
   );
+  --event-border: var(--event-wordmark);
 }
 
-@keyframes pride-hue {
+/* Christmas: a slow red, gold and green wordmark, and candy-cane borders. */
+html[data-event-theme="christmas"] {
+  --event-wordmark: linear-gradient(90deg, #d42426, #f8b229, #1f8a3b, #f8b229, #d42426);
+  --event-border: repeating-linear-gradient(-45deg, #d42426 0 6px, #fff 6px 12px);
+}
+
+/* New Year: gold foil, with a glint sweeping across it. */
+html[data-event-theme="newYear"] {
+  --event-wordmark: linear-gradient(90deg, #a87b00, #d4a017 30%, #fff1a8 50%, #d4a017 70%, #a87b00);
+  --event-border: var(--event-wordmark);
+}
+
+@keyframes event-hue {
   from {
     filter: hue-rotate(0deg) drop-shadow(0 0 5px oklch(0.7 0.2 30 / 0.45));
   }
@@ -350,15 +257,15 @@ html.pride {
   }
 }
 
-/* Flows a 200%-wide rainbow across the element for a single-layer background. */
-@keyframes pride-flow {
+/* Flows a 200%-wide gradient across the element for a single-layer background. */
+@keyframes event-flow {
   to {
     background-position: -200% 0;
   }
 }
 
-/* Two-layer variant: the solid inner fill stays put, the border rainbow flows. */
-@keyframes pride-flow-border {
+/* Two-layer variant: the solid inner fill stays put, the border gradient flows. */
+@keyframes event-flow-border {
   to {
     background-position:
       0 0,
@@ -366,51 +273,96 @@ html.pride {
   }
 }
 
-/* The mark is painted with a static rainbow gradient; cycling the hue makes it
-   shimmer, and the synced drop-shadow gives it a soft multicolour glow. */
-.pride-logo {
-  animation: pride-hue 8s linear infinite;
+/* A mark painted in a gradient (Pride's) cycles its hue so it shimmers, with a
+   soft glow. */
+.event-logo {
+  animation: event-hue 8s linear infinite;
 }
 
-/* Brand wordmark rendered as flowing rainbow text. The class is harmless when
-   Pride is off — only the `html.pride` rule activates it. */
-html.pride .pride-wordmark {
-  background-image: var(--pride-rainbow);
+/* Brand wordmark rendered as flowing gradient text. The class is harmless when
+   no event runs. */
+html[data-event-theme] .event-wordmark {
+  background-image: var(--event-wordmark);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: pride-flow 8s linear infinite;
+  animation: event-flow 8s linear infinite;
 }
 
 /* Primary (default-variant) buttons keep their solid, legible fill but gain an
-   animated rainbow border: a solid padding-box layer over a rainbow border-box
-   layer, so the gradient shows only in the 2px transparent border. */
-html.pride [data-slot="button"].bg-primary {
+   animated border: a solid padding-box layer over the event's border-box
+   layer, so it shows only in the 2px transparent border. */
+html[data-event-theme] [data-slot="button"].bg-primary {
   border: 2px solid transparent;
   background:
     linear-gradient(var(--primary), var(--primary)) padding-box,
-    var(--pride-rainbow) border-box;
+    var(--event-border) border-box;
   background-size:
     auto,
     200% auto;
-  animation: pride-flow-border 8s linear infinite;
+  animation: event-flow-border 8s linear infinite;
 }
 
 /* Preserve a hover affordance (the gradient fill hides the usual bg darken). */
-html.pride [data-slot="button"].bg-primary:hover {
+html[data-event-theme] [data-slot="button"].bg-primary:hover {
   filter: brightness(1.08);
 }
 
+/* Christmas: snow falling over the logo (LogoIcon draws the flakes at its top). */
+@keyframes event-snowfall {
+  from {
+    transform: translate(0, -30px);
+  }
+  50% {
+    transform: translate(12px, 235px);
+  }
+  to {
+    transform: translate(0, 500px);
+  }
+}
+
+.event-snowflake {
+  animation: event-snowfall linear infinite;
+}
+
+/* New Year: sparkles round the logo, each twinkling in its own time. */
+@keyframes event-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
+.event-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: event-twinkle 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pride-logo {
+  .event-logo {
     animation: none;
     filter: drop-shadow(0 0 4px oklch(0.7 0.18 320 / 0.3));
   }
 
-  html.pride .pride-wordmark,
-  html.pride [data-slot="button"].bg-primary {
+  .event-snowflake {
+    animation: none;
+    transform: translateY(var(--rest));
+  }
+
+  .event-sparkle {
+    animation: none;
+  }
+
+  html[data-event-theme] .event-wordmark,
+  html[data-event-theme] [data-slot="button"].bg-primary {
     animation: none;
   }
 }

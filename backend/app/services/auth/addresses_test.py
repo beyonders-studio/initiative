@@ -7,10 +7,10 @@ with.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -367,8 +367,8 @@ async def test_asserting_again_refreshes_rather_than_duplicates(
     user_id, provider_id = user.id, provider.id
     row_id = (await _addresses(session, user_id))[0].id
 
-    first = datetime(2026, 9, 1, tzinfo=timezone.utc)
-    later = datetime(2026, 9, 13, tzinfo=timezone.utc)
+    first = datetime(2026, 9, 1, tzinfo=UTC)
+    later = datetime(2026, 9, 13, tzinfo=UTC)
     for moment in (first, later):
         await addresses.ensure_address(
             session,

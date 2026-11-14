@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from app.core.collection_shapes import SHAPES, FieldDisplay
 from app.core.file_types import FileType
-from app.core.identity_boundary import UPLOAD_PATH, GuildId, PersonId
+from app.core.identity_boundary import UPLOAD_PATH, GuildId
+from app.models.tenant.metadata import MetadataType
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ContentCan
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.file import FileSummary
-from app.models.tenant.metadata import MetadataType
-from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.property import (
     CurrencyCode,
     PropertiesOnCreate,
@@ -24,9 +24,10 @@ from app.schemas.tenant.property import (
     PropertyValueInput,
     annotated_properties,
 )
+from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.tag import TagSummary, annotated_tags
-from app.schemas.tenant.tool_layout import ListLayoutKind
 from app.schemas.tenant.tool import from_row
+from app.schemas.tenant.tool_layout import ListLayoutKind
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -40,14 +41,14 @@ MAX_FILES_PER_CHANGE = 500
 class CollectionFiles(SanitizedBaseModel):
     """Files to put in a collection or take out of it."""
 
-    file_ids: List[int] = Field(min_length=1, max_length=MAX_FILES_PER_CHANGE)
+    file_ids: list[int] = Field(min_length=1, max_length=MAX_FILES_PER_CHANGE)
 
 
 class CollectionFilesAdd(CollectionFiles):
     """Files to put in a collection, and the values of the collection's
     metadata each one it takes starts with: what its file page requires."""
 
-    metadata: List[PropertyValueInput] = Field(default_factory=list)
+    metadata: list[PropertyValueInput] = Field(default_factory=list)
 
 
 #: A ready-made shape, by its key (``app.core.collection_shapes``).
@@ -65,27 +66,27 @@ class CollectionCreate(CollectionFiles, PropertiesOnCreate):
 
     initiative_id: int
     name: TitleStr = Field(..., min_length=1, max_length=255)
-    description: Optional[MentionStr] = Field(default=None, max_length=2000)
-    tag_ids: Optional[List[int]] = None
-    shape: Optional[CollectionShapeKey] = None
+    description: MentionStr | None = Field(default=None, max_length=2000)
+    tag_ids: list[int] | None = None
+    shape: CollectionShapeKey | None = None
     #: The collection whose shape this one starts with.
-    shape_from: Optional[int] = None
+    shape_from: int | None = None
 
     @model_validator(mode="after")
-    def _one_shape(self) -> "CollectionCreate":
+    def _one_shape(self) -> CollectionCreate:
         if self.shape is not None and self.shape_from is not None:
             raise ValueError("a collection starts as a shape or as another's")
         return self
 
 
 class CollectionUpdate(PropertiesOnUpdate):
-    name: Optional[TitleStr] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[MentionStr] = Field(default=None, max_length=2000)
+    name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
+    description: MentionStr | None = Field(default=None, max_length=2000)
     #: The file that stands for it on a card, one of its own. ``null`` clears
     #: the choice, and a card shows the file added most recently.
-    cover_file_id: Optional[int] = None
-    tag_ids: Optional[List[int]] = None
-    comments_enabled: Optional[bool] = None
+    cover_file_id: int | None = None
+    tag_ids: list[int] | None = None
+    comments_enabled: bool | None = None
 
 
 class CollectionCover(SanitizedBaseModel):
@@ -98,14 +99,14 @@ class CollectionCover(SanitizedBaseModel):
     file_type: FileType
     #: The current version's file, for an uploaded file, and what a file's
     #: card reads of it: its thumbnail and its size (``FileSummary``'s).
-    file_url: Annotated[Optional[str], UPLOAD_PATH] = None
-    file_content_type: Optional[str] = None
-    thumbnail_url: Annotated[Optional[str], UPLOAD_PATH] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
+    file_url: Annotated[str | None, UPLOAD_PATH] = None
+    file_content_type: str | None = None
+    thumbnail_url: Annotated[str | None, UPLOAD_PATH] = None
+    width: int | None = None
+    height: int | None = None
 
 
-def collection_cover(file: Optional["File"]) -> Optional[CollectionCover]:
+def collection_cover(file: File | None) -> CollectionCover | None:
     if file is None or file.id is None:
         return None
     version = file.current_version
@@ -131,11 +132,11 @@ class CollectionFileSummary(FileSummary):
     its values of the collection's metadata."""
 
     added_at: datetime
-    metadata: List[PropertySummary] = Field(default_factory=list)
+    metadata: list[PropertySummary] = Field(default_factory=list)
 
 
 class CollectionFileListResponse(PageMeta):
-    items: List[CollectionFileSummary]
+    items: list[CollectionFileSummary]
 
 
 class CollectionCan(ContentCan):
@@ -147,7 +148,7 @@ class CollectionCan(ContentCan):
     unarchive: bool = False
 
 
-class CollectionRead(SanitizedBaseModel):
+class CollectionRead(CreatedByRead):
     """A collection as its reader sees it: only the files they can open are
     counted, and the cover is one of those."""
 
@@ -159,24 +160,23 @@ class CollectionRead(SanitizedBaseModel):
         validation_alias=AliasChoices("community_id", "guild_id")
     )
     name: str
-    description: Optional[MentionStr] = None
-    cover_file_id: Optional[int] = None
-    cover: Optional[CollectionCover] = None
+    description: MentionStr | None = None
+    cover_file_id: int | None = None
+    cover: CollectionCover | None = None
     file_count: int = 0
     #: Its files the reader knows are there and can't open, which they may
     #: ask for.
     hidden_files: HiddenFiles = Field(default_factory=HiddenFiles)
-    created_by: PersonId | None = None
     created_at: datetime
     updated_at: datetime
-    archived_at: Optional[datetime] = None
+    archived_at: datetime | None = None
     comments_enabled: bool = True
-    comments_locked_at: Optional[datetime] = None
+    comments_locked_at: datetime | None = None
     comment_count: int = 0
-    tags: List[TagSummary] = Field(default_factory=list)
-    properties: List[PropertySummary] = Field(default_factory=list)
+    tags: list[TagSummary] = Field(default_factory=list)
+    properties: list[PropertySummary] = Field(default_factory=list)
     #: Its metadata, in order, whose values its files carry here.
-    metadata: List[PropertyDefinitionRead] = Field(default_factory=list)
+    metadata: list[PropertyDefinitionRead] = Field(default_factory=list)
     #: Whether the reader may rename it, change what is in it, or trash it.
     can: CollectionCan = Field(default_factory=CollectionCan)
 
@@ -189,9 +189,9 @@ class CollectionShapeMetadata(SanitizedBaseModel):
     name: str
     type: MetadataType
     #: For a scale, how the shape's lists show it.
-    display: Optional[FieldDisplay] = None
+    display: FieldDisplay | None = None
     #: For money, the currency it starts in.
-    currency: Optional[CurrencyCode] = None
+    currency: CurrencyCode | None = None
 
 
 class CollectionShapeEntry(SanitizedBaseModel):
@@ -201,8 +201,8 @@ class CollectionShapeEntry(SanitizedBaseModel):
     name: str
     hint: str
     #: The lists it shows, in order; it opens on the first.
-    lists: List[ListLayoutKind]
-    metadata: List[CollectionShapeMetadata]
+    lists: list[ListLayoutKind]
+    metadata: list[CollectionShapeMetadata]
 
 
 class CollectionShapeGroup(SanitizedBaseModel):
@@ -210,22 +210,22 @@ class CollectionShapeGroup(SanitizedBaseModel):
 
     key: str
     name: str
-    entries: List[CollectionShapeEntry]
+    entries: list[CollectionShapeEntry]
 
 
 class CollectionListResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[CollectionRead]
+    items: list[CollectionRead]
 
 
 def serialize_collection(
-    row: "Collection",
+    row: Collection,
     *,
-    context: "ActorContext",
+    context: ActorContext,
     file_count: int,
     hidden_files: HiddenFiles,
-    cover: Optional["File"],
+    cover: File | None,
     can: CollectionCan,
 ) -> CollectionRead:
     return from_row(

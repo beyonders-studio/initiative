@@ -41,13 +41,13 @@ from typing import Any
 
 __all__ = [
     "FLAGS",
-    "Guc",
-    "Kind",
     "READ_ONCE",
     "REQUEST_GUCS",
     "ROUTED_COMMUNITY",
     "ROUTED_GUILD_ID",
     "STANDING",
+    "Guc",
+    "Kind",
 ]
 
 
@@ -252,6 +252,30 @@ COMMUNITY_TOOLS = Guc("app.community_tools", Kind.NAMES, standing=True)
 #: (``app.models.platform.guild.AdminSurface``): a custom role's, or else
 #: every one for the admin rung and none below it.
 HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
+#: The installed plug-ins' community permissions the reader holds here, as
+#: ``"<install id>:<permission>"``: those a custom role on the admin rung
+#: keeps, or ``*``, every one, for the admin rung with no custom role.
+HELD_PLUGIN_PERMISSIONS = Guc(
+    "app.held_plugin_permissions", Kind.NAMES, standing=True, read_once=True
+)
+#: ``"<initiative id>:<install id>:<permission>"`` where the reader's role in
+#: that initiative holds one of a plug-in's permissions by a rule, its own or
+#: what the community set for members; and where such a rule says no.
+PLUGIN_GRANTS = Guc("app.plugin_grants", Kind.NAMES, standing=True)
+PLUGIN_DENIES = Guc("app.plugin_denies", Kind.NAMES, standing=True)
+#: For an installed plug-in's request, the install of the community contacts
+#: plug-in, which holds the community's contacts: a community contact the
+#: request creates is that install's. Empty when the community has none, and
+#: on every request a person makes.
+COMMUNITY_CONTACTS_INSTALL = Guc(
+    "app.community_contacts_install", Kind.INT, standing=True
+)
+#: For a member token, the admin surfaces the member it acts for holds, read
+#: as ``app.held_surfaces`` is for a person. A row of the whole community the
+#: token writes takes the surface that administers it here, as the member's
+#: own would. Empty for the install itself, and on every request a person
+#: makes.
+MEMBER_SURFACES = Guc("app.member_surfaces", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam

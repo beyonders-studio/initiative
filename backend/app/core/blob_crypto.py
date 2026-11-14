@@ -32,7 +32,7 @@ from __future__ import annotations
 import os
 import struct
 import uuid
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
@@ -208,12 +208,6 @@ def encrypt(
         chunk = plaintext[index * chunk_size : (index + 1) * chunk_size]
         out += aead.encrypt(nonce, chunk, aad)
     return bytes(out)
-
-
-def ciphertext_size(plaintext_size: int, chunk_size: int = CHUNK_SIZE) -> int:
-    """How many bytes :func:`encrypt` writes for ``plaintext_size`` bytes."""
-    count = max(1, -(-plaintext_size // chunk_size))
-    return _HEADER.size + plaintext_size + count * _TAG_LEN
 
 
 def decrypt_stream(

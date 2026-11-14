@@ -21,7 +21,7 @@ def resolve_zone(value: str | None) -> ZoneInfo:
     must not fail the work that reads it."""
     try:
         return ZoneInfo(value or "UTC")
-    except (KeyError, ValueError, OSError):
+    except KeyError, ValueError, OSError:
         return ZoneInfo("UTC")
 
 
@@ -60,7 +60,7 @@ def normalize_reminder_minutes(value: int | str | None) -> int | None:
         return None
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=UserMessages.INVALID_REMINDER_MINUTES,
@@ -98,7 +98,7 @@ def normalize_week_starts_on(value: int | str | None) -> int | None:
         return None
     try:
         number = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=UserMessages.INVALID_WEEK_START,
@@ -138,8 +138,9 @@ def is_valid_provider_slug(value: str) -> bool:
 
 
 # Post-login return paths must stay inside the SPA: a single-slash-rooted
-# relative path with no scheme, host, or backslash forms.
-NEXT_PATH_MAX_LENGTH = 512
+# relative path with no scheme, host, or backslash forms. Long enough for a
+# plug-in's authorize request, which comes back to its page with its query.
+NEXT_PATH_MAX_LENGTH = 2048
 
 
 def is_safe_next_path(value: str) -> bool:

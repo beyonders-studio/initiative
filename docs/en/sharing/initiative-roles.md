@@ -4,81 +4,110 @@ icon: lucide/shield-user
 
 # Initiative roles
 
-Every member of an initiative holds a **role** — a reusable bundle of permissions that decides which *kinds of tools* they can use here.
+Everyone in an [initiative](../guides/initiatives.md) holds one **role**: a named set of permissions, which is to say the things that role is allowed to do. A role decides which of the initiative's tools somebody can see, and whether they can make new things in them. You describe a kind of person once, like "Volunteer" or "Board member", and hand it out, instead of setting everything person by person.
 
-Roles save you setting permissions person by person. Describe the *kind* of member once, then hand it out.
-
-## Roles vs. sharing
-
-Two different questions, and both apply:
-
-- **Roles** answer *"what kinds of things can this person do in this initiative?"* — can they make projects, or only look at them?
-- **Sharing** answers *"can this person see this **specific** project or file?"* — covered in [Sharing projects & files](sharing-projects-and-files.md).
-
-So a role might let somebody create files in general, while an individual file is still only visible to the handful of people it's been shared with. Both things are true at once and they don't fight.
-
-## What a role can grant
-
-Permissions are grouped by tool, and each offers **View**, **Create**, or neither:
-
-| Tool | Permissions |
-|---|---|
-| **Projects** | View, Create |
-| **Files** | View, Create |
-| **Counters** | View, Create |
-| **Events** (calendar) | View, Create |
-| **Dashboards** | View, Create |
-| **Posts** | View, Create |
-| **Wikis** | View, Create |
-| **Contacts** | View, Create |
-
-So a "Contributor" might view and create projects and files, while a "Guest" only views them and has no idea the dashboards exist.
-
-![A role's permissions](../images/sharing/role-permissions.png)
+Roles answer "what can this kind of person do here?" Sharing answers a different question, "who can open this one project?", and has [its own page](sharing-projects-and-files.md). Both apply at once. A role can let somebody make files in general, while one particular file is still only open to the three people it was shared with, and the two don't fight.
 
 ## The built-in roles { #the-two-built-in-roles }
 
-Every initiative arrives with three roles you didn't make and can't delete.
+Every initiative comes with three roles that can't be deleted:
 
-**Manager** (also called project manager, or PM) is the lead role: every tool permission, fixed, and whoever creates an initiative starts as one, unless they're a community admin. Per-item sharing still applies to them — a Manager can create files all day and still not see the one three people are quietly working on.
-
-**Moderator** is the role that overrides sharing. A Moderator reaches everything in the initiative whether or not it was ever shared with them, and can change who else has access. That's what **full access** means, and no other role gets it — not a custom one, not Manager. It isn't a setting you've failed to find. Moderators also get the initiative's [Moderation](../guides/initiatives.md#moderation) page, where reports land.
-
-Handing out Moderator is a community admin's job, and so is taking it back. Managers staff everything else. Admins who join an initiative arrive as Moderators, because that's the standing they already had, and somebody promoted to community admin moves up to Moderator in every initiative where they aren't already a Manager.
-
-**Member** is where everybody else starts, and the one built-in whose permissions are yours to set. Making the initiative asked what members can do; the answer lives here, and you can change it whenever you like.
-
-!!! warning "Moderators see everything. Everything."
-    Because Moderator overrides per-item sharing, anything kept private to a few people is still perfectly visible to one.
-
-    So hand it to the people who genuinely need the whole picture — not as a general reward for being helpful, and not because someone's been around a long time.
-
-## Making your own roles
-
-1. Open the initiative's **settings → Roles**.
-2. **Add custom role** and name it something your group will actually recognise: "Director", "Cast", "Editor", "Observer".
-3. Tick what it should be allowed to do.
-4. Save. It's available next time you add or edit a member.
-
-Name roles for *people*, not for permissions. "Volunteer" is friendlier and clearer than "View-only contributor", and nobody has ever been pleased to be called a view-only contributor.
-
-## Handing them out
-
-When you [add a member](../guides/initiatives.md#adding-members), you pick their role. Change it later from the same **Members** settings — changes take effect immediately, no re-login, no waiting.
-
-## When the community sets it
-
-Some communities want every initiative to work the same way: posts on everywhere, say, or members never making dashboards. A community admin sets that once, under **Settings → Initiatives → Every initiative**:
-
-| They can set | For every initiative |
+| Role | What it's for |
 |---|---|
-| Each tool | On everywhere, off everywhere, or left to each initiative |
-| What the built-in **Member** role can see and make | The same three choices, one per permission |
-| **Managers can add roles** | Off, nobody adds a role, and any custom role an initiative already has can do no more than members, so what the community said holds |
+| **Moderator** | Can use every tool, and can open, edit and share every item in the initiative however it's shared. That reach is called **Full access**. Moderators also run the initiative like a Project Manager, and they get its [Moderation](../guides/moderation.md) page. |
+| **Project Manager** | Runs the initiative: its members, its roles and its settings. Can see and make things in every tool. Which individual items they can open is still decided by how each one is shared. |
+| **Member** | Where everybody else starts. What members can do is yours to set. |
 
-Anything the community set shows up switched the way it said, with a note, and the initiative's managers can't change it. Pick **Each initiative decides** and it's theirs again, exactly as they left it.
+Moderators and Project Managers are the initiative's **managers**. Their tool permissions are fixed at "everything", so their cards on the **Roles** tab just say what they are. You can rename any role, built-in ones included, with the pencil on its card.
 
-## Related
+Only Moderator has Full access, and no other role can be given it. Putting somebody on the Moderator role, or taking them off it, is a community admin's job; Project Managers handle every other role. Community admins themselves always hold Moderator in an initiative, because they can already open everything in the community.
 
-- [Sharing projects & files](sharing-projects-and-files.md) — the final, per-item layer.
-- [Working with initiatives](../guides/initiatives.md) — creating initiatives and adding members.
+!!! warning "Moderators see everything"
+    Because Moderator reaches every item however it's shared, anything kept private to a few people is still visible to every Moderator. Give it to the people who genuinely need the whole picture, not as a thank-you for being helpful, and not because somebody's been around a long time and it felt rude not to.
+
+## What a role can allow
+
+For each tool, a role has two switches:
+
+| Switch | Lets them |
+|---|---|
+| **View** | See the tool in the initiative, and the things in it that are shared with them. |
+| **Create** | Make new things in the tool. |
+
+The tools are **Projects**, **Files**, **Events** (the calendar), **Counters**, **Dashboards**, **Posts**, **Wikis** and **Contacts**. Turning on **Create** turns on **View** too, and turning off **View** turns off **Create**, since making something you can't see isn't a state worth having.
+
+Each role also has **Run dashboards as Initiative**, which lets its holders set a dashboard to show every row in the initiative to everyone who opens it, whatever each viewer could open on their own. It starts off for everyone but managers.
+
+Tools the initiative has switched off are listed under **Turned off for this initiative**. You can still set them, so turning the tool back on doesn't mean redoing your roles, but they grant nothing until it's on again.
+
+So a "Volunteer" might view projects and files and create nothing, while a "Coordinator" creates everything.
+
+### Plug-ins on a role { #plug-ins-on-a-role }
+
+Each [plug-in](../guides/plugins-and-marketplace.md) that works in the initiative adds switches of its own to every role: **Use** for the plug-in itself, and any part it lets you hand out separately, such as seeing prices. A role starts the way the plug-in suggests, which for most is off. Managers and community admins hold every one, so the manager cards don't list them. Turn one on for a role to let its holders open the plug-in's page, see its fields and run its actions in this initiative.
+
+## Set what members can do
+
+The initiative's managers and community admins can change roles.
+
+1. Open the initiative's **Initiative settings** and select **Roles**.
+2. On the **Member** card, turn **View** and **Create** on or off for each tool, and each plug-in's switches below them.
+
+Each switch saves as you flip it, and it applies to everyone on the Member role straight away. A switch showing **On** or **Off** with a lock was set by your community for every initiative (see [Set the rules for every initiative](#set-the-rules-for-every-initiative)).
+
+![The Roles tab of Initiative settings, with the Moderator and Project Manager cards, the Member card's View and Create switches for each tool, and Add custom role](../images/sharing/role-permissions.webp#only-light)
+![The Roles tab of Initiative settings, with the Moderator and Project Manager cards, the Member card's View and Create switches for each tool, and Add custom role](../images/sharing/role-permissions.dark.webp#only-dark)
+
+## Make your own role
+
+The initiative's managers and community admins can add roles, unless your community keeps initiatives to the built-in ones. Then the **Roles** tab says so instead of offering the button.
+
+1. Open **Initiative settings** and select **Roles**.
+2. Select **Add custom role**.
+3. Type a **Display name**, the name people will see. The **Internal name** fills itself in.
+4. Select **Create role**.
+5. On the new role's card, turn **View** and **Create** on for what it should allow.
+
+It's ready to hand out straight away. Name roles after people, the way your group talks about itself. "Volunteer" is friendlier and clearer than "View-only contributor", and nobody has ever introduced themselves at a committee meeting as a view-only contributor.
+
+## Rename or delete a role
+
+The initiative's managers and community admins can rename and delete roles.
+
+To rename one:
+
+1. Open **Initiative settings** and select **Roles**.
+2. Select the pencil on the role's card.
+3. Change the **Display name**.
+4. Select **Save**.
+
+To delete one you made:
+
+1. Move everybody off it first. A role somebody holds can't be deleted.
+2. Select the trash can on the role's card.
+3. Select **Delete**.
+
+## Give someone a role
+
+The initiative's managers and community admins pick a role when they [add someone](../guides/initiatives.md#add-someone-to-an-initiative), and can change it later.
+
+1. Open **Initiative settings** and select **Members**.
+2. In the person's **Role**, choose the new role.
+
+The change applies immediately, with no signing out and back in. Two limits apply: only a community admin can move somebody onto Moderator or off it, and an initiative always keeps at least one manager.
+
+## Set the rules for every initiative
+
+Some communities want every initiative to work the same way: posts switched on everywhere, say, or members never making dashboards. Community admins can set that once for all of them, including initiatives made later.
+
+1. Open **Community settings** and select **Initiatives**.
+2. Under **Rules for every initiative**, select **Add a rule**.
+3. Choose the **Tool or plug-in**.
+4. For a tool, answer **Is … turned on?**: **Each initiative decides**, **On in every initiative** or **Off in every initiative**. Then answer **Can members view …?**: **Each initiative decides**, **Yes, in every initiative** or **No, only managers**, and **Can members create …?** the same way.
+5. For a plug-in, answer **Do members have …?** the same way, for each switch it adds.
+6. Read **Who it changes today**, which lists the initiatives the rule would change.
+7. Select **Save rule**.
+
+Every initiative takes the rule at once, archived ones included. Their managers see the switches set the way the community said, with a lock, and can't change them. To change a rule later, select **Edit** beside it. The trash can beside it removes the rule, which hands those questions back to each initiative, with whatever each one had set before.
+
+The same card has **Managers can add roles**. Turned off, no initiative can add roles beyond Moderator, Project Manager and Member, and any role an initiative already added can do no more than members, so what the community said still holds.

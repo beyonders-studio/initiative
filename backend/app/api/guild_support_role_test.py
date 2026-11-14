@@ -10,9 +10,9 @@ Covers:
 - ``support`` is never an assignable stored membership role.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -23,14 +23,13 @@ from app.models.platform.access_grant import (
     AccessGrantPurpose,
     SettingsLevel,
 )
-from app.models.platform.guild import GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.user import UserRole
 from app.testing import (
     create_guild,
     create_user,
     get_auth_headers,
 )
-
 
 AI_SETTINGS = "/ai/connections"
 
@@ -43,7 +42,7 @@ async def _live_grant(
     level: str = "read",
     purpose: AccessGrantPurpose = AccessGrantPurpose.content,
 ) -> AccessGrant:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = AccessGrant(
         user_id=user.id,
         guild_id=guild.id,

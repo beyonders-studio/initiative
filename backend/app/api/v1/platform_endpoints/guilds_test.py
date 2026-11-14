@@ -12,29 +12,29 @@ Tests the guild API endpoints at /api/v1/communities including:
 - Leaving a guild
 """
 
+from datetime import UTC
+
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from sqlmodel import select
-
-from app.services.platform import rules
-from app.testing.schema_harness import route_session_to_guild
-from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild, GuildMembership
 from app.models.platform.notification import Notification, NotificationType
-from app.models.platform.user import UserRole, UserStatus
+from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
 from app.models.tenant.initiative import Initiative, InitiativeMember
-from app.models.platform.user import User
+from app.services.platform import rules
+from app.testing import drain_notices
 from app.testing.factories import (
     create_federated_identity,
-    guild_administration,
     create_guild,
     create_guild_membership,
     create_user,
     get_auth_token,
+    guild_administration,
 )
-from app.testing import drain_notices
+from app.testing.schema_harness import route_session_to_guild
 
 
 async def _just_signed_in(session: AsyncSession, user: User) -> dict[str, str]:
@@ -804,7 +804,7 @@ async def test_get_invite_status_valid(
 
     guild = await create_guild(session, name="Test Guild")
     admin = await acting_user(guild_role=CommunityRole.admin, guild=guild)
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=admin.user.id, max_uses=5
     )
     await session.commit()
@@ -843,7 +843,7 @@ async def test_accept_invite_blocked_when_guild_full(
 
     # Minted while the seat is still free, redeemed after it is taken — minting
     # itself is capacity-gated, so the order here is the scenario.
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=creator.id, max_uses=5
     )
     await acting_user(guild_role=CommunityRole.member, guild=guild)
@@ -874,7 +874,8 @@ async def test_an_invite_that_cannot_be_redeemed_is_refused(
     expected_detail: str,
 ):
     """Both refusals are 400, each naming which one it was."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
     from app.services.platform import guilds as guild_service
 
     invitee = await acting_user("member")
@@ -882,11 +883,11 @@ async def test_an_invite_that_cannot_be_redeemed_is_refused(
         code = "invalidcode123"
     else:
         admin = await acting_user(guild_role=CommunityRole.admin)
-        invite, invite_code = await guild_service.create_guild_invite(
+        _invite, invite_code = await guild_service.create_guild_invite(
             session,
             guild_id=admin.guild.id,
             created_by=admin.user.id,
-            expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+            expires_at=datetime.now(UTC) - timedelta(days=1),
         )
         await session.commit()
         code = invite_code
@@ -988,7 +989,7 @@ async def guild_gate_world(session: AsyncSession, acting_user, monkeypatch):
     admin = await acting_user(guild_role=CommunityRole.admin)
     member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
     stranger = await acting_user(guild_role=CommunityRole.admin)
-    invite, invite_code = await guild_service.create_guild_invite(
+    invite, _invite_code = await guild_service.create_guild_invite(
         session, guild_id=admin.guild.id, created_by=admin.user.id
     )
     await session.commit()
@@ -1083,9 +1084,10 @@ async def test_guild_billing_handoff_succeeds_for_admin(
     client: AsyncClient, acting_user, monkeypatch, handoff_signing_key
 ):
     """Admin gets an EdDSA token with the billing-portal audience and role."""
+    import jwt
+
     from app.core.config import settings as app_settings
     from app.core.security import BILLING_PORTAL_AUDIENCE
-    import jwt
 
     monkeypatch.setattr(app_settings, "BILLING_URL", "https://billing.example.com")
     seat = await acting_user(guild_role=CommunityRole.superadmin)

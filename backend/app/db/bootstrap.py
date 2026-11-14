@@ -380,7 +380,8 @@ WITH app_tables AS (
     SELECT current_setting('app._bootstrap_role') AS role
 )
 SELECT format('table %I.%I', n.nspname, c.relname) AS label,
-       format('ALTER TABLE %I.%I OWNER TO %I', n.nspname, c.relname, target.role) AS stmt
+       format('ALTER TABLE %I.%I OWNER TO %I', n.nspname, c.relname, target.role) AS stmt,
+       pg_get_userbyid(c.relowner) AS owner
   FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace, target
  WHERE c.relkind IN ('r', 'v', 'm', 'p')
@@ -391,7 +392,8 @@ SELECT format('table %I.%I', n.nspname, c.relname) AS label,
         OR (n.nspname = 'public' AND c.relname IN (SELECT name FROM app_tables)))
 UNION ALL
 SELECT format('sequence %I.%I', n.nspname, c.relname),
-       format('ALTER SEQUENCE %I.%I OWNER TO %I', n.nspname, c.relname, target.role)
+       format('ALTER SEQUENCE %I.%I OWNER TO %I', n.nspname, c.relname, target.role),
+       pg_get_userbyid(c.relowner)
   FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace, target
  WHERE c.relkind = 'S'
@@ -403,7 +405,8 @@ SELECT format('sequence %I.%I', n.nspname, c.relname),
         WHERE d.objid = c.oid AND d.deptype IN ('a', 'e'))
 UNION ALL
 SELECT format('type public.%I', t.typname),
-       format('ALTER TYPE public.%I OWNER TO %I', t.typname, target.role)
+       format('ALTER TYPE public.%I OWNER TO %I', t.typname, target.role),
+       pg_get_userbyid(t.typowner)
   FROM pg_type t, target
  WHERE t.typnamespace = 'public'::regnamespace
    AND t.typtype = 'e'
@@ -419,7 +422,8 @@ SELECT format('type public.%I', t.typname),
                    AND c2.relname IN (SELECT name FROM app_tables))))
 UNION ALL
 SELECT format('function %s', p.oid::regprocedure),
-       format('ALTER FUNCTION %s OWNER TO %I', p.oid::regprocedure, target.role)
+       format('ALTER FUNCTION %s OWNER TO %I', p.oid::regprocedure, target.role),
+       pg_get_userbyid(p.proowner)
   FROM pg_proc p, target
  WHERE p.pronamespace = 'public'::regnamespace
    AND pg_get_userbyid(p.proowner) <> target.role
@@ -434,35 +438,12 @@ SELECT format('function %s', p.oid::regprocedure),
        string_to_array(current_setting('app._bootstrap_functions'), ','))
 UNION ALL
 SELECT format('schema %I', n.nspname),
-       format('ALTER SCHEMA %I OWNER TO %I', n.nspname, target.role)
+       format('ALTER SCHEMA %I OWNER TO %I', n.nspname, target.role),
+       pg_get_userbyid(n.nspowner)
   FROM pg_namespace n, target
  WHERE n.nspname ~ '{GUILD_OR_TEMPLATE_SCHEMA_REGEX}'
    AND pg_get_userbyid(n.nspowner) <> target.role
    AND pg_get_userbyid(n.nspowner) NOT IN (SELECT role FROM kept)
-"""
-
-
-# A login role must hold no default privilege: a new shared table gives it
-# nothing until a migration grants it from the audited registry. Revoked rather
-# than merely not granted, so a database that was handed over by an earlier
-# build converges instead of keeping what that build set.
-_REVOKE_LOGIN_DEFAULT_PRIVILEGES = """
-DO $$
-DECLARE
-    provisioner text := current_setting('app._bootstrap_role');
-    grantee text := current_setting('app._bootstrap_grantee');
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = grantee) THEN
-        RETURN;
-    END IF;
-    EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public '
-        'REVOKE ALL ON TABLES FROM %I', provisioner, grantee);
-    EXECUTE format(
-        'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public '
-        'REVOKE ALL ON SEQUENCES FROM %I', provisioner, grantee);
-END
-$$;
 """
 
 
@@ -652,13 +633,10 @@ def _role_steps(roles: tuple[LoginRole, ...]) -> list[_Step]:
         steps += [
             ("app._bootstrap_grantee", role.name),
             _ADMINISTER_LOGIN_ROLE,
-            _REVOKE_LOGIN_DEFAULT_PRIVILEGES,
         ]
     steps += [
         _administer_existing_roles(),
-        ("app._bootstrap_tables", ",".join(sorted(SHARED_TABLE_REGISTRY))),
-        ("app._bootstrap_functions", ",".join(sorted(BOOTSTRAP_OWNED_FUNCTIONS))),
-        ("app._bootstrap_kept_owners", _kept_owners()),
+        *_handover_settings(),
         _TRANSFER_STATEMENTS,
         _default_privileges(),
     ]
@@ -729,12 +707,12 @@ async def _transfer_ownership(conn) -> None:
     rows = (await conn.execute(text(_TRANSFER_STATEMENTS))).all()
     if not rows:
         return
-    for label, statement in rows:
+    for label, statement, _owner in rows:
         await conn.execute(text(statement))
     logger.info(
         "database bootstrap: took ownership of %d object(s): %s",
         len(rows),
-        ", ".join(label for label, _stmt in rows),
+        ", ".join(label for label, _stmt, _owner in rows),
     )
 
 
@@ -753,21 +731,29 @@ async def _apply_search_operator(conn) -> bool:
     return await search_operator_present(conn)
 
 
-#: A signal, not a work list: does anything in the app's own schemas belong to
-#: a login other than the one declared to own them? Deliberately coarse —
-#: tables and sequences only — because the remedy it points at moves
-#: everything, and the authoritative description of what "everything" is stays
-#: in :data:`_TRANSFER_STATEMENTS`. The owner is passed in rather than read
-#: from ``current_user`` so the answer does not depend on which connection
-#: asks.
-_FOREIGN_OWNERS = text(
-    "SELECT DISTINCT pg_get_userbyid(c.relowner) AS owner "
-    "  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
-    " WHERE c.relkind IN ('r', 'p', 'v', 'm', 'S') "
-    "   AND c.relowner <> CAST(:owner AS regrole) "
-    "   AND (n.nspname ~ :schemas "
-    "        OR (n.nspname = 'public' AND c.relname = ANY(:tables)))"
-).bindparams(schemas=GUILD_OR_TEMPLATE_SCHEMA_REGEX)
+def _handover_settings() -> list[tuple[str, str]]:
+    """What :data:`_TRANSFER_STATEMENTS` reads besides the role taking the
+    objects: the app's shared tables, the functions the bootstrap keeps, and
+    the shared roles left owning what they own."""
+    return [
+        ("app._bootstrap_tables", ",".join(sorted(SHARED_TABLE_REGISTRY))),
+        ("app._bootstrap_functions", ",".join(sorted(BOOTSTRAP_OWNED_FUNCTIONS))),
+        ("app._bootstrap_kept_owners", _kept_owners()),
+    ]
+
+
+async def owners_to_hand_over(conn, role: str) -> list[str]:
+    """Who owns what the handover would move to ``role``: the handover's own
+    query, run without its statements, so the two cannot disagree about what
+    belongs to the app."""
+    for key, value in [("app._bootstrap_role", role), *_handover_settings()]:
+        await _set_local(conn, key, value)
+    rows = await conn.execute(
+        text(
+            f"SELECT DISTINCT owner FROM ({_TRANSFER_STATEMENTS}) AS pending ORDER BY 1"
+        )
+    )
+    return [row[0] for row in rows.all()]
 
 
 async def warn_if_ownership_was_never_handed_over() -> None:
@@ -792,31 +778,20 @@ async def warn_if_ownership_was_never_handed_over() -> None:
     provisioner, _app_login, _system = login_roles()
     try:
         async with db_session.provisioning_engine.connect() as conn:
-            owners = sorted(
-                row[0]
-                for row in (
-                    await conn.execute(
-                        _FOREIGN_OWNERS,
-                        {
-                            "owner": provisioner.name,
-                            "tables": sorted(SHARED_TABLE_REGISTRY),
-                        },
-                    )
-                ).all()
-            )
-    except Exception:  # noqa: BLE001 — a diagnostic must never hold up boot
+            owners = await owners_to_hand_over(conn, provisioner.name)
+    except Exception:
         logger.debug("ownership check could not run", exc_info=True)
         return
     if not owners:
         return
 
     if settings.DATABASE_URL_BOOTSTRAP:
+        named = " and ".join(repr(owner) for owner in owners)
         remedy = (
-            "%s is the owner connection, so the move was attempted and\n"
+            f"{owner_setting()} is the owner connection, so the move was attempted and\n"
             "found nothing it could take. Point it at a login with rights\n"
-            "over %s -- the owner of the database, or a superuser -- and\n"
+            f"over {named} -- the owner of the database, or a superuser -- and\n"
             "start once.\n"
-            % (owner_setting(), " and ".join(repr(owner) for owner in owners))
         )
     else:
         remedy = (
@@ -827,7 +802,7 @@ async def warn_if_ownership_was_never_handed_over() -> None:
         )
     logger.warning(
         "\n%s\n"
-        "The app's tables still belong to %s, not to %r. Ownership moves as\n"
+        "The app's objects still belong to %s, not to %r. Ownership moves as\n"
         "part of the bootstrap. Left alone, refreshing the app's functions and\n"
         "each community's schema fails on every start.\n\n"
         "%s"

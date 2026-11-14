@@ -3,8 +3,6 @@
   "subtitle": "Abre una iniciativa para gestionar archivos, proyectos y membresía.",
   "newInitiative": "Nueva iniciativa",
   "selectCommunity": "Selecciona una comunidad",
-  "loading": "Cargando iniciativas…",
-  "loadError": "No se pudieron cargar las iniciativas en este momento.",
   "noDescription": "Sin descripción aún.",
   "members": "Miembros:",
   "createInitiative": "Crear iniciativa",
@@ -15,55 +13,35 @@
   "joinRequests": {
     "dialogTitle": "Solicitar unirse a {{name}}",
     "dialogDescription": "Un gerente de proyecto revisará tu solicitud. Verás la iniciativa cuando te dejen entrar.",
-    "messageLabel": "Mensaje (opcional)",
-    "messagePlaceholder": "Cuenta por qué te gustaría unirte…",
     "messageHint": "Una o dos frases para quien lea la cola.",
-    "send": "Enviar solicitud",
-    "sending": "Enviando…",
     "requested": "Se envió tu solicitud para unirte a {{name}}.",
     "requestError": "No se puede enviar esta solicitud en este momento.",
-    "queueTitle": "Solicitudes para unirse",
     "queueDescription": "Personas que pidieron unirse a esta iniciativa. Aprobar las añade como miembros.",
-    "queueLoadError": "No se pueden cargar las solicitudes en este momento.",
-    "noMessage": "Sin mensaje",
-    "unknownRequester": "Alguien",
-    "priorDenials_one": "Rechazada {{count}} vez antes",
-    "priorDenials_other": "Rechazada {{count}} veces antes",
-    "approve": "Aprobar",
-    "deny": "Rechazar",
     "approved": "{{name}} se unió a la iniciativa.",
     "denied": "Se rechazó la solicitud de {{name}}.",
     "resolveError": "No se puede responder a esta solicitud en este momento."
   },
   "manage": {
-    "description": "Asigna los gestores de proyecto de una iniciativa, archívala para ocultarla de la barra lateral sin eliminarla, concede acceso total a los gestores de proyecto o elimina una iniciativa enviándola a la papelera. Hazte gestor de proyecto para trabajar en una iniciativa desde tu propia barra lateral.",
+    "description": "Todas las iniciativas de esta comunidad y quién las dirige. Haz a alguien gestor de proyecto para ponerlo al frente de una; hazte gestor tú para trabajar en ella desde tu propia barra lateral.",
     "adminRequired": "Debes ser administrador de la comunidad para gestionar iniciativas.",
-    "loading": "Cargando iniciativas…",
-    "loadError": "No se pueden cargar las iniciativas en este momento.",
     "filterByName": "Filtrar por nombre",
-    "idColumn": "ID",
     "nameColumn": "Iniciativa",
-    "membersColumn": "Miembros",
     "managersColumn": "Gestores de proyecto",
-    "statusColumn": "Estado",
     "actionsColumn": "Acciones",
     "memberCount_one": "{{count}} miembro",
     "memberCount_other": "{{count}} miembros",
-    "managerCount_one": "{{count}} gestor",
-    "managerCount_other": "{{count}} gestores",
-    "noManagers": "Ninguno",
+    "noManagers": "Sin gestor",
     "noCandidates": "No se encontraron miembros.",
     "managersUpdated": "Gestores de proyecto actualizados.",
     "managersError": "No se pueden actualizar los gestores de proyecto en este momento.",
     "managersUnavailable": "No se pudieron cargar los roles de esta iniciativa — actualiza la página.",
-    "active": "Activa",
-    "archived": "Archivada",
     "archive": "Archivar",
     "unarchive": "Restaurar",
     "delete": "Eliminar",
     "archivedToast": "Iniciativa \"{{name}}\" archivada.",
     "unarchivedToast": "Iniciativa \"{{name}}\" restaurada.",
-    "deletedToast": "Iniciativa \"{{name}}\" movida a la papelera."
+    "deletedToast": "Iniciativa \"{{name}}\" movida a la papelera.",
+    "openSettings": "Abrir ajustes"
   },
   "createDialog": {
     "title": "Crear iniciativa",
@@ -80,7 +58,6 @@
     "createError": "No se pudo crear la iniciativa en este momento."
   },
   "detail": {
-    "loadingInitiative": "Cargando iniciativa...",
     "backToInitiatives": "← Volver a Mis iniciativas",
     "notFound": "Iniciativa no encontrada",
     "notFoundDescription": "La iniciativa que buscas no existe o ya no tienes acceso.",
@@ -103,7 +80,6 @@
   "settings": {
     "title": "Configuración de la iniciativa",
     "breadcrumbSettings": "Configuración",
-    "loadingInitiative": "Cargando iniciativa...",
     "backToInitiatives": "← Volver a Mis iniciativas",
     "backToInitiative": "← Volver a la iniciativa",
     "notFound": "Iniciativa no encontrada",
@@ -172,7 +148,6 @@
     "roleUpdateError": "No se pudo actualizar el rol en este momento.",
     "rolesTitle": "Permisos de roles",
     "rolesDescription": "Lo que cada rol puede ver y lo que puede crear. Los gestores lo tienen todo.",
-    "loadingRoles": "Cargando roles...",
     "addCustomRole": "Agregar rol personalizado",
     "setByCommunity": "Tu comunidad define esto para todas las iniciativas.",
     "customRolesOff": "Tu comunidad limita las iniciativas a sus roles integrados.",
@@ -276,9 +251,10 @@
     "layouts": {
       "heading": "Diseños",
       "description": "Cómo muestra cada herramienta de esta iniciativa lo que contiene: cada diseño, cuándo cambió por última vez y en qué lista se abre un proyecto. Se cambian en el editor de cada una.",
-      "noProjects": "Esta iniciativa aún no tiene proyectos.",
-      "loadError": "No se pudieron cargar los diseños."
-    }
+      "noProjects": "Esta iniciativa aún no tiene proyectos."
+    },
+    "fixedOn": "Activado",
+    "fixedOff": "Desactivado"
   },
   "advancedTools": "Herramientas",
   "advancedToolsDescription": "Elige de qué se compone esta iniciativa. Los proyectos y los archivos vienen activados; el resto lo añades tú.",
@@ -327,18 +303,101 @@
   "contactsFeature": "Contactos",
   "contactsFeatureDescription": "Las personas y empresas para las que o con las que trabajáis: el cliente, el local, el proveedor, a un toque de una llamada.",
   "communityDefaults": {
-    "title": "Todas las iniciativas",
-    "description": "Una herramienta o un permiso de miembro que definas aquí se aplica en todas las iniciativas de esta comunidad; sus responsables lo ven como definido. Si lo dejas a cada iniciativa, sigue siendo suyo.",
-    "toolsHeading": "Herramientas",
-    "memberHeading": "Lo que pueden hacer los miembros",
-    "memberHelp": "Para el rol integrado Miembro en cada iniciativa.",
-    "choice": {
-      "initiative": "Cada iniciativa decide",
-      "on": "Activado en todas",
-      "off": "Desactivado en todas"
+    "title": "Reglas para todas las iniciativas",
+    "description": "Cada iniciativa decide sus herramientas y lo que pueden hacer sus miembros. Una regla aquí lo decide para todas, y sus responsables la ven como definida. Los responsables y moderadores siempre pueden hacerlo todo.",
+    "add": "Añadir una regla",
+    "empty": "No hay reglas. Cada iniciativa decide sus herramientas y lo que pueden hacer sus miembros.",
+    "editLabel": "Editar la regla de {{tool}}",
+    "removeLabel": "Quitar la regla de {{tool}}",
+    "items": {
+      "calendars": "eventos",
+      "contacts": "contactos",
+      "dashboards": "paneles",
+      "files": "archivos",
+      "posts": "publicaciones",
+      "counterGroups": "contadores",
+      "wikis": "wikis",
+      "projects": "proyectos"
     },
+    "rule": {
+      "toolOn": "Activado en todas las iniciativas.",
+      "toolOff": "Desactivado en todas las iniciativas.",
+      "viewCreate": "Los miembros pueden ver y crear {{items}}.",
+      "viewNotCreate": "Los miembros pueden ver {{items}}; crear queda para los responsables.",
+      "view": "Los miembros pueden ver {{items}}.",
+      "notView": "Los miembros no pueden ver {{items}}.",
+      "create": "Los miembros pueden crear {{items}}.",
+      "notCreate": "Los miembros no pueden crear {{items}}.",
+      "plugin": {
+        "on": "Los miembros tienen «{{permission}}».",
+        "off": "Solo los responsables tienen «{{permission}}»."
+      }
+    },
+    "extra": {
+      "dashboards_run_as_initiative": {
+        "on": "Los miembros pueden ejecutar un panel como la iniciativa.",
+        "off": "Solo los responsables pueden ejecutar un panel como la iniciativa."
+      }
+    },
+    "addTitle": "Añadir una regla",
+    "editTitle": "Regla de {{tool}}",
+    "dialogDescription": "Elige lo que se aplica en todas las iniciativas, también en las que se añadan después. Lo que dejes a cada iniciativa sigue siendo suyo.",
+    "toolLabel": "Herramienta o complemento",
+    "question": {
+      "tool": "¿Está {{tool}} activado?",
+      "view": "¿Pueden los miembros ver {{items}}?",
+      "create": "¿Pueden los miembros crear {{items}}?",
+      "extra": {
+        "dashboards_run_as_initiative": "¿Pueden los miembros ejecutar un panel como la iniciativa?"
+      },
+      "plugin": "¿Tienen los miembros «{{permission}}»?"
+    },
+    "answer": {
+      "tool": {
+        "each": "Cada iniciativa decide",
+        "on": "Activado en todas",
+        "off": "Desactivado en todas"
+      },
+      "member": {
+        "each": "Cada iniciativa decide",
+        "on": "Sí, en todas las iniciativas",
+        "off": "No, solo los responsables"
+      }
+    },
+    "createNeedsView": "Los miembros no pueden crear lo que no pueden ver.",
+    "offNote": "Con {{tool}} desactivado en todas, los miembros no tienen nada que ver ni crear, así que sus respuestas siguen siendo de cada iniciativa.",
+    "reads": "La regla dice:",
+    "noRule": "Sin regla. Cada iniciativa decide.",
+    "changesHeading": "A quién cambia hoy",
+    "changesNone": "A ninguna iniciativa hoy.",
+    "changes": {
+      "tool": {
+        "on": "Activa {{tool}} en {{names}}.",
+        "off": "Desactiva {{tool}} en {{names}}. No se elimina nada de su contenido."
+      },
+      "view": {
+        "on": "Permite a los miembros ver {{items}} en {{names}}.",
+        "off": "Impide a los miembros ver {{items}} en {{names}}."
+      },
+      "create": {
+        "on": "Permite a los miembros crear {{items}} en {{names}}.",
+        "off": "Impide a los miembros crear {{items}} en {{names}}."
+      },
+      "extra": {
+        "dashboards_run_as_initiative": {
+          "on": "Permite a los miembros ejecutar un panel como la iniciativa en {{names}}.",
+          "off": "Impide a los miembros ejecutar un panel como la iniciativa en {{names}}."
+        }
+      },
+      "plugin": {
+        "on": "Da a los miembros «{{permission}}» en {{names}}.",
+        "off": "Quita a los miembros «{{permission}}» en {{names}}."
+      }
+    },
+    "save": "Guardar regla",
+    "remove": "Quitar regla",
+    "customRolesHelp": "Permite a los responsables de cada iniciativa añadir roles propios además de Moderador, Gestor de proyecto y Miembro. Si lo desactivas, los roles que ya añadieron no pueden hacer más que los miembros.",
     "customRolesLabel": "Los responsables pueden añadir roles",
-    "customRolesHelp": "Si está desactivado, las iniciativas no pueden añadir roles, y los roles propios que ya tengan no pueden hacer más que los miembros.",
     "saved": "Guardado para todas las iniciativas",
     "error": "No se pudo guardar"
   }

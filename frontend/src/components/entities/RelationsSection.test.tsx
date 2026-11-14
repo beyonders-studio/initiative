@@ -22,6 +22,7 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
+  ActorKind,
   EndpointKind,
   type RelationshipRead,
   SearchEntityType,
@@ -105,6 +106,8 @@ const row = (
   provenance,
   confidence: null,
   created_by: 1,
+  created_by_kind: ActorKind.member,
+  created_by_install: null,
   created_at: "2026-09-01T00:00:00Z",
   other: {
     ...farEnd,

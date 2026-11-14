@@ -1,9 +1,8 @@
 """Unit tests for the spreadsheet-file renderers.
 
-Focus: the workbook shape. A v3 snapshot has to reach xlsx as one
-worksheet per sheet, a legacy v1/v2 snapshot has to keep rendering, and
-CSV — which cannot express a workbook — has to make its single-sheet
-choice explicit and predictable.
+Focus: the workbook shape. A snapshot has to reach xlsx as one worksheet
+per sheet, and CSV — which cannot express a workbook — has to make its
+single-sheet choice explicit and predictable.
 """
 
 import io
@@ -37,13 +36,6 @@ def test_sheets_of_reads_a_v3_workbook():
     assert [s["name"] for s in sheets_of(content)] == ["One", "Two"]
 
 
-def test_sheets_of_treats_a_legacy_snapshot_as_one_sheet():
-    """A file not re-saved since multi-sheet landed has its structures
-    at the top level and no ``sheets`` key."""
-    legacy = {"schema_version": 2, "kind": "spreadsheet", "cells": {"0:0": "x"}}
-    assert sheets_of(legacy) == [legacy]
-
-
 def test_xlsx_renders_one_worksheet_per_sheet():
     content = _workbook(
         _sheet("Summary", {"0:0": "total", "0:1": "=SUM(Data!A1:A2)"}),
@@ -57,14 +49,9 @@ def test_xlsx_renders_one_worksheet_per_sheet():
     assert book["Data"]["A2"].value == 2
 
 
-def test_xlsx_titles_a_legacy_snapshot_from_the_file_name():
-    legacy = {
-        "schema_version": 2,
-        "kind": "spreadsheet",
-        "dimensions": {"rows": 1, "cols": 1},
-        "cells": {"0:0": "x"},
-    }
-    book = load_workbook(io.BytesIO(render_xlsx(legacy, title="Q2: Numbers/Plan")))
+def test_xlsx_titles_a_nameless_sheet_from_the_file_name():
+    nameless = _workbook(_sheet("", {"0:0": "x"}))
+    book = load_workbook(io.BytesIO(render_xlsx(nameless, title="Q2: Numbers/Plan")))
     # Forbidden characters stripped, capped at Excel's 31.
     assert book.sheetnames == ["Q2 NumbersPlan"]
 
@@ -95,16 +82,6 @@ def test_csv_renders_the_first_sheet_only():
     text = render_csv(content).decode("utf-8")
     assert "a,b" in text
     assert "should not appear" not in text
-
-
-def test_csv_still_renders_a_legacy_snapshot():
-    legacy = {
-        "schema_version": 2,
-        "kind": "spreadsheet",
-        "dimensions": {"rows": 1, "cols": 2},
-        "cells": {"0:0": "a", "0:1": "b"},
-    }
-    assert "a,b" in render_csv(legacy).decode("utf-8")
 
 
 def test_all_hidden_workbook_still_renders() -> None:

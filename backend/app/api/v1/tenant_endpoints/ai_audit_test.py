@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -27,7 +27,6 @@ from app.testing import (
     create_wiki_page,
     emitted,
 )
-
 
 CONNECTION_ID = 41
 

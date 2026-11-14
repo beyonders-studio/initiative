@@ -9,17 +9,17 @@ The rule is decided twice, here and in ``public.platform_factor_satisfied()``,
 and the two have to agree; the last section asks the database directly.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.login_methods import SecondFactorRequirement
+from app.models.platform.api_key import UserApiKey
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.models.platform.api_key import UserApiKey
 from app.models.platform.user_totp import UserTotp
 from app.services.platform import api_keys as api_keys_service
 from app.services.platform import rules
@@ -30,7 +30,6 @@ from app.testing.factories import (
     get_auth_headers,
     get_auth_token,
 )
-
 
 ME_URL = "/api/v1/me"
 GUILDS_URL = "/api/v1/communities/"
@@ -44,7 +43,7 @@ async def _ask(session: AsyncSession, level: SecondFactorRequirement) -> None:
 
 async def _enrol(session: AsyncSession, user) -> None:
     """Give the account an authenticator it has proved."""
-    session.add(UserTotp(user_id=user.id, confirmed_at=datetime.now(timezone.utc)))
+    session.add(UserTotp(user_id=user.id, confirmed_at=datetime.now(UTC)))
     await session.commit()
 
 

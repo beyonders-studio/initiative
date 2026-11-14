@@ -1,4 +1,4 @@
-// Each Intl formatter is built once per locale and options, in src/lib/intl.ts.
+// Each Intl formatter is built once per locale and options, in src/ui/lib/intl.ts.
 // Building one costs far more than using it, so a formatter built inside a
 // render or a loop is refused, as are the methods that build one on every
 // call: toLocaleString, toLocaleDateString, toLocaleTimeString, and
@@ -17,7 +17,7 @@ or {
 } as $call where {
   register_diagnostic(
     span=$call,
-    message="Format through src/lib/intl.ts (dateTimeFormat, numberFormat, listFormat, collator), which builds each formatter once. Building one here repeats that work on every call.",
+    message="Format through src/ui/lib/intl.ts (dateTimeFormat, numberFormat, listFormat, collator), which builds each formatter once. Building one here repeats that work on every call.",
     severity="error"
   )
 }

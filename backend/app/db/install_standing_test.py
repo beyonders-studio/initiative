@@ -10,19 +10,19 @@ existing gates answer from it.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import event, text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
-
-from datetime import datetime, timezone
 
 from app.api.deps import InstallAccessError, VerifiedInstall, establish_install_access
 from app.core.plugin_scopes import ALL_SCOPES
 from app.core.tools import Tool
 from app.db.guild_standing import InstallContext
 from app.db.request_context import ContextShapeError, Install
-from app.db.schema_provisioning import guild_schema_name, GuildRoleKind, guild_role_name
+from app.db.schema_provisioning import GuildRoleKind, guild_role_name, guild_schema_name
 from app.db.session import (
     _RLS_ESTABLISHED_INFO_KEY,
     RLS_CONTEXT_MAX_AGE_SECONDS,
@@ -32,19 +32,18 @@ from app.db.session import (
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.identity_ref import IdentityEntity, IdentityPurpose
 from app.models.platform.plugin_service_registration import RegistrationKind
-from app.models.tenant.plugin_placement import PluginPlacement
-from app.models.tenant.initiative import Initiative
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.models.tenant.initiative import PermissionKey
+from app.models.tenant.initiative import Initiative, PermissionKey
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.platform.identity_refs import ensure_ref
 from app.services.platform.intake_setup import set_operations_guild
 from app.testing import (
-    create_resource_grant,
-    create_plugin_service_registration,
     create_file,
     create_guild_plugin,
     create_initiative,
+    create_plugin_service_registration,
+    create_resource_grant,
     route_as,
     route_as_install,
     route_session_to_guild,
@@ -532,18 +531,18 @@ async def test_an_install_without_a_tool_scope_reads_none_of_it(
     await s.rollback()
 
 
-async def test_the_plugin_role_cannot_read_the_communitys_settings(
+async def test_the_plugin_role_reads_no_setting_but_retention(
     session, acting_user, role_session
 ):
+    """Binning a row reads how long the bin keeps it; nothing else of the
+    community's settings is the role's."""
     install = await _install(session, acting_user, role_session, granted=["files:read"])
     s, _context = await _route(role_session, install, ["files:read"])
+    settings = f'"{guild_schema_name(install.guild.id)}".guild_settings'
+    rows = (await s.exec(text(f"SELECT id, retention_days FROM {settings}"))).all()
+    assert len(rows) == 1
     with pytest.raises(DBAPIError, match="permission denied"):
-        await s.exec(
-            text(
-                f'SELECT count(*) FROM "{guild_schema_name(install.guild.id)}"'
-                ".guild_settings"
-            )
-        )
+        await s.exec(text(f"SELECT * FROM {settings}"))
     await s.rollback()
 
 
@@ -785,8 +784,12 @@ async def test_a_new_transaction_replays_the_install(
         # Whether the registration's publisher is on.
         ("publishers", {"id", "enabled"}),
         # A member token's standing: the member's own membership row, whether
-        # it is live (a guest's ends), and whether their account is active.
-        ("guild_memberships", {"guild_id", "user_id", "guest_until", "role"}),
+        # it is live (a guest's ends), the surfaces it holds, and whether their
+        # account is active.
+        (
+            "guild_memberships",
+            {"guild_id", "user_id", "guest_until", "role", "joined_at"},
+        ),
         ("users", {"id", "status"}),
     ],
 )
@@ -896,14 +899,14 @@ async def test_the_install_role_reads_and_mints_in_its_own_sector_only(
         "created_at, retired_at) "
         "VALUES (:ref, :kind, :entity, :purpose, :g, :i, now(), :retired)"
     )
-    own_sector = dict(
-        kind="user",
-        entity=install.seat.user.id + 1,
-        purpose="plugin",
-        g=install.guild.id,
-        i=CLIENT,
-        retired=None,
-    )
+    own_sector = {
+        "kind": "user",
+        "entity": install.seat.user.id + 1,
+        "purpose": "plugin",
+        "g": install.guild.id,
+        "i": CLIENT,
+        "retired": None,
+    }
 
     async def attempt(sql, **values) -> bool:
         try:
@@ -920,7 +923,7 @@ async def test_the_install_role_reads_and_mints_in_its_own_sector_only(
             {"g": install.guild.id + 1000},
             {"purpose": "billing"},
             {"kind": "guild", "entity": install.guild.id + 1000},
-            {"retired": datetime.now(timezone.utc)},
+            {"retired": datetime.now(UTC)},
         )
     ):
         assert not await attempt(
@@ -942,7 +945,12 @@ async def test_the_install_role_reads_and_mints_in_its_own_sector_only(
 
 
 def _pending(**overrides) -> InstallContext:
-    fields = dict(guild_id=3, install_id=5, client_id=CLIENT, token_scopes=frozenset())
+    fields = {
+        "guild_id": 3,
+        "install_id": 5,
+        "client_id": CLIENT,
+        "token_scopes": frozenset(),
+    }
     fields.update(overrides)
     return InstallContext(**fields)
 
@@ -951,15 +959,15 @@ def _pending(**overrides) -> InstallContext:
     "overrides",
     [
         # A context for another install.
-        dict(install_id=6),
+        {"install_id": 6},
         # No context.
-        dict(standing=None),
+        {"standing": None},
         # No client.
-        dict(token_client_id=""),
+        {"token_client_id": ""},
         # A purpose without the member who consented to it.
-        dict(token_purpose="sync"),
+        {"token_purpose": "sync"},
         # A member the context does not name.
-        dict(member_user_id=7),
+        {"member_user_id": 7},
     ],
 )
 def test_an_install_routing_refuses_what_is_not_its_own(overrides):

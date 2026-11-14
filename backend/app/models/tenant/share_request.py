@@ -11,13 +11,11 @@ the record of what was asked and given. Requests made together share a
 ``batch_id``, which one notice names.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    Uuid,
     CheckConstraint,
     Column,
     DateTime,
@@ -26,6 +24,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Uuid,
     text,
 )
 from sqlmodel import Field, SQLModel
@@ -83,7 +82,7 @@ class ShareRequest(SQLModel, table=True):
         Index("ix_share_requests_resource", "resource_type", "resource_id"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -114,22 +113,22 @@ class ShareRequest(SQLModel, table=True):
         ),
     )
     #: What an approval gave, and to whom.
-    granted_level: Optional[str] = Field(
+    granted_level: str | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
     )
-    scope: Optional[str] = Field(
+    scope: str | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
     )
     #: A note from the requester to whoever answers.
-    message: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    resolved_at: Optional[datetime] = Field(
+    resolved_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    resolved_by: Optional[int] = Field(
+    resolved_by: int | None = Field(
         default=None,
         sa_column=Column(Integer, ForeignKey("users.id"), nullable=True),
     )

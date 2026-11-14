@@ -26,8 +26,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Response, UploadFile
-from fastapi import status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Path,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -40,24 +48,24 @@ from app.api.deps import (
 )
 from app.core.capabilities import Capability
 from app.core.image_headers import image_response
+from app.core.messages import AnnouncementMessages, ImageMessages
+from app.db.request_context import Platform
 from app.db.session import set_rls_context
-from app.core.messages import ImageMessages, AnnouncementMessages
 from app.models.platform.announcement import (
     ANNOUNCEMENT_IMAGE_SPEC,
     Announcement,
 )
 from app.models.platform.user import User
 from app.schemas.platform.announcement import (
-    AnnouncementOperatorListResponse,
-    AnnouncementOperatorRead,
     AnnouncementImageRead,
     AnnouncementListResponse,
+    AnnouncementOperatorListResponse,
+    AnnouncementOperatorRead,
     AnnouncementUpdate,
     AnnouncementWrite,
 )
 from app.services.platform import announcements as announcements_service
 from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
-from app.db.request_context import Platform
 
 router = APIRouter()
 
@@ -89,8 +97,8 @@ async def list_announcements(
 ) -> AnnouncementListResponse:
     """Live announcements for this reader, newest first.
 
-    The archive page asks for the dismissed ones too; an expired notice is
-    gone from both, which is what an end date is for.
+    A bell line opening a notice again asks for the dismissed ones too; an
+    expired notice is gone from both, which is what an end date is for.
     """
     items = await announcements_service.list_for_user(
         session, user=current_user, include_dismissed=include_dismissed

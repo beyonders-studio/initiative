@@ -6,10 +6,10 @@ to change once somebody has answered, and how much of the answer each reader
 is shown.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -112,7 +112,7 @@ async def test_poll_cannot_be_born_closed(client: AsyncClient, acting_user, sess
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _posts_enabled(session, a.initiative)
     post = await create_post(session, a.initiative, a.user)
-    past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
 
     response = await client.put(
         a.g(f"/posts/{post.id}/poll"),
@@ -418,7 +418,7 @@ async def test_a_closed_poll_takes_no_more_answers(
     await _posts_enabled(session, a.initiative)
     post = await create_post(session, a.initiative, a.user)
     poll = await create_post_poll(
-        session, post, closes_at=datetime.now(timezone.utc) - timedelta(minutes=1)
+        session, post, closes_at=datetime.now(UTC) - timedelta(minutes=1)
     )
 
     response = await client.put(
@@ -441,7 +441,7 @@ async def test_a_draft_collects_no_answers(client: AsyncClient, acting_user, ses
         a.initiative,
         a.user,
         published_at=None,
-        scheduled_for=datetime.now(timezone.utc) + timedelta(days=1),
+        scheduled_for=datetime.now(UTC) + timedelta(days=1),
     )
     poll = await create_post_poll(session, post)
 
@@ -555,7 +555,7 @@ async def test_hidden_results_open_when_the_poll_closes(
         session,
         post,
         hide_results=True,
-        closes_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+        closes_at=datetime.now(UTC) - timedelta(minutes=1),
     )
 
     response = await client.get(a.g(f"/posts/{post.id}"), headers=a.headers)
@@ -877,9 +877,7 @@ async def test_a_copy_is_a_draft_whose_lapsed_poll_opens_when_posted(
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _posts_enabled(session, a.initiative)
-    post = await create_post(
-        session, a.initiative, a.user, pinned_at=datetime.now(timezone.utc)
-    )
+    post = await create_post(session, a.initiative, a.user, pinned_at=datetime.now(UTC))
     await create_post_poll(session, post)
     read = await client.get(a.g(f"/posts/{post.id}"), headers=a.headers)
     voted = await client.put(
@@ -891,7 +889,7 @@ async def test_a_copy_is_a_draft_whose_lapsed_poll_opens_when_posted(
     poll = (
         await session.exec(select(PostPoll).where(PostPoll.post_id == post.id))
     ).one()
-    poll.closes_at = datetime.now(timezone.utc) - timedelta(days=1)
+    poll.closes_at = datetime.now(UTC) - timedelta(days=1)
     session.add(poll)
     await session.commit()
 

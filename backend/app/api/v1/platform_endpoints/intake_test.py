@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
 from sqlmodel import select
 
-from app.core.intake import IntakeStream
+from app.api.v1.platform_endpoints.tickets_feedback_test import cloud  # noqa: F401
+from app.core.intake import IntakeStream, offered_streams
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
+from app.models.platform.guild import CommunityRole, Guild
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -25,8 +28,6 @@ from app.testing import (
     get_auth_headers,
     route_session_to_guild,
 )
-from app.models.platform.guild import Guild, CommunityRole
-from app.db.request_context import SystemGuild, Unattributed
 
 
 @pytest.fixture
@@ -59,7 +60,9 @@ async def test_every_stream_is_listed_before_anything_is_configured(client, owne
     assert response.status_code == 200
     body = response.json()
     assert body["operations_community_id"] is None
-    assert {b["stream"] for b in body["bindings"]} == {s.value for s in IntakeStream}
+    assert {b["stream"] for b in body["bindings"]} == {
+        s.value for s in offered_streams()
+    }
     assert all(b["enabled"] is False for b in body["bindings"])
 
 
@@ -170,6 +173,26 @@ async def test_clearing_the_pointer_stops_every_stream(client, session, owner):
     )
 
 
+@pytest.mark.usefixtures("cloud")
+async def test_setting_the_ideas_board_up_names_its_published_type(client, owner):
+    """The type is what publishes an idea, so a board set up from its
+    blueprint publishes its Published tasks and keeps every other type a
+    draft."""
+    await client.put(
+        "/api/v1/settings/intake/community",
+        json={"community_id": owner["guild_id"]},
+        headers=owner["actor"].headers,
+    )
+    response = await client.post(
+        "/api/v1/settings/intake/ideas/blueprint",
+        json={"initiative_id": owner["initiative_id"]},
+        headers=owner["actor"].headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["task_type_name"] == "Published"
+
+
+@pytest.mark.usefixtures("cloud")
 async def test_unbinding_keeps_the_project(client, session, owner):
     await client.put(
         "/api/v1/settings/intake/community",
@@ -442,6 +465,7 @@ async def test_rebinding_the_same_project_finds_the_open_case(client, session, o
     assert again.task_id == opened.task_id
 
 
+@pytest.mark.usefixtures("cloud")
 async def test_the_last_case_time_ignores_ordinary_tasks(client, owner):
     """A blueprint's seed task is not a case, and must not read as one."""
     await client.put(
@@ -460,6 +484,32 @@ async def test_the_last_case_time_ignores_ordinary_tasks(client, owner):
     listed = await client.get("/api/v1/settings/intake", headers=owner["actor"].headers)
     feedback = next(b for b in listed.json()["bindings"] if b["stream"] == "feedback")
     assert feedback["last_case_at"] is not None
+
+
+async def test_only_cloud_sets_feedback_up(client, owner):
+    """Feedback goes to Initiative Cloud from every other server, which lists
+    no Feedback board, binds none and keeps no address for one."""
+    await client.put(
+        "/api/v1/settings/intake/community",
+        json={"community_id": owner["guild_id"]},
+        headers=owner["actor"].headers,
+    )
+    listed = await client.get("/api/v1/settings/intake", headers=owner["actor"].headers)
+    assert "feedback" not in {b["stream"] for b in listed.json()["bindings"]}
+    assert listed.json()["feedback_enabled"] is True
+
+    for method, path, body in (
+        ("POST", "feedback/blueprint", {"initiative_id": owner["initiative_id"]}),
+        ("PUT", "feedback", {"project_id": 1}),
+        ("PUT", "feedback/contact", {"email": "ideas@example.org"}),
+    ):
+        response = await client.request(
+            method,
+            f"/api/v1/settings/intake/{path}",
+            json=body,
+            headers=owner["actor"].headers,
+        )
+        assert response.status_code == 404, path
 
 
 async def test_options_are_empty_before_a_guild_is_named(client, owner):
@@ -533,7 +583,7 @@ async def test_a_stream_cannot_be_bound_to_an_archived_project(client, session, 
         await session.exec(select(User).where(User.id == owner["guild_owner_id"]))
     ).one()
     shelved = await create_project(
-        session, initiative, guild_owner, archived_at=datetime.now(timezone.utc)
+        session, initiative, guild_owner, archived_at=datetime.now(UTC)
     )
     shelved_id = shelved.id
     await set_rls_context(session, Unattributed())
@@ -568,7 +618,7 @@ async def test_a_binding_says_when_its_project_has_been_archived(
     project = (
         await session.exec(select(Project).where(Project.id == project_id))
     ).one()
-    project.archived_at = datetime.now(timezone.utc)
+    project.archived_at = datetime.now(UTC)
     session.add(project)
     await session.commit()
     await set_rls_context(session, Unattributed())
@@ -748,6 +798,7 @@ async def test_a_stream_without_a_conversation_names_no_status_roles(client, own
     assert bound["active_status_id"] is None
 
 
+@pytest.mark.usefixtures("cloud")
 async def test_a_status_role_from_another_project_is_refused(client, owner):
     await _point(client, owner)
     support = (
@@ -807,6 +858,7 @@ async def test_a_stream_that_keeps_to_itself_will_not_share_an_initiative(
     assert refused.json()["detail"] == "INTAKE_INITIATIVE_SHARED"
 
 
+@pytest.mark.usefixtures("cloud")
 async def test_streams_that_do_not_keep_to_themselves_share_freely(client, owner):
     await _point(client, owner)
     for stream in ("support", "feedback"):
@@ -819,6 +871,7 @@ async def test_streams_that_do_not_keep_to_themselves_share_freely(client, owner
         assert response.json()["shares_initiative"] is False
 
 
+@pytest.mark.usefixtures("cloud")
 async def test_a_shared_initiative_bound_before_the_rule_is_flagged(
     client, session, owner
 ):

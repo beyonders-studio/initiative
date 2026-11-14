@@ -10,16 +10,16 @@ own.
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.core.messages import LegalMessages
+from app.db.request_context import Platform
 from app.models.platform.legal_acceptance import LegalAcceptance
 from app.models.platform.user import User
 from app.services.platform import legal as legal_service
-from app.db.request_context import Platform
 
 PORTAL = "https://billing.example.com"
 

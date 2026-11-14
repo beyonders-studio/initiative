@@ -7,10 +7,11 @@ touching a key.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -20,13 +21,13 @@ from app.core.notification_categories import (
     Channel,
     NotificationCategory,
 )
+from app.core.user_input_validators import resolve_zone
 from app.models.platform.user_notification_prefs import (
     DigestCadence,
     EmailCadence,
     UserNotificationPrefs,
 )
 from app.services.platform.presence import IDLE_AFTER_SECONDS
-from app.core.user_input_validators import resolve_zone
 
 #: An account with no row and no keys — every default, nothing overridden.
 EMPTY: dict[str, Any] = {}
@@ -68,7 +69,7 @@ def _override(
     section: Mapping[str, Any],
     category: NotificationCategory,
     channel: Channel,
-) -> Optional[bool]:
+) -> bool | None:
     value = _section(_section(section, "categories"), category.value).get(channel.value)
     return value if isinstance(value, bool) else None
 
@@ -125,17 +126,17 @@ def wants(
 # --- Quiet hours -------------------------------------------------------------
 
 
-def _parse_clock(raw: Any) -> Optional[time]:
+def _parse_clock(raw: Any) -> time | None:
     if not isinstance(raw, str):
         return None
     try:
         hour, minute = raw.split(":", 1)
         return time(hour=int(hour), minute=int(minute))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 
-def quiet_hours(prefs: Mapping[str, Any] | None) -> Optional[tuple[time, time]]:
+def quiet_hours(prefs: Mapping[str, Any] | None) -> tuple[time, time] | None:
     """The account's nightly window, or None where it has not set one."""
     section = _section(prefs or EMPTY, "quiet_hours")
     start = _parse_clock(section.get("start"))
@@ -160,7 +161,7 @@ def in_quiet_hours(
     if window is None:
         return False
     start, end = window
-    moment = (now or datetime.now(timezone.utc)).astimezone(resolve_zone(tz_name))
+    moment = (now or datetime.now(UTC)).astimezone(resolve_zone(tz_name))
     current = moment.time()
     if start < end:
         return start <= current < end
@@ -185,7 +186,7 @@ def last_window_close(
     *,
     tz_name: str | None,
     now: datetime | None = None,
-) -> Optional[tuple[datetime, datetime]]:
+) -> tuple[datetime, datetime] | None:
     """The window that most recently closed, as ``(opened_at, closed_at)``.
 
     Both are absolute instants, so the summary can ask for exactly what was
@@ -198,7 +199,7 @@ def last_window_close(
         return None
     start, end = window
     tz = resolve_zone(tz_name)
-    moment = (now or datetime.now(timezone.utc)).astimezone(tz)
+    moment = (now or datetime.now(UTC)).astimezone(tz)
     if in_quiet_hours(prefs, tz_name=tz_name, now=moment):
         return None
 
@@ -212,7 +213,7 @@ def last_window_close(
 
     if moment - closed > HOLD_SUMMARY_GRACE:
         return None
-    return opened.astimezone(timezone.utc), closed.astimezone(timezone.utc)
+    return opened.astimezone(UTC), closed.astimezone(UTC)
 
 
 # --- Holds -------------------------------------------------------------------
@@ -283,7 +284,7 @@ DIGEST_CLOCKS: Mapping[NotificationCategory, str] = {
 DEFAULT_DIGEST_WEEKDAY = 1
 
 
-def _parse_instant(raw: Any) -> Optional[datetime]:
+def _parse_instant(raw: Any) -> datetime | None:
     if not isinstance(raw, str):
         return None
     try:
@@ -293,15 +294,15 @@ def _parse_instant(raw: Any) -> Optional[datetime]:
     # A value written without an offset is read as UTC rather than rejected:
     # every writer here stamps one, and treating a stray naive value as local
     # would make the answer depend on the server's clock.
-    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
-def pause_until(prefs: Mapping[str, Any] | None) -> Optional[datetime]:
+def pause_until(prefs: Mapping[str, Any] | None) -> datetime | None:
     """When the account's pause ends, whether or not it is still running."""
     return _parse_instant(_section(prefs or EMPTY, "pause").get("until"))
 
 
-def pause_since(prefs: Mapping[str, Any] | None) -> Optional[datetime]:
+def pause_since(prefs: Mapping[str, Any] | None) -> datetime | None:
     """When it begins — which is not always now.
 
     A stand-down can be booked ahead for a holiday somebody already knows
@@ -313,7 +314,7 @@ def pause_since(prefs: Mapping[str, Any] | None) -> Optional[datetime]:
 
 def pause_window(
     prefs: Mapping[str, Any] | None,
-) -> Optional[tuple[datetime, datetime]]:
+) -> tuple[datetime, datetime] | None:
     """The stand-down this account has booked, whenever it runs.
 
     A window rather than an end date, because a pause set for next week is not
@@ -327,7 +328,7 @@ def pause_window(
     # An older row, or one written without a start, ran from the moment it was
     # set — and a start after its own end describes nothing.
     if since is None or since >= until:
-        since = datetime.min.replace(tzinfo=timezone.utc)
+        since = datetime.min.replace(tzinfo=UTC)
     return since, until
 
 
@@ -347,7 +348,7 @@ def quiet_hours_close(
     *,
     tz_name: str | None,
     now: datetime | None = None,
-) -> Optional[datetime]:
+) -> datetime | None:
     """When the window the account is currently inside ends, or None if it is
     not inside one."""
     window = quiet_hours(prefs)
@@ -355,14 +356,14 @@ def quiet_hours_close(
         return None
     _start, end = window
     tz = resolve_zone(tz_name)
-    moment = (now or datetime.now(timezone.utc)).astimezone(tz)
+    moment = (now or datetime.now(UTC)).astimezone(tz)
     if not in_quiet_hours(prefs, tz_name=tz_name, now=moment):
         return None
     close = moment.replace(hour=end.hour, minute=end.minute, second=0, microsecond=0)
     if close <= moment:
         # An overnight window closes on the following day.
         close += timedelta(days=1)
-    return close.astimezone(timezone.utc)
+    return close.astimezone(UTC)
 
 
 def holds_in_force(
@@ -378,7 +379,7 @@ def holds_in_force(
     order a reader would want them named; nothing depends on it.
     """
     prefs = prefs or EMPTY
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     found: list[Hold] = []
 
     window = pause_window(prefs)
@@ -392,7 +393,7 @@ def holds_in_force(
     if last_active_at is not None and respects_presence(prefs):
         seen = last_active_at
         if seen.tzinfo is None:
-            seen = seen.replace(tzinfo=timezone.utc)
+            seen = seen.replace(tzinfo=UTC)
         # A stamp from the future is a clock disagreeing with itself; treat it
         # as now so it holds for the ordinary window rather than forever.
         seen = min(seen, now)
@@ -447,14 +448,14 @@ def last_lift(
     *,
     tz_name: str | None,
     now: datetime | None = None,
-) -> Optional[Lift]:
+) -> Lift | None:
     """The hold that most recently ended, if one did and it is still worth
     reporting.
 
     A pause is the outer hold, so a quiet-hours window that closed during one
     is not reported: the pause will report the whole stretch when it ends.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     window = pause_window(prefs)
     if window is not None:
         since, until = window
@@ -587,7 +588,7 @@ def _next_slot(
             slot += timedelta(days=7)
     elif slot <= local:
         slot += timedelta(days=1)
-    return slot.astimezone(timezone.utc)
+    return slot.astimezone(UTC)
 
 
 def email_due_at(
@@ -609,7 +610,7 @@ def email_due_at(
     slot hours away is already past it.
     """
     prefs = prefs or EMPTY
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     schedule = email_schedule(prefs)
     spec = CATEGORY_SPECS[category]
     # A digest is written at the time the account chose for it, so it is not
@@ -716,7 +717,7 @@ async def save_prefs(
         )
     ).one_or_none()
     record = (row[0] if isinstance(row, tuple) else row) if row is not None else None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if record is None:
         record = UserNotificationPrefs(
             user_id=user_id, prefs=dict(prefs), created_at=now, updated_at=now

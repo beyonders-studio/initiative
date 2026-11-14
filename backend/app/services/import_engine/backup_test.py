@@ -2,7 +2,7 @@
 factory-made community: dates move from an anchor, and an initiative keeps its
 join policy."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -36,12 +36,12 @@ async def exported(client, acting_user, session, tmp_path):
     )
     a.initiative.join_policy = InitiativeJoinPolicy.request.value
     session.add(a.initiative)
-    due = datetime.now(timezone.utc).replace(microsecond=0) + DUE_IN
+    due = datetime.now(UTC).replace(microsecond=0) + DUE_IN
     await create_task(session, a.project, title="Proof the dough", due_date=due)
 
     queued = await client.get(a.g("/exports/community"), headers=a.headers)
     assert queued.status_code == 202, queued.text
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
     job_id = queued.json()["id"]
     job = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     assert job.json()["status"] == DataJobStatus.done.value
@@ -67,7 +67,7 @@ async def _restore(session, a, bundle: Path, anchor: datetime | None) -> Initiat
     )
     await session.commit()
     job_id = job.id
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
     session.expire_all()
     await route_session_to_guild(session, guild_id)
@@ -92,7 +92,7 @@ async def test_an_anchored_backup_lands_its_dates_as_far_from_now(exported, sess
     a, due, bundle = exported
 
     initiative = await _restore(
-        session, a, bundle, anchor=datetime.now(timezone.utc) - timedelta(days=30)
+        session, a, bundle, anchor=datetime.now(UTC) - timedelta(days=30)
     )
 
     # Due two days after the anchor, so two days from now.

@@ -9,23 +9,21 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
-from app.core.search import SearchEntityType
 from app.core.file_types import FileType, is_stored
+from app.core.messages import FileMessages
+from app.core.references import unlink_references
+from app.core.search import SearchEntityType
+from app.db.session import routed_guild_id
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceGrant
-from app.core.references import unlink_references
-from app.core.messages import FileMessages
 from app.services.tenant import attachments as attachments_service
-from app.services.tenant import body_states
+from app.services.tenant import body_states, content_references, file_versions
 from app.services.tenant import collections as collections_service
 from app.services.tenant import comments as comments_service
-from app.services.tenant import content_references
-from app.services.tenant import file_versions
-from app.services.tenant import ownership as ownership_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.collaboration import collaboration_manager, written_into
-from app.db.session import routed_guild_id
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -95,7 +93,7 @@ def normalize_file_content(
         url = str(payload.get("url") or "").strip()
         if not url:
             raise FileContentError(FileMessages.SMART_LINK_URL_REQUIRED)
-        if not (url.startswith("http://") or url.startswith("https://")):
+        if not url.startswith(("http://", "https://")):
             raise FileContentError(FileMessages.SMART_LINK_URL_INVALID)
         return {"url": url}
 
@@ -204,13 +202,13 @@ async def copy_contents(
     copy.content = attachments_service.replace_upload_urls(content, copies)
     copy.featured_image_url = copied(copy.featured_image_url)
     if current is not None:
-        # A plug-in is never an author: its copy names the file's uploader.
+        # The copy is its copier's: a member, or the plug-in or Initiative the
+        # insert trigger names when no member is acting.
         file_versions.copy_version(
             session,
             current,
             copy,
             file_url=copied(file_url),
-            created_by=actor.user_id or current.created_by,
         )
     return []
 

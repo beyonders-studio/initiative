@@ -1,10 +1,10 @@
 import base64
-import hmac as _hmac
 import hashlib as _hashlib
+import hmac as _hmac
 
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import settings
 
@@ -28,7 +28,6 @@ SALT_FCM_SERVICE_ACCOUNT = b"fcm-service-account"
 # The key this server sends to the push relay with, issued when it registered.
 SALT_PUSH_RELAY_KEY = b"push-relay-key"
 SALT_EMAIL = b"email"
-SALT_EVENT_PUBLISHER_PAYLOAD = b"event-publisher-payload"
 # Values a guild (or one of its members) supplies to an installed plug-in's
 # connection form. Held per key inside a JSONB map rather than in a column of
 # its own, because one install can hold several.
@@ -53,6 +52,12 @@ SALT_BIRTHDATE = b"birthdate"  # stored value, do not change
 # token lives ten minutes and is never stored, so a key rotation ends the ones
 # in flight and their plug-ins ask again.
 SALT_PLUGIN_ACCESS_TOKEN = b"app-access-token"  # stored value, do not change
+# A Sign in with Initiative authorization code, on its way through the person's
+# browser to the plug-in that asked. Transient: it lives a minute and is spent once.
+SALT_PLUGIN_SIGN_IN_CODE = b"app-sign-in-code"  # stored value, do not change
+# A Sign in with Initiative refresh token, held by the plug-in's server. Never
+# stored here: it names a sign-in whose session row says whether it stands.
+SALT_PLUGIN_SIGN_IN_REFRESH = b"app-sign-in-refresh"  # stored value, do not change
 # Where a page of a plug-in's installs ends, handed to the plug-in to ask for the next
 # one. Transient: never stored.
 SALT_PLUGIN_INSTALLS_CURSOR = b"app-installs-cursor"  # stored value, do not change

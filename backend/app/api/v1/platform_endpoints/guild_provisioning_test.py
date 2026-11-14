@@ -6,25 +6,24 @@ purge worker is what eventually drops them. The `client` fixture points the
 provisioning engine at the test DB and cleans up any schemas/roles created.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import app.api.v1.platform_endpoints.guilds as guilds_endpoint
+from app.core.rules import DEFAULT_GUILD_RETENTION_DAYS
 from app.db import post_commit
 from app.db.schema_provisioning import guild_role_name, guild_schema_name
-from app.models.platform.guild import Guild, CommunityStatus
-from app.core.rules import DEFAULT_GUILD_RETENTION_DAYS
+from app.models.platform.guild import CommunityStatus, Guild
 from app.services.platform import guild_purge
 from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-
 
 #: A fresh test database carries the shipped window.
 RETENTION = DEFAULT_GUILD_RETENTION_DAYS
@@ -195,7 +194,7 @@ async def test_purge_succeeds_even_if_deprovision_fails(
     session.expunge_all()
     assert (
         await guild_purge.purge_due_guilds(
-            session, now=datetime.now(timezone.utc) + timedelta(days=91)
+            session, now=datetime.now(UTC) + timedelta(days=91)
         )
         == 1
     )

@@ -2,12 +2,7 @@
   "invalidRange": "The end date can't be before the start date.",
   "picker": {
     "invalidEventRange": "The event must end after it starts.",
-    "invalidDate": "Enter a valid calendar date.",
-    "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval.",
-    "pickDate": "Pick a date",
-    "pickDateTime": "Pick a date and time",
-    "typeDate": "Type or pick a date",
-    "time": "Time"
+    "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval."
   },
   "status": {
     "overdue": "Overdue",
@@ -47,49 +42,5 @@
     "10": "October",
     "11": "November",
     "12": "December"
-  },
-  "positions": {
-    "first": "first",
-    "second": "second",
-    "third": "third",
-    "fourth": "fourth",
-    "fifth": "fifth",
-    "last": "last"
-  },
-  "recurrenceSummary": {
-    "doesNotRepeat": "Does not repeat",
-    "repeats": "Repeats {{schedule}}",
-    "everySingular": "every {{unit}}",
-    "everyPlural": "every {{count}} {{unit}}",
-    "day": "day",
-    "days": "days",
-    "week": "week",
-    "weeks": "weeks",
-    "month": "month",
-    "months": "months",
-    "year": "year",
-    "years": "years",
-    "onWeekdays": "on {{weekdays}}",
-    "onDay": "on day {{day}}",
-    "onPositionWeekday": "on the {{position}} {{weekday}}",
-    "detailOfMonth": "{{detail}} of {{month}}",
-    "inMonth": "in {{month}}",
-    "afterCompletion": "after completion",
-    "untilDate": "until {{date}}",
-    "forOccurrences": "for {{count}} occurrences",
-    "custom": "Repeats on a custom schedule",
-    "onDays": "on days {{days}}",
-    "onLastDay": "on the last day",
-    "lastDayItem": "the last day",
-    "onEveryWeekdays": "on every {{weekdays}}",
-    "onFirstWorkDay": "on the first weekday",
-    "onLastWorkDay": "on the last weekday",
-    "onFirstOf": "on the first {{weekdays}}",
-    "onLastOf": "on the last {{weekdays}}",
-    "hour": "hour",
-    "hours": "hours",
-    "everyHour": "every hour",
-    "dailyLimit_one": "at most once per day",
-    "dailyLimit_other": "at most {{count}} times per day"
   }
 }

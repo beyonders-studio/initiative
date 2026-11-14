@@ -37,7 +37,7 @@ import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import jwt
@@ -47,35 +47,38 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
+from app.core.config import API_V1_STR, settings
 from app.core.plugin_access_token import (
     ACCESS_TOKEN_LIFETIME_SECONDS,
-    seal_plugin_token,
     seal_install_token,
+    seal_plugin_token,
 )
 from app.core.plugin_scopes import (
     LEVEL_SCOPES,
-    PluginScopeAccess,
     InstallLevel,
+    PluginScopeAccess,
     UnknownPluginScope,
-    plugin_scope_target,
     expand,
     is_known_scope,
     is_standing_scope,
     parse_scope,
+    plugin_scope_target,
     validate_scopes,
 )
-from app.core.config import API_V1_STR, settings
 from app.db import cohorts
 from app.db.guild_standing import ISSUABLE_SCOPES_SQL
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
+from app.models.platform.guild import GuildMembership
 from app.models.platform.plugin_assertion_jti import ASSERTION_JTI_MAX_LENGTH
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
     registration_live_sql,
 )
-from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User, UserStatus
 from app.models.tenant.plugin_member_consent import ConsentAccess, is_valid_purpose
+from app.services import audit as audit_service
 from app.services.marketplace import (
     plugin_installs,
     plugin_keys,
@@ -83,9 +86,6 @@ from app.services.marketplace import (
     registration_lookup,
 )
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
-from app.db.request_context import SystemGuild
-from app.core.audit_events import AuditEventType
-from app.services import audit as audit_service
 from app.services.membership import live_membership_clause
 
 logger = logging.getLogger(__name__)
@@ -95,12 +95,13 @@ __all__ = [
     "GRANT_CLIENT_CREDENTIALS",
     "GRANT_JWT_BEARER",
     "INITIATIVE_RESOURCE_PREFIX",
+    "TOKEN_PATH",
     "InstallationListing",
     "IssuedToken",
     "OAuthError",
-    "TOKEN_PATH",
     "issue_token",
     "list_installations",
+    "spend_jti",
     "token_endpoint_url",
     "verify_client_assertion",
     "verify_member_assertion",
@@ -333,17 +334,36 @@ async def _verify_signed_assertion(
     if not isinstance(jti, str) or not jti or len(jti) > ASSERTION_JTI_MAX_LENGTH:
         raise fail("the assertion's jti is not usable")
 
-    # One statement: the registration is read fresh (the snapshot may be up to
-    # a minute old) and the jti recorded against it. No row back means the
-    # registration is no longer live, or the jti has been spent.
+    if not await spend_jti(
+        session,
+        public_id=issuer,
+        jti=jti,
+        expires_at=datetime.fromtimestamp(expires_at, tz=UTC),
+        channel="plugin_member_assertion" if member else "plugin_assertion",
+    ):
+        raise fail("the assertion was already used")
+    return snapshot, dict(claims)
+
+
+async def spend_jti(
+    session: AsyncSession,
+    *,
+    public_id: str,
+    jti: str,
+    expires_at: datetime,
+    channel: str,
+) -> bool:
+    """Record ``jti`` as spent by the plug-in ``public_id``, and commit.
+
+    One statement: the registration is read fresh (the snapshot may be up to a
+    minute old) and the jti recorded against it. False when the registration
+    is no longer live or the jti was already spent, which is audited as a
+    replay on ``channel``.
+    """
     spent = (
         await session.exec(
             text(_BURN_JTI_SQL),
-            params={
-                "jti": jti,
-                "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc),
-                "public_id": issuer,
-            },
+            params={"jti": jti, "expires_at": expires_at, "public_id": public_id},
         )
     ).first()
     await session.commit()
@@ -351,13 +371,10 @@ async def _verify_signed_assertion(
         audit_service.emit(
             event_type=AuditEventType.SECURITY_REPLAY_REJECTED,
             actor_user_id=None,
-            detail={
-                "channel": "plugin_member_assertion" if member else "plugin_assertion",
-                "install": issuer,
-            },
+            detail={"channel": channel, "install": public_id},
         )
-        raise fail("the assertion was already used")
-    return snapshot, dict(claims)
+        return False
+    return True
 
 
 # --- grants -------------------------------------------------------------------

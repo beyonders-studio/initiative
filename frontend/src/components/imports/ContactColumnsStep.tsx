@@ -6,15 +6,9 @@ import {
   ContactCsvTarget,
   MetadataType,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useProperties } from "@/hooks/useProperties";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** A column nothing reads, and a detail with no label column. */
 const IGNORE = "ignore";

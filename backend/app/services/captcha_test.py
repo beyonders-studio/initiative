@@ -1,12 +1,14 @@
 """Unit tests for the captcha verification helper.
 
-Mocks the outbound httpx call so the suite doesn't hit the real
+Mocks the outbound httpx2 call so the suite doesn't hit the real
 hCaptcha / Cloudflare / Google endpoints. The provider-specific
 URL lookup and the fail-closed-on-network-error behaviour are the
 load-bearing invariants.
 """
 
 from __future__ import annotations
+
+from typing import Self
 
 import pytest
 from fastapi import HTTPException
@@ -18,7 +20,7 @@ from app.services.captcha_config import ResolvedCaptchaConfig
 
 
 class _FakeResponse:
-    """Minimal stand-in for ``httpx.Response`` covering just the bits
+    """Minimal stand-in for ``httpx2.Response`` covering just the bits
     ``verify_or_raise`` touches."""
 
     def __init__(self, body: dict | None, *, raise_for_status: Exception | None = None):
@@ -42,7 +44,7 @@ class _FakeAsyncClient:
         self.last_url: str | None = None
         self.last_data: dict | None = None
 
-    async def __aenter__(self) -> "_FakeAsyncClient":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *_exc) -> None:
@@ -134,7 +136,7 @@ async def test_provider_routes_to_correct_url(
     def _factory(*_args, **_kwargs):
         return fake_client
 
-    monkeypatch.setattr(captcha_service.httpx, "AsyncClient", _factory)
+    monkeypatch.setattr(captcha_service.httpx2, "AsyncClient", _factory)
 
     await captcha_service.verify_or_raise("token-value", remote_ip="9.9.9.9")
     assert fake_client.last_url == expected_url
@@ -151,7 +153,7 @@ async def test_omits_remote_ip_when_unknown(monkeypatch):
     _configure(monkeypatch, provider="hcaptcha")
     fake_client = _FakeAsyncClient(response=_FakeResponse({"success": True}))
     monkeypatch.setattr(
-        captcha_service.httpx, "AsyncClient", lambda *a, **k: fake_client
+        captcha_service.httpx2, "AsyncClient", lambda *a, **k: fake_client
     )
 
     await captcha_service.verify_or_raise("tok", remote_ip=None)
@@ -167,7 +169,7 @@ async def test_provider_rejection_surfaces_as_400_invalid(monkeypatch):
         )
     )
     monkeypatch.setattr(
-        captcha_service.httpx, "AsyncClient", lambda *a, **k: fake_client
+        captcha_service.httpx2, "AsyncClient", lambda *a, **k: fake_client
     )
 
     from app.services.platform import security_signals
@@ -188,14 +190,14 @@ async def test_network_error_fails_closed(monkeypatch):
     """If the verifier is unreachable we don't want to silently let a
     registration through — that would defeat the captcha. Surface as
     ``CAPTCHA_INVALID`` (the user can retry; ops gets a log line)."""
-    import httpx
+    import httpx2
 
     _configure(monkeypatch, provider="recaptcha")
     fake_client = _FakeAsyncClient(
-        response=None, raise_on_post=httpx.ConnectError("DNS failure")
+        response=None, raise_on_post=httpx2.ConnectError("DNS failure")
     )
     monkeypatch.setattr(
-        captcha_service.httpx, "AsyncClient", lambda *a, **k: fake_client
+        captcha_service.httpx2, "AsyncClient", lambda *a, **k: fake_client
     )
 
     with pytest.raises(HTTPException) as exc:

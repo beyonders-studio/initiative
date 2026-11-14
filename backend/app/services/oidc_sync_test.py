@@ -1,27 +1,30 @@
 """Claim sync: a user's first arrival in a guild beside auto-join enrolment,
 and leaving a tenant whose rules no longer grant a membership."""
 
+from datetime import UTC
+
 import pytest
 from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.rules import SetBy
 from app.db import cohorts, post_commit
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.guild import GuildMembership, CommunityRole
-from app.models.platform.platform_provider_default import PlatformProviderDefault
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
     OIDCMappingTargetType,
 )
-from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.platform.platform_provider_default import PlatformProviderDefault
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.custom_role import (
     CustomRole,
     CustomRoleClaimRule,
     CustomRoleMember,
 )
-from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.services import oidc_sync
 from app.services.oidc_sync import sync_oidc_assignments
@@ -30,21 +33,19 @@ from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
-    create_claim_rule,
-    create_guild_membership,
     NARROWED_CLAIM,
     NARROWED_VALUE,
-    create_guild_provider_connection,
     create_auth_provider,
+    create_claim_rule,
     create_guild,
+    create_guild_membership,
     create_guild_plugin,
+    create_guild_provider_connection,
     create_initiative,
     create_plugin_user_connection,
     create_user,
 )
-from app.db.request_context import SystemGuild, Unattributed
 from app.testing.schema_harness import route_session_to_guild
-
 
 #: What an arrival from the tenant the factory's connections narrow to carries.
 _ADMITTED = {NARROWED_CLAIM: NARROWED_VALUE}
@@ -65,14 +66,26 @@ async def _membership(
     ).one_or_none()
 
 
-async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
+@pytest.mark.parametrize(
+    "on_arrival",
+    [
+        pytest.param(False, id="the rule admits them"),
+        pytest.param(True, id="the connection joins them on arrival"),
+    ],
+)
+async def test_claim_mapped_role_survives_auto_join(
+    session: AsyncSession, on_arrival: bool
+):
     """A mapped role wins over the plain membership auto-join would write.
 
     Both apply to the same initiative on the same first arrival. Enrolment runs
     after the mapping for this reason: it writes a non-oidc-managed row, and the
     mapping loop leaves those alone by design, so enrolling first would silently
-    strand a manager on the member role.
+    strand a manager on the member role. A community its connection joins the
+    person to on arrival is enrolled by the sync too, after the rules.
     """
+    from app.services.auth.guild_provider_connections import join_on_arrival
+
     provider = await create_auth_provider(session)
     owner = await create_user(session)
     guild = await create_guild(session, creator=owner)
@@ -82,7 +95,9 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     pm_role = await get_role_by_name(
         session, initiative_id=initiative.id, role_name="project_manager"
     )
-    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    await create_guild_provider_connection(
+        session, guild=guild, provider=provider, auto_join=on_arrival
+    )
 
     newcomer = await create_user(session)
     await create_claim_rule(
@@ -95,12 +110,24 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     )
 
     await set_rls_context(session, Unattributed())
+    arrived = []
+    if on_arrival:
+        arrived = await join_on_arrival(
+            session,
+            provider_id=provider.id,
+            user_id=newcomer.id,
+            claims=_ADMITTED,
+            auto_join=False,
+        )
+        await post_commit.settle(session)
+        assert arrived == [guild.id]
     await sync_oidc_assignments(
         session,
         user_id=newcomer.id,
         provider_id=provider.id,
         claim_values={"engineering"},
         claims=_ADMITTED,
+        arrived=arrived,
     )
     await session.commit()
 
@@ -111,6 +138,60 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     # The claim's role, not the built-in member role enrolment hands out.
     assert membership.role_id == pm_role.id
     assert membership.oidc_provider_id == provider.id
+
+
+async def test_a_closed_community_still_enrols_who_it_takes_on_arrival(
+    session: AsyncSession,
+):
+    """The sync visits only communities that are open, and enrolment in the
+    ones its connections joined on arrival waits for it. A suspended community
+    it passes over still enrols them, as joining it any other way does."""
+    from app.models.platform.guild import CommunityStatus, Guild
+    from app.services.auth.guild_provider_connections import join_on_arrival
+
+    provider = await create_auth_provider(session)
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(
+        session, guild, owner, name="Onboarding", join_policy="open", auto_join=True
+    )
+    await create_guild_provider_connection(
+        session, guild=guild, provider=provider, auto_join=True
+    )
+    newcomer = await create_user(session)
+    guild_id, initiative_id, user_id = guild.id, initiative.id, newcomer.id
+    provider_id = provider.id
+    session.expire_all()
+    closed = (await session.exec(select(Guild).where(Guild.id == guild_id))).one()
+    closed.status = CommunityStatus.suspended.value
+    session.add(closed)
+    await session.commit()
+
+    await set_rls_context(session, Unattributed())
+    arrived = await join_on_arrival(
+        session,
+        provider_id=provider_id,
+        user_id=user_id,
+        claims=_ADMITTED,
+        auto_join=False,
+    )
+    assert arrived == [guild_id]
+    await sync_oidc_assignments(
+        session,
+        user_id=user_id,
+        provider_id=provider_id,
+        claim_values=set(),
+        claims=_ADMITTED,
+        arrived=arrived,
+    )
+    await post_commit.settle(session)
+
+    assert (
+        await _membership(
+            session, guild_id=guild_id, initiative_id=initiative_id, user_id=user_id
+        )
+        is not None
+    )
 
 
 async def _guild_rule(session: AsyncSession, *, provider_id: int, guild_id: int):
@@ -569,7 +650,7 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     here is the answer already on the record, because there is no one to put
     the question to. A private guild is its own to answer for and admits them.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.platform import rules
 
@@ -580,7 +661,7 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     owner = await create_user(session)
     guild = await create_guild(session, creator=owner)
     if listed:
-        guild.is_community = True
+        guild.join_policy = "open"
         guild.categories = ["other"]
         guild.has_adult_content = False
         session.add(guild)
@@ -589,7 +670,7 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     # The two are the two answers to one question, and ck_users_age_answer
     # holds them apart — so saying one is said is unsaying the other.
     newcomer = await create_user(session, age_confirmed_at=None)
-    newcomer.age_below_minimum_at = datetime.now(timezone.utc)
+    newcomer.age_below_minimum_at = datetime.now(UTC)
     session.add(newcomer)
     session.add(
         OIDCClaimMapping(

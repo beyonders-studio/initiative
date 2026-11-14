@@ -8,7 +8,7 @@ set's fetch is stood in for here; ``plugin_keys_test`` covers it.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -20,7 +20,6 @@ from app.testing.plugin_clients import (
     install_plugin,
     mint_client_assertion,
 )
-
 
 TOKEN_URL = "/api/v1/plugin-platform/oauth/token"
 ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"

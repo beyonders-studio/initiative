@@ -1,6 +1,6 @@
 import type { TaskPriority } from "@/api/generated/initiativeAPI.schemas";
-import { priorityDotClass } from "@/components/projects/projectTasksConfig";
-import { cn } from "@/lib/utils";
+import { priorityDotClass } from "@/components/tools/projects/projectTasksConfig";
+import { cn } from "@/ui/lib/utils";
 
 interface TaskPriorityOptionProps {
   priority: TaskPriority;

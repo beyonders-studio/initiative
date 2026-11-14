@@ -1,6 +1,5 @@
-import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { CalendarClock, Loader2, Vote } from "lucide-react";
+import { CalendarClock, Vote } from "lucide-react";
 import {
   createContext,
   lazy,
@@ -20,7 +19,9 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
-import { PinnedBanner } from "@/components/initiativeTools/posts/PinnedBanner";
+import { ReactionBar } from "@/components/reactions/ReactionBar";
+import { TagBadge } from "@/components/tags/TagBadge";
+import { PinnedBanner } from "@/components/tools/posts/PinnedBanner";
 import {
   emptyPollDraft,
   isPollDraftValid,
@@ -28,31 +29,32 @@ import {
   PollEditor,
   pollDraftFromRead,
   pollDraftToWrite,
-} from "@/components/initiativeTools/posts/PollEditor";
-import { PostByline } from "@/components/initiativeTools/posts/PostByline";
-import { PostPoll } from "@/components/initiativeTools/posts/PostPoll";
-import { ReactionBar } from "@/components/reactions/ReactionBar";
-import { TagBadge } from "@/components/tags/TagBadge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@/components/tools/posts/PollEditor";
+import { PostByline } from "@/components/tools/posts/PostByline";
+import { PostPoll } from "@/components/tools/posts/PostPoll";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { POST_SAVES, useDeletePostPoll, useSetPostPoll, useUpdatePost } from "@/hooks/usePosts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
-import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
 import { referenceRef } from "@/lib/smartChips";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { host } from "@/ui/host";
+import { Label } from "@/ui/label";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { filledBy } from "@/ui/layouts/detailLayout";
+import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/ui/lib/formatDate";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { filledBy } from "./detailLayout";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import { POST_LAYOUT, postFields } from "./posts";
 
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 /** What a notice's detail shares with its parts, beside the notice itself. */
@@ -87,22 +89,18 @@ const useDrafts = (): PostDrafts => {
 /** Leaving with unsaved words is asked about first, for a reload too. */
 const useUnsavedGuard = (dirty: boolean) => {
   const { t } = useTranslation("posts");
-  const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
-    enableBeforeUnload: () => dirty,
-    withResolver: true,
-  });
+  const blocker = host.useBlocker(() => dirty);
   return (
     <ConfirmDialog
-      open={blocker.status === "blocked"}
+      open={blocker.blocked}
       onOpenChange={(open) => {
-        if (!open) blocker.reset?.();
+        if (!open) blocker.reset();
       }}
       title={t("unsaved.title")}
       description={t("unsaved.body")}
       confirmLabel={t("unsaved.leave")}
       cancelLabel={t("unsaved.stay")}
-      onConfirm={() => blocker.proceed?.()}
+      onConfirm={() => blocker.proceed()}
       destructive
     />
   );
@@ -209,10 +207,9 @@ const Body = ({ post }: { post: PostRead }) => {
         <div className="flex justify-end">
           <Button
             size="sm"
-            disabled={update.isPending}
+            pending={update.isPending}
             onClick={() => update.mutate({ body: { ...draft } })}
           >
-            {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {update.isPending ? t("saving") : t("common:save")}
           </Button>
         </div>
@@ -280,10 +277,10 @@ const Poll = ({ post }: { post: PostRead }) => {
               </Button>
               <Button
                 size="sm"
-                disabled={savePoll.isPending || !isPollDraftValid(pollDraft)}
+                disabled={!isPollDraftValid(pollDraft)}
+                pending={savePoll.isPending}
                 onClick={() => savePoll.mutate(pollDraftToWrite(pollDraft))}
               >
-                {savePoll.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {savePoll.isPending ? t("saving") : t("common:save")}
               </Button>
             </div>
@@ -323,7 +320,7 @@ const PostShell = ({ context, children }: { context: PostLayoutContext; children
 };
 
 /** A notice's detail: its tags, its own parts and where it lives. */
-export const POST_DETAIL: DetailKind<PostRead, PostLayoutContext, PostUpdate> = {
+export const POST_DETAIL: InitiativeDetail<PostRead, PostLayoutContext, PostUpdate> = {
   spec: POST_LAYOUT,
   fields: postFields,
   namespaces: ["posts", "common"],
@@ -337,12 +334,13 @@ export const POST_DETAIL: DetailKind<PostRead, PostLayoutContext, PostUpdate> = 
     comments: (_node, post) => <ToolCommentsPanel tool={Tool.post} entity={post} />,
   },
   home: (post, context) => ({
-    saves: POST_SAVES,
+    saves: itemSaves(POST_SAVES, post.id),
     readOnly: !context.canEdit || Boolean(context.preview),
     initiativeId: post.initiative_id,
     canOpen: { tool: Tool.post, id: post.id },
     links: { entity: post, title: post.name },
   }),
+  useExtension: useInitiativeExtension,
   Shell: PostShell,
   filled: filledBy<PostRead, PostUpdate>(
     { tags: (post) => post.tags.length > 0 },

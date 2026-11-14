@@ -12,8 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.notification import Notification, NotificationType
 from app.services import notifications as notifications_service
-from app.services.notifications import MAX_ROLLED_UP_COMMENTERS
-from app.services.notifications import _rolled_up_comment
+from app.services.notifications import MAX_ROLLED_UP_COMMENTERS, _rolled_up_comment
 from app.testing import create_user, drain_notices
 
 

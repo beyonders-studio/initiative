@@ -1,13 +1,11 @@
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import type {
   AccountDeletionResponse,
-  DeletionEligibilityResponse,
   ExportPlatformUsersCsvParams,
   ListAllUsersParams,
   OperatorAccountCaseRead,
-  OperatorDeletionEligibilityResponse,
   OperatorUserDeleteRequest,
   OperatorUserListResponse,
   OperatorUserRead,
@@ -15,18 +13,13 @@ import type {
   VerificationSendResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  checkUserDeletionEligibility,
   clearAgeBlock,
   clearProfileField,
   clearSecondFactor,
   deleteUser,
   exportPlatformUsersCsv,
   getCheckUserDeletionEligibilityQueryKey,
-  getListAccountCasesQueryKey,
-  getListAllUsersQueryKey,
   liftSignInLock,
-  listAccountCases,
-  listAllUsers,
   reactivateUser,
   removeUserAvatar,
   resendVerificationEmail,
@@ -37,10 +30,13 @@ import {
   signUserOutEverywhere,
   triggerPasswordReset,
   updatePlatformRole,
+  useCheckUserDeletionEligibility,
+  useListAccountCases,
+  useListAllUsers,
 } from "@/api/generated/operator/operator";
 import {
-  checkDeletionEligibility,
   getCheckDeletionEligibilityQueryKey,
+  useCheckDeletionEligibility,
 } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
@@ -56,12 +52,7 @@ export const usePlatformUsers = (
   params: ListAllUsersParams,
   options?: QueryOpts<OperatorUserListResponse>
 ) => {
-  return useQuery<OperatorUserListResponse>({
-    queryKey: getListAllUsersQueryKey(params),
-    queryFn: () => listAllUsers(params),
-    placeholderData: keepPreviousData,
-    ...options,
-  });
+  return useListAllUsers(params, { query: { placeholderData: keepPreviousData, ...options } });
 };
 
 /**
@@ -73,11 +64,7 @@ export const useOperatorAccountCases = (
   userId: number,
   options?: QueryOpts<OperatorAccountCaseRead[]>
 ) => {
-  return useQuery<OperatorAccountCaseRead[]>({
-    queryKey: getListAccountCasesQueryKey(userId),
-    queryFn: () => listAccountCases(userId),
-    ...options,
-  });
+  return useListAccountCases(userId, { query: options });
 };
 
 /**
@@ -94,11 +81,7 @@ export const useUserDeletionEligibility = (userId: number, open: boolean) => {
       void queryClient.resetQueries({ queryKey: getCheckUserDeletionEligibilityQueryKey(userId) });
     }
   }, [open, queryClient, userId]);
-  return useQuery<OperatorDeletionEligibilityResponse>({
-    queryKey: getCheckUserDeletionEligibilityQueryKey(userId),
-    queryFn: () => checkUserDeletionEligibility(userId),
-    enabled: false,
-  });
+  return useCheckUserDeletionEligibility(userId, { query: { enabled: false } });
 };
 
 /**
@@ -115,11 +98,7 @@ export const useMyDeletionEligibility = (open: boolean) => {
       void queryClient.resetQueries({ queryKey: getCheckDeletionEligibilityQueryKey() });
     }
   }, [open, queryClient]);
-  return useQuery<DeletionEligibilityResponse>({
-    queryKey: getCheckDeletionEligibilityQueryKey(),
-    queryFn: () => checkDeletionEligibility(),
-    enabled: false,
-  });
+  return useCheckDeletionEligibility({ query: { enabled: false } });
 };
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -139,6 +118,7 @@ export const useOperatorDeleteUser = (
     {
       mutationFn: (request) => deleteUser(userId, request, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:operatorDeleteUser.deleteError",
     },
     options
   );
@@ -151,6 +131,7 @@ export const useOperatorTriggerPasswordReset = (
   useApiMutation<VerificationSendResponse, number>(
     {
       mutationFn: (userId) => triggerPasswordReset(userId, forCase(caseTaskId)),
+      errorKey: "settings:platformUsers.resetError",
     },
     options
   );
@@ -162,6 +143,7 @@ export const useOperatorResendVerification = (
   useApiMutation<VerificationSendResponse, number>(
     {
       mutationFn: (userId) => resendVerificationEmail(userId),
+      errorKey: "settings:platformUsers.resendVerificationError",
     },
     options
   );
@@ -175,6 +157,7 @@ export const useOperatorReactivateUser = (
     {
       mutationFn: (userId) => reactivateUser(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.reactivateError",
     },
     options
   );
@@ -192,6 +175,7 @@ export const useOperatorRestoreUser = (
     {
       mutationFn: (userId) => restoreDeletedUser(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.restoreError",
     },
     options
   );
@@ -209,6 +193,7 @@ export const useOperatorSetUsername = (
       mutationFn: ({ userId, username }) =>
         setUserUsername(userId, { username }, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -233,6 +218,7 @@ export const useOperatorSetSuspension = (
           forCase(caseTaskId)
         ),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -249,6 +235,7 @@ export const useOperatorClearAgeBlock = (
     {
       mutationFn: (userId) => clearAgeBlock(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -263,6 +250,7 @@ export const useOperatorLiftSignInLock = (
     {
       mutationFn: (userId) => liftSignInLock(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -278,6 +266,7 @@ export const useOperatorClearSecondFactor = (
     {
       mutationFn: (userId) => clearSecondFactor(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -292,6 +281,7 @@ export const useOperatorRevokeApiKeys = (
     {
       mutationFn: (userId) => revokeUserApiKeys(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -306,6 +296,7 @@ export const useOperatorRemoveAvatar = (
     {
       mutationFn: (userId) => removeUserAvatar(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -320,6 +311,7 @@ export const useOperatorSignOutEverywhere = (
     {
       mutationFn: (userId) => signUserOutEverywhere(userId, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -339,6 +331,7 @@ export const useOperatorClearProfileField = (
     {
       mutationFn: ({ userId, field }) => clearProfileField(userId, field, forCase(caseTaskId)),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.actionError",
     },
     options
   );
@@ -360,6 +353,7 @@ export const useExportPlatformUsersCsv = (options?: MutationOpts<void, ExportPla
         })) as Blob;
         downloadBlob(blob, filename);
       },
+      errorKey: "settings:platformUsers.exportError",
     },
     options
   );
@@ -378,6 +372,7 @@ export const useOperatorUpdatePlatformRole = (
           forCase(caseTaskId)
         ),
       invalidate: () => invalidate(q.operatorUsers()),
+      errorKey: "settings:platformUsers.roleChangeError",
     },
     options
   );

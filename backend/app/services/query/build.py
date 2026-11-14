@@ -16,16 +16,18 @@ The cutover migration writes its statements through the same functions, so the
 SQL a stored definition was rewritten to and the SQL the builder produces are
 the same SQL.
 
-A description reads one of the registry's datasets, or a range of a
-spreadsheet (``sheet(file, range)``). A range's columns are what the file holds,
-so they are not checked here: the description of the statement that follows,
-which reads the file, refuses a column the range does not have.
+A description reads one of the registry's datasets, a range of a spreadsheet
+(``sheet(file, range)``), or one of a plug-in's read endpoints
+(``plugin(public id, endpoint, name => value, …)``). Their columns are what the
+file holds and what the endpoint declares, so they are not checked here: the
+description of the statement that follows refuses a column they do not have.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any
 
 from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind, BoolExprType, LimitOption, SortByDir
@@ -41,7 +43,14 @@ from app.schemas.query import FilterOp
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
 from app.services.fields.spec import ControlKind
-from app.services.query.resolve import SHEET, VIEWER, QueryError, SheetCall
+from app.services.query.resolve import (
+    PLUGIN,
+    SHEET,
+    VIEWER,
+    PluginCall,
+    QueryError,
+    SheetCall,
+)
 
 #: What a column may be reduced to. Aggregates only — a window function is a
 #: different question and the validator does not admit one.
@@ -79,12 +88,12 @@ class Column:
 
     field: str
     #: Reduce the column across the group, rather than returning it as it is.
-    aggregate: Optional[str] = None
+    aggregate: str | None = None
     #: Round a date down before grouping by it.
-    bucket: Optional[str] = None
+    bucket: str | None = None
     #: What the output column is called. Defaults to the field's own name, or
     #: the aggregate's, so a chart's legend reads as something.
-    alias: Optional[str] = None
+    alias: str | None = None
     #: Add the aggregate up along the grouping, so each row holds everything
     #: up to it: a burn-up rather than a count per week.
     running: bool = False
@@ -112,11 +121,11 @@ class Group:
     """
 
     logic: str = "and"
-    conditions: Sequence["Node"] = field(default_factory=tuple)
+    conditions: Sequence[Node] = field(default_factory=tuple)
 
 
 #: One line of a filter: a comparison, or a bracket around more of them.
-Node = Union[Condition, Group]
+Node = Condition | Group
 
 #: The words a bracket may be held together by.
 _LOGIC = {"and": BoolExprType.AND_EXPR, "or": BoolExprType.OR_EXPR}
@@ -134,27 +143,28 @@ class Sort:
 
 @dataclass(frozen=True)
 class QuerySpec:
-    """What somebody clicked, before it is a statement: about one dataset, or
-    one range of a spreadsheet."""
+    """What somebody clicked, before it is a statement: about one dataset, one
+    range of a spreadsheet, or one of a plug-in's read endpoints."""
 
-    dataset: Optional[str] = None
-    sheet: Optional[SheetCall] = None
+    dataset: str | None = None
+    sheet: SheetCall | None = None
+    plugin: PluginCall | None = None
     columns: Sequence[Column] = field(default_factory=tuple)
     where: Sequence[Node] = field(default_factory=tuple)
     #: Columns to group by, named the way the select list names them.
     group_by: Sequence[str] = field(default_factory=tuple)
-    order_by: Optional[Sort] = None
-    limit: Optional[int] = None
+    order_by: Sort | None = None
+    limit: int | None = None
 
 
-def _split(name: str) -> tuple[Optional[str], str]:
+def _split(name: str) -> tuple[str | None, str]:
     """A field name, and the relation it is read through if it names one."""
     relation, _, field_name = name.rpartition(".")
     return (relation or None), field_name
 
 
 def _column_ref(
-    name: str, base: Optional[str] = None, whole: bool = False
+    name: str, base: str | None = None, whole: bool = False
 ) -> ast.ColumnRef:
     """One column, qualified by the relation it belongs to where it names one.
 
@@ -224,7 +234,7 @@ def _relative(days: Any) -> ast.Node:
 
 
 def _expression(
-    column: Column, base: Optional[str] = None, whole: bool = False
+    column: Column, base: str | None = None, whole: bool = False
 ) -> ast.Node:
     """The select-list expression for one column, innermost first: the field,
     rounded if it is bucketed, reduced if it is aggregated."""
@@ -299,7 +309,7 @@ def _viewer_value(dataset_name: str, condition: Condition) -> bool:
 
 
 def _names_a_person(dataset_name: str, field_name: str) -> bool:
-    if dataset_name == SHEET:
+    if dataset_name in (SHEET, PLUGIN):
         return False
     relation_name, plain = _split(field_name)
     holder = dataset_name
@@ -320,10 +330,10 @@ def _value_node(is_viewer: bool, value: Any) -> ast.Node:
 
 
 def _predicate(
-    dataset_name: str, condition: Condition, base: Optional[str] = None
+    dataset_name: str, condition: Condition, base: str | None = None
 ) -> ast.Node:
     viewer = _viewer_value(dataset_name, condition)
-    left = _column_ref(condition.field, base, whole=dataset_name == SHEET)
+    left = _column_ref(condition.field, base, whole=dataset_name in (SHEET, PLUGIN))
     if condition.op is FilterOp.is_null:
         # The DSL's is_null carries whether it means null or not-null.
         return ast.NullTest(arg=left, nulltesttype=0 if condition.value else 1)
@@ -354,8 +364,8 @@ def _where(
     dataset_name: str,
     nodes: Sequence[Node],
     depth: int = 0,
-    base: Optional[str] = None,
-) -> Optional[ast.Node]:
+    base: str | None = None,
+) -> ast.Node | None:
     """Everything the description asks of a row.
 
     A list is AND-ed, which is what a reader means by writing two lines. A
@@ -375,8 +385,8 @@ def _where(
 
 
 def _node(
-    dataset_name: str, node: Node, depth: int, base: Optional[str] = None
-) -> Optional[ast.Node]:
+    dataset_name: str, node: Node, depth: int, base: str | None = None
+) -> ast.Node | None:
     if depth > MAX_GROUP_DEPTH:
         raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, "group depth")
     if isinstance(node, Group):
@@ -449,7 +459,7 @@ def _leaves(nodes: Sequence[Node]) -> list[Condition]:
 
 def _relations_named(spec: QuerySpec) -> list[str]:
     """The relations this description reads through, in the order first met."""
-    if spec.sheet is not None:
+    if spec.dataset is None:
         return []
     named: list[str] = []
     for name in (
@@ -480,6 +490,23 @@ def _from(spec: QuerySpec, relations: Sequence[str]) -> ast.Node:
             _literal(value)
             for value in (spec.sheet.file, spec.sheet.range)
             if value is not None
+        )
+        return reading
+    if spec.plugin is not None:
+        reading = parse_sql(f"SELECT FROM {PLUGIN}()")[0].stmt.fromClause[0]
+        reading.functions[0][0].args = (
+            _literal(spec.plugin.plugin),
+            _literal(spec.plugin.endpoint),
+            *(
+                ast.NamedArgExpr(
+                    name=name,
+                    arg=ast.A_ArrayExpr(elements=tuple(map(_literal, value)))
+                    if isinstance(value, tuple)
+                    else _literal(value),
+                    argnumber=-1,
+                )
+                for name, value in spec.plugin.params
+            ),
         )
         return reading
     declared = dataset(spec.dataset).by_relation
@@ -525,7 +552,7 @@ def build(spec: QuerySpec) -> str:
     reader sees — so what is stored is what they built, and resolution to
     physical names happens when it runs, like any other statement.
     """
-    if (spec.dataset is None) == (spec.sheet is None):
+    if sum(read is not None for read in (spec.dataset, spec.sheet, spec.plugin)) != 1:
         raise QueryError(QueryMessages.MISSING_RELATION)
     if spec.dataset is not None and spec.dataset not in dataset_names():
         raise QueryError(QueryMessages.UNKNOWN_RELATION, spec.dataset)
@@ -549,7 +576,7 @@ def build(spec: QuerySpec) -> str:
     # about one table reads better without it.
     joined = bool(_relations_named(spec))
     base = spec.dataset if joined else None
-    whole = spec.sheet is not None
+    whole = spec.dataset is None
 
     targets = tuple(
         ast.ResTarget(
@@ -567,7 +594,9 @@ def build(spec: QuerySpec) -> str:
     select = ast.SelectStmt(
         targetList=targets,
         fromClause=(_from(spec, _relations_named(spec)),),
-        whereClause=_where(spec.dataset or SHEET, spec.where, base=base),
+        whereClause=_where(
+            spec.dataset or (SHEET if spec.sheet else PLUGIN), spec.where, base=base
+        ),
         op=0,
     )
 

@@ -9,21 +9,8 @@ import type {
   PersonRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
-import { UserHandle } from "@/components/UserHandle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { UserHandle } from "@/components/user/UserHandle";
 import { parseHandle, useDmPermissions, useRequestConnection } from "@/hooks/useDirectMessages";
 import { useRosterCheck, useStartGroup } from "@/hooks/useMyMessages";
 import { useMoreCommunityPeople, usePeopleSections } from "@/hooks/usePeople";
@@ -31,7 +18,22 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { getInitials } from "@/lib/initials";
 import { toast } from "@/lib/mascotToast";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { cn } from "@/ui/lib/utils";
+import { LoadMore } from "@/ui/load-more";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** How long typing settles before the roster follows it. */
 const SEARCH_SETTLES_MS = 250;
@@ -295,7 +297,9 @@ export const NewConversationDialog = () => {
 
         <div className="-mx-2 max-h-80 overflow-y-auto px-2">
           {sections.isLoading ? (
-            <p className="py-2 text-muted-foreground text-sm">{t("messages:loading")}</p>
+            <SkeletonRegion className="py-2">
+              <ListSkeleton rows={4} />
+            </SkeletonRegion>
           ) : !anybody ? (
             /* A section arrives for every community that has somebody else in
                it, listable or not, so its presence is what separates the two
@@ -363,7 +367,6 @@ const CommunityRoster = ({
   onGather: (person: PersonRead) => void;
   gathered: Set<number>;
 }) => {
-  const { t } = useTranslation(["messages", "connections"]);
   const [wantsMore, setWantsMore] = useState(false);
   const more = useMoreCommunityPeople(section.community_id, search, wantsMore);
 
@@ -409,17 +412,11 @@ const CommunityRoster = ({
           );
         })}
       </ul>
-      {hasMore ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full"
-          disabled={more.isFetching}
-          onClick={() => (wantsMore ? void more.fetchNextPage() : setWantsMore(true))}
-        >
-          {t("messages:newConversation.showMore")}
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={hasMore}
+        loading={more.isFetching}
+        onLoadMore={() => (wantsMore ? void more.fetchNextPage() : setWantsMore(true))}
+      />
     </section>
   );
 };

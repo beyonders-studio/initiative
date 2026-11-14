@@ -4,10 +4,11 @@
  * Who filed it and what they called it, and — where the case's stream holds a
  * conversation with them — that conversation and a way to answer it. It is
  * kept apart from the task's comments: everything here is what the requester
- * reads, and nothing in the thread below ever reaches them.
+ * reads, and nothing in the thread below ever reaches them. A published idea
+ * is a case nobody filed: it shows how many voted for it.
  */
 import { Link } from "@tanstack/react-router";
-import { Inbox, KeyRound, Send, UserCheck } from "lucide-react";
+import { Inbox, KeyRound, Lightbulb, Send, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -17,26 +18,36 @@ import {
   type CaseMessageRead,
   CommentAudience,
   Conversation,
+  type TaskCaseRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { AccessGrantStatusBadge } from "@/components/access/AccessGrantStatusBadge";
 import { CommentContent } from "@/components/comments/CommentContent";
-import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusBadge";
-import { CaseHolds } from "@/components/tickets/CaseHolds";
-import { communityEvidenceUrl, EvidenceList } from "@/components/tickets/Evidence";
-import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { UserHandle } from "@/components/user/UserHandle";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateComment } from "@/hooks/useComments";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
-import { useUpdateTask } from "@/hooks/useTasks";
-import { refreshTaskCase, useTakeCase, useTaskCase } from "@/hooks/useTickets";
-import { minutesLeft } from "@/lib/formatDate";
+import { useCreateTask, useTasks, useUpdateTask } from "@/hooks/useTasks";
+import {
+  refreshTaskCase,
+  useJoinCaseToIdea,
+  useJoinIdeaInto,
+  useTakeCase,
+  useTaskCase,
+} from "@/hooks/useTickets";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { minutesLeft } from "@/ui/lib/formatDate";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
+
+import { CaseHolds } from "./CaseHolds";
+import { communityEvidenceUrl, EvidenceList } from "./Evidence";
 
 interface CasePanelProps {
   taskId: number;
@@ -186,6 +197,132 @@ const CaseAccess = ({
   );
 };
 
+/**
+ * Where a case joins an idea on the Ideas board. Feedback joins one, picked
+ * from the board or made from what is typed, and whoever sent it gets a vote;
+ * an idea joins another, which takes its votes and feedback and archives it.
+ */
+const CaseIdea = ({
+  taskId,
+  found,
+  canEdit,
+}: {
+  taskId: number;
+  found: TaskCaseRead;
+  canEdit: boolean;
+}) => {
+  const { t } = useTranslation(["intake", "common"]);
+  const communityId = useActiveCommunityId();
+  const board = found.ideas_board_id ?? null;
+  const isIdea = found.votes != null;
+  const [search, setSearch] = useState("");
+  const [into, setInto] = useState<{ id: number; title: string } | null>(null);
+  const join = useJoinCaseToIdea(taskId);
+  const joinInto = useJoinIdeaInto(taskId, { onSuccess: () => setInto(null) });
+  const createTask = useCreateTask();
+  const ideas = useTasks(
+    {
+      conditions: [
+        { field: "project_id", op: "eq", value: board },
+        ...(search ? [{ field: "title", op: "ilike" as const, value: search }] : []),
+      ],
+      page_size: 20,
+    },
+    { enabled: board != null && canEdit }
+  );
+  if (board == null) return null;
+  const items = (ideas.data?.items ?? [])
+    .filter((task) => task.id !== taskId)
+    .map((task) => ({ value: String(task.id), label: task.title }));
+  const titleOf = (value: string) => items.find((item) => item.value === value)?.label ?? "";
+  const pending = join.isPending || joinInto.isPending || createTask.isPending;
+  const joined = found.joined_idea;
+
+  const picker = (placeholder: string, onPick: (value: string) => void, create: boolean) => (
+    <Combobox
+      items={items}
+      value={null}
+      onValueChange={onPick}
+      onSearchChange={setSearch}
+      loading={ideas.isFetching}
+      placeholder={placeholder}
+      searchPlaceholder={t("case.idea.search")}
+      emptyMessage={t("case.idea.none")}
+      disabled={pending}
+      {...(create
+        ? {
+            typedLabel: (typed: string) => t("case.idea.create", { title: typed }),
+            onCreate: async (typed: string) => {
+              const made = await createTask.mutateAsync({ project_id: board, title: typed });
+              join.mutate(made.id);
+            },
+          }
+        : {})}
+    />
+  );
+
+  return (
+    <CardContent className="space-y-2 border-t pt-4">
+      <p className="flex items-center gap-2 font-medium text-sm">
+        <Lightbulb className="h-4 w-4" aria-hidden="true" />
+        {t("case.idea.title")}
+      </p>
+      {isIdea ? (
+        canEdit ? (
+          <>
+            {picker(
+              t("case.idea.joinInto"),
+              (value) => setInto({ id: Number(value), title: titleOf(value) }),
+              false
+            )}
+            <ConfirmDialog
+              open={into != null}
+              onOpenChange={(open) => (open ? null : setInto(null))}
+              title={t("case.idea.joinIntoTitle", { title: into?.title ?? "" })}
+              description={t("case.idea.joinIntoBody", { title: into?.title ?? "" })}
+              confirmLabel={t("case.idea.joinIntoConfirm")}
+              isLoading={joinInto.isPending}
+              onConfirm={() => into && joinInto.mutate(into.id)}
+            />
+          </>
+        ) : null
+      ) : joined ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link
+            to="/c/$communityId/go/$refType/$refId"
+            params={{
+              communityId: String(communityId),
+              refType: "task",
+              refId: String(joined.task_id),
+            }}
+            className="min-w-0 font-medium text-sm hover:underline"
+          >
+            {joined.title}
+          </Link>
+          {canEdit ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => join.mutate(null)}
+            >
+              {t("case.idea.unjoin")}
+            </Button>
+          ) : null}
+        </div>
+      ) : canEdit ? (
+        picker(t("case.idea.join"), (value) => join.mutate(Number(value)), true)
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("case.idea.notJoined")}</p>
+      )}
+      <p className="text-muted-foreground text-xs">
+        {t(isIdea ? "case.idea.joinIntoHelp" : "case.idea.help")}
+      </p>
+    </CardContent>
+  );
+};
+
 export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
   const { t } = useTranslation(["intake", "common"]);
   const { user } = useAuth();
@@ -197,10 +334,14 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
   const updateTask = useUpdateTask();
   const filed = useRelativeTime(caseQuery.data?.opened_at ?? null);
 
-  const found = caseQuery.data;
+  // A 404 keeps the last answer cached: a published idea put back to a draft
+  // is no longer a case, though it was one a moment ago.
+  const found = caseQuery.isError ? undefined : caseQuery.data;
   if (!found) return null;
 
   const filerName = found.filer ? getUserDisplayName(found.filer) : null;
+  // A published idea: the board's, not a ticket somebody takes or asks access for.
+  const idea = found.votes != null;
   const mine = user != null && assigneeIds.includes(user.id);
   const awaiting = found.awaiting_filer_status_id ?? null;
   const messages = found.messages ?? [];
@@ -244,7 +385,9 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
           ) : null}
         </CardTitle>
         <p className="text-muted-foreground text-sm">
-          {filerName ? (
+          {idea ? (
+            <>{t("case.votes", { count: found.votes })} · </>
+          ) : filerName ? (
             <>
               {t("case.filedBy")}{" "}
               <UserHoverLink user={found.filer ?? null} className="font-medium text-foreground">
@@ -253,7 +396,8 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
               {" · "}
             </>
           ) : (
-            <>{t("case.noFiler")} · </>
+            // Feedback has no filer where its sender did not offer to be contacted.
+            <>{t(found.stream === "feedback" ? "case.noContact" : "case.noFiler")} · </>
           )}
           {filed}
         </p>
@@ -263,7 +407,7 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
             {found.filer_subject}
           </p>
         ) : null}
-        {mine ? (
+        {idea ? null : mine ? (
           <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
             <UserCheck className="h-4 w-4" aria-hidden="true" />
             {t("case.taken")}
@@ -297,11 +441,14 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
           resourceId={found.resource_id}
         />
       ) : null}
-      <CaseAccess
-        taskId={taskId}
-        grants={found.grants ?? []}
-        subjectCommunityId={found.subject_community_id ?? null}
-      />
+      <CaseIdea taskId={taskId} found={found} canEdit={canEdit} />
+      {idea ? null : (
+        <CaseAccess
+          taskId={taskId}
+          grants={found.grants ?? []}
+          subjectCommunityId={found.subject_community_id ?? null}
+        />
+      )}
       {found.filer && (
         <CardContent className="space-y-3">
           {messages.length > 0 ? (

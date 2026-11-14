@@ -88,10 +88,6 @@ class Header:
         authenticated."""
         return max(1, -(-self.length // self.chunk_size))
 
-    @property
-    def stored_size(self) -> int:
-        return HEADER_SIZE + self.length + self.chunk_count * CHUNK_OVERHEAD
-
     def chunk_span(self, index: int) -> tuple[int, int]:
         """Where chunk ``index`` sits in the stored object: its first byte and
         one past its last."""
@@ -105,7 +101,7 @@ def parse_header(data: bytes) -> Header | None:
     encrypted object (one stored before encryption was on)."""
     if len(data) < HEADER_SIZE or data[:4] != MAGIC:
         return None
-    magic, chunk_size, length, generation, nonce, wrapped = _HEADER.unpack(
+    _magic, chunk_size, length, generation, nonce, wrapped = _HEADER.unpack(
         bytes(data[:HEADER_SIZE])
     )
     if chunk_size <= 0:

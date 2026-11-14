@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings as app_config
-from app.core.encryption import decrypt_field, SALT_S3_SECRET_KEY
+from app.core.encryption import SALT_S3_SECRET_KEY, decrypt_field
 from app.core.messages import SettingsMessages
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # from the DB (covers multi-worker deploys; same-process updates refresh eagerly).
 _TTL_SECONDS = 30.0
 
-_resolved: "ResolvedStorageConfig | None" = None
+_resolved: ResolvedStorageConfig | None = None
 _loaded_at: float = 0.0
 
 
@@ -85,8 +85,8 @@ async def refresh_storage_config(session: AsyncSession) -> ResolvedStorageConfig
     global _resolved, _loaded_at
     # Imported here (not at module top) to avoid an import cycle: app_settings ->
     # storage_config (in update_storage_settings) and back.
-    from app.services import storage  # noqa: PLC0415
-    from app.services.platform.app_settings import get_app_settings  # noqa: PLC0415
+    from app.services import storage
+    from app.services.platform.app_settings import get_app_settings
 
     row = await get_app_settings(session)
     secret = await resolve_saved_secret()
@@ -118,7 +118,7 @@ async def resolve_saved_secret() -> str | None:
     Read on a system-engine session of its own: ``app_setting_secrets`` is
     granted to no request-path role.
     """
-    from app.services.platform.app_settings import (  # noqa: PLC0415
+    from app.services.platform.app_settings import (
         load_app_setting_secrets,
     )
 
@@ -139,9 +139,9 @@ async def test_connection(cfg: ResolvedStorageConfig) -> tuple[bool, str]:
     if not cfg.bucket:
         return False, SettingsMessages.STORAGE_BUCKET_REQUIRED
 
-    import anyio  # noqa: PLC0415
+    import anyio
 
-    from app.services import storage  # noqa: PLC0415
+    from app.services import storage
 
     client = storage.build_s3_client(cfg)
 
@@ -150,7 +150,7 @@ async def test_connection(cfg: ResolvedStorageConfig) -> tuple[bool, str]:
 
     try:
         await anyio.to_thread.run_sync(_head)
-    except Exception as exc:  # noqa: BLE001 — report failure to the owner
+    except Exception as exc:  # report failure to the owner
         logger.warning("storage connection test failed: %s", exc)
         return False, SettingsMessages.STORAGE_CONNECTION_FAILED
     return True, "Connection successful."

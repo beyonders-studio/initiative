@@ -1,7 +1,6 @@
 """API payloads about exports beyond the job itself (``DataJobRead``)."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import ConfigDict
 
@@ -24,10 +23,10 @@ class CommunityExportStatus(SanitizedBaseModel):
     #: has turned the wait off.
     cooldown_hours: int
     #: When the next one may start. ``None`` means now.
-    next_available_at: Optional[datetime] = None
+    next_available_at: datetime | None = None
     #: The newest whole-community export, whatever became of it — a failed or
     #: expired one is still what somebody needs to know about.
-    latest: Optional[DataJobRead] = None
+    latest: DataJobRead | None = None
     #: Who started ``latest``, as this community names people. ``None`` where
     #: that account is gone.
-    latest_started_by: Optional[str] = None
+    latest_started_by: str | None = None

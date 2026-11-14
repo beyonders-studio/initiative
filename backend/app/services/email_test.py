@@ -3,13 +3,14 @@
 import logging
 import smtplib
 from dataclasses import replace
+from datetime import UTC
 from types import SimpleNamespace
 
 import pytest
 
 from app.core.email_i18n import email_t
-from app.services.auth import addresses
 from app.services import email as email_service
+from app.services.auth import addresses
 from app.testing import create_user
 
 EVIL_NAME = '<a href="https://phish.example">Reset your password</a>'
@@ -98,10 +99,11 @@ async def test_join_request_email_renders_and_escapes_the_note(session, monkeypa
 
     monkeypatch.setattr(email_service, "send_email", fake_send_email)
 
-    pieces = email_service.initiative_join_request_pieces(
+    pieces = email_service.join_request_pieces(
         manager,
+        of="initiative",
         event="requested",
-        initiative_name="Parser Guild",
+        name="Parser Guild",
         requester="Ada Lovelace",
         message=EVIL_NAME,
     )
@@ -136,14 +138,16 @@ async def test_join_request_email_renders_and_escapes_the_note(session, monkeypa
 
 
 @pytest.mark.parametrize(
-    ("event", "subject"),
+    ("of", "event", "subject"),
     [
-        ("approved", "You've joined Parser Guild"),
-        ("denied", "Request to join Parser Guild declined"),
+        ("initiative", "approved", "You've joined Parser Guild"),
+        ("initiative", "denied", "Request to join Parser Guild declined"),
+        ("community", "approved", "You've joined Parser Guild"),
+        ("community", "denied", "Request to join Parser Guild declined"),
     ],
 )
 async def test_join_request_outcome_emails_render(
-    session, monkeypatch, event: str, subject: str
+    session, monkeypatch, of, event: str, subject: str
 ):
     """The requester's copy resolves for both outcomes, and omits the note line
     entirely when there is nothing to quote."""
@@ -158,10 +162,8 @@ async def test_join_request_outcome_emails_render(
 
     monkeypatch.setattr(email_service, "send_email", fake_send_email)
 
-    pieces = email_service.initiative_join_request_pieces(
-        requester,
-        event=event,
-        initiative_name="Parser Guild",
+    pieces = email_service.join_request_pieces(
+        requester, of=of, event=event, name="Parser Guild"
     )
     pieces = replace(
         pieces, link="https://app.example/navigate?community_id=1&target=%2Fi"
@@ -172,15 +174,15 @@ async def test_join_request_outcome_emails_render(
     captured.update(subject=pieces.subject, html_body=html_body, text_body=text_body)
 
     assert captured["subject"] == subject
-    assert "initiativeJoinRequest." not in captured["html_body"]
+    assert f"{of}JoinRequest." not in captured["html_body"]
     assert "Parser Guild" in captured["html_body"]
     assert "They wrote" not in captured["html_body"]
 
 
 def test_the_hold_letter_names_the_deletion_day_when_there_is_one():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    day = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    day = datetime(2026, 10, 24, tzinfo=UTC)
     billed, held, undated = (
         email_service.community_on_hold_pieces(
             community="Acme",
@@ -207,13 +209,13 @@ def test_the_hold_letter_names_the_deletion_day_when_there_is_one():
 
 
 def test_the_hold_letter_is_written_in_its_readers_language():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     letter = email_service.community_on_hold_pieces(
         community="Acme",
         contact=None,
         guild_id=7,
-        delete_at=datetime(2026, 3, 4, tzinfo=timezone.utc),
+        delete_at=datetime(2026, 3, 4, tzinfo=UTC),
         plan_managed=True,
         locale="de",
     )

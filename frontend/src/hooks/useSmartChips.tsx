@@ -10,9 +10,6 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { batchedReader } from "@/lib/batchedReader";
 import { referenceRef, storedEntityType } from "@/lib/smartChips";
 
-/** How long an answer is trusted when nothing has said it changed — what a
- *  remount or a tab brought forward asks again after. */
-const STALE_MS = 30_000;
 /**
  * How often a chip asks again with nothing having said it changed.
  *
@@ -71,7 +68,6 @@ const chipQuery = (communityId: number, ref: string, enabled = true) => ({
   queryKey: chipKey(communityId, ref),
   queryFn: () => loadChip(communityId, ref),
   enabled: enabled && communityId > 0,
-  staleTime: STALE_MS,
   refetchInterval: (query: { state: { data?: SmartChipState | null } }) =>
     nextAsk(query.state.data),
 });
@@ -128,6 +124,5 @@ export const useReferenceEmbed = (entityType: SearchEntityType, entityId: number
     queryKey: embedKey(communityId, ref),
     queryFn: () => loadEmbed(communityId, ref),
     enabled: communityId > 0,
-    staleTime: STALE_MS,
   });
 };

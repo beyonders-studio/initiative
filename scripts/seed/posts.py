@@ -7,14 +7,14 @@ written today has nothing for the timeline rail to scrub through.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption, PostPollVote
 from app.models.tenant.post_read import PostRead
 from app.models.tenant.resource_grant import ResourceAccessLevel
-
 from seed.common import NOW, Community, chip, lexical, para, share, tag
 
 #: Each notice. ``paragraphs`` is a plain body; ``parts`` is one paragraph of
@@ -28,10 +28,14 @@ POSTS: dict[str, list[dict]] = {
             "name": "Session 12 moved to Saturday",
             "initiative": "strahd",
             "paragraphs": [
-                "The hall is double-booked on Friday, so we are playing Saturday "
-                "instead. Same time, same place, same amount of Barovian drizzle.",
-                "If Saturday does not work for you, say so in the comments and we will "
-                "look at it again.",
+                (
+                    "The hall is double-booked on Friday, so we are playing Saturday "
+                    "instead. Same time, same place, same amount of Barovian drizzle."
+                ),
+                (
+                    "If Saturday does not work for you, say so in the comments and we will "
+                    "look at it again."
+                ),
             ],
             "created_by": "Dungeon Master",
             "published_at": NOW - timedelta(days=2),
@@ -45,8 +49,10 @@ POSTS: dict[str, list[dict]] = {
             "name": "House rules, in one place at last",
             "initiative": "strahd",
             "paragraphs": [
-                "Inspiration is a d6, not advantage. Death saves are rolled in the "
-                "open. Nobody is allowed to argue with the map.",
+                (
+                    "Inspiration is a d6, not advantage. Death saves are rolled in the "
+                    "open. Nobody is allowed to argue with the map."
+                ),
                 "This one stays at the top so nobody has to go looking for it in the chat.",
             ],
             "created_by": "Dungeon Master",
@@ -160,8 +166,10 @@ POSTS: dict[str, list[dict]] = {
             "name": "Session 13 prep notes",
             "initiative": "strahd",
             "paragraphs": [
-                "Goes up on the morning of the session so nobody reads it a week early "
-                "and forgets it."
+                (
+                    "Goes up on the morning of the session so nobody reads it a week early "
+                    "and forgets it."
+                )
             ],
             "created_by": "Dungeon Master",
             "created_at": NOW - timedelta(days=1),
@@ -216,8 +224,9 @@ async def seed(c: Community) -> None:
             name=d["name"],
             body=_body(c, d),
             created_by=creator.id,
-            created_at=d.get("created_at") or published or datetime.now(timezone.utc),
-            updated_at=published or datetime.now(timezone.utc),
+            created_by_kind=ActorKind.member,
+            created_at=d.get("created_at") or published or datetime.now(UTC),
+            updated_at=published or datetime.now(UTC),
             published_at=published,
             scheduled_for=d.get("scheduled_for"),
             pinned_at=d.get("pinned_at"),
@@ -243,7 +252,7 @@ async def seed(c: Community) -> None:
                     PostRead(
                         post_id=post.id,
                         user_id=c.users[name].id,
-                        read_at=published or datetime.now(timezone.utc),
+                        read_at=published or datetime.now(UTC),
                     )
                 )
                 c.ids["post_reads"].append((post.id, name))

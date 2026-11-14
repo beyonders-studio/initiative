@@ -40,12 +40,12 @@
   "errors": {
     "communityContext": "Unable to determine community context for this task.",
     "statusUpdate": "Unable to update task status.",
-    "statusNoMatch": "Unable to update task status. No matching status found."
+    "statusNoMatch": "Unable to update task status. No matching status found.",
+    "reorder": "Couldn't move the task."
   },
   "updating": "Updating…",
   "projectFallback": "Project #{{id}}",
   "edit": {
-    "loadingTask": "Loading task…",
     "notFound": "Task not found",
     "notFoundDescription": "This task may have been deleted or you may have followed a broken link.",
     "noAccess": "Access denied",
@@ -53,7 +53,6 @@
     "backToProjects": "← Back to projects",
     "loadProjectError": "Unable to load project context for this task.",
     "createdBy": "Created by {{name}} · {{time}}",
-    "createdAt": "Created {{time}}",
     "readOnlyNoAccess": "You only have read access to this project, so task fields are disabled.",
     "readOnlyArchived": "This project is archived. Unarchive it from project settings to edit tasks.",
     "aiGenerate": "AI Generate",
@@ -112,22 +111,17 @@
       "days_other": "{{count}} days",
       "any": "Any date"
     },
-    "loadError": "Focus list unavailable right now.",
     "truncated": "Showing the first {{shown}}. Narrow the date window for a shorter list.",
     "settingsHint": "Pinned tasks always appear, whatever these settings say."
   },
   "myTasks": {
     "title": "My Tasks",
     "noCommunity": "No Community",
-    "loadError": "Unable to load your tasks.",
     "groupByDate": "Date",
     "groupByCommunity": "Community"
   },
   "myCalendar": {
     "title": "My Calendar"
-  },
-  "tagTasks": {
-    "loadError": "Unable to load tasks."
   },
   "ai": {
     "fromComments_one": "Written without the task's comment, which did not fit.",
@@ -182,11 +176,9 @@
   "move": {
     "title": "Move task to another project",
     "description": "Select a destination project within the current community. You can only move tasks to projects where you have permission to create new work.",
-    "loadError": "Unable to load writable projects.",
-    "loading": "Loading available projects…",
     "noProjects": "You don’t have any other writable projects available yet.",
     "searchPlaceholder": "Search projects…",
-    "statusResetWarning": "Moving this task will reset its status to ‘Backlog’.",
+    "statusResetWarning": "Moving this task sets its status to the destination project's default status.",
     "moving": "Moving…",
     "moveTask": "Move task"
   },
@@ -199,8 +191,7 @@
     "noInitiatives": "No initiatives found in this community.",
     "noProjects": "No projects found in this initiative.",
     "back": "Back",
-    "searchProjects": "Search projects…",
-    "loadMore": "Load more"
+    "searchProjects": "Search projects…"
   },
   "bulkEdit": {
     "title": "Edit tasks",

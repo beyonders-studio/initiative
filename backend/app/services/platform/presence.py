@@ -36,10 +36,9 @@ tells a reader less rather than more.
 """
 
 from time import monotonic
-from typing import Dict, Optional, Set
 
-from app.models.platform.user import Presence
 from app.db.request_context import Unattributed
+from app.models.platform.user import Presence
 
 #: How long a person's tabs go without a sign of them before they read as idle.
 #: Long enough to sit through reading a file, short enough that a tab left
@@ -52,7 +51,7 @@ class OnlineRoll:
 
     def __init__(self) -> None:
         # user_id -> how many of that user's sockets are open on this process.
-        self._sockets: Dict[int, int] = {}
+        self._sockets: dict[int, int] = {}
         # user_id -> (what they picked, when this roll learned it). The second
         # half is what settles a disagreement between the two things that say
         # so — see ``_learned``.
@@ -61,14 +60,14 @@ class OnlineRoll:
         # Separate from ``_last_active`` because that is cleared when the last
         # socket goes, and somebody who looked in and left is exactly whose
         # visit still has to be recorded.
-        self._pending: Set[int] = set()
+        self._pending: set[int] = set()
         # Kept past the last socket, deliberately: a choice made with nothing
         # open is exactly the one a connect already in flight must not undo.
         # It is one small entry per account this process has seen.
-        self._chosen: Dict[int, tuple[Presence, float]] = {}
+        self._chosen: dict[int, tuple[Presence, float]] = {}
         # user_id -> monotonic time of the last sign of them. Monotonic because
         # only the gap matters, and a clock that steps must not move it.
-        self._last_active: Dict[int, float] = {}
+        self._last_active: dict[int, float] = {}
 
     def _learned(self, user_id: int, chosen: Presence, known_at: float) -> None:
         """Record a choice, unless this roll already knows a later one.
@@ -89,7 +88,7 @@ class OnlineRoll:
         user_id: int,
         chosen: Presence = Presence.online,
         *,
-        known_at: Optional[float] = None,
+        known_at: float | None = None,
     ) -> None:
         """Register a socket, and the column value it read on the way in.
 
@@ -131,7 +130,7 @@ class OnlineRoll:
             self._last_active[user_id] = monotonic()
             self._pending.add(user_id)
 
-    def drain_pending(self) -> Set[int]:
+    def drain_pending(self) -> set[int]:
         """Take the accounts seen since the last call, and start again.
 
         This roll is already the buffer the durable stamp needs: it is told
@@ -152,7 +151,7 @@ class OnlineRoll:
         since = monotonic() - self._last_active.get(user_id, 0.0)
         return Presence.idle if since >= IDLE_AFTER_SECONDS else Presence.online
 
-    def shown(self) -> Dict[int, Presence]:
+    def shown(self) -> dict[int, Presence]:
         """Everyone this process sees as here, and how each appears.
 
         Bounded by the open sockets, so a roster can ask the database who is
@@ -164,13 +163,6 @@ class OnlineRoll:
             if presence is not Presence.offline:
                 appearing[user_id] = presence
         return appearing
-
-    def is_online(self, user_id: int) -> bool:
-        """Whether this account appears at all — any of the shown states.
-
-        Idle counts: they are here, they are just not typing.
-        """
-        return self.presence_of(user_id) is not Presence.offline
 
 
 #: The one roll every channel feeds and every reader asks.

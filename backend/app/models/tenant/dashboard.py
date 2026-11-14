@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
-from typing import Any, List, Optional, TYPE_CHECKING
-
+from datetime import UTC, datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -28,9 +27,9 @@ from app.models.tenant._mixins import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.models.platform.user_profile_view import MemberProfile
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.resource_grant import ResourceGrant
-    from app.models.platform.user_profile_view import MemberProfile
 
 
 class DashboardViewMode(str, Enum):
@@ -89,7 +88,7 @@ class Dashboard(
         {"implicit_returning": False},
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -99,7 +98,7 @@ class Dashboard(
         ),
     )
     name: str = Field(nullable=False, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000)
     definition: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
@@ -121,22 +120,25 @@ class Dashboard(
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
     initiative: Optional["Initiative"] = Relationship()
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Dashboard.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Dashboard.created_by) == MemberProfile.id,"
+                " Dashboard.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         }
     )
-    grants: List["ResourceGrant"] = Relationship(
+    grants: list["ResourceGrant"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
                 "and_(foreign(ResourceGrant.resource_id) == Dashboard.id, "

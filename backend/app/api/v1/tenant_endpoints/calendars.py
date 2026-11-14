@@ -11,9 +11,9 @@ make one and decide its sharing; a member with a write grant on it writes its
 events.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 
@@ -33,14 +33,14 @@ from app.api.deps import (
     plugin_scope,
     raise_for_guild_access,
 )
-from app.core.rate_limit import limiter
 from app.core.messages import CalendarMessages, GuildMessages
+from app.core.rate_limit import limiter
 from app.core.tools import Tool
 from app.core.user_input_validators import resolve_zone
 from app.models.platform.guild import AdminSurface
+from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.models.platform.user import User
 from app.schemas.tenant.calendar import (
     CalendarCreate,
     CalendarRead,
@@ -49,10 +49,10 @@ from app.schemas.tenant.calendar import (
 from app.schemas.tenant.tool import serialize_tool
 from app.services.export.adapters.calendar_events import event_dicts
 from app.services.export.engine import count_within_bound, get_adapter
-from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.ical_service import ical_from_export_dicts
@@ -95,7 +95,7 @@ async def _feed_user(
     )
 
 
-def _unchanged(if_none_match: Optional[str], etag: str) -> bool:
+def _unchanged(if_none_match: str | None, etag: str) -> bool:
     """Whether ``If-None-Match`` names ``etag``: any tag in its list, weak or
     strong, or ``*``."""
     if if_none_match is None:
@@ -112,7 +112,7 @@ async def calendar_feed(
     calendar_id: int,
     session: SessionDep,
     user: Annotated[User, Depends(_feed_user)],
-    if_none_match: Annotated[Optional[str], Header(alias="If-None-Match")] = None,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
 ) -> Response:
     """The calendar as an iCalendar feed, for another app to subscribe to.
 
@@ -182,7 +182,7 @@ async def create_calendar(
     trigger writes; it sets no initial sharing.
     """
     resource_access.refuse_plugin_sharing(guild_context, calendar_in, "grants")
-    plugin: Optional[GuildPlugin] = None
+    plugin: GuildPlugin | None = None
     initiative_id = calendar_in.initiative_id
 
     if initiative_id is None and current_user is None:
@@ -211,7 +211,6 @@ async def create_calendar(
 
     calendar = Calendar(
         initiative_id=initiative_id,
-        created_by=guild_context.user_id,
         name=calendar_in.name.strip(),
         description=calendar_in.description,
         color=calendar_in.color,
@@ -279,7 +278,7 @@ async def update_calendar(
     if data:
         for field, value in data.items():
             setattr(calendar, field, value)
-        calendar.updated_at = datetime.now(timezone.utc)
+        calendar.updated_at = datetime.now(UTC)
         session.add(calendar)
         await attachments_service.claim_uploads(session, calendar)
         await session.commit()
@@ -294,7 +293,7 @@ async def update_calendar(
 async def read_after_write(
     session: RLSSessionDep,
     calendar_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> CalendarRead:
     """The calendar a write answers with: re-read after the commit, serialized.

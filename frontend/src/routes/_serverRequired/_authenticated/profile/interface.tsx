@@ -1,24 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
-
-const UserSettingsInterfacePage = lazy(() =>
-  import("@/pages/user/settings/UserSettingsInterfacePage").then((m) => ({
-    default: m.UserSettingsInterfacePage,
-  }))
-);
+import { InterfacePage } from "@/pages/my/settings/InterfacePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/profile/interface")({
-  component: InterfacePage,
+  component: InterfaceRoute,
 });
 
-function InterfacePage() {
+function InterfaceRoute() {
   const { user, acceptUser } = useAuth();
   if (!user) return null;
-  return (
-    <Suspense fallback={null}>
-      <UserSettingsInterfacePage user={user} acceptUser={acceptUser} />
-    </Suspense>
-  );
+  return <InterfacePage user={user} acceptUser={acceptUser} />;
 }

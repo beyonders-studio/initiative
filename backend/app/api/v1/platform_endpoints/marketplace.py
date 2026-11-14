@@ -34,7 +34,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import SessionDep, UserSessionDep, SystemSessionDep, CurrentUser
+from app.api.deps import CurrentUser, SessionDep, SystemSessionDep, UserSessionDep
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
 from app.core.audit_events import AuditEventType
 from app.core.image_headers import image_response
@@ -61,12 +61,12 @@ from app.schemas.platform.marketplace_registry import (
 from app.services import audit as audit_service
 from app.services.marketplace import catalog as catalog_service
 from app.services.marketplace import listing_assets, local_listings
-from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
+from app.services.marketplace import operator_catalog as operator_catalog_service
 from app.services.marketplace import tuf_registry as registry_service
 from app.services.marketplace.catalog import CatalogError
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import auth_posture
-from app.services.marketplace import operator_catalog as operator_catalog_service
+from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 
 router = APIRouter()
 

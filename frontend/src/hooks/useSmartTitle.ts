@@ -1,13 +1,12 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type TaskPriority, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { getListTagsQueryKey, listTags } from "@/api/generated/tags/tags";
-import { getListTaskTypesQueryOptions } from "@/api/generated/task-types/task-types";
+import { useListTags } from "@/api/generated/tags/tags";
+import { useListTaskTypes } from "@/api/generated/task-types/task-types";
 import { getSearchUsersQueryOptions } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   handlesIn,
   readTitle,
@@ -18,6 +17,8 @@ import {
   titleWords,
   WORD_KEYS,
 } from "@/lib/smartTitle";
+import { useWeekStart } from "@/ui/host";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -73,22 +74,18 @@ export const useSmartTitle = ({
   enabled: boolean;
 }): SmartTitle => {
   const { user } = useAuth();
+  const weekStartsOn = useWeekStart();
   const words = useTitleWords();
   const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
   const [chosen, setChosen] = useState<TitlePerson[]>([]);
   const hasCommunity = communityId != null;
 
-  const tags = useQuery({
-    queryKey: getListTagsQueryKey(communityId ?? 0),
-    queryFn: () => listTags(communityId ?? 0),
-    staleTime: 60 * 1000,
-    enabled: enabled && hasCommunity && text.includes("#"),
+  const tags = useListTags(communityId ?? 0, {
+    query: { staleTime: 60 * 1000, enabled: enabled && hasCommunity && text.includes("#") },
   });
 
-  const types = useQuery({
-    ...getListTaskTypesQueryOptions(communityId ?? 0, projectId),
-    staleTime: 60 * 1000,
-    enabled: enabled && hasCommunity && text.includes(":"),
+  const types = useListTaskTypes(communityId ?? 0, projectId, {
+    query: { staleTime: 60 * 1000, enabled: enabled && hasCommunity && text.includes(":") },
   });
 
   // Looked up once typing pauses, rather than for every letter of a name.
@@ -141,14 +138,14 @@ export const useSmartTitle = ({
   const context = useMemo<Omit<TitleContext, "now">>(
     () => ({
       words,
-      weekStartsOn: user?.week_starts_on ?? 0,
+      weekStartsOn,
       tags: tags.data ?? [],
       types: types.data ?? [],
       people,
       me,
       kept,
     }),
-    [words, user?.week_starts_on, tags.data, types.data, people, me, kept]
+    [words, weekStartsOn, tags.data, types.data, people, me, kept]
   );
   const read = useCallback(
     (typed: string) => readTitle(typed, { ...context, now: new Date() }),

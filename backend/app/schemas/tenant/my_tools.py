@@ -1,7 +1,5 @@
 """Schemas for the cross-guild tool views."""
 
-from typing import Dict
-
 from pydantic import ConfigDict, Field
 
 from app.schemas.base import SanitizedBaseModel
@@ -18,4 +16,4 @@ class MyToolCountsResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    counts: Dict[str, int] = Field(default_factory=dict)
+    counts: dict[str, int] = Field(default_factory=dict)

@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping, Sequence, cast
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from sqlalchemy import Table, delete, func, insert, update
 from sqlmodel import select
@@ -94,7 +95,7 @@ def row(
 ) -> dict[str, Any]:
     """One row for :func:`enqueue`, every column named, so any batch of them
     is one statement."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         **_BLANK,
         "user_id": user_id,
@@ -438,7 +439,7 @@ async def process_notice_outbox() -> None:
 
     async with SystemSessionLocal() as session:
         await set_rls_context(session, Unattributed())
-        while await _run_pass(session, now=datetime.now(timezone.utc)):
+        while await _run_pass(session, now=datetime.now(UTC)):
             pass
 
 

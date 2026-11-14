@@ -32,8 +32,9 @@ is the same ``SET ROLE guild_<id>`` a ``/c/{community_id}`` request makes.
 # have to be real objects for FastAPI to read them.
 
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Annotated, Any, Callable, List, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import ColumnElement, func, literal, union_all
@@ -53,9 +54,10 @@ from app.api.v1.tenant_endpoints.tool_lists import (
     sort_dir_param,
 )
 from app.core.tools import Tool
-from app.db.session import require_guild_context
 from app.db.query import build_paginated_response
+from app.db.session import require_guild_context
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.schemas.tenant.my_tools import MyToolCountsResponse
 from app.services.cross_guild import (
     gather_across_guilds,
@@ -90,7 +92,7 @@ def _params(tool: Tool, page_size: ListParam) -> tuple[ListParam, ...]:
     plural = tool.plural.replace("_", " ")
     return (
         ListParam(
-            "guild_ids", Optional[List[int]], Query(default=None, alias="community_ids")
+            "guild_ids", list[int] | None, Query(default=None, alias="community_ids")
         ),
         search_param(None),
         ListParam(
@@ -251,6 +253,7 @@ async def _conditions(
     spec = TOOL_LISTS[tool]
     conditions = await list_conditions(spec, request)
     if created_by_me:
+        conditions.append(spec.model.created_by_kind == ActorKind.member)
         conditions.append(spec.model.created_by == user_id)
     return conditions
 
@@ -260,11 +263,11 @@ async def list_across_guilds(
     current_user: User,
     tool: Tool,
     *,
-    guild_ids: Optional[List[int]],
-    search: Optional[str],
+    guild_ids: list[int] | None,
+    search: str | None,
     created_by_me: bool,
-    sort_by: Optional[str],
-    sort_dir: Optional[str],
+    sort_by: str | None,
+    sort_dir: str | None,
     page: int,
     page_size: int,
 ) -> tuple[list, int]:
@@ -424,7 +427,7 @@ def _mount(tool: Tool, spec: MyToolList) -> None:
 async def get_my_tool_counts(
     session: UserSessionDep,
     current_user: CurrentUserDep,
-    guild_ids: Optional[List[int]] = Query(default=None, alias="community_ids"),
+    guild_ids: list[int] | None = Query(default=None, alias="community_ids"),
     created_by_me: bool = Query(
         default=False,
         description="Count only what the caller wrote, matching the list views.",

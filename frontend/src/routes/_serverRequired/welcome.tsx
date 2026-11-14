@@ -8,6 +8,6 @@ export const Route = createFileRoute("/_serverRequired/welcome")({
   component: __IS_CAPACITOR__
     ? NotInApp
     : lazyRouteComponent(() =>
-        import("@/pages/landing/HomePage").then((m) => ({ default: m.HomePage }))
+        import("@/pages/site/welcome/WelcomePage").then((m) => ({ default: m.WelcomePage }))
       ),
 });

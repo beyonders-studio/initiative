@@ -201,8 +201,8 @@ export const isPersistablePath = (path: string): boolean => {
 
 /**
  * The dehydrate filter. Only successful reads of allowlisted paths are kept —
- * a cached error is noise, and every hand-written query key (`["dm", …]`,
- * `["people", …]`) falls out here because its first element is not a path.
+ * a cached error is noise, and every hand-written query key (`["dm", …]`)
+ * falls out here because its first element is not a path.
  */
 export const shouldPersistQuery = (query: Query): boolean => {
   if (query.state.status !== "success") return false;

@@ -11,7 +11,7 @@ import gzip
 import logging
 from unittest.mock import patch
 
-import httpx
+import httpx2
 import pytest
 
 from app.services.safe_http import (
@@ -62,21 +62,20 @@ async def test_host_header_includes_explicit_port():
 
 
 async def test_private_resolution_is_refused():
-    with _resolves_to("10.0.0.5"):
-        with pytest.raises(WebhookTargetUrlPrivateError):
-            await build_validated_request(
-                "POST", "https://internal.example.com/x", content=b""
-            )
+    with _resolves_to("10.0.0.5"), pytest.raises(WebhookTargetUrlPrivateError):
+        await build_validated_request(
+            "POST", "https://internal.example.com/x", content=b""
+        )
 
 
 async def test_send_connects_to_pinned_ip():
     seen = {}
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen["host"] = request.url.host
         seen["host_header"] = request.headers.get("host")
         seen["sni"] = request.extensions.get("sni_hostname")
-        return httpx.Response(200, json={"ok": True})
+        return httpx2.Response(200, json={"ok": True})
 
     with _resolves_to("93.184.216.34"):
         response = await request_public_target(
@@ -85,7 +84,7 @@ async def test_send_connects_to_pinned_ip():
             headers={"Content-Type": "application/json"},
             content=b"{}",
             timeout=5.0,
-            transport=httpx.MockTransport(handler),
+            transport=httpx2.MockTransport(handler),
         )
 
     assert response.status_code == 200
@@ -99,9 +98,9 @@ async def test_send_connects_to_pinned_ip():
 async def test_redirects_are_not_followed():
     calls = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         calls.append(request.url.host)
-        return httpx.Response(
+        return httpx2.Response(
             302, headers={"Location": "https://elsewhere.example.com/"}
         )
 
@@ -110,7 +109,7 @@ async def test_redirects_are_not_followed():
             "GET",
             "https://hooks.example.com/deliver",
             timeout=5.0,
-            transport=httpx.MockTransport(handler),
+            transport=httpx2.MockTransport(handler),
         )
 
     assert response.status_code == 302
@@ -139,11 +138,11 @@ async def test_falls_back_to_next_validated_address(caplog):
     writes one line naming the target's origin, a failure at ``INFO``."""
     seen = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen.append(request.url.host)
         if request.url.host == "93.184.216.34":
-            raise httpx.ConnectError("refused", request=request)
-        return httpx.Response(200, json={"ok": True})
+            raise httpx2.ConnectError("refused", request=request)
+        return httpx2.Response(200, json={"ok": True})
 
     infos = [
         (2, 0, 0, "", ("93.184.216.34", 0)),
@@ -158,7 +157,7 @@ async def test_falls_back_to_next_validated_address(caplog):
             "https://cdn.example.com/deliver?key=abc",
             content=b"{}",
             timeout=5.0,
-            transport=httpx.MockTransport(handler),
+            transport=httpx2.MockTransport(handler),
         )
 
     assert response.status_code == 200
@@ -180,25 +179,25 @@ async def test_connect_timeout_does_not_fall_back():
     the timeout over every validated address."""
     seen = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen.append(request.url.host)
-        raise httpx.ConnectTimeout("timed out", request=request)
+        raise httpx2.ConnectTimeout("timed out", request=request)
 
     infos = [
         (2, 0, 0, "", ("93.184.216.34", 0)),
         (2, 0, 0, "", ("93.184.216.35", 0)),
     ]
-    with patch(
-        "app.services.webhook_target_url.socket.getaddrinfo", return_value=infos
+    with (
+        patch("app.services.webhook_target_url.socket.getaddrinfo", return_value=infos),
+        pytest.raises(httpx2.ConnectTimeout),
     ):
-        with pytest.raises(httpx.ConnectTimeout):
-            await request_public_target(
-                "POST",
-                "https://cdn.example.com/deliver",
-                content=b"{}",
-                timeout=5.0,
-                transport=httpx.MockTransport(handler),
-            )
+        await request_public_target(
+            "POST",
+            "https://cdn.example.com/deliver",
+            content=b"{}",
+            timeout=5.0,
+            transport=httpx2.MockTransport(handler),
+        )
 
     assert seen == ["93.184.216.34"]  # stopped after the timeout; no fallback
 
@@ -233,31 +232,29 @@ async def test_allow_private_permits_http_to_private():
 
 async def test_allow_private_still_rejects_http_to_public():
     """allow_private does not relax the http-to-public prohibition."""
-    with _resolves_to("93.184.216.34"):
-        with pytest.raises(WebhookTargetUrlError):
-            await build_validated_request(
-                "POST", "http://hooks.example.com/in", content=b"", allow_private=True
-            )
+    with _resolves_to("93.184.216.34"), pytest.raises(WebhookTargetUrlError):
+        await build_validated_request(
+            "POST", "http://hooks.example.com/in", content=b"", allow_private=True
+        )
 
 
 async def test_private_target_still_refused_without_allow_private():
     """Default (allow_private=False) still refuses a private target."""
-    with _resolves_to("10.0.0.5"):
-        with pytest.raises(WebhookTargetUrlPrivateError):
-            await build_validated_request(
-                "POST", "https://internal.example.com/x", content=b""
-            )
+    with _resolves_to("10.0.0.5"), pytest.raises(WebhookTargetUrlPrivateError):
+        await build_validated_request(
+            "POST", "https://internal.example.com/x", content=b""
+        )
 
 
 def _gzipped(body: bytes):
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
             200,
             headers={"Content-Encoding": "gzip", "Content-Type": "application/json"},
             content=gzip.compress(body),
         )
 
-    return httpx.MockTransport(handler)
+    return httpx2.MockTransport(handler)
 
 
 async def test_a_bounded_read_is_counted_after_decoding(caplog):
@@ -319,20 +316,20 @@ async def test_a_bounded_read_into_a_sink_replaces_what_it_held():
 async def test_a_pinned_client_sends_nothing_about_the_server_and_reads_a_bounded_reply():
     """An SDK's platform headers are dropped and an uncompressed reply is asked
     for; a compressed reply is refused, and a long one stops at the bound."""
-    seen: list[httpx.Request] = []
+    seen: list[httpx2.Request] = []
     replies = [
-        httpx.Response(200, content=b"ok"),
-        httpx.Response(200, headers={"Content-Encoding": "gzip"}, content=b"x"),
-        httpx.Response(200, content=b"0" * 2_000),
+        httpx2.Response(200, content=b"ok"),
+        httpx2.Response(200, headers={"Content-Encoding": "gzip"}, content=b"x"),
+        httpx2.Response(200, content=b"0" * 2_000),
     ]
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
         return replies[len(seen) - 1]
 
-    transport = PinnedTransport(max_bytes=1_000, inner=httpx.MockTransport(handler))
+    transport = PinnedTransport(max_bytes=1_000, inner=httpx2.MockTransport(handler))
     headers = {"X-Stainless-OS": "Linux", "X-Stainless-Runtime-Version": "3.12"}
-    async with httpx.AsyncClient(transport=transport) as client:
+    async with httpx2.AsyncClient(transport=transport) as client:
         with _resolves_to("93.184.216.34"):
             ok = await client.get("https://llm.example.com/v1/models", headers=headers)
             with pytest.raises(ResponseTooLargeError):

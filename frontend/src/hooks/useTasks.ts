@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -40,14 +40,15 @@ import {
   getListColumnLimitsQueryKey,
   getListTasksQueryKey,
   getReadTaskQueryKey,
+  getReadTaskQueryOptions,
   listTasks,
   moveTask,
   promoteChecklistItem,
-  readTask,
   reorderTasks,
   skipTask,
   toggleChecklistItem,
   updateTask,
+  useReadTask,
 } from "@/api/generated/tasks/tasks";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -56,20 +57,19 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   type FieldSaveKind,
   type FieldSaveOptions,
-  type ItemEdit,
   useItemFieldSave,
   useShownWithPending,
 } from "@/hooks/useFieldSave";
 import { chipKey } from "@/hooks/useSmartChips";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import type { GroupMove } from "@/lib/layouts/grouping";
-import { toast } from "@/lib/mascotToast";
-import { withZone } from "@/lib/recurrence";
+import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import { chipRef } from "@/lib/smartChips";
+import { askForStoreReview } from "@/lib/storeReview";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import type { ItemEdit } from "@/ui/layouts/editing";
+import { withZone } from "@/ui/recurrence/recurrence";
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -80,11 +80,8 @@ import type { QueryOpts } from "@/types/query";
 export const useTask = (taskId: number | null, options?: QueryOpts<TaskRead>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  const query = useQuery<TaskRead>({
-    queryKey: getReadTaskQueryKey(communityId, taskId!),
-    queryFn: () => readTask(communityId, taskId!),
-    enabled: taskId !== null && Number.isFinite(taskId) && userEnabled,
-    ...rest,
+  const query = useReadTask(communityId, taskId!, undefined, {
+    query: { enabled: taskId !== null && Number.isFinite(taskId) && userEnabled, ...rest },
   });
   return useShownWithPending(TASK_SAVES, taskId, query);
 };
@@ -94,11 +91,7 @@ export const useTask = (taskId: number | null, options?: QueryOpts<TaskRead>) =>
 export const useReadTaskNow = () => {
   const communityId = useActiveCommunityId();
   const queryClient = useQueryClient();
-  return (taskId: number) =>
-    queryClient.fetchQuery<TaskRead>({
-      queryKey: getReadTaskQueryKey(communityId, taskId),
-      queryFn: () => readTask(communityId, taskId),
-    });
+  return (taskId: number) => queryClient.fetchQuery(getReadTaskQueryOptions(communityId, taskId));
 };
 
 /** The complete task list for `params`: the one key and fetch every reader of it shares. */
@@ -113,20 +106,16 @@ export const useTasks = (params: ListTasksParams, options?: QueryOpts<TaskListRe
   return useQuery<TaskListResponse>({ ...tasksQuery(communityId, params), ...options });
 };
 
-export const usePrefetchTasks = () => {
-  const qc = useQueryClient();
-  const communityId = useActiveCommunityId();
-  return (params: ListTasksParams) =>
-    qc.prefetchQuery({ ...tasksQuery(communityId, params), staleTime: 30_000 });
-};
-
 // ── Task Mutations ──────────────────────────────────────────────────────────
 
 export const useCreateTask = (options?: MutationOpts<TaskRead, Parameters<typeof createTask>[1]>) =>
   useCommunityMutation<TaskRead, Parameters<typeof createTask>[1]>(
     {
       mutationFn: (communityId, data) => createTask(communityId, data),
-      invalidate: () => invalidate(q.allTasks()),
+      invalidate: () => {
+        askForStoreReview();
+        return invalidate(q.allTasks());
+      },
       errorKey: "projects:tasks.createError",
     },
     options
@@ -140,7 +129,10 @@ export const useCreateTaskInCommunity = (
   useApiMutation<TaskRead, { communityId: number; data: Parameters<typeof createTask>[1] }>(
     {
       mutationFn: ({ communityId, data }) => createTask(communityId, data),
-      invalidate: () => invalidate(q.allTasks()),
+      invalidate: () => {
+        askForStoreReview();
+        return invalidate(q.allTasks());
+      },
       errorKey: "projects:tasks.createError",
     },
     options
@@ -200,57 +192,57 @@ export const useUpdateTask = (
    *  most callers of this are doing. */
   errorKey = "tasks:errors.statusUpdate"
 ) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
+  const { onSuccess, ...rest } = options ?? {};
   const queryClient = useQueryClient();
   const communityId = useActiveCommunityId();
   const { user } = useAuth();
 
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ taskId, data, params }: UpdateTaskVariables) => {
-      return updateTask(communityId, taskId, withZone(data), params);
+  return useApiMutation<
+    TaskRead,
+    UpdateTaskVariables,
+    { previousCategory?: string | null; feedbackFired?: boolean }
+  >(
+    {
+      mutationFn: ({ taskId, data, params }) =>
+        updateTask(communityId, taskId, withZone(data), params),
+      invalidate: (_updated, { taskId }) => invalidate(q.allTasks(), q.task(taskId)),
+      errorKey,
     },
-    onMutate: ({ taskId, statusChange }) => {
-      // Snapshot the task's previous status category so onSuccess can detect
-      // the non-done -> done transition that fires the celebratory effect.
-      const cached = findCachedTask(communityId, queryClient, taskId);
-      if (!statusChange) {
-        return { previousCategory: cached?.task_status?.category ?? null };
-      }
-      // The caller already shows the change, so the feedback goes with it.
-      if (statusChange.to === "done" && statusChange.from !== "done" && user) {
-        const isAssigned = cached?.assignees?.some((assignee) => assignee.id === user.id) ?? false;
-        fireTaskCompletionFeedback(user, { isAssigned });
-      }
-      return { feedbackFired: true };
-    },
-    onSuccess: (...args) => {
-      const [updated, vars, context] = args;
-      void invalidate(q.allTasks(), q.task(vars.taskId));
-
-      // Completion feedback: only when (a) the current user is signed in,
-      // (b) the status actually transitioned non-done -> done. Audio +
-      // haptic always fire on completion the user initiated; visual is
-      // additionally gated on the user being assigned to the task.
-      const ctx = context as
-        | { previousCategory?: string | null; feedbackFired?: boolean }
-        | undefined;
-      const previousCategory = ctx?.previousCategory;
-      const newCategory = updated?.task_status?.category;
-      const movedIntoDone = newCategory === "done" && previousCategory !== "done";
-      if (movedIntoDone && user && !ctx?.feedbackFired) {
-        const isAssigned = updated.assignees?.some((assignee) => assignee.id === user.id) ?? false;
-        fireTaskCompletionFeedback(user, { isAssigned });
-      }
-
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], errorKey));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    {
+      ...rest,
+      onMutate: ({ taskId, statusChange }) => {
+        // Snapshot the task's previous status category so onSuccess can detect
+        // the non-done -> done transition that fires the celebratory effect.
+        const cached = findCachedTask(communityId, queryClient, taskId);
+        if (!statusChange) {
+          return { previousCategory: cached?.task_status?.category ?? null };
+        }
+        // The caller already shows the change, so the feedback goes with it.
+        if (statusChange.to === "done" && statusChange.from !== "done" && user) {
+          const isAssigned =
+            cached?.assignees?.some((assignee) => assignee.id === user.id) ?? false;
+          fireTaskCompletionFeedback(user, { isAssigned });
+        }
+        return { feedbackFired: true, previousCategory: statusChange.from };
+      },
+      onSuccess: (...args) => {
+        const [updated, , context] = args;
+        // Completion feedback: only when (a) the current user is signed in,
+        // (b) the status actually transitioned non-done -> done. Audio +
+        // haptic always fire on completion the user initiated; visual is
+        // additionally gated on the user being assigned to the task.
+        const newCategory = updated?.task_status?.category;
+        const movedIntoDone = newCategory === "done" && context?.previousCategory !== "done";
+        if (movedIntoDone && user && !context?.feedbackFired) {
+          const isAssigned =
+            updated.assignees?.some((assignee) => assignee.id === user.id) ?? false;
+          fireTaskCompletionFeedback(user, { isAssigned });
+        }
+        if (movedIntoDone) askForStoreReview();
+        return onSuccess?.(...args);
+      },
+    }
+  );
 };
 
 /** A change to some of a task's fields: what is sent, and how the task reads
@@ -322,6 +314,11 @@ export const useTaskSaveOptions = (
         fireTaskCompletionFeedback(user, { isAssigned });
       }
     },
+    onSaved: (edit) => {
+      if (edit.shows.task_status?.category === "done" && task.task_status.category !== "done") {
+        askForStoreReview();
+      }
+    },
   };
 };
 
@@ -333,11 +330,16 @@ export const useTaskFieldSave = (
   askScope: AskTaskScope,
   /** Runs when an edit is saved, by Save or by Retry. */
   onSaved?: (edit: TaskEdit) => void
-) =>
-  useItemFieldSave(TASK_SAVES, task.id, label, {
-    ...useTaskSaveOptions(task, askScope),
-    onSaved,
+) => {
+  const options = useTaskSaveOptions(task, askScope);
+  return useItemFieldSave(TASK_SAVES, task.id, label, {
+    ...options,
+    onSaved: (edit) => {
+      options.onSaved?.(edit);
+      onSaved?.(edit);
+    },
   });
+};
 
 /**
  * Tick or untick a task from somewhere that is not its project — a file's
@@ -392,65 +394,62 @@ export const useSetTaskDone = () => {
  * the mutation variables rather than read from the active route. This is a
  * separate endpoint call from {@link useUpdateTask}, which is community-page bound.
  */
+interface UpdateTaskInCommunityVariables {
+  communityId: number;
+  taskId: number;
+  data: Parameters<typeof updateTask>[2];
+}
+
 export const useUpdateTaskInCommunity = (
-  options?: MutationOpts<
-    TaskRead,
-    {
-      communityId: number;
-      taskId: number;
-      data: Parameters<typeof updateTask>[2];
-    }
-  >
+  options?: MutationOpts<TaskRead, UpdateTaskInCommunityVariables>,
+  /** What a failure says. Defaults to the status-change wording, which is what
+   *  most callers of this are doing. */
+  errorKey = "tasks:errors.statusUpdate"
 ) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
+  const { onSuccess, ...rest } = options ?? {};
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  return useMutation({
-    ...rest,
-    mutationFn: async ({
-      communityId,
-      taskId,
-      data,
-    }: {
-      communityId: number;
-      taskId: number;
-      data: Parameters<typeof updateTask>[2];
-    }) => {
-      return updateTask(communityId, taskId, withZone(data));
+  return useApiMutation<
+    TaskRead,
+    UpdateTaskInCommunityVariables,
+    { previousCategory: string | null }
+  >(
+    {
+      mutationFn: ({ communityId, taskId, data }) =>
+        updateTask(communityId, taskId, withZone(data)),
+      invalidate: (_updated, vars) => {
+        void invalidate(q.allTasks(), q.task(vars.taskId));
+        // The task's community needn't be the active one, which `invalidate`
+        // keeps to, and how full its columns are changes with its status.
+        if (vars.data.task_status_id != null || vars.data.status_category != null) {
+          void queryClient.invalidateQueries({
+            queryKey: getListColumnLimitsQueryKey(vars.communityId),
+          });
+        }
+      },
+      errorKey,
     },
-    onMutate: ({ communityId, taskId }) => {
-      const cached = findCachedTask(communityId, queryClient, taskId);
-      return { previousCategory: cached?.task_status?.category ?? null };
-    },
-    onSuccess: (...args) => {
-      const [updated, vars, context] = args;
-      void invalidate(q.allTasks(), q.task(vars.taskId));
-      // The task's community needn't be the active one, which `invalidate`
-      // keeps to, and how full its columns are changes with its status.
-      if (vars.data.task_status_id != null || vars.data.status_category != null) {
-        void queryClient.invalidateQueries({
-          queryKey: getListColumnLimitsQueryKey(vars.communityId),
-        });
-      }
-
-      const previousCategory = (context as { previousCategory?: string | null } | undefined)
-        ?.previousCategory;
-      const newCategory = updated?.task_status?.category;
-      const movedIntoDone = newCategory === "done" && previousCategory !== "done";
-      if (movedIntoDone && user) {
-        const isAssigned = updated.assignees?.some((assignee) => assignee.id === user.id) ?? false;
-        fireTaskCompletionFeedback(user, { isAssigned });
-      }
-
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "tasks:errors.statusUpdate"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    {
+      ...rest,
+      onMutate: ({ communityId, taskId }) => {
+        const cached = findCachedTask(communityId, queryClient, taskId);
+        return { previousCategory: cached?.task_status?.category ?? null };
+      },
+      onSuccess: (...args) => {
+        const [updated, , context] = args;
+        const newCategory = updated?.task_status?.category;
+        const movedIntoDone = newCategory === "done" && context?.previousCategory !== "done";
+        if (movedIntoDone && user) {
+          const isAssigned =
+            updated.assignees?.some((assignee) => assignee.id === user.id) ?? false;
+          fireTaskCompletionFeedback(user, { isAssigned });
+        }
+        if (movedIntoDone) askForStoreReview();
+        return onSuccess?.(...args);
+      },
+    }
+  );
 };
 
 /**
@@ -581,69 +580,70 @@ export const useDuplicateTask = (options?: MutationOpts<TaskRead, number>) =>
   );
 
 export const useReorderTasks = (options?: MutationOpts<TaskRead[], TaskReorderRequest>) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
+  const { onSuccess, ...rest } = options ?? {};
   const queryClient = useQueryClient();
   const communityId = useActiveCommunityId();
   const { user } = useAuth();
 
-  return useMutation({
-    ...rest,
-    mutationFn: async (payload: TaskReorderRequest) => {
-      return reorderTasks(communityId, payload as Parameters<typeof reorderTasks>[1]);
+  return useApiMutation<
+    TaskRead[],
+    TaskReorderRequest,
+    { didTransitionToDone: boolean; assignedTransitionToDone: boolean }
+  >(
+    {
+      mutationFn: (payload) =>
+        reorderTasks(communityId, payload as Parameters<typeof reorderTasks>[1]),
+      invalidate: () => invalidate(q.allTasks()),
+      errorKey: "tasks:errors.reorder",
     },
-    onMutate: (payload) => {
-      // Detect non-done -> done transitions in this reorder by inspecting
-      // only the payload items whose task_status_id actually changed. The
-      // reorder response contains every reordered task in the project, so
-      // checking each response item leads to false positives whenever a
-      // task's cache state is missing or stale (e.g. an already-Done task
-      // filtered out of the kanban view).
-      //
-      // Track two flags separately because audio + haptic fire on any
-      // transition the user initiated, while visual additionally requires
-      // the user to be assigned to the task.
-      let didTransitionToDone = false;
-      let assignedTransitionToDone = false;
-      if (user) {
-        for (const item of payload.items) {
-          const cached = findCachedTask(communityId, queryClient, item.id);
-          if (!cached) continue;
-          if (cached.task_status_id === item.task_status_id) continue; // unchanged
-          if (cached.task_status?.category === "done") continue; // already done
-          const newStatus = queryClient
-            .getQueryData<TaskStatusRead[]>(
-              getListTaskStatusesQueryKey(communityId, cached.project_id)
-            )
-            ?.find((s) => s.id === item.task_status_id);
-          if (newStatus?.category !== "done") continue; // not moving into done
-          didTransitionToDone = true;
-          const isAssigned = cached.assignees?.some((assignee) => assignee.id === user.id) ?? false;
-          if (isAssigned) {
-            assignedTransitionToDone = true;
-            break; // any assignment guarantees both flags; no need to keep scanning
+    {
+      ...rest,
+      onMutate: (payload) => {
+        // Detect non-done -> done transitions in this reorder by inspecting
+        // only the payload items whose task_status_id actually changed. The
+        // reorder response contains every reordered task in the project, so
+        // checking each response item leads to false positives whenever a
+        // task's cache state is missing or stale (e.g. an already-Done task
+        // filtered out of the kanban view).
+        //
+        // Track two flags separately because audio + haptic fire on any
+        // transition the user initiated, while visual additionally requires
+        // the user to be assigned to the task.
+        let didTransitionToDone = false;
+        let assignedTransitionToDone = false;
+        if (user) {
+          for (const item of payload.items) {
+            const cached = findCachedTask(communityId, queryClient, item.id);
+            if (!cached) continue;
+            if (cached.task_status_id === item.task_status_id) continue; // unchanged
+            if (cached.task_status?.category === "done") continue; // already done
+            const newStatus = queryClient
+              .getQueryData<TaskStatusRead[]>(
+                getListTaskStatusesQueryKey(communityId, cached.project_id)
+              )
+              ?.find((s) => s.id === item.task_status_id);
+            if (newStatus?.category !== "done") continue; // not moving into done
+            didTransitionToDone = true;
+            const isAssigned =
+              cached.assignees?.some((assignee) => assignee.id === user.id) ?? false;
+            if (isAssigned) {
+              assignedTransitionToDone = true;
+              break; // any assignment guarantees both flags; no need to keep scanning
+            }
           }
         }
-      }
-      return { didTransitionToDone, assignedTransitionToDone };
-    },
-    onSuccess: (...args) => {
-      const [, , context] = args;
-      void invalidate(q.allTasks());
-
-      const ctx = context as
-        | { didTransitionToDone?: boolean; assignedTransitionToDone?: boolean }
-        | undefined;
-      if (ctx?.didTransitionToDone && user) {
-        fireTaskCompletionFeedback(user, {
-          isAssigned: ctx.assignedTransitionToDone ?? false,
-        });
-      }
-
-      onSuccess?.(...args);
-    },
-    onError: onError,
-    onSettled,
-  });
+        return { didTransitionToDone, assignedTransitionToDone };
+      },
+      onSuccess: (...args) => {
+        const [, , context] = args;
+        if (context?.didTransitionToDone && user) {
+          fireTaskCompletionFeedback(user, { isAssigned: context.assignedTransitionToDone });
+        }
+        if (context?.didTransitionToDone) askForStoreReview();
+        return onSuccess?.(...args);
+      },
+    }
+  );
 };
 
 export const useArchiveDoneTasks = (

@@ -11,7 +11,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { useServerForm } from "@/hooks/useServerForm";
 import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 import type { ConnectionMutations } from "./aiConnection.types";
@@ -22,7 +21,6 @@ export interface AIConnectionFormState {
   baseUrl: string;
   model: string;
   apiKey: string;
-  enabled: boolean;
   isDefault: boolean;
   communities: AIConnectionCommunity[];
 }
@@ -33,7 +31,6 @@ const emptyForm: AIConnectionFormState = {
   baseUrl: "",
   model: "",
   apiKey: "",
-  enabled: true,
   isDefault: false,
   communities: [],
 };
@@ -44,7 +41,6 @@ const toFormState = (connection: AIConnectionResponse): AIConnectionFormState =>
   baseUrl: connection.base_url ?? "",
   model: connection.model ?? "",
   apiKey: "",
-  enabled: connection.enabled,
   isDefault: connection.is_default,
   communities: connection.communities,
 });
@@ -127,7 +123,6 @@ export const useAIConnectionForm = ({
         provider: form.provider,
         base_url: baseUrl,
         model: form.model || null,
-        enabled: form.enabled,
         is_default: form.isDefault,
       };
       if (form.apiKey) payload.api_key = form.apiKey;
@@ -142,8 +137,6 @@ export const useAIConnectionForm = ({
             if (updated.model) onClose();
             else onNeedsModel(updated);
           },
-          onError: (error) =>
-            toast.error(getErrorMessage(error, "settings:aiConnections.saveError")),
         }
       );
       return;
@@ -155,7 +148,6 @@ export const useAIConnectionForm = ({
       base_url: baseUrl,
       model: form.model || null,
       api_key: form.apiKey || null,
-      enabled: form.enabled,
       is_default: form.isDefault,
       community_ids: scope === "platform" ? form.communities.map((c) => c.id) : [],
     };
@@ -166,7 +158,6 @@ export const useAIConnectionForm = ({
         if (created.model) onClose();
         else onNeedsModel(created);
       },
-      onError: (error) => toast.error(getErrorMessage(error, "settings:aiConnections.saveError")),
     });
   };
 

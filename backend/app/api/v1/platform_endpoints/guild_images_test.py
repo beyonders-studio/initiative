@@ -8,18 +8,19 @@ existence at a given id included.
 
 import io
 import struct
+from datetime import UTC
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import (
     DEFAULT_BANNER,
-    Guild,
     CommunityRole,
     CommunityStatus,
+    Guild,
 )
 from app.models.platform.guild_image import (
     IMAGE_SPECS,
@@ -112,7 +113,7 @@ async def _set_banner(client: AsyncClient, guild_id: int, headers: dict) -> dict
 
 
 async def _list_as_community(session: AsyncSession, guild: Guild) -> Guild:
-    guild.is_community = True
+    guild.join_policy = "open"
     guild.categories = ["other"]
     guild.has_adult_content = False
     session.add(guild)
@@ -371,7 +372,7 @@ async def test_un_listing_a_guild_stops_serving_its_card(
     url = await _card_url(session, a.guild.id)
     assert (await client.get(url, headers=headers)).status_code == 200
 
-    a.guild.is_community = False
+    a.guild.join_policy = "private"
     session.add(a.guild)
     await session.commit()
 
@@ -527,7 +528,7 @@ async def test_a_pam_grantee_reads_the_full_banner(
 ):
     """Break-glass reaches a guild's front page as a member does, for its
     window."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.platform.access_grant import AccessGrant
 
@@ -536,7 +537,7 @@ async def test_a_pam_grantee_reads_the_full_banner(
     operator = await create_user(
         session, email="operator@example.com", role=UserRole.operator
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=operator.id,

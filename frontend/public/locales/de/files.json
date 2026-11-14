@@ -73,14 +73,10 @@
     "noInitiatives": "Keine Initiativen hier, zu denen du Dateien hinzufügen kannst."
   },
   "detail": {
-    "loading": "Datei wird geladen…",
     "notFound": "Datei nicht gefunden",
     "notFoundDescription": "Diese Datei wurde möglicherweise gelöscht oder du bist einem fehlerhaften Link gefolgt.",
     "noAccess": "Zugriff verweigert",
     "backToFiles": "← Zurück zu den Dateien",
-    "closePanel": "Panel schließen",
-    "openPanel": "Panel öffnen",
-    "togglePanel": "Seitenpanel umschalten",
     "titlePlaceholder": "Dateititel",
     "imageFileRequired": "Bitte wähle eine Bilddatei aus.",
     "imageUploaded": "Bild hochgeladen.",
@@ -105,17 +101,18 @@
   },
   "featuredImage": {
     "label": "Beitragsbild",
+    "add": "Beitragsbild hinzufügen",
     "upload": "Bild hochladen",
-    "fromFiles": "Aus Dateien",
-    "replace": "Ersetzen",
-    "remove": "Entfernen",
+    "fromFiles": "Aus Dateien auswählen",
+    "replace": "Anderes Bild hochladen",
+    "replaceFromFiles": "Anderes aus Dateien auswählen",
+    "remove": "Beitragsbild entfernen",
     "uploading": "Wird hochgeladen…"
   },
   "imageChooser": {
     "title": "Bild aus Dateien wählen",
     "description": "Es wird so eingefügt, wie es jetzt ist: Eine neuere Version der Datei ändert es nicht.",
-    "none": "Hier gibt es keine Bilder.",
-    "more": "Mehr anzeigen"
+    "none": "Hier gibt es keine Bilder."
   },
   "outline": {
     "show": "Inhalt anzeigen",
@@ -342,7 +339,6 @@
     "error": "Diese Datei konnte nicht umgewandelt werden."
   },
   "viewer": {
-    "loadError": "Datei kann nicht geladen werden",
     "openNewTab": "In neuem Tab öffnen",
     "download": "Herunterladen",
     "pageCount_one": "{{count}} Seite",
@@ -371,8 +367,6 @@
   "createFirst": "Mit dem Schreiben beginnen",
   "dropToUpload": "Zum Hochladen als Datei ablegen",
   "error": "Etwas ist schiefgelaufen",
-  "loadError": "Dateien können derzeit nicht geladen werden.",
-  "loading": "Dateien werden geladen…",
   "newFile": "Neue Datei",
   "noFiles": "Noch keine Dateien",
   "noFilesDescription": "Erstelle deine erste Initiative-Datei, um Briefings, Entscheidungen oder Anleitungen zu teilen.",
@@ -433,7 +427,6 @@
     "trashed": "Sammlung in den Papierkorb gelegt",
     "noFiles": "Noch keine Dateien in dieser Sammlung",
     "noFilesDescription": "Füge Dateien aus dieser Initiative hinzu oder lege Dateien irgendwo auf dieser Seite ab, um sie hochzuladen.",
-    "loadingFiles": "Dateien werden geladen...",
     "openFile": "Datei öffnen",
     "filter": "Sammlung",
     "anyCollection": "Jede Sammlung",
@@ -442,9 +435,7 @@
     "newestFirst": "Neueste zuerst",
     "oldestFirst": "Älteste zuerst",
     "views": {
-      "label": "Ansicht",
-      "masonry": "Mauerwerk",
-      "timeline": "Zeitleiste"
+      "label": "Ansicht"
     },
     "groups": {
       "untagged": "Ohne Tag",

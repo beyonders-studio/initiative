@@ -12,7 +12,7 @@ adds, and the audience a notice reaches.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import HTTPException
@@ -20,34 +20,33 @@ from sqlalchemy import ColumnElement, delete
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
-from app.core.errors import CodedError
 from app.api import resource_access
+from app.core.errors import CodedError
 from app.core.tools import Tool
 from app.db import session as db_session
 from app.db.guild_standing import GuildContext
 from app.db.request_context import Member
 from app.db.session import _RLS_CONTEXT_INFO_KEY
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user import UserRole
 from app.models.tenant.calendar_event import CalendarEventAttendee
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.personal_item import PersonalItem
+from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.task import TaskAssignee
 from app.services.permissions import (
     DAC_RESOURCES,
-    audience,
     TOOL_CAN,
     Action,
     actions_of,
+    audience,
     client_access,
     granted_scope_clause,
     listing_scope_clause,
     require_access,
-    writable_scope_clause,
 )
 from app.services.tenant import named_people
 from app.services.tenant.archive import archive_entity
@@ -224,7 +223,7 @@ async def _remove_from_initiative(session, initiative, user) -> None:
 
 async def _freeze(session, guild) -> None:
     guild.status = CommunityStatus.read_only.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     await session.commit()
 
@@ -320,7 +319,7 @@ async def test_a_role_grant_elevates_over_a_users_own(
 
     role_id = await _role_id_of(session, w.initiative, w.co_member.user)
     await w.grant("read", user=w.co_member.user)
-    row, context = await w.as_reader(w.co_member.user)
+    row, _context = await w.as_reader(w.co_member.user)
     assert actions_of(row) == frozenset()
 
     await create_resource_grant(
@@ -516,7 +515,7 @@ async def test_a_frozen_guild_caps_everyone_at_read(session, role_session, actin
 # A statement confined to one initiative asks nothing: the table's own policy
 # already applied the sharing gate. What is left here is the listing rule for a
 # statement that SPANS initiatives, which is narrower than the policy on
-# purpose, and the writable rule, which is narrower than any read policy.
+# purpose.
 
 
 def _compiled(clause: ColumnElement[bool]) -> str:
@@ -603,29 +602,6 @@ def test_no_standing_at_all_narrows_rather_than_opens():
         _compiled(granted_scope_clause(Tool.project, Project.id, 1, context=None))
         != "true"
     )
-
-
-def test_the_writable_clause_asks_the_gate_when_confined():
-    """Unlike the read listing, this one still has something to ask.
-
-    A read policy admits a row shared at any level, so "which of these may I
-    change" is a narrower question than the one already answered. Confined to
-    one initiative it is the table's own gate, asked at write.
-    """
-    sql = _compiled(
-        writable_scope_clause(
-            Tool.project, Project.id, 1, context=standing(7), initiative_id=3
-        )
-    )
-    assert sql != "true"
-    assert "resource_access(" in sql
-    assert ", true, (SELECT current_standing()" in sql
-
-
-def test_the_writable_clause_spanning_initiatives_asks_the_grants_at_write():
-    sql = _compiled(writable_scope_clause(Tool.project, Project.id, 1, context=None))
-    assert "resource_granted(" in sql
-    assert ", true, (SELECT current_standing()" in sql
 
 
 @pytest.mark.parametrize("tool", list(Tool))
@@ -827,7 +803,7 @@ async def test_leaving_the_community_takes_you_off_its_own_content(
             user_id=member_id,
             entity_type="project",
             entity_id=named["project"].id,
-            subscribed_at=datetime.now(timezone.utc),
+            subscribed_at=datetime.now(UTC),
         )
     )
     await session.commit()

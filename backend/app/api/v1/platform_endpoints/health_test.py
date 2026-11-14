@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from prometheus_client import REGISTRY
 
 from app.api.v1.platform_endpoints import health
@@ -248,7 +248,7 @@ async def test_metrics_counts_accounts_active_in_each_window(
     client: AsyncClient, session, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setattr(settings, "METRICS_TOKEN", "s3cret-token")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await create_user(session, last_active_at=now - timedelta(hours=2))
     await create_user(session, last_active_at=now - timedelta(days=3))
     await create_user(session, last_active_at=now - timedelta(days=40))

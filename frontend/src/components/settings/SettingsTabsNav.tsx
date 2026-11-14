@@ -1,22 +1,21 @@
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { Tabs, TabsBar, TabsTrigger } from "@/components/ui/tabs";
+import { extractSubPath } from "@/lib/communityUrl";
+import { Tabs, TabsBar, TabsTrigger } from "@/ui/tabs";
 
 export interface SettingsTab {
   value: string;
   label: string;
   path: string;
+  /** False leaves the tab out of the bar. */
+  visible?: boolean;
   /** Optional mark after the label — a badge saying the tab needs a look. */
   adornment?: ReactNode;
 }
 
 export interface SettingsTabsNavProps {
-  /** Tabs to render as triggers; also the pool `onNavigate` resolves against. */
   tabs: SettingsTab[];
-  /** Value of the currently active tab. */
-  activeTab: string;
-  /** Called with the selected tab's `path` when the user switches tabs. */
-  onNavigate: (path: string) => void;
   /**
    * Optional content rendered inside `<Tabs>` after the tab bar. Used by
    * layouts (e.g. user settings) that render their `<Outlet/>` within the tab
@@ -25,24 +24,39 @@ export interface SettingsTabsNavProps {
   children?: ReactNode;
 }
 
+/** A path without its community prefix or trailing slashes. */
+const tabPath = (path: string): string => extractSubPath(path).replace(/\/+$/, "") || "/";
+
 /**
- * Presentational tab bar shared by the settings and operator tabbed layouts: the
- * `<Tabs>` shell, a full-width `<TabsBar>`, and a `<TabsTrigger>` per tab.
- * Each layout keeps its own guards, header, and active-tab derivation.
+ * The tab bar of a settings area, whose tabs are routes. The tab lit is the
+ * one with the longest path holding the address, matched without the
+ * community prefix, or the first tab when none holds it; selecting a tab
+ * navigates to its path.
  */
-export function SettingsTabsNav({ tabs, activeTab, onNavigate, children }: SettingsTabsNavProps) {
+export function SettingsTabsNav({ tabs, children }: SettingsTabsNavProps) {
+  const navigate = useNavigate();
+  const pathname = useLocation({ select: (location) => tabPath(location.pathname) });
+  const shown = tabs.filter((tab) => tab.visible !== false);
+  const activeTab =
+    shown
+      .map((tab) => ({ value: tab.value, path: tabPath(tab.path) }))
+      .sort((a, b) => b.path.length - a.path.length)
+      .find(({ path }) => pathname === path || pathname.startsWith(`${path}/`))?.value ??
+    shown[0]?.value ??
+    "";
+
   return (
     <Tabs
       value={activeTab}
       onValueChange={(value) => {
-        const tab = tabs.find((item) => item.value === value);
+        const tab = shown.find((item) => item.value === value);
         if (tab) {
-          onNavigate(tab.path);
+          void navigate({ to: tab.path });
         }
       }}
     >
       <TabsBar containerClassName="pb-2" className="gap-1">
-        {tabs.map((tab) => (
+        {shown.map((tab) => (
           <TabsTrigger
             key={tab.value}
             value={tab.value}

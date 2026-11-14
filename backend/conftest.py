@@ -12,7 +12,7 @@ import asyncio
 import functools
 import hashlib
 import os
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,41 +21,41 @@ from urllib.parse import quote
 
 import asyncpg
 import pytest
-from sqlalchemy.engine import make_url
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from cryptography.hazmat.primitives import serialization as _serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519 as _ed25519
-from httpx import ASGITransport, AsyncClient
-from starlette.requests import HTTPConnection
+from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy import event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from starlette.testclient import TestClient
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.requests import HTTPConnection
+from starlette.testclient import TestClient
 
-from app.core.config import settings
+from alembic import command
 from app.api import content_socket
+from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace
-from app.db.session import (
-    clear_rls_context,
-    get_system_session,
-    get_session,
-    prepare_query_engine,
-    served_guild_id,
-)
-from app.testing import guild_pool
-from app.testing.schema_harness import clear_search_path_pin
-from app.testing.server import in_request_tasks
 from app.db.guild_ddl import render_guild_schema_ddl
 from app.db.guild_migrations import GUILD_SCHEMA_REGEX
 from app.db.schema_provisioning import guild_schema_name
+from app.db.session import (
+    clear_rls_context,
+    get_session,
+    get_system_session,
+    prepare_query_engine,
+    served_guild_id,
+)
 from app.db.tenancy import SHARED_TABLES
 from app.main import app
+from app.testing import guild_pool
+from app.testing.schema_harness import clear_search_path_pin
+from app.testing.server import in_request_tasks
 
 # Quarantined tests and a shuffled order (the nightly run).
 pytest_plugins = ["app.testing.run_options", "pytester"]
@@ -171,7 +171,7 @@ def _mem_total_mb() -> int | None:
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_xdist_auto_num_workers(config: "pytest.Config") -> int | None:
+def pytest_xdist_auto_num_workers(config: pytest.Config) -> int | None:
     if os.environ.get("PYTEST_XDIST_AUTO_NUM_WORKERS"):
         return None  # explicit override; let xdist's own hook answer
     if hasattr(os, "sched_getaffinity"):
@@ -451,7 +451,7 @@ async def _test_db_is_at_head() -> bool:
             port=_app_db.port or 5432,
             database=TEST_DB_NAME,
         )
-    except (asyncpg.InvalidCatalogNameError, OSError):
+    except asyncpg.InvalidCatalogNameError, OSError:
         return False
     try:
         rows = await conn.fetch("SELECT version_num FROM alembic_version")
@@ -826,8 +826,8 @@ async def _schema_test_harness(engine, _worker_engines, monkeypatch, request):
       when none did, and to hand out a pooled schema where one is parked
       (``app/testing/guild_pool.py``).
     """
-    import app.db.schema_provisioning as schema_provisioning
     import app.db.session as db_session
+    from app.db import schema_provisioning
     from app.testing.schema_harness import install_guild_routing
 
     install_guild_routing()
@@ -915,7 +915,7 @@ async def _schema_test_harness(engine, _worker_engines, monkeypatch, request):
 
 
 @pytest.fixture(scope="function")
-async def session(engine) -> AsyncGenerator[AsyncSession, None]:
+async def session(engine) -> AsyncGenerator[AsyncSession]:
     """
     Create a fresh database session for each test.
 
@@ -1052,7 +1052,7 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient]:
     """Async HTTP client whose REQUEST path runs as the REAL ``app_user`` login
     role (RLS-enforced), not the Postgres superuser.
 
@@ -1135,7 +1135,7 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     @asynccontextmanager
     async def _override(
         login: str, connection: HTTPConnection
-    ) -> AsyncIterator[AsyncSession]:
+    ) -> AsyncGenerator[AsyncSession]:
         await _publish_setup_state()
         reused = await _served_session(login, served_guild_id(connection))
         # Production gets a FRESH session (empty info) per request; this reused
@@ -1160,13 +1160,13 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     # for the event loop to close later on the same connection.
     async def override_get_session(
         connection: HTTPConnection,
-    ) -> AsyncGenerator[AsyncSession, None]:
+    ) -> AsyncGenerator[AsyncSession]:
         async with _override("app_user", connection) as reused:
             yield reused
 
     async def override_get_system_session(
         connection: HTTPConnection,
-    ) -> AsyncGenerator[AsyncSession, None]:
+    ) -> AsyncGenerator[AsyncSession]:
         async with _override("app_admin", connection) as reused:
             yield reused
 
@@ -1216,6 +1216,11 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
                 await conn.close()
             with suppress(Exception):
                 await eng.dispose()
+        # FastAPI keeps every dependency it has called, the overrides above
+        # included, in caches of 4096 (fastapi.dependencies.models), and they
+        # reach this dict. Emptied, the engines go with the test rather than
+        # staying for the rest of the run.
+        served.clear()
         # The create-guild endpoint ends on a SELECT (no commit), so the privileged
         # setup session may hold a lock on public.guilds; release it too.
         with suppress(Exception):

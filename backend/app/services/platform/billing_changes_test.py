@@ -25,10 +25,10 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityStatus, Guild
+from app.models.platform.identity_ref import IdentityEntity
 from app.services.platform import billing_changes
 from app.services.platform import guilds as guilds_service
 from app.services.platform.identity_refs import billing_ref
-from app.models.platform.identity_ref import IdentityEntity
 from app.testing import (
     create_guest,
     create_guild,

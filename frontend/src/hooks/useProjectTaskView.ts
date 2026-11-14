@@ -35,7 +35,7 @@ import {
 } from "@/hooks/useListView";
 import { useProject, useProjectTaskStatuses, useProjectTaskTypes } from "@/hooks/useProjects";
 import { useKnownTagIds } from "@/hooks/useTags";
-import { detailLayoutOf, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import {
   EMPTY_TASK_FILTERS,
   type StoredTaskFilters,
@@ -45,12 +45,14 @@ import {
   taskFiltersEqual,
   taskSortFields,
 } from "@/lib/filters/taskFilters";
-import { pageParts, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { columnsOf } from "@/lib/layouts/draft";
-import { catalogChoices, viewGrouping } from "@/lib/layouts/grouping";
 import { pluginFields, shippedPluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { type Preset, presetsOf, TASK_PRESETS } from "@/lib/layouts/presets";
-import { taskLayoutFor } from "@/lib/layouts/tasks";
+import { BOARD_COLUMNS } from "@/lib/layouts/taskGroupings";
+import { TASK_LIST_SHAPE, TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/tasks";
+import { pageParts, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { columnsOf } from "@/ui/layouts/draft";
+import { catalogChoices, viewGrouping } from "@/ui/layouts/grouping";
+import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
+import { type Preset, presetsOf } from "@/ui/layouts/presets";
 
 const readTaskFilters = (raw: unknown) => specFromStored(raw as StoredTaskFilters);
 const TASK_DEFAULTS = { filters: EMPTY_TASK_FILTERS, ...NO_PART_VIEW };
@@ -159,13 +161,18 @@ export function useProjectTaskView({
     const table = lists.find((each) => each.kind === "table");
     const fields = new Map(pluginFields(plugins, i18n.language).map((field) => [field.id, field]));
     return {
-      columns: columnsOf((table?.definition ?? {}) as ListLayoutDefinitionInput, fields),
+      columns: columnsOf(
+        (table?.definition ?? {}) as ListLayoutDefinitionInput,
+        fields,
+        TASK_LIST_SHAPE
+      ),
+      // A plug-in's part, which only a browser draws, is left out.
       detail: pageParts(
         taskLayoutFor(defaultType?.layout_preset).tree(
           detailLayoutOf(layoutsQuery.data, "task", defaultType?.id) as StoredRegions | null,
           shippedPluginParts(plugins)
         )
-      ),
+      ).filter((part) => part !== "plugin"),
     };
   }, [lists, plugins, i18n.language, layoutsQuery.data, defaultType]);
 
@@ -195,7 +202,7 @@ export function useProjectTaskView({
    *  screen. Which layout they come back to is theirs to pick: a link that
    *  names one does not change it. */
   const applyPreset = useCallback(
-    (next: Preset) => apply({ filters: next.filters, sorting: next.sorting }),
+    (next: Preset<TaskFilterSpec>) => apply({ filters: next.filters, sorting: next.sorting }),
     [apply]
   );
   const { preset, pick: pickPreset } = usePresetLink({
@@ -205,7 +212,7 @@ export function useProjectTaskView({
     scope: `${projectId}:${kind}`,
     apply: applyPreset,
     same: useCallback(
-      (each: Preset) =>
+      (each: Preset<TaskFilterSpec>) =>
         taskFiltersEqual(view.filters, each.filters) && sameSorting(view.sorting, each.sorting),
       [view.filters, view.sorting]
     ),
@@ -219,7 +226,12 @@ export function useProjectTaskView({
   const { groupings: catalog } = useFieldCatalog("tasks");
   const grouping = useMemo(
     () =>
-      viewGrouping(layout?.definition, kind, groupingKept ? kept : null, catalogChoices(catalog)),
+      viewGrouping(
+        layout?.definition,
+        kind,
+        groupingKept ? kept : null,
+        catalogChoices(catalog, BOARD_COLUMNS)
+      ),
     [layout, kind, kept, groupingKept, catalog]
   );
 

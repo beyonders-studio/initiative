@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -59,7 +59,7 @@ class BillingEventLog(SQLModel, table=True):
     guild_id: int = Field(sa_column=Column(Integer, nullable=False, index=True))
     op: str = Field(sa_column=Column(String(length=32), nullable=False))
     source: str = Field(sa_column=Column(String(length=32), nullable=False))
-    actor: Optional[str] = Field(
+    actor: str | None = Field(
         default=None, sa_column=Column(String(length=128), nullable=True)
     )
     applied_at: datetime = Field(
@@ -103,14 +103,14 @@ class BillingChange(SQLModel, table=True):
         Index("ix_billing_changes_occurred_at", "occurred_at"),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None,
         sa_column=Column(BigInteger, Identity(always=True), primary_key=True),
     )
     xid: int = Field(sa_column=Column(BigInteger, nullable=False))
     guild_id: int = Field(sa_column=Column(Integer, nullable=False))
     kind: str = Field(sa_column=Column(String(48), nullable=False))
-    community_ref: Optional[str] = Field(
+    community_ref: str | None = Field(
         default=None, sa_column=Column(String(128), nullable=True)
     )
     data: dict[str, Any] = Field(

@@ -17,9 +17,9 @@ from app.models.platform.guild import (
     GUILD_ASSIGNABLE_ROLES,
     GUILD_STORED_ROLES,
     AdminSurface,
+    CommunityRole,
     Guild,
     GuildMembership,
-    CommunityRole,
     assignable_roles,
 )
 

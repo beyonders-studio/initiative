@@ -1,9 +1,9 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
 
-import httpx
+import httpx2
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_
 from sqlmodel import select
@@ -11,9 +11,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     CommunityIdPath,
-    get_current_active_user,
-    UserSessionDep,
     SystemSessionDep,
+    UserSessionDep,
+    get_current_active_user,
 )
 from app.api.v1.platform_endpoints.access_grants import check_second_factor
 from app.api.v1.platform_endpoints.operator import (
@@ -28,9 +28,23 @@ from app.api.v1.platform_endpoints.operator import (
 )
 from app.api.v1.platform_endpoints.session_opening import MOBILE_CALLBACK_URI
 from app.core.audit_events import AuditEventType
+from app.core.capabilities import Capability, user_has_capability
+from app.core.clock import utcnow
 from app.core.config import DEFAULT_OIDC_SCOPES
 from app.core.config import settings as app_config
 from app.core.intake import IntakeStream
+from app.core.login_methods import (
+    FACTOR_METHODS,
+    PRIMARY_LOGIN_METHODS,
+    LoginMethod,
+    SecondFactorRequirement,
+)
+from app.core.messages import (
+    AuthMessages,
+    BillingMessages,
+    GuildMessages,
+    SettingsMessages,
+)
 from app.core.rules import (
     OPTION_RULES,
     RETENTION_WINDOWS,
@@ -38,22 +52,52 @@ from app.core.rules import (
     SURFACE_CUSTOM_ROLES,
     SURFACE_PLUGINS,
 )
+from app.core.security import (
+    BillingSupportHandoffNotConfiguredError,
+    HandoffSigningNotConfiguredError,
+    create_billing_contracts_handoff_token,
+    create_billing_control_handoff_token,
+    create_billing_directory_handoff_token,
+    create_billing_insights_handoff_token,
+    create_billing_support_handoff_token,
+)
+from app.core.user_display import handle_of
 from app.db import cohorts
 from app.db.query import build_paginated_response, paginated_query
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
+from app.models.platform.access_grant import (
+    AccessGrant,
+    AccessGrantPurpose,
+    AccessLevel,
+)
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.app_setting_secret import AppSettingSecret
 from app.models.platform.guild import (
+    CommunityRole,
+    CommunityStatus,
     Guild,
     GuildMembership,
-    CommunityRole,
+    operator_status_choices,
 )
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.identity_ref import IdentityEntity
+from app.models.platform.user import User
+from app.schemas.platform.access_grant import BreakGlassCreate, SecondFactorAnswer
+from app.schemas.platform.billing import BillingPortalHandoffResponse
+from app.schemas.platform.guild import (
+    CommunityAction,
+    CommunitySuspensionUpdate,
+    PlatformCommunityRestore,
+    PlatformCommunityStorageListResponse,
+    PlatformCommunityStorageRead,
+    PlatformCommunityStorageUpdate,
+)
+from app.schemas.platform.push import FCMConfigResponse
 from app.schemas.platform.settings import (
-    NotificationSettingsResponse,
-    NotificationSettingsUpdate,
+    AccountsWithoutFactor,
+    CaptchaSettingsResponse,
+    CaptchaSettingsUpdate,
     CommunityNarrowingAgreement,
     CommunityNarrowingPending,
     CommunitySettingsResponse,
@@ -65,85 +109,46 @@ from app.schemas.platform.settings import (
     InterfaceSettingsResponse,
     InterfaceSettingsUpdate,
     LoginMethodStatus,
-    AccountsWithoutFactor,
+    NotificationSettingsResponse,
+    NotificationSettingsUpdate,
     OIDCSettingsResponse,
     PlatformAuthSettingsResponse,
     PlatformAuthSettingsUpdate,
-    StorageBackfillStatusResponse,
-    CaptchaSettingsResponse,
-    CaptchaSettingsUpdate,
     PushSettingsResponse,
     PushSettingsUpdate,
+    StorageBackfillStatusResponse,
     StorageSettingsResponse,
     StorageSettingsUpdate,
     StorageTestResponse,
 )
-from app.models.platform.guild import CommunityStatus, operator_status_choices
-from app.schemas.platform.guild import (
-    CommunityAction,
-    CommunitySuspensionUpdate,
-    PlatformCommunityRestore,
-    PlatformCommunityStorageListResponse,
-    PlatformCommunityStorageRead,
-    PlatformCommunityStorageUpdate,
-)
-from app.core.capabilities import Capability, user_has_capability
-from app.core.clock import utcnow
-from app.models.platform.access_grant import (
-    AccessGrant,
-    AccessGrantPurpose,
-    AccessLevel,
-)
-from app.models.platform.user import User
-from app.schemas.platform.access_grant import BreakGlassCreate, SecondFactorAnswer
-from app.schemas.platform.billing import BillingPortalHandoffResponse
-from app.schemas.platform.push import FCMConfigResponse
 from app.schemas.tenant.plugin_data import PluginDataResponse, PluginSummaryListResponse
-from app.core.messages import (
-    AuthMessages,
-    BillingMessages,
-    GuildMessages,
-    SettingsMessages,
-)
-from app.core.security import (
-    BillingSupportHandoffNotConfiguredError,
-    HandoffSigningNotConfiguredError,
-    create_billing_contracts_handoff_token,
-    create_billing_control_handoff_token,
-    create_billing_directory_handoff_token,
-    create_billing_insights_handoff_token,
-    create_billing_support_handoff_token,
-)
-from app.services.platform.identity_refs import billing_ref, billing_refs
-from app.services.platform import access_grants as access_grants_service
-from app.services.auth import narrowing_review
-from app.services.marketplace import plugin_data as plugin_data_service
-from app.services.auth import platform_provider as platform_provider_service
-from app.services.auth import provider_registry
-from app.core.login_methods import (
-    FACTOR_METHODS,
-    PRIMARY_LOGIN_METHODS,
-    LoginMethod,
-    SecondFactorRequirement,
-)
-from app.services.platform import auth_posture, rules
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import push_config, push_relay
+from app.services import audit as audit_service
 from app.services import captcha as captcha_service
+from app.services import email as email_service
+from app.services import storage_backfill, storage_config
+from app.services.auth import narrowing_review, provider_registry
+from app.services.auth import platform_provider as platform_provider_service
 from app.services.captcha_config import ResolvedCaptchaConfig
+from app.services.marketplace import plugin_data as plugin_data_service
+from app.services.platform import access_grants as access_grants_service
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import (
+    auth_posture,
+    case_activity,
+    grant_cases,
+    push_config,
+    push_relay,
+    rules,
+)
 from app.services.platform import billing as billing_service
+from app.services.platform import guilds as guilds_service
+from app.services.platform.identity_refs import billing_ref, billing_refs
+from app.services.platform.intake import stream_is_bound
 from app.services.platform.retention import (
     ACCOUNT_DELETION,
     COMMUNITY_DELETION,
     COMMUNITY_HOLD,
 )
-from app.services.platform import guilds as guilds_service
-from app.services.platform import case_activity, grant_cases
-from app.core.user_display import handle_of
-from app.services.platform.intake import stream_is_bound
-from app.services import audit as audit_service
-from app.services import email as email_service
-from app.services import storage_backfill, storage_config
 
 logger = logging.getLogger(__name__)
 
@@ -678,10 +683,12 @@ async def start_storage_backfill(
     session: SystemSessionDep,
     _owner: ConfigManageDep,
 ) -> StorageBackfillStatusResponse:
-    # The backfill writes to S3 via the saved credentials, so they must be set
-    # (the documented flow runs it while still serving on "local").
+    # The backfill copies into the bucket the server is saved to use, so it runs
+    # once S3 is the saved backend ("Serve missing objects from local" covers
+    # the files it has not copied yet).
     settings_obj = await app_settings_service.get_app_settings(session)
-    if not settings_obj.s3_bucket:
+    saved_backend = (settings_obj.storage_backend or "local").lower()
+    if saved_backend != "s3" or not settings_obj.s3_bucket:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=SettingsMessages.STORAGE_BACKFILL_NOT_CONFIGURED,
@@ -860,7 +867,7 @@ async def get_fcm_config(
     via_relay = platform == "ios" or (
         platform == "android" and not cfg.service_account_json
     )
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx2.AsyncClient(timeout=10.0) as client:
         relay_server_id = (
             await push_relay.current_server_id(client) if via_relay else None
         )
@@ -1286,10 +1293,9 @@ async def update_platform_community_storage(
             detail={"from": status_before, "to": status_after},
         )
     await session.commit()
-    if status_after is not None:
-        if status_after == CommunityStatus.on_hold.value:
-            await guilds_service.announce_on_hold(session, guild_id)
-            guild = await guilds_service.get_guild(session, guild_id=guild_id)
+    if status_after is not None and status_after == CommunityStatus.on_hold.value:
+        await guilds_service.announce_on_hold(session, guild_id)
+        guild = await guilds_service.get_guild(session, guild_id=guild_id)
     return _guild_storage_read(
         guild,
         administration,
@@ -1461,7 +1467,7 @@ async def agree_community_narrowing(
 @asynccontextmanager
 async def _routed_to_community(
     session: AsyncSession, guild_id: int
-) -> AsyncIterator[AsyncSession]:
+) -> AsyncGenerator[AsyncSession]:
     """A system session routed to a community that is still there."""
     guild = await session.get(Guild, guild_id)
     if guild is None or guild.status == CommunityStatus.deleted:

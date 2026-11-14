@@ -1,7 +1,7 @@
 """Fixed anchors and hourly limits preserve each series' recurrence behavior."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,8 +32,10 @@ from app.testing import create_task, route_as
         ("RRULE:FREQ=WEEKLY\nRDATE:20261007T090000Z", [7, 12, 19]),
         ("RRULE:FREQ=WEEKLY;COUNT=3\nRDATE:20261007T090000Z", [7, 12, 19]),
         (
-            "RRULE:FREQ=DAILY;INTERVAL=3\nRDATE:20261007T090000Z\n"
-            "EXDATE:20261008T090000Z",
+            (
+                "RRULE:FREQ=DAILY;INTERVAL=3\nRDATE:20261007T090000Z\n"
+                "EXDATE:20261008T090000Z"
+            ),
             [7, 11, 14],
         ),
     ],
@@ -45,7 +47,7 @@ async def test_fixed_task_keeps_its_phase_after_an_extra_date(
     first = await create_task(
         session,
         a.project,
-        due_date=datetime(2026, 10, 5, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 5, 9, tzinfo=UTC),
         recurrence=rule,
     )
     task_id = first.id
@@ -73,7 +75,7 @@ async def test_fixed_task_keeps_its_phase_after_an_extra_date(
             (current,) = [row for row in response.json()["items"] if row["recurrence"]]
             task_id = current["id"]
         assert datetime.fromisoformat(current["due_date"]) == datetime(
-            2026, 10, day, 9, tzinfo=timezone.utc
+            2026, 10, day, 9, tzinfo=UTC
         )
 
 
@@ -82,7 +84,7 @@ async def test_zero_date_span_survives_the_next_task(
     client, session, acting_user, operation
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    due = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    due = datetime(2026, 10, 5, 9, tzinfo=UTC)
     first = await create_task(
         session, a.project, start_date=due, due_date=due, recurrence="RRULE:FREQ=DAILY"
     )
@@ -107,7 +109,7 @@ async def test_zero_date_span_survives_the_next_task(
         (current,) = [row for row in response.json()["items"] if row["recurrence"]]
     assert current["start_date"] == current["due_date"]
     assert datetime.fromisoformat(current["due_date"]) == datetime(
-        2026, 10, 6, 9, tzinfo=timezone.utc
+        2026, 10, 6, 9, tzinfo=UTC
     )
 
 
@@ -122,7 +124,7 @@ async def test_resubmitting_unchanged_repeat_keeps_phase_and_calendar_projection
     first = await create_task(
         session,
         a.project,
-        due_date=datetime(2026, 10, 5, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 5, 9, tzinfo=UTC),
         recurrence=rule,
     )
     response = await client.post(a.g(f"/tasks/{first.id}/skip"), headers=a.headers)
@@ -134,7 +136,7 @@ async def test_resubmitting_unchanged_repeat_keeps_phase_and_calendar_projection
     )
     assert response.status_code == 200, response.text
     assert datetime.fromisoformat(response.json()["recurrence_anchor"]) == datetime(
-        2026, 10, 5, 9, tzinfo=timezone.utc
+        2026, 10, 5, 9, tzinfo=UTC
     )
     conditions = json.dumps(
         [{"field": "project_id", "op": "eq", "value": a.project.id}]
@@ -146,18 +148,18 @@ async def test_resubmitting_unchanged_repeat_keeps_phase_and_calendar_projection
     current = TaskListRead.model_validate(response.json()["items"][0])
     _, projected = projected_occurrences(
         [current],
-        datetime(2026, 10, 8, tzinfo=timezone.utc),
-        datetime(2026, 11, 2, tzinfo=timezone.utc),
+        datetime(2026, 10, 8, tzinfo=UTC),
+        datetime(2026, 11, 2, tzinfo=UTC),
     )
     assert [row.due_date for row in projected] == [
-        datetime(2026, 10, 12, 9, tzinfo=timezone.utc),
-        datetime(2026, 10, 19, 9, tzinfo=timezone.utc),
-        datetime(2026, 11, 1, 9, tzinfo=timezone.utc),
+        datetime(2026, 10, 12, 9, tzinfo=UTC),
+        datetime(2026, 10, 19, 9, tzinfo=UTC),
+        datetime(2026, 11, 1, 9, tzinfo=UTC),
     ]
     response = await client.post(a.g(f"/tasks/{first.id}/skip"), headers=a.headers)
     assert response.status_code == 200, response.text
     assert datetime.fromisoformat(response.json()["due_date"]) == datetime(
-        2026, 10, 12, 9, tzinfo=timezone.utc
+        2026, 10, 12, 9, tzinfo=UTC
     )
 
 
@@ -165,7 +167,7 @@ async def test_retained_anchor_does_not_restart_a_consumed_count(
     client, session, acting_user
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    due = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    due = datetime(2026, 10, 5, 9, tzinfo=UTC)
     task = await create_task(
         session,
         a.project,
@@ -191,7 +193,7 @@ async def test_task_edits_reanchor_the_effective_series_date(
     first = await create_task(
         session,
         a.project,
-        due_date=datetime(2026, 10, 5, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 5, 9, tzinfo=UTC),
         recurrence="RRULE:FREQ=WEEKLY"
         if edit == "resubmitted_rule_and_date"
         else "RRULE:FREQ=DAILY",
@@ -202,7 +204,7 @@ async def test_task_edits_reanchor_the_effective_series_date(
             "recurrence": "FREQ=WEEKLY",
             "tz": "UTC",
         }
-        expected = datetime(2026, 10, 13, 9, tzinfo=timezone.utc)
+        expected = datetime(2026, 10, 13, 9, tzinfo=UTC)
     else:
         response = await client.patch(
             a.g(f"/tasks/{first.id}"),
@@ -211,7 +213,7 @@ async def test_task_edits_reanchor_the_effective_series_date(
         )
         assert response.status_code == 200, response.text
         payload = {"recurrence": "FREQ=WEEKLY", "tz": "UTC"}
-        expected = datetime(2026, 10, 12, 9, tzinfo=timezone.utc)
+        expected = datetime(2026, 10, 12, 9, tzinfo=UTC)
     response = await client.patch(
         a.g(f"/tasks/{first.id}"), headers=a.headers, json=payload
     )
@@ -247,7 +249,7 @@ async def test_fixed_to_rolling_count_keeps_the_remaining_series_end(
     first = await create_task(
         session,
         a.project,
-        due_date=datetime(2026, 10, 5, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 5, 9, tzinfo=UTC),
         recurrence="RRULE:FREQ=DAILY;COUNT=3",
     )
     response = await client.patch(
@@ -307,10 +309,8 @@ async def test_next_dates_without_a_saved_anchor_leaves_the_orm_task_clean(
     from app.services.tenant.task_series import next_dates
 
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    baseline = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
-    displayed = (
-        datetime(2026, 10, 9, 9, tzinfo=timezone.utc) if has_carried_dates else baseline
-    )
+    baseline = datetime(2026, 10, 5, 9, tzinfo=UTC)
+    displayed = datetime(2026, 10, 9, 9, tzinfo=UTC) if has_carried_dates else baseline
     task = await create_task(
         session,
         a.project,
@@ -328,7 +328,7 @@ async def test_next_dates_without_a_saved_anchor_leaves_the_orm_task_clean(
     await _remove_saved_anchor(session, task)
     before = (task.recurrence_anchor, task.recurrence_anchor_count)
     dates = await next_dates(session, task, now=baseline, user_timezone="UTC")
-    expected = datetime(2026, 10, 7, 9, tzinfo=timezone.utc)
+    expected = datetime(2026, 10, 7, 9, tzinfo=UTC)
     assert dates == (expected, expected)
     assert (task.recurrence_anchor, task.recurrence_anchor_count) == before
     assert task not in session.dirty
@@ -341,10 +341,8 @@ async def test_advancing_without_a_saved_anchor_preserves_the_original_phase(
     client, session, acting_user, operation, has_carried_dates
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    baseline = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
-    displayed = (
-        datetime(2026, 10, 9, 9, tzinfo=timezone.utc) if has_carried_dates else baseline
-    )
+    baseline = datetime(2026, 10, 5, 9, tzinfo=UTC)
+    displayed = datetime(2026, 10, 9, 9, tzinfo=UTC) if has_carried_dates else baseline
     task = await create_task(
         session,
         a.project,
@@ -385,7 +383,7 @@ async def test_advancing_without_a_saved_anchor_preserves_the_original_phase(
             (current,) = [row for row in response.json()["items"] if row["recurrence"]]
             task_id = current["id"]
         assert datetime.fromisoformat(current["due_date"]) == datetime(
-            2026, 10, day, 9, tzinfo=timezone.utc
+            2026, 10, day, 9, tzinfo=UTC
         )
         assert current["start_date"] == current["due_date"]
         assert datetime.fromisoformat(current["recurrence_anchor"]) == baseline
@@ -402,7 +400,7 @@ async def test_advancing_without_a_saved_anchor_preserves_the_original_phase(
 
 
 def instant(text: str) -> datetime:
-    return datetime.fromisoformat(text).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(text).replace(tzinfo=UTC)
 
 
 @pytest.fixture
@@ -990,31 +988,3 @@ async def test_invalid_import_recurrence_is_a_file_validation_error(
     )
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == "IMPORT_INVALID_ENVELOPE"
-
-
-async def test_legacy_json_repeat_still_imports(hourly_task, session, client):
-    actor, _ = hourly_task
-    envelope = await project_export.build_project_export(
-        session,
-        await get_project_hydrated(session, actor.project.id),
-        exported_by_handle=handle_of(actor.user),
-    )
-    payload = envelope.model_dump(mode="json")
-    payload["tasks"][0].update(
-        {
-            "recurrence": {
-                "frequency": "weekly",
-                "weekdays": ["monday"],
-                "ends": "never",
-            },
-            "recurrence_strategy": "fixed",
-            "recurrence_limit": None,
-        }
-    )
-    response = await client.post(
-        actor.g("/imports/envelope"),
-        headers=actor.headers,
-        json={"initiative_id": actor.initiative.id, "envelope": payload},
-    )
-    assert response.status_code == 201, response.text
-    assert response.json()["result"]["created"]["tasks"] == 1

@@ -2,9 +2,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { type BrowserContext, type Locator, type Page, test } from "@playwright/test";
+import { type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
 
 const RELEASE_IMAGES = fileURLToPath(new URL("../../../docs/images/releases/", import.meta.url));
+const HELP_IMAGES = fileURLToPath(new URL("../../../docs/en/images/", import.meta.url));
 
 /** Small enough to keep in the repository, sharp enough to read a label. */
 const QUALITY = 0.85;
@@ -20,16 +21,40 @@ const QUALITY = 0.85;
  *     ![What it shows](docs/images/releases/<name>.webp)
  */
 export async function shoot(page: Page, name: string, target?: Locator) {
+  await capture(page, RELEASE_IMAGES, name, target);
+}
+
+/**
+ * Take a help center picture the same way, saved as `docs/en/images/<name>.webp`
+ * and `<name>.dark.webp`. `name` holds the page's folder, such as
+ * `tags/tag-page`.
+ *
+ * On the page, from a folder under `docs/en/`, the site showing the one that
+ * matches the reader's theme:
+ *
+ *     ![What it shows](../images/<name>.webp#only-light)
+ *     ![What it shows](../images/<name>.dark.webp#only-dark)
+ */
+export async function shootHelp(page: Page, name: string, target?: Locator) {
+  await capture(page, HELP_IMAGES, name, target);
+}
+
+async function capture(page: Page, folder: string, name: string, target?: Locator) {
   const dark = test.info().project.use.colorScheme === "dark";
-  // Nothing still arriving: no spinner, and no picture half faded in.
+  const file = path.join(folder, `${name}${dark ? ".dark" : ""}.webp`);
+  // Nothing still arriving: no spinner, no placeholder where a list is still
+  // loading, and no picture half drawn.
   await page.waitForLoadState("networkidle");
+  await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0, { timeout: 20_000 });
+  await page.waitForFunction(() =>
+    Array.from(document.images).every((image) => image.complete && image.naturalWidth > 0)
+  );
   // No hover left behind by the last click: the pointer goes to the window's
   // bottom-right corner, where nothing sits.
   const size = page.viewportSize();
   if (size) await page.mouse.move(size.width - 1, size.height - 1);
   const options = { animations: "disabled", caret: "hide", scale: "device" } as const;
   const png = await (target ?? page).screenshot(options);
-  const file = path.join(RELEASE_IMAGES, `${name}${dark ? ".dark" : ""}.webp`);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, await toWebp(page.context(), png));
 }

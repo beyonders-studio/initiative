@@ -6,7 +6,7 @@ they are in, a guild admin and a grant holder in every one, and every socket in
 its guild's own room.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -83,7 +83,7 @@ async def test_rooms_pam_grantee_sees_all(
     grantee = await create_user(  # not a member
         session, email="grantee@example.com", role=UserRole.support
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=grantee.id,

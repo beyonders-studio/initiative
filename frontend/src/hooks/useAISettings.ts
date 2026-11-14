@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
 import {
   createCommunityConnection,
@@ -7,17 +7,12 @@ import {
   deletePlatformConnection,
   fetchCommunityConnectionModels,
   fetchPlatformConnectionModels,
-  getGetPlatformAiModeQueryKey,
-  getListCommunityConnectionsQueryKey,
-  getListPlatformConnectionsQueryKey,
-  getPlatformAiMode,
-  listCommunityConnections,
-  listPlatformConnections,
   testCommunityConnection,
   testPlatformConnection,
   updateCommunityConnection,
   updatePlatformAiMode,
   updatePlatformConnection,
+  useListCommunityConnections,
 } from "@/api/generated/ai-settings/ai-settings";
 import type {
   AIConnectionCreate,
@@ -31,6 +26,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -44,91 +40,77 @@ const invalidateConnectionSurfaces = (scope: ConnectionScope) =>
     invalidate(q.resolvedAISettings()),
   ]);
 
-// ── Platform mode (personal / platform) ───────────────────────────────────────
+type ConnectionUpdateVars = { connectionId: number; data: AIConnectionUpdate };
 
-export const usePlatformAIMode = (options?: QueryOpts<PlatformAIModeResponse>) => {
-  return useQuery<PlatformAIModeResponse>({
-    queryKey: getGetPlatformAiModeQueryKey(),
-    queryFn: () => getPlatformAiMode(),
-    ...options,
-  });
-};
+// ── Platform mode (personal / platform) ───────────────────────────────────────
 
 export const useUpdatePlatformAIMode = (
   options?: MutationOpts<PlatformAIModeResponse, PlatformAIModeUpdate>
-) => {
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: (data: PlatformAIModeUpdate) => updatePlatformAiMode(data),
-    onSuccess: (...args) => {
+) =>
+  useApiMutation<PlatformAIModeResponse, PlatformAIModeUpdate>(
+    {
+      mutationFn: (data) => updatePlatformAiMode(data),
       // A mode change flips every downstream surface (connections, resolved)
       // across the active community — flush the whole AI family.
-      void invalidate(q.allAISettings());
-      onSuccess?.(...args);
+      invalidate: () => invalidate(q.allAISettings()),
+      errorKey: "settings:platformAI.modeSaveError",
     },
-  });
-};
+    options
+  );
 
 // ── Platform connections (personal / platform) ────────────────────────────────
 
-export const usePlatformConnections = (options?: QueryOpts<AIConnectionResponse[]>) => {
-  return useQuery<AIConnectionResponse[]>({
-    queryKey: getListPlatformConnectionsQueryKey(),
-    queryFn: () => listPlatformConnections(),
-    ...options,
-  });
-};
-
 export const useCreatePlatformConnection = (
   options?: MutationOpts<AIConnectionResponse, AIConnectionCreate>
-) => {
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: (data: AIConnectionCreate) => createPlatformConnection(data),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("platform");
-      onSuccess?.(...args);
+) =>
+  useApiMutation<AIConnectionResponse, AIConnectionCreate>(
+    {
+      mutationFn: (data) => createPlatformConnection(data),
+      invalidate: () => invalidateConnectionSurfaces("platform"),
+      errorKey: "settings:aiConnections.saveError",
     },
-  });
-};
+    options
+  );
 
 export const useUpdatePlatformConnection = (
-  options?: MutationOpts<AIConnectionResponse, { connectionId: number; data: AIConnectionUpdate }>
-) => {
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: ({ connectionId, data }: { connectionId: number; data: AIConnectionUpdate }) =>
-      updatePlatformConnection(connectionId, data),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("platform");
-      onSuccess?.(...args);
+  options?: MutationOpts<AIConnectionResponse, ConnectionUpdateVars>
+) =>
+  useApiMutation<AIConnectionResponse, ConnectionUpdateVars>(
+    {
+      mutationFn: ({ connectionId, data }) => updatePlatformConnection(connectionId, data),
+      errorKey: "settings:aiConnections.saveError",
     },
-  });
-};
+    {
+      ...options,
+      // Pending until the list has reloaded, so a row's switch holds the
+      // value it asked for rather than showing the old one in between.
+      onSuccess: async (...args) => {
+        await invalidateConnectionSurfaces("platform");
+        return options?.onSuccess?.(...args);
+      },
+    }
+  );
 
-export const useDeletePlatformConnection = (options?: MutationOpts<void, number>) => {
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: (connectionId: number) => deletePlatformConnection(connectionId),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("platform");
-      onSuccess?.(...args);
+export const useDeletePlatformConnection = (options?: MutationOpts<void, number>) =>
+  useApiMutation<void, number>(
+    {
+      mutationFn: (connectionId) => deletePlatformConnection(connectionId),
+      invalidate: () => invalidateConnectionSurfaces("platform"),
+      errorKey: "settings:aiConnections.deleteError",
     },
-  });
-};
+    options
+  );
 
 export const useTestPlatformConnection = (
   options?: MutationOpts<AIConnectionTestResponse, number>
-) => {
-  return useMutation({
-    ...options,
-    mutationFn: (connectionId: number) => testPlatformConnection(connectionId),
-  });
-};
+) =>
+  useApiMutation<AIConnectionTestResponse, number>(
+    {
+      mutationFn: (connectionId) => testPlatformConnection(connectionId),
+      errorKey: "settings:ai.testError",
+    },
+    options
+  );
 
 export const useFetchPlatformConnectionModels = (
   options?: MutationOpts<AIModelsResponse, number>
@@ -144,67 +126,64 @@ export const useFetchPlatformConnectionModels = (
 export const useCommunityConnections = (options?: QueryOpts<AIConnectionResponse[]>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<AIConnectionResponse[]>({
-    queryKey: getListCommunityConnectionsQueryKey(communityId),
-    queryFn: () => listCommunityConnections(communityId),
-    enabled: userEnabled && communityId > 0,
-    ...rest,
+  return useListCommunityConnections(communityId, {
+    query: { enabled: userEnabled && communityId > 0, ...rest },
   });
 };
 
 export const useCreateCommunityConnection = (
   options?: MutationOpts<AIConnectionResponse, AIConnectionCreate>
-) => {
-  const communityId = useActiveCommunityId();
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: (data: AIConnectionCreate) => createCommunityConnection(communityId, data),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("community");
-      onSuccess?.(...args);
+) =>
+  useCommunityMutation<AIConnectionResponse, AIConnectionCreate>(
+    {
+      mutationFn: (communityId, data) => createCommunityConnection(communityId, data),
+      invalidate: () => invalidateConnectionSurfaces("community"),
+      errorKey: "settings:aiConnections.saveError",
     },
-  });
-};
+    options
+  );
 
 export const useUpdateCommunityConnection = (
-  options?: MutationOpts<AIConnectionResponse, { connectionId: number; data: AIConnectionUpdate }>
-) => {
-  const communityId = useActiveCommunityId();
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: ({ connectionId, data }: { connectionId: number; data: AIConnectionUpdate }) =>
-      updateCommunityConnection(communityId, connectionId, data),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("community");
-      onSuccess?.(...args);
+  options?: MutationOpts<AIConnectionResponse, ConnectionUpdateVars>
+) =>
+  useCommunityMutation<AIConnectionResponse, ConnectionUpdateVars>(
+    {
+      mutationFn: (communityId, { connectionId, data }) =>
+        updateCommunityConnection(communityId, connectionId, data),
+      errorKey: "settings:aiConnections.saveError",
     },
-  });
-};
+    {
+      ...options,
+      // Pending until the list has reloaded, so a row's switch holds the
+      // value it asked for rather than showing the old one in between.
+      onSuccess: async (...args) => {
+        await invalidateConnectionSurfaces("community");
+        return options?.onSuccess?.(...args);
+      },
+    }
+  );
 
-export const useDeleteCommunityConnection = (options?: MutationOpts<void, number>) => {
-  const communityId = useActiveCommunityId();
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation({
-    ...rest,
-    mutationFn: (connectionId: number) => deleteCommunityConnection(communityId, connectionId),
-    onSuccess: (...args) => {
-      void invalidateConnectionSurfaces("community");
-      onSuccess?.(...args);
+export const useDeleteCommunityConnection = (options?: MutationOpts<void, number>) =>
+  useCommunityMutation<void, number>(
+    {
+      mutationFn: (communityId, connectionId) =>
+        deleteCommunityConnection(communityId, connectionId),
+      invalidate: () => invalidateConnectionSurfaces("community"),
+      errorKey: "settings:aiConnections.deleteError",
     },
-  });
-};
+    options
+  );
 
 export const useTestCommunityConnection = (
   options?: MutationOpts<AIConnectionTestResponse, number>
-) => {
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    ...options,
-    mutationFn: (connectionId: number) => testCommunityConnection(communityId, connectionId),
-  });
-};
+) =>
+  useCommunityMutation<AIConnectionTestResponse, number>(
+    {
+      mutationFn: (communityId, connectionId) => testCommunityConnection(communityId, connectionId),
+      errorKey: "settings:ai.testError",
+    },
+    options
+  );
 
 export const useFetchCommunityConnectionModels = (
   options?: MutationOpts<AIModelsResponse, number>

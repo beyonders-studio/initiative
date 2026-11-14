@@ -8,7 +8,7 @@
  * environments, or test runners with stripped Intl data.
  */
 
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 const FALLBACK_TIMEZONES = [
   "UTC",
@@ -54,14 +54,5 @@ export const isKnownTimezone = (zone: string): boolean => {
     return true;
   } catch {
     return false;
-  }
-};
-
-/** The browser's IANA zone, or `UTC` where the runtime does not report one. */
-export const browserTimezone = (): string => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  } catch {
-    return "UTC";
   }
 };

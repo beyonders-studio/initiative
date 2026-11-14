@@ -28,17 +28,17 @@ case was closed opens a new one.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, AsyncIterator, Literal, Optional, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Literal
 
 from sqlalchemy import func
 from sqlmodel import col, select
-from sqlmodel.sql.expression import Select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql.expression import Select
 
-from app.core.tools import Tool
 from app.core.intake import (
     CASE_FIELD_TYPES,
     STREAM_FIELDS,
@@ -46,28 +46,31 @@ from app.core.intake import (
     IntakeStream,
     meta,
 )
+from app.core.tools import Tool
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import DEDUPE_KEY_LENGTH, IntakeBinding, IntakeCase
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
+from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory, TaskType
 from app.schemas.tenant.property import PropertyValueInput
 from app.services.platform import case_activity, case_notices
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import task_creation as task_creation_service
-from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_types as task_types_service
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: How long a repeat is folded into the open case before the writer says so
@@ -95,16 +98,16 @@ class CaseRefs:
     account leaves a dangling id here rather than a preserved person.
     """
 
-    subject_user: Optional[int] = None
-    subject_guild: Optional[int] = None
-    source_event: Optional[str] = None
-    resource_type: Optional[str] = None
-    resource_id: Optional[int] = None
-    reported_at: Optional[datetime] = None
-    severity: Optional[str] = None
-    legal_basis: Optional[str] = None
+    subject_user: int | None = None
+    subject_guild: int | None = None
+    source_event: str | None = None
+    resource_type: str | None = None
+    resource_id: int | None = None
+    reported_at: datetime | None = None
+    severity: str | None = None
+    legal_basis: str | None = None
 
-    def subject_link(self) -> Optional[str]:
+    def subject_link(self) -> str | None:
         """Where what the case is about opens, as an address in the app:
         ``/c/{community}/go/{kind}/{id}``, which the app turns into the
         thing's own page. ``None`` where the case names no one thing, or one
@@ -151,8 +154,32 @@ class CaseFiler:
     user_id: int
     #: What they called it. None where they named nothing — a report — and
     #: the stream's own name stands for it.
-    subject: Optional[str]
+    subject: str | None
     words: str
+
+
+#: A device context's fields, in the order the team reads them, with their
+#: labels.
+_DEVICE_LABELS = (
+    ("app_version", "App version"),
+    ("platform", "Platform"),
+    ("locale", "Language"),
+    ("theme", "Theme"),
+    ("route", "Page"),
+    ("viewport", "Window"),
+)
+
+
+def _with_device(body: str | None, device: DeviceContext | None) -> str | None:
+    """A new case's description: ``body``, then what ``device`` holds."""
+    sent = [
+        f"- {label}: `{value}`"
+        for name, label in _DEVICE_LABELS
+        if device is not None and (value := getattr(device, name))
+    ]
+    if not sent:
+        return body
+    return "\n".join([*([body, ""] if body else []), "Where the app was:", *sent])
 
 
 @dataclass(frozen=True)
@@ -165,7 +192,7 @@ class CaseOutcome:
     opened: bool
 
 
-async def operations_guild_id(session: AsyncSession) -> Optional[int]:
+async def operations_guild_id(session: AsyncSession) -> int | None:
     """The guild this deployment routes operations work to, if any.
 
     Read on the session as given, before any guild routing. ``None`` — the
@@ -176,13 +203,13 @@ async def operations_guild_id(session: AsyncSession) -> Optional[int]:
     return row.operations_guild_id if row is not None else None
 
 
-async def configured_operations_guild_id() -> Optional[int]:
+async def configured_operations_guild_id() -> int | None:
     """:func:`operations_guild_id`, read on a platform system session."""
     async with cohorts.system_session(None) as session:
         return await operations_guild_id(session)
 
 
-async def contact_for(session: AsyncSession, stream: IntakeStream) -> Optional[str]:
+async def contact_for(session: AsyncSession, stream: IntakeStream) -> str | None:
     """Who somebody is told to contact about ``stream``.
 
     The stream's own address, else the deployment's general one, else
@@ -198,7 +225,7 @@ async def contact_for(session: AsyncSession, stream: IntakeStream) -> Optional[s
 
 async def _binding_for(
     session: AsyncSession, stream: IntakeStream
-) -> Optional[IntakeBinding]:
+) -> IntakeBinding | None:
     """The enabled binding for ``stream``, on an already-routed session."""
     return (
         await session.exec(
@@ -248,7 +275,7 @@ async def _open_cases_filed_by(
     *,
     user_id: int,
     stream: IntakeStream,
-    topic: Optional[str] = None,
+    topic: str | None = None,
 ) -> int:
     """How many of ``stream``'s cases ``user_id`` filed that are still open,
     on ``topic`` alone where one is named.
@@ -278,8 +305,8 @@ async def _starting_state(
     session: AsyncSession,
     stream: IntakeStream,
     binding: IntakeBinding,
-    status_id: Optional[int],
-    topic: Optional[str],
+    status_id: int | None,
+    topic: str | None,
 ) -> str:
     """The state a case landing in ``status_id`` shows whoever filed it."""
     from app.services.platform.tickets import derive_state
@@ -320,7 +347,7 @@ async def _hold_key(
 
 async def _open_case_for_key(
     session: AsyncSession, *, project_id: int, stream: IntakeStream, dedupe_key: str
-) -> Optional[IntakeCase]:
+) -> IntakeCase | None:
     """The case this key already has open in this project, if there is one.
 
     The project is read through the task rather than off the case, because the
@@ -421,7 +448,7 @@ async def _record_refs(
 
 async def _landing_status_id(
     session: AsyncSession, binding: IntakeBinding, project: Project
-) -> Optional[int]:
+) -> int | None:
     """The status a new case starts in, or ``None`` for the project's default.
 
     A binding's named status is checked against the project here rather than
@@ -471,17 +498,18 @@ async def open_case(
     stream: IntakeStream,
     *,
     title: str,
-    body: Optional[str] = None,
-    refs: Optional[CaseRefs] = None,
-    dedupe_key: Optional[str] = None,
+    body: str | None = None,
+    refs: CaseRefs | None = None,
+    dedupe_key: str | None = None,
     window: timedelta = DEFAULT_RECURRENCE_WINDOW,
-    now: Optional[datetime] = None,
-    filer: Optional[CaseFiler] = None,
-    detail: Optional[str] = None,
-    evidence: Sequence["PreparedEvidence"] = (),
-    evidence_by: Optional[int] = None,
-    topic: Optional[str] = None,
-) -> Optional[CaseOutcome]:
+    now: datetime | None = None,
+    filer: CaseFiler | None = None,
+    detail: str | None = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    evidence_by: int | None = None,
+    topic: str | None = None,
+    device: DeviceContext | None = None,
+) -> CaseOutcome | None:
     """File ``stream``'s work as a task in the project bound to it.
 
     Returns ``None`` when this deployment has bound nothing for the stream —
@@ -492,8 +520,10 @@ async def open_case(
 
     ``filer`` names the person filing, when a person is. A new case records
     them and opens with their words, said to them; a repeat that lands in a
-    case already open says what was new on the case instead. The stream's cap
-    on one filer's open cases is checked under a lock on that filer, in the
+    case already open says what was new on the case instead. ``device`` is
+    the device and page a person sent it from, where they chose to send it,
+    listed under a new case's description for the people working it. The stream's cap on one
+    filer's open cases is checked under a lock on that filer, in the
     transaction that opens the case, and ``CaseCapReached`` is raised past it.
 
     ``detail`` is what this occurrence brings beyond the description — a new
@@ -517,7 +547,7 @@ async def open_case(
         if evidence_by is not None
         else (filer.user_id if filer is not None else None)
     )
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     if dedupe_key is not None and len(dedupe_key) > DEDUPE_KEY_LENGTH:
         raise ValueError("dedupe_key is longer than the column that stores it")
 
@@ -620,11 +650,12 @@ async def open_case(
 
         # A case starts as its type starts a task, under the body it came with.
         task_type = await _case_type(session, binding, project)
-        fields: dict[str, object] = {"title": title, "description": body}
+        description = _with_device(body, device)
+        fields: dict[str, object] = {"title": title, "description": description}
         lines = task_creation_service.start_from_type(
             task_type,
             fields,
-            sent={"title", "description"} if body else {"title"},
+            sent={"title", "description"} if description else {"title"},
         )
         task = await task_creation_service.create_task_row(
             session,
@@ -671,7 +702,7 @@ async def open_case(
             ),
         )
         session.add(case)
-        opening: Optional[Comment] = None
+        opening: Comment | None = None
         if filer is not None:
             # Their words open the conversation with them, under their name.
             # Named explicitly: the routing carries no user, so the trigger
@@ -680,6 +711,7 @@ async def open_case(
                 task_id=task.id,
                 content=filer.words,
                 created_by=filer.user_id,
+                created_by_kind=ActorKind.member,
                 audience=CommentAudience.filer,
             )
             session.add(opening)
@@ -711,7 +743,7 @@ async def add_filer_reply(
     filer: User,
     words: str,
     stream: IntakeStream,
-    evidence: Sequence["PreparedEvidence"] = (),
+    evidence: Sequence[PreparedEvidence] = (),
 ) -> bool:
     """Write a filer's answer on their case, said to them like the rest of the
     conversation, and move a case that is waiting on them. Returns whether it
@@ -769,6 +801,7 @@ async def add_filer_reply(
             task_id=task_id,
             content=words,
             created_by=filer.id,
+            created_by_kind=ActorKind.member,
             audience=CommentAudience.filer,
         )
         session.add(comment)
@@ -967,7 +1000,7 @@ async def claim_subject_guild(task_id: int, guild_id: int) -> ClaimOutcome:
 
 
 @asynccontextmanager
-async def case_locked(task_id: int) -> AsyncIterator[Optional[AsyncSession]]:
+async def case_locked(task_id: int) -> AsyncGenerator[AsyncSession | None]:
     """Hold case ``task_id``'s task locked for as long as the block runs, as
     the evidence retention sweep locks it: what the block commits elsewhere
     about the case — a hold naming it — is there before the sweep decides

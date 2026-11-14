@@ -9,10 +9,9 @@ and a non-member can't reach another guild's usage at all.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 import pytest
+from httpx2 import AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
 from app.models.platform.guild import CommunityRole

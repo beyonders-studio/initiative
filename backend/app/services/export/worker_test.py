@@ -4,7 +4,7 @@ nothing, and a build is cancelled when its heartbeat finds the row taken.
 Claiming and slots are tested once, through imports; expiry in
 ``exports_test``."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import select
@@ -19,8 +19,8 @@ from app.services.export import worker as export_worker
 from app.testing import (
     create_export_job,
     create_task,
-    route_session_to_guild,
     drain_notices,
+    route_session_to_guild,
 )
 
 
@@ -85,10 +85,10 @@ async def test_an_abandoned_render_is_started_over_until_it_has_been_too_often(
         a.user,
         status=DataJobStatus.running,
         restarts=restarts,
-        updated_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+        updated_at=datetime.now(UTC) - timedelta(minutes=30),
     )
 
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
     assert (await _reload(session, a.guild.id, job.id)).status == ends
     assert await _notices(session, a.user.id, job.id, told) == 1
@@ -111,7 +111,7 @@ async def test_a_render_that_lost_its_row_writes_nothing(
         if calls == 1:
             row = await _reload(session, guild_id, running.id)
             row.status = DataJobStatus.queued
-            row.updated_at = datetime.now(timezone.utc)
+            row.updated_at = datetime.now(UTC)
             session.add(row)
             await session.commit()
             return frozenset(), export_engine.ArtifactLocation(
@@ -123,7 +123,7 @@ async def test_a_render_that_lost_its_row_writes_nothing(
 
     monkeypatch.setattr(export_worker, "_execute", execute)
 
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
     assert calls == 2
     done = await _reload(session, a.guild.id, job.id)

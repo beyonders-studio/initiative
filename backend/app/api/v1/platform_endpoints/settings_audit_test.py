@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -21,7 +21,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-
 
 SMTP_PASSWORD = "smtp-pa55word"
 S3_SECRET = "s3-secret-access-key"

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Iterator
 from unittest.mock import AsyncMock, patch
 
 from app.services import captcha_config
 
 
 @contextmanager
-def captcha_switched_on() -> Iterator[None]:
+def captcha_switched_on() -> Generator[None]:
     """Resolve the captcha configuration as hCaptcha for the duration.
 
     The provider and its keys live on the settings row, behind a process-wide

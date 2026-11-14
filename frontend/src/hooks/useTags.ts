@@ -1,32 +1,25 @@
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
   GetTagEntitiesParams,
   TagCreate,
-  TagEntityCountsResponse,
-  TaggedEntitiesResponse,
   TagRead,
   TagUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createTag,
   deleteTag,
-  getGetTagCountsQueryKey,
-  getGetTagEntitiesQueryKey,
-  getGetTagQueryKey,
-  getListTagsQueryKey,
-  getTag,
-  getTagCounts,
-  getTagEntities,
-  listTags,
   updateTag,
+  useGetTag,
+  useGetTagCounts,
+  useGetTagEntities,
+  useListTags,
 } from "@/api/generated/tags/tags";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
 
@@ -44,11 +37,8 @@ const invalidateTagBearers = () => {
 
 export const useTags = (options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TagRead[]>({
-    queryKey: getListTagsQueryKey(communityId),
-    queryFn: () => listTags(communityId),
-    staleTime: 60 * 1000,
-    enabled: options?.enabled ?? true,
+  return useListTags(communityId, {
+    query: { staleTime: 60 * 1000, enabled: options?.enabled ?? true },
   });
 };
 
@@ -73,11 +63,8 @@ export const useKnownTagIds = (ids: number[]): number[] => {
 
 export const useTag = (tagId: number | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TagRead>({
-    queryKey: getGetTagQueryKey(communityId, tagId!),
-    queryFn: () => getTag(communityId, tagId!),
-    enabled: !!tagId,
-    staleTime: 60 * 1000,
+  return useGetTag(communityId, tagId!, undefined, {
+    query: { enabled: !!tagId, staleTime: 60 * 1000 },
   });
 };
 
@@ -94,27 +81,19 @@ export const useCreateTag = (options?: MutationOpts<TagRead, TagCreate>) =>
 export const useUpdateTag = (
   options?: MutationOpts<TagRead, { tagId: number; data: TagUpdate }>
 ) => {
-  const communityId = useActiveCommunityId();
   const { t } = useTranslation("tags");
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ tagId, data }: { tagId: number; data: TagUpdate }) => {
-      return updateTag(communityId, tagId, data);
+  return useCommunityMutation<TagRead, { tagId: number; data: TagUpdate }>(
+    {
+      mutationFn: (communityId, { tagId, data }) => updateTag(communityId, tagId, data),
+      invalidate: () => {
+        toast.success(t("updated"));
+        void invalidate(q.allTags());
+        invalidateTagBearers();
+      },
+      errorKey: "tags:updateError",
     },
-    onSuccess: (...args) => {
-      toast.success(t("updated"));
-      void invalidate(q.allTags());
-      invalidateTagBearers();
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "tags:updateError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };
 
 export const useDeleteTag = (
@@ -124,51 +103,38 @@ export const useDeleteTag = (
     silent?: boolean;
   }
 ) => {
-  const communityId = useActiveCommunityId();
   const { t } = useTranslation("tags");
-  const { onSuccess, onError, onSettled, silent, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async (tagId: number) => {
-      await deleteTag(communityId, tagId);
+  const { silent, ...rest } = options ?? {};
+  return useCommunityMutation<void, number>(
+    {
+      mutationFn: async (communityId, tagId) => {
+        await deleteTag(communityId, tagId);
+      },
+      invalidate: () => {
+        if (!silent) {
+          toast.success(t("deleted"));
+        }
+        void invalidate(q.allTags());
+        invalidateTagBearers();
+      },
+      errorKey: "tags:deleteError",
     },
-    onSuccess: (...args) => {
-      if (!silent) {
-        toast.success(t("deleted"));
-      }
-      void invalidate(q.allTags());
-      invalidateTagBearers();
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "tags:deleteError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    rest
+  );
 };
 
 /** How many things of each taggable kind carry the tag, keyed by kind — the
  *  tag page's tabs, before any of their tables is read. */
 export const useTagCounts = (tagId: number | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TagEntityCountsResponse>({
-    queryKey: getGetTagCountsQueryKey(communityId, tagId!),
-    queryFn: () => getTagCounts(communityId, tagId!),
-    enabled: !!tagId,
-    staleTime: 30 * 1000,
-  });
+  return useGetTagCounts(communityId, tagId!, { query: { enabled: !!tagId } });
 };
 
 /** One page of the things of one kind carrying the tag. The page in hand stays
  *  up while the next one is read. */
 export const useTagEntities = (tagId: number, params: GetTagEntitiesParams) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TaggedEntitiesResponse>({
-    queryKey: getGetTagEntitiesQueryKey(communityId, tagId, params),
-    queryFn: () => getTagEntities(communityId, tagId, params),
-    staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
+  return useGetTagEntities(communityId, tagId, params, {
+    query: { placeholderData: keepPreviousData },
   });
 };

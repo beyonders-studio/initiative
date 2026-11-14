@@ -19,10 +19,10 @@ where the resource and the caller's access to it are already in hand.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from collections.abc import Mapping
-from typing import Iterable, Literal, Sequence
+from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy import text, union_all
@@ -37,8 +37,8 @@ from app.core.relationships import (
     PERSON,
     SPECS,
     EndpointKind,
-    Related,
     Provenance,
+    Related,
     RelationshipType,
     is_symmetric,
     is_transitive,
@@ -47,6 +47,7 @@ from app.core.relationships import (
 from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.db.session import install_context, require_actor_context
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import named_people
 
@@ -133,10 +134,10 @@ async def create(
         target_id=stored_target.id,
         provenance=provenance.value,
         confidence=confidence,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        created_by=created_by,
+        created_by_kind=None if created_by is None else ActorKind.member,
     )
-    if created_by is not None:
-        row.created_by = created_by
     session.add(row)
     await session.flush()
     return row
@@ -192,7 +193,7 @@ async def link_many(
             refuse_derived(made.relationship_type)
             _refuse_link(made, ends, writable)
             await _create_link(session, made, user_id)
-        except (Refused, SelfLoop):
+        except Refused, SelfLoop:
             continue
 
 
@@ -426,8 +427,9 @@ async def create_many(
             "target_type": target.kind.value,
             "target_id": target.id,
             "provenance": provenance.value,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "created_by": created_by,
+            "created_by_kind": None if created_by is None else ActorKind.member,
         }
         for target in _ordered_many(source, relationship_type, targets)
     ]
@@ -491,7 +493,7 @@ async def remove(
     are not related" would bury the real signal in noise shaped exactly like it.
     """
     if tombstone and row.provenance == Provenance.manual.value:
-        row.removed_at = datetime.now(timezone.utc)
+        row.removed_at = datetime.now(UTC)
         row.removed_by = removed_by
         session.add(row)
     else:
@@ -1043,16 +1045,17 @@ async def purge_for_entities(
 
 __all__ = [
     "ENDPOINT_KINDS",
+    "HOP_BUDGET",
+    "MAX_NEIGHBOURHOOD_HOPS",
     "MAX_WALK_DEPTH",
     "SPECS",
     "Direction",
     "Endpoint",
-    "HOP_BUDGET",
-    "MAX_NEIGHBOURHOOD_HOPS",
     "Neighbourhood",
     "NotTransitive",
-    "SelfLoop",
     "Related",
+    "SelfLoop",
+    "counts_for_many",
     "create",
     "create_many",
     "find",
@@ -1061,7 +1064,6 @@ __all__ = [
     "purge_for_entities",
     "related_for",
     "related_for_many",
-    "counts_for_many",
     "related_ids",
     "remove",
     "set_related",

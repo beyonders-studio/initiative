@@ -24,13 +24,9 @@ import { CloudOff, SearchX } from "lucide-react";
 import { useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
+import { PageBanner } from "@/components/banners/PageBanner";
 import { CommunityCard } from "@/components/communities/CommunityCard";
 import { CommunitySearchField } from "@/components/communities/CommunitySearchField";
-import { DirectoryNearControl } from "@/components/communities/DirectoryNearControl";
-import { PageBanner } from "@/components/PageBanner";
-import { StatusMessage } from "@/components/StatusMessage";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useDirectoryCommunities } from "@/hooks/useCommunityDirectory";
@@ -46,6 +42,11 @@ import {
   subscribeSavedNear,
 } from "@/lib/directoryNear";
 import { getErrorCode } from "@/lib/errorMessage";
+import { LoadMore } from "@/ui/load-more";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
+
+import { DirectoryNearControl } from "./DirectoryNearControl";
 
 /** Stable keys for the loading placeholders — an index key on a list that can
  *  change is the lint rule this avoids. */
@@ -177,17 +178,12 @@ export function CommunitiesPage() {
               <CommunityCard key={community.id} community={community} />
             ))}
           </div>
-          {directory.hasNextPage ? (
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="outline"
-                onClick={() => void directory.fetchNextPage()}
-                disabled={directory.isFetchingNextPage}
-              >
-                {t("communities:community.showMore")}
-              </Button>
-            </div>
-          ) : null}
+          <LoadMore
+            className="pt-2"
+            hasMore={directory.hasNextPage}
+            loading={directory.isFetchingNextPage}
+            onLoadMore={directory.fetchNextPage}
+          />
         </>
       ) : (
         <StatusMessage

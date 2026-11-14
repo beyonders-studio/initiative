@@ -1,13 +1,12 @@
 """Schemas for the platform operator surfaces."""
 
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import AliasChoices, ConfigDict, Field
 
-from app.schemas.base import SanitizedBaseModel
-
 from app.core.intake import IntakeStream
 from app.models.platform.user import UserRole
+from app.schemas.base import SanitizedBaseModel
 
 
 class PlatformRoleUpdate(SanitizedBaseModel):
@@ -20,9 +19,6 @@ class OperatorUserDeleteRequest(SanitizedBaseModel):
     """Request to deactivate, anonymize (soft delete), or hard delete another account."""
 
     action: Literal["deactivate", "soft_delete", "hard_delete"]
-    # Keyed by "guild_id:project_id" (NOT bare project_id) — numeric project ids
-    # repeat across per-guild schemas, so a bare id would collide.
-    project_transfers: Optional[Dict[str, int]] = None
 
 
 class CommunityBlockerInfo(SanitizedBaseModel):
@@ -44,7 +40,7 @@ class OperatorDeletionEligibilityResponse(SanitizedBaseModel):
     can_delete: bool
     #: The account is the last active platform owner; another is promoted first.
     last_owner: bool = False
-    community_blockers: List[CommunityBlockerInfo] = Field(
+    community_blockers: list[CommunityBlockerInfo] = Field(
         default_factory=list,
         validation_alias=AliasChoices("community_blockers", "guild_blockers"),
     )
@@ -68,7 +64,7 @@ class OperatorSuspensionUpdate(SanitizedBaseModel):
     """
 
     suspended: bool
-    reason: Optional[str] = Field(default=None, max_length=500)
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class OperatorAccountCaseRead(SanitizedBaseModel):

@@ -14,34 +14,40 @@ than the address it replaces.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, AsyncIterator, Optional, Sequence
+from typing import TYPE_CHECKING
 
 from limits import parse
-from sqlalchemy import String, cast
+from sqlalchemy import String, cast, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import (
+    STREAMS,
     Conversation,
     FeedbackTopic,
     IntakeStream,
     SecurityTopic,
+    Source,
     conversation_for,
     meta,
+    offered_streams,
 )
 from app.core.rate_limit import take_allowance
 from app.db import cohorts
 from app.db.session import routed_guild_id
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
-from app.models.tenant.comment import Comment
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.services.platform import app_settings as app_settings_service
 from app.services.platform import intake as intake_service
 from app.services.tenant import support as support_service
 
@@ -59,6 +65,8 @@ class TicketMode(str, Enum):
     form = "form"
     #: The stream's contact address, and nothing to fill in.
     email = "email"
+    #: Initiative Cloud takes it: people send it there, signed in to Cloud.
+    cloud = "cloud"
     #: Nothing at all: no form and nobody to write to.
     none = "none"
 
@@ -70,7 +78,7 @@ class StreamAvailability:
     mode: TicketMode
     #: Who to write to about the stream, whatever the mode — a form whose
     #: filing turns out to have nowhere to go falls back to it.
-    contact: Optional[str]
+    contact: str | None
     #: The topics the form offers this person from here, in offering order.
     types: tuple[str, ...] = ()
 
@@ -79,7 +87,7 @@ class FilingTooFast(Exception):
     """This account has filed into the stream as often as its pace allows."""
 
 
-async def _contacts(session: AsyncSession) -> dict[IntakeStream, Optional[str]]:
+async def _contacts(session: AsyncSession) -> dict[IntakeStream, str | None]:
     """Every stream's contact address, from one read of the settings row.
 
     The stream's own address, else the deployment's general one — the rule
@@ -95,14 +103,26 @@ async def _contacts(session: AsyncSession) -> dict[IntakeStream, Optional[str]]:
     }
 
 
-def _fallback(contact: Optional[str]) -> StreamAvailability:
+def _fallback(contact: str | None) -> StreamAvailability:
     return StreamAvailability(
         mode=TicketMode.email if contact else TicketMode.none, contact=contact
     )
 
 
+async def feedback_goes(session: AsyncSession) -> TicketMode | None:
+    """Where feedback goes from here, when it isn't this server's own to take:
+    nowhere while the deployment's switch is off, and to Initiative Cloud from
+    any other server. ``None`` on Cloud with the switch on, where the stream
+    answers for itself."""
+    if not await app_settings_service.feedback_enabled(session):
+        return TicketMode.none
+    if IntakeStream.feedback not in offered_streams():
+        return TicketMode.cloud
+    return None
+
+
 async def availability(
-    session: AsyncSession, *, user: User, guild_id: Optional[int]
+    session: AsyncSession, *, user: User, guild_id: int | None
 ) -> dict[IntakeStream, StreamAvailability]:
     """What each stream offers ``user``, standing in ``guild_id`` if anywhere.
 
@@ -112,6 +132,9 @@ async def availability(
     contacts = await _contacts(session)
     offered: dict[IntakeStream, StreamAvailability] = {}
     for stream in IntakeStream:
+        # A stream nobody files into offers nothing to file.
+        if Source.submitted not in meta(stream).sources:
+            continue
         contact = contacts[stream]
         if stream is IntakeStream.moderation:
             # A report about a community's own content goes to that
@@ -119,6 +142,11 @@ async def availability(
             # form is always there; a report the platform would have to take
             # falls back to the address when nothing is bound.
             offered[stream] = StreamAvailability(TicketMode.form, contact)
+        elif (
+            stream is IntakeStream.feedback
+            and (goes := await feedback_goes(session)) is not None
+        ):
+            offered[stream] = StreamAvailability(goes, None)
         elif not await intake_service.stream_is_bound(stream):
             offered[stream] = _fallback(contact)
         elif stream is IntakeStream.support:
@@ -179,10 +207,10 @@ class FilerState(str, Enum):
 def derive_state(
     *,
     category: str,
-    status_id: Optional[int],
-    awaiting_status_id: Optional[int],
+    status_id: int | None,
+    awaiting_status_id: int | None,
     stream: IntakeStream,
-    topic: Optional[str] = None,
+    topic: str | None = None,
     trashed: bool = False,
 ) -> FilerState:
     """The state a case's status shows its filer.
@@ -209,13 +237,13 @@ class FiledTicket:
 
     task_id: int
     stream: IntakeStream
-    subject: Optional[str]
+    subject: str | None
     state: FilerState
     opened_at: datetime
-    updated_at: Optional[datetime]
-    status_id: Optional[int] = None
+    updated_at: datetime | None
+    status_id: int | None = None
     #: What it is about within its stream, as they chose.
-    topic: Optional[str] = None
+    topic: str | None = None
 
 
 @dataclass(frozen=True)
@@ -229,7 +257,7 @@ class TicketMessage:
     content: str
     created_at: datetime
     #: What they sent with it.
-    attachments: tuple["TicketAttachment", ...] = ()
+    attachments: tuple[TicketAttachment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -263,7 +291,7 @@ class ReplyRefused(Exception):
 
 
 @asynccontextmanager
-async def _as_filer(user: User) -> AsyncIterator[Optional[AsyncSession]]:
+async def _as_filer(user: User) -> AsyncGenerator[AsyncSession | None]:
     """A request session routed as ``user`` reading the cases they filed, or
     ``None`` where there is no operations community to read them in.
 
@@ -334,12 +362,48 @@ def _ticket_from(row) -> FiledTicket:
     )
 
 
+def latest_reply():
+    """The newest comment said to a case's filer by anybody but the filer."""
+    return (
+        select(func.max(Comment.id))
+        .where(Comment.task_id == IntakeCase.task_id)
+        .where(Comment.audience == CommentAudience.filer)
+        .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
+        .where(
+            or_(
+                Comment.created_by_kind != ActorKind.member,
+                Comment.created_by.is_distinct_from(IntakeCase.filer_user_id),  # type: ignore[union-attr]
+            )
+        )
+        .correlate(IntakeCase)
+        .scalar_subquery()
+    )
+
+
+#: The streams whose conversation the team starts.
+_TEAM_STARTS = tuple(
+    stream.value
+    for stream, declared in STREAMS.items()
+    if declared.conversation is Conversation.staff_first
+)
+
+
+def reaches_filer():
+    """Whether a case is its filer's to follow: from the start, or, where the
+    team starts the conversation, once the team has written to them."""
+    return or_(
+        IntakeCase.stream.not_in(_TEAM_STARTS),  # type: ignore[attr-defined]
+        latest_reply().is_not(None),
+    )
+
+
 def _tickets_query():
     return (
         select(*_ticket_columns())
         .join(Task, Task.id == IntakeCase.task_id)
         .join(TaskStatus, TaskStatus.id == Task.task_status_id)
         .outerjoin(IntakeBinding, IntakeBinding.stream == IntakeCase.stream)
+        .where(reaches_filer())
     )
 
 
@@ -403,7 +467,7 @@ async def read_filed(user: User, task_id: int) -> FiledTicketDetail:
     if guild_id is None:
         raise TicketNotFound
     ticket = _ticket_from(row)
-    attached: dict[Optional[int], list[TicketAttachment]] = {}
+    attached: dict[int | None, list[TicketAttachment]] = {}
     for comment_id, *fields in sent:
         attached.setdefault(comment_id, []).append(TicketAttachment(*fields))
     messages = [
@@ -456,7 +520,7 @@ async def reply(
     user: User,
     detail: FiledTicketDetail,
     words: str,
-    evidence: Sequence["PreparedEvidence"] = (),
+    evidence: Sequence[PreparedEvidence] = (),
 ) -> None:
     """Add ``user``'s answer to a case they filed.
 

@@ -9,8 +9,8 @@ what it is looking for, and the database decides what the reader may see.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
-from typing import Iterable, Optional, Sequence
 
 from sqlalchemy import (
     Select,
@@ -20,25 +20,27 @@ from sqlalchemy import (
     false,
     func,
     literal,
+    not_,
     select,
     text,
     union,
 )
-from sqlalchemy.dialects.postgresql import TSQUERY
+from sqlalchemy.dialects.postgresql import TSQUERY, distinct_on
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.errors import CodedError
-from app.db.schema_provisioning import search_operator_available
-from app.db.query import build_paginated_response
-from app.core.plugin_scopes import tool_resource
 from app.core.messages import PluginMessages
+from app.core.plugin_scopes import tool_resource
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
-from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
+from app.db.authorization import standing_arg
 from app.db.guild_standing import ActorContext, InstallContext
+from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
+from app.db.query import build_paginated_response
+from app.db.schema_provisioning import search_operator_available
 from app.db.search_index import MENTION_LEXEME, entity_types
 from app.models.platform.user_profile_view import GuildMember
 from app.models.tenant.engagement_level import EngagementLevel
@@ -46,7 +48,6 @@ from app.models.tenant.initiative import Initiative
 from app.models.tenant.search_entry import SearchEntry
 from app.schemas.tenant.search import SearchHit, SearchResults, SearchSuggestion
 from app.services.tenant.engagement_levels import boosted, level_of
-from app.db.authorization import standing_arg
 
 
 def writable_column(user_id: int | None, *, install: InstallContext | None = None):
@@ -109,7 +110,7 @@ class SearchScopeError(CodedError):
 
 
 def install_entity_types(
-    install: InstallContext, types: Optional[Sequence[SearchEntityType]]
+    install: InstallContext, types: Sequence[SearchEntityType] | None
 ) -> tuple[SearchEntityType, ...]:
     """The kinds an installed plug-in's search reaches: those asked for (the
     default scope when none are) whose read scope it holds, per
@@ -174,7 +175,7 @@ MIN_PREFIX_CHARS = 3
 _WEBSEARCH_OPERATORS = frozenset({"or", "and"})
 
 
-def _trailing_prefix(query: str) -> tuple[str, Optional[str]]:
+def _trailing_prefix(query: str) -> tuple[str, str | None]:
     """The query without its last word, and that word to match as a prefix.
 
     A results page searches as its reader types, so the last word is usually
@@ -200,7 +201,7 @@ _TERM = re.compile(r'-?"([^"]*)"|(\S+)')
 _WORD = re.compile(r"[^\W_]+")
 
 
-def _term(word: str) -> Optional[str]:
+def _term(word: str) -> str | None:
     """A word as a term that could name somebody: without an exclusion's ``-``
     or a stray quote, and ``None`` for an operator or a word holding no
     letters or digits."""
@@ -328,14 +329,14 @@ class Filters:
     asks for ``False``; a template picker asks for ``True``.
     """
 
-    types: Optional[Sequence[SearchEntityType]] = None
-    initiative_id: Optional[int] = None
+    types: Sequence[SearchEntityType] | None = None
+    initiative_id: int | None = None
     #: Archived work is indexed and left out unless it is asked for.
     include_archived: bool = False
-    template: Optional[bool] = None
+    template: bool | None = None
     #: The thing being written in, which a reference may not name — see
     #: :meth:`clause`. A results page has no subject and leaves this unset.
-    subject: Optional[tuple[SearchEntityType, int]] = None
+    subject: tuple[SearchEntityType, int] | None = None
 
     @property
     def entity_types(self) -> tuple[SearchEntityType, ...]:
@@ -359,7 +360,7 @@ class Filters:
             # caller so it comes off before ``limit``, and a picker that asks
             # for five rows is offered five.
             subject_type, subject_id = self.subject
-            clause = clause & ~(
+            clause = clause & not_(
                 (SearchEntry.entity_type == subject_type)
                 & (SearchEntry.entity_id == subject_id)
             )
@@ -388,7 +389,7 @@ def _best_chunk(clause: ColumnElement[bool], parsed) -> Select:
             rank,
         )
         .where(clause)
-        .distinct(SearchEntry.entity_type, SearchEntry.entity_id)
+        .ext(distinct_on(SearchEntry.entity_type, SearchEntry.entity_id))
         .order_by(SearchEntry.entity_type, SearchEntry.entity_id, rank.desc())
         .subquery()
     )
@@ -585,7 +586,7 @@ def _with_context(rows: Select) -> Select:
             (container.entity_type == inner.c.tool)
             & (container.entity_id == inner.c.tool_id)
             & (container.chunk_ix == 0)
-            & ~(
+            & not_(
                 (container.entity_type == inner.c.entity_type)
                 & (container.entity_id == inner.c.entity_id)
             ),
@@ -773,9 +774,9 @@ def _prefix_tokens(text: str) -> list[str]:
 def tool_search_clause(
     tool: Tool,
     id_col: ColumnElement[int],
-    search: Optional[str],
+    search: str | None,
     context: ActorContext,
-) -> Optional[ColumnElement[bool]]:
+) -> ColumnElement[bool] | None:
     """Narrow a tool's list to rows whose indexed text matches ``search``.
 
     The same index the search page reads, so a tool's filter box and the search

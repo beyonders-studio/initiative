@@ -10,7 +10,7 @@ still start a conversation instead of being told to come back later.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -65,14 +65,12 @@ class DmOneTimeKey(SQLModel, table=True):
     key_id: str = Field(sa_column=Column(Text, nullable=False))
     public_key: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     #: The publishing device's signature over the key.
-    signature: bytes | None = Field(
-        default=None, sa_column=Column(LargeBinary, nullable=True)
-    )
+    signature: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     fallback: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

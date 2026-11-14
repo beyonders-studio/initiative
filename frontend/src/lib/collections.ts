@@ -10,8 +10,8 @@ import type {
   FileSummary,
   TagSummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { localDayKey } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
+import { localDayKey } from "@/ui/lib/formatDate";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 /** The mark a collection is drawn with, wherever one is named. */
 export const COLLECTION_ICON = Layers;

@@ -14,9 +14,16 @@ import pytest
 from pglast import ast, parse_sql
 
 from app.core.messages import QueryMessages
+from app.core.search import SearchEntityType
 from app.services.fields.spec import FieldType
 from app.services.query import QueryError, resolve
-from app.services.query.resolve import Sheet, SheetCall
+from app.services.query.resolve import (
+    PluginCall,
+    PluginRows,
+    Sheet,
+    SheetCall,
+    remap_ids,
+)
 
 #: The function spellings this surface supports, as a reader writes them.
 #: Postgres reports the name it resolved, so a spelling that is really a node
@@ -136,6 +143,17 @@ class TestNamesResolveThroughTheRegistry:
     def test_one_relation_needs_no_qualifier(self):
         assert "title" in resolve("SELECT title FROM tasks").sql
 
+    def test_the_author_is_a_person_only_where_a_member_made_the_row(self):
+        """``created_by`` reads as the member who made the row and as nothing
+        for a plug-in or Initiative, under its own name, through an alias as
+        well; the kind it is compared with is not one of the reader's values."""
+        resolved = resolve("SELECT t.created_by FROM tasks t WHERE t.title = 'x'")
+        assert (
+            "CASE WHEN t.created_by_kind = 'member' THEN t.created_by END AS created_by"
+            in resolved.sql
+        )
+        assert resolved.parameters == ("x",)
+
     def test_a_table_joined_to_itself_is_two_relations(self):
         """Two aliases of one dataset are two relations in scope, so a bare
         column of it names both and has to say which."""
@@ -185,8 +203,10 @@ class TestNamesResolveThroughTheRegistry:
             # Inside an expression, and inside a window, the word is a column.
             "SELECT name AS content FROM files ORDER BY lower(content)",
             "SELECT name AS content, count(*) AS n FROM files GROUP BY lower(content)",
-            "SELECT count(*) AS n, sum(count(*)) OVER (ORDER BY n) AS t "
-            "FROM tasks GROUP BY title",
+            (
+                "SELECT count(*) AS n, sum(count(*)) OVER (ORDER BY n) AS t "
+                "FROM tasks GROUP BY title"
+            ),
         ],
     )
     def test_an_output_alias_inside_an_expression_is_a_column(self, sql):
@@ -413,14 +433,20 @@ class TestShapesATileAsks:
         [
             "SELECT count(*) AS n FROM tasks",
             "SELECT title, due_date FROM tasks WHERE due_date < now() ORDER BY due_date",
-            "SELECT date_trunc('month', created_at) AS m, count(*) AS n "
-            "FROM tasks GROUP BY m ORDER BY m",
-            "SELECT p.name, count(*) AS n FROM projects p "
-            "JOIN tasks k ON k.project_id = p.id "
-            "WHERE p.archived_at IS NULL GROUP BY p.name ORDER BY n DESC LIMIT 10",
+            (
+                "SELECT date_trunc('month', created_at) AS m, count(*) AS n "
+                "FROM tasks GROUP BY m ORDER BY m"
+            ),
+            (
+                "SELECT p.name, count(*) AS n FROM projects p "
+                "JOIN tasks k ON k.project_id = p.id "
+                "WHERE p.archived_at IS NULL GROUP BY p.name ORDER BY n DESC LIMIT 10"
+            ),
             "SELECT title FROM tasks WHERE title ILIKE '%bug%' LIMIT 50",
-            "SELECT count(*) AS n FROM tasks "
-            "WHERE due_date BETWEEN '2026-01-01' AND '2026-12-31'",
+            (
+                "SELECT count(*) AS n FROM tasks "
+                "WHERE due_date BETWEEN '2026-01-01' AND '2026-12-31'"
+            ),
         ],
     )
     def test_it_resolves(self, sql):
@@ -534,13 +560,19 @@ class TestWindows:
     @pytest.mark.parametrize(
         "sql",
         [
-            "SELECT date_trunc('week', completed_at) AS week, "
-            "sum(count(*)) OVER (ORDER BY date_trunc('week', completed_at)) AS total "
-            "FROM tasks GROUP BY 1",
-            "SELECT title, row_number() OVER (PARTITION BY priority ORDER BY due_date) "
-            "AS r FROM tasks",
-            "SELECT title, lag(title, 1) OVER w AS prev FROM tasks "
-            "WINDOW w AS (ORDER BY due_date)",
+            (
+                "SELECT date_trunc('week', completed_at) AS week, "
+                "sum(count(*)) OVER (ORDER BY date_trunc('week', completed_at)) AS total "
+                "FROM tasks GROUP BY 1"
+            ),
+            (
+                "SELECT title, row_number() OVER (PARTITION BY priority ORDER BY due_date) "
+                "AS r FROM tasks"
+            ),
+            (
+                "SELECT title, lag(title, 1) OVER w AS prev FROM tasks "
+                "WINDOW w AS (ORDER BY due_date)"
+            ),
         ],
     )
     def test_it_resolves(self, sql):
@@ -639,7 +671,10 @@ class TestTheReaderIsANameAStatementMayUse:
     def test_it_becomes_the_requesting_user(self):
         resolved = resolve("SELECT count(*) AS n FROM tasks WHERE created_by = me")
         assert "app.current_user_id" in resolved.sql
-        assert "me" not in resolved.sql.split("WHERE")[1].split("current_setting")[0]
+        assert (
+            "me"
+            not in resolved.sql.split("WHERE")[1].split("current_setting")[0].split()
+        )
 
     def test_it_is_not_a_value_the_reader_wrote(self):
         """Bound parameters are the reader's literals. The reader is not one of
@@ -671,8 +706,10 @@ class TestTheReaderIsANameAStatementMayUse:
         for sql in (
             "SELECT count(*) AS n FROM tasks WHERE me = created_by",
             "SELECT count(*) AS n FROM tasks WHERE created_by IN (me, 3)",
-            "SELECT CASE WHEN created_by = me THEN 'mine' ELSE 'theirs' END AS whose, "
-            "count(*) AS n FROM tasks GROUP BY 1",
+            (
+                "SELECT CASE WHEN created_by = me THEN 'mine' ELSE 'theirs' END AS whose, "
+                "count(*) AS n FROM tasks GROUP BY 1"
+            ),
         ):
             assert "app.current_user_id" in resolve(sql).sql
 
@@ -742,14 +779,18 @@ class TestAConstantACastNamesTheTypeOf:
     ("sql", "grains"),
     [
         (
-            "SELECT date_trunc('month', due_date) AS m, count(*) AS n "
-            "FROM tasks GROUP BY 1",
+            (
+                "SELECT date_trunc('month', due_date) AS m, count(*) AS n "
+                "FROM tasks GROUP BY 1"
+            ),
             ("month", None),
         ),
         ("SELECT DATE_TRUNC('Quarter', due_date) FROM tasks", ("quarter",)),
         (
-            "SELECT date_trunc('month', due_date)::date AS month, count(*) AS n "
-            "FROM tasks GROUP BY 1",
+            (
+                "SELECT date_trunc('month', due_date)::date AS month, count(*) AS n "
+                "FROM tasks GROUP BY 1"
+            ),
             ("month", None),
         ),
         ("SELECT CAST(date_trunc('week', due_date) AS date) FROM tasks", ("week",)),
@@ -821,8 +862,10 @@ def test_a_sheet_is_read_like_a_dataset_once_its_cells_are():
         ("SELECT a FROM sheet('Budget') AS s(a, b)", QueryMessages.UNSUPPORTED_SYNTAX),
         ("SELECT nope FROM sheet('Budget', 'Q3!A1:C')", QueryMessages.UNKNOWN_FIELD),
         (
-            "SELECT region FROM sheet('Budget', 'Q3!A1:C') AS a "
-            "JOIN sheet('Budget', 'Q3!A1:C') AS b ON a.region = b.region",
+            (
+                "SELECT region FROM sheet('Budget', 'Q3!A1:C') AS a "
+                "JOIN sheet('Budget', 'Q3!A1:C') AS b ON a.region = b.region"
+            ),
             QueryMessages.AMBIGUOUS_FIELD,
         ),
         (
@@ -835,6 +878,60 @@ def test_a_sheet_call_says_what_it_got_wrong(sql, code):
     with pytest.raises(QueryError) as refused:
         resolve(sql, _READ)
     assert refused.value.code == code
+
+
+_ORDERS = PluginCall("acme.shop", "orders", (("range", "30d"), ("tags", ("a", "b"))))
+
+
+def test_a_plugin_endpoint_is_read_like_a_dataset_once_it_answers():
+    """Its parameters are named arguments; its rows are one bound parameter
+    under the columns the endpoint declares, a value of another type read as
+    nothing; and it joins what any relation joins."""
+    sql = (
+        "SELECT t.title, o.status, sum(o.total) AS total "
+        "FROM plugin('acme.shop', 'orders', tags => ARRAY['a', 'b'], range => '30d') AS o "
+        "JOIN tasks AS t ON t.title = o.status GROUP BY t.title, o.status"
+    )
+    unread = resolve(sql)
+    assert unread.unread == (_ORDERS,)
+    assert unread.relations == ("plugins", "tasks")
+
+    rows = PluginRows.from_rows(
+        _ORDERS,
+        (("status", "string"), ("total", "int"), ("at", "datetime"), ("ok", "bool")),
+        [
+            {"status": "open", "total": 4, "at": "2026-11-01T10:00:00Z", "ok": True},
+            {"status": "shut", "total": "four", "at": "soon", "ok": "yes"},
+        ],
+    )
+    read = resolve(sql, {_ORDERS: rows})
+    assert read.unread == ()
+    assert (
+        "json_to_recordset($1) AS o(c1 text, c2 numeric, c3 timestamptz, c4 boolean)"
+        in read.sql
+    )
+    assert json.loads(read.parameters[-1]) == [
+        {"c1": "open", "c2": 4, "c3": "2026-11-01T10:00:00Z", "c4": True},
+        {"c1": "shut", "c2": None, "c3": None, "c4": None},
+    ]
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT a FROM plugin('acme.shop')",
+        "SELECT a FROM plugin('acme.shop', 'orders', 'positional')",
+        "SELECT a FROM plugin('acme.shop', range => '30d', 'orders')",
+        "SELECT a FROM plugin('acme.shop', 'orders', range => status)",
+        "SELECT a FROM plugin('acme.shop', 'orders', range => NULL)",
+        "SELECT a FROM plugin('acme.shop', 'orders', tags => ARRAY[ARRAY['a']])",
+        "SELECT a FROM plugin(1, 'orders')",
+    ],
+)
+def test_a_plugin_call_takes_constants_by_name(sql):
+    with pytest.raises(QueryError) as refused:
+        resolve(sql)
+    assert refused.value.code == QueryMessages.PLUGIN_ARGUMENTS
 
 
 def test_a_name_both_a_dataset_and_a_read_sheet_hold_is_ambiguous():
@@ -855,3 +952,47 @@ def test_a_name_both_a_dataset_and_a_read_sheet_hold_is_ambiguous():
             },
         )
     assert refused.value.code == QueryMessages.AMBIGUOUS_FIELD
+
+
+def test_a_statement_names_rows_by_id_where_a_column_holds_one():
+    """Each constant a key column is compared with, and the file ``sheet()``
+    reads, is put through the mapping in place; a person, a constant in a
+    shape it does not read, and a statement that does not resolve are left
+    as they were."""
+    moved = {
+        (SearchEntityType.project, 12): 120,
+        (SearchEntityType.task, 7): 70,
+        (SearchEntityType.file, 42): 420,
+    }
+
+    def remap(kind: SearchEntityType, entity_id: int) -> int:
+        return moved.get((kind, entity_id), 0)
+
+    for sql, expected in (
+        (
+            "SELECT count(*) AS n FROM tasks WHERE project_id = 12 AND created_by = 12",
+            "SELECT count(*) AS n FROM tasks WHERE project_id = 120 AND created_by = 12",
+        ),
+        (
+            "SELECT t.title FROM tasks t WHERE t.id IN (7, 8) LIMIT 12",
+            "SELECT t.title FROM tasks t WHERE t.id IN (70, 0) LIMIT 12",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project.id <> 12 -- the old one",
+            "SELECT title FROM tasks WHERE project.id <> 120 -- the old one",
+        ),
+        (
+            "SELECT b.x FROM sheet(42, 'Q3!A1:D') AS b JOIN projects p ON p.name = b.x",
+            "SELECT b.x FROM sheet(420, 'Q3!A1:D') AS b JOIN projects p ON p.name = b.x",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
+            "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 12)",
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 120)",
+        ),
+        ("SELECT a FROM nowhere WHERE id = 12", "SELECT a FROM nowhere WHERE id = 12"),
+    ):
+        assert remap_ids(sql, remap) == expected, sql

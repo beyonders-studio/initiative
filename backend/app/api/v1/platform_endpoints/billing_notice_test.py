@@ -13,18 +13,18 @@ from __future__ import annotations
 import secrets
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import billing_boundary
+from app.core.notification_categories import NotificationCategory
 from app.models.platform.billing import BillingEventLog
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.identity_ref import IdentityEntity
 from app.models.platform.notification import Notification, NotificationType
-from app.core.notification_categories import NotificationCategory
 from app.services.platform import email_outbox, identity_refs, notice_outbox
 from app.testing import (
+    billing_boundary,
     billing_guild_ref,
     create_guild,
     create_guild_membership,

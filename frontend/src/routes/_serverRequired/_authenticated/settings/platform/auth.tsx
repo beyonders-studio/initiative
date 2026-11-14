@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { AuthPage } from "@/pages/platform/auth/AuthPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/platform/auth")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/SettingsAuthPage").then((m) => ({ default: m.SettingsAuthPage }))
-  ),
+  component: AuthPage,
 });

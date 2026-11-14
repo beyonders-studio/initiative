@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { PostReactionsField } from "@/components/initiativeTools/posts/PostReactionsField";
-import { ToolSettingsPage } from "@/pages/toolSettings/ToolSettingsPage";
+import { PostReactionsField } from "@/pages/community/tools/posts/PostReactionsField";
+import { SettingsLayout } from "@/pages/community/tools/settings/SettingsLayout";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/posts/$postId/settings"
 )({
-  component: () => <ToolSettingsPage tool={Tool.post} detailsInline={<PostReactionsField />} />,
+  component: () => <SettingsLayout tool={Tool.post} detailsInline={<PostReactionsField />} />,
 });

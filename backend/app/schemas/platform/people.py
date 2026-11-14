@@ -6,13 +6,11 @@ few things only this roster asks for, kept off the shared picker projection so
 every other caller of that shape is untouched.
 """
 
-from typing import List, Optional
-
 from pydantic import AliasChoices, ConfigDict, Field
 
-from app.schemas.base import SanitizedBaseModel
 from app.models.platform.user import Presence
-from app.schemas.platform.user import ProfileDecorations, UserSummary
+from app.schemas.base import SanitizedBaseModel
+from app.schemas.platform.user import UserSummary
 
 
 class PersonRead(UserSummary):
@@ -29,14 +27,11 @@ class PersonRead(UserSummary):
 
     #: How this person appears right now, from the one roll that decides it.
     presence: Presence = Presence.offline
-    #: What they have put around their picture, so a row draws them the way
-    #: every other surface does. Public, like the profile it comes from.
-    profile_decorations: ProfileDecorations = Field(default_factory=ProfileDecorations)
     #: The reader's *own* guilds this person is also in, in the same order the
     #: sections come in. Never names a guild the reader is not in — it is built
     #: from their own guild list. The section a row sits in is included; the
     #: chip drops it, because a row's own guild is not "also in".
-    shared_community_ids: List[int] = Field(
+    shared_community_ids: list[int] = Field(
         default_factory=list,
         validation_alias=AliasChoices("shared_community_ids", "shared_guild_ids"),
     )
@@ -51,10 +46,10 @@ class PeopleCommunitySection(SanitizedBaseModel):
     community_name: str = Field(
         validation_alias=AliasChoices("community_name", "guild_name")
     )
-    icon_url: Optional[str] = None
+    icon_url: str | None = None
     #: Everyone in the guild the reader may be shown, not just this page.
     total_count: int
-    items: List[PersonRead]
+    items: list[PersonRead]
     has_next: bool
 
 
@@ -67,6 +62,6 @@ class PeopleSectionsResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    sections: List[PeopleCommunitySection]
+    sections: list[PeopleCommunitySection]
     page: int
     page_size: int

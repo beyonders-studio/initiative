@@ -17,17 +17,18 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { AskToEdit } from "@/components/access/RequestAccess";
-import { BookmarkButton } from "@/components/BookmarkButton";
-import { useFullBleed } from "@/components/PageBanner";
-import { SubscribeButton } from "@/components/SubscribeButton";
-import { ToolBreadcrumb, type ToolBreadcrumbSegment } from "@/components/tools/ToolBreadcrumb";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useFullBleed } from "@/components/banners/PageBanner";
 import { useListedInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { hexToRgba, resolveInitiativeColor } from "@/lib/initiativeColors";
-import { useFieldDraft } from "@/lib/layouts/editing";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { useFieldDraft } from "@/ui/layouts/editing";
+import { cn } from "@/ui/lib/utils";
+
+import { BookmarkButton } from "./BookmarkButton";
+import { SubscribeButton } from "./SubscribeButton";
+import { ToolBreadcrumb, type ToolBreadcrumbSegment } from "./ToolBreadcrumb";
 
 const TITLE_CLASS = "font-semibold text-3xl tracking-tight";
 

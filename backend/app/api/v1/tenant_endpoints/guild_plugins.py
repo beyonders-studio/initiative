@@ -21,7 +21,7 @@ creates carries its own grants, and the tool that owns it enforces them exactly
 as it does for initiative content. A plug-in's *pages* are the
 exception, because they have no local content to carry grants: the handoff mint
 is where who-may-open-this is settled, against where the seat placed the plug-in
-and which roles it allowed there.
+and the permission the page names, which the community's roles hold.
 
 Two things a guild admin does not govern. A plug-in the deployment marks mandatory
 is installed everywhere and is neither removable nor disableable here — the
@@ -31,8 +31,8 @@ nothing, whether or not the guild wanted it.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -49,12 +49,6 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
-    get_guild_seat_write_session,
-    refuse_closed_surface,
-    require_surface_open,
-)
-from app.core.rules import SURFACE_PLUGINS
-from app.api.deps import (
     AgeViewerDep,
     CurrentUser,
     GuildContextDep,
@@ -63,9 +57,12 @@ from app.api.deps import (
     SeatSessionDep,
     SeatWriteContextDep,
     SeatWriteSessionDep,
+    get_guild_seat_write_session,
+    refuse_closed_surface,
     require_first_party_session,
     require_grant_writes,
     require_seat,
+    require_surface_open,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import (
@@ -75,6 +72,7 @@ from app.core.messages import (
 )
 from app.core.plugin_scopes import plugin_scope_target
 from app.core.rate_limit import limiter
+from app.core.rules import SURFACE_PLUGINS
 from app.db import post_commit
 from app.db.guild_standing import GuildContext
 from app.db.query import build_paginated_response, paginated_query
@@ -104,8 +102,6 @@ from app.schemas.tenant.guild_plugin import (
     CommunityPluginUninstallNotice,
     CommunityPluginUpdate,
     CommunityPluginUpgrade,
-    PluginPlacementRead,
-    PluginPlacementUpdate,
     serialize_consent,
     serialize_guild_plugin,
     serialize_guild_plugin_detail,
@@ -182,7 +178,7 @@ def _config_fields(config: dict, secrets: dict) -> dict[str, Any]:
     return fields
 
 
-async def _plugin_avatar(session: AsyncSession, plugin: GuildPlugin) -> Optional[str]:
+async def _plugin_avatar(session: AsyncSession, plugin: GuildPlugin) -> str | None:
     """The artwork for one install's listing."""
     avatars = await catalog_service.listing_avatars(session, [plugin.listing_uid])
     return avatars.get(plugin.listing_uid)
@@ -245,7 +241,7 @@ async def _plugin_names(
     """The names of the plug-ins the install's ``plugins:`` scopes name, and those a
     pending version's new ones name."""
     scopes = list(guild_plugins_service.requested_scopes(plugin.definition))
-    if offer is not None:
+    if isinstance(offer, plugin_updates_service.UpdateOffer):
         scopes.extend(offer.asks.added_scopes)
     return await guild_plugins_service.plugin_scope_names(session, scopes)
 
@@ -386,17 +382,26 @@ async def _read(
 
 
 async def _entitlement(
-    guild_id: int, listing_uid: Optional[str]
-) -> Optional[CommunityPluginEntitlementRead]:
+    guild_id: int, listing_uid: str | None
+) -> CommunityPluginEntitlementRead | None:
     """What the statement held for the install's listing says, if one is."""
     if not listing_uid:
         return None
     statement = await plugin_entitlements.read_statement(guild_id, listing_uid)
     if statement is None:
         return None
+    active = plugin_entitlements.statement_active(statement.values)
+    reason = plugin_entitlements.statement_reason(statement.values)
     return CommunityPluginEntitlementRead(
-        active=plugin_entitlements.statement_active(statement.values),
-        reason=plugin_entitlements.statement_reason(statement.values),
+        active=active,
+        reason=reason,
+        # Where the seat gets it again; a full term's way on is a request,
+        # which the page makes on its own.
+        action_url=(
+            plugin_entitlements.action_url(listing_uid)
+            if not active and reason != plugin_entitlements.REASON_TERM_FULL
+            else None
+        ),
     )
 
 
@@ -407,7 +412,9 @@ async def _detail(
     user_id: int,
     viewer: AgeViewer,
     *,
-    offer: Optional[plugin_updates_service.UpdateOffer] = None,
+    offer: (
+        plugin_updates_service.UpdateOffer | plugin_updates_service.RefusedUpdate | None
+    ) = None,
 ) -> CommunityPluginDetail:
     """One install with its connections and consents, as ``user_id`` sees it.
 
@@ -425,7 +432,12 @@ async def _detail(
             guild_id=context.guild_id,
             listing_uid=plugin.listing_uid,
         ),
-        update_offer=offer,
+        update_offer=(
+            offer if isinstance(offer, plugin_updates_service.UpdateOffer) else None
+        ),
+        update_refused=(
+            offer if isinstance(offer, plugin_updates_service.RefusedUpdate) else None
+        ),
         installed=await guild_plugins_service.installed_plugin_ids(session),
         plugin_names=await _plugin_names(session, plugin, offer),
         context=context,
@@ -558,19 +570,10 @@ async def install_community_plugin(
 
     The install dialog is the seat's consent, and it lands with the install in
     one transaction: the scopes granted (checked as ``PUT …/scopes`` checks
-    them), the initiatives the plug-in is placed in (``"all"`` is every initiative
-    that exists now), and the built-in roles that open it in each. Anything
-    refused is refused before the install exists.
+    them) and the initiatives the plug-in is placed in (``"all"`` is every
+    initiative that exists now). Who uses it there is each initiative's roles'
+    answer. Anything refused is refused before the install exists.
     """
-    unknown_roles = set(payload.role_kinds) - set(
-        guild_plugins_service.BUILTIN_ROLE_NAMES
-    )
-    if unknown_roles:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=GuildPluginMessages.PLACEMENT_ROLE_INVALID,
-        )
-
     listing, version = await resolve_listing_install(
         session, payload.listing_uid, kind="plugin"
     )
@@ -606,18 +609,16 @@ async def install_community_plugin(
             listing_version=version.version,
             definition=definition,
             guild_id=guild_context.guild_id,
-            created_by=current_user.id,
             name=name,
             actor_user_id=current_user.id,
             granted_scopes=sorted(granted),
             allowed_callers=payload.callers,
         )
         if payload.placements:
-            await guild_plugins_service.place_with_roles(
+            await guild_plugins_service.set_placed_initiatives(
                 session,
                 plugin,
-                None if payload.placements == "all" else payload.placements,
-                payload.role_kinds,
+                None if payload.placements == "all" else set(payload.placements),
             )
         await session.commit()
     except guild_plugins_service.ErasePendingError as exc:
@@ -630,11 +631,7 @@ async def install_community_plugin(
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=(
-                GuildPluginMessages.PLACEMENT_ROLE_INVALID
-                if isinstance(exc, guild_plugins_service.PlacementRoleError)
-                else GuildPluginMessages.PLACEMENT_INVALID
-            ),
+            detail=GuildPluginMessages.PLACEMENT_INVALID,
         ) from exc
     except IntegrityError as exc:
         # The look-up above and this insert are not one atomic step, so two
@@ -671,7 +668,7 @@ async def upgrade_community_plugin(
     current_user: CurrentUser,
     guild_context: SeatWriteContextDep,
     viewer: AgeViewerDep,
-    payload: Optional[CommunityPluginUpgrade] = None,
+    payload: CommunityPluginUpgrade | None = None,
 ) -> CommunityPluginDetail:
     """Re-pin an installed plug-in to its listing's current version, now.
 
@@ -807,7 +804,7 @@ async def decline_community_plugin_upgrade(
     """
     plugin = await _load(session, plugin_id, for_update=True)
     offer = await plugin_updates_service.update_offer(session, plugin)
-    if offer is None:
+    if not isinstance(offer, plugin_updates_service.UpdateOffer):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=MarketplaceMessages.ALREADY_LATEST_VERSION,
@@ -861,10 +858,9 @@ async def update_community_plugin(
     them.
 
     ``placed_initiative_ids`` is the whole set of initiatives a plug-in's
-    initiative-scoped surfaces appear in. An initiative that stays placed keeps
-    the roles it had, a new one starts with its moderator role, and one left out
-    is removed. It is the community's own answer to where a plug-in belongs rather
-    than a permission, so it reads the same for everyone, admins included.
+    initiative-scoped surfaces appear in; one left out is removed. It is the
+    community's own answer to where a plug-in belongs rather than a permission,
+    so it reads the same for everyone, admins included.
     """
     plugin = await _load(session, plugin_id)
 
@@ -885,7 +881,7 @@ async def update_community_plugin(
         plugin.auto_update = data["auto_update"]
     if data.get("placed_initiative_ids") is not None:
         await _set_placement(session, plugin, data["placed_initiative_ids"])
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     session.add(plugin)
     after = {
         **audit_service.snapshot(plugin, _PLUGIN_SETTINGS_FIELDS),
@@ -1020,15 +1016,26 @@ async def update_community_plugin_config(
 
     Only guild-scoped connections are settable here. A per-member one is that
     member's to make, and the fields a plug-in marks ``managed`` come from its
-    ``after_connect`` hook when a flow completes rather than through a form.
+    ``after_connect`` hook rather than through a form.
+
+    A connection that declares ``after_connect`` beside its fields is saved on
+    its own, once the plug-in has checked what was typed: refused
+    (``COMMUNITY_PLUGIN_CONNECTION_REFUSED``), or not answered
+    (``COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED``), nothing is stored.
     """
-    # Both configuration maps are rewritten whole below, so the row is taken
-    # first — a flow completing is doing the same thing to the same values.
-    plugin = await _load(session, plugin_id, for_update=True)
-    await guild_plugins_service.apply_static_config(
-        session, plugin, payload.values, actor_user_id=current_user.id
-    )
-    await session.commit()
+    plugin = await _load(session, plugin_id)
+    typed = await flows_service.typed_to_check(session, plugin, payload.values)
+    if typed is not None:
+        await flows_service.check_typed(session, typed, actor_user_id=current_user.id)
+    else:
+        # Both configuration maps are rewritten whole below, so the row is taken
+        # first — a flow completing is doing the same thing to the same values.
+        plugin = await _load(session, plugin_id, for_update=True)
+        await guild_plugins_service.apply_static_config(
+            session, plugin, payload.values, actor_user_id=current_user.id
+        )
+        await session.commit()
+    plugin = await _load(session, plugin_id)
     await session.refresh(plugin)
     return await _detail(session, plugin, guild_context, current_user.id, viewer)
 
@@ -1073,61 +1080,6 @@ async def update_community_plugin_setting(
 # ---------------------------------------------------------------------------
 # Placement and scopes, set by the seat
 # ---------------------------------------------------------------------------
-
-
-@router.put(
-    "/{plugin_id}/placements/{initiative_id}",
-    response_model=PluginPlacementRead,
-    dependencies=[_SURFACE_OPEN],
-)
-async def put_community_plugin_placement(
-    plugin_id: int,
-    initiative_id: int,
-    payload: PluginPlacementUpdate,
-    session: SeatWriteSessionDep,
-    current_user: CurrentUser,
-    guild_context: SeatWriteContextDep,
-) -> PluginPlacementRead:
-    """Place the plug-in in one initiative with exactly these roles.
-
-    Creates the placement or replaces its roles. Every role must be one of that
-    initiative's; guild admins open the plug-in there whatever the roles say.
-    """
-    plugin = await _load(session, plugin_id)
-    before = await guild_plugins_service.placement_role_ids(
-        session, plugin.id, initiative_id
-    )
-    try:
-        placement = await guild_plugins_service.set_placement_roles(
-            session, plugin, initiative_id, payload.role_ids
-        )
-    except guild_plugins_service.PlacementRoleError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=GuildPluginMessages.PLACEMENT_ROLE_INVALID,
-        ) from exc
-    except guild_plugins_service.PlacementError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=GuildPluginMessages.PLACEMENT_INVALID,
-        ) from exc
-    after = list(placement.role_ids or [])
-    changed = audit_service.changed_fields(
-        {"placed": before is not None, "role_ids": before},
-        {"placed": True, "role_ids": after},
-    )
-    if changed["changed"]:
-        await audit_service.record(
-            session,
-            event_type=AuditEventType.PLUGIN_UPDATED,
-            actor_user_id=current_user.id,
-            guild_id=guild_context.guild_id,
-            target_type="plugin",
-            target_id=plugin.id,
-            detail={"area": "placement", "initiative_id": initiative_id, **changed},
-        )
-    await session.commit()
-    return PluginPlacementRead(initiative_id=initiative_id, role_ids=after)
 
 
 @router.put(
@@ -1183,8 +1135,8 @@ async def create_community_plugin_handoff(
 
     Whether the surface may be opened is decided here, under the caller's real
     session, so the plug-in never makes that call and never sees a request from
-    somebody who failed it. At the community level only the guild's admins open
-    a surface.
+    somebody who failed it. At the community level the caller holds the
+    surface's permission as an admin surface is held.
 
     The token goes to the iframe by ``postMessage`` — never a query string —
     and expires in a minute.
@@ -1227,9 +1179,9 @@ async def create_initiative_plugin_handoff(
 
     Three gates, outermost first. The initiative must be one this caller can
     reach. The manifest must declare the surface for this scope, and the seat
-    must have placed the plug-in here. And the caller must hold one of the roles
-    that placement allows — or be a guild admin, as everywhere in their own
-    guild. A surface marked ``admin_only`` is for the admins alone.
+    must have placed the plug-in here. And the caller's role here must hold the
+    permission the surface names, as a tool's permissions are held — which a
+    guild admin and the initiative's managers always do.
 
     The initiative in the minted token is this route's, never the caller's to
     supply, so a plug-in can scope what it shows without asking a second question

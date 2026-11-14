@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import json
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
-from app.models.platform.guild import Guild, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild
 from app.testing import emitted
 from app.testing.factories import (
     create_auth_provider,
@@ -24,7 +24,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-
 
 TENANT_CLAIM_VALUE = "morels.me"
 GROUP_CLAIM_VALUE = "eng-team"

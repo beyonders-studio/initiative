@@ -29,9 +29,10 @@ import logging
 import mimetypes
 import os
 import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Iterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, runtime_checkable
 from urllib.parse import quote
 
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -148,7 +149,7 @@ class StorageBackend(Protocol):
     ) -> None: ...
 
     def write_file(
-        self, key: str, path: "Path", *, content_type: str | None = None
+        self, key: str, path: Path, *, content_type: str | None = None
     ) -> None:
         """Store what is already on disk, without reading it into memory first.
 
@@ -423,7 +424,7 @@ class S3Storage:
         self,
         *,
         bucket: str,
-        client: "BaseClient",
+        client: BaseClient,
         prefix: str = "",
     ) -> None:
         self._bucket = bucket
@@ -1054,11 +1055,6 @@ class EncryptedStorage:
             ),
         )
 
-    def is_encrypted(self, key: str) -> bool | None:
-        """Whether ``key`` is stored encrypted; ``None`` where it is missing."""
-        probed = self._probe(key)
-        return None if probed is None else probed[1] is not None
-
     def encrypt_in_place(self, key: str) -> bool:
         """Re-write ``key``, stored before encryption was on, encrypted.
         Returns whether it did: not for an object already encrypted, missing,
@@ -1347,7 +1343,7 @@ def build_upload_response(
 
 
 _local_backends: dict[str, LocalFilesystemStorage] = {}
-_s3_client: "BaseClient | None" = None
+_s3_client: BaseClient | None = None
 
 
 def reset_s3_client() -> None:
@@ -1361,10 +1357,6 @@ def reset_s3_client() -> None:
     _s3_client = None
 
 
-def _backend_name() -> str:
-    return current_storage_config().backend
-
-
 def _local(prefix: str = "") -> LocalFilesystemStorage:
     backend = _local_backends.get(prefix)
     if backend is None:
@@ -1373,7 +1365,7 @@ def _local(prefix: str = "") -> LocalFilesystemStorage:
     return backend
 
 
-def build_s3_client(cfg: "ResolvedStorageConfig | None" = None) -> "BaseClient":
+def build_s3_client(cfg: ResolvedStorageConfig | None = None) -> BaseClient:
     """Construct a boto3 S3 client from a resolved storage config (uncached).
 
     Used by the request-path client cache (:func:`_get_s3_client`) and by the
@@ -1417,7 +1409,7 @@ def build_s3_client(cfg: "ResolvedStorageConfig | None" = None) -> "BaseClient":
     return boto3.client("s3", **client_kwargs)
 
 
-def _get_s3_client() -> "BaseClient":
+def _get_s3_client() -> BaseClient:
     global _s3_client
     if _s3_client is None:
         _s3_client = build_s3_client()
@@ -1447,23 +1439,6 @@ def _make(prefix: str) -> StorageBackend:
             return DualReadStorage(primary=s3, fallback=_local(prefix))
         return s3
     raise ValueError(f"Unsupported STORAGE_BACKEND={name!r} (expected 'local' or 's3')")
-
-
-def get_storage() -> StorageBackend:
-    """Return the process-wide local backend.
-
-    There is no *unscoped* S3 backend: all object-store content is guild-scoped,
-    so S3 writes MUST go through :func:`get_guild_storage` (which namespaces keys
-    under ``guild_<id>/``). Returning a root-prefixed S3 backend here would let a
-    caller write objects at the bucket root, outside any guild namespace — so the
-    S3 path raises instead. Identity media (avatars, icons) stays in Postgres, so
-    there is no public-plane S3 caller that would need this.
-    """
-    if _backend_name() == "s3":
-        raise NotImplementedError(
-            "get_storage() has no unscoped S3 backend; use get_guild_storage(guild_id)"
-        )
-    return _make("")
 
 
 def get_guild_storage(guild_id: int) -> StorageBackend:

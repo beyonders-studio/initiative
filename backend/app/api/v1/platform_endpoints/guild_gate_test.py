@@ -9,31 +9,32 @@ Runs against the same fake IdP harness as the operator flow tests.
 
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
-from httpx import AsyncClient
+import httpx2
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints.auth_test import _wire_fake_idp
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
 from app.models.platform.auth_session import AuthSession
-from app.models.platform.guild import GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildMembership
+from app.services.platform import rules
 from app.testing.factories import (
-    guild_administration,
+    NARROWED_CLAIM,
+    NARROWED_VALUE,
     create_auth_provider,
     create_federated_identity,
     create_guild,
-    create_guild_membership,
     create_guild_auth_policy,
+    create_guild_membership,
     create_guild_provider_connection,
     create_user,
     get_auth_token,
+    guild_administration,
 )
-from app.testing.factories import NARROWED_CLAIM, NARROWED_VALUE
-from app.testing.oidc import ISSUER as OIDC_ISSUER, FakeIdp, mint_id_token
-from app.core.login_methods import LoginMethod
-from app.core.rules import SignInRequirement
-from app.services.platform import rules
-
+from app.testing.oidc import ISSUER as OIDC_ISSUER
+from app.testing.oidc import FakeIdp, mint_id_token
 
 # ── Arriving ───────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ async def _sign_in(
 ):
     """One sign-in at the deployment, through ``slug``."""
     state, nonce = await _begin_login(client, slug)
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200,
         json={
             "access_token": "at-1",

@@ -14,24 +14,23 @@ this account hold the seat, is there a membership row — are the standing's:
 
 from __future__ import annotations
 
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_, func, or_
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.authorization import standing_arg
+
+# Re-export the RLS context helper so callers can import from a single place.
+from app.db.session import require_guild_context, set_rls_context  # noqa: F401
+from app.models.platform.user import User
 from app.models.tenant.initiative import (
+    DEFAULT_PERMISSION_VALUES,
     InitiativeMember,
     InitiativeRoleModel,
     InitiativeRule,
     PermissionKey,
-    DEFAULT_PERMISSION_VALUES,
 )
-from app.models.platform.user import User
-
-# Re-export the RLS context helper so callers can import from a single place.
-from app.db.session import require_guild_context, set_rls_context  # noqa: F401
-from app.db.authorization import standing_arg
 from app.services.tenant.initiative_tools import member_permission_sql
-
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -111,6 +110,7 @@ def _with_permission_row(statement, permission_key: PermissionKey):
         InitiativeRule,
         and_(
             InitiativeRule.initiative_role_id == InitiativeRoleModel.id,
+            InitiativeRule.install_id.is_(None),
             InitiativeRule.key == permission_key,
         ),
     )

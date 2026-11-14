@@ -12,10 +12,10 @@ hand: a search that only reached the twenty rows already fetched would pass a
 weaker test than the one the guild home needs.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.models.platform.guild import CommunityRole
 from app.testing import (
@@ -131,7 +131,7 @@ async def test_sort_by_last_updated(
     """``sort_by=updated_at&sort_dir=desc`` is what the guild home asks for by
     default, so it has to mean most-recently-touched first everywhere."""
     a, home = await _workspace(session, acting_user)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await factory(
         session, home, a.user, name="Stale", updated_at=now - timedelta(days=3)
     )

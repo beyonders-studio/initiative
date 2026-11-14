@@ -12,17 +12,17 @@ import { SmilePlus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useSuggestedReactions } from "@/hooks/useReactions";
+import { Button } from "@/ui/button";
 import {
   EmojiPicker,
   EmojiPickerContent,
   EmojiPickerFooter,
   EmojiPickerSearch,
-} from "@/components/ui/emoji-picker";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSuggestedReactions } from "@/hooks/useReactions";
-import { cn } from "@/lib/utils";
+} from "@/ui/emoji-picker";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 interface ReactionPickerProps {
   onSelect: (emoji: string) => void;

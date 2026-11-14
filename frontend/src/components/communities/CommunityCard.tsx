@@ -4,7 +4,8 @@
  * Everything on this card is what the community published by opting in — its
  * banner, name, description, icon, shelves, and how many people are already
  * there. A community the caller is already in keeps its card (so a search still
- * finds it) but offers a way in rather than a way to join twice.
+ * finds it) but offers a way in rather than a way to join twice. One that takes
+ * requests is asked rather than joined, and says so while the ask waits.
  *
  * The two pictures arrive as URLs and are fetched per card, not carried in the
  * directory payload: a page is up to sixty of these, and each one is then
@@ -14,7 +15,7 @@
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,29 +23,39 @@ import type { DirectoryCommunityRead } from "@/api/generated/initiativeAPI.schem
 import { AgeConfirmationDialog } from "@/components/communities/AgeConfirmationDialog";
 import { CommunityCardFace } from "@/components/communities/CommunityCardFace";
 import { CommunityAvatar } from "@/components/communities/CommunitySidebar";
+import { RequestToJoinDialog } from "@/components/members/RequestToJoinDialog";
 import { ReportButton } from "@/components/moderation/ReportButton";
-import { Button } from "@/components/ui/button";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useJoinDirectoryCommunity } from "@/hooks/useCommunityDirectory";
+import {
+  useAskToJoinDirectoryCommunity,
+  useJoinDirectoryCommunity,
+  useWithdrawDirectoryJoinRequest,
+} from "@/hooks/useCommunityDirectory";
 import { communityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 export const CommunityCard = ({ community }: { community: DirectoryCommunityRead }) => {
   const { t } = useTranslation(["communities", "common"]);
   const navigate = useNavigate();
   const { refreshCommunities, switchCommunity } = useCommunities();
   const join = useJoinDirectoryCommunity();
+  const ask = useAskToJoinDirectoryCommunity();
+  const withdraw = useWithdrawDirectoryJoinRequest();
   const { user } = useAuth();
   const { communityAgeGateEnabled } = useAppConfig();
   const [askingAge, setAskingAge] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const byRequest = community.join_policy === "request";
 
-  // Somebody may only take a place in a listed community once they have said they
-  // are old enough. Asked here, before the join, so answering is what joins —
-  // the server refuses it either way, and being refused after clicking Join is
-  // a worse way to be asked a question you can answer.
+  // Somebody may only take a place in a listed community, or ask for one, once
+  // they have said they are old enough. Asked here, before the join, so
+  // answering is what joins (or asks) — the server refuses it either way, and
+  // being refused after clicking Join is a worse way to be asked a question you
+  // can answer.
   //
   // This is the only place the question is put. An account that never answers
   // it keeps every community it was invited to and the whole of the app around
@@ -75,20 +86,45 @@ export const CommunityCard = ({ community }: { community: DirectoryCommunityRead
     }
   };
 
+  const proceed = () => (byRequest ? setAsking(true) : void performJoin());
+
   const handleJoin = () => {
     if (needsAgeConfirmation) {
       setAskingAge(true);
       return;
     }
-    void performJoin();
+    proceed();
+  };
+
+  const sendRequest = async (message: string | null) => {
+    try {
+      await ask.mutateAsync({ communityId: community.id, message });
+      toast.success(t("communities:community.askedToast", { community: community.name }));
+      setAsking(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "communities:community.askFailed"));
+    }
+  };
+
+  const withdrawRequest = async () => {
+    try {
+      await withdraw.mutateAsync(community.id);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "communities:community.withdrawFailed"));
+    }
   };
 
   return (
     <>
-      <AgeConfirmationDialog
-        open={askingAge}
-        onOpenChange={setAskingAge}
-        onConfirmed={() => void performJoin()}
+      <AgeConfirmationDialog open={askingAge} onOpenChange={setAskingAge} onConfirmed={proceed} />
+      <RequestToJoinDialog
+        title={t("communities:community.askTitle", { community: community.name })}
+        description={t("communities:community.askDescription")}
+        hint={t("communities:community.askHint")}
+        pending={ask.isPending}
+        onSend={(message) => void sendRequest(message)}
+        open={asking}
+        onOpenChange={setAsking}
       />
       <CommunityCardFace
         community={community}
@@ -109,16 +145,28 @@ export const CommunityCard = ({ community }: { community: DirectoryCommunityRead
             <Button variant="outline" className="w-full" onClick={open}>
               {t("communities:community.open")}
             </Button>
+          ) : community.request_pending ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                <Clock className="h-4 w-4" aria-hidden="true" />
+                {t("communities:community.requested")}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void withdrawRequest()}
+                pending={withdraw.isPending}
+              >
+                {t("communities:community.withdraw")}
+              </Button>
+            </div>
           ) : (
-            <Button className="w-full" onClick={handleJoin} disabled={join.isPending}>
-              {join.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  {t("communities:community.joining")}
-                </>
-              ) : (
-                t("communities:community.join")
-              )}
+            <Button className="w-full" onClick={handleJoin} pending={join.isPending}>
+              {join.isPending
+                ? t("communities:community.joining")
+                : byRequest
+                  ? t("communities:community.askToJoin")
+                  : t("communities:community.join")}
             </Button>
           )}
         </div>

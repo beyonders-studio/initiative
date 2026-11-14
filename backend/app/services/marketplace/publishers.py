@@ -26,9 +26,10 @@ write grant.
 from __future__ import annotations
 
 import logging
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -55,9 +56,9 @@ __all__ = [
     "normalize_display_name",
     "normalize_prefix",
     "publisher_by_prefix",
-    "valid_prefix",
     "seed_publishers",
     "update_publisher",
+    "valid_prefix",
 ]
 
 #: What a publisher record says, for the audit log.
@@ -111,9 +112,7 @@ async def get_publisher(session: AsyncSession, publisher_id: int) -> Publisher:
     return row
 
 
-async def publisher_by_prefix(
-    session: AsyncSession, prefix: str
-) -> Optional[Publisher]:
+async def publisher_by_prefix(session: AsyncSession, prefix: str) -> Publisher | None:
     return (
         await session.exec(select(Publisher).where(Publisher.prefix == prefix))
     ).first()
@@ -162,8 +161,8 @@ async def update_publisher(
     session: AsyncSession,
     publisher_id: int,
     *,
-    display_name: Optional[str] = None,
-    enabled: Optional[bool] = None,
+    display_name: str | None = None,
+    enabled: bool | None = None,
     actor_user_id: int | None = None,
 ) -> Publisher:
     """Rename a publisher, or switch it on or off. Off makes every

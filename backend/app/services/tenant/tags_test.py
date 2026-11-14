@@ -7,21 +7,23 @@ explicit now has to do instead: drop with the tag, drop with the tagged thing,
 and disappear the moment the tag is trashed.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import ENDPOINT_KINDS, RelationshipType, node_id
 from app.core.search import SearchEntityType
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.relationship import EntityRelationship
-from app.db.session import set_rls_context
 from app.services.tenant import tags as tags_service
 from app.services.tenant.soft_delete import hard_purge_entity
+from app.testing import create_guild_membership, route_as
 from app.testing.factories import (
     assign_tag,
     create_collection,
@@ -31,8 +33,6 @@ from app.testing.factories import (
     create_task,
 )
 from app.testing.schema_harness import route_session_to_guild
-from app.testing import create_guild_membership, route_as
-from app.db.request_context import SystemGuild
 
 
 def test_every_taggable_kind_can_sit_on_an_edge():
@@ -115,7 +115,7 @@ async def test_a_trashed_tag_stops_being_an_assignment(
     await assign_tag(session, task, tag, commit=True)
 
     await route_session_to_guild(session, a.guild.id)
-    tag.deleted_at = datetime.now(timezone.utc)
+    tag.deleted_at = datetime.now(UTC)
     session.add(tag)
     await session.commit()
 
@@ -139,7 +139,7 @@ async def test_purging_a_tag_takes_its_assignments(session: AsyncSession, acting
     tag = await create_tag(session, a.guild)
     task = await create_task(session, a.project)
     await assign_tag(session, task, tag, commit=True)
-    tag.deleted_at = datetime.now(timezone.utc)
+    tag.deleted_at = datetime.now(UTC)
     session.add(tag)
     await session.commit()
 

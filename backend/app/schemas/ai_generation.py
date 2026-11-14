@@ -3,7 +3,6 @@
 import string
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -48,10 +47,10 @@ class AIStreamEvent(SanitizedBaseModel):
     next piece of the answer; or ``error``, the code it ended on. A catch-up
     with nothing to read ends after ``since``."""
 
-    since: Optional[datetime] = None
-    cut: Optional[AIStreamCut] = None
-    text: Optional[RawTextStr] = None
-    error: Optional[str] = None
+    since: datetime | None = None
+    cut: AIStreamCut | None = None
+    text: RawTextStr | None = None
+    error: str | None = None
 
 
 #: What a language tag is written with.
@@ -83,10 +82,10 @@ class AIWriteRequest(SanitizedBaseModel):
     #: The text after the selection.
     after: RawTextStr = Field(default="", max_length=100_000)
     #: The language to translate into, as a language tag (``de``, ``pt-BR``).
-    language: Optional[str] = Field(default=None, max_length=35)
+    language: str | None = Field(default=None, max_length=35)
 
     @model_validator(mode="after")
-    def _says_what_to_work_on(self) -> "AIWriteRequest":
+    def _says_what_to_work_on(self) -> AIWriteRequest:
         if self.action is AIWriteAction.translate and not self.language:
             raise ValueError("translate needs a language")
         if self.language and not set(self.language) <= _LANGUAGE_TAG_CHARS:

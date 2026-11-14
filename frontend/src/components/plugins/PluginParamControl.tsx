@@ -8,19 +8,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PluginDataParam } from "@/api/pluginData";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { usePluginParamOptions } from "@/hooks/usePluginData";
 import { asControlValue, asDeclaredList, asDeclaredType } from "@/lib/widgets/pluginParams";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Combobox } from "@/ui/combobox";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /**
  * One value, typed, in the type its plug-in declared.
@@ -153,6 +147,7 @@ export function PluginParamControl({
   param,
   pluginId,
   endpointId,
+  initiativeId,
   values,
   open,
   onChange,
@@ -160,6 +155,8 @@ export function PluginParamControl({
   param: PluginDataParam;
   pluginId: number | undefined;
   endpointId: string | undefined;
+  /** The initiative the form is filled in, whose menus it asks for. */
+  initiativeId: number;
   values: Record<string, unknown>;
   open: boolean;
   onChange: (key: string, value: unknown) => void;
@@ -174,6 +171,7 @@ export function PluginParamControl({
     endpointId,
     param: param.key,
     params: values,
+    initiativeId,
     enabled: open && Boolean(param.options_from),
   });
 
@@ -203,14 +201,15 @@ export function PluginParamControl({
       <div className="space-y-2">
         {heading}
         {offered.length ? (
-          <MultiSelect
+          <Combobox
+            multiple
             id={controlId}
-            selectedValues={chosen}
-            options={offered.map((option) => ({
+            value={chosen}
+            items={offered.map((option) => ({
               value: option.value,
               label: option.label ?? option.value,
             }))}
-            onChange={(next) => onChange(param.key, asDeclaredList(param, next))}
+            onValueChange={(next) => onChange(param.key, asDeclaredList(param, next))}
             placeholder={t("dashboards:config.pluginParamPlaceholder")}
           />
         ) : (

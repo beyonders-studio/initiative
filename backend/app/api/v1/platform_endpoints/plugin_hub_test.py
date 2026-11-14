@@ -12,39 +12,40 @@ the plug-in called; everything above it runs for real.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-import httpx
+import httpx2
 import jwt
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import seal_install_token
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.messages import PluginDataMessages, PluginHubMessages
+from app.core.plugin_access_token import seal_install_token
 from app.models.platform.guild import CommunityRole, GuildMembership
-from app.models.tenant.plugin_member_consent import PluginMemberConsent
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.initiative import InitiativeRule
+from app.models.tenant.plugin_member_consent import PluginMemberConsent
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace import plugin_data as plugin_data_service
-from app.services.marketplace.plugin_refs import ensure_plugin_ref
 from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
+from app.services.marketplace.plugin_refs import ensure_plugin_ref
+from app.services.tenant.initiatives import get_member_role
+from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.testing import (
-    create_plugin_user_connection,
-    create_plugin_service_registration,
     create_guild_plugin,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
     emitted,
     route_session_to_guild,
 )
-from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
-from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
 from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
-
+from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
 
 TARGET = "tests.github"
 TARGET_UID = "TESTGTHB000001"
@@ -150,7 +151,7 @@ def upstream(monkeypatch):
 
     class Recorder:
         def __init__(self) -> None:
-            self.calls: list[httpx.Request] = []
+            self.calls: list[httpx2.Request] = []
 
         def claims(self, index: int = -1) -> dict[str, Any]:
             header = self.calls[index].headers["Authorization"]
@@ -179,12 +180,12 @@ async def _hub(
     place_target: bool = True,
     install_target: bool = True,
     declarative: bool = False,
-    definition: Optional[dict[str, Any]] = None,
-) -> tuple[InstalledPlugin, Optional[GuildPlugin]]:
+    definition: dict[str, Any] | None = None,
+) -> tuple[InstalledPlugin, GuildPlugin | None]:
     """A caller asking for ``plugins:tests.github``, and the target installed in
-    the same community, placed where the caller is unless told otherwise. A
-    ``declarative`` target is called by Initiative itself, on the community's
-    stored token."""
+    the same community, placed where the caller is unless told otherwise, where
+    its members' role uses it. A ``declarative`` target is called by Initiative
+    itself, on the community's stored token."""
     installed = await install_plugin(
         session,
         acting_user,
@@ -235,14 +236,42 @@ async def _hub(
         session.add(
             PluginPlacement(install_id=target.id, initiative_id=installed.placed.id)
         )
-        await session.commit()
+        await _hold(session, installed, target, "use")
     return installed, target
+
+
+async def _hold(
+    session: AsyncSession, installed, target, permission: str, *, enabled=True
+) -> None:
+    """The placed initiative's member role's answer for one of the target's
+    permissions."""
+    await route_session_to_guild(session, installed.guild.id)
+    role = await get_member_role(session, initiative_id=installed.placed.id)
+    assert role is not None
+    rule = (
+        await session.exec(
+            select(InitiativeRule).where(
+                InitiativeRule.initiative_role_id == role.id,
+                InitiativeRule.install_id == target.id,
+                InitiativeRule.key == permission,
+            )
+        )
+    ).first() or InitiativeRule(
+        initiative_id=installed.placed.id,
+        initiative_role_id=role.id,
+        install_id=target.id,
+        key=permission,
+        enabled=enabled,
+    )
+    rule.enabled = enabled
+    session.add(rule)
+    await session.commit()
 
 
 def _installation_headers(
     installed: InstalledPlugin,
     scopes: tuple[str, ...] = (PLUGINS_SCOPE,),
-    initiative_id: Optional[int] = None,
+    initiative_id: int | None = None,
 ) -> dict[str, str]:
     token, _exp = seal_install_token(
         guild_id=installed.guild.id,
@@ -277,7 +306,7 @@ async def _member(
             label="Comment as you",
             requested_access="read_write",
             granted_access=access,
-            granted_at=datetime.now(timezone.utc),
+            granted_at=datetime.now(UTC),
         )
     )
     await session.commit()
@@ -517,6 +546,40 @@ async def test_a_member_call_hands_on_only_the_members_connections(
     assert upstream.claims()["connection_refs"] == {"account": "cr_member_account"}
 
 
+async def test_a_member_call_is_held_to_the_members_permission_in_the_target(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
+):
+    """As opening the target would be: the member's role where the target is
+    placed holds the permission the endpoint names, or ``use``. A call made as
+    the community answers to what the community granted alone."""
+    definition = _target_definition()
+    definition["permissions"] = [
+        {"id": "triage", "level": "initiative", "name": {"en": "Triage"}}
+    ]
+    definition["endpoints"][0]["permission"] = "triage"
+    installed, target = await _hub(
+        session, acting_user, role_session, definition=definition
+    )
+    assert target is not None
+    member = await _member(session, acting_user, installed)
+    await _connect(session, installed, target, member)
+
+    async def call(endpoint_id: str, headers) -> int:
+        response = await client.post(
+            _url(endpoint_id), json={"params": {}}, headers=headers
+        )
+        if response.status_code == 403:
+            assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
+        return response.status_code
+
+    assert await call(ISSUES, _member_headers(installed, member)) == 403
+    assert await call(ISSUES, _installation_headers(installed)) == 200
+    await _hold(session, installed, target, "triage")
+    assert await call(ISSUES, _member_headers(installed, member)) == 200
+    await _hold(session, installed, target, "use", enabled=False)
+    assert await call(COMMENT, _member_headers(installed, member)) == 403
+
+
 async def test_a_read_only_consent_does_not_write_as_the_member(
     client: AsyncClient, session: AsyncSession, acting_user, role_session, upstream
 ):
@@ -641,7 +704,7 @@ async def test_a_member_token_for_a_member_who_left_is_refused(
     with."""
     installed, _target = await _hub(session, acting_user, role_session)
     member = await _member(session, acting_user, installed)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if ended == "consent":
         await route_session_to_guild(session, installed.guild.id)
         consent = (
@@ -742,7 +805,7 @@ async def test_a_declarative_target_is_called_by_initiative(
     assert vendor.api_requests[0]["headers"]["authorization"] == "Bearer gho_community"
 
 
-def _with_member_account(requires: Optional[dict[str, Any]]) -> dict[str, Any]:
+def _with_member_account(requires: dict[str, Any] | None) -> dict[str, Any]:
     """:func:`declarative_plugin` with a member's own account beside the
     community's workspace: its read open to members, on the workspace, under
     ``requires``; and a member's comment on their account."""

@@ -1,4 +1,8 @@
-import type { CollectionFileSummary, CollectionRead } from "@/api/generated/initiativeAPI.schemas";
+import {
+  ActorKind,
+  type CollectionFileSummary,
+  type CollectionRead,
+} from "@/api/generated/initiativeAPI.schemas";
 
 import { buildFileSummary } from "./file.factory";
 
@@ -23,6 +27,8 @@ export function buildCollection(overrides: Partial<CollectionRead> = {}): Collec
     file_count: 1,
     hidden_files: { count: 0, requested: 0 },
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",
     archived_at: null,

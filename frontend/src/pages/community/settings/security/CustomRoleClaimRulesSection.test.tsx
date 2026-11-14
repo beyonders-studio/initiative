@@ -1,0 +1,113 @@
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { buildUser } from "@/__tests__/factories";
+import { renderWithProviders } from "@/__tests__/helpers/render";
+
+const orderRules = vi.fn();
+const updateRule = vi.fn();
+
+let roles: unknown[] = [];
+let rulesState: { data?: unknown; isLoading: boolean; isError: boolean } = {
+  isLoading: false,
+  isError: false,
+};
+let closedSurfaces: string[] = [];
+const rules = [
+  { id: 1, provider_id: 11, claim_value: "staff", role_id: 3, position: 1 },
+  { id: 2, provider_id: 11, claim_value: "crew", role_id: 3, position: 2 },
+];
+
+vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
+  useCustomRoleClaimRules: () => ({ data: rules, refetch: vi.fn(), ...rulesState }),
+  useCommunityProviderConnections: () => ({
+    data: [{ provider_id: 11, provider_display_name: "Entra" }],
+    isLoading: false,
+  }),
+  useCreateCustomRoleClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateCustomRoleClaimRule: () => ({ mutate: updateRule, isPending: false }),
+  useOrderCustomRoleClaimRules: () => ({ mutate: orderRules, isPending: false }),
+  useDeleteCustomRoleClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+vi.mock("@/hooks/useCustomRoles", () => ({
+  useCustomRoles: () => ({ data: roles }),
+}));
+
+vi.mock("@/hooks/useCommunities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useCommunities")>()),
+  useCommunities: () => ({ activeCommunity: { closed_surfaces: closedSurfaces } }),
+}));
+
+import { CustomRoleClaimRulesSection } from "./CustomRoleClaimRulesSection";
+
+const render = () =>
+  renderWithProviders(<CustomRoleClaimRulesSection communityId={1} />, {
+    auth: { user: buildUser() },
+  });
+
+describe("CustomRoleClaimRulesSection", () => {
+  beforeEach(() => {
+    orderRules.mockReset();
+    updateRule.mockReset();
+    rulesState = { isLoading: false, isError: false };
+    closedSurfaces = [];
+    roles = [{ id: 3, name: "Door person", base_rung: "member", surfaces: ["invites"] }];
+  });
+
+  it("stays out of the way where the community has no custom roles", () => {
+    roles = [];
+    const { container } = render();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("lists the rules in order, and moves one", async () => {
+    const user = userEvent.setup();
+    render();
+
+    expect(screen.getAllByText("Through Entra, gives Door person")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Move crew up" }));
+    expect(orderRules).toHaveBeenCalledWith([2, 1]);
+    expect(screen.getByRole("button", { name: "Move staff up" })).toBeDisabled();
+  });
+
+  it("edits a rule in the dialog it was added in, keeping its provider and place", async () => {
+    const user = userEvent.setup();
+    render();
+
+    await user.click(screen.getByRole("button", { name: "Actions for crew" }));
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Edit role rule")).toBeInTheDocument();
+    expect(within(dialog).getByText("Entra")).toBeInTheDocument();
+    const group = within(dialog).getByLabelText("Group");
+    await user.clear(group);
+    await user.type(group, "crew-leads");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(updateRule).toHaveBeenCalledWith(
+      { ruleId: 2, data: { claim_value: "crew-leads", role_id: 3 } },
+      expect.anything()
+    );
+  });
+
+  it("keeps the rules readable and offers no change where custom roles are closed", () => {
+    closedSurfaces = ["custom_roles"];
+    render();
+
+    expect(screen.getAllByText("Through Entra, gives Door person")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Add role rule" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move crew up" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for crew" })).not.toBeInTheDocument();
+  });
+
+  it("says the rules failed to load rather than that there are none", () => {
+    rulesState = { data: undefined, isLoading: false, isError: true };
+    render();
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("No group gives a custom role yet.")).not.toBeInTheDocument();
+  });
+});

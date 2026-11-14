@@ -1,7 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-
-import { getAppConfig, getGetAppConfigQueryKey } from "@/api/generated/config/config";
-import type { AppConfig } from "@/api/generated/initiativeAPI.schemas";
+import { useGetAppConfig } from "@/api/generated/config/config";
 import type { OptionalConsentCategory } from "@/lib/consent";
 
 /**
@@ -30,12 +27,8 @@ import type { OptionalConsentCategory } from "@/lib/consent";
 const CONFIG_STALE_MS = 5 * 60 * 1000;
 
 export const useAppConfig = () => {
-  const query = useQuery<AppConfig>({
-    queryKey: getGetAppConfigQueryKey(),
-    queryFn: () => getAppConfig(),
-    staleTime: CONFIG_STALE_MS,
-    gcTime: Infinity,
-    retry: 1,
+  const query = useGetAppConfig({
+    query: { staleTime: CONFIG_STALE_MS, gcTime: Infinity, retry: 1 },
   });
 
   return {

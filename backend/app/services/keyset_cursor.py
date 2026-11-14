@@ -24,5 +24,5 @@ def decode(cursor: str | None) -> tuple[datetime, int] | None:
     stamp, _, raw_id = cursor.partition("|")
     try:
         return datetime.fromisoformat(stamp), int(raw_id)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None

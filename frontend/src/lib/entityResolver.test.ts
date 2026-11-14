@@ -1,8 +1,6 @@
 /**
- * The `/go` resolver is the only path an id-only link has to a real URL, and
- * the legacy normalizer is what keeps already-sent notification links working
- * after tools moved inside their initiatives. Neither is type-checked against
- * a route, so both are pinned here.
+ * The `/go` resolver is the only path an id-only link has to a real URL. It is
+ * not type-checked against a route, so it is pinned here.
  */
 import { QueryClient } from "@tanstack/react-query";
 import { HttpResponse } from "msw";
@@ -10,12 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
-import {
-  isEntityRefType,
-  linkedCommentId,
-  normalizeLegacyTarget,
-  resolveEntityPath,
-} from "@/lib/entityResolver";
+import { isEntityRefType, linkedCommentId, resolveEntityPath } from "@/lib/entityResolver";
 
 const COMMUNITY = 1;
 let queryClient: QueryClient;
@@ -144,32 +137,5 @@ describe("resolveEntityPath", () => {
     expect(isEntityRefType("counter_group")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
     expect(isEntityRefType("collection")).toBe(true);
-  });
-});
-
-describe("normalizeLegacyTarget", () => {
-  it("maps a stored pre-nesting target onto the resolver", () => {
-    expect(normalizeLegacyTarget("/tasks/4")).toBe("/go/task/4");
-    expect(normalizeLegacyTarget("/projects/12")).toBe("/go/project/12");
-    expect(normalizeLegacyTarget("/files/3")).toBe("/go/file/3");
-    expect(normalizeLegacyTarget("/calendar-events/8")).toBe("/go/calendar-event/8");
-    expect(normalizeLegacyTarget("/go/event/8")).toBe("/go/calendar-event/8");
-  });
-
-  it("rewrites an initiative path directly — no lookup needed", () => {
-    expect(normalizeLegacyTarget("/initiatives/6")).toBe("/i/6");
-  });
-
-  it("sends a deleted list page to the community home", () => {
-    expect(normalizeLegacyTarget("/projects")).toBe("/");
-    expect(normalizeLegacyTarget("/calendar")).toBe("/");
-    // The initiative list is a section of the community home now, not a page.
-    expect(normalizeLegacyTarget("/initiatives")).toBe("/");
-  });
-
-  it("leaves a current path alone", () => {
-    expect(normalizeLegacyTarget("/i/5/projects/7")).toBe("/i/5/projects/7");
-    expect(normalizeLegacyTarget("/settings/data")).toBe("/settings/data");
-    expect(normalizeLegacyTarget("settings/data")).toBe("/settings/data");
   });
 });

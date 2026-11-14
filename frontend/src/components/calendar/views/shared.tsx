@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next";
 
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { TaskTypeMark } from "@/components/tasks/TaskTypeOption";
-import { resolveLocalDateTime } from "@/lib/localDateTime";
 import { toast } from "@/lib/mascotToast";
-import { formatHourLabel, formatCompactTime as formatTime } from "@/lib/timeFormat";
-import { cn } from "@/lib/utils";
+import { resolveLocalDateTime } from "@/ui/lib/localDateTime";
+import { formatHourLabel, formatCompactTime as formatTime } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
 
 import type { CalendarEntry, CalendarEntryKind } from "../CalendarView";
 

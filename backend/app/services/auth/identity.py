@@ -25,21 +25,19 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from sqlalchemy import false, not_, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import false, or_
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.encryption import encrypt_token, normalize_email
 from app.core.login_methods import LoginMethod
-from app.services.auth import addresses
-from app.services.platform import rules
-from app.core.security import USABLE_HASH_PREFIXES
+from app.core.security import ARGON2_HASH_PREFIX
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.federated_identity import FederatedIdentity
@@ -48,8 +46,10 @@ from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_email import UserEmail
 from app.models.platform.user_passkey import UserPasskey
 from app.services import audit as audit_service
+from app.services.auth import addresses
 from app.services.auth.platform_provider import can_serve_login_clause
 from app.services.platform import dm_settings as dm_settings_service
+from app.services.platform import rules
 from app.services.platform import usernames as username_service
 
 logger = logging.getLogger(__name__)
@@ -112,7 +112,7 @@ async def resolve_oidc_identity(
                 identity.user_id,
             )
             return IdentityResolution(outcome=ResolutionOutcome.JIT_DISABLED)
-        identity.last_login_at = datetime.now(timezone.utc)
+        identity.last_login_at = datetime.now(UTC)
         identity.email_verified = email_verified
         session.add(identity)
         await session.commit()
@@ -179,7 +179,7 @@ async def link_identity(
         provider_id=provider.id,
         subject=subject,
         email_verified=email_verified,
-        last_login_at=datetime.now(timezone.utc),
+        last_login_at=datetime.now(UTC),
     )
     session.add(identity)
     await session.commit()
@@ -282,12 +282,7 @@ def _no_usable_password_clause():
     """
     return or_(
         User.hashed_password.is_(None),
-        ~or_(
-            *(
-                User.hashed_password.startswith(prefix)
-                for prefix in USABLE_HASH_PREFIXES
-            )
-        ),
+        not_(User.hashed_password.startswith(ARGON2_HASH_PREFIX)),
     )
 
 
@@ -580,7 +575,7 @@ async def _provision(
                 provider_id=provider.id,
                 subject=subject,
                 email_verified=verified,
-                last_login_at=datetime.now(timezone.utc),
+                last_login_at=datetime.now(UTC),
             )
             session.add(identity)
             await session.flush()
@@ -611,7 +606,7 @@ async def _provision(
         return IdentityResolution(
             outcome=ResolutionOutcome.PROVISIONED, user=user, identity=identity
         )
-    except (IntegrityError, _AddressTaken):
+    except IntegrityError, _AddressTaken:
         # Lost a JIT race with a concurrent login. A conflicting unique insert
         # blocks until the other transaction commits, so by the time we're here
         # the winner is committed and visible; the savepoint has already discarded

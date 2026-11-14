@@ -33,9 +33,9 @@ import logging
 import secrets
 import string
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from cryptography.fernet import InvalidToken
 from sqlalchemy import delete, tuple_
@@ -70,9 +70,9 @@ from app.services.tenant.plugin_config import REMOVED_AT, connection_by_id
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "INDEX_SWEEP",
     "PAGE_LIMIT",
     "IndexedInstall",
-    "INDEX_SWEEP",
     "assigned_value",
     "claim",
     "claim_value",
@@ -109,12 +109,12 @@ class IndexedInstall:
     #: Switched on, in a community in use.
     active: bool
     #: The route value it was found by, for :func:`routed`.
-    route: Optional[str] = None
+    route: str | None = None
 
 
 def hook_route(
-    definition: Optional[dict[str, Any]], config: Optional[Mapping[str, Any]]
-) -> Optional[str]:
+    definition: dict[str, Any] | None, config: Mapping[str, Any] | None
+) -> str | None:
     """The value an install's vendor webhooks are routed by: in its stored
     ``config``, the field of the static connection the ``webhooks.route`` of
     its pinned ``definition`` names. None while that connection holds the
@@ -144,7 +144,7 @@ def hook_route(
     return text if text and len(text) <= HOOK_ROUTE_MAX_LENGTH else None
 
 
-async def claim(guild_id: int, plugin: GuildPlugin, route: Optional[str]) -> bool:
+async def claim(guild_id: int, plugin: GuildPlugin, route: str | None) -> bool:
     """Write one install's row as ``plugin`` stands, routed by ``route``.
 
     False, writing nothing, when the route is held for another community's
@@ -263,7 +263,7 @@ def _encode_cursor(entry: IndexedInstall) -> str:
     )
 
 
-def _decode_cursor(cursor: Optional[str]) -> Optional[tuple[int, int]]:
+def _decode_cursor(cursor: str | None) -> tuple[int, int] | None:
     """A cursor that does not open starts the list again."""
     if not cursor:
         return None
@@ -272,13 +272,13 @@ def _decode_cursor(cursor: Optional[str]) -> Optional[tuple[int, int]]:
             cursor, SALT_PLUGIN_INSTALLS_CURSOR
         ).partition(":")
         return int(guild), int(install)
-    except (InvalidToken, ValueError):
+    except InvalidToken, ValueError:
         return None
 
 
 async def page(
-    listing_uid: str, *, cursor: Optional[str], limit: int
-) -> tuple[list[IndexedInstall], Optional[str]]:
+    listing_uid: str, *, cursor: str | None, limit: int
+) -> tuple[list[IndexedInstall], str | None]:
     """One page of a listing's installs, in (community, install) order, and
     the cursor for the next page, or ``None`` at the end."""
     statement = (
@@ -309,6 +309,28 @@ async def page(
     if len(entries) <= limit:
         return entries, None
     return entries[:limit], _encode_cursor(entries[limit - 1])
+
+
+async def communities_holding(
+    listing_uid: str, guild_ids: Collection[int]
+) -> list[int]:
+    """Which of ``guild_ids`` hold an install of the listing, in a community
+    still live, in community order. Whether each install is switched on is the
+    install row's answer, as for :func:`routed`."""
+    if not guild_ids:
+        return []
+    statement = (
+        select(PluginInstall.guild_id)
+        .join(Guild, Guild.id == PluginInstall.guild_id)
+        .where(
+            PluginInstall.listing_uid == listing_uid,
+            col(PluginInstall.guild_id).in_(sorted(guild_ids)),
+            Guild.status.in_(sorted(LIVE_STATUS_VALUES)),
+        )
+        .order_by(PluginInstall.guild_id)
+    )
+    async with db_session.SystemSessionLocal() as session:
+        return list(dict.fromkeys((await session.exec(statement)).all()))
 
 
 async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:
@@ -405,7 +427,7 @@ async def claim_value(
 
 async def assigned_value(
     session: AsyncSession, guild_id: int, plugin: GuildPlugin, key: str
-) -> Optional[str]:
+) -> str | None:
     """A value claimed for the install's unique setting ``key``: the
     community's name (:func:`_name_value`), or that with a short random
     suffix while another install holds it. ``None`` when none is claimed in

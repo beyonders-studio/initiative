@@ -5,30 +5,29 @@ import { useTranslation } from "react-i18next";
 
 import { type TaskListRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import {
-  ToolFilterButton,
-  ToolFilterPanel,
-} from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { globalTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { Label } from "@/components/ui/label";
+import { ToolFilterButton, ToolFilterPanel } from "@/components/tools/ToolFilterPanel";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useFocusPreferences } from "@/hooks/useFocusSummary";
 import { MY_TASKS_VIEW, useGlobalTasksTable } from "@/hooks/useGlobalTasksTable";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useListView } from "@/hooks/useListView";
 import { useMyToolRows } from "@/hooks/useMyTools";
 import { useProperties } from "@/hooks/useProperties";
 import { useTaskListName } from "@/hooks/useTaskListName";
 import { communityPath } from "@/lib/communityUrl";
 import type { HomeTaskList } from "@/lib/home/firstHome";
-import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
+import { Field } from "@/ui/field";
+import type { LayoutEnv } from "@/ui/layouts/fields";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 import { QuickAddTask } from "./QuickAddTask";
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
@@ -75,7 +74,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
   const fields = useMemo(() => taskFields(allPropertyDefinitions), [allPropertyDefinitions]);
   // Rows come from every community: each one's links go to its own.
   const { t: viewT } = useTranslation(LAYOUT_NAMESPACES);
-  const env = useMemo<LayoutEnv>(() => {
+  const env = useMemo<LayoutEnv<TaskListRead>>(() => {
     const path = (to: string, task: TaskListRead) => {
       const communityId = task.community_id ?? table.activeCommunityId;
       return communityId ? communityPath(communityId, to) : to;
@@ -84,7 +83,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
       t: viewT as TranslateFn,
       communityPath: path,
       // A row without an initiative resolves through /go.
-      taskHref: (task) =>
+      itemHref: (task) =>
         path(
           task.initiative_id != null
             ? taskRoute(task.initiative_id, task.project_id, task.id)
@@ -212,7 +211,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
               <TableSkeleton rows={8} columns={6} pagination />
             </SkeletonRegion>
           ) : table.hasError ? (
-            <p className="py-8 text-center text-destructive text-sm">{t("myTasks.loadError")}</p>
+            <StatusMessage />
           ) : nothingYet ? (
             <HomeWidgetNotice
               icon={Inbox}
@@ -259,7 +258,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
                   table.setPage(pag.pageIndex + 1);
                 }
               }}
-              onPrefetchPage={(pageIndex) => table.prefetchPage(pageIndex + 1)}
+              onPrefetchPage={table.prefetchPage}
               manualSorting
               onSortingChange={table.handleSortingChange}
               enableResetSorting
@@ -312,10 +311,8 @@ export const TasksSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
   const { addTo: _dropped, ...withoutList } = options;
 
   return (
-    <div className="space-y-2">
-      <Label>{t("widgets.tasks.addTo")}</Label>
-      <AsyncCombobox
-        aria-label={t("widgets.tasks.addTo")}
+    <Field label={t("widgets.tasks.addTo")}>
+      <Combobox
         items={lists.map((row) => ({
           value: key(row.communityId, row.id),
           label:
@@ -352,6 +349,6 @@ export const TasksSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
           {t("widgets.tasks.noList")}
         </Button>
       ) : null}
-    </div>
+    </Field>
   );
 };

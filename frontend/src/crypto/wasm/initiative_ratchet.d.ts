@@ -49,11 +49,9 @@ export function create_inbound_session(pickle: string, key: string, their_identi
 /**
  * Open a session with a device, spending a prekey claimed from the directory.
  *
- * A signed prekey must verify against the device's fingerprint key; an
- * unsigned one is accepted only from a device the caller already trusts
- * unsigned (see the trust module).
+ * The prekey's signature must verify against the device's fingerprint key.
  */
-export function create_outbound_session(pickle: string, key: string, their_identity_key: string, their_fingerprint_key: string, their_one_time_key: string, one_time_key_signature: string | null | undefined, fallback: boolean): any;
+export function create_outbound_session(pickle: string, key: string, their_identity_key: string, their_fingerprint_key: string, their_one_time_key: string, one_time_key_signature: string, fallback: boolean): any;
 
 /**
  * Top the prekey pool up, and mint a fallback key if asked.

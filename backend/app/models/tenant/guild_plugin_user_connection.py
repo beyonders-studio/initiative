@@ -31,8 +31,8 @@ reach, and this row carries only which keys hold one (``secret_fields``).
 the plug-in for everyone.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -46,14 +46,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
-
-
-#: Where a connection has got to, as far as this side can tell.
-#:
-#: ``pending`` — the member started the vendor flow and the plug-in has not written
-#: a result back yet. ``connected`` — values are present. ``blocked`` — an admin
-#: stopped this member reconnecting, and the row is a tombstone.
-CONNECTION_STATUSES: frozenset[str] = frozenset({"pending", "connected", "blocked"})
 
 #: How wide a manifest connection id is stored, and therefore the widest one
 #: any caller can name.
@@ -81,7 +73,7 @@ class GuildPluginUserConnection(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     plugin_id: int = Field(
         sa_column=Column(
@@ -119,29 +111,34 @@ class GuildPluginUserConnection(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
     )
 
+    #: Where a connection has got to, as far as this side can tell.
+    #:
+    #: ``pending`` — the member started the vendor flow and the plug-in has not
+    #: written a result back yet. ``connected`` — values are present. ``blocked``
+    #: — an admin stopped this member reconnecting, and the row is a tombstone.
     status: str = Field(
         default="pending",
         sa_column=Column(String(16), nullable=False, server_default="pending"),
     )
     #: What the plug-in says the member connected as, e.g. ``@alice``. Display only,
     #: reported by the plug-in, never a credential.
-    account_label: Optional[str] = Field(
+    account_label: str | None = Field(
         default=None, sa_column=Column(Text, nullable=True)
     )
 
-    blocked_at: Optional[datetime] = Field(
+    blocked_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    blocked_by_id: Optional[int] = Field(
+    blocked_by_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, ForeignKey("users.id"), nullable=True),
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

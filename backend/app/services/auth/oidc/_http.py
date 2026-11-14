@@ -14,7 +14,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
-import httpx
+import httpx2
 
 from app.services.safe_http import ResponseTooLargeError, request_public_target
 from app.services.webhook_target_url import (
@@ -22,7 +22,7 @@ from app.services.webhook_target_url import (
     WebhookTargetUrlPrivateError,
 )
 
-ClientFactory = Callable[[], httpx.AsyncClient]
+ClientFactory = Callable[[], httpx2.AsyncClient]
 
 DEFAULT_HTTP_TIMEOUT_SECONDS: float = 10.0
 # A discovery doc / JWKS is a few KiB; 512 KiB is generous headroom.
@@ -75,7 +75,7 @@ async def fetch_json(
     size cap. Raises :class:`OidcHttpError` on any failure (fail-closed).
 
     ``headers`` are sent verbatim (the userinfo endpoint needs a bearer token).
-    ``client_factory`` builds the ``httpx.AsyncClient`` per call (tests inject a
+    ``client_factory`` builds the ``httpx2.AsyncClient`` per call (tests inject a
     ``MockTransport``); it defaults to a timeout-configured client.
     """
     return await _request_json(
@@ -120,7 +120,7 @@ async def _request_json(
     max_response_bytes: int,
 ) -> Any:
     require_https(url)
-    factory = client_factory or (lambda: httpx.AsyncClient(timeout=timeout_seconds))
+    factory = client_factory or (lambda: httpx2.AsyncClient(timeout=timeout_seconds))
     body = bytearray()
     # Failures are flagged and raised AFTER the stream context exits: raising
     # inside it would leave our exception exposed to replacement by a teardown
@@ -129,22 +129,24 @@ async def _request_json(
     over_cap = False
     error_status: int | None = None
     try:
-        async with factory() as client:
-            async with client.stream(method, url, data=data, headers=headers) as resp:
-                if resp.status_code >= 400:
-                    # Read a bounded snippet of the error body for its OAuth
-                    # error code ({"error": "invalid_grant", ...}), the one
-                    # diagnostic the server operator needs in the logs.
-                    error_status = resp.status_code
-                    max_bytes = _ERROR_SNIPPET_MAX_BYTES
-                else:
-                    max_bytes = max_response_bytes
-                async for chunk in resp.aiter_bytes():
-                    body.extend(chunk)
-                    if len(body) > max_bytes:
-                        over_cap = True
-                        break
-    except httpx.HTTPError as exc:
+        async with (
+            factory() as client,
+            client.stream(method, url, data=data, headers=headers) as resp,
+        ):
+            if resp.status_code >= 400:
+                # Read a bounded snippet of the error body for its OAuth
+                # error code ({"error": "invalid_grant", ...}), the one
+                # diagnostic the server operator needs in the logs.
+                error_status = resp.status_code
+                max_bytes = _ERROR_SNIPPET_MAX_BYTES
+            else:
+                max_bytes = max_response_bytes
+            async for chunk in resp.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > max_bytes:
+                    over_cap = True
+                    break
+    except httpx2.HTTPError as exc:
         raise OidcHttpError(f"fetch failed for {url}: {exc}") from exc
     if error_status is not None:
         try:
@@ -167,7 +169,7 @@ async def post_form_json_pinned(
     data: dict[str, str],
     *,
     headers: dict[str, str] | None = None,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
     timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
     max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
 ) -> Any:
@@ -203,7 +205,7 @@ async def post_form_json_pinned(
         ) from exc
     except (WebhookTargetUrlError, WebhookTargetUrlPrivateError) as exc:
         raise OidcHttpError(f"refusing target {url!r}: {exc}") from exc
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise OidcHttpError(f"fetch failed for {url}: {exc}") from exc
 
     body = response.content

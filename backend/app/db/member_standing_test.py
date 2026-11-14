@@ -11,7 +11,7 @@ the gates then answer.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import delete, event, text
@@ -19,24 +19,31 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
 from app.api.deps import InstallAccessError
-from app.db.guild_standing import InstallContext
-from app.db.schema_provisioning import guild_schema_name, GuildRoleKind, guild_role_name
-from app.models.platform.guild import CommunityRole
-from app.models.platform.user import User, UserStatus
-from app.models.tenant.plugin_member_consent import PluginMemberConsent, ConsentAccess
 from app.core.file_types import FileType
+from app.core.plugin_scopes import tool_resource
+from app.core.tools import Tool
+from app.db.authorization import COMMUNITY_ROWS
+from app.db.guild_standing import InstallContext
+from app.db.schema_provisioning import GuildRoleKind, guild_role_name, guild_schema_name
+from app.models.platform.guild import AdminSurface, CommunityRole
+from app.models.platform.user import User, UserStatus
+from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
+from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.plugin_member_consent import ConsentAccess, PluginMemberConsent
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_file,
+    create_guild_plugin,
     create_resource_grant,
     route_as_install,
     route_session_to_guild,
 )
 from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 
 
 async def _member(acting_user, installed: InstalledPlugin, *, role: str = "member"):
@@ -288,7 +295,7 @@ async def test_a_guild_admins_member_token_administers_nothing(
     with pytest.raises(DBAPIError, match="permission denied"):
         await s.exec(
             text(
-                f'SELECT count(*) FROM "{guild_schema_name(installed.guild.id)}"'
+                f'SELECT * FROM "{guild_schema_name(installed.guild.id)}"'
                 ".guild_settings"
             )
         )
@@ -513,4 +520,129 @@ async def test_a_member_token_writes_no_owner_row_itself(
     )
     with pytest.raises(DBAPIError, match="row-level security"):
         await s.flush()
+    await s.rollback()
+
+
+async def test_a_member_token_makes_a_community_contact_as_a_surface_holder(
+    session, acting_user, role_session
+):
+    """The standing carries the admin surfaces the member holds, and the
+    database takes ``community_contacts`` there of a community contact the
+    token creates, as it does of the member making one themselves."""
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=["contacts:write"]
+    )
+    holder = await create_guild_plugin(
+        session,
+        installed.guild,
+        installed.seat.user,
+        definition={"plugin_kind": "tool_instance", "tool": Tool.contact.value},
+        plugin_kind="tool_instance",
+    )
+    member = await _member(acting_user, installed)
+    await _consent(session, installed, member.user.id)
+
+    s, context = await _route(
+        role_session, installed, member.user.id, ["contacts:write"]
+    )
+    assert context.member_surfaces == ()
+    s.add(Contact(initiative_id=None, name="Bloom & Co"))
+    with pytest.raises(DBAPIError, match="row-level security"):
+        await s.flush()
+    await s.rollback()
+
+    await route_session_to_guild(session, installed.guild.id)
+    role = CustomRole(
+        name="Contacts",
+        base_rung=CommunityRole.member.value,
+        surfaces=[AdminSurface.community_contacts.value],
+    )
+    session.add(role)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=role.id))
+    await session.commit()
+
+    s, context = await _route(
+        role_session, installed, member.user.id, ["contacts:write"]
+    )
+    assert context.member_surfaces == (AdminSurface.community_contacts.value,)
+    made = Contact(initiative_id=None, name="Bloom & Co")
+    s.add(made)
+    await s.flush()
+    made_id = made.id
+    await s.commit()
+    await route_session_to_guild(session, installed.guild.id)
+    grants = (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == Tool.contact.value,
+                ResourceGrant.resource_id == made_id,
+            )
+        )
+    ).all()
+    assert {
+        (g.level, g.plugin_install_id, g.user_id, g.all_initiative_members)
+        for g in grants
+    } == {
+        (ResourceAccessLevel.owner, holder.id, None, False),
+        (ResourceAccessLevel.read, None, None, True),
+    }
+
+
+#: The model of each tool whose rows may belong to the whole community.
+_COMMUNITY_ROW_MODELS = {Tool.calendar: Calendar, Tool.contact: Contact}
+
+
+@pytest.mark.parametrize("tool", sorted(COMMUNITY_ROWS, key=lambda t: t.value))
+async def test_a_member_token_changes_a_community_row_as_the_member_would(
+    session, acting_user, role_session, tool
+):
+    """A member with a write grant on a row of the whole community changes it
+    through a member token exactly where they could themselves: where the
+    grant changes the row, or once they hold the surface that administers
+    it."""
+    rows = COMMUNITY_ROWS[tool]
+    scope = f"{tool_resource(tool).value}:write"
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=[scope]
+    )
+    member = await _member(acting_user, installed)
+    await _consent(session, installed, member.user.id)
+
+    await route_session_to_guild(session, installed.guild.id)
+    model = _COMMUNITY_ROW_MODELS[tool]
+    row = model(initiative_id=None, name="The whole community's")
+    session.add(row)
+    await session.flush()
+    session.add(
+        ResourceGrant(
+            resource_type=tool.value,
+            resource_id=row.id,
+            user_id=member.user.id,
+            level=ResourceAccessLevel.write,
+        )
+    )
+    await session.commit()
+    rename = text(
+        f"UPDATE {model.__tablename__} SET name = 'Renamed' WHERE id = :id RETURNING id"
+    ).bindparams(id=row.id)
+
+    s, _context = await _route(role_session, installed, member.user.id, [scope])
+    changed = (await s.exec(rename)).first() is not None
+    assert changed is rows.granted_writes_row
+    await s.rollback()
+
+    await route_session_to_guild(session, installed.guild.id)
+    role = CustomRole(
+        name="Community rows",
+        base_rung=CommunityRole.member.value,
+        surfaces=[rows.surface.value],
+    )
+    session.add(role)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=role.id))
+    await session.commit()
+
+    s, _context = await _route(role_session, installed, member.user.id, [scope])
+    assert (await s.exec(rename)).first() is not None
     await s.rollback()

@@ -21,7 +21,7 @@ and written on the system engine (``guild_provider_connections`` and
 ``auth_providers`` carry no request-path grants).
 """
 
-from typing import Annotated, List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -29,35 +29,37 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     CommunityIdPath,
+    GuildContext,
     SeatSessionDep,
     SeatWriteSessionDep,
-    get_guild_seat_write_session,
-    require_surface_open,
-    GuildContext,
-    require_surface,
-    get_current_active_user,
     SystemSessionDep,
+    get_current_active_user,
+    get_guild_seat_write_session,
+    require_surface,
+    require_surface_open,
 )
 from app.core.audit_events import AuditEventType
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import AuthProviderMessages, CustomRoleMessages
 from app.core.rules import SURFACE_CUSTOM_ROLES
-from app.models.tenant.custom_role import CustomRole, CustomRoleClaimRule
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
+from app.models.tenant.custom_role import CustomRole, CustomRoleClaimRule
 from app.schemas.platform.settings import (
-    ConnectableProviderRead,
     CommunityClaimRuleCreate,
     CommunityClaimRuleRead,
     CommunityClaimRulesResponse,
+    CommunityClaimRuleUpdate,
     CommunityProviderConnectionCreate,
     CommunityProviderConnectionRead,
     CommunityProviderConnectionUpdate,
+    ConnectableProviderRead,
 )
 from app.schemas.tenant.custom_role import (
     CustomRoleClaimRuleCreate,
     CustomRoleClaimRuleOrder,
     CustomRoleClaimRuleRead,
+    CustomRoleClaimRuleUpdate,
 )
 from app.services import audit as audit_service
 from app.services.auth import guild_claim_rules as claim_rules
@@ -89,13 +91,13 @@ async def _require_connection_option(
 
 @router.get(
     "/{community_id}/auth/connections",
-    response_model=List[CommunityProviderConnectionRead],
+    response_model=list[CommunityProviderConnectionRead],
 )
 async def list_community_provider_connections(
     guild_id: CommunityIdPath,
     _guild_context: MembersContext,
     system_session: SystemSessionDep,
-) -> List[CommunityProviderConnectionRead]:
+) -> list[CommunityProviderConnectionRead]:
     await guild_entitlements.require_auth_option(
         system_session, guild_id, CommunityAuthOption.providers
     )
@@ -104,13 +106,13 @@ async def list_community_provider_connections(
 
 @router.get(
     "/{community_id}/auth/connections/available",
-    response_model=List[ConnectableProviderRead],
+    response_model=list[ConnectableProviderRead],
 )
 async def list_connectable_providers(
     guild_id: CommunityIdPath,
     _guild_context: MembersContext,
     system_session: SystemSessionDep,
-) -> List[ConnectableProviderRead]:
+) -> list[ConnectableProviderRead]:
     """The providers this community may choose from: the ones on offer, plus
     the ones it already connects to. Names only — a community picks a provider
     by name, and one registered for a single customer is nobody else's to
@@ -226,6 +228,28 @@ async def create_community_claim_rule(
     )
 
 
+@router.patch(
+    "/{community_id}/auth/rules/{rule_id}", response_model=CommunityClaimRuleRead
+)
+async def update_community_claim_rule(
+    guild_id: CommunityIdPath,
+    rule_id: int,
+    payload: CommunityClaimRuleUpdate,
+    _session: SeatWriteSessionDep,
+    system_session: SystemSessionDep,
+    current_user: CurrentUserDep,
+) -> CommunityClaimRuleRead:
+    """Change the group a rule reads or where it places people."""
+    await _require_connection_option(system_session, guild_id)
+    return await claim_rules.update_rule(
+        system_session,
+        guild_id=guild_id,
+        rule_id=rule_id,
+        payload=payload,
+        actor_user_id=current_user.id,
+    )
+
+
 @router.delete(
     "/{community_id}/auth/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT
 )
@@ -261,13 +285,13 @@ def _role_rule_read(rule: CustomRoleClaimRule) -> CustomRoleClaimRuleRead:
 
 @router.get(
     "/{community_id}/auth/role-rules",
-    response_model=List[CustomRoleClaimRuleRead],
+    response_model=list[CustomRoleClaimRuleRead],
 )
 async def list_custom_role_claim_rules(
     guild_id: CommunityIdPath,
     session: SeatSessionDep,
     system_session: SystemSessionDep,
-) -> List[CustomRoleClaimRuleRead]:
+) -> list[CustomRoleClaimRuleRead]:
     """Which custom role each group gives, in the order a sign-in reads them:
     the first rule whose group it carries decides. Kept in the community's own
     schema, beside the roles they name."""
@@ -306,7 +330,7 @@ async def create_custom_role_claim_rule(
         rule = await custom_roles_service.add_claim_rule(
             session,
             provider_id=payload.provider_id,
-            claim_value=payload.claim_value.strip(),
+            claim_value=payload.claim_value,
             role_id=payload.role_id,
         )
     except IntegrityError:
@@ -334,7 +358,7 @@ async def create_custom_role_claim_rule(
 
 @router.put(
     "/{community_id}/auth/role-rules/order",
-    response_model=List[CustomRoleClaimRuleRead],
+    response_model=list[CustomRoleClaimRuleRead],
     dependencies=[_ROLE_RULES_OPEN],
 )
 async def order_custom_role_claim_rules(
@@ -343,7 +367,7 @@ async def order_custom_role_claim_rules(
     session: SeatWriteSessionDep,
     system_session: SystemSessionDep,
     current_user: CurrentUserDep,
-) -> List[CustomRoleClaimRuleRead]:
+) -> list[CustomRoleClaimRuleRead]:
     """Put the rules in a new order; it names every rule once."""
     await _require_connection_option(system_session, guild_id)
     if not await custom_roles_service.order_claim_rules(session, payload.rule_ids):
@@ -364,6 +388,68 @@ async def order_custom_role_claim_rules(
         _role_rule_read(rule)
         for rule in await custom_roles_service.claim_rules(session)
     ]
+
+
+@router.patch(
+    "/{community_id}/auth/role-rules/{rule_id}",
+    response_model=CustomRoleClaimRuleRead,
+    dependencies=[_ROLE_RULES_OPEN],
+)
+async def update_custom_role_claim_rule(
+    guild_id: CommunityIdPath,
+    rule_id: int,
+    payload: CustomRoleClaimRuleUpdate,
+    session: SeatWriteSessionDep,
+    system_session: SystemSessionDep,
+    current_user: CurrentUserDep,
+) -> CustomRoleClaimRuleRead:
+    """Change the group a rule reads or the role it gives. Whoever holds a
+    role by it is given the new one at their next sign-in through that
+    provider."""
+    await _require_connection_option(system_session, guild_id)
+    rule = await session.get(CustomRoleClaimRule, rule_id)
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=AuthProviderMessages.RULE_NOT_FOUND,
+        )
+    if (
+        payload.role_id is not None
+        and await session.get(CustomRole, payload.role_id) is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=CustomRoleMessages.CUSTOM_ROLE_NOT_FOUND,
+        )
+    before = {"claim_value": rule.claim_value, "role_id": rule.role_id}
+    if payload.claim_value is not None:
+        rule.claim_value = payload.claim_value
+    if payload.role_id is not None:
+        rule.role_id = payload.role_id
+    session.add(rule)
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=AuthProviderMessages.RULE_EXISTS,
+        ) from None
+    changed = audit_service.changed_fields(
+        before, {"claim_value": rule.claim_value, "role_id": rule.role_id}
+    )
+    if changed["changed"]:
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.CLAIM_RULE_UPDATED,
+            actor_user_id=current_user.id,
+            guild_id=guild_id,
+            target_type="custom_role_claim_rule",
+            target_id=rule.id,
+            detail=changed,
+        )
+    await session.commit()
+    return _role_rule_read(rule)
 
 
 @router.delete(

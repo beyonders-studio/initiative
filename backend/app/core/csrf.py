@@ -38,7 +38,6 @@ CLAUDE.md "Security-sensitive comments".
 
 from __future__ import annotations
 
-
 from urllib.parse import urlsplit
 
 from starlette.datastructures import Headers

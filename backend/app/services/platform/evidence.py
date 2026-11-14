@@ -33,10 +33,11 @@ import unicodedata
 import uuid
 import warnings
 import zlib
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Iterator, Optional, Sequence
+from typing import Self
 
 from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, delete, or_, update
@@ -50,6 +51,7 @@ from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.evidence import DISPLAY_NAME_LENGTH, Evidence, EvidenceKind
 from app.services import storage as storage_service
 from app.services import upload_scanning
@@ -84,7 +86,7 @@ class EvidenceRefused(Exception):
 class IncomingFile:
     """One file as a request carried it."""
 
-    filename: Optional[str]
+    filename: str | None
     data: bytes
 
 
@@ -282,7 +284,7 @@ def _without_location(data: bytes, content_type: str) -> bytes:
 _UNSAFE_NAME = re.compile(r"[\x00-\x1f\x7f/\\]+")
 
 
-def clean_name(filename: Optional[str]) -> str:
+def clean_name(filename: str | None) -> str:
     """A name to show for a file: its last path part, with control characters
     and separators taken out, and no longer than the column."""
     name = unicodedata.normalize("NFC", Path(filename or "").name)
@@ -347,11 +349,11 @@ def store(
     *,
     guild_id: int,
     prepared: Iterable[PreparedEvidence],
-    created_by: Optional[int],
+    created_by: int | None,
     written: list[str],
-    case_task_id: Optional[int] = None,
-    report_id: Optional[int] = None,
-    comment_id: Optional[int] = None,
+    case_task_id: int | None = None,
+    report_id: int | None = None,
+    comment_id: int | None = None,
 ) -> list[Evidence]:
     """Seal and store each file in ``guild_id``'s namespace, and add its row to
     ``session``, which must be routed into that community. Each object's key
@@ -390,6 +392,7 @@ def store(
             ),
             kek_version=version,
             created_by=created_by,
+            created_by_kind=None if created_by is None else ActorKind.member,
         )
         session.add(row)
         rows.append(row)
@@ -425,7 +428,7 @@ class Sealing:
         self.written: list[str] = []
         self._kept = False
 
-    def __enter__(self) -> "Sealing":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -437,10 +440,10 @@ class Sealing:
         session: AsyncSession,
         *,
         prepared: Iterable[PreparedEvidence],
-        created_by: Optional[int],
-        case_task_id: Optional[int] = None,
-        report_id: Optional[int] = None,
-        comment_id: Optional[int] = None,
+        created_by: int | None,
+        case_task_id: int | None = None,
+        report_id: int | None = None,
+        comment_id: int | None = None,
     ) -> list[Evidence]:
         return store(
             session,
@@ -509,7 +512,7 @@ class SealedObject:
     size_bytes: int
 
 
-async def sealed(session: AsyncSession, evidence_id: int) -> Optional[SealedObject]:
+async def sealed(session: AsyncSession, evidence_id: int) -> SealedObject | None:
     """The stored half of row ``evidence_id``, read on ``session`` — a system
     session routed into the community holding it, once the reader's own
     session has shown the row is theirs to read."""
@@ -660,6 +663,7 @@ async def transfer(
             ),
             kek_version=version,
             created_by=row.created_by,
+            created_by_kind=row.created_by_kind,
         )
         destination.add(copy)
         carried.append(copy)
@@ -725,7 +729,7 @@ async def purge_cases_due(session: AsyncSession, guild_id: int) -> int:
     from app.models.tenant.intake import IntakeCase
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     gone: list[str] = []
     for stream in IntakeStream:
         cutoff = now - timedelta(days=meta(stream).retention_days)
@@ -777,7 +781,7 @@ async def purge_reports_due(session: AsyncSession, guild_id: int) -> int:
     ``retention_days`` — the rows, then the objects. Returns how many went."""
     from app.models.tenant.moderation import ModerationReport
 
-    report_cutoff = datetime.now(timezone.utc) - timedelta(
+    report_cutoff = datetime.now(UTC) - timedelta(
         days=meta(IntakeStream.moderation).retention_days
     )
     gone = (
@@ -833,7 +837,7 @@ async def held_cases(session: AsyncSession, task_ids: Sequence[int]) -> set[int]
                 continue
             try:
                 subject = int(summary.value)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             by_subject.setdefault(subject, []).append(task_id)
     if not by_subject:
@@ -865,7 +869,7 @@ async def held_cases(session: AsyncSession, task_ids: Sequence[int]) -> set[int]
                     ).all()
                 )
                 await other.rollback()
-        except Exception:  # noqa: BLE001 — kept rather than lost; asked again next sweep
+        except Exception:
             logger.exception("evidence: could not ask community %s for holds", subject)
             held.update(ids)
     return {int(task_id) for task_id in held if task_id is not None}

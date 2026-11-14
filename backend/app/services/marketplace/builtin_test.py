@@ -36,15 +36,15 @@ from app.services.marketplace.builtin import (
     load_builtin_manifests,
     seed_builtin_listings,
 )
-from app.services.query import resolve
-from app.testing import route_session_to_guild
-from app.services.tenant.dashboard_definition import WIDGET_SPECS
 from app.services.marketplace.definitions import (
     RESERVED_PUBLIC_ID_PREFIX,
     TOOL_LISTING_KINDS,
-    normalize_publisher,
     normalize_listing_definition,
+    normalize_publisher,
 )
+from app.services.query import resolve
+from app.services.tenant.dashboard_definition import WIDGET_SPECS
+from app.testing import route_session_to_guild
 
 pytestmark = pytest.mark.always
 

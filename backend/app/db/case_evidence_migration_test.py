@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 
@@ -65,7 +65,7 @@ async def test_a_cases_evidence_moves_from_its_case_to_its_task(session) -> None
     await create_task(session, project)
     task = await create_task(session, project)
     await make_operations_community(session, guild.id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await set_rls_context(session, SystemGuild(guild.id))
     case = IntakeCase(
         stream=IntakeStream.support,

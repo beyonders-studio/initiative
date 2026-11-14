@@ -21,22 +21,23 @@ See plan & ``project_export.py`` for the format. The algorithm:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import ValidationError
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
-from app.schemas.recurrence import validate_task_recurrence
 from app.core.messages import ImportEngineMessages, ProjectExportMessages
 from app.core.search import SearchEntityType
+from app.core.task_types import LAYOUT_SHAPES, MAX_TASK_TYPES
+from app.core.tools import TYPED_DETAILS, Tool
+from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.initiative import Initiative
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import MetadataType
-
+from app.models.tenant.project import Project
 from app.models.tenant.task import (
     Task,
     TaskAssignee,
@@ -44,7 +45,7 @@ from app.models.tenant.task import (
     TaskStatusCategory,
     TaskType,
 )
-from app.models.platform.user import User
+from app.schemas.recurrence import validate_task_recurrence
 from app.schemas.tenant.project_export import (
     ProjectExportComment,
     ProjectExportEnvelope,
@@ -53,6 +54,11 @@ from app.schemas.tenant.project_export import (
 )
 from app.schemas.tenant.task import mint_checklist_item_id
 from app.schemas.tenant.task_type import TaskTypeStartingValues
+from app.services.import_engine.common import (
+    handle_key,
+    load_initiative_member_handles,
+    unique_name_in_initiative,
+)
 from app.services.import_engine.context import ImportContext
 from app.services.import_engine.contract import (
     EnvelopeImportResult,
@@ -65,28 +71,21 @@ from app.services.import_engine.importers._base import (
 )
 from app.services.import_engine.links import links_to_pages
 from app.services.import_engine.mentions import place_markdown_mentions
+from app.services.import_engine.people import (
+    PeopleMap,
+    bring_in_named,
+    initiative_member_id,
+)
 from app.services.import_engine.references import (
     has_source_references,
     note_or_settle,
 )
-from app.services.import_engine.people import (
-    PeopleMap,
-    initiative_member_id,
-    bring_in_named,
-)
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import task_completion
-from app.services.tenant import tool_layouts as tool_layouts_service
-from app.services.tenant.task_statuses import defaults_for_category
 from app.services.tenant import task_types as task_types_service
-from app.core.task_types import LAYOUT_SHAPES, MAX_TASK_TYPES
-from app.services.import_engine.common import (
-    load_initiative_member_handles,
-    handle_key,
-    unique_name_in_initiative,
-)
-from app.core.tools import TYPED_DETAILS, Tool
+from app.services.tenant import tool_layouts as tool_layouts_service
 from app.services.tenant.named_people import Governing
+from app.services.tenant.task_statuses import defaults_for_category
 
 
 async def import_project(
@@ -321,7 +320,7 @@ async def import_project(
 # ---------------------------------------------------------------------------
 
 
-def _starting_values(raw: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+def _starting_values(raw: dict[str, Any] | None) -> dict[str, Any] | None:
     """A type's starting values as the column holds them, held to what a write
     of them would be; ones that are not start nothing."""
     if not raw:
@@ -445,6 +444,7 @@ async def _import_task(
         archived_at=envelope_task.archived_at,
         completed_at=envelope_task.completed_at,
         created_by=importer_id,
+        created_by_kind=ActorKind.member,
         # When the work was written down, where the envelope says so. An
         # envelope that carries neither leaves the model's own default — the
         # moment of the import, which is the only time this row can honestly
@@ -466,7 +466,7 @@ async def _import_task(
     task_completion.sync_completed_at(
         task,
         status_id_to_category.get(status_id),
-        now=datetime.now(timezone.utc),
+        now=datetime.now(UTC),
     )
     session.add(task)
     await session.flush()
@@ -604,9 +604,10 @@ async def _import_task(
                 initiative_member_handles=initiative_member_handles,
             ),
             created_by=author_id,
+            created_by_kind=ActorKind.member,
             imported_author_name=source_name,
             parent_comment_id=written.get(envelope_comment.reply_to_ref or ""),
-            created_at=envelope_comment.created_at or datetime.now(timezone.utc),
+            created_at=envelope_comment.created_at or datetime.now(UTC),
         )
         session.add(comment)
         if context is not None and links_to_pages(comment.content):

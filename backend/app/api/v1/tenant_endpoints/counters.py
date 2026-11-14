@@ -1,11 +1,9 @@
 """Counter group endpoints — CRUD, value operations, permissions, WebSocket."""
 
-from datetime import datetime, timezone
-from typing import Annotated, Optional
-
 import logging
+from datetime import UTC, datetime
+from typing import Annotated
 
-from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import (
     APIRouter,
     Depends,
@@ -13,26 +11,29 @@ from fastapi import (
     WebSocket,
     status,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-
-from app.db.session import routed_guild_id
+from app.api import resource_access, tool_copy
 from app.api.actor_route import ActorRoute
+from app.api.content_socket import serve_tool_stream
 from app.api.deps import (
-    CommunityIdPath,
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    CommunityIdPath,
     GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
     get_current_active_user,
     plugin_scope,
 )
+from app.core.tools import Tool
+from app.db.session import routed_guild_id
+from app.models.platform.user import User
 from app.models.tenant.counter import (
     Counter,
     CounterGroup,
 )
-from app.models.platform.user import User
 from app.schemas.tenant.counter import (
     CounterCreate,
     CounterGroupCreate,
@@ -40,21 +41,17 @@ from app.schemas.tenant.counter import (
     CounterGroupUpdate,
     CounterRead,
     CounterSetCountRequest,
-    CounterStepRequest,
     CounterSortRequest,
+    CounterStepRequest,
     CounterUpdate,
-    serialize_counter,
     _validate_counter_constraints,
+    serialize_counter,
 )
 from app.schemas.tenant.tool import serialize_tool
-from app.services.tenant import metadata as metadata_service
+from app.services.content_sockets import sockets
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import counters as counters_service
-from app.api import resource_access, tool_copy
-from app.core.tools import Tool
-from app.services.content_sockets import sockets
-from app.api.content_socket import serve_tool_stream
-
+from app.services.tenant import metadata as metadata_service
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -83,7 +80,7 @@ CounterGroupsWrite = Annotated[
 async def read_after_write(
     session: RLSSessionDep,
     group_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> CounterGroupRead:
     """The counter group a write answers with: re-read after the commit,
@@ -106,7 +103,7 @@ async def read_after_write(
 async def _group_committed(
     session: RLSSessionDep,
     group_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
     event: str,
 ) -> CounterGroupRead:
@@ -174,7 +171,6 @@ async def create_counter_group(
 
     group = CounterGroup(
         initiative_id=initiative.id,
-        created_by=guild_context.user_id,
         name=group_in.name,
         description=group_in.description,
     )
@@ -214,7 +210,7 @@ async def update_counter_group(
     )
     for field, value in group_in.model_dump(exclude_unset=True).items():
         setattr(group, field, value)
-    group.updated_at = datetime.now(timezone.utc)
+    group.updated_at = datetime.now(UTC)
     session.add(group)
     await attachments_service.claim_uploads(session, group)
     return await _group_committed(
@@ -304,7 +300,7 @@ async def update_counter(
     counter.initial_count = counters_service.clamp(
         counter.initial_count, counter.min, counter.max
     )
-    counter.updated_at = datetime.now(timezone.utc)
+    counter.updated_at = datetime.now(UTC)
     session.add(counter)
     return await _counter_committed(
         session, counter, "counter_updated", context=guild_context

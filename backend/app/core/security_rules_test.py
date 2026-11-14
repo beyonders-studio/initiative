@@ -12,8 +12,8 @@ from app.core.security_rules import (
     BY_NAME,
     BY_WATCHED,
     RULES,
-    Signal,
     SecurityRule,
+    Signal,
     signal_envelope,
 )
 

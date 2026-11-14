@@ -14,11 +14,11 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityLocationLine } from "@/components/communities/CommunityLocationLine";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { renderableBanner } from "@/lib/banner";
 import { communityCategoryLabel } from "@/lib/communityCategories";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Card, CardContent } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
 
 export const CommunityCardFace = ({
   community,
@@ -52,7 +52,8 @@ export const CommunityCardFace = ({
   const banner = renderableBanner(community.banner);
 
   return (
-    <Card className={cn("flex h-full flex-col overflow-hidden", className)}>
+    // What a report of the listing pictures.
+    <Card data-report-target className={cn("flex h-full flex-col overflow-hidden", className)}>
       {banner.image_url ? (
         <img
           src={banner.image_url}

@@ -9,18 +9,13 @@ import logging
 import re
 import unicodedata
 import zipfile
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
     BinaryIO,
-    Dict,
-    Iterable,
-    Mapping,
-    Set,
-    Tuple,
 )
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -36,10 +31,11 @@ from app.core.file_types import (
     type_of_name,
 )
 from app.core.identity_boundary import UPLOAD_PATH_SHAPE
-from app.core.messages import AttachmentMessages
 from app.core.image_headers import read_image_header
+from app.core.messages import AttachmentMessages
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import ids_in
+from app.models.tenant._mixins import ActorKind
 from app.services.platform import billing_changes
 from app.services.storage import (
     ReadableBlob,
@@ -126,7 +122,7 @@ def normalize_upload_url(url: str | None) -> str | None:
         return None
     url = url.strip()
     path = url
-    if url.startswith("http://") or url.startswith("https://"):
+    if url.startswith(("http://", "https://")):
         parsed = urlparse(url)
         path = parsed.path or ""
     if not path.startswith(UPLOADS_URL_PREFIX):
@@ -151,12 +147,12 @@ def delete_blobs(guild_id: int, filenames: Iterable[str]) -> None:
         storage.delete(name)
 
 
-def upload_names(urls: Iterable[str | None]) -> Set[str]:
+def upload_names(urls: Iterable[str | None]) -> set[str]:
     """The stored names these URLs address."""
     return {Path(n).name for n in (normalize_upload_url(u) for u in urls) if n}
 
 
-async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
+async def purge_file_uploads(session, files: Iterable[Any]) -> set[str]:
     """Delete the uploads of files about to be hard-purged.
 
     A version's thumbnail backs that version alone, so it goes with it. The
@@ -202,9 +198,9 @@ async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     )
 
 
-def upload_urls_in_markdown(text: str | None) -> Set[str]:
+def upload_urls_in_markdown(text: str | None) -> set[str]:
     """Every upload a markdown body shows, normalized."""
-    urls: Set[str] = set()
+    urls: set[str] = set()
     for match in _MARKDOWN_UPLOAD_URL.findall(text or ""):
         normalized = normalize_upload_url(match)
         if normalized:
@@ -254,7 +250,7 @@ def _like(filename: str) -> str:
 
 
 @asynccontextmanager
-async def guild_wide(guild_id: int) -> AsyncIterator[Any]:
+async def guild_wide(guild_id: int) -> AsyncGenerator[Any]:
     """A system session from the guild's cohort, routed into it: every upload
     it stores, whoever can read which."""
     from app.db import cohorts
@@ -272,7 +268,7 @@ Leaving = Mapping[type, Iterable[int]]
 
 
 async def _still_shown(
-    session, filename: str, *, leaving: Leaving, tables: Set[str] | None = None
+    session, filename: str, *, leaving: Leaving, tables: set[str] | None = None
 ) -> bool:
     """Whether anything stored — archived or in the trash included — other than
     the rows ``leaving`` shows this stored file, looking only in ``tables`` when
@@ -295,7 +291,7 @@ async def _still_shown(
     return False
 
 
-async def _drop_upload_rows(session, filenames: Set[str]) -> Set[str]:
+async def _drop_upload_rows(session, filenames: set[str]) -> set[str]:
     """Delete these ``uploads`` rows of the routed guild; returns the names
     that had one."""
     from sqlalchemy import delete as sa_delete
@@ -318,8 +314,8 @@ async def _drop_upload_rows(session, filenames: Set[str]) -> Set[str]:
 
 
 async def release_uploads(
-    session, urls: Iterable[str | None], *, leaving: Leaving = {}
-) -> Set[str]:
+    session, urls: Iterable[str | None], *, leaving: Leaving | None = None
+) -> set[str]:
     """Delete the ``uploads`` rows of the files these URLs name that nothing
     stored shows any more.
 
@@ -332,6 +328,8 @@ async def release_uploads(
     :func:`delete_blobs` once the rows are gone — after its commit, so a
     rolled-back write leaves the file.
     """
+    if leaving is None:
+        leaving = {}
     names = {
         name
         for name in upload_names(urls)
@@ -342,7 +340,7 @@ async def release_uploads(
 
 async def release_unshown(
     guild_id: int, urls: Iterable[str | None], *, pasted_only: bool = False
-) -> Set[str]:
+) -> set[str]:
     """Delete the ``uploads`` rows of the files these URLs name that nothing in
     the community shows, once the change that let go of them has committed.
 
@@ -373,7 +371,7 @@ async def release_unshown(
 
 async def release_pasted_images(
     session, urls: Iterable[str], *, leaving: Leaving
-) -> Set[str]:
+) -> set[str]:
     """:func:`release_uploads`, for the pictures pasted into a task description
     or a comment (see :data:`PASTED_IMAGE_PREFIX`) — the only uploads a markdown
     body owns."""
@@ -400,7 +398,11 @@ async def discard_pasted_image(session, filename: str, *, user_id: int) -> str |
         return None
     upload = (
         await session.exec(
-            select(Upload).where(Upload.filename == name, Upload.created_by == user_id)
+            select(Upload).where(
+                Upload.filename == name,
+                Upload.created_by_kind == ActorKind.member,
+                Upload.created_by == user_id,
+            )
         )
     ).first()
     if upload is None or await _still_shown(session, name, leaving={}):
@@ -409,7 +411,7 @@ async def discard_pasted_image(session, filename: str, *, user_id: int) -> str |
     return name
 
 
-async def release_unclaimed_pasted_images(session, *, now: datetime) -> Set[str]:
+async def release_unclaimed_pasted_images(session, *, now: datetime) -> set[str]:
     """Delete pictures pasted longer ago than the grace period that nothing
     shows — the ones a closed tab never got to discard.
 
@@ -443,7 +445,7 @@ async def release_unclaimed_pasted_images(session, *, now: datetime) -> Set[str]
     return await _drop_upload_rows(session, set(unshown.all()))
 
 
-async def purge_pasted_images(session, doomed: Iterable[Any]) -> Set[str]:
+async def purge_pasted_images(session, doomed: Iterable[Any]) -> set[str]:
     """Delete the pictures pasted into tasks and comments about to be
     hard-purged, unless something that stays still shows them.
 
@@ -453,7 +455,7 @@ async def purge_pasted_images(session, doomed: Iterable[Any]) -> Set[str]:
     from app.models.tenant.comment import Comment
     from app.models.tenant.task import Task
 
-    urls: Set[str] = set()
+    urls: set[str] = set()
     leaving: dict[type, set[int]] = {Task: set(), Comment: set()}
     for row in doomed:
         if isinstance(row, Task):
@@ -465,8 +467,8 @@ async def purge_pasted_images(session, doomed: Iterable[Any]) -> Set[str]:
     return await release_pasted_images(session, urls, leaving=leaving)
 
 
-def extract_upload_urls(payload: Any) -> Set[str]:
-    urls: Set[str] = set()
+def extract_upload_urls(payload: Any) -> set[str]:
+    urls: set[str] = set()
 
     def _walk(value: Any) -> None:
         if isinstance(value, str):
@@ -491,7 +493,7 @@ async def copy_uploads(
     guild_id: int,
     created_by: int | None,
     initiative_id: int | None,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Copy the guild's stored files these URLs name into new files, kept for
     ``initiative_id`` (``None``: the whole guild), and return each source URL's
     copy. ``created_by`` None keeps each file's own uploader on its copy.
@@ -518,7 +520,7 @@ async def copy_uploads(
         incoming_bytes=sum(source.size_bytes or 0 for source in sources),
     )
     storage = get_guild_storage(guild_id)
-    copies: Dict[str, str] = {}
+    copies: dict[str, str] = {}
     for source in sources:
         name = new_upload_filename(
             Path(source.filename).suffix,
@@ -530,12 +532,15 @@ async def copy_uploads(
         session.add(
             Upload(
                 filename=name,
-                created_by=created_by if created_by is not None else source.created_by,
+                created_by=source.created_by if created_by is None else created_by,
+                created_by_kind=source.created_by_kind
+                if created_by is None
+                else ActorKind.member,
                 size_bytes=source.size_bytes,
                 content_type=source.content_type,
                 content_hash=source.content_hash,
                 initiative_id=initiative_id,
-                claimed_at=datetime.now(timezone.utc),
+                claimed_at=datetime.now(UTC),
             )
         )
         copies[by_name[source.filename]] = f"{UPLOADS_URL_PREFIX}{guild_id}/{name}"
@@ -574,7 +579,7 @@ def shows_files(model: type, fields: Iterable[str]) -> bool:
 
 
 async def claim_uploads(
-    session, *rows: Any, uploaded_by: Set[int] | None = None, carried: bool = False
+    session, *rows: Any, uploaded_by: set[int] | None = None, carried: bool = False
 ) -> None:
     """Keep the uploads these saved rows show for the initiative each row
     belongs to — none for content of the whole guild.
@@ -602,8 +607,8 @@ async def claim_uploads(
     from sqlalchemy.orm.attributes import flag_modified
     from sqlmodel import select
 
-    from app.db.plugin_rls import PLUGIN_TABLE_ACCESS
     from app.db.initiative_rls import INITIATIVE_PATHS
+    from app.db.plugin_rls import PLUGIN_TABLE_ACCESS
     from app.db.session import guild_context, install_context
     from app.models.tenant.upload import Upload
     from app.services.tenant import body_states
@@ -616,7 +621,7 @@ async def claim_uploads(
     own = f"{UPLOADS_URL_PREFIX}{guild_id}/"
     # Each row showing one of the guild's files: its upload columns, its
     # initiative, and the files it shows by stored name.
-    showing: list[tuple[Any, list[str], int | None, Dict[str, str]]] = []
+    showing: list[tuple[Any, list[str], int | None, dict[str, str]]] = []
     for row in rows:
         columns = [c for model, c in _upload_columns() if type(row) is model]
         unloaded = [c for c in columns if c in inspect(row).unloaded]
@@ -655,15 +660,18 @@ async def claim_uploads(
             .execution_options(populate_existing=True)
         )
     }
-    now = datetime.now(timezone.utc)
-    wanted: Dict[int | None, Set[str]] = {}
+    now = datetime.now(UTC)
+    wanted: dict[int | None, set[str]] = {}
     for _row, _columns, initiative_id, shown in showing:
         for name, url in shown.items():
             upload = uploads.get(name)
             if upload is None:
                 continue
             if upload.claimed_at is None:
-                if uploaded_by is None or upload.created_by in uploaded_by:
+                if uploaded_by is None or (
+                    upload.created_by_kind == ActorKind.member
+                    and upload.created_by in uploaded_by
+                ):
                     upload.initiative_id = initiative_id
                     upload.claimed_at = now
             elif upload.initiative_id != initiative_id:
@@ -677,7 +685,7 @@ async def claim_uploads(
         # An installed plug-in reaches a file through the content showing it, so
         # it copies one only when content it reads shows it: other content,
         # or rows it carried here.
-        saving: Dict[type, list[int]] = {}
+        saving: dict[type, list[int]] = {}
         for row, *_ in showing:
             saving.setdefault(type(row), []).append(row.id)
         for initiative_id, urls in wanted.items():
@@ -725,7 +733,7 @@ async def claim_uploads(
     await session.flush()
 
 
-async def claim_shown(session, filenames: Set[str]) -> None:
+async def claim_shown(session, filenames: set[str]) -> None:
     """:func:`claim_uploads` for every stored row that shows these files —
     archived or in the trash included — oldest first."""
     from sqlalchemy import ARRAY, Text, any_, bindparam, cast
@@ -749,7 +757,7 @@ async def claim_shown(session, filenames: Set[str]) -> None:
     )
 
 
-async def purge_initiative_uploads(session, initiative_ids: Iterable[int]) -> Set[str]:
+async def purge_initiative_uploads(session, initiative_ids: Iterable[int]) -> set[str]:
     """Delete the ``uploads`` rows kept for initiatives about to be hard-purged;
     returns their stored names, whose blobs the caller deletes after its
     commit."""
@@ -833,7 +841,7 @@ def _name_settles(detected: str, named_type: FileType, source: BinaryIO) -> bool
     return named in _OFFICE_CONTAINERS and detected in _CONTAINER_TYPES
 
 
-def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
+def validate_file(content: bytes, filename: str | None) -> tuple[str, str]:
     """The type and stored extension of an uploaded file, read from its bytes.
 
     Any format is taken but a program. The name only narrows what the bytes
@@ -898,7 +906,7 @@ def validate_source(source: BinaryIO, filename: str | None) -> str:
 
 def _type_of(
     detected: str | None, source: BinaryIO, filename: str | None
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """The type and stored extension of a file whose bytes said ``detected``,
     with ``source`` to read a zip's list from."""
     # Read as the name the file is kept and downloaded under.
@@ -910,9 +918,12 @@ def _type_of(
         raise RefusedFileTypeError(f"Refused file type: {detected}")
     named_type = type_of_name(filename)
     mime = detected
-    if named_type is not None and named_type is not type_of_media(detected):
-        if _name_settles(detected, named_type, source):
-            mime = spec_of(named_type).media_types[0]
+    if (
+        named_type is not None
+        and named_type is not type_of_media(detected)
+        and _name_settles(detected, named_type, source)
+    ):
+        mime = spec_of(named_type).media_types[0]
     extensions = spec_of(type_of_media(mime)).extensions
     suffix = Path(filename).suffix.lower() if filename else ""
     return mime, suffix if suffix in extensions else next(iter(extensions), "")
@@ -951,13 +962,16 @@ async def store_upload(
     guild_id: int,
     filename: str,
     data: bytes | Path,
-    content_type: str | None,
-    created_by: int | None,
+    content_type: str,
+    created_by: int | None = None,
+    created_by_kind: ActorKind | None = None,
     initiative_id: int | None = None,
 ) -> str:
     """Write ``data``, or the file at that path without reading it into
     memory, to the guild's storage as ``filename`` and record it in
     ``uploads``. Returns the served URL, ``/uploads/{community_id}/{filename}``.
+    ``created_by`` and ``created_by_kind`` name its author, both or neither:
+    neither is the request's (``CreatedByMixin``).
 
     Every upload a person or an import brings into a guild is stored here.
     The ``uploads`` row is what the serve route requires and what the storage
@@ -975,7 +989,6 @@ async def store_upload(
 
     scan = upload_scanning.enabled() and not filename.startswith(THUMBNAIL_PREFIX)
     storage = get_guild_storage(guild_id)
-    stored_type = content_type or "application/octet-stream"
     if isinstance(data, Path):
         size = data.stat().st_size
         if scan:
@@ -983,13 +996,15 @@ async def store_upload(
                 upload_scanning.scan_stream, blob_pieces(ReadableBlob(path=data)), size
             )
         await asyncio.to_thread(
-            storage.write_file, filename, data, content_type=stored_type
+            storage.write_file, filename, data, content_type=content_type
         )
     else:
         size = len(data)
         if scan:
             await asyncio.to_thread(upload_scanning.scan_bytes, data)
-        await asyncio.to_thread(storage.write, filename, data, content_type=stored_type)
+        await asyncio.to_thread(
+            storage.write, filename, data, content_type=content_type
+        )
     return record_upload(
         session,
         guild_id=guild_id,
@@ -998,6 +1013,7 @@ async def store_upload(
         content_type=content_type,
         content_hash=await asyncio.to_thread(compute_content_hash, data),
         created_by=created_by,
+        created_by_kind=created_by_kind,
         initiative_id=initiative_id,
     )
 
@@ -1008,10 +1024,11 @@ def record_upload(
     guild_id: int,
     filename: str,
     size: int,
-    content_type: str | None,
+    content_type: str,
     content_hash: str | None,
-    created_by: int | None,
     initiative_id: int | None,
+    created_by: int | None = None,
+    created_by_kind: ActorKind | None = None,
 ) -> str:
     """Record what is already in the guild's storage as ``filename`` in
     ``uploads``, as :func:`store_upload` records what it writes, and return
@@ -1023,11 +1040,12 @@ def record_upload(
         Upload(
             filename=filename,
             created_by=created_by,
+            created_by_kind=created_by_kind,
             size_bytes=size,
             content_type=content_type,
             content_hash=content_hash,
             initiative_id=initiative_id,
-            claimed_at=None if initiative_id is None else datetime.now(timezone.utc),
+            claimed_at=None if initiative_id is None else datetime.now(UTC),
         )
     )
     # What billing is told the community stores, once this commits.

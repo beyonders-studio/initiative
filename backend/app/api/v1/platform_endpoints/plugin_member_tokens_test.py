@@ -15,19 +15,19 @@ from typing import Annotated, Any
 
 import pytest
 from fastapi import APIRouter, Depends
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import delete
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.actor_route import ActorRoute
 from app.api.deps import ActorContext, ActorSessionDep, plugin_scope
+from app.core.messages import AuthMessages, GuildPluginMessages, PluginMessages
 from app.core.plugin_access_token import (
     InstallAccessToken,
     seal_install_token,
     unseal_access_token,
 )
-from app.core.messages import PluginMessages, AuthMessages, GuildPluginMessages
 from app.db.guild_standing import InstallContext
 from app.main import app
 from app.models.platform.guild import CommunityRole
@@ -39,7 +39,7 @@ from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
     ensure_plugin_ref,
 )
-from app.testing import create_file, route_session_to_guild, drain_notices
+from app.testing import create_file, drain_notices, route_session_to_guild
 from app.testing.plugin_clients import (
     CLIENT,
     InstalledPlugin,

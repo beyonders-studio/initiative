@@ -4,13 +4,18 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
+import { HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildUserCommunityMember } from "@/__tests__/factories";
+import { buildPage, buildUserCommunityMember, buildUserSummary } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import type { UserCommunityMemberListResponse } from "@/api/generated/initiativeAPI.schemas";
 import { getListUsersQueryKey } from "@/api/generated/users/users";
-import { useSetMemberApiAccess } from "@/hooks/useUsers";
+import { useSearchMembers, useSetMemberApiAccess } from "@/hooks/useUsers";
+
+vi.mock("@/hooks/useActiveCommunityId", () => ({ useActiveCommunityId: () => 1 }));
 
 vi.mock("@/api/generated/communities/communities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -52,5 +57,47 @@ describe("useSetMemberApiAccess", () => {
         client.getQueryData<UserCommunityMemberListResponse>(key)?.items[0].api_keys_allowed
       ).toBe(false);
     }
+  });
+});
+
+describe("useSearchMembers", () => {
+  const searchMembers = () =>
+    renderHook(() => useSearchMembers(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+      ),
+    }).result.current;
+
+  /** Answers `path` with Ada, keeping what it was asked. */
+  const answerWithAda = (path: string) => {
+    const asked: { params?: URLSearchParams } = {};
+    server.use(
+      communityHttp.get(path, ({ request }) => {
+        asked.params = new URL(request.url).searchParams;
+        return HttpResponse.json(
+          buildPage([buildUserSummary({ id: 7, display_name: "Ada Lovelace" })])
+        );
+      })
+    );
+    return asked;
+  };
+
+  it("searches an initiative's members and draws each as a picker does", async () => {
+    const asked = answerWithAda("/initiatives/:initiativeId/members/search");
+
+    const found = await searchMembers()({ type: "initiative", initiativeId: 1 }, { search: "ada" });
+
+    expect(found).toEqual([{ id: 7, name: "Ada Lovelace", picture: undefined, initials: "AL" }]);
+    expect(asked.params?.get("search")).toBe("ada");
+  });
+
+  it("looks people up across the community, with no row to open", async () => {
+    const asked = answerWithAda("/users/search");
+
+    const found = await searchMembers()({ type: "community" }, { ids: [7] });
+
+    expect(found.map((member) => member.name)).toEqual(["Ada Lovelace"]);
+    expect(asked.params?.getAll("user_id")).toEqual(["7"]);
+    expect(asked.params?.has("resource_id")).toBe(false);
   });
 });

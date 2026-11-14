@@ -8,18 +8,20 @@ import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type TaskListRead } from "@/api/generated/initiativeAPI.schemas";
-import { numberFormat } from "@/lib/intl";
-import { canRequire } from "@/lib/layouts/draft";
 import {
+  addablePluginParts,
   fieldsInParts,
   pluginFieldId,
   pluginFields,
+  pluginParts,
   pluginsOnItems,
   shippedPluginParts,
 } from "@/lib/layouts/plugins";
 import { TASK_LAYOUT, taskFields } from "@/lib/layouts/tasks";
-import { type LayoutNode, LayoutTree } from "@/lib/layouts/tree";
 import type { TranslateFn } from "@/types/i18n";
+import { canRequire } from "@/ui/layouts/draft";
+import { type LayoutNode, LayoutTree } from "@/ui/layouts/tree";
+import { numberFormat } from "@/ui/lib/intl";
 
 const definition = {
   endpoints: [
@@ -80,15 +82,25 @@ const definition = {
   ],
 };
 
+/** What the server offers the reader of an install on the items of one
+ *  initiative, 7 unless said. */
+const offered = (
+  fields: string[],
+  parts: string[] = [],
+  actions: string[] = [],
+  initiative_id = 7
+) => [{ initiative_id, fields, parts, actions }];
+
 const install = {
   id: 3,
   name: "CI",
   enabled: true,
   definition,
-  item_initiatives: [7],
-  item_fields: ["ci.state", "ci.url", "ci.runs", "event.only"],
-  item_parts: ["builds"],
-  item_actions: ["rerun", "cancel-run"],
+  item_access: offered(
+    ["ci.state", "ci.url", "ci.runs", "event.only"],
+    ["builds"],
+    ["rerun", "cancel-run"]
+  ),
   setting_values: { prefix: "acme" },
 };
 
@@ -120,12 +132,12 @@ const draw = (
   const plugins = pluginsOnItems(installs, 7);
   const view = {
     fields: taskFields([], pluginFields(plugins, "en")),
-    plugins,
+    parts: pluginParts(plugins),
     variant: "card" as const,
     env: {
       t: i18n.getFixedT(null, ["projects", "dates", "relations"]) as TranslateFn,
       communityPath: (path: string) => path,
-      taskHref: ({ id }: TaskListRead) => `/tasks/${id}`,
+      itemHref: ({ id }: TaskListRead) => `/tasks/${id}`,
     },
   };
   return renderWithProviders(<LayoutTree node={card} item={item} view={view} />);
@@ -137,9 +149,9 @@ describe("pluginsOnItems", () => {
       [
         install,
         { ...install, id: 4, enabled: false },
-        { ...install, id: 5, item_initiatives: [8] },
+        { ...install, id: 5, item_access: offered(["ci.state"], [], [], 8) },
         // Its connection holds nothing, so the server offers less of it.
-        { ...install, id: 6, item_fields: ["ci.url"], item_parts: [], item_actions: [] },
+        { ...install, id: 6, item_access: offered(["ci.url"]) },
       ],
       7
     );
@@ -191,6 +203,22 @@ describe("a plug-in on a task's page", () => {
     expect(side({ header: [], main: [], side: [] })).toEqual([]);
   });
 
+  it("offers each of a plug-in's parts once, and none past the server's limit", () => {
+    const parts = ["a", "b", "c", "d"].map((id) => ({ id }));
+    const placing = (...ids: string[]): LayoutNode => ({
+      type: "card",
+      children: ids.map((part) => ({ type: "plugin", props: { plugin: 3, part } })),
+    });
+
+    expect(addablePluginParts(placing("a"), 3, parts).map((part) => part.id)).toEqual([
+      "b",
+      "c",
+      "d",
+    ]);
+    expect(addablePluginParts(placing("a"), 4, parts)).toHaveLength(4);
+    expect(addablePluginParts(placing("a", "b", "c"), 3, parts)).toEqual([]);
+  });
+
   it("draws a field once where a part it draws shows it, at any depth", () => {
     const plugins = pluginsOnItems([install], 7);
     const page = (...side: LayoutNode[]): LayoutNode => ({
@@ -206,7 +234,10 @@ describe("a plug-in on a task's page", () => {
     // Taken off, or not offered to the reader, a part hides nothing.
     expect(fieldsInParts(page(), plugins)).toEqual(new Set());
     expect(
-      fieldsInParts(page(builds), pluginsOnItems([{ ...install, item_parts: [] }], 7))
+      fieldsInParts(
+        page(builds),
+        pluginsOnItems([{ ...install, item_access: offered(install.item_access[0].fields) }], 7)
+      )
     ).toEqual(new Set());
   });
 });
@@ -233,6 +264,14 @@ describe("a plug-in on a card", () => {
   });
 
   it("draws a property type's value as a property's, with the options and currency it carries", () => {
+    const keys = [
+      "deal.price",
+      "deal.site",
+      "deal.stage",
+      "deal.areas",
+      "deal.owner",
+      "deal.picks",
+    ];
     const kinds = {
       ...install,
       id: 8,
@@ -252,16 +291,7 @@ describe("a plug-in on a card", () => {
           { key: "deal.picks", name: { en: "Picks" }, kind: "select", list: true, on: ["task"] },
         ],
       },
-      item_fields: [
-        "deal.price",
-        "deal.site",
-        "deal.stage",
-        "deal.areas",
-        "deal.owner",
-        "deal.picks",
-      ],
-      item_parts: [],
-      item_actions: [],
+      item_access: offered(keys),
     };
     const stages = [
       buildPropertyOption({ value: "won", label: "Gewonnen" }),
@@ -272,7 +302,7 @@ describe("a plug-in on a card", () => {
     draw(
       {
         type: "card",
-        children: kinds.item_fields.map((key) => ({
+        children: keys.map((key) => ({
           type: "field",
           props: { field: pluginFieldId(8, key) },
         })),
@@ -322,9 +352,7 @@ describe("a plug-in on a card", () => {
       definition: {
         fields: [{ key: "ci.coverage", name: { en: "Coverage" }, kind: "scale", on: ["task"] }],
       },
-      item_fields: ["ci.coverage"],
-      item_parts: [],
-      item_actions: [],
+      item_access: offered(["ci.coverage"]),
     };
     const card: LayoutNode = {
       type: "card",

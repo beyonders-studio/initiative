@@ -14,9 +14,9 @@ import uuid
 from datetime import date, timedelta
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -37,16 +37,15 @@ from app.core.security import (
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_session import AuthSession
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.user_email import UserEmail
-from app.services.auth import addresses
-from app.services.platform import email_outbox
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import rules
 from app.models.platform.federated_identity_secret import FederatedIdentitySecret
 from app.models.platform.user import User, UserStatus
+from app.models.platform.user_email import UserEmail
+from app.services.auth import addresses
 from app.services.auth.oidc.flow_state import s256
 from app.services.auth.oidc.provider import OidcClientConfig, OidcProvider
 from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import email_outbox, rules
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
     create_auth_provider,
@@ -57,7 +56,11 @@ from app.testing.factories import (
 )
 from app.testing.oidc import (
     CLIENT_ID as OIDC_CLIENT_ID,
+)
+from app.testing.oidc import (
     ISSUER as OIDC_ISSUER,
+)
+from app.testing.oidc import (
     OTHER_KEY,
     FakeIdp,
     mint_id_token,
@@ -128,7 +131,7 @@ async def test_register_with_a_community_makes_it(
 ):
     """A registration that names a community makes it, with the new account as
     its superadmin; one that also carries an invite is refused."""
-    from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+    from app.models.platform.guild import CommunityRole, Guild, GuildMembership
 
     await create_user(session)
     community = {"name": "Book Club", "description": "Monthly reads"}
@@ -268,7 +271,7 @@ async def test_register_with_invite_blocked_when_guild_full(
     seat = await create_user(session, email="reg-seat@example.com")
     # Minted while the seat is still free, redeemed after it is taken —
     # minting itself is capacity-gated, so the order here is the scenario.
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=seat.id, max_uses=5
     )
     await guild_service.ensure_membership(session, guild_id=guild.id, user_id=seat.id)
@@ -297,9 +300,9 @@ async def test_register_with_a_bound_invite_joins_on_confirming(
     from app.models.platform.guild import GuildMembership
     from app.models.platform.user import UserRole
     from app.models.platform.user_token import UserTokenPurpose
-    from app.services.platform import user_tokens
     from app.services import email as email_service
     from app.services.platform import guilds as guild_service
+    from app.services.platform import user_tokens
     from app.testing.factories import create_guild
 
     settings_row = await app_settings_service.get_app_settings(session)
@@ -314,7 +317,7 @@ async def test_register_with_a_bound_invite_joins_on_confirming(
     monkeypatch.setattr(email_service, "send_verification_email", _capture)
     admin = await create_user(session, email="bound-admin@example.com")
     guild = await create_guild(session, creator=admin)
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=admin.id,
@@ -723,7 +726,7 @@ def two_per_address(client, monkeypatch):
     rate_limit.limiter.reset()
 
 
-async def _sign_in(client: AsyncClient, email: str, password: str) -> httpx.Response:
+async def _sign_in(client: AsyncClient, email: str, password: str) -> httpx2.Response:
     return await client.post(
         "/api/v1/auth/token", data={"username": email, "password": password}
     )
@@ -873,7 +876,7 @@ async def test_an_address_is_sent_no_more_letters_than_its_allowance(
     session.add(row)
     await session.commit()
 
-    async def _forgot(email: str) -> httpx.Response:
+    async def _forgot(email: str) -> httpx2.Response:
         return await client.post("/api/v1/auth/password/forgot", json={"email": email})
 
     for _ in range(2):
@@ -1038,26 +1041,20 @@ async def test_login_email_case_insensitive(client: AsyncClient, session: AsyncS
     assert "access_token" in data
 
 
-async def test_login_rehashes_legacy_bcrypt_password(
+async def test_login_rehashes_a_password_under_outdated_parameters(
     client: AsyncClient, session: AsyncSession
 ):
-    """A user whose stored hash predates the argon2 migration should still
-    log in successfully, and the hash should be rewritten as argon2id on
-    the way out so the bcrypt verify path eventually disappears for active
-    users.
-    """
-    import bcrypt as _bcrypt
+    """A hash written under weaker argon2 parameters still signs in, and is
+    rewritten under the current ones on the way out."""
+    from argon2 import PasswordHasher
 
-    password = "legacy-bcrypt-password"
-    legacy_hash = _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode(
-        "utf-8"
-    )
-    assert legacy_hash.startswith("$2"), "test setup expected a real bcrypt hash"
+    password = "outdated-parameters-password"
+    outdated = PasswordHasher(time_cost=1, memory_cost=8192).hash(password)
 
     user = await create_user(
         session,
-        email="legacy@example.com",
-        hashed_password=legacy_hash,
+        email="outdated@example.com",
+        hashed_password=outdated,
         status=UserStatus.active,
         email_verified=True,
     )
@@ -1065,19 +1062,18 @@ async def test_login_rehashes_legacy_bcrypt_password(
 
     response = await client.post(
         "/api/v1/auth/token",
-        data={"username": "legacy@example.com", "password": password},
+        data={"username": "outdated@example.com", "password": password},
     )
     assert response.status_code == 200
 
     await session.refresh(user)
-    assert user.hashed_password.startswith("$argon2"), (
-        "expected legacy bcrypt hash to be rewritten as argon2id after a successful login"
-    )
+    assert user.hashed_password != outdated
+    assert not PasswordHasher().check_needs_rehash(user.hashed_password)
 
-    # Second login must verify against the new argon2 hash.
+    # The next sign-in verifies against the new hash.
     response = await client.post(
         "/api/v1/auth/token",
-        data={"username": "legacy@example.com", "password": password},
+        data={"username": "outdated@example.com", "password": password},
     )
     assert response.status_code == 200
 
@@ -1332,7 +1328,7 @@ async def test_logout_clears_session_cookie(client: AsyncClient, session: AsyncS
 # --- OIDC login/callback (relying-party flow) --------------------------------
 #
 # End-to-end against a fake IdP: real signed id_tokens, real discovery/JWKS/
-# token/userinfo endpoints behind an httpx.MockTransport, the real settings→
+# token/userinfo endpoints behind an httpx2.MockTransport, the real settings→
 # provider reconcile, and the real identity-resolution ladder underneath.
 
 
@@ -1402,7 +1398,7 @@ async def _run_oidc_flow(
 ):
     """The full login → IdP → callback round trip; returns the callback response."""
     state, nonce = await _begin_login(client, login_params)
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200,
         json={
             "access_token": "at-1",
@@ -2017,7 +2013,7 @@ async def test_row_provider_full_login_flow(
     query = {k: v[0] for k, v in parse_qs(urlsplit(location).query).items()}
     assert query["redirect_uri"].endswith("/api/v1/auth/corp/callback")
 
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200,
         json={
             "access_token": "at-corp",

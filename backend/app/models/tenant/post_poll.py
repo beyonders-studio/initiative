@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -59,7 +59,7 @@ class PostPoll(CreatedByMixin, table=True):
     __tablename__ = "post_polls"
     __table_args__ = (UniqueConstraint("post_id", name="uq_post_polls_post_id"),)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     post_id: int = Field(
         sa_column=Column(
             Integer,
@@ -70,7 +70,7 @@ class PostPoll(CreatedByMixin, table=True):
     )
     #: The question, when the headline is not already it. A notice that reads
     #: "Which night works?" needs nothing here.
-    question: Optional[str] = Field(default=None, nullable=True, max_length=255)
+    question: str | None = Field(default=None, nullable=True, max_length=255)
     allows_multiple: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
@@ -84,21 +84,21 @@ class PostPoll(CreatedByMixin, table=True):
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
     )
     #: When voting stops. NULL leaves it open for as long as the notice stands.
-    closes_at: Optional[datetime] = Field(
+    closes_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
     post: Optional["Post"] = Relationship(back_populates="poll")
-    options: List["PostPollOption"] = Relationship(
+    options: list["PostPollOption"] = Relationship(
         back_populates="poll",
         sa_relationship_kwargs={
             "cascade": "all, delete-orphan",
@@ -106,12 +106,12 @@ class PostPoll(CreatedByMixin, table=True):
         },
     )
 
-    def is_closed(self, now: Optional[datetime] = None) -> bool:
+    def is_closed(self, now: datetime | None = None) -> bool:
         """Whether voting has stopped — the Python side of
         :func:`poll_is_open`, for a poll already loaded."""
         if self.closes_at is None:
             return False
-        return self.closes_at <= (now or datetime.now(timezone.utc))
+        return self.closes_at <= (now or datetime.now(UTC))
 
 
 class PostPollOption(CreatedByMixin, table=True):
@@ -132,12 +132,12 @@ class PostPollOption(CreatedByMixin, table=True):
         UniqueConstraint("poll_id", "id", name="uq_post_poll_options_poll_id_id"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     #: Optional in Python, ``NOT NULL`` in the database: an option is built as
     #: part of its poll and the relationship fills this on flush, so requiring
     #: it in the constructor would only mean flushing the poll first to learn
     #: an id the same statement is about to assign.
-    poll_id: Optional[int] = Field(
+    poll_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -152,11 +152,11 @@ class PostPollOption(CreatedByMixin, table=True):
     )
     text: str = Field(nullable=False, max_length=MAX_POLL_OPTION_CHARS)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-    poll: Optional[PostPoll] = Relationship(back_populates="options")
+    poll: PostPoll | None = Relationship(back_populates="options")
 
 
 class PostPollVote(SQLModel, table=True):
@@ -190,7 +190,7 @@ class PostPollVote(SQLModel, table=True):
     option_id: int = Field(primary_key=True, nullable=False)
     user_id: int = Field(primary_key=True, nullable=False, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

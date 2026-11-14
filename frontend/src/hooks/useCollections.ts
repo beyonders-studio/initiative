@@ -1,31 +1,26 @@
-import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import {
   addCollectionFiles,
   createCollection,
   deleteCollection,
-  getCollectionFilesTimeline,
-  getGetCollectionFilesTimelineQueryKey,
   getListCollectionFilesQueryKey,
   getListCollectionShapesQueryKey,
-  getListCollectionsQueryKey,
-  getReadCollectionQueryKey,
   listCollectionFiles,
-  listCollectionShapes,
-  listCollections,
-  readCollection,
   removeCollectionFiles,
   setCollectionFileMetadata,
   updateCollection,
   uploadFile,
+  useGetCollectionFilesTimeline,
+  useListCollectionShapes,
+  useListCollections,
+  useReadCollection,
 } from "@/api/generated/files/files";
 import type {
   CollectionCreate,
   CollectionFileListResponse,
-  CollectionListResponse,
   CollectionRead,
-  CollectionShapeGroup,
   CollectionUpdate,
   FileRead,
   GetCollectionFilesTimelineParams,
@@ -39,9 +34,9 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { type FieldSaveKind, heldKey } from "@/hooks/useFieldSave";
-import { nameWithoutExtension } from "@/lib/fileUtils";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import { nameWithoutExtension } from "@/ui/lib/fileUtils";
 
 /** How many files a page of a collection's wall brings. */
 const PAGE_SIZE = 60;
@@ -55,11 +50,7 @@ export const invalidateCollectionContents = () => invalidate(q.allCollections(),
 export const useCollections = (initiativeId: number | null) => {
   const communityId = useActiveCommunityId();
   const params = { initiative_id: initiativeId ?? 0 };
-  return useQuery<CollectionListResponse>({
-    queryKey: getListCollectionsQueryKey(communityId, params),
-    queryFn: () => listCollections(communityId, params),
-    enabled: initiativeId !== null,
-  });
+  return useListCollections(communityId, params, { query: { enabled: initiativeId !== null } });
 };
 
 /** The ready-made shapes a new collection can start as, in the reader's
@@ -67,20 +58,19 @@ export const useCollections = (initiativeId: number | null) => {
 export const useCollectionShapes = (enabled: boolean) => {
   const communityId = useActiveCommunityId();
   const { i18n } = useTranslation();
-  return useQuery<CollectionShapeGroup[]>({
-    queryKey: [...getListCollectionShapesQueryKey(communityId), i18n.language],
-    queryFn: () => listCollectionShapes(communityId),
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled,
+  return useListCollectionShapes(communityId, {
+    query: {
+      queryKey: [...getListCollectionShapesQueryKey(communityId), i18n.language],
+      staleTime: Number.POSITIVE_INFINITY,
+      enabled,
+    },
   });
 };
 
 export const useCollection = (collectionId: number | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CollectionRead>({
-    queryKey: getReadCollectionQueryKey(communityId, collectionId ?? 0),
-    queryFn: () => readCollection(communityId, collectionId ?? 0),
-    enabled: collectionId !== null && Number.isFinite(collectionId),
+  return useReadCollection(communityId, collectionId ?? 0, {
+    query: { enabled: collectionId !== null && Number.isFinite(collectionId) },
   });
 };
 
@@ -128,11 +118,8 @@ export const useCollectionFilesTimeline = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled = true, ...rest } = options ?? {};
-  return useQuery<TimelineResponse>({
-    queryKey: getGetCollectionFilesTimelineQueryKey(communityId, collectionId ?? 0, params),
-    queryFn: () => getCollectionFilesTimeline(communityId, collectionId ?? 0, params),
-    enabled: collectionId !== null && Number.isFinite(collectionId) && enabled,
-    ...rest,
+  return useGetCollectionFilesTimeline(communityId, collectionId ?? 0, params, {
+    query: { enabled: collectionId !== null && Number.isFinite(collectionId) && enabled, ...rest },
   });
 };
 

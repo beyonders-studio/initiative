@@ -11,9 +11,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core.search import SearchEntityType
 from app.services.content_sockets import RoomMember
 from app.services.tenant import collaboration as collaboration_module
-from app.core.search import SearchEntityType
 from app.services.tenant.collaboration import (
     CollaborationManager,
     CollaborationRoom,
@@ -101,7 +101,7 @@ async def test_a_room_is_reached_only_from_its_own_guild() -> None:
 
     assert manager._rooms.get((1, DOC, 5)) is not None
     assert manager._rooms.get((2, DOC, 5)) is None
-    assert manager.has_active_collaborators(2, DOC, 5) is False
+    assert manager.live_room(2, DOC, 5) is None
 
 
 async def test_removing_a_room_leaves_the_other_guild_alone() -> None:

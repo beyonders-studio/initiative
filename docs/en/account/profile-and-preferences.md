@@ -4,189 +4,167 @@ icon: lucide/user-cog
 
 # Profile & preferences
 
-Your personal settings live in **My Settings**, opened from your name and picture at the bottom of the sidebar.
+Your personal settings live in **My Settings**. Apart from your profile, which everyone can see, nothing here changes anything for anybody else, so fiddle away.
 
-Nothing on any of these tabs changes anything for anybody else, so fiddle away.
+To open it, select your name or picture at the bottom of the sidebar, then **My Settings**. Its tabs are **Profile**, **Account**, **Preferences**, **Notifications**, **Privacy**, **Security** and **Trash**. **Privacy** only appears when your server gives you something to set there.
 
-The tabs split along a simple line: **Profile** is the face other people see, **Account** is how you get in, **Preferences** is how the app reads to you.
+This page covers your profile, how the app looks and behaves for you, privacy, trash and closing your account. Email addresses, your password and where you're signed in are on [Sign-in and security](sign-in-and-security.md). [Notifications](../guides/notifications.md) has its own page too.
 
-## Your profile page
+## See your profile page
 
-You have a page of your own, at a link worth sharing — `/u/jordan1234`, your handle with its number run onto the end. Open it from **My profile** in your account menu, or by clicking anyone in a member list or search result.
+Your profile is one page that belongs to you rather than to any one community, at a link like `/u/jordan0472`, your handle with its number run onto the end. Open it from **My Profile** in your account menu. Other people reach it by selecting your name anywhere it appears.
 
-It shows your picture, your handle, your status, the banner and frame and trophies you're wearing, how you're around right now, and when you joined. Underneath, the communities you're in — of the ones that have listed themselves in the [community directory](../guides/communities.md#finding-a-community-to-join). A private community is nobody else's business and never appears.
+It shows your picture, handle, status, presence, the banner, frame and trophies you're wearing, and when you joined. Underneath are the communities you're in that have listed themselves in the [community directory](../guides/communities.md#finding-a-community-to-join). A community that isn't listed never appears.
 
-It's public, and it's the same page whoever opens it, because it belongs to *you* rather than to any one community. Your handle is the only name your account has. To go by something friendlier in one community, give yourself a [display name](../guides/communities.md#your-name-in-a-community) there.
+Your handle is the only name your account has. To go by something friendlier in one community, set a [display name](../guides/communities.md#your-name-in-a-community) there.
 
-![A profile page](../images/account/profile-page.png)
+![A profile card with a banner, frame and trophies, the status "Prepping Thursday's session", and the joined date](../images/account/profile-page.png)
 
-## Profile
+## Change your username
 
-Everything on that page, with a live preview at the top — pick something and the card changes before you save, so you never have to imagine the result.
+Your username sits at the top of **My Settings › Account**. You can't change it yourself, because it's how everybody finds and mentions you. If you need a different one, ask a moderator on your server.
 
-- **Picture** — upload one, or point at an image URL. An uploaded picture saves the moment you choose it.
-- **Status** — an emoji, a line about what you're up to, or both. Set it by clicking the bubble on the card rather than filling in a form. Up to 100 characters; clearing it takes it off.
-- **Presence** — the dot under your picture. See [Saying how you're around](#saying-how-youre-around).
-- **Your packs** — the decoration packs you've downloaded, and how to remove one.
-- **Your look** — which banner, frame and trophies you're wearing.
+## Change your profile picture
 
-![The Profile tab](../images/account/profile-settings.png)
+1. In **My Settings › Profile**, select your picture on the card at the top.
+2. On the **Upload** tab, choose an image. Or on the **URL** tab, paste an image's address and select **Save changes**.
 
-### Decorations
+An uploaded picture saves the moment you choose it, cropped square and resized for you. Anything up to 12 MB works. **Remove uploaded avatar** takes it off again.
 
-A profile wears three things, mixed freely — they don't have to come from the same pack.
+## Set your status
+
+Your status is an emoji, a short line, or both. Everyone who opens your profile sees it.
+
+1. Select your name at the bottom of the sidebar, then **Set status**. Or select the speech bubble on your card in **My Settings › Profile**.
+2. Pick an emoji, type up to 40 characters, or both.
+3. Select **Set status**.
+
+**Clear** takes it off.
+
+## Show how you're around { #saying-how-youre-around }
+
+The small dot on your picture is your presence.
+
+1. Select your name at the bottom of the sidebar.
+2. Select the item showing your presence now, such as **Online**.
+3. Pick one.
+
+| Pick | What people see |
+|---|---|
+| **Online** | You have Initiative open. |
+| **Idle** | Nothing's been touched for a while. It sets itself, or you can pick it to say you've stepped away. |
+| **Busy** | You're around and would rather not be interrupted. |
+| **Offline** | Nobody sees you as here, even with a tab open. |
+
+**Offline** means offline. You can have Initiative open all evening and the dot will still say offline, because you asked it to. The dot on your card in **My Settings › Profile** opens the same choices.
+
+## Dress up your profile { #decorations }
+
+A profile wears three kinds of decoration, mixed however you like:
 
 | | What it is | How many |
 |---|---|---|
-| **Banner** | The artwork across the top of your profile | One |
+| **Banner** | Artwork across the top of your profile | One |
 | **Frame** | Artwork around your picture, which follows you into the sidebar and onto every comment you write | One |
-| **Trophies** | The rail of small marks under your picture | Up to six |
+| **Trophies** | Small marks in a row under your picture | Up to six |
 
-Banners and frames move. Trophies hold still, because six wiggling things in a row would be unreadable and slightly upsetting. And if you've asked your device for less motion, everything holds still.
+1. In **My Settings › Profile**, find **Your look**.
+2. Pick a **Banner**, a **Frame** and up to six **Trophies**. The card at the top changes as you pick.
+3. Select **Save look**.
 
-Not every frame is a ring, either. Several stand *in front* of your picture, so you end up sitting in the teacup, in one bay of the Colosseum, or wearing the headphones. Yes, really. We had a lot of fun with these.
+Picking the one you're already wearing takes it off, so there's no "none" to hunt for. Some frames let you choose their colors, and some decorations carry a year you can set. Several frames stand in front of your picture, so you can end up sitting in a teacup or wearing headphones. We had a lot of fun with these.
 
-You never upload a decoration. You pick from what you own — the set that ships with Initiative, plus whatever **decoration packs** you download from your marketplace. See [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md#your-own-marketplace). Because they ship with Initiative rather than being uploaded, wearing one costs your community no storage.
+![The Profile tab of My Settings, with a banner, a frame and three trophies on the card and the Banner, Frame and Trophies pickers below](../images/account/profile-settings.webp#only-light)
+![The Profile tab of My Settings, with a banner, a frame and three trophies on the card and the Banner, Frame and Trophies pickers below](../images/account/profile-settings.dark.webp#only-dark)
 
-Picking the thing you're already wearing takes it off again, so there's no separate "none" to hunt for. Press **Save look** when you're happy with yourself.
+Banners and frames move; trophies hold still, because six wiggling things in a row would be upsetting. If your device is set to reduce motion, everything holds still.
 
-### Removing a pack
+## Get more decorations
 
-**Remove pack** in **Your packs** gives it up. Its pieces leave your collection, and anything from it you were wearing comes off too — Initiative warns you before it does anything, and you can download it again later.
+You pick from what you own: the set that comes with Initiative, plus any decoration packs you take from the marketplace.
 
-Taken a lot of packs? The search box above the list finds one by name.
+1. In **My Settings › Profile**, select **Browse the marketplace** beside **Your packs**.
+2. Open a decoration pack.
+3. Select **Get this pack**.
 
-## Saying how you're around
+Its pieces land in **Your look**, ready to wear. Decorations come with Initiative rather than being uploaded, so wearing one costs your community no storage. See [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md).
 
-The small **dot** under your picture in the sidebar. Click it and pick:
+## Remove a decoration pack
 
-| | What it means |
+1. In **My Settings › Profile**, find the pack under **Your packs**. **Search your packs** finds it by name when the list gets long.
+2. Select **Remove pack**.
+3. Select **Remove pack** again to confirm.
+
+Its pieces leave your collection, and anything from it you were wearing comes off. You can get it again from the marketplace.
+
+## Change how the app looks and behaves { #preferences }
+
+Everything in **My Settings › Preferences** saves the moment you choose it.
+
+| Setting | What it changes |
 |---|---|
-| **Online** | You've got Initiative open. |
-| **Idle** | Sets itself once nothing's been touched for a while — or pick it outright to say you've stepped away. |
-| **Busy** | You're around, and would rather not be interrupted. |
-| **Offline** | Nobody sees you as here, whatever you have open. |
+| **Color theme** | The app's colors. Each theme has a light and a dark version. |
+| **Recent items in tab bar** | How many recently opened things stay in the tabs along the top, from 1 to 100. |
+| **Language** | The language of the app's own words. |
+| **Timezone** | The clock your due dates, daily reminders and repeating tasks run on. It's taken from your browser when you sign up. |
+| **Week starts on** | Which day calendars and date pickers show first. |
+| **Time format** | **12-hour (1:30 PM)**, **24-hour (13:30)**, or **Browser default**, which follows your browser's language. Your computer's own clock setting doesn't change it, so this is where to settle it when the two disagree. |
+| **Read details from the title** | Typing "friday at 3pm", "every week", "!high", "#tag" or "@name" into a new task's title sets its due date, repeat, priority, tags and assignees. See [Type the details into the title](../guides/projects-and-tasks.md#typing-the-details-into-the-title). |
+| **Task completion feedback** | A bit of fun when you finish a task you were assigned: **Confetti**, **+1 Heart**, **Natural 20**, **Gold coins**, **Random (surprise me)** or **None**. |
+| **Sound on task completion** | A short pop when you finish any task. |
+| **Vibration on task completion** | A buzz, on phones and browsers that can. |
 
-**Offline** genuinely means offline. You can have Initiative open all evening and the dot will still say offline, because you asked it to and it isn't anybody's business.
+Each completion setting has a **Preview** button, so you can try it before you keep it. To switch between light and dark, use **Theme** in your account menu: **System**, **Light** or **Dark**.
 
-The same dot on your profile card in **My Settings → Profile** opens the same menu, and your choice shows on your profile page and wherever your picture turns up.
+Under **This device** are settings this phone or computer keeps for itself rather than for your account. **Keep screen awake** stops the screen dimming while Initiative is open, which is handy for a counter propped up on a door. The desktop app adds its own switches here; see [Install the app](../getting-started/install-the-app.md#keep-the-desktop-app-running-in-the-background).
 
-## Account
+## Choose who can reach you
 
-Who you are and how you get in.
+**My Settings › Privacy** gathers the settings about who can reach you and what's kept about you. Each part appears only where your server has that feature on, and each has its own walkthrough:
 
-- **Username** — your handle: the name you picked plus a four-digit number, like `jordan#1234`. The number is what lets two people share a name. A moderator can change it for you.
-- **Email addresses** — any confirmed one signs you in, and account mail goes to all of them. Adding one, making one primary or removing one asks for your current password, or for a fresh sign-in if you sign in without one. Your addresses hear about it when a new one is confirmed or the primary moves, and a confirmed address you remove is told too. Moving the primary or removing one can [wait two days](#changes-that-wait).
+| Section | What it decides | Walkthrough |
+|---|---|---|
+| **Direct messages** | Who can ask to message you, and whether people see when you've read their messages | [Choose who can ask to message you](../guides/messages.md#who-can-reach-you) |
+| **Connections** and **Pending** | The people who can always message you, and requests waiting on you | [Connect with someone](../guides/messages.md#connect-with-someone) |
+| **Ignored accounts** | People whose mentions, replies and messages stop reaching you | [Ignore someone](../guides/messages.md#ignoring-someone) |
+| **Search ranking** | Whether what you open helps search list things first | [Search](../guides/search-and-shortcuts.md) |
+| **Cookies** | Which optional cookies this browser allows | [Data & compliance](../security/data-and-compliance.md) |
 
-### Changes that wait
+Every switch here saves the moment you change it.
 
-Moving your primary address, removing a confirmed one, turning off two-factor authentication and removing your last passkey wait two days when they're made from somewhere your account hasn't been signed in for long. Nothing changes in the meantime, so if it wasn't you, two days is a lot of time to notice.
+## Restore something you deleted { #trash }
 
-While it waits:
+**My Settings › Trash** lists what you deleted yourself, from every community, until each community's retention period runs out.
 
-- Every confirmed address gets an email about it, with a link to cancel it.
-- It sits at the top of **Account** and **Security** in your settings, with **Cancel the change**.
-- Got a passkey? **Make it now with a passkey** skips the wait.
+1. Open **My Settings › Trash**.
+2. Find the item. **Auto-purges** says when it goes for good.
+3. Select **Restore**.
 
-One change waits at a time. Ask for another and you'll be pointed at the first.
+It goes back where it was. Community admins have a community-wide trash of their own; see [Bring back something deleted](../guides/running-a-community.md#trash-and-retention).
 
-### "This wasn't me"
+## Close your account { #closing-your-account }
 
-Every email about a change to how you sign in — an address, a passkey, two-factor authentication, a new set of recovery codes, your password, a sign-in provider newly able to open your account — carries a **This wasn't me** button. It opens **Wasn't you?**, where **Sign out everywhere** signs your account out of every browser, phone and computer and turns off its API keys. On its own it changes nothing else.
+**My Settings › Account** ends with **Close your account**, which offers two ways out. Both ask you to type a phrase and confirm with your password, and both check first for anything that would stop them. You can't leave a community without a superadmin, so if you're the only one somewhere, make somebody else superadmin first.
 
-Sometimes it can do more. When a change looks out of place — not made with a passkey, not from somewhere you'd been signed in for a day, or one of several in a row — the emails to your older addresses can undo it as well:
+### Deactivate your account
 
-- an added address is taken back off;
-- the primary address moves back;
-- a removed address goes back on.
+Deactivating is for "I'm stepping away for a while." You can't sign in, and you're removed from every community, but your name, email and work stay. Whoever runs the server can switch it back on, and you'll need fresh invites to rejoin your communities.
 
-An added passkey can be taken back from any of your addresses. Each link works once, for a week.
+1. Select **Deactivate account**.
+2. Select **Next** once the check passes.
+3. Type `DEACTIVATE MY ACCOUNT` and your password.
+4. Select **Deactivate Account**.
 
-## Preferences
+### Delete your account
 
-How the app reads to you. Each choice saves as you make it — no Save button.
+1. Select **Delete account**.
+2. Select **Next** once the check passes.
+3. Type `DELETE MY ACCOUNT` and your password.
+4. Select **Delete Account**.
 
-![My Settings › Preferences, with a preview of each theme](../images/account/preferences.png)
-
-**Appearance**
-
-- **Color theme** — pick one from the previews. Each comes in light and dark, and follows your device's setting. To force light or dark, use **Theme** in your account menu.
-- **Recent items in tab bar** — how many to keep along the top (1–100).
-
-**Language and time**
-
-- **Language** — for the interface.
-- **Timezone** — the clock your due dates, daily reminders, scheduled email and repeating tasks run on. Taken from your browser at sign-up; correct it here if it's wrong.
-- **Week starts on** — which day calendars and date pickers lead with.
-- **Time format** — whether a clock reads `1:30 PM` or `13:30`, everywhere one appears: calendars and their hour gutters, event times, due dates, message timestamps. **Browser default** takes its cue from your browser's language. Your phone or laptop keeps its own 12/24-hour setting to itself, so when the app and the clock on your wall disagree, this is the place to settle it.
-
-**When you add a task**
-
-- **Read details from the title** — write "friday at 3pm", "every week", "!high", "#tag" or "@name" into a new task's title to fill in its due date, repeat, priority, tags and assignees. On unless you switch it off. See [Typing the details into the title](../guides/projects-and-tasks.md#typing-the-details-into-the-title).
-
-**When you finish a task**
-
-- **Task completion feedback** — a bit of fun when you finish something: **Confetti**, **+1 Heart**, **Natural 20**, **Gold coins**, **Random**, or **None**.
-- **Sound** and **vibration** on task completion — optional, each with a button to try it.
-
-**This device**
-
-Settings kept by this browser or computer rather than your account. **Keep screen awake** stops the screen dimming while Initiative is open, which is useful for a counter propped up on a door. The desktop app adds its own switches here: updating itself, staying in the tray, and opening when the computer starts.
-
-## Security
-
-Every way you sign in, in one place: your **password** (current one, then the new one twice, 12+ characters), your [passkeys](passkeys.md) and [two-factor authentication](two-factor-authentication.md). A way in your server doesn't offer isn't shown. Sign in with a work login instead? Then your password lives with them, not us, and that part is none of your concern.
-
-## Where you're signed in
-
-**My Settings → Security** lists every browser, phone and computer with your account open, one row each: what each one is — *Chrome on macOS*, *Firefox on Windows* — where it last connected from, when it was last used, and which one is the one you're reading this on.
-
-**Sign out** ends a browser's session and leaves the rest alone. **Remove device** is the phone and desktop app version: it signs the app out and stops your messages going to it, and if it's ever signed in again it clears off the messages only it had. It's the button for the phone that went in the canal. A device marked **not signed in** still holds your messages from an earlier sign-in; remove it once it's gone for good.
-
-**Sign out everywhere else** closes the lot in one go and keeps you where you are, which is the button for the laptop you borrowed at your mum's and the library computer you have thought about twice since. Phones and computers keep their messages, and pick up where they left off when you sign back in.
-
-A browser stays signed in for thirty days of not being used, and the phone and desktop apps for ninety, unless your server or community sets something shorter.
-
-Changing your password, resetting it, or turning off a second factor signs out everything, everywhere, including you. That's the biggest hammer in the drawer. This is the one for when you don't need the hammer.
-
-The same tab holds [two-factor authentication](two-factor-authentication.md), [passkeys](passkeys.md) and [API keys](api-keys-and-integrations.md).
-
-## Privacy
-
-Who can ask to message you, your connections, and any requests waiting on you. **Count my activity toward search ranking** decides whether what you open helps [search](../guides/search-and-shortcuts.md) list things first; nobody can see what you opened. **Ignored accounts** is here too: **Ignore by handle**, and that account's mentions, replies and reactions stop reaching you, along with anything it sends you. Communities you share carry on as normal: you each see the other's work there. See [Messages](../guides/messages.md#who-can-reach-you).
-
-## Trash
-
-Things *you* recently deleted, restorable within the retention window. (Community-wide trash is separate — see [Trash and retention](../guides/communities.md#trash-and-retention).)
-
-## Closing your account
-
-The bottom of the **Account** tab. Two paths, and Initiative walks you through either with a short wizard that checks for anything needing sorted first — projects you own, communities where you're the last admin.
-
-### Deactivate
-
-Temporarily switches your account off. You can't sign in, and you're removed from your communities (rejoining needs a fresh invite), but your handle, email and content are kept. Whoever runs the server can reactivate you. Good for "I'm stepping away for a while."
-
-### Delete
-
-You disappear for everyone else straight away. What you hold is kept a while longer, and then erased.
-
-- **Anonymize** — your email and picture go, and you can't sign in, but things you wrote stay in place as "Deleted user". This keeps your teammates' history intact while removing *your* personal details.
-- **Hard delete** (platform operators) — everything goes, including content you authored.
-
-Before deletion, Initiative makes sure your **owned projects are transferred**, so nothing your group depends on disappears with you.
-
-You also get an email confirming it happened, to every address you'd confirmed. The one moment somebody most wants it in writing.
+You disappear for everyone else straight away, and you're signed out everywhere. Everything you hold is kept for a while, 30 days unless your server sets otherwise, and then erased: your name, email and picture go, the projects you own pass to other people, and your comments and work stay, marked as a deleted user.
 
 !!! tip "There's a window where you can change your mind"
-    **Sign back in during it and the whole thing is called off** — communities, roles, files, exactly where you left them. Thirty days on most servers, though whoever runs yours sets the number and may have set none at all, in which case nothing is erased on a timer.
+    Sign back in before the window closes and the deletion is called off, with your communities and your work exactly where you left them. Plug-ins you'd connected need connecting again. Some servers set no window at all, and then nothing is erased on a timer.
 
-    After that it's properly permanent, and there is no undo, no support ticket and no clever recovery. If you're unsure, deactivate instead.
-
-## Related
-
-- [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md) — where decoration packs come from.
-- [Messages](../guides/messages.md) — the Privacy tab in full.
-- [Notifications](../guides/notifications.md) — what you're told about, and where.
-- [API keys & integrations](api-keys-and-integrations.md) — the Security tab's access keys.
-- [Data & compliance](../security/data-and-compliance.md) — what happens to your data.
+    After the window, it's permanent. If you're unsure, deactivate instead.

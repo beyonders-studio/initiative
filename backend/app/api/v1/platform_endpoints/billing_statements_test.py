@@ -17,12 +17,11 @@
 from __future__ import annotations
 
 import base64
-
 import json
 
 import jwt
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -32,8 +31,8 @@ from app.models.platform.plugin_entitlement import PluginEntitlement
 from app.services import sweep_timers
 from app.services.marketplace import plugin_entitlements, tuf_registry
 from app.services.tenant import plugin_connection_flows as flows
-from app.testing import billing_boundary
 from app.testing import (
+    billing_boundary,
     billing_guild_ref,
     create_guild,
     create_guild_plugin,
@@ -68,7 +67,6 @@ def hooks(monkeypatch) -> list[tuple[str, int, dict]]:
     async def call_hook(name, *, install_id, body, **_kwargs):
         if name == plugin_entitlements.ENTITLEMENT_HOOK:
             delivered.append((name, install_id, dict(body)))
-        return None
 
     monkeypatch.setattr(flows, "call_hook", call_hook)
     return delivered
@@ -413,7 +411,7 @@ async def test_a_statement_signed_by_the_boundary_key_is_refused(
         session, uid=PAID_UID, public_id=PAID_ID, access="entitled"
     )
     good = await _jws(guild.id, version=1, values={"active": True})
-    header, claims, _signature = good.split(".")
+    _header, claims, _signature = good.split(".")
     forged = jwt.encode(
         json.loads(base64.urlsafe_b64decode(claims + "=" * (-len(claims) % 4))),
         billing_boundary.PRIVATE_PEM,

@@ -13,8 +13,8 @@ import { useTranslation } from "react-i18next";
 import type { DirectoryCommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityCard } from "@/components/communities/CommunityCard";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Button } from "@/components/ui/button";
 import { useCommunities } from "@/hooks/useCommunities";
+import { Button } from "@/ui/button";
 
 export const CommunitiesWidget = () => {
   const { t } = useTranslation("home");
@@ -34,6 +34,8 @@ export const CommunitiesWidget = () => {
         member_count: community.member_count,
         online_count: community.online_count,
         already_member: true,
+        join_policy: community.join_policy,
+        request_pending: false,
         banner: { ...community.banner, image_url: community.banner_card_url },
         location: community.location,
       })),

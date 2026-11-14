@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -14,14 +14,15 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlmodel import Enum as SQLEnum, Field, Relationship, SQLModel
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, Relationship, SQLModel
 
 from app.core import recurrence
 from app.models.tenant._mixins import CreatedByMixin, HoldMixin, SoftDeleteMixin
 
 if TYPE_CHECKING:  # pragma: no cover
-    from app.models.tenant.calendar import Calendar
     from app.models.platform.user_profile_view import MemberProfile
+    from app.models.tenant.calendar import Calendar
 
 
 class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
@@ -39,13 +40,11 @@ class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     )
     _display_field = "title"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     calendar_id: int = Field(foreign_key="calendars.id", nullable=False, index=True)
     title: str = Field(nullable=False, max_length=255)
-    description: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-    location: Optional[str] = Field(default=None, max_length=500)
+    description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    location: str | None = Field(default=None, max_length=500)
     start_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
@@ -63,7 +62,7 @@ class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
     # RFC 5545 recurrence lines as picked (``app.core.recurrence``).
-    recurrence: Optional[str] = Field(
+    recurrence: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True),
     )
@@ -74,12 +73,12 @@ class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     )
     # No occurrence starts after this; null when the series never ends.
     # Written from ``recurrence`` on every save (see the listener below).
-    recurrence_until: Optional[datetime] = Field(
+    recurrence_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # One occurrence of a repeating event, changed on its own: the series it
     # belongs to and the start it has there. Goes with its series to the bin.
-    series_id: Optional[int] = Field(
+    series_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -88,36 +87,39 @@ class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             index=True,
         ),
     )
-    original_start: Optional[datetime] = Field(
+    original_start: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # What the occurrence changed; everything else follows the series.
-    overridden_fields: List[str] = Field(
+    overridden_fields: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(Text), nullable=False, server_default=text("'{}'")),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
     calendar: Optional["Calendar"] = Relationship(back_populates="events")
     # Set on an override built before its series has an id (an import), so
-    # the flush writes ``series_id``; never loaded.
+    # the flush writes ``series_id``; never loaded, so reading it raises.
     series: Optional["CalendarEvent"] = Relationship(
-        sa_relationship_kwargs={"remote_side": "CalendarEvent.id", "lazy": "noload"}
+        sa_relationship_kwargs={"remote_side": "CalendarEvent.id", "lazy": "raise"}
     )
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(CalendarEvent.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(CalendarEvent.created_by) == MemberProfile.id,"
+                " CalendarEvent.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         },
     )
-    attendees: List["CalendarEventAttendee"] = Relationship(
+    attendees: list["CalendarEventAttendee"] = Relationship(
         back_populates="calendar_event",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
@@ -155,11 +157,11 @@ class CalendarEventAttendee(SQLModel, table=True):
     )
     user_id: int = Field(foreign_key="users.id", primary_key=True, index=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-    calendar_event: Optional[CalendarEvent] = Relationship(back_populates="attendees")
+    calendar_event: CalendarEvent | None = Relationship(back_populates="attendees")
     user: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
@@ -190,7 +192,7 @@ class CalendarEventAnswer(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     calendar_event_id: int = Field(
         sa_column=Column(
             Integer,
@@ -199,7 +201,7 @@ class CalendarEventAnswer(SQLModel, table=True):
         ),
     )
     user_id: int = Field(index=True)
-    occurrence_start: Optional[datetime] = Field(
+    occurrence_start: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     rsvp_status: RSVPStatus = Field(

@@ -9,8 +9,7 @@ no free slot refuses the canvas as a whole.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
+from datetime import UTC, datetime, timedelta
 
 from app.api.v1.tenant_endpoints.query_test import WORKBOOK
 from app.core.file_types import FileType
@@ -83,7 +82,7 @@ async def _author_with_tasks(session, acting_user):
             project,
             title=f"Task {offset}",
             status_category=category,
-            due_date=datetime(2026, 9, 1, tzinfo=timezone.utc) + timedelta(days=offset),
+            due_date=datetime(2026, 9, 1, tzinfo=UTC) + timedelta(days=offset),
         )
     return author, project
 
@@ -101,20 +100,28 @@ async def test_the_canvas_answers_what_each_widget_answers(
         "SELECT t.id, p.id FROM tasks AS t JOIN projects AS p ON p.id = t.project_id ORDER BY t.id",
         "SELECT count(*) AS n FROM projects",
         # A running total, as the builder writes one.
-        "SELECT date_trunc('day', due_date) AS day, "
-        "sum(count(*)) OVER (ORDER BY date_trunc('day', due_date)) AS total "
-        "FROM tasks GROUP BY 1 ORDER BY 1",
+        (
+            "SELECT date_trunc('day', due_date) AS day, "
+            "sum(count(*)) OVER (ORDER BY date_trunc('day', due_date)) AS total "
+            "FROM tasks GROUP BY 1 ORDER BY 1"
+        ),
         # A frame counted in days: its offset has to reach Postgres as written.
-        "SELECT title, count(*) OVER (ORDER BY due_date "
-        "RANGE BETWEEN '1 day' PRECEDING AND CURRENT ROW) AS near "
-        "FROM tasks ORDER BY due_date",
+        (
+            "SELECT title, count(*) OVER (ORDER BY due_date "
+            "RANGE BETWEEN '1 day' PRECEDING AND CURRENT ROW) AS near "
+            "FROM tasks ORDER BY due_date"
+        ),
         # A window repeating an output grouped by its alias.
-        "SELECT priority = 'high' AS hot, "
-        "sum(count(*)) OVER (ORDER BY priority = 'high') AS t "
-        "FROM tasks GROUP BY hot",
+        (
+            "SELECT priority = 'high' AS hot, "
+            "sum(count(*)) OVER (ORDER BY priority = 'high') AS t "
+            "FROM tasks GROUP BY hot"
+        ),
         # A spreadsheet's range, beside the community's own rows.
-        "SELECT region, sum(amount) AS total FROM sheet('Q3 Budget') "
-        "GROUP BY region ORDER BY region",
+        (
+            "SELECT region, sum(amount) AS total FROM sheet('Q3 Budget') "
+            "GROUP BY region ORDER BY region"
+        ),
     )
     dashboard_id = await _canvas(client, author, *statements)
 
@@ -141,7 +148,7 @@ async def test_the_canvas_answers_what_each_widget_answers(
 async def test_a_reader_sees_their_own_rows_or_the_initiatives(
     client, session, acting_user
 ):
-    author, project = await _author_with_tasks(session, acting_user)
+    author, _project = await _author_with_tasks(session, acting_user)
     reader = await acting_user(
         guild_role=CommunityRole.member,
         guild=author.guild,
@@ -241,8 +248,16 @@ async def test_a_widget_that_fails_does_not_blank_the_canvas(
     canvas = await _data(client, author, dashboard_id)
 
     assert canvas["w1"]["result"]["rows"] == [[3]]
-    assert canvas["w2"] == {"result": None, "error": QueryMessages.EXECUTION_FAILED}
-    assert canvas["w3"] == {"result": None, "error": QueryMessages.SHEET_NOT_FOUND}
+    assert canvas["w2"] == {
+        "result": None,
+        "plugin": None,
+        "error": QueryMessages.EXECUTION_FAILED,
+    }
+    assert canvas["w3"] == {
+        "result": None,
+        "plugin": None,
+        "error": QueryMessages.SHEET_NOT_FOUND,
+    }
 
 
 async def test_a_guild_with_no_free_slot_refuses_the_canvas(

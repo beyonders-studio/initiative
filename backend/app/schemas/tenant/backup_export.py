@@ -15,8 +15,8 @@ the exporter under sharing rules are simply absent everywhere.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
+from app.models.platform.guild import CommunityJoinPolicy
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.schemas.base import SanitizedBaseModel
 
@@ -38,7 +38,7 @@ class ManifestAttachTo(SanitizedBaseModel):
     ref: str  # the far end's manifest entry path
     #: The page it is filed under in that wiki, by the page's slug in the
     #: wiki's envelope. Absent is the top of the wiki.
-    page: Optional[str] = None
+    page: str | None = None
 
 
 class ManifestEntry(SanitizedBaseModel):
@@ -47,21 +47,21 @@ class ManifestEntry(SanitizedBaseModel):
     path: str
     tool: str  # "project" | "file" | "counter_group" | "calendar" | "post"
     type: str  # envelope type, or "file"
-    schema_version: Optional[int] = None  # None for foreign formats
+    schema_version: int | None = None  # None for foreign formats
     entity_id: int
     title: str
     # Absent for a guild-level entry — a thing the community owns directly
     # rather than through one of its initiatives.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     # Metadata for entries whose file format can't carry it itself
     # (file entries are raw blobs; envelopes carry their own tags/properties).
     tags: list[str] = []
     properties: list[dict] = []
     # ``assets/{storage_key}`` for uploaded files (the blob IS the file).
-    asset: Optional[str] = None
+    asset: str | None = None
     # What this entry is filed in besides its own list, resolved after every
     # entry has been applied. Absent for everything that is only where it is.
-    attach_to: Optional[ManifestAttachTo] = None
+    attach_to: ManifestAttachTo | None = None
 
 
 class ManifestPerson(SanitizedBaseModel):
@@ -77,7 +77,7 @@ class ManifestPerson(SanitizedBaseModel):
     """
 
     handle: str
-    name: Optional[str] = None
+    name: str | None = None
     comment_count: int = 0
 
 
@@ -87,8 +87,8 @@ class ManifestAsset(SanitizedBaseModel):
 
     path: str
     storage_key: str
-    original_filename: Optional[str] = None
-    content_type: Optional[str] = None
+    original_filename: str | None = None
+    content_type: str | None = None
     size_bytes: int = 0
     referenced_by: list[str] = []
 
@@ -99,25 +99,25 @@ class ManifestSkipped(SanitizedBaseModel):
     title: str
     # Absent for a guild-level entry — a thing the community owns directly
     # rather than through one of its initiatives.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     reason: str  # "uploads_excluded" | ...
 
 
 class ManifestInitiative(SanitizedBaseModel):
     id: int
     name: str
-    description: Optional[str] = None
-    color: Optional[str] = None
+    description: str | None = None
+    color: str | None = None
     # tool -> "included" | "excluded" | "disabled" (per-initiative flag off)
     tools: dict[str, str]
     # How members come to join it. Absent from an archive written before it
     # was carried, which restores as a new initiative's default.
-    join_policy: Optional[InitiativeJoinPolicy] = None
+    join_policy: InitiativeJoinPolicy | None = None
     # Apply into an initiative that already exists, rather than creating one.
     # An exporter never writes this — a backup describes where it came from,
     # not where it is going. A foreign source (an Atlassian fetch) writes it,
     # because a Jira project belongs in an initiative somebody already runs.
-    target_initiative_id: Optional[int] = None
+    target_initiative_id: int | None = None
 
 
 class ManifestCommunitySection(SanitizedBaseModel):
@@ -146,8 +146,8 @@ class ManifestCommunity(SanitizedBaseModel):
 
     id: int
     name: str
-    description: Optional[str] = None
-    is_community: bool = False
+    description: str | None = None
+    join_policy: CommunityJoinPolicy = CommunityJoinPolicy.private
 
 
 class BackupManifest(SanitizedBaseModel):
@@ -155,8 +155,8 @@ class BackupManifest(SanitizedBaseModel):
     schema_version: int = BACKUP_SCHEMA_VERSION
     app_version: str
     exported_at: datetime
-    exported_by_handle: Optional[str] = None
-    source_instance_url: Optional[str] = None
+    exported_by_handle: str | None = None
+    source_instance_url: str | None = None
     guild: ManifestCommunity
     include_uploads: bool
     initiatives: list[ManifestInitiative]
@@ -165,10 +165,8 @@ class BackupManifest(SanitizedBaseModel):
     entries: list[ManifestEntry]
     assets: list[ManifestAsset]
     skipped: list[ManifestSkipped]
-    # Everyone the archive quotes. Absent in a backup taken before it was
-    # inventoried, which reads as "nobody to ask about" and leaves those
-    # comments to the exact-handle match.
-    people: list[ManifestPerson] = []
+    # Everyone the archive quotes.
+    people: list[ManifestPerson]
 
 
 class BackupToolEstimate(SanitizedBaseModel):

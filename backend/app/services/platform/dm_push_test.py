@@ -14,6 +14,7 @@ sign-in when it is renewed.
 
 import base64
 import uuid
+from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -55,7 +56,9 @@ async def _install(
     the same sign-in (a fresh one unless ``headers`` names it)."""
     headers = headers or await signed_in_headers(session, actor.user)
     registered = await client.post(
-        "/api/v1/me/dm/devices", json=_registration(seed), headers=headers
+        "/api/v1/me/dm/devices",
+        json=_registration(actor.user.id, seed),
+        headers=headers,
     )
     assert registered.status_code == 201, registered.text
     push = await client.post(
@@ -172,7 +175,9 @@ class TestTheLink:
         # A second key store on the same account, collected under the first
         # installation's sign-in.
         registered = await client.post(
-            "/api/v1/me/dm/devices", json=_registration(21), headers=a.headers
+            "/api/v1/me/dm/devices",
+            json=_registration(a.user.id, 21),
+            headers=a.headers,
         )
         second = registered.json()["devices"][-1]["id"]
 
@@ -200,7 +205,7 @@ class TestTheLink:
         first, headers = await _install(client, session, a, seed=15)
 
         registered = await client.post(
-            "/api/v1/me/dm/devices", json=_registration(31), headers=headers
+            "/api/v1/me/dm/devices", json=_registration(a.user.id, 31), headers=headers
         )
         assert registered.status_code == 201, registered.text
 
@@ -569,7 +574,7 @@ class TestAGroupPush:
     """Which conversation first, then who spoke -- the way a lock screen reads."""
 
     async def _group(self, client, session, members):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.models.platform.dm_conversation import (
             DmConversation,
@@ -589,7 +594,7 @@ class TestAGroupPush:
                 client, session, actor, seed=1 + 40 * i
             )
             devices[actor.user.id] = device_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         conversation = DmConversation(
             kind=DmConversationKind.group,
             roster_key=roster_key(actor.user.id for actor in members),

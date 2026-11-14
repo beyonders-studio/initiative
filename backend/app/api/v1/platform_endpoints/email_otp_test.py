@@ -1,12 +1,13 @@
 """Signing in with a one-time code sent to an address."""
 
-from httpx import AsyncClient
+from datetime import UTC
+
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.platform import rules
 from app.core.security import decode_session_token
+from app.services.platform import rules
 from app.testing import captcha_switched_on, create_user
-
 
 SEND_URL = "/api/v1/auth/email-otp/send"
 VERIFY_URL = "/api/v1/auth/email-otp/verify"
@@ -152,7 +153,7 @@ async def test_a_code_answers_once(
 async def test_an_expired_code_opens_nothing(
     client: AsyncClient, session: AsyncSession, monkeypatch
 ):
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlalchemy import update
 
@@ -165,7 +166,7 @@ async def test_an_expired_code_opens_nothing(
 
     await session.exec(
         update(AuthChallenge).values(
-            expires_at=datetime.now(timezone.utc) - timedelta(seconds=1)
+            expires_at=datetime.now(UTC) - timedelta(seconds=1)
         )
     )
     await session.commit()
@@ -653,7 +654,7 @@ REGENERATE_URL = "/api/v1/auth/recovery-codes/regenerate"
 
 async def _stale_session_headers(session: AsyncSession, user) -> dict[str, str]:
     """A session signed into long enough ago that it no longer confirms."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.services.auth import sessions as session_service
     from app.testing import get_auth_token
@@ -661,7 +662,7 @@ async def _stale_session_headers(session: AsyncSession, user) -> dict[str, str]:
     issued = await session_service.create_session(
         session, user_id=user.id, amr=["otp"], satisfied_providers=[]
     )
-    issued.session.created_at = datetime.now(timezone.utc) - timedelta(minutes=11)
+    issued.session.created_at = datetime.now(UTC) - timedelta(minutes=11)
     session.add(issued.session)
     await session.commit()
     return {

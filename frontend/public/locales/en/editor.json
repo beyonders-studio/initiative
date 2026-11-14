@@ -154,9 +154,6 @@
       "total_one": "{{count}} task",
       "total_other": "{{count}} tasks",
       "none": "No tasks match.",
-      "previous": "Previous",
-      "next": "Next",
-      "page": "Page {{page}} of {{pages}}",
       "label": "Label",
       "labelPlaceholder": "Open launch tasks",
       "from": "From",
@@ -175,6 +172,7 @@
     "gone": "Deleted",
     "noMatches": "Nothing in this initiative matches “{{query}}”.",
     "scopeHint": "Only this document’s initiative can be named here.",
+    "searchOrCreate": "Type to search, or make what is not there yet",
     "searching": "Searching…",
     "unavailable": "This is no longer available to you"
   },
@@ -242,5 +240,77 @@
     "changed": "The text changed while writing. Insert this below it instead, or discard it.",
     "cannotKeep": "Writing help can't put this selection back whole: it runs across list items or a heading, or holds something like a picture. Select text within one of them instead.",
     "error": "Couldn't write that. Please try again."
+  },
+  "syncing": "Syncing document...",
+  "placeholder": "Press / for commands...",
+  "brokenImage": "Broken",
+  "copyCode": "copy",
+  "caption": {
+    "add": "Add Caption",
+    "placeholder": "Enter a caption..."
+  },
+  "picker": {
+    "bulletedList": "Bulleted List",
+    "checkList": "Check List",
+    "code": "Code",
+    "divider": "Divider",
+    "numberedList": "Numbered List",
+    "quote": "Quote",
+    "alignLeft": "Align left",
+    "alignCenter": "Align center",
+    "alignRight": "Align right",
+    "alignJustify": "Align justify",
+    "tableOfSize": "{{rows}}x{{columns}} Table"
+  },
+  "tableDialog": {
+    "rows": "Number of rows",
+    "rowsPlaceholder": "# of rows (1-500)",
+    "columns": "Number of columns",
+    "columnsPlaceholder": "# of columns (1-50)",
+    "confirm": "Confirm"
+  },
+  "columnLayouts": {
+    "twoEqual": "2 columns (equal width)",
+    "twoQuarterLeft": "2 columns (25% - 75%)",
+    "threeEqual": "3 columns (equal width)",
+    "threeWideMiddle": "3 columns (25% - 50% - 25%)",
+    "fourEqual": "4 columns (equal width)"
+  },
+  "contextMenu": {
+    "removeLink": "Remove Link",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "pasteAsPlainText": "Paste as Plain Text",
+    "deleteNode": "Delete Node",
+    "pasteNotAllowed": "Not allowed to paste from clipboard."
+  },
+  "selectionFormat": {
+    "bold": "Toggle bold",
+    "italic": "Toggle italic",
+    "underline": "Toggle underline",
+    "strikethrough": "Toggle strikethrough",
+    "code": "Toggle code",
+    "link": "Toggle link",
+    "subscript": "Toggle subscript",
+    "superscript": "Toggle superscript"
+  },
+  "actions": {
+    "importTitle": "Import",
+    "importLabel": "Import editor state from JSON",
+    "importTooltip": "Import Content",
+    "speechToText": "Speech To Text",
+    "enableSpeechToText": "Enable speech to text",
+    "disableSpeechToText": "Disable speech to text",
+    "markdownTitle": "Convert From Markdown",
+    "markdownLabel": "Convert from markdown",
+    "readOnlyMode": "Read-Only Mode",
+    "lockReadOnly": "Lock read-only mode",
+    "unlockReadOnly": "Unlock read-only mode",
+    "viewOnlyMode": "View Only Mode",
+    "editMode": "Edit Mode",
+    "clearEditor": "Clear Editor",
+    "clearEditorConfirm": "Are you sure you want to clear the editor?",
+    "treeView": "Tree View"
   }
 }

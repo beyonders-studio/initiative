@@ -3,16 +3,16 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type CommunityInviteRead, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
-import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { InviteLinkLimits, useCommunityInvites } from "@/hooks/useCommunityInvites";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 const inviteLinkForCode = (code: string) => {
   const base = import.meta.env.VITE_APP_URL?.trim() || window.location.origin;
@@ -33,26 +33,22 @@ export const InviteLimitFields = ({
   const { t } = useTranslation("communities");
   return (
     <>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-uses`}>{t("users.maxUsesLabel")}</Label>
+      <Field label={t("users.maxUsesLabel")}>
         <Input
-          id={`${idPrefix}-uses`}
           type="number"
           min={1}
           value={value.maxUses}
           onChange={(event) => onChange({ ...value, maxUses: Number(event.target.value) })}
         />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-days`}>{t("users.expiresDaysLabel")}</Label>
+      </Field>
+      <Field label={t("users.expiresDaysLabel")}>
         <Input
-          id={`${idPrefix}-days`}
           type="number"
           min={0}
           value={value.expiresDays}
           onChange={(event) => onChange({ ...value, expiresDays: Number(event.target.value) })}
         />
-      </div>
+      </Field>
     </>
   );
 };
@@ -118,7 +114,7 @@ export const CommunityInviteList = ({
   return (
     <>
       {isLoading ? (
-        <SkeletonRegion label={t("users.loadingInvites")}>
+        <SkeletonRegion>
           <ListSkeleton rows={2} avatar={false} />
         </SkeletonRegion>
       ) : null}

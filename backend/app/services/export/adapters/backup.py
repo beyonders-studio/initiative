@@ -53,23 +53,14 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
-from typing import Any, Optional, cast
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.user_display import handle_of
 from app.core.config import settings
-from app.core.messages import ExportMessages, InitiativeMessages
-from app.models.platform.user import User
 from app.core.file_types import FileType, is_stored
-from app.services.export.adapters._common import (
-    BuildContext,
-    ToolExportAdapter,
-    storage_key_of,
-)
-from app.services.export.adapters.file import file_type_of
-from app.services.export.contract import RenderItem, RenderRequest
+from app.core.messages import ExportMessages, InitiativeMessages
 from app.core.tools import (
     BULK_EXPORT_TOOLS,
     Tool,
@@ -77,12 +68,22 @@ from app.core.tools import (
     tool_envelope_type,
     tool_export_source,
 )
+from app.core.user_display import handle_of
+from app.core.user_input_validators import resolve_zone
+from app.models.platform.guild import CommunityJoinPolicy
+from app.models.platform.user import User
+from app.services.export import delivery
+from app.services.export import limits as export_limits
+from app.services.export.adapters._common import (
+    BuildContext,
+    ToolExportAdapter,
+    storage_key_of,
+)
+from app.services.export.adapters.file import file_type_of
+from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
 from app.services.export.filters import narrow, parse_filters
-from app.services.export import delivery
 from app.services.platform.csv_export import safe_filename_component
-from app.services.export import limits as export_limits
-from app.core.user_input_validators import resolve_zone
 
 # Tool keys as they appear in the selector's include/formats maps. Derived:
 # a backup covers what the engine can export, so a ninth tool is carried by
@@ -154,8 +155,8 @@ async def _resolve_scope(
     from sqlalchemy.orm import undefer
     from sqlmodel import select
 
-    from app.models.tenant.initiative import Initiative
     from app.models.platform.guild import CommunityRole
+    from app.models.tenant.initiative import Initiative
     from app.services.membership import initiative_scope_clause
     from app.services.platform import guilds as guilds_service
 
@@ -184,7 +185,7 @@ async def _resolve_scope(
     initiative_id = params.get("initiative_id")
     try:
         initiative_id = int(initiative_id)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     statement = (
         select(Initiative)
@@ -209,13 +210,12 @@ def _validate_params(params: dict, *, scope_kind: str) -> None:
     if mode not in ("backup", "report"):
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     include = params.get("include")
-    if include is not None:
-        if (
-            not isinstance(include, dict)
-            or not set(include) <= set(_TOOLS)
-            or not all(isinstance(v, bool) for v in include.values())
-        ):
-            raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
+    if include is not None and (
+        not isinstance(include, dict)
+        or not set(include) <= set(_TOOLS)
+        or not all(isinstance(v, bool) for v in include.values())
+    ):
+        raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     filters = params.get("filters")
     if filters is not None:
         if not isinstance(filters, dict) or not set(filters) <= set(_TOOLS):
@@ -436,14 +436,14 @@ async def _build_scope(
             type=f"{scope_kind}-backup",
             schema_version=BACKUP_SCHEMA_VERSION,
             app_version=get_version(),
-            exported_at=datetime.now(timezone.utc),
+            exported_at=datetime.now(UTC),
             exported_by_handle=handle_of(user),
             source_instance_url=settings.APP_URL,
             guild=ManifestCommunity(
                 id=guild_id,
                 name=guild.name if guild else "",
                 description=guild.description if guild else None,
-                is_community=bool(guild.is_community) if guild else False,
+                join_policy=guild.join_policy if guild else CommunityJoinPolicy.private,
             ),
             include_uploads=_include_uploads(params),
             initiatives=[
@@ -1080,7 +1080,8 @@ class _ScopeBuilder:
         if roles:
             rows = await self.session.exec(
                 select(InitiativeRule).where(
-                    InitiativeRule.initiative_role_id.in_([r.id for r in roles])
+                    InitiativeRule.initiative_role_id.in_([r.id for r in roles]),
+                    InitiativeRule.install_id.is_(None),
                 )
             )
             for permission in rows:
@@ -1263,7 +1264,7 @@ class _ScopeBuilder:
             places = {field.id: place for place, field in enumerate(own, start=1)}
             named: list = []
 
-            def place(property_id: int) -> Optional[int]:
+            def place(property_id: int) -> int | None:
                 if property_id not in places and property_id in properties:
                     named.append(properties[property_id])
                     places[property_id] = len(places) + 1

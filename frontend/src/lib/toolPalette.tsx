@@ -24,8 +24,8 @@ import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import type { ToolPaletteListOptions } from "@/hooks/useToolPaletteList";
 import { useToolPaletteList } from "@/hooks/useToolPaletteList";
 import { USER_MENTION_PATTERN } from "@/lib/commentReferences";
-import { fileIcon } from "@/lib/fileIcon";
 import { TOOLS, toolCamelPlural, toolDetailRoute } from "@/lib/tools";
+import { fileIcon } from "@/ui/lib/fileIcon";
 
 export interface PaletteItem {
   id: number;

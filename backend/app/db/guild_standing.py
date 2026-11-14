@@ -42,13 +42,14 @@ routing of one community and the standing of another.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, fields, replace
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from typing import TYPE_CHECKING, Any
 
 from app.core.capabilities import may_hold_grant
 from app.core.plugin_scopes import (
-    PLUGIN_SCOPE_PREFIX,
     LEVEL_SCOPES,
+    PLUGIN_SCOPE_PREFIX,
     STANDING_SCOPES,
     InstallLevel,
 )
@@ -61,14 +62,10 @@ from app.models.platform.access_grant import (
     AccessLevel,
     SettingsLevel,
 )
-from app.models.platform.plugin_service_registration import (
-    RegistrationKind,
-    registration_live_sql,
-)
 from app.models.platform.guild import (
     GUILD_LADDER,
-    AdminSurface,
     LIVE_STATUS_VALUES,
+    AdminSurface,
     CommunityRole,
     CommunityStatus,
 )
@@ -79,30 +76,35 @@ from app.models.platform.identity_ref import (
     IdentityPurpose,
     ref_prefix,
 )
+from app.models.platform.member_moderation import live_timeout_sql
+from app.models.platform.plugin_service_registration import (
+    RegistrationKind,
+    registration_live_sql,
+)
 from app.models.platform.user import UserRole, UserStatus
-from app.models.tenant.plugin_member_consent import ConsentAccess
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
+    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_PREFIX,
-    DEFAULT_PERMISSION_VALUES,
     PermissionKey,
 )
+from app.models.tenant.plugin_member_consent import ConsentAccess
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.models.platform.access_grant import AccessGrant
-    from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+    from app.models.platform.guild import Guild, GuildMembership
 
 __all__ = [
-    "ActorContext",
-    "GuildContext",
     "INSTALL_STANDING_SQL",
     "ISSUABLE_SCOPES_SQL",
-    "InstallContext",
     "STANDING_SQL",
+    "ActorContext",
+    "GuildContext",
+    "InstallContext",
     "compute_guild_standing",
     "compute_install_standing",
     "named_ref_candidates",
@@ -172,11 +174,12 @@ _ROUTED_AS_GUEST = "pg_has_role(current_user, 'guest_base', 'USAGE')"
 #: What the community sets for every initiative in it: its own
 #: ``initiative_rules`` rows, the ones with no initiative
 #: (``app.models.tenant.initiative.COMMUNITY_DEFAULT_KEYS``), read once. Each
-#: statement's ``WITH`` names it.
+#: statement's ``WITH`` names it. A row naming an install is that plug-in's
+#: permission, read on its own (``my_plugin_rules``).
 _COMMUNITY_DEFAULTS_CTE = """community_defaults AS MATERIALIZED (
   SELECT r.key, r.enabled
   FROM initiative_rules r
-  WHERE r.initiative_id IS NULL
+  WHERE r.initiative_id IS NULL AND r.install_id IS NULL
 )"""
 
 #: The roles what the community set for members holds for: the built-in
@@ -239,8 +242,30 @@ my_role_permissions AS MATERIALIZED (
   FROM my_initiatives m
   JOIN initiative_rules rp
     ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
+   AND rp.install_id IS NULL
   LEFT JOIN community_defaults cd
     ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
+),
+-- A plug-in's permissions, as a tool's keys are held: what the community set
+-- for members where it reaches the role, in every initiative the reader is
+-- in, and otherwise the role's own rows.
+my_plugin_rules AS MATERIALIZED (
+  SELECT m.initiative_id, c.install_id, c.key, c.enabled
+  FROM my_initiatives m
+  JOIN initiative_rules c
+    ON c.initiative_id IS NULL AND c.install_id IS NOT NULL
+  WHERE {_HELD_FOR_MEMBERS}
+  UNION ALL
+  SELECT rp.initiative_id, rp.install_id, rp.key, rp.enabled
+  FROM my_initiatives m
+  JOIN initiative_rules rp
+    ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
+   AND rp.install_id IS NOT NULL
+  WHERE NOT ({_HELD_FOR_MEMBERS} AND EXISTS (
+    SELECT 1 FROM initiative_rules c
+    WHERE c.initiative_id IS NULL
+      AND c.install_id = rp.install_id AND c.key = rp.key
+  ))
 ),
 my_grants AS MATERIALIZED (
   SELECT g.purpose, g.access_level::text AS access_level
@@ -251,19 +276,44 @@ my_grants AS MATERIALIZED (
     AND {_GRANT_HELD}
 )"""
 
+
+def _held_surfaces(membership: str) -> str:
+    """The admin surfaces ``app.current_user_id`` holds by ``membership``, a
+    relation of their membership row's ``role`` and ``joined_at``: a custom
+    role given during this membership, on the rung the membership holds,
+    decides; otherwise the rung does."""
+    return f"""COALESCE((
+      SELECT CASE
+               WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
+               WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
+               ELSE ''
+             END
+      FROM {membership} m
+      LEFT JOIN custom_role_members cm
+        ON cm.user_id = {gucs.USER_ID} AND cm.assigned_at >= m.joined_at
+      LEFT JOIN custom_roles r
+        ON r.id = cm.role_id AND r.base_rung = m.role::text
+    ), '')"""
+
+
 #: What the person statement writes: each standing key and its expression.
 _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.STANDING_GUILD_ID: f"""COALESCE({gucs.ROUTED_COMMUNITY}, '')""",
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
     ), 'false')""",
-    # A custom role given during this membership, on the rung the membership
-    # holds, decides; otherwise the rung does.
-    gucs.HELD_SURFACES: f"""COALESCE((
+    gucs.HELD_SURFACES: _held_surfaces("my_membership"),
+    # As the surfaces are held: a custom role on the admin rung keeps the ones
+    # it lists, and the admin rung with none holds every one.
+    gucs.HELD_PLUGIN_PERMISSIONS: f"""COALESCE((
       SELECT CASE
-               WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
-               WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
-               ELSE ''
+               WHEN m.role NOT IN ({_ADMIN_RUNGS_SQL}) THEN ''
+               WHEN r.id IS NULL THEN '*'
+               ELSE COALESCE((
+                 SELECT string_agg(p.install_id || ':' || p.permission, ',')
+                 FROM custom_role_plugin_permissions p
+                 WHERE p.role_id = r.id
+               ), '')
              END
       FROM my_membership m
       LEFT JOIN custom_role_members cm
@@ -339,6 +389,18 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       FROM my_role_permissions rp
       WHERE NOT rp.enabled
     ), '')""",
+    gucs.PLUGIN_GRANTS: """COALESCE((
+      SELECT string_agg(DISTINCT
+        pr.initiative_id || ':' || pr.install_id || ':' || pr.key, ',')
+      FROM my_plugin_rules pr
+      WHERE pr.enabled
+    ), '')""",
+    gucs.PLUGIN_DENIES: """COALESCE((
+      SELECT string_agg(DISTINCT
+        pr.initiative_id || ':' || pr.install_id || ':' || pr.key, ',')
+      FROM my_plugin_rules pr
+      WHERE NOT pr.enabled
+    ), '')""",
     gucs.COMMUNITY_TOOLS: f"""COALESCE((
       SELECT string_agg(
         substr(cd.key, {len(INITIATIVE_TOOL_PREFIX) + 1})
@@ -379,8 +441,14 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
         AND NOT r.enabled
     ), '')""",
     gucs.GUILD_AUTH_OK: """   (SELECT public.guild_auth_satisfied()::text)""",
+    # The community's content is frozen, or this member is timed out in it.
     gucs.CONTENT_HOLD: f"""COALESCE((
-      SELECT (g.status = '{CommunityStatus.read_only.value}')::text
+      SELECT (g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
+        SELECT 1 FROM my_row r
+        JOIN public.member_moderation mm
+          ON mm.guild_id = g.id AND mm.user_id = {gucs.USER_ID}
+        WHERE {live_timeout_sql("mm", "r.role")}
+      ))::text
       FROM public.guilds g
       WHERE g.id = {gucs.GUILD_ID}
     ), 'false')""",
@@ -465,6 +533,16 @@ ISSUABLE_SCOPES_SQL = (
     "@> jsonb_build_array(s))"
 )
 
+#: The install's content is held read-only, over the guild row ``g``: the
+#: community's is frozen, or the member a member token acts for is timed out.
+_INSTALL_HOLD = f"""(g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
+        SELECT 1 FROM public.member_moderation mm
+        JOIN public.guild_memberships m
+          ON m.guild_id = mm.guild_id AND m.user_id = mm.user_id
+        WHERE mm.guild_id = g.id AND mm.user_id = {gucs.USER_ID}
+          AND {live_timeout_sql("mm", "m.role")}
+      ))"""
+
 
 #: What the install statement writes: each key and its expression.
 _INSTALL_STANDING: dict[gucs.Guc, str] = {
@@ -475,6 +553,9 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.HELD_SURFACES: f"""COALESCE((
       SELECT '{_EVERY_SURFACE}' FROM standing_level lv WHERE lv.administers
     ), '')""",
+    gucs.HELD_PLUGIN_PERMISSIONS: """''""",
+    gucs.PLUGIN_GRANTS: """''""",
+    gucs.PLUGIN_DENIES: """''""",
     gucs.GUILD_SEAT: """'false'""",
     gucs.SETTINGS_RUNG: """''""",
     gucs.PAM_GUILD_ID: """''""",
@@ -541,10 +622,29 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     ), '')""",
     gucs.GUILD_AUTH_OK: """   (SELECT EXISTS (SELECT 1 FROM install))::text""",
     gucs.CONTENT_HOLD: f"""COALESCE((
-      SELECT (g.status = '{CommunityStatus.read_only.value}')::text
+      SELECT ({_INSTALL_HOLD})::text
       FROM public.guilds g
       WHERE g.id = {gucs.GUILD_ID}
     ), 'false')""",
+    # The install that mounts contacts at community scope, as
+    # ``guild_plugins.find_mounting_plugin`` finds it for a person.
+    gucs.COMMUNITY_CONTACTS_INSTALL: f"""COALESCE((
+      SELECT h.id::text
+      FROM guild_plugins h
+      WHERE h.definition ->> 'plugin_kind' = 'tool_instance'
+        AND h.definition ->> 'tool' = '{Tool.contact.value}'
+        AND EXISTS (SELECT 1 FROM install)
+      ORDER BY h.id
+      LIMIT 1
+    ), '')""",
+    # The surfaces the member a member token acts for holds, as theirs are
+    # read when they sign in themselves.
+    gucs.MEMBER_SURFACES: _held_surfaces(f"""(
+        SELECT gm.role, gm.joined_at
+        FROM public.guild_memberships gm
+        WHERE gm.guild_id = {gucs.GUILD_ID} AND gm.user_id = {gucs.USER_ID}
+          AND EXISTS (SELECT 1 FROM install)
+      )"""),
 }
 
 #: An installed plug-in's standing, in one statement. Runs as
@@ -591,7 +691,8 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: that the scopes also allow, and every other key denied; the member's roles
 #: and "Full access" within those initiatives; and writes only when the
 #: consent is ``read_write``. It is never an admin, the seat, a grantee or a
-#: manager. The consent was given from a session that met the community's
+#: manager; the admin surfaces the member holds are carried apart, in
+#: ``app.member_surfaces``, for the rows of the whole community it writes. The consent was given from a session that met the community's
 #: sign-in rules, so that value too is what ``live`` says.
 #:
 #: Two more columns carry what the install calls things, both read only in its
@@ -620,7 +721,7 @@ consent AS (
 ),
 install AS (
   SELECT a.id, {ISSUABLE_SCOPES_SQL} AS granted_scopes,
-         g.status = '{CommunityStatus.read_only.value}' AS read_only
+         {_INSTALL_HOLD} AS read_only
   FROM guild_plugins a
   JOIN public.guilds g ON g.id = {gucs.GUILD_ID}
   WHERE a.id = {gucs.INSTALL_ID}
@@ -723,11 +824,13 @@ permitted AS (
      OR COALESCE(cd.enabled, EXISTS (
        SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
+         AND rp.install_id IS NULL
          AND rp.key = k.key
          AND rp.enabled
      ) OR (k.is_default AND NOT EXISTS (
        SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
+         AND rp.install_id IS NULL
          AND rp.key = k.key
          AND NOT rp.enabled
      )))
@@ -807,7 +910,7 @@ class GuildContext:
     values.
     """
 
-    guild: "Guild"
+    guild: Guild
     user_id: int
     #: The community, as a number. Held rather than read off ``guild``: a
     #: cross-guild gather clears the session's identity map between
@@ -815,17 +918,17 @@ class GuildContext:
     #: object still being attached to a session.
     guild_id: int
     #: The membership row, when there is one. ``None`` for a grantee.
-    membership: Optional["GuildMembership"] = None
+    membership: GuildMembership | None = None
     #: That row's role, as a value. Held rather than read off the row for the
     #: reason ``guild_id`` is: what somebody is in a community must not depend
     #: on an object still being attached to a session.
-    guild_role: Optional[str] = None
+    guild_role: str | None = None
     #: The live content grant, when access is by one rather than by membership.
-    grant: Optional["AccessGrant"] = None
+    grant: AccessGrant | None = None
     #: The live settings grant, independent of content access, and the rung it
     #: confers.
-    settings_grant: Optional["AccessGrant"] = None
-    settings_grant_level: Optional[str] = None
+    settings_grant: AccessGrant | None = None
+    settings_grant_level: str | None = None
     #: True when the community is in ``read_only`` status and access is by real
     #: membership: the session is routed into the SELECT-only ``guild_<id>_ro``
     #: role, so content writes are refused by Postgres. Never set on the grant
@@ -834,7 +937,7 @@ class GuildContext:
 
     # --- What the standing statement returned --------------------------------
     #: The community the standing was computed for; ``None`` until it has been.
-    standing_guild_id: Optional[int] = None
+    standing_guild_id: int | None = None
     #: The membership row's role is ``admin`` or ``superadmin``. Computed from
     #: that row by the database; no grant sets it.
     guild_admin: bool = False
@@ -842,7 +945,7 @@ class GuildContext:
     #: a live ``superadmin`` settings grant.
     guild_seat: bool = False
     #: The rung a live settings grant lends here, or ``None``.
-    settings_rung: Optional[str] = None
+    settings_rung: str | None = None
     #: A live content grant covers this request, at read / read_write.
     pam_read: bool = False
     pam_write: bool = False
@@ -868,6 +971,14 @@ class GuildContext:
     community_tools: tuple[str, ...] = ()
     #: The admin surfaces the reader holds (:meth:`holds_surface`).
     held_surfaces: tuple[str, ...] = ()
+    #: The plug-ins' community permissions the reader holds, as
+    #: ``"<install id>:<permission>"``, or ``*`` for every one
+    #: (:meth:`holds_plugin_permission`).
+    held_plugin_permissions: tuple[str, ...] = ()
+    #: ``"<initiative id>:<install id>:<permission>"`` where a rule gives the
+    #: reader's role one of a plug-in's permissions, and where one says no.
+    plugin_grants: tuple[str, ...] = ()
+    plugin_denies: tuple[str, ...] = ()
     #: Initiatives where the reader's role holds "Full access".
     override_initiatives: tuple[int, ...] = ()
     #: The community's sign-in policy is satisfied by this session.
@@ -880,7 +991,7 @@ class GuildContext:
     # --- Identity ------------------------------------------------------------
 
     @property
-    def role(self) -> "CommunityRole":
+    def role(self) -> CommunityRole:
         """The seat this request holds in the community.
 
         A grantee holds ``support`` — a first-class identity for granted access
@@ -907,22 +1018,58 @@ class GuildContext:
         the community's content. A grant holds none."""
         return surface.value in self.held_surfaces
 
+    def holds_plugin_permission(
+        self,
+        install_id: int,
+        permission: str,
+        *,
+        initiative_id: int | None,
+        members: bool = False,
+    ) -> bool:
+        """Whether the reader holds one of an installed plug-in's permissions,
+        as the database computed it, as the community's own are held.
+
+        At the community level (``initiative_id`` ``None``), as an admin
+        surface: the admin rung holds every one, and a custom role on it the
+        ones it keeps. Inside an initiative, as a tool's key: the community's
+        admins and the initiative's managers hold every one, and any other role
+        of the initiative by its rule, or where it has none by ``members``, the
+        default the plug-in declared. A grant holds none. Where the plug-in is
+        placed is the caller's to ask."""
+        if initiative_id is None:
+            return bool(
+                {"*", f"{install_id}:{permission}"}.intersection(
+                    self.held_plugin_permissions
+                )
+            )
+        if self.is_admin or initiative_id in self.manager_initiatives:
+            return True
+        if initiative_id not in self.member_initiatives:
+            return False
+        pair = f"{initiative_id}:{install_id}:{permission}"
+        if pair in self.plugin_grants:
+            return True
+        return members and pair not in self.plugin_denies
+
     @property
     def holds_every_surface(self) -> bool:
-        """Whether the reader holds the whole catalog: an admin with no custom
-        role, or one whose role keeps every surface. What making or unmaking
-        an admin asks, since the admin rung holds every one."""
-        return all(self.holds_surface(surface) for surface in AdminSurface)
+        """Whether the reader holds everything the admin rung holds, every
+        surface and every plug-in permission: an admin with no custom role.
+        What making or unmaking an admin asks, since either widens somebody
+        to all of it."""
+        return "*" in self.held_plugin_permissions and all(
+            self.holds_surface(surface) for surface in AdminSurface
+        )
 
     @property
     def manages_admins(self) -> bool:
-        """Whether this request may make or unmake an admin: holding every
-        surface, as the admin rung does, or on a settings grant — the answer
-        the membership policy gives too."""
+        """Whether this request may make or unmake an admin: holding
+        everything, as the admin rung does, or on a settings grant — the
+        answer the membership policy gives too."""
         return self.holds_every_surface or self.settings_rung is not None
 
     @property
-    def rung(self) -> "CommunityRole":
+    def rung(self) -> CommunityRole:
         """The rung this request administers the community at.
 
         The membership row's, or the one a live settings grant lends for its
@@ -934,7 +1081,7 @@ class GuildContext:
             return CommunityRole(self.settings_rung)
         return self.role
 
-    def reaches(self, rung: "CommunityRole", *, settings: bool = False) -> bool:
+    def reaches(self, rung: CommunityRole, *, settings: bool = False) -> bool:
         """Whether this request carries what ``rung`` carries, by the standing.
 
         The community's ladder asked of a request rather than of a row: the
@@ -1005,12 +1152,12 @@ class GuildContext:
     # --- The two grant axes --------------------------------------------------
 
     @property
-    def settings_level(self) -> Optional[str]:
+    def settings_level(self) -> str | None:
         """The rung a settings grant confers, read off the grant itself."""
         return self.settings_grant_level
 
     @property
-    def grant_content(self) -> Optional[str]:
+    def grant_content(self) -> str | None:
         """The content grant's level as the database found it: ``read``,
         ``read_write``, ``moderate``, or ``None`` when no live grant covers
         this request."""
@@ -1035,33 +1182,16 @@ class GuildContext:
             return self.pam_write
         return self.pam_read or self.pam_write
 
-    def overrides_sharing(self, initiative_id: Optional[int]) -> bool:
+    def overrides_sharing(self, initiative_id: int | None) -> bool:
         """Whether this request holds "Full access" in ``initiative_id`` — the
         initiative-scoped sibling of the admin leg."""
         if initiative_id is None:
             return False
         return initiative_id in self.override_initiatives
 
-    def membership_only(self) -> "GuildContext":
-        """This standing with what a grant reaches taken off.
-
-        For a decision that has to rest on somebody's own place in the
-        community rather than on a window somebody opened for them.
-        """
-        return replace(
-            self,
-            grant=None,
-            settings_grant=None,
-            settings_grant_level=None,
-            settings_rung=None,
-            pam_read=False,
-            pam_write=False,
-            pam_moderate=False,
-        )
-
     # --- The standing --------------------------------------------------------
 
-    def with_standing(self, row: dict[str, Any]) -> "GuildContext":
+    def with_standing(self, row: dict[str, Any]) -> GuildContext:
         """This context completed with what the standing statement returned."""
         return replace(self, **_standing_fields(self, row))
 
@@ -1085,17 +1215,17 @@ class InstallContext:
     #: the seat's grant together, which the standing computes.
     token_scopes: frozenset[str]
     #: The one initiative the token is narrowed to, when it is.
-    scope_initiative_id: Optional[int] = None
+    scope_initiative_id: int | None = None
     #: The member a member token acts for, and the purpose they consented to
     #: (``None`` for app-wide consent). ``None`` for the install itself. A write
     #: that names its author, such as the owner grant on something created,
     #: names this member.
-    member_user_id: Optional[int] = None
-    purpose: Optional[str] = None
+    member_user_id: int | None = None
+    purpose: str | None = None
 
     # --- What the install standing statement returned -------------------------
     #: The community the standing was computed for; ``None`` until it has been.
-    standing_guild_id: Optional[int] = None
+    standing_guild_id: int | None = None
     #: The community is in use, the install is on, and its registration is
     #: live and the client the token names.
     live: bool = False
@@ -1128,8 +1258,15 @@ class InstallContext:
     #: The resources its scopes let it read, and write.
     install_read: tuple[str, ...] = ()
     install_write: tuple[str, ...] = ()
+    #: The install of the community contacts plug-in, which a community
+    #: contact this install creates goes into; ``None`` when there is none.
+    community_contacts_install: int | None = None
+    #: For a member token, the admin surfaces the member holds, which the rows
+    #: of the whole community it writes ask of it; none for the install
+    #: itself.
+    member_surfaces: tuple[str, ...] = ()
     #: What this install calls its community, when it has been named to it.
-    guild_ref: Optional[str] = None
+    guild_ref: str | None = None
     #: The references this request named that resolve in the install's own
     #: sector, as ``(ref, entity_type, entity_id)``. For this request only:
     #: the replay writes the standing, and names nobody.
@@ -1143,7 +1280,7 @@ class InstallContext:
         that may act answers it."""
         return self.live
 
-    def overrides_sharing(self, initiative_id: Optional[int]) -> bool:
+    def overrides_sharing(self, initiative_id: int | None) -> bool:
         """Whether the request holds "Full access" in ``initiative_id``: the
         member a member token acts for, by their role, or the install itself,
         by the moderator standing."""
@@ -1168,6 +1305,12 @@ class InstallContext:
 
     def holds_surface(self, surface: AdminSurface) -> bool:
         return surface.value in self.held_surfaces
+
+    def member_holds_surface(self, surface: AdminSurface) -> bool:
+        """Whether a member token's member holds ``surface``, as a row of the
+        community's that ``surface`` administers asks of a plug-in writing it
+        for them. The install acting as itself answers by its scopes alone."""
+        return self.member_user_id is None or surface.value in self.member_surfaces
 
     @property
     def content_read_only(self) -> bool:
@@ -1196,7 +1339,7 @@ class InstallContext:
         return False
 
     @property
-    def grant_content(self) -> Optional[str]:
+    def grant_content(self) -> str | None:
         return None
 
     def grant_satisfies(
@@ -1213,7 +1356,7 @@ class InstallContext:
             self.install_write if access == "write" else self.install_read
         )
 
-    def with_standing(self, row: dict[str, Any]) -> "InstallContext":
+    def with_standing(self, row: dict[str, Any]) -> InstallContext:
         """This context completed with what the install standing statement
         returned."""
         return replace(
@@ -1265,7 +1408,7 @@ def _named_members(value: Any) -> frozenset[int]:
 
 
 def standing_values(
-    context: "GuildContext | InstallContext | None",
+    context: GuildContext | InstallContext | None,
 ) -> dict[gucs.Guc, Any]:
     """The standing ``context`` carries, as the routing statement writes it.
 
@@ -1279,7 +1422,7 @@ def standing_values(
     return {guc: getattr(context, guc.bind, None) for guc in gucs.STANDING}
 
 
-async def compute_guild_standing(session: "AsyncSession") -> dict[str, Any]:
+async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
     """Run :data:`STANDING_SQL` and return the row it wrote.
 
     The routed session has just had every standing key cleared, so what this
@@ -1310,7 +1453,7 @@ def named_ref_candidates(values: Sequence[str]) -> list[str]:
 
 
 async def compute_install_standing(
-    session: "AsyncSession", named_refs: Sequence[str] = ()
+    session: AsyncSession, named_refs: Sequence[str] = ()
 ) -> dict[str, Any]:
     """Run :data:`INSTALL_STANDING_SQL` and return the row it wrote.
 

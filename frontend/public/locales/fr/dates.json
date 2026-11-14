@@ -1,13 +1,8 @@
 {
   "invalidRange": "La date de fin ne peut pas précéder la date de début.",
   "picker": {
-    "invalidDate": "Saisissez une date valide.",
     "invalidEventRange": "L’événement doit se terminer après son début.",
-    "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété.",
-    "pickDate": "Choisir une date",
-    "pickDateTime": "Choisir une date et une heure",
-    "typeDate": "Saisir ou choisir une date",
-    "time": "Heure"
+    "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété."
   },
   "status": {
     "overdue": "En retard",
@@ -47,49 +42,5 @@
     "10": "octobre",
     "11": "novembre",
     "12": "décembre"
-  },
-  "positions": {
-    "first": "premier",
-    "second": "deuxième",
-    "third": "troisième",
-    "fourth": "quatrième",
-    "fifth": "cinquième",
-    "last": "dernier"
-  },
-  "recurrenceSummary": {
-    "doesNotRepeat": "Ne se répète pas",
-    "repeats": "Se répète {{schedule}}",
-    "everySingular": "chaque {{unit}}",
-    "everyPlural": "à intervalle de {{count}} {{unit}}",
-    "day": "jour",
-    "days": "jours",
-    "week": "semaine",
-    "weeks": "semaines",
-    "month": "mois",
-    "months": "mois",
-    "year": "année",
-    "years": "années",
-    "onWeekdays": "le {{weekdays}}",
-    "onDay": "le jour {{day}}",
-    "onPositionWeekday": "le {{position}} {{weekday}}",
-    "detailOfMonth": "{{detail}} en {{month}}",
-    "inMonth": "en {{month}}",
-    "afterCompletion": "après achèvement",
-    "untilDate": "jusqu'au {{date}}",
-    "forOccurrences": "pour {{count}} occurrences",
-    "custom": "Se répète selon un calendrier personnalisé",
-    "onDays": "les jours {{days}}",
-    "onLastDay": "le dernier jour",
-    "lastDayItem": "le dernier jour",
-    "onEveryWeekdays": "chaque {{weekdays}}",
-    "onFirstWorkDay": "le premier jour ouvré",
-    "onLastWorkDay": "le dernier jour ouvré",
-    "onFirstOf": "le premier {{weekdays}}",
-    "onLastOf": "le dernier {{weekdays}}",
-    "hour": "heure",
-    "hours": "heures",
-    "everyHour": "chaque heure",
-    "dailyLimit_one": "au maximum une fois par jour",
-    "dailyLimit_other": "au maximum {{count}} fois par jour"
   }
 }

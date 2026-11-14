@@ -27,43 +27,46 @@ import asyncio
 import logging
 import zipfile
 from collections import Counter
+from collections.abc import Awaitable, Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, AsyncContextManager, Awaitable, BinaryIO, Callable
+from typing import Any, BinaryIO
 from urllib.parse import urlsplit
 
 from cryptography.fernet import InvalidToken
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import ImportEngineMessages
-from app.core.tools import Tool, tool_envelope_type
-from app.core.version import get_version
-from app.models.platform.user import User, UserStatus
-from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
-from app.models.tenant.initiative import Initiative
 from app.core.encryption import (
     SALT_IMPORT_CREDENTIAL,
     decrypt_field,
     encrypt_field,
 )
+from app.core.messages import ImportEngineMessages
+from app.core.tools import Tool, tool_envelope_type
+from app.core.version import get_version
+from app.models.platform.user import User, UserStatus
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
+from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.import_job import (
     AtlassianDroppedItem,
     AtlassianFetchSummary,
     AtlassianPlanProperty,
     BackupImportPlan,
 )
-from app.services.import_engine import engine as import_engine
 from app.services.import_engine import (
     confluence_fetch,
     jira_attachments,
     jira_fetch,
 )
+from app.services.import_engine import engine as import_engine
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.atlassian import AtlassianCredential
 from app.services.import_engine.atlassian_bundle import BundleWriter, merge_people
 from app.services.import_engine.common import load_guild_member_handles
 from app.services.import_engine.contract import ImportEngineError
-from app.services.import_engine import limits as import_limits
 from app.services.import_engine.zip_bounds import open_zip
 from app.services.tenant import attachments as attachments_service
 
@@ -71,9 +74,6 @@ logger = logging.getLogger(__name__)
 
 #: ``data_jobs.source`` for every import read from an Atlassian site.
 SOURCE = "atlassian"
-
-#: The provider a credential has to have been stored under to start one.
-PROVIDER = "atlassian"
 
 #: The importer whose permission a Jira project needs.
 _PROJECT_ENVELOPE = tool_envelope_type(Tool.project)
@@ -216,6 +216,7 @@ async def start_import(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=SOURCE,
         params={
             "initiative_id": initiative.id,
@@ -230,7 +231,7 @@ async def start_import(
         },
         secret_encrypted=encrypt_field(credential.api_token, SALT_IMPORT_CREDENTIAL),
         status=DataJobStatus.queued,
-        expires_at=datetime.now(timezone.utc)
+        expires_at=datetime.now(UTC)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
     session.add(job)
@@ -293,6 +294,7 @@ async def start_export(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=SOURCE,
         params={
             "initiative_id": initiative.id,
@@ -301,7 +303,7 @@ async def start_export(
         },
         file_ref=payload_ref,
         status=DataJobStatus.queued,
-        expires_at=datetime.now(timezone.utc)
+        expires_at=datetime.now(UTC)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
     session.add(job)
@@ -325,7 +327,7 @@ async def _fetch_export(
     job: DataJob,
     *,
     guild_id: int,
-    open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
+    open_user_session: Callable[[], AbstractAsyncContextManager[AsyncSession]],
     progress: Callable[[AtlassianFetchSummary], Awaitable[None]] | None,
 ) -> StagedFetch:
     """Convert an uploaded HTML export into the bundle a site fetch writes."""
@@ -362,7 +364,7 @@ async def _convert_export(
     archive: zipfile.ZipFile,
     *,
     guild_id: int,
-    open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
+    open_user_session: Callable[[], AbstractAsyncContextManager[AsyncSession]],
     progress: Callable[[AtlassianFetchSummary], Awaitable[None]] | None,
 ) -> StagedFetch:
     from app.api.deps import establish_guild_access
@@ -538,7 +540,7 @@ async def fetch(
     job: DataJob,
     *,
     guild_id: int,
-    open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
+    open_user_session: Callable[[], AbstractAsyncContextManager[AsyncSession]],
     progress: Callable[[AtlassianFetchSummary], Awaitable[None]] | None = None,
 ) -> StagedFetch:
     """:func:`_read`, within :data:`~limits.IMPORT_FETCH_DEADLINE_SECONDS`.
@@ -562,7 +564,7 @@ async def _read(
     job: DataJob,
     *,
     guild_id: int,
-    open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
+    open_user_session: Callable[[], AbstractAsyncContextManager[AsyncSession]],
     progress: Callable[[AtlassianFetchSummary], Awaitable[None]] | None = None,
 ) -> StagedFetch:
     """Read the job's projects or spaces from the site and stage the bundle.

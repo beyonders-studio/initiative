@@ -5,7 +5,7 @@ import {
   readStoredCommunityId,
   readStoredCommunityIdFor,
 } from "@/lib/activeCommunityStorage";
-import { removeItem, setItem } from "@/lib/storage";
+import { removeItem } from "@/lib/storage";
 
 const KEY = "initiative-active-guild";
 
@@ -33,19 +33,6 @@ describe("the community a browser remembers", () => {
     persistCommunityId(1, 24);
 
     expect(readStoredCommunityId()).toBe(1);
-  });
-
-  it("reads what the old single-value shape left behind", () => {
-    setItem(KEY, "7");
-
-    expect(readStoredCommunityId()).toBe(7);
-    // Nothing in that shape says whose it was, so it stands in for any account
-    // until the first write under the new one replaces it.
-    expect(readStoredCommunityIdFor(19)).toBe(7);
-
-    persistCommunityId(2, 19);
-    expect(readStoredCommunityIdFor(19)).toBe(2);
-    expect(readStoredCommunityIdFor(24)).toBeNull();
   });
 
   it("forgets an account's community when it is cleared", () => {

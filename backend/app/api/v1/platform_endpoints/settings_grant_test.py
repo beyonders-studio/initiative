@@ -1,15 +1,17 @@
 """A grant for a community's settings, and nothing inside it."""
 
+from datetime import UTC
 from unittest.mock import AsyncMock
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.services.platform import access_grants as access_grants_service
+from app.services.platform import rules
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -19,7 +21,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-from app.services.platform import rules
 
 
 async def _request_and_approve(client, *, requester, approver, guild, rung):
@@ -199,6 +200,22 @@ async def test_the_superadmin_grantee_reads_the_auth_controls(
     assert response.status_code == 200, response.text
     assert response.json() == {
         "auth_options": ["providers", "restrictions"],
+        # The owner who made it, holding no second factor, no passkey and no
+        # provider link; no guests.
+        "member_figures": {
+            "total": 1,
+            "without_factor": 1,
+            "without_passkey": 1,
+            "never_through_any": 1,
+            "never_through": [],
+        },
+        "guest_figures": {
+            "total": 0,
+            "without_factor": 0,
+            "without_passkey": 0,
+            "never_through_any": 0,
+            "never_through": [],
+        },
         "auth_policy": {
             "policy": "open",
             "provider_id": None,
@@ -408,7 +425,7 @@ async def test_a_grant_counts_only_while_its_holder_may_hold_it(
 ):
     """A settings grant answers to its holder's rung as it stands now: demoted
     to moderator, they keep a Moderate grant's reach and nothing else."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.platform.access_grant import AccessGrant
 
@@ -429,7 +446,7 @@ async def test_a_grant_counts_only_while_its_holder_may_hold_it(
     entry = await client.get(f"/api/v1/communities/{guild.id}", headers=headers)
     assert entry.status_code == 403, entry.text
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=support.id,

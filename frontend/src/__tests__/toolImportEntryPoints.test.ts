@@ -28,15 +28,15 @@ const read = (relative: string) => fs.readFileSync(path.resolve(__dirname, relat
 const SURFACES = [
   {
     what: "the shared tool index",
-    source: read("../components/tools/ToolIndexPage.tsx"),
+    source: read("../pages/community/tools/ToolIndexPage.tsx"),
   },
   {
     what: "the calendars page",
-    source: read("../pages/initiativeTools/events/CalendarsPage.tsx"),
+    source: read("../pages/community/tools/calendars/CalendarsPage.tsx"),
   },
   {
     what: "the posts board",
-    source: read("../pages/initiativeTools/posts/PostsPage.tsx"),
+    source: read("../pages/community/tools/posts/PostsPage.tsx"),
   },
 ];
 

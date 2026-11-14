@@ -104,7 +104,7 @@ def test_every_platform_relation_resolves_to_a_table():
     listing = public_relation(
         PLATFORM_TARGET_RELATION[PlatformReportTarget.directory_listing]
     )
-    assert "is_community" in listing.c
+    assert "join_policy" in listing.c
 
 
 def test_a_marketplace_listing_is_the_platforms():

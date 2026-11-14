@@ -13,7 +13,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from operator import attrgetter
-from typing import Any, Final, List, Optional
+from typing import Any, Final
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, exists, func, or_
@@ -44,9 +44,10 @@ from app.db.query import (
 from app.db.session import require_guild_context, routed_guild_id
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, in_thread
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import PERSON_TYPES, MetadataDefinition
+from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import RecurrenceStrategy, Task, TaskAssignee, TaskPriority
 from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortDir
@@ -194,8 +195,8 @@ def _build_task_filter_fields(
     *,
     guild_id: int,
     current_user_id: int | None,
-    property_definitions: Optional[dict[int, MetadataDefinition]] = None,
-    plugin_fields: Optional[dict] = None,
+    property_definitions: dict[int, MetadataDefinition] | None = None,
+    plugin_fields: dict | None = None,
 ) -> dict:
     """The ``allowed_fields`` mapping for a task filter, from the field registry.
 
@@ -327,17 +328,18 @@ async def _annotate_tasks(
 #: How long a list row's description excerpt runs: two lines of a board card.
 _DESCRIPTION_EXCERPT_CHARS: Final = 160
 
-#: How much of the stored markdown a list reads to make the excerpt from —
-#: room for the markup (pictures, links, mentions) the excerpt leaves out.
-_DESCRIPTION_SOURCE_CHARS: Final = 4 * _DESCRIPTION_EXCERPT_CHARS
 
-#: What a list row reads in place of the description: its head, one character
-#: past the source length so a cut one can be told apart, and whether there is
-#: any description at all.
+def description_head(description: Any, chars: int = _DESCRIPTION_EXCERPT_CHARS):
+    """The head of ``description`` an excerpt of ``chars`` is made from: room
+    for the markup (pictures, links, mentions) the excerpt leaves out, and one
+    character past it so a cut one can be told apart."""
+    return func.left(description, 4 * chars + 1)
+
+
+#: What a list row reads in place of the description: its head, and whether
+#: there is any description at all.
 _DESCRIPTION_COLUMNS = (
-    func.left(Task.description, _DESCRIPTION_SOURCE_CHARS + 1).label(
-        "description_head"
-    ),
+    description_head(Task.description).label("description_head"),
     func.coalesce(Task.description != "", False).label("has_description"),
 )
 
@@ -350,39 +352,54 @@ _UNFINISHED_LINK = re.compile(r"(?:[!@]|#[\w-]+)?\[[^\]]*(?:\]\([^)]*)?$")
 _HELD_MENTION = re.compile("\ue000(\\d*)(\ue001)?")
 
 
-def _description_excerpt(head: str | None) -> str | None:
-    """A list row's plain-text excerpt of a description, from its head.
+def description_excerpt(
+    head: str | None,
+    chars: int = _DESCRIPTION_EXCERPT_CHARS,
+    *,
+    first_block: bool = False,
+) -> str | None:
+    """A plain-text excerpt of a description of at most ``chars``, from its
+    head (:func:`description_head` with the same ``chars``).
 
-    ``head`` is the first :data:`_DESCRIPTION_SOURCE_CHARS` + 1 characters of
-    the markdown; one past the source length means the description goes on, so
-    the excerpt is cut even when the text read so far is short. The excerpt is
-    the words of the description's blocks (:func:`blocks_from_markdown`):
-    pictures and code blocks drop out, a link keeps the words it shows, a
-    thing mentioned reads as its name, and a mention of somebody stays its
-    markdown, ``@[](42)``, which the client names.
+    One past the head's source length means the description goes on, so the
+    excerpt is cut even when the text read so far is short. The excerpt is
+    the words of the description's blocks (:func:`blocks_from_markdown`), or
+    with ``first_block`` of the first that has any: pictures and code blocks
+    drop out, a link keeps the words it shows, a thing mentioned reads as its
+    name, and a mention of somebody stays its markdown, ``@[](42)``, which the
+    client names.
     """
     if not head:
         return None
-    source_cut = len(head) > _DESCRIPTION_SOURCE_CHARS
-    source = head[:_DESCRIPTION_SOURCE_CHARS]
+    source_chars = 4 * chars
+    source_cut = len(head) > source_chars
+    source = head[:source_chars]
     if source_cut:
         # A link, picture or mention the cut goes through is left out whole.
         source = _UNFINISHED_LINK.sub("", source)
     words: list[str] = []
+    # Whether a block with words was read, and with ``first_block`` whether
+    # another followed it, so it was read whole.
+    found = ended = False
     for runs in runs_of(blocks_from_markdown(source)):
+        if first_block and found:
+            ended = True
+            break
         for run in runs:
             if "mention" in run:
                 words.append(f"\ue000{run['mention']}\ue001")
             elif not run.get("picture"):
                 words.append(run["text"])
         words.append(" ")
+        found = bool("".join(words).strip())
     text = " ".join("".join(words).split())
-    if not source_cut and len(text) <= _DESCRIPTION_EXCERPT_CHARS:
+    whole = not source_cut or ended
+    if whole and len(text) <= chars:
         return _released(text) or None
     # Leave room for the ellipsis, and end on a whole word: unless the cut
     # falls before a space, drop what follows the last one, which is part of a
     # word or, where the source was cut, of a piece of markup.
-    cut = text[: _DESCRIPTION_EXCERPT_CHARS - 1]
+    cut = text[: chars - 1]
     if not text[len(cut) :].startswith(" "):
         cut = cut.rpartition(" ")[0] or cut
     cut = _released(cut).rstrip()
@@ -420,7 +437,7 @@ def _task_to_list_read(
     initiative = project.initiative if project else None
     return TaskListRead.model_validate(task, from_attributes=True).model_copy(
         update={
-            "description_excerpt": _description_excerpt(description_head),
+            "description_excerpt": description_excerpt(description_head),
             "has_description": has_description,
             "community_id": guild_id,
             "community_name": guild_name,
@@ -457,7 +474,7 @@ _LIST_ROW_OPTIONS = (
 )
 
 
-def list_statement(build, q: "TaskListQuery", *options, columns=()):
+def list_statement(build, q: TaskListQuery, *options, columns=()):
     """``build``'s tasks, each with ``columns`` beside it, in the order ``q``
     asked for, loaded with ``options``."""
     return apply_sorting(
@@ -469,7 +486,7 @@ def list_statement(build, q: "TaskListQuery", *options, columns=()):
     )
 
 
-def list_row_statement(build, q: "TaskListQuery"):
+def list_row_statement(build, q: TaskListQuery):
     """The rows :func:`list_reads` serializes: each task loaded for a list,
     with its description head and flag beside it."""
     return list_statement(build, q, *_LIST_ROW_OPTIONS, columns=_DESCRIPTION_COLUMNS)
@@ -556,7 +573,7 @@ async def load_task(session: AsyncSession, task_id: int) -> Task | None:
 
 def _confining_project_id(
     conditions: list[FilterCondition | FilterGroup],
-) -> Optional[int]:
+) -> int | None:
     """The single project this request is narrowed to, or ``None``.
 
     Only a plain top-level equality on one id confines a request to a project.
@@ -579,7 +596,7 @@ def _confining_project_id(
             return None
         try:
             return int(cond.value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
     return None
 
@@ -590,8 +607,8 @@ async def _allowed_project_ids(
     context: ActorContext,
     *,
     include_templates: bool = False,
-    project_id: Optional[int] = None,
-) -> Optional[set[int]]:
+    project_id: int | None = None,
+) -> set[int] | None:
     """Project ids whose tasks this request may see.
 
     The set stays explicitly guild-scoped either way; the sharing gate on top of
@@ -622,7 +639,7 @@ async def _allowed_project_ids(
     else:
         conditions.append(Project.id == project_id)
     if not include_templates:
-        conditions.append(Project.is_template == False)  # noqa: E712
+        conditions.append(Project.is_template == False)
     stmt = select(Project.id).join(Project.initiative).where(*conditions)
     result = await session.exec(stmt)
     return {pid for pid in result.all() if pid is not None}
@@ -651,7 +668,7 @@ async def _gather_global_task_reads(
     current_user: User,
     *,
     build_query,
-    guild_ids: Optional[List[int]],
+    guild_ids: list[int] | None,
     page: int,
     page_size: int,
     sort_fields: list | None = None,
@@ -791,7 +808,7 @@ async def _gather_global_task_reads(
 async def list_global_tasks(
     session: AsyncSession,
     current_user: User,
-    q: "TaskListQuery",
+    q: TaskListQuery,
     *,
     created: bool = False,
     include_archived: bool = False,
@@ -812,7 +829,9 @@ async def list_global_tasks(
     ``conditions``).
     """
     base_conditions = [
-        Task.created_by == current_user.id
+        and_(
+            Task.created_by_kind == ActorKind.member, Task.created_by == current_user.id
+        )
         if created
         else TaskAssignee.user_id == current_user.id,
         Project.archived_at.is_(None),
@@ -862,13 +881,13 @@ class TaskListQuery:
     and the cross-guild /me aggregates so they stay in lockstep."""
 
     user_conditions: list
-    sort_fields: Optional[list]
-    tz: Optional[str]
+    sort_fields: list | None
+    tz: str | None
     # project_id narrows which projects the guild path checks access on; guild_ids
     # restricts the cross-guild fan-out. Every other field filters through
     # ``user_conditions`` via apply_filters, so no other scalar is extracted here.
-    project_id: Optional[int]
-    guild_ids: Optional[list]
+    project_id: int | None
+    guild_ids: list | None
     property_definitions: dict
     #: The plug-in fields the reader may filter by (``metadata.filter_fields``).
     plugin_fields: dict
@@ -882,7 +901,7 @@ def _property_value_leaves(
 
 
 def check_task_conditions(
-    conditions: Optional[str],
+    conditions: str | None,
 ) -> list[FilterCondition | FilterGroup]:
     """The task list's ``conditions``, parsed and checked without a database:
     the operators each field takes, and how many property filters one list
@@ -902,9 +921,9 @@ def check_task_conditions(
 
 async def parse_task_list_query(
     session,
-    conditions: Optional[str],
-    sorting: Optional[str],
-    tz: Optional[str],
+    conditions: str | None,
+    sorting: str | None,
+    tz: str | None,
     *,
     across_guilds_for: User | None = None,
 ) -> TaskListQuery:
@@ -941,7 +960,7 @@ async def parse_task_list_query(
         if isinstance(cond.value, dict):
             try:
                 property_ids_needed.append(int(cond.value.get("property_id")))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
     guild_ids = extract_condition_value(user_conditions, "community_ids")
     if across_guilds_for is not None:
@@ -994,7 +1013,7 @@ def read_person_filters(q: TaskListQuery) -> None:
         elif cond.field == "property_values" and isinstance(cond.value, dict):
             try:
                 defn = q.property_definitions.get(int(cond.value.get("property_id")))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 defn = None
             if (
                 defn is not None
@@ -1011,7 +1030,7 @@ async def _load_property_definitions_across_guilds(
     session: AsyncSession,
     current_user: User,
     needed: list[int],
-    guild_ids: Optional[list],
+    guild_ids: list | None,
 ) -> dict[int, MetadataDefinition]:
     """Load the property definitions a cross-guild ``/me`` list needs, routing
     into each of the user's guild schemas.
@@ -1113,9 +1132,9 @@ async def count_tasks_for_export(
     session,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
 ) -> int:
     """Row count for an export snapshot — the cheap pre-render signal for the
@@ -1138,9 +1157,9 @@ async def task_ids_for_export(
     session,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
     limit: int,
 ) -> list[int]:
@@ -1163,9 +1182,9 @@ async def query_task_reads_for_export(
     session,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
     max_rows: int,
 ) -> list[TaskListRead]:
@@ -1217,7 +1236,7 @@ async def task_reads_by_id(
 
 async def task_details_for_export(
     session, task_ids: list[int]
-) -> tuple[dict[int, tuple[Optional[str], list]], dict[int, list[Comment]]]:
+) -> tuple[dict[int, tuple[str | None, list]], dict[int, list[Comment]]]:
     """What a detailed report adds to listed tasks: each one's description and
     checklist, and its comments. Read under the caller's session, for tasks
     the list already let them see."""
@@ -1258,7 +1277,7 @@ async def _load_comments_for_tasks(
 
 
 def _task_calendar_window_clause(
-    start_after: Optional[datetime], start_before: Optional[datetime]
+    start_after: datetime | None, start_before: datetime | None
 ):
     """Keep only tasks that sit on a calendar within ``[start_after,
     start_before]`` — i.e. whose ``start_date`` OR ``due_date`` falls in the
@@ -1361,13 +1380,13 @@ async def query_guild_tasks(
     current_user: User,
     guild_context: ActorContext,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
-    start_after: Optional[datetime] = None,
-    start_before: Optional[datetime] = None,
-    initiative_id: Optional[int] = None,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    initiative_id: int | None = None,
 ) -> list[TaskListRead]:
     """Fetch every guild task matching the filter (no pagination).
 
@@ -1402,12 +1421,12 @@ async def query_my_tasks_list(
     session: AsyncSession,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
-    start_after: Optional[datetime] = None,
-    start_before: Optional[datetime] = None,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
 ) -> list[TaskListRead]:
     """Fetch every cross-guild assigned task matching the filter (no paging).
 

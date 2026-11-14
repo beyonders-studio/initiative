@@ -1,7 +1,7 @@
 """A sign-in finished in the phone's browser, handed back to the app.
 
-The app cannot hold an identity provider's redirect or a passkey ceremony
-itself, so it opens the phone's browser and the sign-in finishes there. What
+The app cannot hold an identity provider's redirect itself, so it opens the
+phone's browser and the sign-in finishes there. What
 comes back through ``initiative://oidc/callback`` is a one-time code, not a
 credential: the app redeems it over HTTPS with the PKCE verifier it generated
 when it began (RFC 8252 §7.1, RFC 7636), and the session opens then.
@@ -35,9 +35,18 @@ _CHALLENGE_CHARS = frozenset(
 _CHALLENGE_LENGTH = 43
 
 
+#: RFC 7636 §4.1: a verifier is 43–128 unreserved characters.
+_VERIFIER_CHARS = _CHALLENGE_CHARS | {".", "~"}
+
+
 def is_challenge(value: str) -> bool:
     """Whether ``value`` has the shape of an S256 ``code_challenge``."""
     return len(value) == _CHALLENGE_LENGTH and set(value) <= _CHALLENGE_CHARS
+
+
+def is_verifier(value: str) -> bool:
+    """Whether ``value`` has the shape of a PKCE ``code_verifier``."""
+    return 43 <= len(value) <= 128 and set(value) <= _VERIFIER_CHARS
 
 
 @dataclass(frozen=True)
@@ -92,6 +101,6 @@ async def redeem(
         return None
     try:
         data = json.loads(decrypt_field(code, SALT_NATIVE_HANDOFF))
-    except (InvalidToken, UnicodeDecodeError, ValueError):
+    except InvalidToken, UnicodeDecodeError, ValueError:
         return None
     return Handoff(**data)

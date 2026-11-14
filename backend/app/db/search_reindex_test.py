@@ -9,18 +9,20 @@ last swept for.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 from sqlalchemy import text
 from sqlmodel import select
 
 from app.db import cohorts, schema_provisioning
 from app.db import session as db_session
+from app.db.request_context import SystemGuild
 from app.db.schema_provisioning import backfill_guild_search, reindex_guild_search
 from app.db.search_index import search_generation
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.search_entry import SearchEntry
 from app.testing import create_project, create_tag, create_task
-from app.db.request_context import SystemGuild
 
 
 async def _entries(session, guild_id: int, entity_type: str) -> list[SearchEntry]:
@@ -91,11 +93,11 @@ async def test_the_swept_rows_carry_the_same_identity_the_trigger_writes(
 
 
 async def test_soft_deleted_content_is_not_swept_in(session, acting_user):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project, title="trashed")
-    task.deleted_at = datetime.now(timezone.utc)
+    task.deleted_at = datetime.now(UTC)
     session.add(task)
     await session.commit()
     await _wipe(a.guild.id)

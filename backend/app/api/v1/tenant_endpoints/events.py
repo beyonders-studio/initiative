@@ -1,12 +1,11 @@
-from app.api.deps import CommunityIdPath
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, WebSocket
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.content_socket import admit, hold_open
+from app.api.deps import CommunityIdPath
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.services.content_sockets import (
@@ -35,9 +34,7 @@ def _rooms_for(guild_id: int) -> Authorizer:
     given its room, and somebody removed loses it.
     """
 
-    async def authorize(
-        session: AsyncSession, user: User
-    ) -> Optional[frozenset[RoomKey]]:
+    async def authorize(session: AsyncSession, user: User) -> frozenset[RoomKey] | None:
         rows = await session.exec(
             select(Initiative.id).where(initiative_scope_clause(user.id, Initiative.id))
         )

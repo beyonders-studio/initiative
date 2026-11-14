@@ -1,7 +1,7 @@
 import json
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Any, NoReturn, Optional, Sequence
+from typing import Annotated, Any, NoReturn
 
 from fastapi import Cookie, Depends, HTTPException, Path, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -59,6 +59,7 @@ from app.db.public_rls import PLATFORM_SUSPENDED
 from app.db.request_context import (
     ContentGrantee,
     Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
@@ -108,6 +109,7 @@ from app.services.auth.credentials import (
 from app.services.membership import live_membership_clause
 from app.services.platform import access_grants as access_grants_service
 from app.services.platform import auth_posture, guild_entitlements, rules
+from app.services.platform import member_moderation as moderation_service
 from app.services.tenant import plugin_age
 from app.services.tenant.plugin_age import AgeViewer
 
@@ -127,7 +129,6 @@ _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 #: something authority the credential itself carries, because there the
 #: credential is a party to the decision rather than a way of transporting it.
 CREDENTIAL_SESSION = CredentialKind.session.value
-CREDENTIAL_API_KEY = CredentialKind.api_key.value
 #: An installed plug-in's access token. Only a route that names a plug-in scope
 #: admits one (:func:`plugin_scope`).
 CREDENTIAL_INSTALL = "install"
@@ -229,8 +230,8 @@ async def _authenticate(
 async def get_current_user(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User:
     # ``bearer_token`` and ``session_cookie`` declare the schemes for the API
     # description; the credential itself is read once, by ``identify``.
@@ -265,8 +266,8 @@ def require_first_party_session(request: Request) -> str:
 async def get_current_user_optional(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User | None:
     try:
         return await get_current_user(request, session, bearer_token, session_cookie)
@@ -686,7 +687,7 @@ async def _enforce_guild_api_access(
 
 async def _read_membership_gate(
     session: AsyncSession, guild_id: int, user_id: int
-) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool] | None:
+) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool, bool] | None:
     """The two rows the gate needs about a member, in one query.
 
     ``guild_memberships`` and ``guilds`` both live in ``public`` and are both
@@ -694,7 +695,8 @@ async def _read_membership_gate(
     was two trips for one answer. Two of the deployment's rules ride along for
     the same reason — what it asks of an account is decided in the same breath
     as what the community asks of the session, and a read of its own would be a
-    round trip on every guild request there is.
+    round trip on every guild request there is. So does whether the member is
+    timed out, which decides the role the request routes into.
 
     Each row still comes back under its own policies — an outer join to a row
     the session may not read yields NULL, exactly as its own SELECT would have.
@@ -708,6 +710,7 @@ async def _read_membership_gate(
                 Guild,
                 rules.platform_rule_sql("second_factor_requirement"),
                 rules.platform_rule_sql("community_age_gate_enabled"),
+                moderation_service.live_timeout_end(),
             )
             .select_from(GuildMembership)
             .outerjoin(Guild, Guild.id == GuildMembership.guild_id)
@@ -720,10 +723,16 @@ async def _read_membership_gate(
     ).one_or_none()
     if row is None:
         return None
-    membership, guild, asked, age_gate_on = row
+    membership, guild, asked, age_gate_on, timed_out_until = row
     if guild is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
-    return membership, guild, asked_of_an_account(asked), bool(age_gate_on)
+    return (
+        membership,
+        guild,
+        asked_of_an_account(asked),
+        bool(age_gate_on),
+        timed_out_until is not None,
+    )
 
 
 async def _read_grant_gate(
@@ -850,7 +859,7 @@ async def _load_guild_context(
                 None if settings_grant is None else settings_grant.access_level
             ),
         )
-    membership, guild, asked, age_gate_on = gate
+    membership, guild, asked, age_gate_on, timed_out = gate
     # Membership access respects the guild's lifecycle status: the statuses
     # that serve members are named, and every other one is refused, on every
     # surface. A suspended community is in time out — its administrators are
@@ -876,7 +885,7 @@ async def _load_guild_context(
     if (
         not for_settings
         and current_user.age_confirmed_at is None
-        and guild.is_community
+        and guild.listed
         and age_gate_on
     ):
         raise GuildAccessError(
@@ -895,8 +904,11 @@ async def _load_guild_context(
         guild_id=guild_id,
         membership=membership,
         guild_role=membership.role.value,
+        # The community's content is frozen, or this member is timed out: the
+        # same hold, which the standing statement computes from the same rows.
         content_read_only=(
-            not for_settings and guild.status == CommunityStatus.read_only.value
+            not for_settings
+            and (guild.status == CommunityStatus.read_only.value or timed_out)
         ),
     )
 
@@ -1258,16 +1270,6 @@ async def get_guild_settings_session(
     return session
 
 
-async def get_guild_settings_write_session(
-    session: SessionDep,
-    guild_context: Annotated[GuildContext, Depends(get_guild_settings_context)],
-) -> AsyncSession:
-    """The same session, for a configuration route that changes something: a
-    grantee is asked for the ``read_write`` grant beside the rung."""
-    require_grant_writes(guild_context)
-    return session
-
-
 async def establish_guild_access(
     session: AsyncSession,
     current_user: User,
@@ -1436,6 +1438,36 @@ async def establish_filer_access(session: AsyncSession, user: User) -> int:
                 cases=tuple(row[0] for row in cases),
             ),
         )
+    except DBAPIError as exc:
+        clear_rls_context(session)
+        await session.rollback()
+        raise FilerAccessError("operations community cannot be routed") from exc
+    return guild_id
+
+
+async def establish_ideas_access(session: AsyncSession, user: User | None) -> int:
+    """Route ``session`` as whoever reads the published ideas, ``user`` or
+    nobody signed in — the establishment seam for the ideas, beside
+    :func:`establish_filer_access`.
+
+    Into the operations community's ``guild_<id>_ideas`` role, which is what
+    decides what they read. ``session`` comes from that community's cohort on
+    the request engine. Returns the community's id.
+
+    Raises :class:`FilerAccessError` where no operations community is set, or
+    it has no ideas role to assume.
+    """
+    from app.services.platform.intake import configured_operations_guild_id
+
+    guild_id = await configured_operations_guild_id()
+    if guild_id is None:
+        raise FilerAccessError("no operations community")
+    user_id = int(user.id) if user is not None else None
+    try:
+        await set_rls_context(session, IdeaReader(guild_id=guild_id, user_id=user_id))
+        # Applied by the first statement: a community with no ideas role to
+        # assume is refused here rather than by the caller's first read.
+        await session.exec(sa_text("SELECT 1"))
     except DBAPIError as exc:
         clear_rls_context(session)
         await session.rollback()
@@ -1689,7 +1721,7 @@ def plugin_scope(scope: str) -> Callable[..., Awaitable[ActorContext]]:
         request: Request,
         session: SessionDep,
         guild_id: CommunityIdPath,
-        person: Annotated[Optional[User], Depends(get_actor_user)],
+        person: Annotated[User | None, Depends(get_actor_user)],
     ) -> ActorContext:
         if person is None:
             # ``get_actor_user`` answers ``None`` only for an access token.
@@ -1726,7 +1758,7 @@ def plugin_scope_by(
         request: Request,
         session: SessionDep,
         guild_id: CommunityIdPath,
-        person: Annotated[Optional[User], Depends(get_actor_user)],
+        person: Annotated[User | None, Depends(get_actor_user)],
     ) -> ActorContext:
         if person is None:
             scope = scopes.get(str(request.path_params.get(param)))
@@ -1781,7 +1813,7 @@ def plugin_scope_checked(
         request: Request,
         session: SessionDep,
         guild_id: CommunityIdPath,
-        person: Annotated[Optional[User], Depends(get_actor_user)],
+        person: Annotated[User | None, Depends(get_actor_user)],
     ) -> ActorContext:
         if person is None:
             return await _establish_install_request(request, session, None)
@@ -1804,9 +1836,9 @@ def plugin_scope_checked(
 async def get_actor_user(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
-) -> Optional[User]:
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
+) -> User | None:
     """The person a scoped route serves, or ``None`` for an installed plug-in.
 
     For a person, the same two dependencies a content route composes, in the
@@ -1822,7 +1854,7 @@ async def get_actor_user(
 
 
 #: The account a scoped route serves; ``None`` when an installed plug-in calls it.
-ActorUserDep = Annotated[Optional[User], Depends(get_actor_user)]
+ActorUserDep = Annotated[User | None, Depends(get_actor_user)]
 
 
 def _route_dependency_value(route: Any, attribute: str) -> Any:
@@ -1995,9 +2027,6 @@ SettingsSeatWriteContextDep = Annotated[
     Depends(require_guild_roles(CommunityRole.superadmin, settings=True, write=True)),
 ]
 SettingsRLSSessionDep = Annotated[AsyncSession, Depends(get_guild_settings_session)]
-SettingsWriteSessionDep = Annotated[
-    AsyncSession, Depends(get_guild_settings_write_session)
-]
 SeatContextDep = Annotated[GuildContext, Depends(get_guild_seat_context)]
 SeatWriteContextDep = Annotated[GuildContext, Depends(get_guild_seat_write_context)]
 SeatSessionDep = Annotated[AsyncSession, Depends(get_guild_seat_session)]
@@ -2054,21 +2083,6 @@ async def _apply_user_session_context(
     )
     await set_rls_context(session, Platform(user_id=current_user.id, tier=tier))
     return session
-
-
-async def get_factor_exempt_user_session(
-    session: SessionDep,
-    current_user: FactorExemptUser,
-) -> AsyncSession:
-    """The platform-path session for a route that stays reachable while the
-    deployment's second-factor rule is unmet — routed exactly as the ordinary
-    one, and holding no more."""
-    return await _apply_user_session_context(session, current_user)
-
-
-FactorExemptSessionDep = Annotated[
-    AsyncSession, Depends(get_factor_exempt_user_session)
-]
 
 
 async def get_account_holder_session(
@@ -2133,9 +2147,9 @@ UserSessionDep = Annotated[AsyncSession, Depends(get_user_session)]
 async def get_upload_user(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    token_param: Annotated[Optional[str], Query(alias="token")] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    token_param: Annotated[str | None, Query(alias="token")] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User:
     """Auth dependency for /uploads/* and authenticated file downloads.
 

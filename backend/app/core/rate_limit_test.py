@@ -13,7 +13,7 @@ import uuid
 import jwt
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware, _find_route_handler
@@ -22,20 +22,20 @@ from starlette.requests import Request
 from starlette.routing import Mount
 
 from app.core import audit_context, identify, rate_limit
-from app.core.plugin_access_token import seal_install_token
 from app.core.config import settings
+from app.core.plugin_access_token import seal_install_token
 from app.core.rate_limit import (
     _default_limits,
     build_limiter,
     get_user_or_ip_key,
     limiter,
 )
+from app.core.routing import MOUNTED, route_endpoint
 from app.core.security import (
     SESSION_COOKIE_NAME,
     create_upload_token,
     mint_access_token,
 )
-from app.core.routing import MOUNTED, route_endpoint
 from app.main import app
 from app.testing import create_user, get_auth_headers, in_request_tasks
 

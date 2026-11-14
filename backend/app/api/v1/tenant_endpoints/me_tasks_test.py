@@ -7,15 +7,18 @@ created.
 """
 
 import json
+from datetime import UTC
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.tenant.task_types import get_default_type
-from app.testing import guild_of
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task, TaskAssignee, TaskPriority
+from app.services.tenant.task_types import get_default_type
+from app.testing import guild_of, route_as
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
@@ -26,8 +29,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.testing import route_as
 
 
 async def _create_task(
@@ -57,6 +58,7 @@ async def _create_task(
         task_status_id=status.id,
         task_type_id=(await get_default_type(session, project.id)).id,
         created_by=created_by,
+        created_by_kind=ActorKind.member,
         due_date=due_date,
         start_date=start_date,
         priority=priority,
@@ -93,7 +95,7 @@ async def test_list_my_tasks_returns_assigned(
 ):
     """GET /me/tasks returns tasks assigned to the current user."""
     user = await create_user(session, email="user@example.com")
-    guild, _, project = await _setup_guild_with_project(session, user)
+    _guild, _, project = await _setup_guild_with_project(session, user)
 
     task1 = await _create_task(session, project, "Assigned 1", created_by=user.id)
     task2 = await _create_task(session, project, "Assigned 2", created_by=user.id)
@@ -136,7 +138,11 @@ async def test_list_my_tasks_assigned_or_created(
     await _assign(session, from_other, user.id)
     # A row from before ``created_by`` existed belongs to nobody's created view.
     legacy = await _create_task(session, project, "Legacy", created_by=user.id)
-    await session.exec(update(Task).where(Task.id == legacy.id).values(created_by=None))
+    await session.exec(
+        update(Task)
+        .where(Task.id == legacy.id)
+        .values(created_by=None, created_by_kind=ActorKind.system)
+    )
     await session.commit()
 
     headers = get_auth_headers(user)
@@ -198,7 +204,7 @@ async def test_list_my_tasks_priority_filter(
 ):
     """GET /me/tasks respects priority filters."""
     user = await create_user(session, email="user@example.com")
-    guild, _, project = await _setup_guild_with_project(session, user)
+    _guild, _, project = await _setup_guild_with_project(session, user)
 
     high = await _create_task(session, project, "High", created_by=user.id)
     high.priority = TaskPriority.high
@@ -233,14 +239,14 @@ async def test_list_my_tasks_due_date_filter_across_guilds(
     the full condition set per guild via apply_filters, matching the
     guild-scoped list.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     overdue = now - timedelta(days=2)
     upcoming = now + timedelta(days=10)
 
     user = await create_user(session, email="user@example.com")
-    guild1, _, project1 = await _setup_guild_with_project(
+    _guild1, _, project1 = await _setup_guild_with_project(
         session, user, guild_name="Guild 1"
     )
     _guild2, _, project2 = await _setup_guild_with_project(
@@ -329,7 +335,7 @@ async def test_list_my_tasks_guild_ids_filter(
 async def test_list_my_tasks_pagination(client: AsyncClient, session: AsyncSession):
     """GET /me/tasks supports pagination."""
     user = await create_user(session, email="user@example.com")
-    guild, _, project = await _setup_guild_with_project(session, user)
+    _guild, _, project = await _setup_guild_with_project(session, user)
 
     for i in range(3):
         task = await _create_task(session, project, f"Task {i}", created_by=user.id)
@@ -394,9 +400,9 @@ async def test_list_my_tasks_paged_page_interleaves_guilds(
     ``total_count``. Interleaving the due dates across two guilds means guild
     order and sort order disagree on every page.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     user = await create_user(session, email="user@example.com")
     _guild1, _, project1 = await _setup_guild_with_project(
@@ -463,9 +469,9 @@ async def test_list_my_tasks_page_from_one_guild_only(
     whose tasks all sort onto a later page must contribute to ``total_count``
     without appearing in ``items``.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     user = await create_user(session, email="user@example.com")
     _guild1, _, project1 = await _setup_guild_with_project(
@@ -516,18 +522,18 @@ async def test_list_my_tasks_date_group_sorted_across_guilds(
     later guild's "today" task could appear after an earlier guild's "later"
     task. The merged set must be globally re-sorted before pagination.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     overdue = now - timedelta(days=2)
     this_week = now + timedelta(days=3)
     later = now + timedelta(days=60)
 
     user = await create_user(session, email="user@example.com")
-    guild1, _, project1 = await _setup_guild_with_project(
+    _guild1, _, project1 = await _setup_guild_with_project(
         session, user, guild_name="Guild 1"
     )
-    guild2, _, project2 = await _setup_guild_with_project(
+    _guild2, _, project2 = await _setup_guild_with_project(
         session, user, guild_name="Guild 2"
     )
 
@@ -571,10 +577,10 @@ async def test_list_my_tasks_priority_sorted_desc_across_guilds(
     not alphabetically — descending therefore yields urgent → high → medium → low.
     """
     user = await create_user(session, email="user@example.com")
-    guild1, _, project1 = await _setup_guild_with_project(
+    _guild1, _, project1 = await _setup_guild_with_project(
         session, user, guild_name="Guild 1"
     )
-    guild2, _, project2 = await _setup_guild_with_project(
+    _guild2, _, project2 = await _setup_guild_with_project(
         session, user, guild_name="Guild 2"
     )
 
@@ -620,7 +626,7 @@ async def test_list_my_tasks_property_value_is_null_filter(
     )
 
     user = await create_user(session, email="user@example.com")
-    guild, initiative, project = await _setup_guild_with_project(session, user)
+    _guild, initiative, project = await _setup_guild_with_project(session, user)
 
     definition = await create_property_definition(
         session, initiative, name="Owner note", type=MetadataType.text
@@ -735,7 +741,7 @@ async def test_list_my_tasks_property_filter_spans_guilds(
 async def test_my_tasks_accepts_nested_or_conditions(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.tenant.task import TaskStatusCategory
     from app.testing.factories import create_task
@@ -743,7 +749,7 @@ async def test_my_tasks_accepts_nested_or_conditions(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     due_soon = await create_task(
         session,

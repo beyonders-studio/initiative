@@ -9,17 +9,18 @@ decided by leaves memberships where they are.
 import base64
 import json
 
-import httpx
+import httpx2
 from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_OIDC_CLIENT_SECRET, encrypt_field
+from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.guild import GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
@@ -37,7 +38,6 @@ from app.testing.factories import (
     create_guild_provider_connection,
     create_user,
 )
-from app.db.request_context import Unattributed
 
 
 async def _configured(session: AsyncSession, slug: str):
@@ -115,7 +115,7 @@ async def test_a_provider_that_fails_does_not_take_the_others_with_it(
 
 _TOKEN_ENDPOINT = "https://bridge.example.com/token"
 _USERINFO_ENDPOINT = "https://bridge.example.com/userinfo"
-_REAL_ASYNC_CLIENT = httpx.AsyncClient
+_REAL_ASYNC_CLIENT = httpx2.AsyncClient
 
 
 def _directory_rule(*, provider_id: int, guild_id: int) -> OIDCClaimMapping:
@@ -149,20 +149,20 @@ def _idp(monkeypatch, *, id_token_claims: dict | None, userinfo: dict) -> None:
             "userinfo_endpoint": _USERINFO_ENDPOINT,
         }
 
-    def _handler(request: httpx.Request) -> httpx.Response:
+    def _handler(request: httpx2.Request) -> httpx2.Response:
         if str(request.url) == _TOKEN_ENDPOINT:
             body: dict = {"access_token": "access"}
             if id_token_claims is not None:
                 body["id_token"] = _unsigned_jwt(id_token_claims)
-            return httpx.Response(200, json=body)
-        return httpx.Response(200, json=userinfo)
+            return httpx2.Response(200, json=body)
+        return httpx2.Response(200, json=userinfo)
 
     def _client(*args, **kwargs):
-        kwargs["transport"] = httpx.MockTransport(_handler)
+        kwargs["transport"] = httpx2.MockTransport(_handler)
         return _REAL_ASYNC_CLIENT(*args, **kwargs)
 
     monkeypatch.setattr(oidc_refresh, "_fetch_oidc_metadata", _metadata)
-    monkeypatch.setattr(oidc_refresh.httpx, "AsyncClient", _client)
+    monkeypatch.setattr(oidc_refresh.httpx2, "AsyncClient", _client)
 
 
 async def _placed_by_directory(session: AsyncSession):

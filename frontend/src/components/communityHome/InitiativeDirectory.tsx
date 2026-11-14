@@ -29,8 +29,8 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronRight, Clock, Loader2, Plus, Users } from "lucide-react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { Check, ChevronRight, Clock, Plus, Users } from "lucide-react";
+import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -38,22 +38,26 @@ import type {
   InitiativeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeJoinPolicy } from "@/api/generated/initiativeAPI.schemas";
-import { RequestToJoinDialog } from "@/components/initiatives/RequestToJoinDialog";
-import { Markdown } from "@/components/Markdown";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Markdown } from "@/components/markdown/Markdown";
+import { RequestToJoinDialog } from "@/components/members/RequestToJoinDialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useInitiativeAccess } from "@/hooks/useInitiativeAccess";
-import { useInitiatives, useJoinInitiative } from "@/hooks/useInitiatives";
+import {
+  useInitiatives,
+  useJoinInitiative,
+  useRequestToJoinInitiative,
+} from "@/hooks/useInitiatives";
 import { useToolCountsByInitiative } from "@/hooks/useToolCounts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { hexToRgba, InitiativeColorDot, resolveInitiativeColor } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
 import { getItem, setItem } from "@/lib/storage";
 import { initiativeRoute, TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { cn } from "@/ui/lib/utils";
 
 export const DIRECTORY_SECTION_ID = "initiative-directory";
 
@@ -118,9 +122,11 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
 
   const [open, setOpen] = useState(() => getItem(collapsedStorageKey(communityId)) !== "true");
   // Switching communities keeps this mounted, so re-read the community whose list it now is.
-  useEffect(() => {
+  const [prevCommunityId, setPrevCommunityId] = useState(communityId);
+  if (prevCommunityId !== communityId) {
+    setPrevCommunityId(communityId);
     setOpen(getItem(collapsedStorageKey(communityId)) !== "true");
-  }, [communityId]);
+  }
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -137,6 +143,12 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
   // Which door is being knocked on, if any — the dialog is one instance for the
   // whole section rather than one per card.
   const [requesting, setRequesting] = useState<{ id: number; name: string } | null>(null);
+  const requestToJoin = useRequestToJoinInitiative({
+    onSuccess: () => {
+      toast.success(t("initiatives:joinRequests.requested", { name: requesting?.name ?? "" }));
+      setRequesting(null);
+    },
+  });
 
   // Nothing to show and nothing to add: the community simply has no initiatives
   // this reader can reach, and the surrounding page says so where it matters.
@@ -277,16 +289,10 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
           <Button
             size="sm"
             disabled={joinInitiative.isPending}
+            pending={joiningId === entry.id}
             onClick={() => joinInitiative.mutate({ initiativeId: entry.id })}
           >
-            {joiningId === entry.id ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("directory.joining")}
-              </>
-            ) : (
-              t("directory.join")
-            )}
+            {joiningId === entry.id ? t("directory.joining") : t("directory.join")}
           </Button>
         ) : entry.join_policy === InitiativeJoinPolicy.request ? (
           entry.has_pending_request ? (
@@ -351,7 +357,13 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
         </CollapsibleContent>
 
         <RequestToJoinDialog
-          initiative={requesting}
+          title={t("initiatives:joinRequests.dialogTitle", { name: requesting?.name ?? "" })}
+          description={t("initiatives:joinRequests.dialogDescription")}
+          hint={t("initiatives:joinRequests.messageHint")}
+          pending={requestToJoin.isPending}
+          onSend={(message) =>
+            requesting && requestToJoin.mutate({ initiativeId: requesting.id, data: { message } })
+          }
           open={requesting !== null}
           onOpenChange={(next) => {
             if (!next) {

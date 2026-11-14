@@ -8,7 +8,7 @@ request that was refused, and a write that changed nothing, leave no record.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -23,7 +23,6 @@ from app.testing.factories import (
     get_auth_headers,
     get_auth_token,
 )
-
 
 PASSWORD = "testpassword123"
 

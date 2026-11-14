@@ -20,8 +20,6 @@ task takes it on.
 
 from __future__ import annotations
 
-from typing import List
-
 from fastapi import APIRouter, status
 from sqlmodel import select
 
@@ -51,7 +49,7 @@ me_router = APIRouter()
 
 async def _community_items(
     session, user_id: int, mark: ListedMark, limit: int | None = None
-) -> List[PersonalItemRead]:
+) -> list[PersonalItemRead]:
     """This community's tools the reader marked this way and may still read,
     newest first. Must run in the community's routed session."""
     context = require_guild_context(session)
@@ -63,7 +61,7 @@ async def _community_items(
     loaded = await load_tool_items(
         session, ((row.entity_type, row.entity_id) for row in rows)
     )
-    items: List[PersonalItemRead] = []
+    items: list[PersonalItemRead] = []
     for row in rows:
         item = loaded.get((row.entity_type, row.entity_id))
         if item is None:
@@ -131,13 +129,13 @@ async def _set(
     return await _state(session, current_user.id, kind, row.id)
 
 
-@guild_router.get("", response_model=List[PersonalItemRead])
+@guild_router.get("", response_model=list[PersonalItemRead])
 async def list_personal_items(
     mark: ListedMark,
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
-) -> List[PersonalItemRead]:
+) -> list[PersonalItemRead]:
     """The tools the reader opened or bookmarked in this community, newest first."""
     del guild_context  # validation + routing happen in the dependency
     return await _community_items(session, current_user.id, mark)
@@ -313,12 +311,12 @@ async def unsubscribe_item(
     )
 
 
-@me_router.get("/personal-items", response_model=List[PersonalItemRead])
+@me_router.get("/personal-items", response_model=list[PersonalItemRead])
 async def list_my_personal_items(
     mark: ListedMark,
     session: UserSessionDep,
     current_user: CurrentUser,
-) -> List[PersonalItemRead]:
+) -> list[PersonalItemRead]:
     """The tools the reader opened or bookmarked in every community they are in,
     newest first. Opens are the tabs: as many as the reader keeps."""
     member_guilds = list(
@@ -336,7 +334,7 @@ async def list_my_personal_items(
         else None
     )
 
-    async def _fetch(guild_session, guild_id: int) -> List[PersonalItemRead]:  # type: ignore[no-untyped-def]
+    async def _fetch(guild_session, guild_id: int) -> list[PersonalItemRead]:  # type: ignore[no-untyped-def]
         del guild_id
         return await _community_items(guild_session, current_user.id, mark, limit)
 

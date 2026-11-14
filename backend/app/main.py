@@ -2,7 +2,6 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -10,17 +9,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import TypeAdapter
 from pydantic.json_schema import models_json_schema
-from fastapi.responses import FileResponse, JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from starlette.types import ASGIApp, Receive, Scope, Send
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware, _should_exempt, sync_check_limits
-
 from sqlalchemy.exc import DBAPIError
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.deps import (
     CommunityIdPath,
@@ -30,28 +28,32 @@ from app.api.deps import (
     get_upload_user,
     raise_for_guild_access,
 )
-from app.api.plugin_openapi import build_plugin_openapi, mark_plugin_scopes
 from app.api.embed_csp import content_security_policy, plugin_frame_policy
-from app.core.body_limit import BodySizeLimitMiddleware
-from app.core.compression import TextCompressionMiddleware
-from app.core.csrf import CsrfOriginMiddleware
+from app.api.plugin_openapi import build_plugin_openapi, mark_plugin_scopes
 from app.api.v1.api import api_router
 from app.api.well_known import router as well_known_router
+from app.core.body_limit import BodySizeLimitMiddleware
+from app.core.compression import TextCompressionMiddleware
+from app.core.config import API_V1_STR, PROJECT_NAME, settings
+from app.core.csrf import CsrfOriginMiddleware
 from app.core.errors import CodedError
+from app.core.logging_config import configure_logging
 from app.core.messages import (
     CommonMessages,
     GuildMessages,
 )
 from app.core.rate_limit import limiter
+from app.core.request_audit import RequestAuditMiddleware, server_error
+from app.core.routing import MOUNTED, route_endpoint
 from app.core.security import (
     billing_support_handoff_enabled,
 )
-from app.core.config import API_V1_STR, PROJECT_NAME, settings
-from app.core.logging_config import configure_logging
-from app.core.request_audit import RequestAuditMiddleware, server_error
-from app.core.routing import MOUNTED, route_endpoint
-from app.core.version import __version__
 from app.core.smart_chips import SmartChipKind
+from app.core.version import __version__
+from app.db.errors import INSUFFICIENT_PRIVILEGE_SQLSTATE, dbapi_sqlstate
+from app.db.frozen import FROZEN_PARENT_CONSTRAINT, frozen_refusal
+from app.db.session import SystemSessionLocal
+from app.models.platform.user import User
 from app.schemas.platform.ticket import (
     AppealTicketCreate,
     FeedbackTicketCreate,
@@ -59,10 +61,6 @@ from app.schemas.platform.ticket import (
     SecurityTicketCreate,
     SupportTicketCreate,
 )
-from app.db.errors import INSUFFICIENT_PRIVILEGE_SQLSTATE, dbapi_sqlstate
-from app.db.frozen import FROZEN_PARENT_CONSTRAINT, frozen_refusal
-from app.db.session import SystemSessionLocal
-from app.models.platform.user import User
 from app.services import background_tasks as background_tasks_service
 from app.services import captcha_config
 
@@ -71,10 +69,6 @@ from app.services import captcha_config
 configure_logging()
 
 logger = logging.getLogger(__name__)
-
-#: The same question for a row written before the type column existed: its
-#: stored name is the only thing that describes it.
-NAMED_AS_MARKUP = (".svg", ".html", ".htm")
 
 #: How long a browser may reuse a served upload before asking again.
 #:
@@ -627,16 +621,9 @@ async def serve_upload_file(
     }
     # What the file is, as the server recorded it when it was written — so a
     # local blob and an S3 one describe themselves the same way, rather than
-    # each backend answering from what it happens to have. A row from before
-    # the column existed carries nothing; its name is read instead, and the
-    # backend keeps naming the type as it always has.
+    # each backend answering from what it happens to have.
     stored_type = hit[0]
-    inline = (
-        stored_type in INLINE_UPLOAD_TYPES
-        if stored_type is not None
-        else not fname.lower().endswith(NAMED_AS_MARKUP)
-    )
-    if not inline:
+    if stored_type not in INLINE_UPLOAD_TYPES:
         headers["Content-Disposition"] = "attachment"
         headers["Content-Security-Policy"] = USER_CONTENT_CSP
     logger.info("upload_served filename=%s user=%d", filename, current_user.id)

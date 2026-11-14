@@ -6,12 +6,12 @@ only after a credential resolves to an active user, and leaves it when the
 connection ends, however it ends.
 
 The socket is driven directly rather than over the wire — the HTTP test client
-here is ``httpx``, which speaks no WebSocket — with a stand-in that records what
+here is ``httpx2``, which speaks no WebSocket — with a stand-in that records what
 the endpoint did to it.
 """
 
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import WebSocketDisconnect
@@ -269,9 +269,8 @@ async def test_the_socket_closes_when_its_sign_in_ends(
     from sqlalchemy import update
 
     from app.models.platform.user import User
-    from app.services.content_sockets import WS_CREDENTIAL_ENDED
-
     from app.services.auth import sessions as session_service
+    from app.services.content_sockets import WS_CREDENTIAL_ENDED
 
     user = await create_user(session)
     issued = await session_service.create_session(

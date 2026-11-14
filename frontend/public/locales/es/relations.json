@@ -3,7 +3,6 @@
   "description": "Todo con lo que esto está conectado, y cómo.",
   "untitled": "Sin título",
   "empty": "Aún no hay nada enlazado.",
-  "loadFailed": "Los enlaces no responden. Inténtalo de nuevo en un momento.",
   "add": "Añadir enlace",
   "graph": {
     "alt": "{{title}} y las {{count}} cosas con las que está conectado",
@@ -95,7 +94,6 @@
       "option": "está etiquetado"
     }
   },
-  "loading": "Cargando…",
   "empty_task": "Aún no hay nada enlazado. Enlaza el archivo que describe esta tarea, o la tarea que la bloquea.",
   "empty_file": "Aún no hay nada enlazado. Enlaza el proyecto que esto explica, o la tarea de la que surgió.",
   "empty_project": "Aún no hay nada enlazado. Adjunta los archivos en los que se apoya este proyecto.",

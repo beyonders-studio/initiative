@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { getAppConfig, getGetAppConfigQueryKey } from "@/api/generated/config/config";
+import { useGetAppConfig } from "@/api/generated/config/config";
 import { useServer } from "@/hooks/useServer";
 import { setAccentFaviconColors, syncFaviconWithTheme } from "@/lib/favicon";
+import { hexToOklch, type Oklch, oklchToString } from "@/lib/oklch";
 
 interface InterfaceSettings {
   light_accent_color: string;
@@ -12,67 +12,17 @@ interface InterfaceSettings {
 
 const clampUnit = (value: number) => Math.max(0, Math.min(1, value));
 
-const srgbToLinear = (value: number) => {
-  const channel = value / 255;
-  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-};
-
-const hexToOklch = (hex: string | undefined | null) => {
-  if (!hex) {
-    // Default to a neutral gray if no hex provided
-    return { l: 0.5, c: 0, h: 0 };
-  }
-  let normalized = hex.replace("#", "");
-  if (normalized.length === 3) {
-    normalized = normalized
-      .split("")
-      .map((char) => `${char}${char}`)
-      .join("");
-  }
-
-  const r = srgbToLinear(parseInt(normalized.slice(0, 2), 16));
-  const g = srgbToLinear(parseInt(normalized.slice(2, 4), 16));
-  const b = srgbToLinear(parseInt(normalized.slice(4, 6), 16));
-
-  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
-  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
-  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
-
-  const l_ = Math.cbrt(l);
-  const m_ = Math.cbrt(m);
-  const s_ = Math.cbrt(s);
-
-  const okL = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
-  const okA = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
-  const okB = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
-
-  const chroma = Math.sqrt(okA * okA + okB * okB);
-  let hue = (Math.atan2(okB, okA) * 180) / Math.PI;
-  if (hue < 0) {
-    hue += 360;
-  }
-
-  return {
-    l: clampUnit(okL),
-    c: Math.max(0, chroma),
-    h: hue,
-  };
-};
-
-const oklchToString = ({ l, c, h }: { l: number; c: number; h: number }) =>
-  `${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(2)}`;
-
-const lighten = (oklch: { l: number; c: number; h: number }, amount: number) => ({
+const lighten = (oklch: Oklch, amount: number) => ({
   ...oklch,
   l: clampUnit(oklch.l + amount / 100),
 });
 
-const darken = (oklch: { l: number; c: number; h: number }, amount: number) => ({
+const darken = (oklch: Oklch, amount: number) => ({
   ...oklch,
   l: clampUnit(oklch.l - amount / 100),
 });
 
-const toReadableForeground = (color: { l: number; c: number; h: number }) => {
+const toReadableForeground = (color: Oklch) => {
   const targetLightness = color.l >= 0.6 ? 0.18 : 0.96;
   return {
     ...color,
@@ -102,12 +52,12 @@ export const useInterfaceColors = () => {
   const { isServerConfigured, loading: serverLoading } = useServer();
 
   // The colours are part of the public config the SPA boots with.
-  const query = useQuery({
-    queryKey: getGetAppConfigQueryKey(),
-    queryFn: () => getAppConfig(),
-    staleTime: 1000 * 60 * 10,
-    // Don't fetch until server is configured (matters on native platforms)
-    enabled: isServerConfigured && !serverLoading,
+  const query = useGetAppConfig({
+    query: {
+      staleTime: 1000 * 60 * 10,
+      // Don't fetch until server is configured (matters on native platforms)
+      enabled: isServerConfigured && !serverLoading,
+    },
   });
 
   useEffect(() => {

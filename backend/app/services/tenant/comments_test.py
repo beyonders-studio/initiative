@@ -11,12 +11,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File
 from app.services.tenant.comments import (
     _ensure_parent_access,
     _load_parent,
 )
-from app.testing.factories import TOOL_FACTORIES
 from app.testing import (
     create_access_grant,
     create_comment,
@@ -28,6 +28,7 @@ from app.testing import (
     create_user,
     route_as,
 )
+from app.testing.factories import TOOL_FACTORIES
 
 
 async def test_task_comment_access_honors_grant(session: AsyncSession, reading_as):
@@ -80,6 +81,7 @@ async def test_file_comment_access_honors_grant(session: AsyncSession, reading_a
         name="Doc",
         content={},
         created_by=owner.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(file)
     await session.commit()
@@ -134,9 +136,9 @@ async def test_a_read_only_grant_cannot_post(session: AsyncSession, reading_as):
     task = await create_task(session, project)
 
     insert = text(
-        "INSERT INTO comments (task_id, content, created_by,"
+        "INSERT INTO comments (task_id, content, created_by, created_by_kind,"
         " created_at, updated_at)"
-        " VALUES (:t, 'let me in', :u, now(), now())"
+        " VALUES (:t, 'let me in', :u, 'member', now(), now())"
     ).bindparams(t=task.id, u=support.id)
 
     # A grantee reaches the community through the row, and the row says at
@@ -185,7 +187,7 @@ class TestCommentRlsLegs:
         await create_guild_membership(session, user=outsider, guild=guild)
 
         count_sql = text(
-            f"SELECT count(*) FROM comments WHERE {tool.value}_id = :eid"  # noqa: S608 — column name from the Tool enum
+            f"SELECT count(*) FROM comments WHERE {tool.value}_id = :eid"
         ).bindparams(eid=entity.id)
 
         s = await role_session("app_user")

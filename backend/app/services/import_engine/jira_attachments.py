@@ -18,15 +18,16 @@ from __future__ import annotations
 import logging
 import tempfile
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, BinaryIO, Callable, Optional
+from typing import Any, BinaryIO
 
 from app.core.messages import ImportEngineMessages
 from app.services.data_jobs import while_beating
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.import_engine.contract import ImportEngineError
-from app.services.import_engine import limits as import_limits
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class ImageReport:
     file_bytes: int = 0
     files_by_issue: dict[str, list[StoredImage]] = field(default_factory=dict)
 
-    def absorb(self, other: "ImageReport") -> None:
+    def absorb(self, other: ImageReport) -> None:
         """Add another page's report to this one."""
         self.images += other.images
         self.image_bytes += other.image_bytes
@@ -215,7 +216,7 @@ async def download_images(
     budget_bytes: int,
     max_files: int,
     files_allowed: bool = False,
-    tick: Optional[Callable[[], Awaitable[None]]] = None,
+    tick: Callable[[], Awaitable[None]] | None = None,
 ) -> ImageReport:
     """Fetch every issue's images, within the per-image cap and a total budget.
 
@@ -312,7 +313,7 @@ def media_urls(images: list[StoredImage], *, guild_id: int) -> dict[str, str]:
 
 def unreferenced_section(
     images: list[StoredImage], referenced: set[str], *, guild_id: int
-) -> Optional[str]:
+) -> str | None:
     """Markdown for the images attached but never embedded, or ``None``.
 
     Ends the description, under a rule, so an image somebody attached without

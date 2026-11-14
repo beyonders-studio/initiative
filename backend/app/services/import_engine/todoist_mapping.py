@@ -30,8 +30,8 @@ from __future__ import annotations
 import csv
 import io
 import re
-from datetime import date, datetime, time, timezone
-from typing import Any, Optional
+from datetime import UTC, date, datetime, time
+from typing import Any
 
 from app.core import recurrence
 from app.core.user_input_validators import resolve_zone
@@ -94,7 +94,7 @@ def _cell(row: dict[str, str], name: str) -> str:
 def _int(value: str, default: int) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -251,7 +251,7 @@ def _repeating(
         end = datetime.combine(
             date.fromisoformat(deadline[:10]), time(23, 59, 59), resolve_zone(tz)
         )
-        rule += f";UNTIL={end.astimezone(timezone.utc):%Y%m%dT%H%M%SZ}"
+        rule += f";UNTIL={end.astimezone(UTC):%Y%m%dT%H%M%SZ}"
     anchor = datetime.combine(
         now.astimezone(resolve_zone(tz)).date(), at or time(), resolve_zone(tz)
     )
@@ -305,12 +305,12 @@ def build_project_envelope(
     is nothing to pick between — what the wizard collects is a name. ``now``
     is when a repeating task's next date is counted from.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     rows = _rows(content)
     section_names: list[str] = []
-    current_section: Optional[str] = None
+    current_section: str | None = None
     tasks: list[dict[str, Any]] = []
-    last_task: Optional[dict[str, Any]] = None
+    last_task: dict[str, Any] | None = None
     skipped = 0
 
     for row in rows:

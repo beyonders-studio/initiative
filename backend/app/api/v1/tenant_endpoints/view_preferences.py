@@ -9,7 +9,7 @@ key names the list inside the community, so it carries no community id
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Response, status
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -19,10 +19,9 @@ from app.api.deps import CurrentUser, GuildContextDep, RLSSessionDep
 from app.api.v1.platform_endpoints.user_view_preferences import ScopeKeyPath
 from app.models.tenant.view_preference import ViewPreference
 from app.schemas.platform.user_view_preference import (
-    UserViewPreferenceWrite,
     UserViewPreferencesMap,
+    UserViewPreferenceWrite,
 )
-
 
 router = APIRouter()
 
@@ -56,7 +55,7 @@ async def put_community_view_preference(
     grantee is not a member, and a ``read_only`` community takes no writes, so
     nothing is kept for either."""
     if not (guild_context.is_pam or guild_context.content_read_only):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stmt = pg_insert(ViewPreference).values(
             user_id=current_user.id,
             scope_key=scope_key,

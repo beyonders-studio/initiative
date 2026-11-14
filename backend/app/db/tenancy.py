@@ -43,28 +43,27 @@ from app.core.rules import (
     SURFACE_CUSTOM_ROLES,
     SURFACE_PLUGINS,
 )
-
 from app.db.initiative_rls import INITIATIVE_SCOPED_TABLES
 from app.db.public_rls import SHARED_TABLE_REGISTRY
 
 __all__ = [
-    "NON_MODEL_SHARED_TABLES",
-    "SHARED_TABLES",
+    "ALL_CLASSIFIED_TABLES",
+    "CREATED_BY_EXEMPT_TABLES",
     "GUILD_LEVEL_TABLES",
+    "GUILD_SCOPED_TABLES",
+    "INITIATIVE_SCOPED_TABLES",
     "MANAGED_TABLES",
-    "OWN_ROW_TABLES",
     "MEMBER_CREDENTIAL_TABLES",
     "MEMBER_SECRET_TABLES",
+    "NON_MODEL_SHARED_TABLES",
+    "OPERATIONS_TABLES",
+    "OWN_ROW_TABLES",
     "PRIVATE_ROW_SHARED_READ",
     "PRIVATE_ROW_TABLES",
-    "CREATED_BY_EXEMPT_TABLES",
-    "INITIATIVE_SCOPED_TABLES",
-    "GUILD_SCOPED_TABLES",
-    "OPERATIONS_TABLES",
-    "ALL_CLASSIFIED_TABLES",
+    "SHARED_TABLES",
     "is_guild_scoped",
-    "is_shared",
     "is_initiative_scoped",
+    "is_shared",
 ]
 
 # --- Shared (stay in the ``public`` schema) ---------------------------------
@@ -101,6 +100,7 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # (app.db.guild_ddl._custom_roles_block).
         "custom_roles",
         "custom_role_members",
+        "custom_role_plugin_permissions",
         # Which custom role a provider's group gives: sign-in configuration,
         # the seat's (SEAT_TABLES).
         "custom_role_claim_rules",
@@ -352,6 +352,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "calendar_event_attendees",
         "calendar_event_answers",
         "custom_role_members",
+        "custom_role_plugin_permissions",
         "initiative_members",
         "initiative_rules",
         "task_assignees",
@@ -383,6 +384,9 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         # A ballot: ``user_id`` is the voter, which is both the author of the
         # row and its whole content.
         "post_poll_votes",
+        # A vote for an idea, likewise; the voter is not a member, and the
+        # writer that records it has nobody of its own to name.
+        "idea_votes",
         "personal_items",
         # A value belongs to its definition's owner, not to whoever set it.
         "metadata_values",
@@ -432,7 +436,7 @@ GUILD_SCOPED_TABLES: frozenset[str] = INITIATIVE_SCOPED_TABLES | GUILD_LEVEL_TAB
 # (``app.db.operations_schema``). Each is still classified above, which is how
 # it is secured there.
 OPERATIONS_TABLES: frozenset[str] = frozenset(
-    {"intake_bindings", "intake_cases", "case_grants"}
+    {"intake_bindings", "intake_cases", "case_grants", "idea_votes"}
 )
 
 # Union of every table that has an explicit placement decision.

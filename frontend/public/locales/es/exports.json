@@ -172,7 +172,6 @@
       "dashboard": "Panel"
     },
     "download": "Descargar",
-    "empty": "Aún no hay exportaciones.",
-    "loadFailed": "No se pudieron cargar las exportaciones. Actualiza para volver a intentarlo."
+    "empty": "Aún no hay exportaciones."
   }
 }

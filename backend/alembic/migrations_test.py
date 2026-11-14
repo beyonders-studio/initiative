@@ -26,30 +26,29 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 from urllib.parse import urlparse
 
 import asyncpg
 import pytest
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
+from alembic import command
 from app.core.config import settings
-from conftest import CHECKOUT_ID, connect_su_postgres
 from app.db.advisory_locks import LockNamespace
 from app.db.tenancy import GUILD_SCOPED_TABLES
-
+from conftest import CHECKOUT_ID, connect_su_postgres
 
 ALEMBIC_SCRIPT_LOCATION = Path(__file__).resolve().parent
 BACKEND_DIR = ALEMBIC_SCRIPT_LOCATION.parent
 ALEMBIC_INI_PATH = BACKEND_DIR / "alembic.ini"
 
-# The baseline is the new root: anything before it was squashed into
-# this migration (the v0.53.5 snapshot) and cannot be reached, so its
+# The baseline is the root: everything before it was collapsed into it
+# (scripts/collapse_migrations.py) and cannot be reached, so its
 # ``downgrade()`` is a permanent ``NotImplementedError``.
-BASELINE_REVISION = "20260626_0125"
+BASELINE_REVISION = ScriptDirectory(str(ALEMBIC_SCRIPT_LOCATION)).get_base()
 
 # Migrations whose ``downgrade()`` intentionally raises
 # ``NotImplementedError`` and which therefore have to be skipped when
@@ -58,23 +57,6 @@ BASELINE_REVISION = "20260626_0125"
 INTENTIONALLY_IRREVERSIBLE = frozenset(
     {
         BASELINE_REVISION,
-        # post_squash_reconcile: folds the (never-shipped) 0126–0130 chain —
-        # legacy healing + policy strips + grant matrices. It reconciles
-        # pre-collapse states that no longer have code paths; roll forward only.
-        "20260702_0126",
-        # drop_frozen_public_guild_copies: the dropped rows can't be restored,
-        # so stamping 0162 back would leave the revision disagreeing with the
-        # physical schema. One-way door; restore from a backup instead.
-        "20260811_0163",
-        # an_account_is_reached_by_its_addresses: users.email_hash was NOT NULL
-        # and unique across the table, and user_emails allows an account to hold
-        # no address, so the column cannot be rebuilt for every row. Roll
-        # forward; restore from a backup instead.
-        "20260915_0274",
-        # apps_are_plug_ins: the app tables, roles and stored values move to
-        # their plug-in names with nothing kept under the old ones. Roll
-        # forward; restore from a backup instead.
-        "20261005_0457",
     }
 )
 

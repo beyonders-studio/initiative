@@ -35,8 +35,10 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 # "ALTER TABLE public.x FORCE ROW LEVEL SECURITY". The optional "public." and
 # the required whitespace before FORCE keep this from matching the "NO FORCE"
 # half of a lift-and-restore.
-_FORCE = re.compile(r"ALTER\s+TABLE\s+(?:public\.)?(\w+)\s+FORCE\s+ROW\s+LEVEL", re.I)
-_WRITE = re.compile(r"(?:INSERT\s+INTO|UPDATE)\s+(?:public\.)?(\w+)", re.I)
+_FORCE = re.compile(
+    r"ALTER\s+TABLE\s+(?:public\.)?(\w+)\s+FORCE\s+ROW\s+LEVEL", re.IGNORECASE
+)
+_WRITE = re.compile(r"(?:INSERT\s+INTO|UPDATE)\s+(?:public\.)?(\w+)", re.IGNORECASE)
 
 
 def _module_functions(tree: ast.Module) -> dict[str, ast.FunctionDef]:
@@ -64,7 +66,7 @@ def _reachable_strings(
 
 
 def _created_tables(upgrade: ast.FunctionDef) -> set[str]:
-    created = set()
+    created: set[str] = set()
     for node in ast.walk(upgrade):
         if (
             isinstance(node, ast.Call)
@@ -72,6 +74,7 @@ def _created_tables(upgrade: ast.FunctionDef) -> set[str]:
             and node.func.attr == "create_table"
             and node.args
             and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
         ):
             created.add(node.args[0].value)
     return created

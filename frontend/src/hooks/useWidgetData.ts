@@ -9,8 +9,9 @@
  * author's data. Nothing a definition can say reaches a URL.
  *
  * Two bindings: a statement, which answers with columns and rows, and a
- * plug-in's data, which answers with its own rows or, with a statement over
- * them, with columns and rows too. Every hook below is called
+ * plug-in widget's endpoint, which answers with the plug-in's own rows and
+ * values. A placed widget of either kind is answered with its canvas; the
+ * config dialog's preview asks for its own. Every hook below is called
  * on every render with `enabled` gating rather than conditionally, because
  * hooks must be unconditional. Disabled queries cost nothing, and the ones that
  * do run share React Query's cache — two widgets running the same statement
@@ -93,14 +94,12 @@ export interface WidgetDataResult {
  * tables the statement reads answer for that initiative alone. So a widget
  * cannot show another initiative's rows even to a reader who is in both.
  *
- * `widgetId` says which widget on that dashboard is asking. Only a binding
- * carrying a statement needs it, and only to have the *stored* one run: nothing
- * here says what to run.
+ * `widgetId` says which widget on that dashboard is asking, and only to have
+ * what it *stores* read: its statement, or its plug-in's endpoint with its
+ * parameters. Nothing here says what to run.
  *
- * `dashboardId` is the row the widget sits on, and only the `plugin` source needs
- * it: a plug-in's data is community-level, so the proxy is told which
- * initiative-scoped surface is asking and decides the read against *that* row's
- * gates.
+ * `dashboardId` is the row the widget sits on. A widget not placed yet names it
+ * too: a plug-in widget's preview is read for that dashboard.
  */
 export function useWidgetData(
   binding: WidgetBinding,
@@ -109,6 +108,7 @@ export function useWidgetData(
   widgetId?: string
 ): WidgetDataResult {
   const source = binding.source;
+  const isPlugin = source === "plugin";
   const scoped = typeof initiativeId === "number" && Number.isFinite(initiativeId);
 
   // The statement is the request: no ids to resolve first. What it does not
@@ -126,7 +126,12 @@ export function useWidgetData(
   // handed. The binding here is the effective one — the definition with the
   // instance config over it, which is what the server reads too — so this asks
   // the same question the lookup would.
-  const addressed = typeof dashboardId === "number" && Boolean(widgetId) && Boolean(binding.sql);
+  // A plug-in widget is placed the same way: the server reads its endpoint with
+  // the parameters it stores.
+  const bound = isPlugin
+    ? Boolean(binding.plugin_uid && binding.endpoint_id)
+    : Boolean(binding.sql);
+  const addressed = typeof dashboardId === "number" && Boolean(widgetId) && bound;
   // Placed once is placed for good. A canvas re-renders with its dashboard
   // momentarily unknown, and a widget that flipped back to sending its own
   // statement for those renders would read a hook that has nothing retained —
@@ -137,9 +142,9 @@ export function useWidgetData(
   if (addressed) wasPlaced.current = true;
   const placed = addressed || wasPlaced.current;
   const widgetQuery = useWidgetQuery(
-    source === "query" && placed ? (dashboardId ?? null) : null,
-    source === "query" && placed ? (widgetId ?? null) : null,
-    { enabled: scoped && source === "query" && placed }
+    placed ? (dashboardId ?? null) : null,
+    placed ? (widgetId ?? null) : null,
+    { enabled: scoped && placed }
   );
   const sqlQuery = useSqlQuery(
     source === "query" && !placed ? (binding.sql ?? null) : null,
@@ -151,27 +156,34 @@ export function useWidgetData(
   // The plug-in palette is one request per community, shared by every plug-in widget on the
   // canvas. It is what turns a binding's `plugin_uid` into an install id and tells
   // us what freshness the source asks for.
-  const isPlugin = source === "plugin";
   const pluginCatalogQuery = usePluginWidgetCatalog(scoped && isPlugin);
   const pluginBinding = resolvePluginBinding(
     pluginCatalogQuery.data,
     binding.plugin_uid,
     binding.endpoint_id
   );
+  // Only a plug-in widget that is not placed yet, the config dialog's preview,
+  // reads its endpoint itself, with the parameters on the form.
   const pluginQuery = usePluginData({
     pluginId: pluginBinding?.entry.plugin_id,
     endpointId: binding.endpoint_id ?? undefined,
     dashboardId,
     params: binding.params ?? undefined,
-    widgetId,
     cacheTtlSeconds: pluginBinding?.source.cache_ttl_seconds,
-    enabled: scoped && isPlugin,
+    enabled: scoped && isPlugin && !placed,
   });
 
+  // A placed widget is answered by its canvas entry, a refusal included, as a
+  // statement's tile is; the preview's query keeps its last good body for its
+  // key.
+  const pluginAnswer = placed ? widgetQuery.plugin : pluginQuery.data;
+  const pluginLoading = placed ? widgetQuery.isLoading : pluginQuery.isLoading;
+  const pluginFailed = placed ? widgetQuery.isError : pluginQuery.isError;
+
   const refetch = useCallback(() => {
-    if (source === "query") void answering.refetch();
-    if (isPlugin) void pluginQuery.refetch();
-  }, [source, isPlugin, answering.refetch, pluginQuery.refetch]);
+    if (placed || source === "query") void answering.refetch();
+    else if (isPlugin) void pluginQuery.refetch();
+  }, [placed, source, isPlugin, answering.refetch, pluginQuery.refetch]);
 
   return useMemo<WidgetDataResult>(() => {
     const unbound = (): WidgetDataResult => ({
@@ -234,9 +246,13 @@ export function useWidgetData(
       }
 
       case "plugin": {
-        // A definition that never had the plug-in filled in, or a canvas with no
-        // dashboard behind it (a preview). Neither is an error.
-        if (!binding.plugin_uid || !binding.endpoint_id || typeof dashboardId !== "number") {
+        // A definition that never had the plug-in filled in, or a preview with no
+        // dashboard behind it. Neither is an error.
+        if (
+          !binding.plugin_uid ||
+          !binding.endpoint_id ||
+          (!placed && typeof dashboardId !== "number")
+        ) {
           return unbound();
         }
         if (pluginCatalogQuery.isLoading) {
@@ -282,11 +298,9 @@ export function useWidgetData(
         // Installed, but its pinned version stopped offering this source —
         // the catalog answered, so this is absence rather than a failure.
         if (!pluginBinding) return absent({ isLoading: false, isError: false });
-        // A plug-in that stopped answering does not blank a tile that already has
-        // rows: React Query keeps the last good body for this key, and showing
-        // it is more useful than showing nothing. The error tile is for when
-        // there is genuinely nothing to draw.
-        if (pluginQuery.isError && !pluginQuery.data) {
+        // The preview's last good rows are more useful than nothing, so the
+        // error tile is for when there is genuinely nothing to draw.
+        if (pluginFailed && !pluginAnswer) {
           return {
             data: emptyDataFor(source),
             isLoading: false,
@@ -296,36 +310,15 @@ export function useWidgetData(
             errorCode: WidgetErrorCode.PLUGIN_UNAVAILABLE,
           };
         }
-        const rows = pluginQuery.data?.rows ?? [];
-        const values = pluginQuery.data?.values ?? {};
+        const rows = pluginAnswer?.rows ?? [];
+        const values = pluginAnswer?.values ?? {};
         const meta: DataMeta = { total: rows.length };
-        // A binding with a statement asks a question of the plug-in's rows, and the
-        // server answers with a table — the same envelope a query produces. So
-        // a chart can be pointed at a plug-in, while a plug-in's own module keeps
-        // being handed the plug-in's own shape.
-        const table = pluginQuery.data?.table;
-        if (table) {
-          const described = table.columns ?? [];
-          const answered: DataMeta = { total: table.rows?.length ?? 0 };
-          return {
-            data: {
-              source: "rows",
-              ...normalizeQueryRows(described, table.rows ?? []),
-              meta: answered,
-            },
-            isLoading: pluginQuery.isLoading,
-            isUnbound: false,
-            isRestricted: false,
-            refetch,
-            meta: answered,
-          };
-        }
         return {
           // Already read through the endpoint's declared returns on the way
           // here. Nothing on this side looks inside either half; the sandbox is
           // handed them as values.
           data: { source, rows, values, meta },
-          isLoading: pluginQuery.isLoading,
+          isLoading: pluginLoading,
           isUnbound: false,
           isRestricted: false,
           refetch,
@@ -344,6 +337,7 @@ export function useWidgetData(
     answering.isLoading,
     answering.isError,
     scoped,
+    placed,
     dashboardId,
     binding.plugin_uid,
     binding.endpoint_id,
@@ -351,9 +345,9 @@ export function useWidgetData(
     pluginCatalogQuery.data,
     pluginCatalogQuery.isLoading,
     pluginCatalogQuery.isError,
-    pluginQuery.data,
-    pluginQuery.isLoading,
-    pluginQuery.isError,
+    pluginAnswer,
+    pluginLoading,
+    pluginFailed,
     refetch,
   ]);
 }

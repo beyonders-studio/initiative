@@ -7,6 +7,7 @@ who reads what; the log's own reads go through its policy too.
 from __future__ import annotations
 
 import json
+from datetime import UTC
 
 import pytest
 from sqlalchemy import text
@@ -211,7 +212,8 @@ async def test_the_database_keeps_a_tombstone_and_the_log_as_they_are(
         asking = await reading_as(scene[who].user.id, scene["guild"].id)
         with pytest.raises(Exception) as refused:
             await asking.exec(text(statement), params=params)
-        assert "ObjectNotInPrerequisiteState" in str(refused.value), statement
+        # object_not_in_prerequisite_state
+        assert getattr(refused.value.orig, "sqlstate", None) == "55000", statement
         await asking.rollback()
 
 
@@ -413,7 +415,7 @@ async def test_an_edit_waits_on_a_lock_being_placed_and_is_refused_by_it(
     """Locking and writing take turns on the thread: an edit arriving while a
     lock is being placed waits for it, then finds the thread locked."""
     import asyncio
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.db import cohorts
     from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -430,7 +432,7 @@ async def test_an_edit_waits_on_a_lock_being_placed_and_is_refused_by_it(
             thread_key(guild_id, "tasks", task_id),
         )
         task = (await locking.exec(select(Task).where(Task.id == task_id))).one()
-        task.comments_locked_at = datetime.now(timezone.utc)
+        task.comments_locked_at = datetime.now(UTC)
         locking.add(task)
         await locking.flush()
 

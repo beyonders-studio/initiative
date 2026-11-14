@@ -21,9 +21,9 @@ from app.models.tenant.resource_grant import (
     ResourceAccessLevel,
 )
 from app.testing import (
-    create_resource_grant,
     create_access_grant,
     create_project,
+    create_resource_grant,
     create_user,
     route_as,
 )

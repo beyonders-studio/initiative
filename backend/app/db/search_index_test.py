@@ -10,14 +10,15 @@ against the rendering code.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
-
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, select
 
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
+from app.db.request_context import SystemGuild
 from app.db.search_index import (
     COMMENT_PREVIEW_CHARS,
     NOT_SEARCHABLE,
@@ -39,7 +40,6 @@ from app.testing import (
     create_task,
     route_system,
 )
-from app.db.request_context import SystemGuild
 
 
 async def _entries(
@@ -233,9 +233,9 @@ async def test_soft_delete_removes_it_from_the_index(session, acting_user):
     task = await create_task(session, a.project, title="gone")
     assert await _entries(session, a.guild.id, "task", task.id)
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    task.deleted_at = datetime.now(timezone.utc)
+    task.deleted_at = datetime.now(UTC)
     session.add(task)
     await session.commit()
 

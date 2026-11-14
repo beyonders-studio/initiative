@@ -11,19 +11,17 @@
  * declares.
  */
 
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginSettingRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useUpdatePluginSetting } from "@/hooks/useCommunityPluginDetail";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { listFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
 
 export interface PluginSettingsPanelProps {
   pluginId: number;
@@ -77,7 +75,6 @@ function SettingField({
           setDraft(null);
           toast.success(t("plugins:installSettings.saved"));
         },
-        onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
       }
     );
   };
@@ -97,9 +94,9 @@ function SettingField({
         />
         <Button
           type="submit"
-          disabled={draft === null || draft.trim() === (setting.value ?? "") || save.isPending}
+          disabled={draft === null || draft.trim() === (setting.value ?? "")}
+          pending={save.isPending}
         >
-          {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {t("common:save")}
         </Button>
       </form>

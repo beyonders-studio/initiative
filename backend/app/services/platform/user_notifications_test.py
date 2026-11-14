@@ -6,7 +6,7 @@ read in between, and an event landing on an already-read line would never be
 seen.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -36,7 +36,7 @@ class TestRefreshNotification:
         user = await create_user(session, email="rollup-read-race@example.com")
         guild = await create_guild(session, creator=user)
         line = await _line(session, user.id, guild_id=guild.id, count=1)
-        line.read_at = datetime.now(timezone.utc)
+        line.read_at = datetime.now(UTC)
         await session.flush()
 
         await user_notifications.refresh_notification(
@@ -48,7 +48,7 @@ class TestRefreshNotification:
         user = await create_user(session, email="rollup-withdraw-read@example.com")
         guild = await create_guild(session, creator=user)
         line = await _line(session, user.id, guild_id=guild.id, count=2)
-        read_at = datetime.now(timezone.utc)
+        read_at = datetime.now(UTC)
         line.read_at = read_at
         await session.flush()
 
@@ -88,7 +88,7 @@ async def test_find_unread_by_data_matches_every_key(session: AsyncSession):
         is None
     )
 
-    wanted.read_at = datetime.now(timezone.utc)
+    wanted.read_at = datetime.now(UTC)
     await session.flush()
     assert (
         await user_notifications.find_unread_by_data(

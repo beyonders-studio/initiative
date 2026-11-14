@@ -5,7 +5,9 @@ form-encoded in, JSON out, and its errors are the protocol's own
 ``{"error", "error_description"}`` bodies rather than this API's ``detail``
 codes, because the reader is an OAuth client. The plug-in authenticates with a JWT
 it signs (RFC 7523 §2.2), or, for a member token, presents one as the grant
-itself (RFC 7523 §2.1); see :mod:`app.services.marketplace.plugin_oauth`.
+itself (RFC 7523 §2.1); see :mod:`app.services.marketplace.plugin_oauth`. Sign in
+with Initiative's ``authorization_code`` and ``refresh_token`` grants are answered
+here too (:mod:`app.services.marketplace.plugin_sign_in`).
 
 ``GET /plugin-platform/installations`` takes a **plug-in token** and lists the plug-in's
 installs, a page at a time, each named by the reference the plug-in asks for an
@@ -16,24 +18,28 @@ what they read is registrations, spent assertions and, for the listing, the
 install index (``plugin_installs``).
 """
 
-from typing import Any, List, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import SystemSessionDep
-from app.core.plugin_access_token import PluginAccessToken
-from app.core.plugin_scopes import InstallLevel
 from app.core.identify import bearer_plugin_token
 from app.core.messages import AuthMessages
+from app.core.plugin_access_token import PluginAccessToken
+from app.core.plugin_scopes import InstallLevel
 from app.schemas.platform.plugin_oauth import (
     PluginAccessTokenResponse,
     PluginInstallationRead,
     PluginOAuthErrorResponse,
 )
-from app.services.marketplace import plugin_installs, plugin_oauth, registration_lookup
-
+from app.services.marketplace import (
+    plugin_installs,
+    plugin_oauth,
+    plugin_sign_in,
+    registration_lookup,
+)
 
 router = APIRouter()
 
@@ -53,6 +59,10 @@ _PARAMETERS = (
     "resource",
     "level",
     "assertion",
+    "code",
+    "redirect_uri",
+    "code_verifier",
+    "refresh_token",
 )
 
 _TOKEN_REQUEST_BODY: dict[str, Any] = {
@@ -69,6 +79,7 @@ _TOKEN_REQUEST_BODY: dict[str, Any] = {
                             "enum": [
                                 plugin_oauth.GRANT_CLIENT_CREDENTIALS,
                                 plugin_oauth.GRANT_JWT_BEARER,
+                                *sorted(plugin_sign_in.GRANTS),
                             ],
                         },
                         "client_assertion_type": {
@@ -85,6 +96,10 @@ _TOKEN_REQUEST_BODY: dict[str, Any] = {
                             "enum": [level.value for level in InstallLevel],
                         },
                         "assertion": {"type": "string"},
+                        "code": {"type": "string"},
+                        "redirect_uri": {"type": "string"},
+                        "code_verifier": {"type": "string"},
+                        "refresh_token": {"type": "string"},
                     },
                 }
             }
@@ -151,10 +166,33 @@ async def issue_plugin_access_token(
     request: Request, session: SystemSessionDep
 ) -> JSONResponse:
     """Issue a plug-in token, an installation token for one of the plug-in's
-    installs, or a member token for a member who consented. See the module
+    installs, or a member token for a member who consented; or, for Sign in with
+    Initiative, spend a code or a refresh token for an ID token. See the module
     docstring for the parameters."""
     try:
         params = await _read_form(request)
+        if params["grant_type"] in plugin_sign_in.GRANTS:
+            signed_in = await plugin_sign_in.issue_token(
+                session,
+                grant_type=params["grant_type"] or "",
+                client_assertion_type=params["client_assertion_type"],
+                client_assertion=params["client_assertion"],
+                client_id=params["client_id"],
+                code=params["code"],
+                redirect_uri=params["redirect_uri"],
+                code_verifier=params["code_verifier"],
+                refresh_token=params["refresh_token"],
+            )
+            body = PluginAccessTokenResponse(
+                access_token=signed_in.access_token,
+                expires_in=signed_in.expires_in,
+                scope="openid",
+                id_token=signed_in.id_token,
+                refresh_token=signed_in.refresh_token,
+            )
+            return JSONResponse(
+                content=body.model_dump(exclude_none=True), headers=_NO_STORE
+            )
         issued = await plugin_oauth.issue_token(
             session,
             grant_type=params["grant_type"],
@@ -175,7 +213,7 @@ async def issue_plugin_access_token(
         expires_in=issued.expires_in,
         scope=issued.scope,
     )
-    return JSONResponse(content=body.model_dump(), headers=_NO_STORE)
+    return JSONResponse(content=body.model_dump(exclude_none=True), headers=_NO_STORE)
 
 
 def _refuse() -> HTTPException:
@@ -195,15 +233,15 @@ def _plugin_token(request: Request) -> PluginAccessToken:
     return unsealed
 
 
-@router.get("/installations", response_model=List[PluginInstallationRead])
+@router.get("/installations", response_model=list[PluginInstallationRead])
 async def list_plugin_installations(
     request: Request,
     response: Response,
     limit: int = Query(
         default=plugin_installs.PAGE_LIMIT, ge=1, le=plugin_installs.PAGE_LIMIT
     ),
-    cursor: Optional[str] = Query(default=None, max_length=512),
-) -> List[PluginInstallationRead]:
+    cursor: str | None = Query(default=None, max_length=512),
+) -> list[PluginInstallationRead]:
     """The calling plug-in's installs, a page at a time. Takes a plug-in token.
 
     The next page, when there is one, is named in a ``Link`` header

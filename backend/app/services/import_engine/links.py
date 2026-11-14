@@ -27,8 +27,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -88,7 +88,7 @@ class LinkCollector:
     #: (:func:`app.services.import_engine.references.resolve_references`).
     _referencing: list[tuple[SearchEntityType, int]] = field(default_factory=list)
 
-    def lookup(self, ref: str) -> Optional[Endpoint]:
+    def lookup(self, ref: str) -> Endpoint | None:
         """The row a ref names, if it has been written yet this job."""
         return self._refs.get(ref)
 
@@ -207,7 +207,7 @@ def wiki_page_slug_ref(wiki_id: int, slug: str) -> str:
     return f"wiki:{wiki_id}:page:{slug}"
 
 
-def confluence_page_ref(url: str, site_url: str | None) -> Optional[str]:
+def confluence_page_ref(url: str, site_url: str | None) -> str | None:
     """The ref a Confluence page URL names — ``confluence:123`` — when it is a
     page on this site."""
     if not site_url or not url.startswith(site_url.rstrip("/") + "/"):
@@ -222,7 +222,7 @@ def links_to_pages(text: str | None) -> bool:
 
 
 def rewrite_page_links(
-    text: str, resolve: Callable[[str], Optional[tuple[int, str]]]
+    text: str, resolve: Callable[[str], tuple[int, str] | None]
 ) -> str:
     """``text`` with each markdown link to a page that came over turned into
     a mention of the wiki page it became. ``resolve`` answers a URL with the
@@ -263,7 +263,7 @@ async def resolve_page_links(
         return 0
     titles: dict[int, str] = {}
 
-    def page_for(url: str) -> Optional[tuple[int, str]]:
+    def page_for(url: str) -> tuple[int, str] | None:
         ref = confluence_page_ref(url, site_url)
         endpoint = collector.lookup(ref) if ref else None
         if endpoint is None or endpoint.kind != SearchEntityType.wiki_page:

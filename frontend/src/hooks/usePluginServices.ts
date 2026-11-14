@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   PluginServicePublishedKey,
   PluginServiceRegistrationCreate,
@@ -12,11 +10,10 @@ import {
   connectPluginService,
   createPluginService,
   deletePluginService,
-  getListPluginServicesQueryKey,
-  listPluginServices,
   readPluginServiceKeys,
   startPluginServiceVendorSetup,
   updatePluginService,
+  useListPluginServices,
 } from "@/api/generated/plugin-services/plugin-services";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
@@ -25,11 +22,7 @@ import type { QueryOpts } from "@/types/query";
 
 /** Every plug-in service this deployment has wired up (`plugins.manage`). */
 export const usePluginServices = (options?: QueryOpts<PluginServiceRegistrationRead[]>) =>
-  useQuery<PluginServiceRegistrationRead[]>({
-    queryKey: getListPluginServicesQueryKey(),
-    queryFn: () => listPluginServices(),
-    ...options,
-  });
+  useListPluginServices({ query: options });
 
 export const useCreatePluginService = (
   options?: MutationOpts<PluginServiceRegistrationRead, PluginServiceRegistrationCreate>
@@ -38,6 +31,7 @@ export const useCreatePluginService = (
     {
       mutationFn: (data) => createPluginService(data),
       invalidate: () => invalidate(q.pluginServices()),
+      errorKey: "settings:pluginServices.saveError",
     },
     options
   );
@@ -63,6 +57,7 @@ export const useDeletePluginService = (options?: MutationOpts<void, number>) =>
     {
       mutationFn: (registrationId) => deletePluginService(registrationId),
       invalidate: () => invalidate(q.pluginServices()),
+      errorKey: "settings:pluginServices.deleteError",
     },
     options
   );

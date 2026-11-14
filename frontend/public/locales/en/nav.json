@@ -3,13 +3,6 @@
   "communitySettings": "Community Settings",
   "initiatives": "Initiatives",
   "tags": "Tags",
-  "people": "People",
-  "peopleEmpty": "Nobody is listed here yet. People this community can't message are left off this list.",
-  "peopleGroup": "{{label}} — {{count}}",
-  "peopleMore": "Show more",
-  "peopleError": "The people list couldn't be loaded.",
-  "peopleReaderHidden": "You're not on this list because people here can't message you.",
-  "peopleReaderHiddenLink": "Change it",
   "bookmarks": "Bookmarks",
   "noInitiativesAvailable": "No initiatives available",
   "addInitiative": "Add initiative",
@@ -26,7 +19,6 @@
   "platformSettings": "Platform Settings",
   "signOut": "Sign out",
   "viewDocumentation": "View documentation",
-  "newBadge": "NEW",
   "alphaBadge": "ALPHA",
   "initiativeSettings": "Initiative Settings",
   "initiativeActions": "Initiative actions",
@@ -47,10 +39,6 @@
   "themeSystem": "System",
   "themeLight": "Light",
   "themeDark": "Dark",
-  "pride": "Pride",
-  "prideAuto": "Auto (June)",
-  "prideOn": "On",
-  "prideOff": "Off",
   "counterGroups": "Counters",
   "allCounterGroups": "All Counters",
   "createCounterGroup": "New Counter Group",
@@ -81,8 +69,6 @@
     "goHome": "Go back home"
   },
   "operatorDashboard": "Operator Dashboard",
-  "pastAnnouncements": "Past announcements",
-  "documentation": "Documentation",
   "requestsWaiting_one": "{{count}} waiting",
   "requestsWaiting_other": "{{count}} waiting",
   "posts": "Posts",
@@ -95,5 +81,6 @@
   "sidebar": {
     "resize": "Drag to resize the sidebar"
   },
-  "sendFeedback": "Send feedback"
+  "sendFeedback": "Send feedback",
+  "rateApp": "Rate us on Google Play"
 }

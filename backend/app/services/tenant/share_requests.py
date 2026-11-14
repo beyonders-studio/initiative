@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -48,9 +48,6 @@ from app.models.tenant.share_request import (
 from app.services import notifications as notifications_service
 from app.services import permissions as permissions_service
 from app.services.tenant import initiatives as initiatives_service
-
-#: The rungs a person may ask for. Owner is given, never asked for.
-ASKABLE = (ResourceAccessLevel.read, ResourceAccessLevel.write)
 
 
 @dataclass(frozen=True)
@@ -475,7 +472,7 @@ async def answer(
             )
         ).all()
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for r in found:
         tool = Tool(getattr(r.resource_type, "value", r.resource_type))
         r.resolved_at = now

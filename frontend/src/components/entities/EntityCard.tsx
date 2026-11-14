@@ -8,19 +8,20 @@ import {
   type SmartChipState,
 } from "@/api/generated/initiativeAPI.schemas";
 import { MemberAvatar } from "@/components/members/MemberSearchSelect";
-import { LazyImage } from "@/components/shared/LazyImage";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
-import { fileIcon } from "@/lib/fileIcon";
 import { isItem, relatedTarget } from "@/lib/relationships";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
-import { CHIP_TONE_CLASSES } from "@/lib/smartChips";
 import { entityRefRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cardVariants } from "@/ui/card";
+import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
+import { LazyImage } from "@/ui/lazy-image";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** How much of a thing to draw. */
 export type EntityCardVariant = "card" | "compact";
@@ -258,7 +259,7 @@ export const EntityCard = ({
 
   const shell = compact
     ? "group block w-full rounded-md transition"
-    : "group block w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition";
+    : cardVariants({ variant: "tile" });
   const rowHint = [badge, title, caption].filter(Boolean).join(" · ");
 
   return (
@@ -269,9 +270,7 @@ export const EntityCard = ({
           className={cn(
             shell,
             settled && "opacity-70",
-            compact
-              ? "hover:bg-accent/50"
-              : "hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg",
+            compact && "hover:bg-accent/50",
             onRemove && compact && "pr-8",
             className
           )}
@@ -287,6 +286,8 @@ export const EntityCard = ({
           className={cn(
             shell,
             "cursor-default opacity-60",
+            // Nowhere to go, so it does not lift under the pointer.
+            !compact && "hover:translate-none hover:border-border hover:shadow-sm",
             onRemove && compact && "pr-8",
             className
           )}

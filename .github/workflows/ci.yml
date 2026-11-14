@@ -251,7 +251,7 @@ jobs:
 
           # Upgrading a database a release wrote, by booting the images. A pull
           # request into dev upgrades from the newest release; every
-          # integration push walks each release since WALK_FROM in turn. A
+          # integration push walks each release since the baseline's in turn. A
           # release pull request is walked by Release Candidate, on the image
           # it will publish.
           upgrade() {
@@ -307,7 +307,7 @@ jobs:
         if: steps.diff.outputs.tooling == 'true'
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Test the Android signing workflow
         if: steps.diff.outputs.tooling == 'true'
@@ -442,6 +442,17 @@ jobs:
         run: |
           cd backend
           set -o pipefail
+          # Once a minute, what the runner has left. A runner that gives out
+          # ends the job with no later step, so the last of these lines are
+          # all the log says about what it ran short of.
+          while sleep 60; do
+            echo "runner: $(free -m | awk '/^Mem:/ {m = $7 " of " $2 " MB memory free"} /^Swap:/ {s = $3 " MB swap used"} END {print m ", " s}')," \
+              "$(df -h --output=avail / | tail -1 | tr -d ' ') disk free," \
+              "python $(ps -eo comm=,rss= | awk '$1 ~ /^python/ {s += $2} END {print int(s / 1024)}') MB," \
+              "$(docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' | sed -E 's/^[0-9a-f]{32}_//; s| /.*||' | paste -sd, -)"
+          done &
+          sampler=$!
+          trap 'kill $sampler' EXIT
           if [[ "$MODE" == "select" && ! -f .testmondata ]]; then
             echo "::warning::No test selection data from dev, so running every test."
             MODE=full

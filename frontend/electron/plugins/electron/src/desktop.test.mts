@@ -21,6 +21,7 @@ const { FakeWindow, FakeNotification, Emitter } = vi.hoisted(() => {
     restore = vi.fn();
     isMinimized = () => false;
     setOverlayIcon = vi.fn();
+    setTitleBarOverlay = vi.fn();
   }
 
   class FakeNotification extends Emitter {
@@ -48,6 +49,7 @@ vi.mock("./app.mjs", () => {
     setBadgeCount: vi.fn(),
     getPath: () => electron.userData,
     getAppPath: () => "/app",
+    isPackaged: false,
     getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
     setLoginItemSettings: vi.fn(),
     quit: vi.fn(),
@@ -184,6 +186,26 @@ describe("the badge", () => {
   });
 });
 
+describe("the title bar's window buttons", () => {
+  const colors = { color: "#f8fafc", symbolColor: "#020618" };
+
+  it("take the page's colours on Windows and Linux", async () => {
+    onPlatform("linux");
+    const { desktop, window } = started();
+
+    await desktop.setTitleBarColors(colors);
+    expect(window.setTitleBarOverlay).toHaveBeenCalledWith(colors);
+  });
+
+  it("are left alone on a Mac", async () => {
+    onPlatform("darwin");
+    const { desktop, window } = started();
+
+    await desktop.setTitleBarColors(colors);
+    expect(window.setTitleBarOverlay).not.toHaveBeenCalled();
+  });
+});
+
 describe("opening at sign-in", () => {
   const autostart = () =>
     join(process.env.XDG_CONFIG_HOME as string, "autostart", "initiative.desktop");
@@ -202,6 +224,22 @@ describe("opening at sign-in", () => {
 
     await desktop.setOpenAtLogin({ enabled: false });
     await expect(desktop.getSettings()).resolves.toMatchObject({ openAtLogin: false });
+  });
+
+  it("is on from the first start until the person switches it off", async () => {
+    onPlatform("linux");
+    electron.app.isPackaged = true as never;
+    try {
+      const { desktop } = started();
+      expect(readFileSync(autostart(), "utf8")).toContain("--hidden");
+
+      await desktop.setOpenAtLogin({ enabled: false });
+      const next = new Desktop({ notifyListeners: vi.fn() });
+      next.load();
+      await expect(next.getSettings()).resolves.toMatchObject({ openAtLogin: false });
+    } finally {
+      electron.app.isPackaged = false as never;
+    }
   });
 
   it("asks Windows for a login item that starts in the tray", async () => {

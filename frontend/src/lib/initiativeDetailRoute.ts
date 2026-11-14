@@ -12,5 +12,7 @@ import { lazyRouteComponent } from "@tanstack/react-router";
  * waits on the tab's own content.
  */
 export const LazyInitiativeDetailPage = lazyRouteComponent(() =>
-  import("@/pages/InitiativeDetailPage").then((m) => ({ default: m.InitiativeDetailPage }))
+  import("@/pages/community/initiatives/InitiativePage").then((m) => ({
+    default: m.InitiativePage,
+  }))
 );

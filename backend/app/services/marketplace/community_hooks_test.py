@@ -16,9 +16,9 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-import httpx
+import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -71,7 +71,7 @@ class Plugins:
         self.answers = {host: list(statuses) for host, statuses in answers.items()}
         self.calls: list[tuple[str, str, dict, dict]] = []
 
-    def handle(self, request: httpx.Request) -> httpx.Response:
+    def handle(self, request: httpx2.Request) -> httpx2.Response:
         # The request is sent to the address the name resolved to; the name
         # rides in the Host header.
         host = request.headers["host"].split(".")[0]
@@ -87,7 +87,7 @@ class Plugins:
         )
         statuses = self.answers.get(host, [204])
         status = statuses.pop(0) if len(statuses) > 1 else statuses[0]
-        return httpx.Response(status)
+        return httpx2.Response(status)
 
     def paths(self, host: str = "hooked") -> list[str]:
         return [path for called, path, _, _ in self.calls if called == host]
@@ -100,7 +100,7 @@ def _signing(monkeypatch):
 
     async def resolve(url: str, *, allow_private: bool = False) -> ValidatedTarget:
         return ValidatedTarget(
-            hostname=httpx.URL(url).host,
+            hostname=httpx2.URL(url).host,
             addresses=(ipaddress.ip_address("93.184.216.34"),),
         )
 
@@ -110,7 +110,7 @@ def _signing(monkeypatch):
 def _answering(monkeypatch, **answers: list[int]) -> Plugins:
     plugins = Plugins(**answers)
     monkeypatch.setattr(
-        plugin_connection_flows, "http_transport", httpx.MockTransport(plugins.handle)
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(plugins.handle)
     )
     return plugins
 
@@ -204,7 +204,7 @@ async def _come_due(session: AsyncSession, guild_id: int) -> None:
     await session.exec(
         update(PluginCommunityHook)
         .where(PluginCommunityHook.guild_id == guild_id)
-        .values(next_attempt_at=datetime.now(timezone.utc) - timedelta(seconds=1))
+        .values(next_attempt_at=datetime.now(UTC) - timedelta(seconds=1))
     )
     await session.commit()
 
@@ -349,7 +349,7 @@ class TestSending:
         assert row.done_at is None and row.attempts == 1
         assert "500" in (row.last_error or "")
         # The visit answers the retry as its next due time.
-        assert due == row.next_attempt_at > datetime.now(timezone.utc)
+        assert due == row.next_attempt_at > datetime.now(UTC)
 
         await _visit(guild.id)
         assert len(plugins.calls) == 1
@@ -387,7 +387,7 @@ class TestSending:
         assert mine is not None
 
         # Its claim lapsed and another sender took the plug-in.
-        theirs = datetime.now(timezone.utc) + community_hooks.LEASE
+        theirs = datetime.now(UTC) + community_hooks.LEASE
         await set_rls_context(session, Unattributed())
         await session.exec(
             update(PluginCommunityHook)
@@ -402,7 +402,7 @@ class TestSending:
         assert (row.done_at, row.attempts, row.claimed_until) == (None, 0, theirs)
 
         # One whose claim ran out records nothing either.
-        mine.claimed_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+        mine.claimed_until = datetime.now(UTC) - timedelta(seconds=1)
         assert not await community_hooks._settle(
             mine, community_hooks._Outcome("delivered")
         )
@@ -458,9 +458,7 @@ class TestSending:
         head, _behind = await _hooks(session, guild.id)
 
         assert due == head.next_attempt_at
-        outside = await community_hooks.due_outside(
-            guild.id, datetime.now(timezone.utc)
-        )
+        outside = await community_hooks.due_outside(guild.id, datetime.now(UTC))
         assert outside == head.next_attempt_at
 
     async def test_a_state_waiting_to_be_superseded_is_due_now(
@@ -473,8 +471,8 @@ class TestSending:
         await _visit(guild.id)
         await _deliver(guild.id, hook="community_status")
 
-        due = await community_hooks.due_outside(guild.id, datetime.now(timezone.utc))
-        assert due is not None and due <= datetime.now(timezone.utc)
+        due = await community_hooks.due_outside(guild.id, datetime.now(UTC))
+        assert due is not None and due <= datetime.now(UTC)
 
     async def test_it_is_given_up_on_in_the_end(self, session, monkeypatch):
         _user, guild, _install = await _setup(session)
@@ -526,10 +524,7 @@ class TestState:
         await plugin_installs.record(guild.id, install)
         plugins = _answering(monkeypatch)
 
-        assert (
-            await community_hooks.due_outside(guild.id, datetime.now(timezone.utc))
-            is None
-        )
+        assert await community_hooks.due_outside(guild.id, datetime.now(UTC)) is None
         await _visit(guild.id)
         assert await _hooks(session, guild.id) == []
         assert await _sent(session, guild.id) is None
@@ -538,7 +533,7 @@ class TestState:
         await session.commit()
         invalidate_registrations()
         # The daily reconcile sees an install not told, now that it can be.
-        assert await community_hooks.due_outside(guild.id, datetime.now(timezone.utc))
+        assert await community_hooks.due_outside(guild.id, datetime.now(UTC))
         await _visit(guild.id)
 
         assert [body for _, _, _, body in plugins.calls] == [{"status": "active"}]
@@ -761,7 +756,7 @@ async def _deleted(session: AsyncSession, guild_id: int) -> datetime:
     from app.models.platform.guild import Guild
 
     await set_rls_context(session, Unattributed())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         update(Guild)
         .where(Guild.id == guild_id)
@@ -911,7 +906,7 @@ class TestPurging:
         from app.core.messages import GuildMessages
 
         operator = await acting_user("owner")
-        user, guild, install = await _setup(session)
+        _user, guild, install = await _setup(session)
         guild_id = guild.id
         await plugin_refs.ensure_plugin_guild_ref(
             guild_id=guild_id, public_id=PUBLIC_ID
@@ -1053,7 +1048,7 @@ class TestSendingAtOnce:
         await session.exec(
             update(PluginCommunityHook)
             .where(PluginCommunityHook.guild_id == guild_id)
-            .values(claimed_until=datetime.now(timezone.utc) + timedelta(minutes=1))
+            .values(claimed_until=datetime.now(UTC) + timedelta(minutes=1))
         )
         await session.commit()
         monkeypatch.setattr(community_hooks, "CALL_WAIT_SECONDS", 0.3)
@@ -1078,7 +1073,7 @@ class TestSendingAtOnce:
         await session.exec(
             update(PluginCommunityHook)
             .where(PluginCommunityHook.guild_id == guild_id)
-            .values(claimed_until=datetime.now(timezone.utc) - timedelta(seconds=1))
+            .values(claimed_until=datetime.now(UTC) - timedelta(seconds=1))
         )
         await session.commit()
         await schedule()
@@ -1099,13 +1094,13 @@ class TestSendingAtOnce:
         open_during_send: list[int] = []
         plugins = Plugins()
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             engine = db_session.SystemSessionLocal.kw["bind"]
             open_during_send.append(engine.sync_engine.pool.checkedout())
             return plugins.handle(request)
 
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(handle)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(handle)
         )
         await _deliver(guild.id, hook="installed")
         await _visit(guild.id)

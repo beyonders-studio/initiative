@@ -11,17 +11,17 @@ import json
 from datetime import timedelta
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from jwt.algorithms import OKPAlgorithm
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
-from app.core.messages import PluginServiceMessages, AuthMessages
+from app.core.messages import AuthMessages, PluginServiceMessages
 from app.models.platform.plugin_install import PluginInstall
 from app.models.platform.plugin_service_registration import (
     LISTING_STATED_FIELDS,
@@ -36,13 +36,12 @@ from app.testing import emitted
 from app.testing.factories import (
     create_guild,
     create_guild_plugin,
-    create_plugin_service_registration,
     create_marketplace_listing,
+    create_plugin_service_registration,
     create_user,
     get_auth_headers,
 )
 from app.testing.fake_vendor import declarative_github
-
 
 BASE = "/api/v1/plugin-services/"
 PUBLISHERS = "/api/v1/plugin-publishers/"
@@ -253,15 +252,15 @@ async def test_connect_pins_the_key_set_the_operator_confirmed(
     served = [_key_set(_PLUGIN_KEY, kid="acme.widgets-1")]
     fetched: list[str] = []
 
-    def answer(request: httpx.Request) -> httpx.Response:
+    def answer(request: httpx2.Request) -> httpx2.Response:
         fetched.append(str(request.url))
-        return httpx.Response(200, json=served[0])
+        return httpx2.Response(200, json=served[0])
 
     real_request = plugin_keys.request_public_target
 
     async def through_the_plugin(*args, **kwargs):
         return await real_request(
-            *args, **{**kwargs, "transport": httpx.MockTransport(answer)}
+            *args, **{**kwargs, "transport": httpx2.MockTransport(answer)}
         )
 
     monkeypatch.setattr(plugin_keys, "request_public_target", through_the_plugin)
@@ -351,7 +350,7 @@ async def test_sharing_is_turned_off_once_each_installation_has_one_community(
         )
         return {item.guild_id: (item.hook_route, item.exclusive) for item in rows}
 
-    async def share(on: bool) -> httpx.Response:
+    async def share(on: bool) -> httpx2.Response:
         return await client.patch(
             f"{BASE}{row.id}", headers=headers, json={"shared_routes": on}
         )
@@ -762,22 +761,22 @@ CONVERSION = {
 
 def _github(
     monkeypatch, *, status: int = 201, answer: dict = CONVERSION
-) -> list[httpx.Request]:
+) -> list[httpx2.Request]:
     """GitHub answering a manifest conversion; the requests it was sent."""
-    sent: list[httpx.Request] = []
+    sent: list[httpx2.Request] = []
 
     async def resolve(url: str, *, allow_private: bool = False) -> ValidatedTarget:
         return ValidatedTarget(
-            hostname=httpx.URL(url).host,
+            hostname=httpx2.URL(url).host,
             addresses=(ipaddress.ip_address("140.82.112.6"),),
         )
 
-    def handle(request: httpx.Request) -> httpx.Response:
+    def handle(request: httpx2.Request) -> httpx2.Response:
         sent.append(request)
-        return httpx.Response(status, json=answer if status < 400 else {})
+        return httpx2.Response(status, json=answer if status < 400 else {})
 
     monkeypatch.setattr(safe_http, "resolve_validated_target_async", resolve)
-    monkeypatch.setattr(vendor_setup, "http_transport", httpx.MockTransport(handle))
+    monkeypatch.setattr(vendor_setup, "http_transport", httpx2.MockTransport(handle))
     return sent
 
 

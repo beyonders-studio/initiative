@@ -2,10 +2,7 @@
 
 Input is the canonical v3 snapshot ``files_spreadsheet`` persists:
 ``{sheets: [{id, name, dimensions, cells, columns, rows, cellStyles,
-frozen}, ...]}`` with ``"r:c"`` keys. A legacy v1/v2 snapshot — the same
-structures at the top level, no ``sheets`` — is read as a one-sheet
-workbook, so a file that hasn't been re-saved since multi-sheet
-landed still exports.
+frozen}, ...]}`` with ``"r:c"`` keys.
 
 XLSX maps the workbook one-to-one: a worksheet per sheet, in tab order,
 carrying the formatting model (fonts, colors, alignment, borders, number
@@ -63,14 +60,12 @@ def _cell_coords(key: str) -> tuple[int, int] | None:
 
 
 def sheets_of(content: dict) -> list[dict]:
-    """The workbook's sheets in tab order. A legacy (pre-v3) snapshot has
-    no ``sheets`` key and *is* its own single sheet."""
-    if not isinstance(content, dict):
+    """The workbook's sheets in tab order; one empty sheet for a file that
+    holds none."""
+    sheets = content.get("sheets") if isinstance(content, dict) else None
+    if not isinstance(sheets, list):
         return [{}]
-    sheets = content.get("sheets")
-    if isinstance(sheets, list) and sheets:
-        return [sheet for sheet in sheets if isinstance(sheet, dict)] or [{}]
-    return [content]
+    return [sheet for sheet in sheets if isinstance(sheet, dict)] or [{}]
 
 
 def _grid_size(content: dict) -> tuple[int, int]:
@@ -111,8 +106,8 @@ def render_csv(content: dict) -> bytes:
 def render_xlsx(content: dict, *, title: str, data: dict | None = None) -> bytes:
     """The whole workbook: one worksheet per sheet, in tab order.
 
-    ``title`` is the *file's* name, used only to title the worksheet of
-    a legacy snapshot that has no per-sheet names. ``data`` is the export
+    ``title`` is the *file's* name, used only to title a worksheet whose
+    sheet has no name. ``data`` is the export
     item's payload, read for its stamp.
     """
     workbook = Workbook()
@@ -194,8 +189,7 @@ def _sheet_title(title: str) -> str:
 
 def _unique_title(title: str, used: set[str]) -> str:
     """Worksheet titles must be unique within a workbook. Names are already
-    de-duplicated on write, but a legacy snapshot (every sheet falling back
-    to the file title) or a hand-edited payload can still collide, and
+    de-duplicated on write, but a hand-edited payload can still collide, and
     openpyxl would raise."""
     candidate = title
     counter = 1

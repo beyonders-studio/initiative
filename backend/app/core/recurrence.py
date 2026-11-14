@@ -22,13 +22,14 @@ is asked for, and looks a set distance past them.
 from __future__ import annotations
 
 import calendar
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from datetime import MAXYEAR, date, datetime, time, timedelta, timezone, tzinfo
+from datetime import MAXYEAR, UTC, date, datetime, time, timedelta, tzinfo
 from functools import lru_cache
 from heapq import merge
 from itertools import groupby, islice, takewhile
 from types import EllipsisType
-from typing import Iterable, Iterator, Literal
+from typing import Literal
 
 import icalendar
 from dateutil.rrule import rrulestr
@@ -138,8 +139,7 @@ class Recurrence:
                 lines.append(
                     f"{name}:"
                     + ",".join(
-                        d.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-                        for d in instants
+                        d.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ") for d in instants
                     )
                 )
         return "\n".join(lines)
@@ -220,7 +220,7 @@ def normalize(text: str, *, kind: RecurrenceKind) -> str:
         if isinstance(value, datetime) and value.utcoffset() != timedelta(0):
             raise ValueError("A repeat's dates and times are UTC.")
     # dateutil is the engine every date comes from, so it has to read the rule.
-    reference = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    reference = datetime(2000, 1, 1, tzinfo=UTC)
     next(_walk(recurrence, reference, 0, reference, reference), None)
     lines = recurrence.to_lines()
     if len(lines) > MAX_LENGTH:
@@ -241,7 +241,7 @@ def shift_for(text: str, start: datetime, zone: tzinfo) -> int:
     local = start.astimezone(zone)
     if of_hours(rule):
         return int((local.utcoffset() or timedelta(0)).total_seconds() // 60)
-    return (local.date() - start.astimezone(timezone.utc).date()).days * 1440
+    return (local.date() - start.astimezone(UTC).date()).days * 1440
 
 
 def stored(
@@ -325,7 +325,7 @@ def _walk(
 
     def here(value: date | datetime, at: time) -> datetime:
         if isinstance(value, datetime):
-            moment = value.astimezone(timezone.utc).replace(tzinfo=None)
+            moment = value.astimezone(UTC).replace(tzinfo=None)
             # Held where its shift keeps it on the calendar.
             held = min(
                 max(moment, datetime.min + abs(offset)), datetime.max - abs(offset)
@@ -392,7 +392,7 @@ def _walk(
     )
     for value, _ in groupby(merge(own(), extra)):
         if value not in skipped:
-            yield (value - offset).replace(tzinfo=timezone.utc)
+            yield (value - offset).replace(tzinfo=UTC)
 
 
 def _pinned(parts: dict[str, list], at: datetime) -> dict[str, list]:
@@ -463,18 +463,18 @@ def last_start(
     recurrence = parse(text)
     offset = timedelta(minutes=shift)
     # An extra start given as a date is at the series' time on that date.
-    at = (start.astimezone(timezone.utc) + offset).time()
+    at = (start.astimezone(UTC) + offset).time()
     extra = [
-        value.astimezone(timezone.utc)
+        value.astimezone(UTC)
         if isinstance(value, datetime)
-        else datetime.combine(value, at, timezone.utc) - offset
+        else datetime.combine(value, at, UTC) - offset
         for value in recurrence.rdates
     ]
     if until := recurrence.rule.get("UNTIL"):
         end = until[0]
         if not isinstance(end, datetime):
-            end = datetime.combine(end, _END_OF_DAY, timezone.utc) - offset
-        return max([end.astimezone(timezone.utc), *extra])
+            end = datetime.combine(end, _END_OF_DAY, UTC) - offset
+        return max([end.astimezone(UTC), *extra])
     if "COUNT" in recurrence.rule:
         left = _remaining(recurrence, done)
         return max(_walk(left, start, shift, start), default=None)
@@ -582,25 +582,25 @@ def rehomed(
     as much as the first moved."""
     rule = parse(text).rule
     if "BYHOUR" in rule:
-        local = value.astimezone(timezone.utc) + timedelta(minutes=old_shift)
-        anchor = new_start.astimezone(timezone.utc) + timedelta(minutes=new_shift)
+        local = value.astimezone(UTC) + timedelta(minutes=old_shift)
+        anchor = new_start.astimezone(UTC) + timedelta(minutes=new_shift)
         return local.replace(
             minute=anchor.minute, second=anchor.second, microsecond=0
         ) - timedelta(minutes=new_shift)
     if rule["FREQ"][0] == "HOURLY":
-        return value.astimezone(timezone.utc) + (new_start - old_start)
-    day = (value.astimezone(timezone.utc) + timedelta(minutes=old_shift)).date()
+        return value.astimezone(UTC) + (new_start - old_start)
+    day = (value.astimezone(UTC) + timedelta(minutes=old_shift)).date()
     new = timedelta(minutes=new_shift)
-    at = (new_start.astimezone(timezone.utc) + new).time()
-    return datetime.combine(day, at, timezone.utc) - new
+    at = (new_start.astimezone(UTC) + new).time()
+    return datetime.combine(day, at, UTC) - new
 
 
 def _names(value: date | datetime, at: datetime, shift: int) -> bool:
     """Whether a skipped or extra start is the occurrence starting at ``at``:
     an instant by itself, a date by the day it was picked on."""
     if isinstance(value, datetime):
-        return value.astimezone(timezone.utc) == at.astimezone(timezone.utc)
-    return (at.astimezone(timezone.utc) + timedelta(minutes=shift)).date() == value
+        return value.astimezone(UTC) == at.astimezone(UTC)
+    return (at.astimezone(UTC) + timedelta(minutes=shift)).date() == value
 
 
 def occurs(text: str, start: datetime, shift: int, at: datetime) -> bool:
@@ -616,7 +616,7 @@ def skipped(text: str, shift: int, at: datetime) -> str:
     if len(rdates) != len(repeat.rdates):
         return Recurrence(repeat.rule, repeat.exdates, rdates).to_lines()
     return Recurrence(
-        repeat.rule, (*repeat.exdates, at.astimezone(timezone.utc)), repeat.rdates
+        repeat.rule, (*repeat.exdates, at.astimezone(UTC)), repeat.rdates
     ).to_lines()
 
 
@@ -636,7 +636,7 @@ def with_extra(text: str, shift: int, at: datetime) -> str:
     return Recurrence(
         repeat.rule,
         tuple(value for value in repeat.exdates if not _names(value, at, shift)),
-        (*repeat.rdates, at.astimezone(timezone.utc)),
+        (*repeat.rdates, at.astimezone(UTC)),
     ).to_lines()
 
 
@@ -647,12 +647,12 @@ def exception_starts(
     at the series' time on the day it was picked."""
     repeat = parse(text)
     offset = timedelta(minutes=shift)
-    at = (start.astimezone(timezone.utc) + offset).time()
+    at = (start.astimezone(UTC) + offset).time()
 
     def instant(value: date | datetime) -> datetime:
         if isinstance(value, datetime):
-            return value.astimezone(timezone.utc)
-        return datetime.combine(value, at, timezone.utc) - offset
+            return value.astimezone(UTC)
+        return datetime.combine(value, at, UTC) - offset
 
     return (
         sorted(instant(v) for v in repeat.exdates),
@@ -680,12 +680,12 @@ def split(
     otherwise the first part ends the second before ``at``. Each part keeps
     the skipped and extra starts on its side."""
     repeat = parse(text)
-    at = at.astimezone(timezone.utc)
+    at = at.astimezone(UTC)
     offset = timedelta(minutes=shift)
 
     def early(value: date | datetime) -> bool:
         if isinstance(value, datetime):
-            return value.astimezone(timezone.utc) < at
+            return value.astimezone(UTC) < at
         return value < (at + offset).date()
 
     starts = _walk(Recurrence(repeat.rule), start, shift, start, at)
@@ -790,8 +790,8 @@ def moved(
     the same number: the series' k-th occurrence becomes its k-th, so each
     still names one, and no two name the same. An extra start, or a value the
     rule never made, moves as far as the series start did."""
-    start = start.astimezone(timezone.utc)
-    asked = tuple(value.astimezone(timezone.utc) for value in occurrences)
+    start = start.astimezone(UTC)
+    asked = tuple(value.astimezone(UTC) for value in occurrences)
     if not delta:
         return Moved(text, start, {value: value for value in asked})
     repeat = parse(text)
@@ -802,8 +802,8 @@ def moved(
 
     def instant(value: date | datetime) -> datetime:
         if isinstance(value, datetime):
-            return value.astimezone(timezone.utc)
-        return datetime.combine(value, at, timezone.utc) - offset
+            return value.astimezone(UTC)
+        return datetime.combine(value, at, UTC) - offset
 
     until = repeat.rule.get("UNTIL")
     end = instant(until[0]) if until else None
@@ -917,9 +917,8 @@ def _nearest_alike(
             upper = _next_period(freq, first)
             periods[first] = list(
                 walk(
-                    (first - offset).replace(tzinfo=timezone.utc),
-                    (upper - offset).replace(tzinfo=timezone.utc)
-                    - timedelta(microseconds=1),
+                    (first - offset).replace(tzinfo=UTC),
+                    (upper - offset).replace(tzinfo=UTC) - timedelta(microseconds=1),
                 )
             )
         listed = periods[first]
@@ -949,50 +948,9 @@ def _nearest_alike(
 # Imports
 # ---------------------------------------------------------------------------
 
-_LEGACY_POSITIONS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "last": -1}
-
-
-def from_legacy(data: dict, *, zone: tzinfo, all_day: bool = False) -> str | None:
-    """A repeat in the JSON shape exports carried before RRULE, as the rule its
-    days were picked in (``zone``). None when it names no frequency."""
-    freq = str(data.get("frequency") or "").upper()
-    if freq not in ("DAILY", "WEEKLY", "MONTHLY", "YEARLY"):
-        return None
-
-    def code(day: object) -> str:
-        return str(day)[:2].upper()  # "monday" and the older "MO" alike
-
-    rule: dict[str, list] = {"FREQ": [freq]}
-    if (interval := int(data.get("interval") or 1)) > 1:
-        rule["INTERVAL"] = [interval]
-    if freq == "WEEKLY" and data.get("weekdays"):
-        rule["BYDAY"] = [code(d) for d in data["weekdays"] if code(d) in _WEEKDAYS]
-    if freq in ("MONTHLY", "YEARLY"):
-        if data.get("monthly_mode") == "weekday" and data.get("weekday"):
-            position = _LEGACY_POSITIONS.get(data.get("weekday_position") or "first", 1)
-            rule["BYDAY"] = [f"{position}{code(data['weekday'])}"]
-        elif day := data.get("day_of_month"):
-            # A day a short month lacks fell on that month's last day.
-            rule["BYMONTHDAY"] = [day] if day <= 28 else list(range(28, day + 1))
-            if day > 28:
-                rule["BYSETPOS"] = [-1]
-        if freq == "YEARLY" and data.get("month"):
-            rule["BYMONTH"] = [int(data["month"])]
-    if data.get("ends") == "after_occurrences" and data.get("end_after_occurrences"):
-        rule["COUNT"] = [int(data["end_after_occurrences"])]
-    elif data.get("ends") == "on_date" and data.get("end_date"):
-        # The last day as the form showed it: the date the value is written with.
-        last = datetime.fromisoformat(str(data["end_date"])).date()
-        rule["UNTIL"] = [
-            last
-            if all_day
-            else datetime.combine(last, _END_OF_DAY, zone).astimezone(timezone.utc)
-        ]
-    return Recurrence(rule).to_lines()
-
 
 def imported(
-    value: str | dict | None,
+    value: str | None,
     *,
     kind: RecurrenceKind,
     start: datetime | None,
@@ -1001,18 +959,10 @@ def imported(
     all_day: bool = False,
 ) -> tuple[str | None, int]:
     """A repeat read from an import and its shift: a rule string comes with
-    its ``shift``, and the JSON shape exports carried before RRULE was picked in
-    a zone the export doesn't name, which ``tz`` (the importer's) stands in
-    for. A repeat that doesn't hold up imports as none."""
+    its ``shift``. A repeat that doesn't hold up imports as none."""
     try:
         if not -_MAX_SHIFT <= shift <= _MAX_SHIFT:
             raise ValueError("A shift is at most a day.")
-        if isinstance(value, dict):
-            zone = resolve_zone(None if all_day else tz)
-            legacy = from_legacy(value, zone=zone, all_day=all_day)
-            if legacy is None:
-                return None, 0
-            return stored(legacy, start, None if all_day else tz, kind=kind)
         return (normalize(value, kind=kind), shift) if value else (None, 0)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None, 0

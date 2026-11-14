@@ -2,7 +2,7 @@
 them and the initiatives they are in, and nothing community-wide."""
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -12,6 +12,7 @@ from app.db.guild_standing import compute_guild_standing
 from app.db.request_context import Member
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole, CommunityStatus
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.project import Project
@@ -76,7 +77,14 @@ async def test_a_guest_given_one_item_reaches_it_and_nothing_else_there(
     assert await _ids(s, "SELECT id FROM initiatives") == {initiative_id}
     assert await _ids(s, "SELECT user_id FROM initiative_members") == set()
     assert await _ids(s, "SELECT user_id FROM resource_grants") == {guest_id}
-    s.add(Project(name="Mine", initiative_id=initiative_id, created_by=guest_id))
+    s.add(
+        Project(
+            name="Mine",
+            initiative_id=initiative_id,
+            created_by=guest_id,
+            created_by_kind=ActorKind.member,
+        )
+    )
     with pytest.raises(DBAPIError):
         await s.flush()
 
@@ -116,7 +124,7 @@ async def test_a_guest_reads_the_files_of_the_initiatives_it_reaches(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     guest = await create_guest(session, a.guild)
     await create_resource_grant(session, a.project, user=guest)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     shown = await create_upload(
         session, a.guild, a.user, initiative_id=a.initiative.id, claimed_at=now
     )
@@ -205,7 +213,12 @@ async def test_a_guest_whose_role_creates_makes_a_project_it_writes(
     initiative_id, guest_id = a.initiative.id, guest.id
 
     s, _ = await _routed(role_session, guest_id, a.guild.id)
-    project = Project(name="Mine", initiative_id=initiative_id, created_by=guest_id)
+    project = Project(
+        name="Mine",
+        initiative_id=initiative_id,
+        created_by=guest_id,
+        created_by_kind=ActorKind.member,
+    )
     s.add(project)
     await s.flush()
     held = (
@@ -247,7 +260,14 @@ async def test_a_guest_comments_on_what_it_reaches_only(
     task_id, guest_id = task.id, guest.id
 
     s, _ = await _routed(role_session, guest_id, a.guild.id)
-    s.add(Comment(content="Looks good", task_id=task_id, created_by=guest_id))
+    s.add(
+        Comment(
+            content="Looks good",
+            task_id=task_id,
+            created_by=guest_id,
+            created_by_kind=ActorKind.member,
+        )
+    )
 
     if reached:
         await s.flush()

@@ -9,30 +9,23 @@
 import type { NavigateFn } from "@tanstack/react-router";
 
 import { type NotificationRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { openAnnouncement } from "@/components/announcements/AnnouncementCenter";
 import { communityPath } from "@/lib/communityUrl";
-import {
-  entityRefTypeFor,
-  isSearchEntityType,
-  normalizeLegacyTarget,
-  normalizePluginTarget,
-} from "@/lib/entityResolver";
+import { entityRefTypeFor, isSearchEntityType } from "@/lib/entityResolver";
 import { downloadExportArtifact } from "@/lib/exportDownload";
-import { formatDate } from "@/lib/formatDate";
 import { storeSellingNow } from "@/lib/storeSelling";
 import { entityRefRoute, toolKebabSingular } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { formatDate } from "@/ui/lib/formatDate";
 
 /** Whether plan lines may ask the reader to choose a plan here. Not until a
  *  phone's store has answered (`@/lib/storeSelling`). */
 const sellsHere = (): boolean => storeSellingNow() === true;
 
-// Build community-scoped URL directly. Notification rows persist their
-// target_path, so one written before tools moved inside their initiative is
-// mapped onto the `/go` resolver on the way out.
-const buildCommunityPath = (communityId: number, targetPath: string): string => {
-  const normalized = targetPath.startsWith("/") ? targetPath : `/${targetPath}`;
-  return communityPath(communityId, normalizeLegacyTarget(normalized));
-};
+const asPath = (path: string): string => (path.startsWith("/") ? path : `/${path}`);
+
+const buildCommunityPath = (communityId: number, targetPath: string): string =>
+  communityPath(communityId, asPath(targetPath));
 
 export const resolveSmartLink = (notification: NotificationRead): string | null => {
   const data = notification.data || {};
@@ -54,9 +47,7 @@ export const resolveSmartLink = (notification: NotificationRead): string | null 
     // list is about the person rather than any one community, so the server
     // sends no `community_id` with those. The mobile tap handler has always
     // treated a bare `target_path` as an app-level route; this matches it.
-    return communityId !== null
-      ? buildCommunityPath(communityId, targetPath)
-      : normalizePluginTarget(targetPath);
+    return communityId !== null ? buildCommunityPath(communityId, targetPath) : asPath(targetPath);
   }
 
   if (typeof data.smart_link === "string" && data.smart_link) {
@@ -87,6 +78,11 @@ const entityRefFromData = (data: Record<string, unknown>): string | null => {
 };
 
 export const notificationLink = (notification: NotificationRead): string | null => {
+  // A turned-down asker is in no community to open: they go back to the
+  // directory, which is the app's own, whatever community the line names.
+  if (notification.type === "community_join_denied") {
+    return "/communities";
+  }
   const smartLink = resolveSmartLink(notification);
   if (smartLink) {
     return smartLink;
@@ -199,8 +195,7 @@ const MAX_SHOWN_REACTION_EMOJI = 3;
 
 // A reaction notification rolls up every reaction to the same comment, so the
 // line names the most recent reactor, how many others joined them, and the
-// emoji used. Rows written before the rollup carry their one reaction in the
-// top-level `emoji`/`reactor_name` fields, which read here as a rollup of one.
+// emoji used.
 const reactionSummary = (
   data: Record<string, unknown>
 ): { reactorName: string | null; emoji: string; others: number } => {
@@ -218,19 +213,12 @@ const reactionSummary = (
     .filter((value): value is string => value !== null);
 
   const reactorName = text(data.reactor_name) ?? names[names.length - 1] ?? null;
-  const latestEmoji = text(data.emoji);
-  if (emoji.length === 0 && latestEmoji) {
-    emoji.push(latestEmoji);
-  }
 
   // `reactor_count` counts everyone the line has rolled up, including people
   // whose reactions have since rolled off the detail it keeps — counting the
-  // names here would understate the crowd on a busy comment. Rows written
-  // before the roster existed only ever had the names, so they use those.
+  // names here would understate the crowd on a busy comment.
   const rostered = Number(data.reactor_count);
-  const others = Number.isFinite(rostered)
-    ? Math.max(rostered - 1, 0)
-    : new Set(names.filter((name) => name !== reactorName)).size;
+  const others = Number.isFinite(rostered) ? Math.max(rostered - 1, 0) : 0;
 
   return {
     reactorName,
@@ -239,9 +227,6 @@ const reactionSummary = (
   };
 };
 
-// A comment notification rolls up every comment on the same thing, so the line
-// names who and how many rather than repeating per comment. Rows written before
-// the rollup carry only ``commenter_name``, which reads here as a rollup of one.
 /** What a subscription line can say happened, as the feed names it. */
 const SUBSCRIPTION_VERBS = [
   "created",
@@ -254,6 +239,8 @@ const SUBSCRIPTION_VERBS = [
   "reacted",
 ] as const;
 
+// A comment notification rolls up every comment on the same thing, so the line
+// names who and how many rather than repeating per comment.
 export const commentSummary = (
   data: Record<string, unknown>
 ): { name: string; others: number; count: number } => {
@@ -263,9 +250,7 @@ export const commentSummary = (
   const names = roster
     .map((entry) => (typeof entry?.name === "string" ? entry.name : null))
     .filter((name): name is string => name !== null);
-  const latest = names[names.length - 1] ?? null;
-  const name =
-    latest ?? (typeof data.commenter_name === "string" ? data.commenter_name : "Someone");
+  const name = names[names.length - 1] ?? "Someone";
   // `commenter_count` is everyone the line stands for, including people whose
   // entry has rolled off the roster it carries.
   const people = Number(data.commenter_count);
@@ -478,6 +463,19 @@ export const notificationText = (
       return t("notifications.initiativeJoinDenied", {
         initiativeName: data.initiative_name ?? t("notifications.plain.initiativeIn"),
       });
+    case "community_join_requested":
+      return t("notifications.communityJoinRequested", {
+        requester: data.requester_name ?? t("notifications.someone"),
+        community: data.community_name ?? t("notifications.plain.community"),
+      });
+    case "community_join_approved":
+      return t("notifications.communityJoinApproved", {
+        community: data.community_name ?? t("notifications.plain.community"),
+      });
+    case "community_join_denied":
+      return t("notifications.communityJoinDenied", {
+        community: data.community_name ?? t("notifications.plain.community"),
+      });
     case "export_ready":
       return t("notifications.exportReady");
     case "export_failed":
@@ -508,6 +506,10 @@ export const notificationText = (
         : t("notifications.accountSuspended");
     case "account_unsuspended":
       return t("notifications.accountUnsuspended");
+    case "announcement":
+      return t("notifications.announcement", {
+        title: typeof data.title === "string" ? data.title : "",
+      });
     case "plugin_consent_requested":
       // The label is the plug-in's own words, quoted as such by the string.
       return t("notifications.pluginConsentRequested", {
@@ -607,6 +609,14 @@ export const notificationText = (
             : "notifications.ticketMoving";
       return t(key, { subject: subject ?? t("notifications.ticketUnnamed") });
     }
+    case "idea_updated":
+      return t("notifications.ideaMoved", {
+        title:
+          typeof data.title === "string" && data.title
+            ? data.title
+            : t("notifications.ideaUnnamed"),
+        status: typeof data.status === "string" ? data.status : "",
+      });
     case "community_welcome":
       return t(
         !sellsHere() ? "notifications.communityWelcomeInApp" : "notifications.communityWelcome",
@@ -640,8 +650,9 @@ const exportDownloadTarget = (
 };
 
 /**
- * Open a notification: mark it read, then fetch a finished export or go to
- * the line's destination. Returns whether it led anywhere.
+ * Open a notification: mark it read, then show an announcement again, fetch a
+ * finished export or go to the line's destination. Returns whether it led
+ * anywhere.
  *
  * The bell, the inbox and the desktop app's system notifications all open a
  * line through this. `t` must have the `exports` namespace loaded, for the
@@ -661,6 +672,15 @@ export const openNotification = (
 ): boolean => {
   if (!notification.read_at) {
     markRead(notification.id);
+  }
+  // An announcement opens again in its own dialog.
+  if (notification.type === "announcement") {
+    const key = notification.data?.announcement_key;
+    if (typeof key !== "string") {
+      return false;
+    }
+    openAnnouncement(key);
+    return true;
   }
   // A finished export is fetched, not navigated to: the artifact lives behind
   // the job-gated download endpoint, so opening it IS the download.

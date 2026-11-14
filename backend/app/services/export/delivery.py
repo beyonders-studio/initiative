@@ -24,7 +24,7 @@ from pathlib import Path
 
 from app.core.config import settings
 
-__all__ = ["destination_root", "is_configured", "deliver"]
+__all__ = ["deliver", "destination_root", "is_configured"]
 
 
 def destination_root() -> Path | None:

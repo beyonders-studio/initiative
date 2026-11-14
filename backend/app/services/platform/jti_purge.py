@@ -20,15 +20,15 @@ replay window.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from sqlmodel import SQLModel
 
 from app.core.security import plugin_platform_signing_enabled
 from app.db.jti_blocklist import purge_expired_jtis
-from app.models.platform.plugin_assertion_jti import PluginAssertionJti
 from app.models.platform.billing import BillingJti
+from app.models.platform.plugin_assertion_jti import PluginAssertionJti
 from app.services.platform import billing_changes
 from app.services.platform.billing import billing_inbound_enabled
 

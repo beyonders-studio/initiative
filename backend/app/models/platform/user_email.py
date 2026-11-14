@@ -11,8 +11,7 @@ own-row RLS, exactly like ``auth_sessions``. The schema-default request-path
 DML is REVOKEd in the migration.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -55,7 +54,7 @@ class UserEmail(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         sa_column=Column(
             Integer,
@@ -78,7 +77,7 @@ class UserEmail(SQLModel, table=True):
     )
 
     # When the holder proved they hold it. NULL means unproven.
-    verified_at: Optional[datetime] = Field(
+    verified_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # The address that receives account mail. Exactly one per account.
@@ -96,11 +95,11 @@ class UserEmail(SQLModel, table=True):
     source: str = Field(sa_column=Column(Text, nullable=False))
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     # Last time a sign-in resolved through this address, for the account page
     # and for telling a stale address from one in use.
-    last_login_at: Optional[datetime] = Field(
+    last_login_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, List, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -16,29 +16,28 @@ from fastapi import (
 from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, literal
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.api import resource_access
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
-    plugin_scope,
     FactorExemptAccountHolder,
     FactorExemptAccountHolderSessionDep,
+    GuildContext,
+    GuildContextDep,
     RLSSessionDep,
+    SessionDep,
     SettingsContextDep,
     SettingsRLSSessionDep,
-    SessionDep,
+    SystemSessionDep,
     UserSessionDep,
     get_current_active_user,
     holds_guild_role,
+    plugin_scope,
     require_first_party_session,
-    SystemSessionDep,
-    GuildContext,
-    GuildContextDep,
     require_surface,
-)
-from app.api.v1.platform_endpoints.password_recheck import (
-    require_password_or_recent_proof,
 )
 from app.api.v1.platform_endpoints.change_assessment import is_risky
 from app.api.v1.platform_endpoints.held_changes import (
@@ -47,74 +46,104 @@ from app.api.v1.platform_endpoints.held_changes import (
     held_response,
     hold_change,
 )
+from app.api.v1.platform_endpoints.password_recheck import (
+    require_password_or_recent_proof,
+)
 from app.api.v1.platform_endpoints.session_opening import set_password
-from app.core.capabilities import Capability
-from app.core.image_headers import image_response
-from app.core.password_policy import validate_new_password
-from app.core.identity_boundary import PersonId
-from app.core.user_display import handle_of
-from app.db import cohorts
-from app.db.guild_standing import InstallContext
 from app.core import usernames
+from app.core.audit_events import AuditEventType
+from app.core.capabilities import Capability
+from app.core.encryption import SALT_EMAIL, decrypt_field
+from app.core.identity_boundary import PersonId
+from app.core.image_headers import image_response
+from app.core.intake import IntakeStream
+from app.core.messages import (
+    AuthMessages,
+    GuildMessages,
+    ImageMessages,
+    InitiativeMessages,
+    LegalMessages,
+    UserMessages,
+)
+from app.core.password_policy import validate_new_password
 from app.core.rate_limit import limiter
 from app.core.security import read_handle_offer
+from app.core.tools import Tool
+from app.core.user_display import handle_of
 from app.core.user_input_validators import (
     normalize_reminder_minutes,
-    normalize_timezone,
     normalize_time_format,
+    normalize_timezone,
     normalize_week_starts_on,
 )
-from sqlmodel.ext.asyncio.session import AsyncSession
+from app.db import cohorts
+from app.db.guild_standing import InstallContext
+from app.db.query import (
+    MAX_ID_FILTER_VALUES,
+    apply_pagination,
+    build_paginated_response,
+    ids_in,
+    paginated_query,
+)
+from app.models.platform.account_change_hold import HeldChangeKind
 from app.models.platform.guild import (
-    AdminSurface,
     GUILD_ADMIN_ROLES,
-    GuildMembership,
+    AdminSurface,
     CommunityRole,
+    GuildMembership,
 )
 from app.models.platform.guild_image import GuildImageVariant
-from app.core.intake import IntakeStream
 from app.models.platform.user import Presence, User, UserStatus
-from app.models.tenant.initiative import InitiativeMember
-from app.services.platform import intake as intake_service
+from app.models.platform.user_avatar import AVATAR_SPEC
 from app.models.platform.user_cookie_consent import UserCookieConsent
+from app.models.platform.user_profile_view import (
+    GuildMember,
+    MemberProfile,
+    user_profiles,
+)
+from app.models.platform.user_token import UserTokenPurpose
+from app.models.tenant.initiative import InitiativeMember
+from app.schemas.platform.api_key import (
+    ApiKeyCreateRequest,
+    ApiKeyCreateResponse,
+    ApiKeyListResponse,
+)
+from app.schemas.platform.auth import VerificationSendResponse
 from app.schemas.platform.guild import (
-    DirectoryCommunityRead,
     CommunityBannerRead,
     CommunityCategory,
+    DirectoryCommunityRead,
 )
 from app.schemas.platform.user import (
-    HeldChangeOutcome,
+    AccountDeletionRequest,
+    AccountDeletionResponse,
     AccountTimeOutRead,
+    AgeConfirmation,
+    CommunityBanRead,
+    CommunityRosterMember,
+    CommunityRosterResponse,
+    CommunityTimeoutWrite,
     CookieConsentRead,
     CookieConsentUpdate,
+    DecorationPack,
+    DecorationPackListResponse,
+    DeletionEligibilityResponse,
+    HeldChangeOutcome,
+    OwnedDecoration,
+    OwnedDecorationsResponse,
+    ProfileDecorations,
+    UserCommunityMember,
+    UserCommunityMemberListResponse,
     UserEmailChange,
     UserEmailCreate,
     UserEmailListResponse,
     UserEmailRead,
-    AgeConfirmation,
-    DecorationPack,
-    DecorationPackListResponse,
-    OwnedDecoration,
-    OwnedDecorationsResponse,
-    ProfileDecorations,
     UsernameClaim,
-    CommunityRosterMember,
-    CommunityRosterResponse,
-    UserCommunityMember,
-    UserCommunityMemberListResponse,
     UserProfile,
     UserRead,
     UserSelfUpdate,
     UserSummary,
     UserSummaryListResponse,
-    AccountDeletionRequest,
-    AccountDeletionResponse,
-    DeletionEligibilityResponse,
-)
-from app.schemas.platform.api_key import (
-    ApiKeyCreateRequest,
-    ApiKeyCreateResponse,
-    ApiKeyListResponse,
 )
 from app.schemas.tenant.ownership import (
     OwnedContentItem,
@@ -124,63 +153,38 @@ from app.schemas.tenant.ownership import (
     OwnershipTransferResponse,
 )
 from app.schemas.tenant.stats import UserStatsResponse
-from app.core.encryption import SALT_EMAIL, decrypt_field
-from app.core.messages import (
-    AuthMessages,
-    GuildMessages,
-    ImageMessages,
-    InitiativeMessages,
-    LegalMessages,
-    UserMessages,
-)
-from app.models.platform.account_change_hold import HeldChangeKind
-from app.services.auth import addresses, held_changes
-
-from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
-from app.services import sweep_timers
-from app.services.cross_guild import member_guild_ids
-from app.core.tools import Tool
-from app.api import resource_access
-from app.services.tenant import initiatives as initiatives_service
-from app.services.tenant import named_people
-from app.services.tenant import ownership as ownership_service
-from app.services.platform import cookie_consent as cookie_consent_service
-from app.services.platform import rules
-from app.services.platform import guilds as guilds_service
-from app.services.platform import guild_images as images_service
-from app.services.platform import legal as legal_service
-from app.services.content_sockets import sockets as content_sockets
-from app.services.platform import presence
-from app.services.platform import usernames as username_service
-from app.models.platform.user_avatar import AVATAR_SPEC
-from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
-from app.models.platform.user_profile_view import (
-    GuildMember,
-    MemberProfile,
-    user_profiles,
-)
-from app.services.platform import user_avatars as user_avatars_service
-from app.services.platform import profile_decorations as profile_decorations_service
-from app.services.platform import users as users_service
-from app.services.platform import api_keys as api_keys_service
-from app.services.tenant.plugin_age import request_country
-from app.services.platform import csv_export
-from app.services.tenant import stats_service
-from app.models.platform.user_token import UserTokenPurpose
-from app.schemas.platform.auth import VerificationSendResponse
 from app.services import email as email_service
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import auth_posture
-from app.services.platform import user_tokens as user_tokens_service
-from app.services.tenant import personal_items as personal_items_service
-from app.db.query import (
-    MAX_ID_FILTER_VALUES,
-    apply_pagination,
-    build_paginated_response,
-    ids_in,
-    paginated_query,
+from app.services import sweep_timers
+from app.services.auth import addresses, held_changes
+from app.services.content_sockets import sockets as content_sockets
+from app.services.cross_guild import member_guild_ids
+from app.services.platform import (
+    account_stream,
+    auth_posture,
+    csv_export,
+    presence,
+    rules,
 )
+from app.services.platform import api_keys as api_keys_service
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import cookie_consent as cookie_consent_service
+from app.services.platform import guild_images as images_service
+from app.services.platform import guilds as guilds_service
+from app.services.platform import intake as intake_service
+from app.services.platform import legal as legal_service
+from app.services.platform import member_moderation as moderation_service
+from app.services.platform import profile_decorations as profile_decorations_service
+from app.services.platform import user_avatars as user_avatars_service
+from app.services.platform import user_tokens as user_tokens_service
+from app.services.platform import usernames as username_service
+from app.services.platform import users as users_service
+from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant import named_people, stats_service
+from app.services.tenant import ownership as ownership_service
+from app.services.tenant import personal_items as personal_items_service
+from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
+from app.services.tenant.plugin_age import request_country
 
 # Allowed values for the optional "task completion visual feedback" effect.
 # Mirrored on the frontend in src/lib/taskCompletionVisualFeedback.ts; keep
@@ -275,7 +279,7 @@ async def read_me(
 async def get_user_stats(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_id: Optional[int] = Query(
+    guild_id: int | None = Query(
         default=None,
         description="Optional guild ID to filter stats",
         alias="community_id",
@@ -299,7 +303,7 @@ async def list_users(
     session: SettingsRLSSessionDep,
     _current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: SettingsContextDep,
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         description=(
             "Matches members the way ``/search`` does: the handle, a whole "
@@ -345,6 +349,9 @@ async def list_users(
                 applied=False,
             ),
             GuildMembership.guest_until,
+            # Read under the table's policies: every member's for the roster's
+            # holders, the reader's own for anyone else.
+            moderation_service.live_timeout_end(),
         ),
         guild_id=guild_context.guild_id,
     )
@@ -378,9 +385,11 @@ async def list_users(
         display_name,
         api_keys_allowed,
         guest_until,
+        timed_out_until,
     ) in rows:
         member = UserCommunityMember.model_validate(user)
         member.guest_until = guest_until
+        member.timed_out_until = timed_out_until
         member.community_role = guild_role.value
         member.oidc_managed = oidc_provider_id is not None
         member.display_name = display_name
@@ -404,9 +413,9 @@ def _in_initiative(initiative_id: int):
 async def _search_members_for_plugin(
     session: AsyncSession,
     *,
-    search: Optional[str],
-    user_id: Optional[list[int]],
-    initiative_id: Optional[int],
+    search: str | None,
+    user_id: list[int] | None,
+    initiative_id: int | None,
     page: int,
     page_size: int,
 ) -> UserSummaryListResponse:
@@ -457,7 +466,7 @@ def _membership_standing(role: CommunityRole | None) -> dict[str, object]:
 async def search_users(
     session: ActorSessionDep,
     guild_context: MembersRead,
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         description=(
             "Matches the handle's name part. Type the whole handle "
@@ -469,14 +478,14 @@ async def search_users(
     user_id: Annotated[
         list[PersonId] | None, Query(max_length=MAX_ID_FILTER_VALUES)
     ] = None,
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None,
         description=(
             "Only members of this initiative. The caller must reach it: be in "
             "it, administer the community, or (a plug-in) be placed there."
         ),
     ),
-    tool: Optional[Tool] = Query(
+    tool: Tool | None = Query(
         default=None,
         description=(
             "With ``resource_id``: only the people who can open that row, which "
@@ -485,7 +494,7 @@ async def search_users(
             "person's picker; an installed plug-in's search does not take it."
         ),
     ),
-    resource_id: Optional[int] = Query(default=None),
+    resource_id: int | None = Query(default=None),
     self_first: bool = Query(
         default=False,
         description=(
@@ -901,12 +910,12 @@ async def read_user_profile(
     )
 
 
-@router.get("/{handle}/communities", response_model=List[DirectoryCommunityRead])
+@router.get("/{handle}/communities", response_model=list[DirectoryCommunityRead])
 async def read_user_communities(
     handle: str,
     system_session: SystemSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-) -> List[DirectoryCommunityRead]:
+) -> list[DirectoryCommunityRead]:
     """The listed communities one person belongs to.
 
     A separate read from the profile on purpose: the profile is the public
@@ -1068,7 +1077,7 @@ async def export_users_csv(
         guild_slug = csv_export.safe_filename_component(
             guild_context.guild.name or "guild"
         )
-        datestamp = datetime.now(timezone.utc).date().isoformat()
+        datestamp = datetime.now(UTC).date().isoformat()
         filename = f"{guild_slug}-users-{datestamp}.csv"
 
     return Response(
@@ -1104,7 +1113,7 @@ async def claim_my_username(
         prefer=read_handle_offer(payload.offer, payload.username),
     )
 
-    current_user.updated_at = datetime.now(timezone.utc)
+    current_user.updated_at = datetime.now(UTC)
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)
@@ -1217,7 +1226,7 @@ async def confirm_my_age(
     # answer again.
     try:
         old_enough = users_service.record_age_answer(current_user, payload.birthdate)
-        current_user.updated_at = datetime.now(timezone.utc)
+        current_user.updated_at = datetime.now(UTC)
         session.add(current_user)
         await session.commit()
     except BaseException:
@@ -1615,7 +1624,7 @@ async def update_me(
                 )
         current_user.profile_decorations = decorations.model_dump()
 
-    current_user.updated_at = datetime.now(timezone.utc)
+    current_user.updated_at = datetime.now(UTC)
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)
@@ -1993,8 +2002,13 @@ async def remove_member(
     system_session: SystemSessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
     guild_context: MembersContext,
+    ban: bool = Query(
+        default=False,
+        description="Also keep them out: no invite, directory join or sign-in "
+        "rule lets them back in until the ban is lifted.",
+    ),
 ) -> None:
-    """Remove a member from this guild.
+    """Remove a member from this guild, and with ``ban``, keep them out.
 
     Ends their memberships and the access those carried. It does not move
     ownership: content they own stays recorded as theirs and stops being
@@ -2047,10 +2061,122 @@ async def remove_member(
         user_id=user_id,
         actor_user_id=current_admin.id,
     )
+    if ban:
+        await moderation_service.ban(
+            session,
+            guild_id=guild_context.guild_id,
+            user_id=user_id,
+            actor_user_id=current_admin.id,
+        )
     await session.commit()
     # Kicked from the guild — drop the user's live content streams immediately
     # (guild-level access change), consistent with the other removal paths.
     await content_sockets.revoke_user(guild_context.guild_id, user_id)
+
+
+@guild_router.get("/bans", response_model=list[CommunityBanRead])
+async def list_bans(
+    session: SessionDep,
+    guild_context: MembersContext,
+) -> list[CommunityBanRead]:
+    """Everybody this community has banned, the most recent first."""
+    return [
+        CommunityBanRead(user=UserSummary.model_validate(person), banned_at=banned_at)
+        for person, banned_at in await moderation_service.list_bans(
+            session, guild_id=guild_context.guild_id
+        )
+    ]
+
+
+@guild_router.delete("/bans/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def lift_ban(
+    user_id: int,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_user)],
+    guild_context: MembersContext,
+) -> None:
+    """Lift a ban. They can be invited or join again; nothing puts them back."""
+    await moderation_service.unban(
+        session,
+        guild_id=guild_context.guild_id,
+        user_id=user_id,
+        actor_user_id=current_admin.id,
+    )
+    await session.commit()
+
+
+async def _timeout_target(
+    session: AsyncSession, guild_context: GuildContext, user_id: int
+) -> None:
+    """Refuse a timeout for anyone but a member or guest of this community."""
+    membership = (
+        await session.exec(
+            select(GuildMembership).where(
+                GuildMembership.user_id == user_id,
+                GuildMembership.guild_id == guild_context.guild_id,
+            )
+        )
+    ).one_or_none()
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=UserMessages.NOT_IN_GUILD
+        )
+    if membership.role in GUILD_ADMIN_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.TIMEOUT_NOT_FOR_ADMINS,
+        )
+
+
+async def _timeout_changed(session: AsyncSession, guild_id: int, user_id: int) -> None:
+    """Commit, then have the person's tabs and live connections pick it up."""
+    account_stream.queue_account_signal(session, user_id, "membership")
+    await session.commit()
+    await content_sockets.revoke_user(guild_id, user_id)
+
+
+@guild_router.put("/{user_id}/timeout", status_code=status.HTTP_204_NO_CONTENT)
+async def time_out_member(
+    user_id: int,
+    payload: CommunityTimeoutWrite,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_user)],
+    guild_context: MembersContext,
+) -> None:
+    """Hold a member's content here read-only until ``ends_at``: they still
+    read the community, and change nothing in it. Replaces a timeout they
+    have."""
+    if payload.ends_at <= datetime.now(UTC):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=GuildMessages.TIMEOUT_MUST_END_LATER,
+        )
+    await _timeout_target(session, guild_context, user_id)
+    await moderation_service.time_out(
+        session,
+        guild_id=guild_context.guild_id,
+        user_id=user_id,
+        ends_at=payload.ends_at,
+        actor_user_id=current_admin.id,
+    )
+    await _timeout_changed(session, guild_context.guild_id, user_id)
+
+
+@guild_router.delete("/{user_id}/timeout", status_code=status.HTTP_204_NO_CONTENT)
+async def lift_member_timeout(
+    user_id: int,
+    session: SessionDep,
+    current_admin: Annotated[User, Depends(get_current_active_user)],
+    guild_context: MembersContext,
+) -> None:
+    """End a member's timeout early."""
+    await moderation_service.lift_timeout(
+        session,
+        guild_id=guild_context.guild_id,
+        user_id=user_id,
+        actor_user_id=current_admin.id,
+    )
+    await _timeout_changed(session, guild_context.guild_id, user_id)
 
 
 # --- profile pictures --------------------------------------------------------

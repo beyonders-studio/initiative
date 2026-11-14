@@ -36,7 +36,7 @@ hand it to a plug-in that may own it (:func:`eligible_plugin_owners`).
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
@@ -44,21 +44,21 @@ from sqlalchemy import select as sa_select
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+import app.db.base  # noqa: F401 — registers every model, so each tool's is found by table
+from app.core.audit_events import AuditEventType
+from app.core.messages import UserMessages
 from app.core.plugin_scopes import (
     PluginScopeResource,
     UnknownPluginScope,
     expand,
     tool_resource,
 )
-from app.core.audit_events import AuditEventType
-from app.core.messages import UserMessages
 from app.core.tools import Tool
-import app.db.base  # noqa: F401 — registers every model, so each tool's is found by table
 from app.db.session import install_context
-from app.models.tenant._mixins import tool_models
 from app.models.platform.guild import GuildMembership
-from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.tenant._mixins import ActorKind, tool_models
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.tenant.ownership import OwnerPluginSummary
 from app.services import audit as audit_service
@@ -95,7 +95,7 @@ OWNABLE: dict[Tool, OwnableSpec] = {
 TOOL_BY_MODEL: dict[Any, Tool] = {spec.model: tool for tool, spec in OWNABLE.items()}
 
 
-def tool_for_row(row: Any) -> Optional[Tool]:
+def tool_for_row(row: Any) -> Tool | None:
     """The :class:`Tool` this row is an instance of, or None if it is not one.
 
     Tasks, comments and uploads land here as None — they have an author and no
@@ -110,7 +110,7 @@ class OwnedItem:
     id: int
     name: str
     #: The initiative the row belongs to, which a plug-in owner must be placed in.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -118,15 +118,15 @@ class Owner:
     """Who holds a resource's owner grant: a person or an installed plug-in.
     Exactly one of the two is set."""
 
-    user_id: Optional[int] = None
-    plugin_install_id: Optional[int] = None
+    user_id: int | None = None
+    plugin_install_id: int | None = None
 
     def __post_init__(self) -> None:
         if (self.user_id is None) == (self.plugin_install_id is None):
             raise ValueError("an owner is a person or a plug-in, and exactly one")
 
 
-def _grant_owner(grant: Any) -> Optional[Owner]:
+def _grant_owner(grant: Any) -> Owner | None:
     """The owner an owner-level grant row names, or None for any other row."""
     if grant.level != ResourceAccessLevel.owner:
         return None
@@ -137,7 +137,7 @@ def _grant_owner(grant: Any) -> Optional[Owner]:
     return None
 
 
-def owner_of(row: Any) -> Optional[Owner]:
+def owner_of(row: Any) -> Owner | None:
     """Who holds this resource's owner grant, or None if nobody does.
 
     Reads ``row.grants``, which the caller must have eagerly loaded — this is
@@ -152,7 +152,7 @@ def owner_of(row: Any) -> Optional[Owner]:
     return None
 
 
-def owner_user_id_of(row: Any) -> Optional[int]:
+def owner_user_id_of(row: Any) -> int | None:
     """The person holding this resource's owner grant, or None when nobody
     does or a plug-in does. Reads ``row.grants`` as :func:`owner_of` does."""
     owner = owner_of(row)
@@ -163,7 +163,7 @@ def owner_user_id_of(row: Any) -> Optional[int]:
 _OWNER_PLUGIN_ATTRIBUTE = "_owner_plugin"
 
 
-def owner_plugin_of(row: Any) -> Optional[OwnerPluginSummary]:
+def owner_plugin_of(row: Any) -> OwnerPluginSummary | None:
     """The installed plug-in that owns ``row``, as :func:`annotate_owner_plugins`
     left it; None when a person owns it, nobody does, or it was not
     annotated."""
@@ -214,7 +214,7 @@ async def annotate_owner_plugins(session: AsyncSession, rows: Iterable[Any]) -> 
 # ── Reading what is owned ────────────────────────────────────────────────────
 
 
-def _owner_grant_resource_ids(tool: Tool, user_id: Optional[int] = None):
+def _owner_grant_resource_ids(tool: Tool, user_id: int | None = None):
     stmt = sa_select(ResourceGrant.resource_id).where(
         ResourceGrant.resource_type == tool.value,
         ResourceGrant.level == ResourceAccessLevel.owner,
@@ -439,7 +439,7 @@ async def _clear_owner_grants(session: AsyncSession, *, tool: Tool, row: Any) ->
 
 
 async def set_resource_owner(
-    session: AsyncSession, *, tool: Tool, row: Any, new_owner: Optional[Owner]
+    session: AsyncSession, *, tool: Tool, row: Any, new_owner: Owner | None
 ) -> None:
     """Make ``new_owner`` the resource's owner, or leave it unowned when None.
     Caller commits, and has decided the new owner may hold it (a plug-in, by
@@ -522,7 +522,7 @@ async def give_to_install(
     install_id: int,
     guild_id: int,
     grants: Sequence[Any],
-    actor_user_id: Optional[int] = None,
+    actor_user_id: int | None = None,
 ) -> None:
     """Make a row of the whole community the install's that mounts its tool,
     shared by ``grants``. Uninstalling trashes what the install owns; the owner
@@ -546,7 +546,7 @@ async def give_to_install(
 
 async def current_owner(
     session: AsyncSession, *, tool: Tool, resource_id: int
-) -> Optional[Owner]:
+) -> Owner | None:
     """Who owns this resource right now, straight from the grants.
 
     Unlike :func:`owner_of` this issues a query, for callers holding a row
@@ -582,10 +582,11 @@ async def restore_ownership_to_author(
         return False
 
     # Every tool carries CreatedByMixin, so once tool_for_row has answered there
-    # is a created_by to read (ownership_test pins that).
-    author_id = row.created_by
-    if author_id is None:
+    # is a created_by to read (ownership_test pins that). Only a member author
+    # is given anything back.
+    if row.created_by_kind != ActorKind.member or row.created_by is None:
         return False
+    author_id = row.created_by
 
     if await current_owner(session, tool=tool, resource_id=row.id) is not None:
         return False
@@ -610,10 +611,10 @@ async def restore_ownership_to_author(
 async def _record_ownership_move(
     session: AsyncSession,
     *,
-    actor_user_id: Optional[int],
-    from_user_id: Optional[int],
+    actor_user_id: int | None,
+    from_user_id: int | None,
     to: Owner,
-    guild_id: Optional[int],
+    guild_id: int | None,
     counts: dict[Tool, int],
 ) -> None:
     """One record for one move, with what it moved counted by tool.
@@ -667,8 +668,8 @@ async def transfer_content_ownership(
     *,
     from_user_id: int,
     to: Owner,
-    guild_id: Optional[int] = None,
-    actor_user_id: Optional[int] = None,
+    guild_id: int | None = None,
+    actor_user_id: int | None = None,
 ) -> dict[Tool, int]:
     """Move everything ``from_user_id`` owns in the routed guild to ``to``.
     Returns a per-tool count of what moved. Caller commits.
@@ -696,7 +697,7 @@ async def claim_unowned_content(
     *,
     guild_id: int,
     to: Owner,
-    actor_user_id: Optional[int] = None,
+    actor_user_id: int | None = None,
 ) -> dict[Tool, int]:
     """Give every resource no current member or live install owns to ``to``.
     Returns a per-tool count. Caller commits.
@@ -721,21 +722,21 @@ async def claim_unowned_content(
 
 __all__ = [
     "OWNABLE",
+    "OwnableSpec",
+    "OwnedItem",
     "Owner",
     "annotate_owner_plugins",
+    "claim_unowned_content",
     "current_owner",
     "eligible_plugin_owners",
-    "owner_plugin_of",
     "owner_of",
+    "owner_plugin_of",
     "owner_user_id_of",
     "require_plugin_owner_eligible",
     "restore_ownership_to_author",
-    "tool_for_row",
-    "OwnableSpec",
-    "OwnedItem",
-    "claim_unowned_content",
     "set_resource_owner",
     "summarize_owned_content",
     "summarize_unowned_content",
+    "tool_for_row",
     "transfer_content_ownership",
 ]

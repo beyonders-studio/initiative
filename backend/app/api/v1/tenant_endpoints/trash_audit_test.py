@@ -6,7 +6,7 @@ of the row afterwards: which kind of thing it was, which id, and who did it.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType

@@ -42,11 +42,11 @@ __all__ = [
     "ACCESS_TOKEN_LIFETIME_SECONDS",
     "ACCESS_TOKEN_PREFIX",
     "AccessTokenError",
-    "PluginAccessToken",
     "InstallAccessToken",
+    "PluginAccessToken",
     "is_access_token",
-    "seal_plugin_token",
     "seal_install_token",
+    "seal_plugin_token",
     "unseal_access_token",
 ]
 

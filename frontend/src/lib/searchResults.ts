@@ -124,13 +124,6 @@ export const categoryEntityTypes = (category: SearchCategory): SearchEntityType[
   return TOOL_ENTITY_TYPES;
 };
 
-/** The category a hit renders under. */
-export const hitCategory = (target: SearchTarget): SearchCategory => {
-  if (target.entity_type === TAG_ENTITY_TYPE) return "tag";
-  if (target.entity_type === COMMENT_ENTITY_TYPE) return "comment";
-  return "tool";
-};
-
 /** The icon a hit renders with — its own where it lives inside a tool, its
  *  tool's where it is one. */
 export const hitIcon = (target: SearchTarget): LucideIcon => {

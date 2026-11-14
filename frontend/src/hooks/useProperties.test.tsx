@@ -20,32 +20,34 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 describe("useAppendPropertyOption", () => {
-  const definition = buildPropertyDefinition({
-    id: 7,
-    type: "select",
-    options: [{ value: "todo", label: "To do", color: null }],
-  });
+  const todo = { value: "todo", label: "To do", color: null };
+  const definition = buildPropertyDefinition({ id: 7, type: "select", options: [todo] });
 
-  const answering = (options: { value: string; label: string; color: null }[]) =>
+  /** Answers with `options` held, and keeps what each write sent. */
+  const answering = (options: { value: string; label: string; color: null }[]) => {
+    const sent: unknown[] = [];
     server.use(
-      communityHttp.patch("/property-definitions/:id", () =>
-        HttpResponse.json({
+      communityHttp.patch("/property-definitions/:id", async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json({
           definition: { ...definition, options },
           orphaned_value_count: 0,
-        })
-      )
+        });
+      })
     );
+    return sent;
+  };
 
   it("answers with the option the server kept", async () => {
-    answering([
-      { value: "todo", label: "To do", color: null },
-      { value: "done", label: "Done", color: null },
-    ]);
+    const done = { value: "done", label: "Done", color: null };
+    const sent = answering([todo, done]);
     const { result } = renderHook(() => useAppendPropertyOption(), { wrapper });
 
-    const added = await result.current.appendOption(definition, "Done");
+    const added = await result.current({ id: 7, options: [todo] }, "Done");
 
-    expect(added.option).toMatchObject({ value: "done", label: "Done" });
+    expect(added).toMatchObject({ value: "done", label: "Done" });
+    // The options held, and the new one under a slug of its label.
+    expect(sent).toEqual([{ options: [todo, done] }]);
   });
 
   it("refuses when the value was already taken by another label", async () => {
@@ -55,6 +57,6 @@ describe("useAppendPropertyOption", () => {
     ]);
     const { result } = renderHook(() => useAppendPropertyOption(), { wrapper });
 
-    await expect(result.current.appendOption(definition, "Done")).rejects.toThrow();
+    await expect(result.current({ id: 7, options: [todo] }, "Done")).rejects.toThrow();
   });
 });

@@ -73,14 +73,10 @@
     "noInitiatives": "No initiatives here you can add files to."
   },
   "detail": {
-    "loading": "Loading file…",
     "notFound": "File not found",
     "notFoundDescription": "This file may have been deleted or you may have followed a broken link.",
     "noAccess": "Access denied",
     "backToFiles": "← Back to files",
-    "closePanel": "Close panel",
-    "openPanel": "Open panel",
-    "togglePanel": "Toggle side panel",
     "titlePlaceholder": "File title",
     "imageFileRequired": "Please select an image file.",
     "imageUploaded": "Image uploaded.",
@@ -105,17 +101,18 @@
   },
   "featuredImage": {
     "label": "Featured image",
-    "upload": "Upload image",
-    "fromFiles": "From Files",
-    "replace": "Replace",
-    "remove": "Remove",
+    "add": "Add featured image",
+    "upload": "Upload an image",
+    "fromFiles": "Choose from Files",
+    "replace": "Upload a different image",
+    "replaceFromFiles": "Choose a different one from Files",
+    "remove": "Remove the featured image",
     "uploading": "Uploading…"
   },
   "imageChooser": {
     "title": "Choose a picture from Files",
     "description": "It goes in as it is now: a newer version of the file won't change it.",
-    "none": "No pictures here.",
-    "more": "Show more"
+    "none": "No pictures here."
   },
   "outline": {
     "show": "Show contents",
@@ -342,7 +339,6 @@
     "error": "Couldn't convert this file."
   },
   "viewer": {
-    "loadError": "Unable to load file",
     "openNewTab": "Open in new tab",
     "download": "Download",
     "pageCount_one": "{{count}} page",
@@ -371,8 +367,6 @@
   "createFirst": "Start writing",
   "dropToUpload": "Drop to upload a file",
   "error": "Something went wrong",
-  "loadError": "Unable to load files right now.",
-  "loading": "Loading files…",
   "newFile": "New file",
   "noFiles": "No files yet",
   "noFilesDescription": "Create your first initiative file to share briefs, decisions, or guides.",
@@ -433,7 +427,6 @@
     "trashed": "Collection moved to the trash",
     "noFiles": "No files in this collection yet",
     "noFilesDescription": "Add files from this initiative, or drop files anywhere on this page to upload them.",
-    "loadingFiles": "Loading files...",
     "openFile": "Open file",
     "filter": "Collection",
     "anyCollection": "Any collection",
@@ -442,9 +435,7 @@
     "newestFirst": "Newest first",
     "oldestFirst": "Oldest first",
     "views": {
-      "label": "View",
-      "masonry": "Masonry",
-      "timeline": "Timeline"
+      "label": "View"
     },
     "groups": {
       "untagged": "Untagged",

@@ -6,8 +6,9 @@ rules have of their own (the stranded-account count, a provider's
 connection) is tested beside the routes that take it.
 """
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
@@ -15,10 +16,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod, SecondFactorRequirement
-from app.models.platform.user_dm_settings import DmPolicy
-from app.schemas.ai_settings import AIConfigMode
 from app.core.security import AUTH_POLICY_UNMET_HEADER
 from app.models.platform.user import UserRole
+from app.models.platform.user_dm_settings import DmPolicy
+from app.schemas.ai_settings import AIConfigMode
 from app.services.platform import auth_posture, rules
 from app.services.platform.auth_posture import (
     COMMUNITY_RULES,
@@ -100,6 +101,7 @@ CASES: dict[tuple[str, str], Case] = {
         False, True, PLATFORM_SETTINGS
     ),
     ("platform", "marketplace_registry_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "feedback_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "public_registration_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "community_creation_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "community_creation_daily_limit"): Case(5, 1, PLATFORM_SETTINGS),

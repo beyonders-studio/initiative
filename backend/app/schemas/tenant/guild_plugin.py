@@ -10,37 +10,34 @@ The connection blocks are read off the *pinned* definition rather than the
 catalog, so an install describes the form it was actually configured against.
 """
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from datetime import datetime
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
-    Dict,
-    List,
     Literal,
-    Optional,
-    Sequence,
-    TYPE_CHECKING,
-    Union,
 )
 
 from pydantic import AliasChoices, ConfigDict, Field
 
+from app.core.identity_boundary import PersonId
 from app.models.tenant.plugin_member_consent import ConsentAccess, ConsentStatus
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.marketplace import ListingSource
 from app.schemas.query import PageMeta
 from app.services.marketplace.definitions import published_by_us
 from app.services.marketplace.registration_lookup import InstallState
+from app.services.marketplace.service_plugins import declared_permissions
 from app.services.tenant import plugin_age
 from app.services.tenant import plugin_config as plugin_config_service
-from app.services.tenant.plugin_age import AgeViewer
 from app.services.tenant.guild_plugins import (
     grantable_scopes,
-    offered_scopes,
     item_openability,
+    offered_scopes,
     surface_openability,
 )
+from app.services.tenant.plugin_age import AgeViewer
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import GuildContext
@@ -51,43 +48,40 @@ class CommunityPluginInstall(SanitizedBaseModel):
 
     The definition comes from the catalog, and the content the install creates
     is made server-side. What the request adds is the seat's answer to the
-    install dialog: what the plug-in may reach, where it appears, and who opens it
-    there. The install, its grant and its placements are one transaction.
+    install dialog: what the plug-in may reach and where it appears. Who uses it
+    there is each initiative's roles' answer. The install, its grant and its
+    placements are one transaction.
     """
 
     listing_uid: str = Field(max_length=14)
     #: Overrides the listing's own default for the content this creates.
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
     #: The scopes the seat grants. Each must be one the manifest requests and
     #: one the registration's ceiling allows, as for ``PUT …/scopes``. Left
     #: out, nothing is granted.
-    granted_scopes: List[str] = Field(default_factory=list, max_length=64)
+    granted_scopes: list[str] = Field(default_factory=list, max_length=64)
     #: The installs here the seat lets use this plug-in, from the listing's
     #: ``callers``. One it leaves out may not.
-    callers: List[int] = Field(default_factory=list, max_length=64)
+    callers: list[int] = Field(default_factory=list, max_length=64)
     #: Where the plug-in's initiative surfaces appear: ``"all"`` for every
     #: initiative that exists now, or a list of this guild's initiative ids.
     #: Left out, the plug-in is placed nowhere.
-    placements: Union[Literal["all"], Annotated[List[int], Field(max_length=1000)]] = (
-        Field(default_factory=list)
+    placements: Literal["all"] | Annotated[list[int], Field(max_length=1000)] = Field(
+        default_factory=list
     )
-    #: The built-in initiative roles that may open the plug-in in each placement,
-    #: by name (``moderator``, ``project_manager``, ``member``), resolved to
-    #: each initiative's own role of that name.
-    role_kinds: List[str] = Field(default_factory=lambda: ["moderator"], max_length=10)
 
 
 class CommunityPluginUpdate(SanitizedBaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
     #: Turning a plug-in off hides it without touching what it created.
-    enabled: Optional[bool] = None
+    enabled: bool | None = None
     #: Whether published versions are applied on their own. On until a guild
     #: admin turns it off, after which the Update button is how they land.
-    auto_update: Optional[bool] = None
+    auto_update: bool | None = None
     #: The initiatives this plug-in's initiative-scoped surfaces appear in, as the
     #: whole set: an initiative left out is no longer placed. An empty list
     #: places the plug-in in none. Left out entirely, placement is untouched.
-    placed_initiative_ids: Optional[List[int]] = None
+    placed_initiative_ids: list[int] | None = None
 
 
 class CommunityPluginConfigUpdate(SanitizedBaseModel):
@@ -104,7 +98,7 @@ class CommunityPluginConfigUpdate(SanitizedBaseModel):
     turned into ``1``).
     """
 
-    values: Dict[str, Dict[str, Any]] = {}
+    values: dict[str, dict[str, Any]] = {}
 
 
 class CommunityPluginSettingUpdate(SanitizedBaseModel):
@@ -115,7 +109,7 @@ class CommunityPluginSettingUpdate(SanitizedBaseModel):
     community on this server holds.
     """
 
-    value: Optional[str] = None
+    value: str | None = None
 
 
 class CommunityPluginArtifact(SanitizedBaseModel):
@@ -141,19 +135,19 @@ class CommunityPluginConnectionRead(SanitizedBaseModel):
 
     id: str
     scope: str
-    label: Dict[str, str] = {}
+    label: dict[str, str] = {}
     #: The declared fields, verbatim from the pinned definition, so one generic
     #: form renderer can draw any plug-in's settings page.
-    fields: List[Dict[str, Any]] = []
+    fields: list[dict[str, Any]] = []
     #: What the connection says it will use the credential for. Display-only.
-    access_hint: Optional[Dict[str, Any]] = None
+    access_hint: dict[str, Any] | None = None
     #: The non-secret values, so a form can show what is currently set: a
     #: member's own on a per-member connection, and on a guild-wide one only
     #: for the seat, which sets them. Secret fields are absent from this by
     #: construction — they live in a column this never reads.
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
     #: Which fields hold a value, secret ones included. Never the values.
-    has_value: Dict[str, bool] = {}
+    has_value: dict[str, bool] = {}
     #: Whether everything this connection declared it needs is present.
     satisfied: bool = False
     #: Whether the connection is established through the vendor's own flow,
@@ -162,8 +156,8 @@ class CommunityPluginConnectionRead(SanitizedBaseModel):
     runs_flow: bool = False
     #: The viewer's own state on an interactive connection: ``pending``,
     #: ``connected``, ``expired`` (reconnect) or ``blocked``.
-    status: Optional[str] = None
-    account_label: Optional[str] = None
+    status: str | None = None
+    account_label: str | None = None
     blocked: bool = False
 
 
@@ -174,36 +168,46 @@ class CommunityPluginSettingRead(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     key: str
-    label: Dict[str, str] = {}
-    description: Dict[str, str] = {}
+    label: dict[str, str] = {}
+    description: dict[str, str] = {}
     #: No two communities on this server hold the same value, and the values it
     #: held before stay this community's.
     unique: bool = False
-    value: Optional[str] = None
+    value: str | None = None
     #: A unique setting's earlier values, newest first, which the plug-in still
     #: reads.
-    aliases: List[str] = []
+    aliases: list[str] = []
 
 
-class PluginPlacementRead(SanitizedBaseModel):
-    """One initiative a plug-in is placed in, and who may open it there."""
+class PluginPermissionRead(SanitizedBaseModel):
+    """One of a plug-in's permissions, as the community's role pages list it."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    id: str
+    #: ``initiative``: held by an initiative's roles, as a tool's permissions
+    #: are. ``community``: held by the community's admins, as an admin surface.
+    level: Literal["initiative", "community"]
+    #: What the plug-in calls it, by language. Absent for a ``use`` the plug-in
+    #: did not declare, which the client names itself.
+    name: dict[str, str] | None = None
+    #: An initiative permission's default: whether a role holds it where no
+    #: rule says otherwise.
+    members: bool = False
+
+
+class PluginItemAccessRead(SanitizedBaseModel):
+    """What of a plug-in the viewer meets on the items of one initiative."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     initiative_id: int
-    #: The initiative roles allowed to open the plug-in's surfaces here.
-    role_ids: List[int] = []
-
-
-class PluginPlacementUpdate(SanitizedBaseModel):
-    """Who may open a plug-in's surfaces in one initiative.
-
-    The whole set: a role left out is no longer allowed. Every id must be a
-    role of that initiative. An empty list places the plug-in with no role, so
-    only guild admins open it there.
-    """
-
-    role_ids: List[int] = Field(default_factory=list, max_length=200)
+    #: The declared fields and parts the viewer is drawn there: those whose
+    #: permission they hold and whose connections hold what they require.
+    fields: list[str] = []
+    parts: list[str] = []
+    #: The declared actions the viewer may run on those items.
+    actions: list[str] = []
 
 
 class CommunityPluginScopesUpdate(SanitizedBaseModel):
@@ -213,7 +217,7 @@ class CommunityPluginScopesUpdate(SanitizedBaseModel):
     allows the plug-in. An empty list withdraws every grant.
     """
 
-    granted: List[str] = Field(default_factory=list, max_length=64)
+    granted: list[str] = Field(default_factory=list, max_length=64)
 
 
 class PluginSurfaceAccessRead(SanitizedBaseModel):
@@ -232,7 +236,7 @@ class PluginSurfaceAccessRead(SanitizedBaseModel):
         validation_alias=AliasChoices("openable_community_wide", "openable_guild_wide"),
     )
     #: The initiatives the viewer may open it in.
-    openable_initiatives: List[int] = []
+    openable_initiatives: list[int] = []
 
 
 class CommunityPluginUninstallNotice(SanitizedBaseModel):
@@ -250,8 +254,8 @@ class CommunityPluginUninstallNotice(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     managed: bool = False
-    message: Optional[str] = None
-    action_url: Optional[str] = None
+    message: str | None = None
+    action_url: str | None = None
 
 
 class CommunityPluginRead(SanitizedBaseModel):
@@ -269,23 +273,26 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: Whether this install tracks its listing. True unless a guild admin chose
     #: to apply versions by hand.
     auto_update: bool = True
+    #: A version that asks for more than the install holds, waiting for the
+    #: seat to accept or decline it.
+    pending_version: str | None = None
     #: What the install produced — for a tool instance, the row it created, so
     #: the sidebar can link straight to it.
-    artifacts: List[CommunityPluginArtifact] = []
+    artifacts: list[CommunityPluginArtifact] = []
     #: Whether a guild admin still has a guild-scoped connection to fill in.
     needs_config: bool = False
     #: What the plug-in reported about the configuration it was given.
     config_state: str = "unverified"
-    config_state_detail: Optional[str] = None
+    config_state_detail: str | None = None
     #: Which tool this plug-in mounts, when it mounts one. Read off the pinned
     #: definition so the client need not fetch the catalog to render an entry.
-    tool: Optional[str] = None
+    tool: str | None = None
     #: The listing's artwork, so the sidebar can draw this install. Looked up
     #: from the catalog rather than pinned: a publisher who changes their
     #: picture changes it everywhere the plug-in is shown.
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     #: What a service plug-in contributes, from its pinned definition.
-    features: List[str] = []
+    features: list[str] = []
     #: The pinned definition itself, verbatim.
     #:
     #: A passthrough rather than a read: this build gives meaning to parts of it
@@ -297,31 +304,27 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: what *this* install actually is. It never carries a stored value: the
     #: definition describes the form, and what was typed into it lives in
     #: columns nothing here reads.
-    definition: Dict[str, Any] = {}
+    definition: dict[str, Any] = {}
     #: The initiatives this plug-in's initiative-scoped surfaces appear in, as the
-    #: seat set them, each with the roles allowed to open it there. An
-    #: initiative not listed is one the plug-in does not appear in. Placement
-    #: rather than permission: it is the community's own answer to where an
-    #: plug-in belongs, so it reads the same for everyone.
-    placements: List[PluginPlacementRead] = []
+    #: seat set them. An initiative not listed is one the plug-in does not
+    #: appear in. Placement rather than permission: it is the community's own
+    #: answer to where a plug-in belongs, so it reads the same for everyone.
+    placed_initiative_ids: list[int] = []
+    #: What the community decides who may do with the plug-in: its declared
+    #: permissions, ``use`` at each level among them.
+    permissions: list[PluginPermissionRead] = []
     #: Each page the pinned definition declares, with where the
     #: viewer may open it.
-    surface_access: List[PluginSurfaceAccessRead] = []
-    #: The initiatives whose items show the viewer this plug-in's values and
-    #: parts.
-    item_initiatives: List[int] = []
-    #: The declared fields and parts offered there: those whose connections
-    #: hold what they require.
-    item_fields: List[str] = []
-    item_parts: List[str] = []
-    #: The declared actions the viewer may run on those items.
-    item_actions: List[str] = []
+    surface_access: list[PluginSurfaceAccessRead] = []
+    #: What the viewer meets on items, by initiative: those where they meet
+    #: anything of it.
+    item_access: list[PluginItemAccessRead] = []
     #: The install's settings' values by key, which its parts' text names.
-    setting_values: Dict[str, Any] = {}
+    setting_values: dict[str, Any] = {}
     #: The scopes the community's seat granted this install: empty until the
     #: seat grants some, and never wider than what the manifest requests or
     #: the registration allows.
-    granted_scopes: List[str] = []
+    granted_scopes: list[str] = []
     #: The deployment provides this plug-in to every guild, and a guild admin
     #: neither removes nor disables it. The affordances are absent rather than
     #: erroring, so the client is told which installs those are.
@@ -330,7 +333,7 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: service plug-in whose registration is missing or switched off — the install
     #: stays where it is and says why it is doing nothing.
     available: bool = True
-    created_by: int
+    created_by: PersonId
     created_at: datetime
     updated_at: datetime
 
@@ -346,16 +349,16 @@ class CommunityPluginConsentRead(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     id: int
-    purpose: Optional[str] = None
+    purpose: str | None = None
     label: str
     #: The one initiative the purpose is bound to, when it is.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     requested_access: ConsentAccess
-    granted_access: Optional[ConsentAccess] = None
+    granted_access: ConsentAccess | None = None
     status: ConsentStatus
     requested_at: datetime
-    granted_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
+    granted_at: datetime | None = None
+    revoked_at: datetime | None = None
 
 
 class CommunityPluginConsentAnswer(SanitizedBaseModel):
@@ -378,7 +381,7 @@ class PluginSurfaceSummary(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     id: str
-    name: Dict[str, str] = {}
+    name: dict[str, str] = {}
 
 
 class CommunityPluginUpgradeAsks(SanitizedBaseModel):
@@ -393,9 +396,19 @@ class CommunityPluginUpgradeAsks(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     version: str
-    added_scopes: List[str] = []
-    added_surfaces: List[PluginSurfaceSummary] = []
+    added_scopes: list[str] = []
+    added_surfaces: list[PluginSurfaceSummary] = []
     declined: bool = False
+
+
+class CommunityPluginUpdateRefused(SanitizedBaseModel):
+    """A newer version than the install's that this server cannot run.
+    ``reason`` is the ``messages.py`` code of the refusal."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    version: str
+    reason: str
 
 
 class CommunityPluginUpgrade(SanitizedBaseModel):
@@ -408,7 +421,7 @@ class CommunityPluginUpgrade(SanitizedBaseModel):
     """
 
     version: str = Field(max_length=32)
-    add_scopes: List[str] = Field(default_factory=list, max_length=64)
+    add_scopes: list[str] = Field(default_factory=list, max_length=64)
 
 
 class CommunityPluginDecline(SanitizedBaseModel):
@@ -438,12 +451,16 @@ class CommunityPluginListingRef(SanitizedBaseModel):
 class CommunityPluginEntitlementRead(SanitizedBaseModel):
     """What the entitlement statement held for an install's listing says, as
     the plug-in's page reads it: whether it entitles the community, and why
-    not when it says (``term_full``: the deployment's term has no seat free)."""
+    not when it says (``term_full``: the deployment's term has no seat free).
+    Inactive for any other reason, its plan has ended."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     active: bool
-    reason: Optional[str] = None
+    reason: str | None = None
+    #: Where the seat gets it again, for an inactive statement that is not
+    #: ``term_full``: a page of the billing portal, opened with a handoff.
+    action_url: str | None = None
 
 
 class CommunityPluginDetail(CommunityPluginRead):
@@ -453,44 +470,46 @@ class CommunityPluginDetail(CommunityPluginRead):
     pinned form and the sidebar has no use for it.
     """
 
-    connections: List[CommunityPluginConnectionRead] = []
+    connections: list[CommunityPluginConnectionRead] = []
     #: Each setting the pinned definition declares, with its value.
-    settings: List[CommunityPluginSettingRead] = []
+    settings: list[CommunityPluginSettingRead] = []
     #: The viewer's own answers to this plug-in's requests to act as them, one per
     #: purpose, the plug-in-wide one first. Nobody else's.
-    consents: List[CommunityPluginConsentRead] = []
+    consents: list[CommunityPluginConsentRead] = []
     #: The version this install would move to if it updated now, and absent
-    #: when there is none — an install already on the newest, and one whose
-    #: listing is gone or has published nothing this build can run, are one
-    #: answer to the only question being asked. Only the detail read carries it:
-    #: it costs a catalog lookup, and it is the page offering the Update button
-    #: that needs the answer.
-    update_version: Optional[str] = None
+    #: when there is none: the install is on the newest, or the listing is gone
+    #: or withdrawn, or its newest is one this server cannot run
+    #: (``update_refused``). Only the detail read carries it: it costs a catalog
+    #: lookup, and it is the page offering the Update button that needs it.
+    update_version: str | None = None
+    #: A newer version this server cannot run, and why, so the page can say
+    #: so rather than "Up to date".
+    update_refused: CommunityPluginUpdateRefused | None = None
     #: The scopes the pinned manifest asks for, in vocabulary order. Using a
     #: plug-in the community does not have is left out until it does.
-    requested_scopes: List[str] = []
+    requested_scopes: list[str] = []
     #: The requested scopes this deployment allows the seat to grant. A
     #: requested scope missing here is one the server would refuse.
-    grantable_scopes: List[str] = []
+    grantable_scopes: list[str] = []
     #: What ``update_version`` asks for beyond what the install holds, when it
     #: asks for anything. Absent for a version that asks nothing new, which
     #: applies without consent.
-    pending_update: Optional[CommunityPluginUpgradeAsks] = None
+    pending_update: CommunityPluginUpgradeAsks | None = None
     #: For each ``plugins:`` scope above, the requested ones and those the pending
     #: version adds: the name the plug-in it lets this one use goes by, keyed by
     #: that plug-in's public id. Its public id when the catalog has no name for it.
-    plugin_names: Dict[str, str] = {}
+    plugin_names: dict[str, str] = {}
     #: The catalog listing behind this install. Absent when the catalog no
     #: longer holds it.
-    listing: Optional[CommunityPluginListingRef] = None
+    listing: CommunityPluginListingRef | None = None
     #: The entitlement statement held for the install's listing, when one is.
-    entitlement: Optional[CommunityPluginEntitlementRead] = None
+    entitlement: CommunityPluginEntitlementRead | None = None
 
 
 class CommunityPluginListResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[CommunityPluginRead]
+    items: list[CommunityPluginRead]
 
 
 class CommunityPluginConnectStart(SanitizedBaseModel):
@@ -522,7 +541,7 @@ class CommunityPluginHandoff(SanitizedBaseModel):
     handoff_token: str
     expires_in_seconds: int
     page_url: str
-    allowed_origins: List[str] = []
+    allowed_origins: list[str] = []
     audience: str
     surface_id: str
 
@@ -541,9 +560,9 @@ class CommunityPluginMemberConnection(SanitizedBaseModel):
     connection_id: str
     user_id: int
     status: str
-    account_label: Optional[str] = None
+    account_label: str | None = None
     blocked: bool = False
-    blocked_by_id: Optional[int] = None
+    blocked_by_id: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -554,7 +573,7 @@ class CommunityPluginConnectionSummary(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     connection_id: str
-    label: Dict[str, str] = {}
+    label: dict[str, str] = {}
     connected_count: int = 0
     blocked_count: int = 0
     member_count: int = 0
@@ -580,13 +599,13 @@ class CommunityPluginMembersResponse(PageMeta):
     and ``consents`` are the rows of the members on this page.
     """
 
-    summary: List[CommunityPluginConnectionSummary] = []
-    items: List[CommunityPluginMemberConnection] = []
+    summary: list[CommunityPluginConnectionSummary] = []
+    items: list[CommunityPluginMemberConnection] = []
     #: The page's members' answers to this plug-in's requests to act as them.
     #: Beside the connections rather than in a view of its own: both answer
     #: "what does this plug-in have of this member's", and an admin governing one
     #: wants the other in the same place.
-    consents: List[CommunityPluginMemberConsent] = []
+    consents: list[CommunityPluginMemberConsent] = []
     consent_summary: CommunityPluginConsentSummary = CommunityPluginConsentSummary()
 
 
@@ -596,11 +615,11 @@ class CommunityPluginMembersResponse(PageMeta):
 def serialize_guild_plugin(
     plugin: Any,
     *,
-    context: "GuildContext",
-    install_state: Optional[InstallState] = None,
-    avatar_url: Optional[str] = None,
+    context: GuildContext,
+    install_state: InstallState | None = None,
+    avatar_url: str | None = None,
     placements: Sequence[Any] = (),
-    artifacts: Sequence[Dict[str, Any]] = (),
+    artifacts: Sequence[dict[str, Any]] = (),
     viewer: AgeViewer,
 ) -> CommunityPluginRead:
     """One install as the client sees it.
@@ -617,17 +636,12 @@ def serialize_guild_plugin(
     state = plugin_config_service.config_state(plugin)
     age_allows = plugin_age.age_allows(definition, viewer)
     openability = surface_openability(
-        definition,
-        placements=placements,
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
-        age_allows=age_allows,
+        plugin, placements=placements, context=context, age_allows=age_allows
     )
     on_items = item_openability(
         plugin,
         placements=placements,
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
+        context=context,
         age_allows=age_allows,
         frozen=context.content_read_only,
     )
@@ -642,6 +656,7 @@ def serialize_guild_plugin(
         name=plugin.name,
         enabled=plugin.enabled,
         auto_update=plugin.auto_update,
+        pending_version=plugin.pending_version,
         artifacts=[CommunityPluginArtifact(**artifact) for artifact in artifacts],
         needs_config=state.needs_config,
         config_state=state.state,
@@ -650,11 +665,9 @@ def serialize_guild_plugin(
         avatar_url=avatar_url,
         features=list(features) if isinstance(features, list) else [],
         definition=definition,
-        placements=[
-            PluginPlacementRead(
-                initiative_id=row.initiative_id, role_ids=list(row.role_ids or [])
-            )
-            for row in sorted(placements, key=lambda row: row.initiative_id)
+        placed_initiative_ids=sorted(row.initiative_id for row in placements),
+        permissions=[
+            PluginPermissionRead(**entry) for entry in declared_permissions(definition)
         ],
         surface_access=[
             PluginSurfaceAccessRead(
@@ -664,10 +677,15 @@ def serialize_guild_plugin(
             )
             for one in openability
         ],
-        item_initiatives=list(on_items.initiatives),
-        item_fields=list(on_items.fields),
-        item_parts=list(on_items.parts),
-        item_actions=list(on_items.actions),
+        item_access=[
+            PluginItemAccessRead(
+                initiative_id=one.initiative_id,
+                fields=list(one.fields),
+                parts=list(one.parts),
+                actions=list(one.actions),
+            )
+            for one in on_items
+        ],
         setting_values=dict(plugin.settings or {}),
         granted_scopes=sorted(plugin.granted_scopes or []),
         mandatory=service_state.mandatory,
@@ -680,7 +698,7 @@ def serialize_guild_plugin(
 
 def serialize_connection(
     plugin: Any,
-    connection: Dict[str, Any],
+    connection: dict[str, Any],
     *,
     member_row: Any = None,
     holds_seat: bool = False,
@@ -734,7 +752,14 @@ def serialize_connection(
         ),
         runs_flow=plugin_config_service.runs_vendor_flow(connection),
         status=member_row.status if member_row is not None else None,
-        account_label=member_row.account_label if member_row is not None else None,
+        account_label=(
+            member_row.account_label
+            if member_row is not None
+            # The account the plug-in checked a guild-wide connection against.
+            else stored_config.get(plugin_config_service.ACCOUNT_LABEL)
+            if readable
+            else None
+        ),
         blocked=member_row is not None and member_row.blocked_at is not None,
     )
 
@@ -742,25 +767,27 @@ def serialize_connection(
 def serialize_guild_plugin_detail(
     plugin: Any,
     *,
-    context: "GuildContext",
-    member_rows: Dict[str, Any],
-    install_state: Optional[InstallState] = None,
-    avatar_url: Optional[str] = None,
+    context: GuildContext,
+    member_rows: dict[str, Any],
+    install_state: InstallState | None = None,
+    avatar_url: str | None = None,
     update_offer: Any = None,
+    update_refused: Any = None,
     installed: Collection[str] = (),
     placements: Sequence[Any] = (),
-    artifacts: Sequence[Dict[str, Any]] = (),
+    artifacts: Sequence[dict[str, Any]] = (),
     consent_rows: Sequence[Any] = (),
-    plugin_names: Optional[Dict[str, str]] = None,
+    plugin_names: dict[str, str] | None = None,
     viewer: AgeViewer,
     listing: Any = None,
-    entitlement: Optional[CommunityPluginEntitlementRead] = None,
+    entitlement: CommunityPluginEntitlementRead | None = None,
 ) -> CommunityPluginDetail:
     """The install and its connections, from the viewer's own perspective.
 
-    ``update_offer`` (an ``plugin_updates.UpdateOffer``) is resolved by the
-    caller, which is the layer holding a session that can read the catalog,
-    and so are ``listing`` (the install's ``MarketplaceListing``, if any) and
+    ``update_offer`` (a ``plugin_updates.UpdateOffer``) and ``update_refused``
+    (a ``plugin_updates.RefusedUpdate``) are resolved by the caller, which is
+    the layer holding a session that can read the catalog, and so are
+    ``listing`` (the install's ``MarketplaceListing``, if any) and
     ``installed``, the public ids of the plug-ins the community has.
     """
     base = serialize_guild_plugin(
@@ -801,6 +828,13 @@ def serialize_guild_plugin_detail(
         ],
         consents=[serialize_consent(row) for row in consent_rows],
         update_version=update_offer.version if update_offer is not None else None,
+        update_refused=(
+            CommunityPluginUpdateRefused(
+                version=update_refused.version, reason=update_refused.reason
+            )
+            if update_refused is not None
+            else None
+        ),
         pending_update=serialize_upgrade_asks(plugin, update_offer),
         requested_scopes=offered_scopes(plugin.definition, installed),
         grantable_scopes=grantable_scopes(
@@ -844,7 +878,7 @@ def upgrade_asks_read(version: str, asks: Any, *, declined: bool = False):
 
 def serialize_upgrade_asks(
     plugin: Any, offer: Any
-) -> Optional[CommunityPluginUpgradeAsks]:
+) -> CommunityPluginUpgradeAsks | None:
     """The offered version's asks, or ``None`` when it asks nothing new."""
     if offer is None or not offer.asks.asks_more:
         return None

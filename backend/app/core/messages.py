@@ -255,10 +255,23 @@ class GuildMessages:
     NOT_A_GUEST = "NOT_A_GUEST"
     GUEST_TIME_ENDED = "GUEST_TIME_ENDED"
     GUEST_GRANT_NOT_FOUND = "GUEST_GRANT_NOT_FOUND"
+    # The community banned this person; no way in admits them until it is lifted.
+    BANNED_FROM_COMMUNITY = "BANNED_FROM_COMMUNITY"
+    # A timeout is for members and guests: an administrator keeps the settings
+    # surface, where it could be lifted again.
+    TIMEOUT_NOT_FOR_ADMINS = "TIMEOUT_NOT_FOR_ADMINS"
+    TIMEOUT_MUST_END_LATER = "TIMEOUT_MUST_END_LATER"
     # Asked to join a guild that is not listed in the community directory (or
     # is no longer active). Reported as a 404 — an unlisted guild has published
     # nothing, its existence at a given id included.
     COMMUNITY_NOT_A_COMMUNITY = "COMMUNITY_NOT_A_COMMUNITY"
+    # A listed community's join policy decides the way in: asked to join one
+    # that takes requests, or to ask one that does not.
+    COMMUNITY_JOIN_BY_REQUEST = "COMMUNITY_JOIN_BY_REQUEST"
+    COMMUNITY_JOIN_NOT_BY_REQUEST = "COMMUNITY_JOIN_NOT_BY_REQUEST"
+    COMMUNITY_ALREADY_A_MEMBER = "COMMUNITY_ALREADY_A_MEMBER"
+    # Answered, withdrawn, or never this community's.
+    COMMUNITY_JOIN_REQUEST_NOT_FOUND = "COMMUNITY_JOIN_REQUEST_NOT_FOUND"
     # The three things a guild must be before it can be listed: on at least one
     # shelf, declared free of adult content, and able to admit anyone at all.
     COMMUNITY_COMMUNITY_REQUIRES_CATEGORY = "COMMUNITY_COMMUNITY_REQUIRES_CATEGORY"
@@ -823,6 +836,14 @@ class TicketMessages:
     REPLY_NOT_TAKEN = "TICKET_REPLY_NOT_TAKEN"
 
 
+class IdeaMessages:
+    """Reading the published ideas, and voting."""
+
+    NOT_FOUND = "IDEA_NOT_FOUND"
+    #: A closed idea keeps its votes and takes no change to them.
+    CLOSED = "IDEA_CLOSED"
+
+
 class IntakeMessages:
     """Binding a stream of operations work to a project."""
 
@@ -1033,6 +1054,7 @@ class ImportEngineMessages:
     IMPORT_UNKNOWN_TYPE = "IMPORT_UNKNOWN_TYPE"
     IMPORT_INVALID_ENVELOPE = "IMPORT_INVALID_ENVELOPE"
     IMPORT_SCHEMA_VERSION_UNSUPPORTED = "IMPORT_SCHEMA_VERSION_UNSUPPORTED"
+    IMPORT_ARCHIVE_TOO_OLD = "IMPORT_ARCHIVE_TOO_OLD"
     IMPORT_INVALID_PARAMS = "IMPORT_INVALID_PARAMS"
     IMPORT_TOO_LARGE = "IMPORT_TOO_LARGE"
     IMPORT_JOB_LIMIT_REACHED = "IMPORT_JOB_LIMIT_REACHED"
@@ -1117,9 +1139,6 @@ class QueryMessages:
     #: A field that exists but is computed rather than stored, so there is no
     #: column for a query to name yet.
     FIELD_NOT_SELECTABLE = "QUERY_FIELD_NOT_SELECTABLE"
-    #: A column read beside an aggregate without being grouped, so there is no
-    #: one value of it per row of the answer.
-    UNGROUPED_FIELD = "QUERY_UNGROUPED_FIELD"
     #: An unqualified column that more than one relation in scope could mean.
     AMBIGUOUS_FIELD = "QUERY_AMBIGUOUS_FIELD"
     #: The same alias used for two relations.
@@ -1155,6 +1174,12 @@ class QueryMessages:
     SHEET_RANGE_TOO_LARGE = "QUERY_SHEET_RANGE_TOO_LARGE"
     #: The spreadsheet's cells could not be read just now.
     SHEET_UNREADABLE = "QUERY_SHEET_UNREADABLE"
+
+    # Plug-ins.
+
+    #: ``plugin()`` takes a plug-in's public id and an endpoint's name, then
+    #: parameters by name, each a constant or an ``ARRAY`` of them.
+    PLUGIN_ARGUMENTS = "QUERY_PLUGIN_ARGUMENTS"
 
     # Execution.
 
@@ -1202,8 +1227,8 @@ class ContactMessages:
     # A community contact lives inside the community contacts plug-in, which is
     # what reaches it and what its removal takes with it.
     PLUGIN_REQUIRED = "CONTACT_COMMUNITY_PLUGIN_REQUIRED"
-    # An installed plug-in creates a contact in an initiative; a community one
-    # is recorded on the community contacts plug-in's install.
+    # A plug-in on a token narrowed to one initiative creates a contact in an
+    # initiative; a community one takes a token that is not narrowed.
     PLUGIN_INITIATIVE_REQUIRED = "CONTACT_PLUGIN_INITIATIVE_REQUIRED"
     # Moving a contact into the community's contacts, when it is there already.
     ALREADY_IN_COMMUNITY = "CONTACT_ALREADY_IN_COMMUNITY"
@@ -1481,6 +1506,17 @@ class GuildPluginMessages:
     CONNECTION_NOT_STATIC = "COMMUNITY_PLUGIN_CONNECTION_NOT_STATIC"
     #: A guild admin has stopped this member connecting this one.
     CONNECTION_BLOCKED = "COMMUNITY_PLUGIN_CONNECTION_BLOCKED"
+    #: The plug-in checked what was typed into the connection and refused it;
+    #: nothing was stored.
+    CONNECTION_REFUSED = "COMMUNITY_PLUGIN_CONNECTION_REFUSED"
+    #: The plug-in could not be asked to check what was typed into the
+    #: connection, or answered something that cannot be stored; nothing was.
+    CONNECTION_NOT_CHECKED = "COMMUNITY_PLUGIN_CONNECTION_NOT_CHECKED"
+    #: Another community holds the account the plug-in checked these values
+    #: against; nothing was stored.
+    CONNECTION_TAKEN = "COMMUNITY_PLUGIN_CONNECTION_TAKEN"
+    #: A connection the plug-in checks is saved on its own, not beside others.
+    CONNECTION_CHECKED_ALONE = "COMMUNITY_PLUGIN_CONNECTION_CHECKED_ALONE"
     #: The plug-in is installed but turned off, so nothing flows through it.
     DISABLED = "COMMUNITY_PLUGIN_DISABLED"
     #: The connection's flow needs values this deployment's operator has not
@@ -1517,19 +1553,17 @@ class GuildPluginMessages:
     SERVICE_NOT_REGISTERED = "COMMUNITY_PLUGIN_SERVICE_NOT_REGISTERED"
     #: The pinned definition declares no surface under that id.
     SURFACE_NOT_FOUND = "COMMUNITY_PLUGIN_SURFACE_NOT_FOUND"
-    #: The surface is opened at the community level, or is marked
-    #: ``admin_only``, and the caller is not a guild admin.
-    SURFACE_ADMIN_ONLY = "COMMUNITY_PLUGIN_SURFACE_ADMIN_ONLY"
-    #: The surface was opened in an initiative the plug-in is placed in, and the
-    #: caller holds none of the roles that placement allows.
-    SURFACE_ROLE_NOT_ALLOWED = "COMMUNITY_PLUGIN_SURFACE_ROLE_NOT_ALLOWED"
+    #: The surface is here, and the caller does not hold the permission it
+    #: names, where it was opened.
+    SURFACE_PERMISSION_REQUIRED = "COMMUNITY_PLUGIN_SURFACE_PERMISSION_REQUIRED"
+    #: A role's answer names a permission the install does not declare at that
+    #: level, or an install that is not this community's.
+    PERMISSION_UNKNOWN = "COMMUNITY_PLUGIN_PERMISSION_UNKNOWN"
     #: The viewer is younger than the plug-in's minimum age where they are, or
     #: has no date of birth on file to say otherwise.
     AGE_RESTRICTED = "COMMUNITY_PLUGIN_AGE_RESTRICTED"
     #: The placement sent names an initiative that is not one of this guild's.
     PLACEMENT_INVALID = "COMMUNITY_PLUGIN_PLACEMENT_INVALID"
-    #: The placement names a role that is not one of its initiative's.
-    PLACEMENT_ROLE_INVALID = "COMMUNITY_PLUGIN_PLACEMENT_ROLE_INVALID"
     #: A scope granted to an install that its manifest does not request.
     SCOPE_NOT_REQUESTED = "COMMUNITY_PLUGIN_SCOPE_NOT_REQUESTED"
     #: A scope granted to an install beyond what this deployment allows the plug-in.
@@ -1615,6 +1649,25 @@ class PluginServiceMessages:
     SHARED_ROUTES_IN_USE = "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE"
 
 
+class PluginSignInMessages:
+    """Codes for Sign in with Initiative's own page, which a plug-in sent
+    somebody to. Shown there rather than sent back, because each one means the
+    request cannot be trusted to name where to send them."""
+
+    #: No live plug-in with pages answers to the request's ``client_id``.
+    UNKNOWN_CLIENT = "PLUGIN_SIGN_IN_UNKNOWN_CLIENT"
+    #: The plug-in's manifest declares no ``sign_in``.
+    NOT_OFFERED = "PLUGIN_SIGN_IN_NOT_OFFERED"
+    #: ``redirect_uri`` is not the one the plug-in's manifest names.
+    REDIRECT_MISMATCH = "PLUGIN_SIGN_IN_REDIRECT_MISMATCH"
+    #: The request is malformed: no state, no PKCE ``S256`` challenge, no nonce.
+    INVALID_REQUEST = "PLUGIN_SIGN_IN_INVALID_REQUEST"
+    #: The place chosen no longer admits the person, or holds no such plug-in.
+    PLACE_UNAVAILABLE = "PLUGIN_SIGN_IN_PLACE_UNAVAILABLE"
+    #: Signing in to a plug-in takes a signed-in session, not an API key.
+    SESSION_REQUIRED = "PLUGIN_SIGN_IN_SESSION_REQUIRED"
+
+
 class PluginMessages:
     """Codes for an installed plug-in calling a route with its access token."""
 
@@ -1669,8 +1722,9 @@ class PluginDataMessages:
     #: The install names no such data source, or the pinned definition is not a
     #: service plug-in's at all.
     ENDPOINT_NOT_FOUND = "PLUGIN_DATA_ENDPOINT_NOT_FOUND"
-    #: The endpoint is marked ``admin_only`` and the caller is not a guild admin.
-    ADMIN_ONLY = "PLUGIN_DATA_ADMIN_ONLY"
+    #: The endpoint names a permission the caller does not hold in the
+    #: initiative it is read in.
+    PERMISSION_REQUIRED = "PLUGIN_DATA_PERMISSION_REQUIRED"
     #: The source declares no such parameter, so there is nothing to fill in.
     PARAM_NOT_FOUND = "PLUGIN_DATA_PARAM_NOT_FOUND"
     #: The install is turned off in this guild.

@@ -2,17 +2,17 @@ import asyncio
 import functools
 import logging
 import time
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, AsyncGenerator, Optional, Sequence
+from typing import Any
 
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from asyncpg.exceptions import InvalidCatalogNameError
 from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -24,13 +24,18 @@ from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import HTTPConnection
 
+from alembic import command
 from app.core import metrics
-from app.core.plugin_access_token import InstallAccessToken
 from app.core.config import settings
 from app.core.identify import bearer_plugin_token
+from app.core.plugin_access_token import InstallAccessToken
 from app.core.tools import Tool
-from app.db import base  # noqa: F401  # ensure models are imported for Alembic
-from app.db import cohorts, gucs, post_commit
+from app.db import (
+    base,  # noqa: F401  # ensure models are imported for Alembic
+    cohorts,
+    gucs,
+    post_commit,
+)
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_standing import (
     GuildContext,
@@ -224,7 +229,7 @@ def served_guild_id(connection: HTTPConnection) -> int | None:
 
 async def get_session(
     connection: HTTPConnection,
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     # No checkout reset: context is transaction-local (set_config is_local +
     # SET LOCAL semantics), so a pooled connection carries NO role/GUC/
     # search_path state between transactions — there is nothing to clear.
@@ -240,7 +245,7 @@ async def get_session(
 
 async def get_system_session(
     connection: HTTPConnection,
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     """Get a session on the system engine (background jobs, bootstrapping,
     platform lifecycle). ``app_admin`` is the standard Postgres trusted-batch
     actor — BYPASSRLS, bounded by enumerated per-table GRANTs (0129); guild
@@ -658,12 +663,12 @@ async def _apply_stored_context(session: AsyncSession) -> None:
 class SavedContext:
     """A session's stored context, as :func:`save_rls_context` found it."""
 
-    context: Optional[RequestContext]
-    established: Optional[float]
+    context: RequestContext | None
+    established: float | None
     #: The tier the request authenticated as. A routing records it, so it is
     #: put back with the rest: the caller on the other side is still the same
     #: request, and one that had recorded none has none again.
-    tier: Optional[str]
+    tier: str | None
 
 
 def save_rls_context(session: AsyncSession) -> SavedContext:
@@ -744,6 +749,21 @@ def migration_chain() -> tuple[frozenset[str], str | None]:
         return frozenset(), None
 
 
+def migration_floor() -> tuple[str, str]:
+    """The revision this image's chain starts at, and the release it was cut
+    at: the oldest a database may be stamped at and still upgrade here."""
+    chain = ScriptDirectory.from_config(_get_alembic_config())
+    root = chain.get_revision(chain.get_base())
+    assert root is not None
+    return root.revision, root.module.release
+
+
+def _names_no_database(exc: DBAPIError) -> bool:
+    """Whether a connection was refused because its database does not exist
+    (SQLSTATE ``3D000``)."""
+    return getattr(exc.orig, "sqlstate", None) == "3D000"
+
+
 def _missing_database_error() -> RuntimeError:
     """What to raise when DATABASE_URL names a database that is not there.
 
@@ -767,7 +787,7 @@ def _missing_database_error() -> RuntimeError:
 
 
 @asynccontextmanager
-async def migration_lock() -> AsyncGenerator[AsyncConnection, None]:
+async def migration_lock() -> AsyncGenerator[AsyncConnection]:
     """Take the database's migration lock for the duration of the block.
 
     Alembic runs in-process at startup, so instances sharing a database take
@@ -786,8 +806,10 @@ async def migration_lock() -> AsyncGenerator[AsyncConnection, None]:
     )
     try:
         conn = await lock_engine.connect()
-    except InvalidCatalogNameError as exc:
+    except DBAPIError as exc:
         await lock_engine.dispose()
+        if not _names_no_database(exc):
+            raise
         raise _missing_database_error() from exc
     try:
         if not await advisory_lock(
@@ -812,5 +834,7 @@ async def run_migrations() -> None:
     config = _get_alembic_config()
     try:
         await asyncio.to_thread(command.upgrade, config, "head")
-    except InvalidCatalogNameError as exc:
+    except DBAPIError as exc:
+        if not _names_no_database(exc):
+            raise
         raise _missing_database_error() from exc

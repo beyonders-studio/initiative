@@ -10,9 +10,9 @@ A checklist lives in ``tasks.checklist`` as an ordered JSONB array of
   item's ``done``, in one statement, so ticks of different items both land.
 """
 
-from typing import Any, Iterable, Sequence
-
 import json
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import TextClause, text

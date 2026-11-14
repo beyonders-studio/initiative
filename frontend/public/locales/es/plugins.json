@@ -33,6 +33,7 @@
     "autoUpdateOff": "Las actualizaciones ahora se aplican a mano.",
     "upgradeTo": "Actualizar a {{version}}",
     "upToDate": "Actualizada",
+    "updateWaiting": "Actualización pendiente",
     "upgraded": "Actualizada a {{version}}.",
     "removeManagedNeutral": "Los cargos de este complemento los gestiona tu proveedor.",
     "removeManagedAction": "Gestionar",
@@ -45,7 +46,8 @@
     "decline": "Rechazar",
     "declined": "Rechazaste la versión {{version}}. El complemento se queda en su versión actual.",
     "declinedDone": "Versión {{version}} rechazada.",
-    "moved": "Ahora hay otra versión disponible. Revisa lo que pide."
+    "moved": "Ahora hay otra versión disponible. Revisa lo que pide.",
+    "refused": "La versión {{version}} no puede ejecutarse en este servidor."
   },
   "install": {
     "title": "Añadir {{name}}",
@@ -59,19 +61,27 @@
     "whereTitle": "Dónde trabaja",
     "whereDescription": "Muestra su página, y lee y cambia contenido, solo en las iniciativas que elijas.",
     "whereDescriptionNoPage": "Lee y cambia contenido solo en las iniciativas que elijas.",
-    "whoTitle": "Quién puede abrirla allí",
+    "whoTitle": "Quién puede usarlo",
     "callersTitle": "Complementos que pueden usarla",
     "callersDescription": "Estos complementos de tu comunidad piden usar {{name}}. Cada uno que dejes marcado podrá hacerlo.",
-    "roles": {
-      "moderator": "Moderadores",
-      "project_manager": "Responsables de proyecto",
-      "member": "Miembros"
-    },
     "entitlementRequired": "Hay que activar este complemento para tu comunidad antes de poder añadirlo.",
     "entitlementAction": "Ver opciones",
     "termFull": "El plan de esta instalación no tiene plazas libres para {{name}}.",
     "termFullRequest": "Solicitar",
-    "termFullAskAdmins": "Pide a los administradores de tu comunidad que lo soliciten."
+    "termFullAskAdmins": "Pide a los administradores de tu comunidad que lo soliciten.",
+    "permissions": {
+      "initiativeMembers": "En cada iniciativa, todos los roles lo tienen al principio. Cámbialo en la pantalla de Roles de la iniciativa.",
+      "initiativeManagers": "En cada iniciativa, los responsables lo tienen al principio. Dáselo a otros roles en la pantalla de Roles de la iniciativa.",
+      "community": "En toda la comunidad, los administradores lo tienen. Elige en la pantalla de Roles de la comunidad qué roles de administrador personalizados lo conservan."
+    }
+  },
+  "offer": {
+    "choosePlan": "Elegir un plan",
+    "buy": "Comprar",
+    "seePlans": "Ver planes",
+    "notOnPlan": "El plan de tu comunidad no incluye complementos de pago. Los planes que sí los incluyen están en la página de planes.",
+    "notOffered": "Este complemento no se ofrece para esta comunidad.",
+    "planEnded": "El plan de este complemento ha terminado."
   },
   "connections": {
     "none": "Este complemento no pide nada que configurar.",
@@ -199,12 +209,9 @@
     "some": "Solo las iniciativas que yo elija",
     "none": "No se eligió ninguna iniciativa, así que este complemento no alcanza nada dentro de las iniciativas.",
     "roles": {
-      "open": "Quién puede abrirla en {{name}}",
-      "title": "Quién puede abrirla aquí",
-      "adminsAlways": "Los administradores de la comunidad siempre pueden abrirla.",
-      "adminsOnly": "Solo administradores de la comunidad",
-      "count_one": "{{count}} rol",
-      "count_other": "{{count}} roles"
+      "open": "Roles en {{name}}",
+      "link": "Roles",
+      "note": "Los roles de cada iniciativa deciden quién lo usa allí, en su pantalla de Roles."
     }
   },
   "connected": {
@@ -332,5 +339,9 @@
     "provided": "Esta comunidad lo añadió y lo ofrece su editor, no Initiative.",
     "report": "¿Algo va mal? Denúncialo.",
     "continue": "Continuar"
+  },
+  "permissions": {
+    "use": "Usar",
+    "named": "{{plugin}}: {{permission}}"
   }
 }

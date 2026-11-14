@@ -9,8 +9,8 @@ reads the frames its writer delivered.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from types import SimpleNamespace
-from typing import Iterable, Optional
 
 from app.models.platform.user import Presence
 from app.services.content_sockets import (
@@ -31,7 +31,7 @@ class FakeWebSocket:
     def __init__(self) -> None:
         self.sent: list[dict] = []
         self.sent_bytes: list[bytes] = []
-        self.closed: Optional[int] = None
+        self.closed: int | None = None
 
     async def send_json(self, message: dict) -> None:
         self.sent.append(message)
@@ -39,7 +39,7 @@ class FakeWebSocket:
     async def send_bytes(self, payload: bytes) -> None:
         self.sent_bytes.append(payload)
 
-    async def close(self, code: Optional[int] = None) -> None:
+    async def close(self, code: int | None = None) -> None:
         self.closed = code
 
 
@@ -84,7 +84,7 @@ def watch_events_bus(
 
 def open_account_socket(
     user_id: int,
-    websocket: Optional[FakeWebSocket] = None,
+    websocket: FakeWebSocket | None = None,
     *,
     chosen_presence: Presence = Presence.online,
 ) -> FakeWebSocket:

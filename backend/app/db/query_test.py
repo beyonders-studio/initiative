@@ -1,6 +1,6 @@
 """Unit tests for the reusable query utility functions."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import (
@@ -17,18 +17,17 @@ from sqlalchemy import (
 from sqlmodel import select
 
 from app.db.query import (
-    clamp_page,
     apply_filters,
-    apply_sorting,
     apply_pagination,
+    apply_sorting,
     build_paginated_response,
+    clamp_page,
     extract_condition_value,
     iter_leaf_conditions,
     parse_conditions,
     parse_sort_fields,
 )
-from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortField, SortDir
-
+from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortDir, SortField
 
 # ---------------------------------------------------------------------------
 # Dummy table for testing (not persisted — we only inspect generated SQL)
@@ -577,7 +576,7 @@ class TestDateValueCoercion:
         result = apply_filters(stmt, _DummyModel, conditions)
         bind = list(result.whereclause.get_children())[1]
         assert isinstance(bind.type, DateTime)
-        assert bind.value == datetime(2026, 6, 1, tzinfo=timezone.utc)
+        assert bind.value == datetime(2026, 6, 1, tzinfo=UTC)
 
     def test_parses_z_suffix(self):
         """The shape JS toISOString() produces."""

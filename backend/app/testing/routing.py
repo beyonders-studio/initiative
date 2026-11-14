@@ -10,16 +10,16 @@ routing now needs a membership or a grant to exist first.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional, Sequence
 
 from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.user import User
 from app.db import gucs
 from app.db.request_context import Platform, SystemGuild
+from app.models.platform.user import User
 
 __all__ = [
     "as_role",
@@ -35,7 +35,7 @@ async def route_as(
     *,
     user_id: int,
     guild_id: int,
-    satisfied_providers: Optional[Sequence[int]] = None,
+    satisfied_providers: Sequence[int] | None = None,
     on_behalf: bool = False,
     settings: bool = False,
     seat: bool = False,
@@ -83,9 +83,9 @@ async def route_as_install(
     install_id: int,
     client_id: str,
     scopes: Sequence[str],
-    initiative_id: Optional[int] = None,
-    user_id: Optional[int] = None,
-    purpose: Optional[str] = None,
+    initiative_id: int | None = None,
+    user_id: int | None = None,
+    purpose: str | None = None,
 ):
     """Route ``session`` as an installed plug-in, through the install seam.
 
@@ -119,7 +119,7 @@ async def route_system(session: AsyncSession, *, guild_id: int) -> None:
 
 
 @asynccontextmanager
-async def platform_session(user: User) -> AsyncIterator[AsyncSession]:
+async def platform_session(user: User) -> AsyncGenerator[AsyncSession]:
     """A request-path session on the platform context ``user``'s requests run
     in, as ``UserSessionDep`` hands one to a ``/me/*`` route: work across
     communities made on it reads each one from its own cohort."""
@@ -135,7 +135,7 @@ async def platform_session(user: User) -> AsyncIterator[AsyncSession]:
 @asynccontextmanager
 async def as_role(
     session: AsyncSession, role: str, user_id: int
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None]:
     """Run the block as the Postgres ``role`` with ``user_id`` as the current
     user, on the session's connection, then return to the login role.
 

@@ -3,8 +3,59 @@ from typing import Any
 from fastapi import APIRouter
 
 from app.api.deps import DirectMessagesEnabledDep
-from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
-from app.core.tools import Tool
+from app.api.v1.platform_endpoints import (
+    access_grants,
+    account_change,
+    announcements,
+    auth,
+    auth_providers,
+    billing,
+    community_join_requests,
+    config,
+    demo,
+    dm,
+    dm_transport,
+    email_otp,
+    field_catalog,
+    guild_provider_connections,
+    guilds,
+    health,
+    held_changes,
+    home_layouts,
+    ideas,
+    intake,
+    legal,
+    marketplace,
+    native,
+    notification_prefs,
+    notifications,
+    operator,
+    passkeys,
+    passwordless,
+    people,
+    plugin_connection_callbacks,
+    plugin_consent_requests,
+    plugin_hooks,
+    plugin_hub,
+    plugin_installation,
+    plugin_oauth,
+    plugin_platform,
+    plugin_services,
+    plugin_sign_in,
+    provider_placement,
+    push,
+    recurrence,
+    second_factor,
+    sessions,
+    settings,
+    tickets,
+    user_view_preferences,
+    users,
+    version,
+)
+from app.api.v1.platform_endpoints import (
+    ai_settings as platform_ai_settings,
+)
 
 # Endpoints are organized by the kind of data they touch (they must never mix —
 # this mirrors the tenant/ vs platform/ split in models/, schemas/, services/):
@@ -16,48 +67,46 @@ from app.core.tools import Tool
 #                          single guild context (see /me routes below).
 from app.api.v1.tenant_endpoints import (
     activity,
-    moderation,
-    evidence,
-    holds,
-    archive,
-    query,
-    smart_chips,
-    search as guild_search,
     ai,
     ai_settings,
-    plugin_data,
+    archive,
     attachments,
-    webhooks,
     calendar_entries,
     calendar_events,
     calendars,
-    dashboards,
-    data_jobs,
-    guild_plugins,
     collaboration,
+    collections,
     comments,
     contacts,
     counters,
-    files,
+    custom_roles,
+    dashboards,
+    data_jobs,
     events,
+    evidence,
     exports,
+    files,
+    guild_plugins,
+    holds,
     imports,
-    resumable_uploads,
     initiatives,
-    marketplace as guild_marketplace,
     me_tools,
-    collections,
     me_trash,
+    moderation,
+    personal_items,
+    plugin_data,
     posts,
     projects,
     property_definitions,
     property_values,
+    query,
     reactions,
-    personal_items,
     relationships,
     resource_grants,
+    resumable_uploads,
+    share_requests,
+    smart_chips,
     storage,
-    custom_roles,
     tags,
     task_statuses,
     task_types,
@@ -68,58 +117,18 @@ from app.api.v1.tenant_endpoints import (
     tool_lists,
     tools,
     trash,
-    share_requests,
     view_preferences,
+    webhooks,
     wikis,
 )
-from app.api.v1.platform_endpoints import (
-    account_change,
-    held_changes,
-    home_layouts,
-    field_catalog,
-    recurrence,
-    access_grants,
-    announcements,
-    ai_settings as platform_ai_settings,
-    plugin_consent_requests,
-    plugin_oauth,
-    plugin_platform,
-    plugin_installation,
-    plugin_hub,
-    plugin_connection_callbacks,
-    plugin_hooks,
-    plugin_services,
-    auth,
-    auth_providers,
-    provider_placement,
-    billing,
-    config,
-    demo,
-    guild_provider_connections,
-    guilds,
-    health,
-    legal,
-    marketplace,
-    native,
-    notification_prefs,
-    notifications,
-    operator,
-    push,
-    intake,
-    passkeys,
-    people,
-    email_otp,
-    passwordless,
-    second_factor,
-    sessions,
-    settings,
-    tickets,
-    user_view_preferences,
-    users,
-    version,
-    dm,
-    dm_transport,
+from app.api.v1.tenant_endpoints import (
+    marketplace as guild_marketplace,
 )
+from app.api.v1.tenant_endpoints import (
+    search as guild_search,
+)
+from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
+from app.core.tools import Tool
 
 api_router = APIRouter()
 
@@ -136,6 +145,7 @@ api_router.include_router(config.router, tags=["config"])
 # This deployment's terms and privacy policy, if it has any.
 # Unauthenticated: the signup form links to them.
 api_router.include_router(legal.router, tags=["legal"])
+api_router.include_router(ideas.router, prefix="/ideas", tags=["ideas"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # The demo deployment's routes; 404 unless the deployment runs as the demo.
 api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
@@ -149,6 +159,9 @@ api_router.include_router(email_otp.router, prefix="/auth", tags=["auth"])
 api_router.include_router(sessions.router, prefix="/auth", tags=["auth"])
 api_router.include_router(operator.router, prefix="/operator", tags=["operator"])
 api_router.include_router(guilds.router, prefix="/communities", tags=["communities"])
+api_router.include_router(
+    community_join_requests.router, prefix="/communities", tags=["communities"]
+)
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 # Direct messages, both halves, gated on the platform switch in one place: a
 # deployment that does not offer messaging refuses the whole surface rather
@@ -199,6 +212,11 @@ api_router.include_router(
 # plug-in or installation token. The listing of its installs takes the plug-in token.
 api_router.include_router(
     plugin_oauth.router, prefix="/plugin-platform", tags=["plugin-platform"]
+)
+# Sign in with Initiative's own page: the plug-in asking, where the person may
+# open it, and the code that sends them back.
+api_router.include_router(
+    plugin_sign_in.router, prefix="/plugin-platform", tags=["plugin-platform"]
 )
 # An installed plug-in asking a member to let it act as them, on its installation
 # token. The member answers on their own consent screen.

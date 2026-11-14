@@ -8,7 +8,7 @@ guild-admin override). A guild admin is the one who puts somebody on it, and a
 guild admin joining an initiative lands on it.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -75,7 +75,7 @@ async def _setup(session: AsyncSession, acting_user):
 async def test_moderator_holds_full_access_and_project_manager_does_not(
     session: AsyncSession, acting_user
 ):
-    admin, _owner, _pm, _guild, initiative = await _setup(session, acting_user)
+    _admin, _owner, _pm, _guild, initiative = await _setup(session, acting_user)
 
     moderator = await _role_by_name(session, initiative, "moderator")
     assert moderator.is_builtin is True
@@ -191,7 +191,7 @@ async def test_only_a_guild_admin_moves_a_member_on_or_off_the_moderator_role(
     """A project manager may edit roles and staff the initiative; the one role
     a community admin keeps for themselves is the one carrying Full access —
     putting somebody on it, and taking them off it again."""
-    admin, owner, pm, guild, initiative = await _setup(session, acting_user)
+    admin, _owner, pm, guild, initiative = await _setup(session, acting_user)
     moderator = await _role_by_name(session, initiative, "moderator")
 
     resp = await client.patch(

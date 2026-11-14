@@ -22,8 +22,8 @@ option), or a deployment that did, holds no levels: the pass clears them.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import (
     DateTime,
@@ -36,9 +36,8 @@ from sqlalchemy import (
     select,
     text,
 )
-from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.dialects.postgresql import ARRAY
-
+from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import cohorts
@@ -209,7 +208,7 @@ async def prepare() -> Visit:
             return
         if not live:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await session.exec(
             _LEVELS,  # type: ignore[arg-type]
             params={

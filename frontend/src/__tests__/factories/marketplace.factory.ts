@@ -2,6 +2,7 @@ import type {
   MarketplaceListingDetail,
   MarketplaceListingSummary,
   MarketplaceVersionRead,
+  PluginWidgetCatalogEntry,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { ProjectListingEnvelope } from "@/lib/projectListing";
 
@@ -72,6 +73,37 @@ export function buildMarketplaceListingDetail(
     plugin_names: {},
     has_initiative_surfaces: false,
     callers: [],
+    ...overrides,
+  };
+}
+
+/**
+ * One install in the plug-in widget catalog: `acme.shop`, with one read
+ * endpoint, `orders`, that takes a `range` and returns a list of `status` and
+ * `total`, and no widgets of its own.
+ */
+export function buildPluginCatalogEntry(
+  overrides: Partial<PluginWidgetCatalogEntry> = {}
+): PluginWidgetCatalogEntry {
+  counter++;
+  return {
+    plugin_id: counter,
+    plugin_uid: `PLUGIN${String(counter).padStart(8, "0")}`,
+    public_id: "acme.shop",
+    name: "Shop",
+    enabled: true,
+    widgets: [],
+    endpoints: [
+      {
+        id: "plugin.acme.shop.orders",
+        cache_ttl_seconds: 60,
+        params: [{ key: "range", type: "string", label: { en: "Range" } }],
+        returns: [
+          { key: "status", type: "string", list: true },
+          { key: "total", type: "number", list: true },
+        ],
+      },
+    ],
     ...overrides,
   };
 }

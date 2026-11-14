@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import logging
 
-import httpx
+import httpx2
 from fastapi import HTTPException, status
 
 from app.core.config import CaptchaProvider
@@ -139,11 +139,11 @@ async def verify_or_raise(token: str | None, *, remote_ip: str | None) -> None:
         payload["remoteip"] = remote_ip
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx2.AsyncClient(timeout=10) as client:
             resp = await client.post(verify_url, data=payload)
             resp.raise_for_status()
             body = resp.json()
-    except (httpx.HTTPError, ValueError) as exc:
+    except (httpx2.HTTPError, ValueError) as exc:
         # Fail-closed — if we can't reach the provider, treat as
         # invalid rather than letting a registration through unchecked.
         logger.warning("Captcha verification request to %s failed: %s", provider, exc)

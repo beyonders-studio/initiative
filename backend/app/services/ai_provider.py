@@ -13,14 +13,14 @@ A connection always names its model; nothing here picks one.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any
 
 import anthropic
-import httpx
+import httpx2
 import openai
 from pydantic import BaseModel, ValidationError
 
@@ -207,7 +207,7 @@ def _openai_client(target: Target, timeout: float) -> openai.AsyncOpenAI:
         # runs answers the same way the second time.
         max_retries=0 if PRESETS[target.provider].self_hosted else 2,
         default_headers={"User-Agent": "Initiative"},
-        http_client=httpx.AsyncClient(
+        http_client=httpx2.AsyncClient(
             timeout=timeout,
             follow_redirects=False,
             transport=PinnedTransport(
@@ -394,7 +394,7 @@ async def _send(
 
 
 @contextmanager
-def _slot(guild_id: int | None) -> Iterator[None]:
+def _slot(guild_id: int | None) -> Generator[None]:
     """Hold one of the community's open requests, or refuse when it has
     none left."""
     if guild_id is None:
@@ -421,7 +421,7 @@ async def _sent(
     try:
         try:
             text, used = await send(target, job, prompt, schema)
-        except (anthropic.BadRequestError, openai.BadRequestError):
+        except anthropic.BadRequestError, openai.BadRequestError:
             if schema is None:
                 raise
             # A model that takes no schema still answers one the prompt asks
@@ -443,10 +443,7 @@ async def complete_text(
     return (await _send(target, job, prompt, guild_id)).strip()
 
 
-Answer = TypeVar("Answer", bound=BaseModel)
-
-
-async def complete_json(
+async def complete_json[Answer: BaseModel](
     target: Target,
     job: Job,
     prompt: tuple[str, str],
@@ -472,17 +469,19 @@ async def _anthropic_stream(
     target: Target, job: Job, prompt: tuple[str, str], used: list[int]
 ) -> AsyncIterator[str]:
     system, user = prompt
-    async with _anthropic_client(target, job.timeout) as client:
-        async with client.messages.stream(
+    async with (
+        _anthropic_client(target, job.timeout) as client,
+        client.messages.stream(
             model=target.model or "",
             max_tokens=job.max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
-        ) as stream:
-            # Only the text: a model that thinks first streams that apart.
-            async for text in stream.text_stream:
-                yield text
-            usage = (await stream.get_final_message()).usage
+        ) as stream,
+    ):
+        # Only the text: a model that thinks first streams that apart.
+        async for text in stream.text_stream:
+            yield text
+        usage = (await stream.get_final_message()).usage
     used[:] = [
         usage.input_tokens,
         usage.output_tokens,

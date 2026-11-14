@@ -20,6 +20,7 @@ from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
+from app.models.tenant._mixins import ActorKind
 from app.services.tenant import archive as archive_service
 from app.services.tenant.soft_delete import soft_delete_entity
 from app.testing import (
@@ -93,6 +94,7 @@ async def test_every_project_gets_its_types_and_every_task_and_page_its_task_typ
     )
     nobodys = await create_project(session, a.initiative, gone, name="Orphaned")
     nobodys.created_by = None
+    nobodys.created_by_kind = ActorKind.system
     session.add(nobodys)
     await session.commit()
 
@@ -114,6 +116,10 @@ async def test_every_project_gets_its_types_and_every_task_and_page_its_task_typ
             text("SELECT set_config('search_path', :path, true)"),
             {"path": f"guild_{a.guild.id}, public"},
         )
+        # The operations community renders its ideas policies over a column
+        # the revision adds; they come back with the schema after the test.
+        for policy in ("ideas_read", "ideas_only"):
+            await connection.execute(text(f"DROP POLICY IF EXISTS {policy} ON tasks"))
         await connection.run_sync(_run, migration._apply_downgrade)
         # As before the revision: one task page per project, and one left
         # behind by a project that is gone. Written as the owner, with the

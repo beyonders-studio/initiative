@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { buildCommunity } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import { asPhoneThatMayNotSell } from "@/__tests__/helpers/storeSelling";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 import type { CommunityEntry, useCommunities } from "@/hooks/useCommunities";
 import { toast } from "@/lib/mascotToast";
 

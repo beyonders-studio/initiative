@@ -14,27 +14,30 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, AsyncIterator, BinaryIO
+from typing import Any, BinaryIO
 
 from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db import gucs
-from app.db.session import raise_flag, routed_guild_id
 from app.core.messages import ImportEngineMessages
+from app.core.tools import tool_for_create_permission
+from app.db import gucs
+from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.session import raise_flag, routed_guild_id
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
-from app.core.legacy_references import UNMAPPED, rewrite_body, rewrite_ref, rewrite_text
-from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
 from app.schemas.tenant.import_job import BackupPlanPerson, EnvelopeImportPlan
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.common import (
     handle_key,
     load_guild_member_handles,
@@ -45,7 +48,6 @@ from app.services.import_engine.contract import (
     ImportEngineError,
     InlineImport,
 )
-from app.services.import_engine import limits as import_limits
 from app.services.tenant.initiative_tools import tool_on_in
 
 # Statuses that count against the per-user active-job cap.
@@ -57,100 +59,6 @@ _ACTIVE_STATUSES = (
     DataJobStatus.queued,
     DataJobStatus.running,
 )
-
-
-#: How an archive or an envelope written by an older build names files (once
-#: documents): the manifest's tool, its tool switches and envelope type, the
-#: keys holding a file's type and the files filed in a wiki or attached to an
-#: item, the refs naming one, and the role permissions for the tool. Read on
-#: restore and on a lone envelope's import, and rewritten to this build's names
-#: before anything else looks at them; nothing writes them. A gallery's backup
-#: entry is filed with the files, since its pictures are restored as files and
-#: a collection.
-_LEGACY_ENVELOPE_TYPES = {"initiative-document": tool_envelope_type(Tool.file)}
-_LEGACY_TOOLS = {"document": Tool.file.value}
-_LEGACY_ENTRY_TOOLS = {**_LEGACY_TOOLS, "gallery": Tool.file.value}
-_LEGACY_KEYS = {"documents": "files", "document_type": "file_type"}
-_LEGACY_PERMISSIONS = {
-    "documents_enabled": Tool.file.view_permission,
-    "create_documents": Tool.file.create_permission,
-}
-
-
-#: Where an archive or an envelope holds what an older build may have written
-#: a reference in, as the stored columns hold it: an editor body (a Lexical
-#: state, or a comment's markdown), and running text, each string of it (a
-#: description, a task's checklist, what a repeat carries over, a type's
-#: starting values). Any other string is left as written, and so is any other
-#: body: a spreadsheet's cells and a whiteboard's text are what was typed.
-_BODY_KEYS = frozenset({"content", "body"})
-_TEXT_KEYS = frozenset(
-    {
-        "description",
-        "location",
-        "notes",
-        "checklist",
-        "recurrence_carry",
-        "starting_values",
-    }
-)
-
-
-def _rewrite_strings(value: Any) -> Any:
-    if isinstance(value, str):
-        return rewrite_text(value, UNMAPPED)
-    if isinstance(value, list):
-        return [_rewrite_strings(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _rewrite_strings(item) for key, item in value.items()}
-    return value
-
-
-def current_shape(value: Any) -> Any:
-    """``value``, read from an archive or an envelope, with the names an
-    older build gave files spelled as this one spells them, and every
-    reference in its bodies and running text as well. A gallery's pictures
-    are restored with no id to name them by, and a queue and its items are
-    not restored, so a reference to any of them is its words."""
-    if isinstance(value, list):
-        return [current_shape(item) for item in value]
-    if not isinstance(value, dict):
-        return value
-    shaped: dict[str, Any] = {}
-    for key, item in value.items():
-        key = _LEGACY_KEYS.get(key, key)
-        if key in _BODY_KEYS:
-            item = (
-                rewrite_text(item, UNMAPPED)
-                if isinstance(item, str)
-                else rewrite_body(item, UNMAPPED)
-            )
-        elif key in _TEXT_KEYS:
-            item = _rewrite_strings(item)
-        else:
-            item = current_shape(item)
-        shaped[key] = item
-    tools = shaped.get("tools")
-    if isinstance(tools, dict):
-        shaped["tools"] = {
-            _LEGACY_TOOLS.get(key, key): item for key, item in tools.items()
-        }
-    kind = shaped.get("type")
-    if isinstance(kind, str) and kind in _LEGACY_ENVELOPE_TYPES:
-        shaped["type"] = _LEGACY_ENVELOPE_TYPES[kind]
-    tool = shaped.get("tool")
-    if isinstance(tool, str) and tool in _LEGACY_ENTRY_TOOLS:
-        shaped["tool"] = _LEGACY_ENTRY_TOOLS[tool]
-    ref = shaped.get("external_ref")
-    if isinstance(ref, str):
-        shaped["external_ref"] = rewrite_ref(ref, UNMAPPED) or ref
-    permissions = shaped.get("permissions")
-    if isinstance(permissions, list):
-        shaped["permissions"] = [
-            _LEGACY_PERMISSIONS.get(key, key) if isinstance(key, str) else key
-            for key in permissions
-        ]
-    return shaped
 
 
 def require_writable(guild_context: Any) -> None:
@@ -190,7 +98,7 @@ async def load_target_initiative(
 
     try:
         initiative_id = int(initiative_id)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
 
     initiative = (
@@ -289,7 +197,6 @@ async def start_envelope_import(
     * **Queued**, above it — the payload is staged and the worker
       re-validates and applies it under the creator's RLS session.
     """
-    envelope = current_shape(envelope)
     envelope_type = envelope.get("type")
     if not isinstance(envelope_type, str):
         raise ImportEngineError(ImportEngineMessages.IMPORT_UNKNOWN_TYPE)
@@ -329,6 +236,7 @@ async def start_envelope_import(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=envelope_type,
         params={"initiative_id": initiative.id},
         file_ref=payload_ref,
@@ -339,7 +247,7 @@ async def start_envelope_import(
         if unplaced
         else None,
         status=DataJobStatus.staged if unplaced else DataJobStatus.queued,
-        expires_at=datetime.now(timezone.utc)
+        expires_at=datetime.now(UTC)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
     session.add(job)
@@ -357,7 +265,7 @@ async def apply_one_envelope(
     user: User,
     people_map: Any = None,
     exclude_properties: Any = None,
-) -> "EnvelopeImportResult":
+) -> EnvelopeImportResult:
     """Apply one envelope and then resolve the links it asserted.
 
     A lone envelope is the degenerate case of the deferred pass, not a
@@ -416,6 +324,7 @@ async def count_active_jobs_locked(session: AsyncSession, *, user: User) -> None
             .select_from(DataJob)
             .where(
                 DataJob.direction == DataJobDirection.import_,
+                DataJob.created_by_kind == ActorKind.member,
                 DataJob.created_by == user.id,
                 col(DataJob.status).in_(_ACTIVE_STATUSES),
             )
@@ -466,12 +375,11 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
     ``IMPORT_TOO_LARGE`` once it passes ``max_bytes``."""
     import tempfile
 
-    handle = tempfile.NamedTemporaryFile(
-        prefix="import-upload-", suffix=".zip", delete=False
-    )
-    path = Path(handle.name)
+    fd, name = tempfile.mkstemp(prefix="import-upload-", suffix=".zip")
+    path = Path(name)
+    # Closing flushes, so it fails like a write does and is cleaned up the same.
     try:
-        with handle:
+        with os.fdopen(fd, "wb") as handle:
             total = 0
             while True:
                 chunk = source.read(min(_SPOOL_CHUNK_BYTES, max_bytes + 1 - total))
@@ -490,7 +398,7 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
 
 
 @asynccontextmanager
-async def spooled_upload(source: BinaryIO, *, max_bytes: int) -> AsyncIterator[Path]:
+async def spooled_upload(source: BinaryIO, *, max_bytes: int) -> AsyncGenerator[Path]:
     """An uploaded file as a local file for the length of the block.
 
     Copied off the event loop a chunk at a time, so no more than one chunk is
@@ -518,19 +426,20 @@ def _spool_payload(guild_id: int, payload_ref: str) -> tuple[Path, bool] | None:
         return Path(blob.path), False
     if blob.stream is None:
         return None
-    handle = tempfile.NamedTemporaryFile(prefix="import-payload-", delete=False)
+    fd, name = tempfile.mkstemp(prefix="import-payload-")
+    path = Path(name)
     try:
-        with handle:
+        with os.fdopen(fd, "wb") as handle:
             for chunk in blob.stream:
                 handle.write(chunk)
     except BaseException:
-        Path(handle.name).unlink(missing_ok=True)
+        path.unlink(missing_ok=True)
         raise
-    return Path(handle.name), True
+    return path, True
 
 
 @asynccontextmanager
-async def open_payload(guild_id: int, payload_ref: str) -> AsyncIterator[Path | None]:
+async def open_payload(guild_id: int, payload_ref: str) -> AsyncGenerator[Path | None]:
     """A staged payload as a local file for the length of the block, or
     ``None`` when the blob is gone.
 

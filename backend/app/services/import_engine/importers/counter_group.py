@@ -12,12 +12,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import Counter, CounterGroup, CounterViewMode
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import CounterGroupEnvelope
 from app.services.import_engine.common import unique_name_in_initiative
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,
@@ -56,6 +57,7 @@ class CounterGroupImporter(NamesPeopleInPassing):
             description=env.description,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
         )
         session.add(group)
         await session.flush()

@@ -13,26 +13,25 @@ Tests the task API endpoints at /api/v1/tasks including:
 """
 
 import json
+from datetime import UTC, date, datetime, time
 from typing import Any
-from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from sqlmodel import select
-
-from app.services.tenant.task_types import get_default_type
-from app.services.tenant.task_series import advance_recurrence_if_needed
-from app.models.platform.guild import CommunityRole
-from app.models.tenant.task import Task, TaskStatusCategory
-from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.testing.schema_harness import route_session_to_guild
-from app.models.tenant.batched_notice import BatchedNotice
 from app.core.messages import CommonMessages, TaskMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
+from app.models.platform.guild import CommunityRole
+from app.models.tenant.batched_notice import BatchedNotice
+from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.models.tenant.task import Task, TaskStatusCategory
+from app.services.tenant.task_series import advance_recurrence_if_needed
+from app.services.tenant.task_types import get_default_type
+from app.testing import create_resource_grant, guild_of, route_as
 from app.testing.factories import (
     assign_tag,
     checklist_items,
@@ -44,12 +43,12 @@ from app.testing.factories import (
     create_initiative,
     create_project,
     create_relationship,
+    create_tag,
     create_task,
     create_task_status,
-    create_tag,
     create_user,
 )
-from app.testing import create_resource_grant, guild_of, route_as
+from app.testing.schema_harness import route_session_to_guild
 
 LOS_ANGELES = ZoneInfo("America/Los_Angeles")
 
@@ -121,9 +120,11 @@ async def test_list_tasks_in_project(
         for task in (long, short, linked, bare)
     } == {
         long.id: (
-            "[WIP] Plan Draft the budget, then share it with everyone. Draft the"
-            " budget, then share it with everyone. Draft the budget, then share it"
-            " with everyone. Draft…",
+            (
+                "[WIP] Plan Draft the budget, then share it with everyone. Draft the"
+                " budget, then share it with everyone. Draft the budget, then share it"
+                " with everyone. Draft…"
+            ),
             True,
         ),
         short.id: (f"Ask @[]({a.user.id}) about the budget.", True),
@@ -1489,9 +1490,8 @@ async def test_reorder_rebalances_on_precision_exhaustion(
     assert data[task3.id]["position"] == 3.0
 
     # task2 was only renumbered, not explicitly moved -> updated_at must not churn.
-    # (Normalize the trailing 'Z' — datetime.fromisoformat rejects it on <3.11.)
     def _parse(ts: str) -> datetime:
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return datetime.fromisoformat(ts)
 
     assert _parse(data[task2.id]["updated_at"]) == task2_updated_before
     # task3 was explicitly moved -> updated_at advances.
@@ -1640,21 +1640,21 @@ async def recurring_task_env(session: AsyncSession, acting_user):
     [
         (
             "rolling",
-            datetime(2026, 1, 20, 17, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 1, 20, 17, 0, 0, tzinfo=UTC),
             "RRULE:FREQ=DAILY;INTERVAL=3",
             time(17, 0),
             None,
         ),
         (
             "fixed",
-            datetime(2026, 1, 20, 9, 30, 0, tzinfo=timezone.utc),
+            datetime(2026, 1, 20, 9, 30, 0, tzinfo=UTC),
             "RRULE:FREQ=DAILY;INTERVAL=2",
             time(9, 30),
             date(2026, 1, 22),
         ),
         (
             "rolling",
-            datetime(2026, 1, 20, 0, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 1, 20, 0, 0, 0, tzinfo=UTC),
             "RRULE:FREQ=WEEKLY;BYDAY=MO",
             time(0, 0),
             None,
@@ -1716,7 +1716,7 @@ async def test_completing_a_recurring_task_opens_the_next_occurrence(
 
     successor = next(t for t in tasks if t["id"] != task.id)
     assert successor["title"] == "Recurring Task"
-    next_due = datetime.fromisoformat(successor["due_date"].replace("Z", "+00:00"))
+    next_due = datetime.fromisoformat(successor["due_date"])
     assert next_due.time() == next_time
     if next_date is not None:
         assert next_due.date() == next_date
@@ -1728,18 +1728,18 @@ async def test_completing_a_recurring_task_opens_the_next_occurrence(
         (
             # 5pm Los Angeles on Sunday 2026-05-03, which is already the 4th
             # in UTC, completed at 9pm the same Sunday.
-            datetime(2026, 5, 4, 0, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 4, 0, 0, 0, tzinfo=UTC),
             "RRULE:FREQ=DAILY;INTERVAL=3",
-            datetime(2026, 5, 4, 4, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 4, 4, 0, 0, tzinfo=UTC),
             datetime(2026, 5, 6, 17, 0, 0, tzinfo=LOS_ANGELES),
         ),
         (
             # 2:30 AM Los Angeles, completed on the US spring-forward day.
             # 2:30 AM does not exist that night, so the day's time is 3:30,
             # and the next occurrence is a day on from it.
-            datetime(2026, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+            datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC),
             "RRULE:FREQ=DAILY",
-            datetime(2026, 3, 8, 18, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 3, 8, 18, 0, 0, tzinfo=UTC),
             datetime(2026, 3, 9, 3, 30, 0, tzinfo=LOS_ANGELES),
         ),
     ],
@@ -1818,7 +1818,7 @@ async def test_completing_a_tagged_recurring_task_copies_tags_to_next_occurrence
         a.project,
         title="Tagged recurring task",
         task_status_id=todo.id,
-        due_date=datetime(2026, 5, 4, 12, 0, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 5, 4, 12, 0, 0, tzinfo=UTC),
         recurrence="RRULE:FREQ=DAILY",
         recurrence_strategy="fixed",
     )
@@ -1846,7 +1846,7 @@ async def test_completing_a_tagged_recurring_task_copies_tags_to_next_occurrence
         session,
         task,
         previous_status_category=TaskStatusCategory.todo,
-        now=datetime(2026, 5, 4, 13, 0, 0, tzinfo=timezone.utc),
+        now=datetime(2026, 5, 4, 13, 0, 0, tzinfo=UTC),
         user_timezone="UTC",
     )
     assert advanced is True
@@ -1880,7 +1880,7 @@ async def test_a_task_changes_alone_or_with_its_series(
         a.project,
         title="Water plants",
         task_status_id=todo.id,
-        due_date=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 5, 4, 12, 0, tzinfo=UTC),
         recurrence="RRULE:FREQ=DAILY",
     )
     await session.commit()
@@ -1949,7 +1949,7 @@ async def test_a_task_changes_type_alone_or_with_its_series(
         a.project,
         title="Water plants",
         task_status_id=todo.id,
-        due_date=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 5, 4, 12, 0, tzinfo=UTC),
         recurrence="RRULE:FREQ=DAILY",
     )
     await session.commit()
@@ -1993,7 +1993,7 @@ async def test_a_series_type_deleted_since_leaves_the_task_its_own(
         session,
         a.project,
         task_status_id=todo.id,
-        due_date=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 5, 4, 12, 0, tzinfo=UTC),
         recurrence="RRULE:FREQ=DAILY",
     )
     await session.commit()
@@ -2033,7 +2033,7 @@ async def test_filter_tasks_by_date_window_group(
     dates lands in the visible range, so a task due in-window but started
     before it must still come back.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -2048,7 +2048,7 @@ async def test_filter_tasks_by_date_window_group(
         return task
 
     def _at(day):
-        return datetime(2026, 6, day, 12, 0, tzinfo=timezone.utc)
+        return datetime(2026, 6, day, 12, 0, tzinfo=UTC)
 
     # Window is June 2026; each task is named for why it should/shouldn't match.
     both_inside = await _dated("both inside", _at(10), _at(11))
@@ -2056,12 +2056,12 @@ async def test_filter_tasks_by_date_window_group(
     start_only = await _dated("start only", _at(13), None)
     # Starts in May, due in June: the due marker is on screen.
     straddles = await _dated(
-        "straddles", datetime(2026, 5, 20, 12, 0, tzinfo=timezone.utc), _at(14)
+        "straddles", datetime(2026, 5, 20, 12, 0, tzinfo=UTC), _at(14)
     )
     outside = await _dated(
         "outside",
-        datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
-        datetime(2026, 8, 2, 12, 0, tzinfo=timezone.utc),
+        datetime(2026, 8, 1, 12, 0, tzinfo=UTC),
+        datetime(2026, 8, 2, 12, 0, tzinfo=UTC),
     )
     undated = await _create_task(session, a.project, "undated")
 
@@ -2361,7 +2361,7 @@ async def test_a_project_blocks_until_the_work_in_it_is_done(
         session, blocking_project, category=TaskStatusCategory.done
     )
     todo.task_status_id = done.id  # ty: ignore[invalid-assignment] — persisted row, id is set
-    todo.completed_at = datetime.now(timezone.utc)
+    todo.completed_at = datetime.now(UTC)
     session.add(todo)
     await session.commit()
 
@@ -2609,7 +2609,7 @@ async def test_changing_a_tasks_type_keeps_what_it_holds(
     task = await create_task(
         session,
         a.project,
-        due_date=datetime(2026, 11, 2, tzinfo=timezone.utc),
+        due_date=datetime(2026, 11, 2, tzinfo=UTC),
         checklist=[{"id": "a", "text": "Pack", "done": False}],
     )
     await session.commit()

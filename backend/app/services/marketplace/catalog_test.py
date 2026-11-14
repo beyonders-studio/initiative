@@ -585,7 +585,7 @@ class TestSearch:
         await create_marketplace_listing(
             session, uid="GNE00000000001", public_id="tests.gone", available=False
         )
-        found, total = await service.list_listings(session)
+        found, _total = await service.list_listings(session)
         assert "tests.gone" not in [listing.public_id for listing in found]
         # But it is still there, so an install that pinned it keeps its
         # provenance rather than pointing at nothing.
@@ -686,7 +686,7 @@ def test_a_shipped_version_keeps_its_content():
             text=True,
             check=True,
         ).stdout.split()
-    except (OSError, subprocess.CalledProcessError):
+    except OSError, subprocess.CalledProcessError:
         pytest.skip("no git history here")
     if not tags:
         pytest.skip("no release tag in this checkout's history")
@@ -700,6 +700,7 @@ def test_a_shipped_version_keeps_its_content():
             [*git, "show", f"{tags[0]}:{prefix}{path.name}"],
             capture_output=True,
             text=True,
+            check=False,
         )
         if shipped.returncode != 0:
             continue  # not in that release

@@ -4,89 +4,107 @@ icon: lucide/sparkles
 
 # AI features
 
-Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file or a wiki page, and tidying the sentence you have rewritten four times.
+Initiative has optional AI help for the dull parts: drafting a task description, breaking a task into steps, summarizing a long document, catching you up on what happened while you were away, and tidying the sentence you've rewritten four times.
 
-Optional, off unless somebody deliberately switches it on, and never quietly running in the background while you weren't looking.
+It's off unless somebody deliberately switches it on, and it only runs when you press a button. Nothing writes itself while you're making coffee. If you don't see the sparkle buttons below, AI isn't on in your community, and everything else in Initiative works exactly the same without it.
 
-## What it can do
+There's nothing for you to set up. Whoever runs your server, or your community's superadmin, picks the AI provider and pays for it; see [Who switches AI on](#who-switches-ai-on).
 
-When AI is switched on, you'll see **Generate** options in a few places:
+## Have AI draft a task's description
 
-- Drafting or improving a **task description**.
-- Suggesting a **checklist** to break something down.
-- Producing a **summary** of a file or a wiki page.
-- **Catch me up**, on a community's front page or a project: what changed while you were away.
-- **Writing help** in any document, wiki page or post.
+1. Open the task.
+2. Select **AI Generate** beside the description.
+3. Read what it wrote, and edit it like anything else you'd typed.
 
-You ask each time. Nothing writes itself while you're making tea.
+The draft goes into the description box. **Undo suggestion** puts back whatever was there before. AI writes from the whole task, not just its title: its checklist, its project, the unfinished tasks linked to it, and its comments, newest first. When a long comment thread doesn't all fit, the message after it says how many comments it read, so the draft that ignores what Priya said on Tuesday comes with a reason.
 
-A task's description and checklist are written from the whole task, not just its title. That means its existing checklist (so you aren't offered "Book the hall" twice), the project it's in, the unfinished tasks linked to it, and its comments, newest first. A thread that has run to forty comments may not all fit. When that happens you're told how many were read, so the suggestion that ignores what Priya said on Tuesday comes with a reason.
+## Have AI suggest a checklist
 
-Nothing is saved until you say so. Checklist suggestions arrive ticked, and you untick what you don't want. A written description lands in your draft, and **Undo suggestion** puts back whatever you had before.
+1. Open the task.
+2. Select **AI Generate** beside **Checklist**.
+3. In **AI-generated checklist**, untick any step you don't want.
+4. Select **Add Selected**.
 
-A summary writes itself in as you watch, from the page as it reads right now, including whatever a colleague typed into it ten seconds ago. A very long document may not all fit, in which case the summary says how far in it got. The constitution's appendices will survive being left out.
+Nothing is added until you select it. AI reads the task the same way as for a description, so you won't be offered "Book the hall" if it's already on the list.
 
-**Catch me up** reads the same cards as the activity feed, from your last visit to that page on this device, and only the ones you can open. Away for a fortnight? It covers the last week, because that's as far back as the feed goes, and it tells you where it started. If nothing happened, it says so and sends nothing anywhere, which is the cheapest answer AI will ever give you.
+## Summarize a document or wiki page
 
-### Writing help
+1. Open the document or wiki page.
+2. Select **Summary**, the sparkle button at the top.
+3. Select **Generate Summary**.
 
-Select some text and the sparkle in the formatting bar offers **Rewrite**, **Shorten**, **Fix spelling and grammar** and **Translate**. Type `/` for **Continue writing**, which picks up from wherever your cursor is.
+The summary writes itself in as you watch, from the page as it reads right now, including whatever a colleague typed ten seconds ago. **Copy summary** copies it, and **Regenerate summary** writes a fresh one. A very long page may not all fit; the summary then says how much of it was read. The bylaws' appendices will survive being left out.
 
-The answer appears in a small box under your text, and nothing in the document changes until you pick **Replace** or **Insert below**. **Discard** makes it as if you never asked. Only the selection and the paragraphs either side of it are sent.
+Summaries work on documents written in Initiative. An uploaded file such as a PDF can't be summarized.
 
-If somebody else edits that same sentence while the answer is being written, **Replace** declines rather than flatten their change. **Insert below** works either way, and the two of you can sort it out from there.
+## Catch up on what changed
 
-## Who sets it up
+**Catch me up** is on your community's home page and at the top of each project.
 
-Whoever runs the server decides who's in charge of AI, under **Settings → Platform → Integrations**. One of three, for the whole server:
+1. Select **Catch me up**.
+2. Select **Catch me up** again in the panel that opens.
 
-| Mode | What it means |
+You get a short summary of what changed since you were last there, reading only things you're allowed to open. It goes back a week at most, and says where it started. If nothing happened, it says so and sends nothing anywhere, which is the cheapest answer AI will ever give you.
+
+## Get writing help in a document
+
+In any document, wiki page or post:
+
+1. Select the text you want help with.
+2. Select the sparkle button (**Writing help**) in the toolbar above it.
+3. Pick **Rewrite**, **Shorten**, **Fix spelling and grammar** or **Translate…** and a language.
+4. Read the suggestion that appears under your text.
+5. Select **Replace** to swap it in, **Insert below** to keep both, or **Discard**.
+
+To have AI keep going from where your cursor is, type `/`, pick **Continue writing**, then select **Insert** or **Discard**.
+
+Nothing in the document changes until you pick. Only your selection and the text around it are sent. If somebody else edits the same sentence while the suggestion is being written, **Replace** steps aside so it doesn't flatten their change; **Insert below** still works, and the two of you can sort it out from there.
+
+## What gets sent to the AI provider { #the-privacy-bit-which-is-genuinely-worth-reading }
+
+AI features work by sending text to whichever provider your community uses: a task with its comments and linked tasks, a document, the changes for Catch me up. Only things you can open yourself are ever sent. That text leaves your server and goes to that company, under its terms.
+
+This is the one place in Initiative where your work deliberately goes somewhere else, so here it is plainly:
+
+- **The Initiative project never trains on your content**, and has no way to. See [Why the rules are what they are](../security/data-and-compliance.md#why-the-rules-are-what-they-are).
+- **What the provider does with it is between your server and that provider.** Some train on what they receive, some don't, and some let you choose. We can't promise on their behalf.
+
+That's why every AI feature waits for a button press, and why AI can be switched off entirely.
+
+!!! tip "Want the text to stay home?"
+    Whoever runs your server can use a provider that runs on their own machine, such as Ollama or an OpenAI-compatible server like vLLM. The text never leaves your network, so there's no third party's terms to read. If your group's work is the kind you wouldn't hand a stranger, ask for this.
+
+## Who switches AI on
+
+Whoever runs the server chooses how AI works for the whole server, under **Platform Settings › Integrations**:
+
+| **AI configuration mode** | What it means |
 |---|---|
 | **Disabled** | AI is off for everyone. |
 | **Platform-managed** | The server's owner sets up the AI every community uses. |
-| **Community-managed** | Each community's [superadmin](../guides/communities.md#why-superadmin-is-separate) sets up its own, under **Community settings → Integrations**. |
+| **Community-managed** | Each community's superadmin sets up its own, under **Community settings › Integrations**. |
 
-Never both. What they set up are **connections**: a provider, a model and a key.
+It's one or the other, never both. What they set up are connections, each a provider, a model and usually a key:
 
 | Provider | Notes |
 |---|---|
-| **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **Groq**, **xAI**, **Together AI**, **OpenRouter** | Hosted services. Each needs an API key from that company. |
-| **OpenAI-compatible server** | Anything that speaks the OpenAI API, at the address the connection gives: vLLM, llama.cpp, LM Studio, LocalAI, or a gateway your company already runs. The key is optional. |
-| **Ollama** | Models on a machine of the server owner's. Only they can set one up. |
+| OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, xAI, Together AI, OpenRouter | Hosted services. Each needs an API key from that company. |
+| **OpenAI-compatible server** | Anything that speaks the OpenAI API at the address you give, up to `/v1`: vLLM, llama.cpp, LM Studio, LocalAI, or a gateway. The key is optional. |
+| Ollama | Models on a machine the server owner runs. Only the server owner can add one. |
 
-The model comes from the provider's own list, so save the connection once and pick from what it offers. A connection without a model sits there doing nothing until somebody picks one, which is at least restful.
+### Set up an AI connection
 
-Only the server's owner can point a connection at a machine on a private network, and only for Ollama or an OpenAI-compatible server.
+1. Open **Integrations** in **Platform Settings** or **Community settings**.
+2. Select **Add connection**.
+3. Give it a **Label**, and choose the **Provider**.
+4. Fill in the **API key**, and the **Base URL** for a server of your own.
+5. Type a **Model** name, or leave it for now.
+6. Select **Test** to check it answers.
+7. Select **Save connection**.
+8. If you left the model empty, select **Edit** on the connection and pick one from the provider's list.
 
-With more than one connection, everybody uses the one marked as the default. On a platform-managed server, the owner can also give a connection to particular communities. Those communities use it, on its own key, and nobody else does, which suits a company where each department pays from its own account.
+A connection marked **Needs a model** does nothing until somebody picks one. With several connections, members use the one ticked as **Default connection**. On a platform-managed server, the owner can give a connection to particular communities under **Communities**; they use it on its key and nobody else does, which suits a company where each department pays from its own account. When a provider starts refusing requests (out of credit, a spending limit reached, a key withdrawn), the connection says **Failing since** and why.
 
-A connection's settings say when its requests are failing, and since when: out of credit, a spending limit reached, a key the provider refused. Whoever looks after it hears from settings before anyone has to ask.
+### Switch AI off for one community
 
-### Switching it off for one community
-
-A community's superadmin can turn AI off for that community alone, under **AI in this community** on the same settings page. Off, nothing from that community goes to any provider, whatever the server offers. The legal team's notes stay the legal team's.
-
-## Your part
-
-Nothing. There's no key to find, no form to fill in and no setting to get wrong. If the **Generate** buttons are there, somebody has already done the setting up, and the bill is theirs too.
-
-## The privacy bit, which is genuinely worth reading
-
-AI features work by sending the relevant text — a task with its comments and linked tasks, a file's contents — to whichever provider is configured. Only what you can open yourself is ever sent. That content **leaves your server** and goes to that company, under *their* terms.
-
-This is the one place in Initiative where your work deliberately goes somewhere else, so we'd rather be precise about it than reassuring:
-
-- **We never train on your content, and there's no path for us to.** That's a fact about the architecture, not a promise about our behaviour. See [Why the rules are what they are](../security/data-and-compliance.md#why-the-rules-are-what-they-are).
-- **What the provider does with it is between you and them.** The moment you press Generate, that text is governed by whatever you agreed to with OpenAI, Anthropic, or whoever else. Some providers train on what they receive; some don't; some let you choose. We can't promise on their behalf, and we won't pretend to.
-
-Which is precisely why the buttons are explicit, why nothing generates on its own, and why the whole thing can be switched off.
-
-!!! tip "Want a hard guarantee? Keep it local."
-    Whoever runs your server can configure a **local** provider: Ollama, or an OpenAI-compatible server such as vLLM on their own machine. The text never leaves your server, so there's no third party's terms to read and nothing to take anyone's word for. If your group's work is the kind you wouldn't hand a stranger, this is the option to ask for.
-
-Not sure what's configured on your server? Ask a community admin or whoever runs the server — or simply never press the buttons. Everything else in Initiative works exactly the same without them, and nobody is keeping score.
-
-## Related
-
-- [Profile & preferences](profile-and-preferences.md) — your other personal settings.
-- [Platform configuration](../running-a-server/configuration.md) — for whoever runs the server.
+Where your server gives a community its own security settings, its superadmin can switch AI off there alone, with **AI features** under **Community settings › Security**. Off, nothing from that community goes to any provider, whatever the server offers. The legal team's notes stay the legal team's.

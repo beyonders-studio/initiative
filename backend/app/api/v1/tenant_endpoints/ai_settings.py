@@ -15,16 +15,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.deps import get_guild_settings_session, require_surface_open
-from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.api.deps import (
+    CurrentUser,
     GuildContext,
     RLSSessionDep,
     SettingsRLSSessionDep,
     get_guild_membership,
+    get_guild_settings_session,
     require_guild_roles,
-    CurrentUser,
+    require_surface_open,
 )
+from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.models.platform.guild import CommunityRole
 from app.schemas.ai_settings import (
     AIConnectionCreate,
@@ -78,7 +79,7 @@ async def create_community_connection(
     user: CurrentUser,
 ) -> AIConnectionResponse:
     return await ai_settings_service.create_guild_connection(
-        session, ctx.guild_id, user.id, payload, actor_user_id=user.id
+        session, ctx.guild_id, payload, actor_user_id=user.id
     )
 
 

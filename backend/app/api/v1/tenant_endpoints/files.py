@@ -1,13 +1,12 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, Any, List, Optional
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
     Body,
     Depends,
-    File as FormFile,
     Form,
     HTTPException,
     Query,
@@ -15,39 +14,32 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi import (
+    File as FormFile,
+)
 from fastapi.responses import Response
 from sqlalchemy import text
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.search import SearchEntityType
-from app.core.body_limit import max_document_body
-from app.services.permissions import Action
-from app.services.tenant import content_references
-from app.services.tenant.relationships import Endpoint
+from app.api import resource_access
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
-    CommunityIdPath,
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    CommunityIdPath,
+    GuildAccessError,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
-    plugin_scope,
     SessionDep,
     UploadUserDep,
     establish_guild_access,
     get_current_active_user,
-    GuildAccessError,
-    GuildContextDep,
+    plugin_scope,
 )
-from app.core.messages import (
-    CommonMessages,
-    FileMessages,
-)
-from app.core.rate_limit import limiter
-from app.db.session import require_actor_context
-from app.core.image_headers import read_image_header
+from app.core.body_limit import max_document_body
 from app.core.file_types import (
     FileKind,
     FileType,
@@ -56,30 +48,37 @@ from app.core.file_types import (
     type_of_media,
     types_of_kind,
 )
+from app.core.image_headers import read_image_header
+from app.core.messages import (
+    CommonMessages,
+    FileMessages,
+)
+from app.core.rate_limit import limiter
+from app.core.search import SearchEntityType
+from app.core.tools import Tool
+from app.db.session import require_actor_context
+from app.models.platform.notification import NotificationType
+from app.models.platform.user import User
 from app.models.tenant.collection import CollectionFile
 from app.models.tenant.file import (
     File,
     FileVersion,
 )
-from app.models.platform.notification import NotificationType
-from app.models.platform.user import User
+from app.schemas.ai_generation import AIStreamEvent
 from app.schemas.tenant.file import (
     FileCreate,
-    FileVersionRead,
     FileRead,
     FileSummary,
     FileUpdate,
-    serialize_file,
+    FileVersionRead,
     SpreadsheetImportRead,
+    serialize_file,
 )
-from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.resource_grant import initiative_readable
-from app.schemas.ai_generation import AIStreamEvent
-from app.services import resumable
-from app.services.tenant import attachments as attachments_service
-from app.services.tenant import thumbnails
-from app.services.tenant import file_conversion, file_versions
-from app.services import storage_config
+from app.schemas.tenant.tool import serialize_tool
+from app.services import ai_generation, reachability, resumable, storage_config
+from app.services import notifications as notifications_service
+from app.services.permissions import Action
 from app.services.storage import (
     INLINE_UPLOAD_TYPES,
     USER_CONTENT_CSP,
@@ -87,20 +86,21 @@ from app.services.storage import (
     get_guild_storage,
     requested_range,
 )
-from app.api import resource_access
-from app.core.tools import Tool
-from app.services.tenant import body_states
+from app.services.tenant import attachments as attachments_service
+from app.services.tenant import (
+    body_states,
+    content_references,
+    file_conversion,
+    file_versions,
+    spreadsheet_import,
+    thumbnails,
+    tool_listing,
+)
 from app.services.tenant import comments as comments_service
 from app.services.tenant import files as files_service
-from app.services.tenant import ownership as ownership_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
-from app.services.tenant.names import ensure_name_free
-from app.services.tenant import tool_listing
-from app.services import notifications as notifications_service
-from app.services import reachability
-from app.services import ai_generation
-from app.services.tenant import spreadsheet_import
 from app.services.tenant.collaboration import (
     collaboration_manager,
     content_version,
@@ -108,6 +108,8 @@ from app.services.tenant.collaboration import (
     versioned,
     written_into,
 )
+from app.services.tenant.names import ensure_name_free
+from app.services.tenant.relationships import Endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -175,14 +177,14 @@ def visible_file_conditions(
     context: ActorContext,
     user_id: int | None,
     *,
-    initiative_id: Optional[int] = None,
-    search: Optional[str] = None,
-    tag_ids: Optional[List[int]] = None,
-    untagged: Optional[bool] = None,
-    is_template: Optional[bool] = None,
-    file_type: Optional[FileType] = None,
-    kind: Optional[FileKind] = None,
-    collection_id: Optional[int] = None,
+    initiative_id: int | None = None,
+    search: str | None = None,
+    tag_ids: list[int] | None = None,
+    untagged: bool | None = None,
+    is_template: bool | None = None,
+    file_type: FileType | None = None,
+    kind: FileKind | None = None,
+    collection_id: int | None = None,
 ):
     """WHERE conditions for visible-file queries — the list and the tag
     counts beside it, so the sidebar's numbers match the rows under them.
@@ -294,7 +296,6 @@ async def create_file(
         initiative_id=initiative.id,
         file_type=file_in.file_type,
         content=normalized_content,
-        created_by=guild_context.user_id,
         featured_image_url=file_in.featured_image_url,
         is_template=file_in.is_template,
     )
@@ -362,7 +363,6 @@ async def upload_file(
         name=name,
         initiative_id=initiative.id,
         content={},  # An uploaded file has no content of its own
-        created_by=guild_context.user_id,
         file_type=type_of_media(stored["file_content_type"]),
     )
     session.add(file)
@@ -383,9 +383,7 @@ async def upload_file(
     # grant exists.
     await session.flush()
 
-    version = await file_versions.add_version(
-        session, file, created_by=guild_context.user_id, **stored
-    )
+    version = await file_versions.add_version(session, file, **stored)
     await file_versions.commit_version(session, guild_context.guild_id, version)
     return await read_after_write(session, file.id, current_user, guild_context)
 
@@ -471,7 +469,6 @@ async def _store_file(
             size=size,
             content_type=mime_type,
             content_hash=None,
-            created_by=guild_context.user_id,
             initiative_id=initiative_id,
         )
     else:
@@ -484,7 +481,6 @@ async def _store_file(
             filename=attachments_service.new_upload_filename(extension),
             data=contents,
             content_type=mime_type,
-            created_by=guild_context.user_id,
             initiative_id=initiative_id,
         )
     return {
@@ -537,15 +533,15 @@ async def upload_file_version(
         initiative_id=file.initiative_id,
         keep_kind=spec_of(file.file_type).kind,
     )
-    version = await file_versions.add_version(
-        session, file, created_by=guild_context.user_id, **stored
-    )
+    version = await file_versions.add_version(session, file, **stored)
     await file_versions.commit_version(
         session,
         guild_context.guild_id,
         version,
         conflict=True,
     )
+    # Its author is the database's to stamp, so it is read back.
+    await session.refresh(version)
     return file_versions.read(FileVersionRead, version, file)
 
 
@@ -564,7 +560,7 @@ async def convert_file(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
     gone, pictures = await file_conversion.convert(
-        session, guild_context.guild_id, file, user_id=current_user.id
+        session, guild_context.guild_id, file
     )
     try:
         await session.commit()
@@ -652,13 +648,13 @@ async def put_video_thumbnail(
     await session.commit()
 
 
-@router.get("/{file_id}/versions", response_model=List[FileVersionRead])
+@router.get("/{file_id}/versions", response_model=list[FileVersionRead])
 async def list_file_versions(
     file_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> List[FileVersionRead]:
+) -> list[FileVersionRead]:
     """List all stored versions of an uploaded file, newest first. Read access."""
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context
@@ -853,7 +849,7 @@ async def update_file(
         updated = True
 
     if updated:
-        file.updated_at = datetime.now(timezone.utc)
+        file.updated_at = datetime.now(UTC)
         session.add(file)
         if content_updated:
             await content_references.sync_for_entity(
@@ -888,7 +884,7 @@ async def notify_mentions(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    mentioned_user_ids: List[int] = Body(..., embed=True),
+    mentioned_user_ids: list[int] = Body(..., embed=True),
 ) -> None:
     """Notify users that they were mentioned in a file."""
     if not mentioned_user_ids:
@@ -969,7 +965,7 @@ async def generate_summary(
 async def read_after_write(
     session: RLSSessionDep,
     file_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
     *,
     populate_existing: bool = False,

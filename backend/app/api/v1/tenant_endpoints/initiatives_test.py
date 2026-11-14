@@ -9,14 +9,14 @@ Tests the initiative API endpoints at /api/v1/initiatives including:
 - Managing initiative members (add, remove, update roles)
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import GuildMessages, InitiativeMessages
+from app.core.messages import GuildMessages, GuildPluginMessages, InitiativeMessages
 from app.core.notification_categories import NotificationCategory
 from app.core.tools import Tool
 from app.models.platform.access_grant import AccessGrant
@@ -29,21 +29,23 @@ from app.models.tenant.initiative import (
     InitiativeJoinRequest,
     InitiativeMember,
 )
-from app.services.tenant.initiative_tools import tool_on_sql
-from app.testing.schema_harness import route_session_to_guild
 from app.models.tenant.resource_grant import ResourceGrant
 from app.services import email as email_service
-from app.services.platform import email_outbox
 from app.services.content_sockets import sockets as content_sockets
+from app.services.platform import email_outbox
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant.guild_plugins import set_placed_initiatives
+from app.services.tenant.initiative_tools import tool_on_sql
 from app.testing import (
+    create_guild_plugin,
     create_resource_grant,
     create_tool_entity,
+    drain_notices,
     enable_all_tools,
     set_notification_prefs,
-    drain_notices,
 )
 from app.testing.factories import create_guild_membership, create_initiative
+from app.testing.schema_harness import route_session_to_guild
 from app.testing.sockets import open_account_socket
 
 
@@ -57,7 +59,7 @@ async def _live_grant(
     purpose: str = "content",
 ):
     """An approved, currently-live access grant — the PAM branch of GuildContext."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=user.id,
@@ -844,8 +846,9 @@ async def test_update_initiative_member_role(
     )
 
     # Look up the PM role ID for this initiative
-    from app.models.tenant.initiative import InitiativeRoleModel
     from sqlmodel import select
+
+    from app.models.tenant.initiative import InitiativeRoleModel
 
     pm_role_stmt = select(InitiativeRoleModel).where(
         InitiativeRoleModel.initiative_id == admin.initiative.id,
@@ -1065,8 +1068,9 @@ async def test_cannot_demote_last_manager(
     manager = await acting_user(guild_role=CommunityRole.member, initiative=True)
 
     # Look up the member role ID for this initiative
-    from app.models.tenant.initiative import InitiativeRoleModel
     from sqlmodel import select
+
+    from app.models.tenant.initiative import InitiativeRoleModel
 
     member_role_stmt = select(InitiativeRoleModel).where(
         InitiativeRoleModel.initiative_id == manager.initiative.id,
@@ -1166,7 +1170,7 @@ async def test_directory_lists_only_joinable_initiatives(
         admin.user,
         name="Retired",
         join_policy="open",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
 
     caller = await acting_user(guild_role=caller_role, guild=admin.guild)
@@ -1849,10 +1853,11 @@ async def test_joining_flips_content_visibility(
         assert body["resolved_by"] == manager.user.id
         assert body["resolved_at"] is not None
 
-    membership = await initiatives_service.get_initiative_membership_with_role(
+    membership = await initiatives_service.get_initiative_membership(
         session, initiative_id=initiative.id, user_id=member.user.id
     )
     assert membership is not None
+    await session.refresh(membership, ["role_ref"])
     assert membership.role_ref.name == "member"
     assert membership.role_ref.is_manager is False
     assert membership.oidc_provider_id is None
@@ -2459,7 +2464,8 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
 ):
     """What a community's admins set for every initiative wins over each
     initiative's own, reaches its members' standing, is refused to its
-    managers, and hands back the initiative's own value when cleared."""
+    managers, and hands back the initiative's own value when cleared. Only an
+    admin reads which initiatives have each one on of their own."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     initiative_id = admin.initiative.id
     pm = await acting_user(
@@ -2515,11 +2521,17 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         "member_permissions": {"posts_enabled": True},
         "custom_roles": False,
     }
+    no_own = {
+        "own_tools": {},
+        "own_member_permissions": {},
+        "own_plugin_member_permissions": [],
+        "plugin_member_permissions": [],
+    }
     made = await client.patch(defaults_url, headers=admin.headers, json=set_)
     assert made.status_code == 200, made.text
-    assert made.json() == set_
+    assert made.json() == {**set_, **no_own}
     read = await client.get(member.g("/initiatives/defaults"), headers=member.headers)
-    assert read.json() == set_
+    assert read.json() == {**set_, **no_own}
     seen = await members_view()
     assert seen["posts_enabled"] is True
     assert Tool.post.value in seen["can"]["view"]
@@ -2572,7 +2584,13 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         "tools": {},
         "member_permissions": {},
         "custom_roles": True,
+        **no_own,
     }
+    own_read = (await client.get(defaults_url, headers=admin.headers)).json()
+    assert initiative_id not in own_read["own_tools"][Tool.post.value]
+    assert initiative_id in own_read["own_tools"][Tool.project.value]
+    assert initiative_id not in own_read["own_member_permissions"]["posts_enabled"]
+    assert initiative_id in own_read["own_member_permissions"]["create_files"]
     seen = await members_view()
     assert seen["posts_enabled"] is False
     assert Tool.post.value not in seen["can"]["view"]
@@ -2593,3 +2611,104 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         )
     )
     assert on == initiative_id
+
+
+async def test_a_role_holds_a_plug_in_s_permissions_as_it_holds_a_tool_s(
+    client: AsyncClient, acting_user, session: AsyncSession
+):
+    """Each placed plug-in's initiative permissions are answered on the roles
+    page: a manager holds every one, any other role takes the plug-in's
+    default until its own answer says otherwise, and what the community sets
+    for members stands over that. What the member's role holds is what opens
+    the plug-in for them."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    initiative_id = admin.initiative.id
+    plugin = await create_guild_plugin(
+        session,
+        admin.guild,
+        admin.user,
+        definition={
+            "pages": [{"id": "board", "path": "/b", "scopes": ["initiative"]}],
+            "permissions": [
+                {"id": "prices", "level": "initiative", "name": {}, "members": True}
+            ],
+        },
+    )
+    await route_session_to_guild(session, admin.guild.id)
+    await set_placed_initiatives(session, plugin, {initiative_id})
+    await session.commit()
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
+    )
+    roles_url = admin.g(f"/initiatives/{initiative_id}/roles")
+    defaults_url = admin.g("/initiatives/defaults")
+
+    async def answers(name: str) -> dict[str, bool]:
+        roles = (await client.get(roles_url, headers=admin.headers)).json()
+        role = next(r for r in roles if r["name"] == name)
+        return {a["permission"]: a["enabled"] for a in role["plugin_permissions"]}
+
+    async def opens() -> list[int]:
+        listed = (
+            await client.get(member.g("/plugins/"), headers=member.headers)
+        ).json()
+        [item] = listed["items"]
+        [board] = item["surface_access"]
+        return board["openable_initiatives"]
+
+    assert await answers("moderator") == {"use": True, "prices": True}
+    assert await answers("member") == {"use": False, "prices": True}
+    assert await opens() == []
+
+    roles = (await client.get(roles_url, headers=admin.headers)).json()
+    member_role = next(r for r in roles if r["name"] == "member")
+    role_url = f"{roles_url}/{member_role['id']}"
+    use = {"install_id": plugin.id, "permission": "use", "enabled": True}
+    # The same answer twice is one answer.
+    changed = await client.patch(
+        role_url, headers=admin.headers, json={"plugin_permissions": [use, use]}
+    )
+    assert changed.status_code == 200, changed.text
+    assert await answers("member") == {"use": True, "prices": True}
+    assert await opens() == [initiative_id]
+    # What a rule set for every initiative would change: where the members'
+    # own role holds each one.
+    own = (await client.get(defaults_url, headers=admin.headers)).json()
+    assert own["own_plugin_member_permissions"] == [
+        {"install_id": plugin.id, "permission": p, "initiative_ids": [initiative_id]}
+        for p in ("use", "prices")
+    ]
+    unknown = await client.patch(
+        role_url,
+        headers=admin.headers,
+        json={"plugin_permissions": [{**use, "permission": "costs"}]},
+    )
+    assert unknown.status_code == 422
+    assert unknown.json()["detail"] == GuildPluginMessages.PERMISSION_UNKNOWN
+
+    # The community sets members' answer for every initiative.
+    off = {**use, "enabled": False}
+    made = await client.patch(
+        defaults_url, headers=admin.headers, json={"plugin_member_permissions": [off]}
+    )
+    assert made.status_code == 200, made.text
+    assert made.json()["plugin_member_permissions"] == [off]
+    assert await answers("member") == {"use": False, "prices": True}
+    assert await opens() == []
+    refused = await client.patch(
+        role_url, headers=admin.headers, json={"plugin_permissions": [use]}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == InitiativeMessages.SET_BY_COMMUNITY
+
+    # Handed back, the role's own answer applies again.
+    cleared = await client.patch(
+        defaults_url,
+        headers=admin.headers,
+        json={"plugin_member_permissions": [{**use, "enabled": None}]},
+    )
+    assert cleared.json()["plugin_member_permissions"] == []
+    assert await opens() == [initiative_id]

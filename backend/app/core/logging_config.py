@@ -34,7 +34,7 @@ import logging.config
 import smtplib
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg
@@ -252,7 +252,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         line: dict[str, Any] = {
-            "ts": datetime.fromtimestamp(record.created, timezone.utc)
+            "ts": datetime.fromtimestamp(record.created, UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z"),
             "level": record.levelname,
@@ -309,11 +309,11 @@ def logging_config() -> dict[str, Any]:
             SERVER_LOGGER_NAME: {"handlers": [], "propagate": True},
             ACCESS_LOGGER_NAME: {"handlers": [], "propagate": True},
             # Every outgoing request is logged once, by ``services.safe_http``.
-            "httpx": {"level": "WARNING"},
-            "httpcore": {"level": "WARNING"},
-            # The Anthropic SDK's own copy of the same library.
             "httpx2": {"level": "WARNING"},
             "httpcore2": {"level": "WARNING"},
+            # fastmcp's client, which is still the original library.
+            "httpx": {"level": "WARNING"},
+            "httpcore": {"level": "WARNING"},
         },
     }
 

@@ -1,12 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { setCollectionFileMetadata } from "@/api/generated/files/files";
 import type {
   PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
-  PropertyDefinitionGroups,
   PropertyDefinitionPromote,
   PropertyDefinitionRead,
   PropertyDefinitionUpdate,
@@ -20,36 +18,25 @@ import {
   createPropertyDefinition,
   deletePropertyDefinition,
   deletePropertyDefinitions,
-  getListPropertyDefinitionsByOwnerQueryKey,
-  getListPropertyDefinitionsQueryKey,
-  listPropertyDefinitions,
-  listPropertyDefinitionsByOwner,
   promotePropertyDefinitions,
   updatePropertyDefinition,
+  useListPropertyDefinitions,
+  useListPropertyDefinitionsByOwner,
 } from "@/api/generated/property-definitions/property-definitions";
 import { invalidate, q } from "@/api/query-keys";
-import { buildUniqueOptionSlug, findOptionByLabel } from "@/components/properties/propertyHelpers";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { type FieldSaveKind, heldKey } from "@/hooks/useFieldSave";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
+import {
+  buildUniqueOptionSlug,
+  findOptionByLabel,
+  type MetadataOwner,
+  ownerColumns,
+} from "@/ui/properties/propertyHelpers";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
-
-/** Who a definition belongs to where it is not the initiative's: a project
- *  (its metadata, on its tasks) or a collection (its metadata, on its files). */
-export type MetadataOwner = { kind: "project" | "collection"; id: number };
-
-/** The owner columns a definition is created and listed with. */
-export const ownerColumns = (
-  owner: MetadataOwner | undefined
-): { project_id?: number; collection_id?: number } =>
-  owner === undefined
-    ? {}
-    : owner.kind === "project"
-      ? { project_id: owner.id }
-      : { collection_id: owner.id };
 
 /**
  * List property definitions.
@@ -74,11 +61,8 @@ export const useProperties = (options?: {
   };
   if (initiativeId !== undefined) params.initiative_id = initiativeId;
   const hasParams = Object.keys(params).length > 0;
-  return useQuery<PropertyDefinitionRead[]>({
-    queryKey: getListPropertyDefinitionsQueryKey(communityId, hasParams ? params : undefined),
-    queryFn: () => listPropertyDefinitions(communityId, hasParams ? params : undefined),
-    enabled: options?.enabled ?? true,
-    staleTime: 60 * 1000,
+  return useListPropertyDefinitions(communityId, hasParams ? params : undefined, {
+    query: { enabled: options?.enabled ?? true, staleTime: 60 * 1000 },
   });
 };
 
@@ -90,10 +74,8 @@ export const useProperties = (options?: {
 export const usePropertyGroups = (initiativeId: number) => {
   const communityId = useActiveCommunityId();
   const params = { initiative_id: initiativeId };
-  return useQuery<PropertyDefinitionGroups>({
-    queryKey: getListPropertyDefinitionsByOwnerQueryKey(communityId, params),
-    queryFn: () => listPropertyDefinitionsByOwner(communityId, params),
-    staleTime: 60 * 1000,
+  return useListPropertyDefinitionsByOwner(communityId, params, {
+    query: { staleTime: 60 * 1000 },
   });
 };
 
@@ -124,12 +106,23 @@ export const useOwnedDefinitions = (options: {
         : undefined,
     [properties.data, metadata.data, owned]
   );
-  return {
-    data,
-    isLoading: properties.isLoading || (owned && metadata.isLoading),
-    isError: properties.isError || (owned && metadata.isError),
-    refetch: () => Promise.all([properties.refetch(), metadata.refetch()]),
-  };
+  const isLoading = properties.isLoading || (owned && metadata.isLoading);
+  const isError = properties.isError || (owned && metadata.isError);
+  const isPlaceholderData = properties.isPlaceholderData || (owned && metadata.isPlaceholderData);
+  const { refetch: refetchProperties } = properties;
+  const { refetch: refetchMetadata } = metadata;
+  // The same answer from one render to the next while nothing in it changes.
+  return useMemo(
+    () => ({
+      data,
+      isLoading,
+      isError,
+      /** Whether `data` is a previous place's, shown while this one's is read. */
+      isPlaceholderData,
+      refetch: () => Promise.all([refetchProperties(), refetchMetadata()]),
+    }),
+    [data, isLoading, isError, isPlaceholderData, refetchProperties, refetchMetadata]
+  );
 };
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -210,18 +203,15 @@ export const usePromoteProperties = (
  * the newly-added option. If a case-insensitive label match already exists
  * the existing option is returned without hitting the network, so the UI
  * can use it transparently as "picked" after the user typed an existing
- * label.
+ * label. A failure is toasted here, and rejects.
  */
 export const useAppendPropertyOption = () => {
   const { t } = useTranslation("properties");
-  const communityId = useActiveCommunityId();
-
-  const mutation = useMutation({
-    mutationFn: async (vars: {
-      definition: PropertyDefinitionRead;
-      label: string;
-      color?: string | null;
-    }) => {
+  const { mutateAsync } = useCommunityMutation({
+    mutationFn: async (
+      communityId: number,
+      vars: { definition: { id: number; options: PropertyOption[] }; label: string }
+    ) => {
       const label = vars.label.trim();
       if (!label) {
         throw new Error("Option label cannot be empty");
@@ -230,14 +220,12 @@ export const useAppendPropertyOption = () => {
       if (existing) {
         return { option: existing, created: false as const };
       }
-      const currentOptions = vars.definition.options ?? [];
+      const currentOptions = vars.definition.options;
       const slug = buildUniqueOptionSlug(label, currentOptions);
-      const newOption: PropertyOption = {
-        value: slug,
-        label,
-        color: vars.color ?? null,
-      };
-      const nextOptions: PropertyOption[] = [...currentOptions, newOption];
+      const nextOptions: PropertyOption[] = [
+        ...currentOptions,
+        { value: slug, label, color: null },
+      ];
       const saved = await updatePropertyDefinition(communityId, vars.definition.id, {
         options: nextOptions,
       });
@@ -250,22 +238,20 @@ export const useAppendPropertyOption = () => {
       }
       return { option: stored, created: true as const };
     },
-    onSuccess: (result) => {
+    invalidate: (result) => {
       void invalidate(q.allProperties(), q.allPropertyHolders());
       if (result.created) {
         toast.success(t("input.optionAdded"));
       }
     },
-    onError: () => {
-      toast.error(t("input.optionAddFailed"));
-    },
+    errorKey: "properties:input.optionAddFailed",
   });
 
-  return {
-    appendOption: (definition: PropertyDefinitionRead, label: string, color?: string | null) =>
-      mutation.mutateAsync({ definition, label, color }),
-    isPending: mutation.isPending,
-  };
+  return useCallback(
+    (definition: { id: number; options: PropertyOption[] }, label: string) =>
+      mutateAsync({ definition, label }).then(({ option }) => option),
+    [mutateAsync]
+  );
 };
 
 /** Anything that carries property values. */

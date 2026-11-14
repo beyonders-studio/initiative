@@ -44,7 +44,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import cache, partial
 from typing import Any
 
@@ -133,15 +133,15 @@ def sweeps() -> tuple[Sweep, ...]:
     from app.models.tenant.batched_notice import BatchedNotice
     from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
     from app.models.tenant.content_hold import ContentHold
-    from app.models.tenant.engagement_level import EngagementLevel
-    from app.models.tenant.event_outbox import EventOutbox
-    from app.models.tenant.evidence import Evidence
     from app.models.tenant.data_job import (
         HOLDS_FILE,
         DataJob,
         DataJobDirection,
         DataJobStatus,
     )
+    from app.models.tenant.engagement_level import EngagementLevel
+    from app.models.tenant.event_outbox import EventOutbox
+    from app.models.tenant.evidence import Evidence
     from app.models.tenant.guild_plugin import GuildPlugin
     from app.models.tenant.intake import IntakeCase
     from app.models.tenant.moderation import ModerationReport
@@ -214,9 +214,7 @@ def sweeps() -> tuple[Sweep, ...]:
         await import_worker.jobs.sweep_stale(session, guild_id)
 
     async def publish_posts(session: AsyncSession, _guild_id: int) -> None:
-        await post_publication.publish_due_posts(
-            session, now=datetime.now(timezone.utc)
-        )
+        await post_publication.publish_due_posts(session, now=datetime.now(UTC))
 
     return (
         Sweep(
@@ -856,31 +854,31 @@ def sweeps() -> tuple[Sweep, ...]:
 async def _batch(spec: Any) -> Scan:
     from app.services import notifications
 
-    return notifications.batch_scan(spec, now=datetime.now(timezone.utc))
+    return notifications.batch_scan(spec, now=datetime.now(UTC))
 
 
 async def _reminders() -> Scan:
     from app.services import notifications
 
-    return await notifications.reminder_scan(now=datetime.now(timezone.utc))
+    return await notifications.reminder_scan(now=datetime.now(UTC))
 
 
 async def _task_reminders() -> Scan:
     from app.services import notifications
 
-    return notifications.task_reminder_scan(now=datetime.now(timezone.utc))
+    return notifications.task_reminder_scan(now=datetime.now(UTC))
 
 
 async def _overdue() -> Scan:
     from app.services import notifications
 
-    return notifications.overdue_scan(now=datetime.now(timezone.utc))
+    return notifications.overdue_scan(now=datetime.now(UTC))
 
 
 async def _coming_up() -> Scan:
     from app.services import notifications
 
-    return notifications.coming_up_scan(now=datetime.now(timezone.utc))
+    return notifications.coming_up_scan(now=datetime.now(UTC))
 
 
 def _by_kind() -> dict[str, Sweep]:
@@ -907,7 +905,7 @@ async def _arm_next(
 ) -> None:
     """Arm the sweep's next timer in the community, never sooner than its
     cadence."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # A visit may leave its session routed elsewhere (a data job's outcome is
     # written from the unrouted context).
     await set_rls_context(session, SystemGuild(guild_id))
@@ -940,7 +938,7 @@ def _visit_and_rearm(
         due = (
             answered
             if sweep.answers
-            else await _next_due(session, sweep, datetime.now(timezone.utc))
+            else await _next_due(session, sweep, datetime.now(UTC))
         )
         await _arm_next(session, guild_id, sweep, due)  # type: ignore[arg-type]
         # Only once the next timer is saved.
@@ -1161,7 +1159,7 @@ async def process_due_timers(*, outward: bool = False) -> None:
     for kind in [kind for kind in _woken if (kind in _outward()) == outward]:
         await arm_in(kind, _woken.pop(kind))
     while True:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         claimed = await _claim(now, outward=outward)
         if claimed:
             await _run(claimed, now, outward=outward)
@@ -1190,7 +1188,7 @@ async def reconcile(session: AsyncSession, guild_id: int) -> datetime:
     from app.db.operations_schema import holds_operations
     from app.db.schema_provisioning import guild_schema_name
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     pending = await _pending_kinds(guild_id)
     # The operations community's own sweeps read tables only it has.
     operations = await holds_operations(session, guild_schema_name(guild_id))
@@ -1231,7 +1229,7 @@ async def watch_catalog() -> None:
     registration that went live or changed. Looks back two intervals, so a
     change between two looks is never missed; arming one already due adds
     nothing."""
-    since = datetime.now(timezone.utc) - timedelta(seconds=2 * CATALOG_WATCH_SECONDS)
+    since = datetime.now(UTC) - timedelta(seconds=2 * CATALOG_WATCH_SECONDS)
     async with cohorts.system_session(None) as session:
         await set_rls_context(session, Unattributed())
         changed = (

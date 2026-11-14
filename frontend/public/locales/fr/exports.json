@@ -172,7 +172,6 @@
       "dashboard": "Tableau de bord"
     },
     "download": "Télécharger",
-    "empty": "Aucun export pour l’instant.",
-    "loadFailed": "Impossible de charger les exports. Actualisez pour réessayer."
+    "empty": "Aucun export pour l’instant."
   }
 }

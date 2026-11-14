@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,33 +9,10 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { EntityPicker, type LinkableSuggestion } from "@/components/entities/EntityPicker";
-import { MemberSelect, type MemberSummary } from "@/components/members/MemberSearchSelect";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { FileDropArea } from "@/components/ui/file-drop";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
-import type { MemberSearchScope } from "@/hooks/useUsers";
-import { fileIcon } from "@/lib/fileIcon";
-import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
@@ -51,8 +28,24 @@ import {
   isSearchCategory,
   type SearchCategory,
 } from "@/lib/searchResults";
-import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
+import { Input } from "@/ui/input";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
+import { type Member, MemberPicker, type MemberScope } from "@/ui/member-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tabs, TabsContent } from "@/ui/tabs";
 
 /** What a link can end at, as the search tabs name them: a thing, or a member. */
 const LINK_CATEGORIES: SearchCategory[] = ["tool", "member"];
@@ -61,7 +54,7 @@ const LINK_CATEGORIES: SearchCategory[] = ["tool", "member"];
  * Anybody in the community. Who a link names need not be able to open the
  * thing it is on: "depends on our accountant" is still worth saying.
  */
-const PEOPLE: MemberSearchScope = { type: "community" };
+const PEOPLE: MemberScope = { type: "community" };
 
 interface AddLinkDialogProps {
   /** The thing being linked from. */
@@ -104,7 +97,7 @@ export const AddLinkDialog = ({
   const [groupKey, setGroupKey] = useState<RelationGroupKey | null>(null);
   const [category, setCategory] = useState<SearchCategory>(DEFAULT_SEARCH_CATEGORY);
   const [picked, setPicked] = useState<LinkableSuggestion | null>(null);
-  const [person, setPerson] = useState<MemberSummary | null>(null);
+  const [person, setPerson] = useState<Member | null>(null);
   const [file, setFile] = useState<File | null>(canUpload ? initialFile : null);
   const [fileName, setFileName] = useState(() =>
     canUpload && initialFile ? nameWithoutExtension(initialFile.name) : ""
@@ -127,7 +120,7 @@ export const AddLinkDialog = ({
    */
   const farWritable = person || file ? true : picked?.can_write !== false;
   const farTitle = person
-    ? getUserDisplayName(person)
+    ? person.name
     : (picked?.title ?? (file ? fileName.trim() || file.name : null));
 
   /**
@@ -196,6 +189,7 @@ export const AddLinkDialog = ({
     clearFile();
   };
 
+  const searchMembers = useSearchMembers();
   const upload = useUploadFile();
   const relate = useRelate(anchorTool, {
     onSuccess: () => {
@@ -249,7 +243,7 @@ export const AddLinkDialog = ({
 
   return (
     <Dialog open onOpenChange={(open) => (open ? null : onClose())}>
-      <DialogContent className="w-full rounded-2xl border bg-card shadow-2xl sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("dialog.title")}</DialogTitle>
           <DialogDescription>
@@ -301,15 +295,13 @@ export const AddLinkDialog = ({
               )}
 
               {file ? (
-                <div className="space-y-2">
-                  <Label htmlFor="relation-upload-name">{t("dialog.upload.name")}</Label>
+                <Field label={t("dialog.upload.name")}>
                   <Input
-                    id="relation-upload-name"
                     value={fileName}
                     onChange={(event) => setFileName(event.target.value)}
                     disabled={pending}
                   />
-                </div>
+                </Field>
               ) : canUpload ? (
                 /* The other way to name the far end: something that is not in
                    the app yet. */
@@ -317,11 +309,12 @@ export const AddLinkDialog = ({
               ) : null}
             </TabsContent>
             <TabsContent value="member">
-              <MemberSelect
+              <MemberPicker
+                searchMembers={searchMembers}
                 scope={PEOPLE}
                 value={person?.id ?? null}
-                selectedUser={person}
-                onChange={(_id, member) => setPerson(member ?? null)}
+                selected={person}
+                onChange={(_id, member) => setPerson(member)}
                 placeholder={t("dialog.entityPlaceholder")}
                 emptyMessage={t("dialog.noPeople")}
                 aria-label={t("dialog.person")}
@@ -330,8 +323,10 @@ export const AddLinkDialog = ({
           </Tabs>
 
           {farType && farTitle ? (
-            <div className="space-y-2">
-              <Label htmlFor="relation-kind">{t("dialog.sentenceLabel")}</Label>
+            <Field
+              label={t("dialog.sentenceLabel")}
+              hint={offered.length < assertable.length && t("dialog.readOnlyTarget")}
+            >
               {/* Read as one sentence, with both ends named: "This task is
                   blocked by Ship the API". Seeing the claim written out is
                   what tells somebody it is the wrong one — and the verb in
@@ -342,7 +337,7 @@ export const AddLinkDialog = ({
                   value={chosenGroup ?? undefined}
                   onValueChange={(value) => setGroupKey(value as RelationGroupKey)}
                 >
-                  <SelectTrigger id="relation-kind" className="w-auto min-w-44 bg-background">
+                  <SelectTrigger className="w-auto min-w-44 bg-background">
                     <SelectValue placeholder={t("dialog.relationship")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -355,24 +350,18 @@ export const AddLinkDialog = ({
                 </Select>
                 <span className="min-w-0 truncate font-medium text-sm">{farTitle}</span>
               </div>
-              {offered.length < assertable.length ? (
-                <p className="text-muted-foreground text-xs">{t("dialog.readOnlyTarget")}</p>
-              ) : null}
-            </div>
+            </Field>
           ) : null}
         </div>
         <DialogFooter>
-          <Button type="button" onClick={() => void submit()} disabled={pending || !ready}>
-            {pending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {upload.isPending ? t("dialog.uploading") : t("dialog.submitting")}
-              </>
-            ) : file ? (
-              t("dialog.submitUpload")
-            ) : (
-              t("dialog.submit")
-            )}
+          <Button type="button" onClick={() => void submit()} pending={pending} disabled={!ready}>
+            {pending
+              ? upload.isPending
+                ? t("dialog.uploading")
+                : t("dialog.submitting")
+              : file
+                ? t("dialog.submitUpload")
+                : t("dialog.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

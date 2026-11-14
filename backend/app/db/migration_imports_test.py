@@ -19,7 +19,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 
 #: Modules a migration may import from the app.

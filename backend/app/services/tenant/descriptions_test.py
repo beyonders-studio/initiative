@@ -5,7 +5,7 @@ saved — create, edit, duplicate — and each has its own answer to "who hears
 about it".
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,8 +14,8 @@ from app.core.search import SearchEntityType
 from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.relationship import EntityRelationship
-from app.services.tenant.relationships import Endpoint
 from app.services.tenant.descriptions import newly_mentioned
+from app.services.tenant.relationships import Endpoint
 from app.testing import (
     create_file,
     create_resource_grant,

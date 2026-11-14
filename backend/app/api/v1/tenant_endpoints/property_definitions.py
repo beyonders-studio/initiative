@@ -8,13 +8,13 @@ the projects scope. A collection's is by whoever may change the collection
 with the files scope, since a collection is part of Files. A plug-in's own
 metadata is declared by its manifest, and never made here."""
 
-from datetime import datetime, timezone
-from typing import Annotated, List, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import joinedload, selectinload, undefer
 from sqlmodel import col, delete, or_, select
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
@@ -31,14 +31,14 @@ from app.core.messages import InitiativeMessages, PluginMessages, PropertyMessag
 from app.core.plugin_scopes import tool_resource
 from app.core.tools import KINDS, Tool
 from app.db.frozen import row_is_frozen
+from app.models.platform.user import User
 from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative
-from app.models.platform.user import User
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import (
     MetadataDefinition,
     MetadataType,
 )
+from app.models.tenant.project import Project
 from app.schemas.tenant.property import (
     MetadataOwnerKind,
     PropertyDefinitionBulkDelete,
@@ -170,7 +170,7 @@ async def _require_removable(
     """Raise unless the request may remove every one of ``definitions``, as
     removing each alone asks: its project or collection writable, or for the
     initiative's metadata, a manager. Each owner is asked once."""
-    asked: set[tuple[Optional[int], Optional[int]]] = set()
+    asked: set[tuple[int | None, int | None]] = set()
     for defn in definitions:
         _require_write_scope(guild_context, defn)
         owner = (defn.project_id, defn.collection_id)
@@ -202,7 +202,7 @@ async def _editable_projects(
             resource_access.authorize(
                 Tool.project, project, context=guild_context, access="write"
             )
-        except (HTTPException, CodedError):
+        except HTTPException, CodedError:
             continue
         editable[int(project.id or 0)] = project.name
     return editable
@@ -370,7 +370,7 @@ def _added_options(defn: MetadataDefinition, options: list) -> list[dict]:
     ]
 
 
-def _serialize_options(options: Optional[list]) -> Optional[list[dict]]:
+def _serialize_options(options: list | None) -> list[dict] | None:
     """Coerce PropertyOption models into plain dicts for JSONB storage."""
     if options is None:
         return None
@@ -383,16 +383,16 @@ def _serialize_options(options: Optional[list]) -> Optional[list[dict]]:
     return serialized
 
 
-@router.get("/", response_model=List[PropertyDefinitionRead])
+@router.get("/", response_model=list[PropertyDefinitionRead])
 async def list_property_definitions(
     session: ActorSessionDep,
     guild_context: PropertyDefinitionsRead,
-    initiative_id: Optional[int] = Query(default=None),
-    project_id: Optional[int] = Query(
+    initiative_id: int | None = Query(default=None),
+    project_id: int | None = Query(
         default=None,
         description="List this project's metadata instead of properties.",
     ),
-    collection_id: Optional[int] = Query(
+    collection_id: int | None = Query(
         default=None,
         description="List this collection's metadata instead of properties.",
     ),
@@ -640,7 +640,7 @@ async def update_property_definition(
     if not reshapes:
         added = _added_options(defn, payload.options or [])
         defn.options = [*(defn.options or []), *added]
-        defn.updated_at = datetime.now(timezone.utc)
+        defn.updated_at = datetime.now(UTC)
         session.add(defn)
         await session.commit()
         await session.refresh(defn)
@@ -691,7 +691,7 @@ async def update_property_definition(
             )
             defn.options = _serialize_options(options_payload)
 
-    defn.updated_at = datetime.now(timezone.utc)
+    defn.updated_at = datetime.now(UTC)
     session.add(defn)
     await session.commit()
     await session.refresh(defn)

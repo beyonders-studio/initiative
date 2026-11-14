@@ -1,14 +1,15 @@
 """Integration tests for authenticated /uploads/* file serving."""
 
+from datetime import UTC
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing.schema_harness import route_session_to_guild
 from app.core.config import settings
 from app.core.security import create_upload_token
+from app.models.tenant._mixins import ActorKind
 from app.services.storage import USER_CONTENT_CSP
 from app.testing.factories import (
     create_access_grant,
@@ -23,6 +24,7 @@ from app.testing.factories import (
     get_auth_headers,
     get_auth_token,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 def _uploads_dir() -> Path:
@@ -74,7 +76,9 @@ async def test_upload_accessible_with_auth_header(
         Upload(
             filename="test_auth_header.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -94,9 +98,8 @@ async def test_a_served_upload_is_cacheable_but_not_indefinitely(
     would let a reader who lost access go on drawing what they fetched. So
     the window is bounded, private to that browser, and not reusable once
     stale."""
-    from app.models.tenant.upload import Upload
-
     from app.main import UPLOAD_CACHE_SECONDS
+    from app.models.tenant.upload import Upload
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
@@ -107,7 +110,9 @@ async def test_a_served_upload_is_cacheable_but_not_indefinitely(
         Upload(
             filename="test_cache_header.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -163,7 +168,9 @@ async def test_upload_accessible_with_scoped_upload_token(
         Upload(
             filename="test_query_upload_token.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -202,7 +209,9 @@ async def test_issue_upload_token_endpoint(
         Upload(
             filename="test_minted_token.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
+            content_type="text/plain",
         )
     )
     await session.commit()
@@ -289,7 +298,9 @@ async def test_upload_guild_member_can_access_file(
     upload = Upload(
         filename="test_guild_access.png",
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         size_bytes=16,
+        content_type="image/png",
     )
     session.add(upload)
     await session.commit()
@@ -319,7 +330,9 @@ async def test_upload_non_member_cannot_access_file(
         upload = Upload(
             filename="test_guild_forbidden.png",
             created_by=owner.id,
+            created_by_kind=ActorKind.member,
             size_bytes=16,
+            content_type="image/png",
         )
         session.add(upload)
         await session.commit()
@@ -396,8 +409,8 @@ async def test_upload_row_in_guild_schema_is_served(
     await session.exec(
         text(
             f'INSERT INTO "{schema}".uploads'
-            " (filename, created_by, size_bytes, created_at)"
-            " VALUES (:fn, :uid, 5, now())"
+            " (filename, created_by, created_by_kind, size_bytes, content_type,"
+            " created_at) VALUES (:fn, :uid, 'member', 5, 'text/plain', now())"
         ),
         params={"fn": "test_guild_schema_row.txt", "uid": user.id},
     )
@@ -434,7 +447,7 @@ async def test_upload_suspended_guild_member_404_grant_still_served(
     """A member of a SUSPENDED guild can no longer fetch its uploads (404, the
     route's fail-closed shape), while a live PAM grant still serves — the
     seam's member-only status gate."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.platform.access_grant import AccessGrant
     from app.models.platform.guild import CommunityStatus
@@ -450,7 +463,7 @@ async def test_upload_suspended_guild_member_404_grant_still_served(
         user,
         filename="suspended_guild.txt",
         initiative_id=initiative.id,
-        claimed_at=datetime.now(timezone.utc),
+        claimed_at=datetime.now(UTC),
     )
     guild.status = CommunityStatus.suspended.value
     await session.commit()
@@ -462,7 +475,7 @@ async def test_upload_suspended_guild_member_404_grant_still_served(
 
     # A scoped PAM read grantee is unaffected (PAM overrides suspension).
     grantee = await create_user(session, role="support")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=grantee.id,
@@ -498,7 +511,15 @@ async def test_an_upload_is_reached_the_way_the_community_is(
     await create_guild_membership(session, user=user, guild=guild)
     _stage_upload(guild.id, "rule.txt")
     await route_session_to_guild(session, guild.id)
-    session.add(Upload(filename="rule.txt", created_by=user.id, size_bytes=5))
+    session.add(
+        Upload(
+            filename="rule.txt",
+            created_by=user.id,
+            created_by_kind=ActorKind.member,
+            size_bytes=5,
+            content_type="text/plain",
+        )
+    )
     await session.commit()
     path = f"/uploads/{guild.id}/rule.txt"
 
@@ -542,6 +563,7 @@ async def test_a_served_upload_is_typed_from_its_row(
         Upload(
             filename="recorded_as_svg.png",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=44,
             content_type="image/svg+xml",
         )
@@ -574,6 +596,7 @@ async def test_a_served_raster_stays_inline(
         Upload(
             filename="picture.png",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=16,
             content_type="image/png",
         )
@@ -589,39 +612,6 @@ async def test_a_served_raster_stays_inline(
     assert "content-disposition" not in response.headers
 
 
-async def test_a_row_without_a_recorded_type_falls_back_to_its_name(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    """Rows written before the type column existed carry no type; their stored
-    name is all there is to go on, and it still decides the same way."""
-    from app.models.tenant.upload import Upload
-
-    user = await create_user(session)
-    guild = await create_guild(session, creator=user)
-    await create_guild_membership(session, user=user, guild=guild)
-    for name in ("legacy.png", "legacy.svg"):
-        _stage_upload(guild.id, name, b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
-        await route_session_to_guild(session, guild.id)
-        session.add(
-            Upload(
-                filename=name,
-                created_by=user.id,
-                size_bytes=16,
-            )
-        )
-    await session.commit()
-    headers = get_auth_headers(user)
-
-    raster = await client.get(f"/uploads/{guild.id}/legacy.png", headers=headers)
-    assert raster.status_code == 200
-    assert "content-disposition" not in raster.headers
-
-    markup = await client.get(f"/uploads/{guild.id}/legacy.svg", headers=headers)
-    assert markup.status_code == 200
-    assert markup.headers["content-disposition"] == "attachment"
-    assert markup.headers["content-security-policy"] == USER_CONTENT_CSP
-
-
 async def test_an_upload_is_reached_through_the_initiative_that_shows_it(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -629,7 +619,7 @@ async def test_an_upload_is_reached_through_the_initiative_that_shows_it(
     initiative's content, that initiative's members read it and nobody else
     in the guild does. Saved into content of the whole guild, every member
     does."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     uploader = await create_user(session)
     guild = await create_guild(session, creator=uploader)
@@ -640,7 +630,7 @@ async def test_an_upload_is_reached_through_the_initiative_that_shows_it(
     await create_guild_membership(session, user=outsider, guild=guild)
     initiative = await create_initiative(session, guild, uploader)
     await create_initiative_member(session, initiative, member)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     kept = {
         "draft.txt": {},
         "initiative.txt": {"initiative_id": initiative.id, "claimed_at": now},

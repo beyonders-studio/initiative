@@ -8,10 +8,10 @@ registered channels together.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from sqlmodel import select
 
@@ -67,6 +67,8 @@ _IN_APP_ONLY = {
     # A plug-in asking a member to consent: answered on the plug-in's settings, where
     # it waits until they get to it.
     NotificationType.plugin_consent_requested,
+    # The record of an announcement already shown in its own dialog.
+    NotificationType.announcement,
     # A version of an installed plug-in waiting for the seat: it waits on the
     # settings page until they get to it, so nothing is gained by interrupting
     # them on a device.
@@ -149,14 +151,13 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     is not sent to and is dropped too. The same value registered by another
     account is left alone. Each send carries the recipient's unread count."""
     from app.models.platform.push_token import PushToken
-    from app.services.platform import push_notifications, push_tokens
-    from app.testing import create_user
 
     # FCM's switch moved onto the settings row in 0368, so the gate is the
     # resolved config rather than the env var. Patched here instead of seeded
     # through the cache so this test still asserts only what it is about --
     # which devices are sent to and kept.
-    from app.services.platform import push_config
+    from app.services.platform import push_config, push_notifications, push_tokens
+    from app.testing import create_user
 
     async def _enabled():
         return push_config.ResolvedPushConfig(
@@ -217,7 +218,7 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
             session_id=sid,
         )
     recipient_id, bystander_id = recipient.id, bystander.id
-    for read_at in (None, None, datetime.now(timezone.utc)):
+    for read_at in (None, None, datetime.now(UTC)):
         session.add(
             Notification(
                 user_id=recipient_id,
@@ -257,7 +258,6 @@ async def test_access_token_is_reused_until_it_lapses(monkeypatch):
     from app.services.platform import push_config, push_notifications
 
     built: list[dict] = []
-    made: list["_Credentials"] = []
 
     class _Credentials:
         def __init__(self, info):
@@ -272,6 +272,7 @@ async def test_access_token_is_reused_until_it_lapses(monkeypatch):
             self.valid = True
             self.token = f"token-{len(built)}"
 
+    made: list[_Credentials] = []
     monkeypatch.setattr(
         push_notifications.service_account.Credentials,
         "from_service_account_info",
@@ -357,23 +358,23 @@ class _Wire:
 
     def __init__(self, status: int = 200) -> None:
         self.status = status
-        self.sends: list[httpx.Request] = []
+        self.sends: list[httpx2.Request] = []
         self.registrations = 0
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/v1/servers":
             self.registrations += 1
             n = self.registrations
-            return httpx.Response(
+            return httpx2.Response(
                 201, json={"server_id": f"srv_new{n}", "server_key": f"new-{n}"}
             )
         self.sends.append(request)
         if self.status == 200:
-            return httpx.Response(200, json={"name": "projects/p/messages/1"})
-        return httpx.Response(self.status, json={"error": {"code": self.status}})
+            return httpx2.Response(200, json={"name": "projects/p/messages/1"})
+        return httpx2.Response(self.status, json={"error": {"code": self.status}})
 
-    def client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(self.handler))
+    def client(self) -> httpx2.AsyncClient:
+        return httpx2.AsyncClient(transport=httpx2.MockTransport(self.handler))
 
 
 @pytest.fixture
@@ -584,7 +585,7 @@ async def test_each_device_is_sent_on_its_own_platform(monkeypatch):
         PushToken(id=1, user_id=1, push_token="phone", platform="ios"),
         PushToken(id=2, user_id=1, push_token="tablet", platform="android"),
     ]
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
         outcome = await push_notifications._send_to_devices(
             client, tokens, title="t", body="b", data=None, channel_id="default"
         )

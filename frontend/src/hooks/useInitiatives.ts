@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,25 +22,21 @@ import {
   deleteInitiative,
   denyJoinRequest,
   getGetInitiativeMembersQueryKey,
-  getGetInitiativeQueryKey,
-  getInitiative,
   getInitiativeMembers,
-  getListInitiativeDirectoryQueryKey,
-  getListInitiativesQueryKey,
-  getListJoinRequestsQueryKey,
   joinInitiative,
-  listInitiativeDirectory,
-  listInitiatives,
-  listJoinRequests,
   removeInitiativeMember,
   updateInitiative,
   updateInitiativeMember,
+  useGetInitiative,
+  useGetInitiativeMembers,
+  useListInitiativeDirectory,
+  useListInitiatives,
+  useListJoinRequests,
 } from "@/api/generated/initiatives/initiatives";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -56,11 +52,7 @@ import type { QueryOpts } from "@/types/query";
  */
 export const useInitiatives = (options?: QueryOpts<InitiativeRead[]>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<InitiativeRead[]>({
-    queryKey: getListInitiativesQueryKey(communityId),
-    queryFn: () => listInitiatives(communityId),
-    ...options,
-  });
+  return useListInitiatives(communityId, undefined, { query: options });
 };
 
 const COMMUNITY_SCOPE = { scope: InitiativeListScope.community } as const;
@@ -71,11 +63,7 @@ const COMMUNITY_SCOPE = { scope: InitiativeListScope.community } as const;
  */
 export const useCommunityInitiatives = (options?: QueryOpts<InitiativeRead[]>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<InitiativeRead[]>({
-    queryKey: getListInitiativesQueryKey(communityId, COMMUNITY_SCOPE),
-    queryFn: () => listInitiatives(communityId, COMMUNITY_SCOPE),
-    ...options,
-  });
+  return useListInitiatives(communityId, COMMUNITY_SCOPE, { query: options });
 };
 
 /**
@@ -89,11 +77,8 @@ export const useInitiativesForCommunity = (
   options?: QueryOpts<InitiativeRead[]>
 ) => {
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeRead[]>({
-    queryKey: getListInitiativesQueryKey(communityId!),
-    queryFn: () => listInitiatives(communityId!),
-    enabled: !!communityId && userEnabled,
-    ...rest,
+  return useListInitiatives(communityId!, undefined, {
+    query: { enabled: !!communityId && userEnabled, ...rest },
   });
 };
 
@@ -109,11 +94,8 @@ export const useInitiativeDirectory = (options?: QueryOpts<InitiativeDirectoryEn
   const communityId = useActiveCommunityId();
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeDirectoryEntry[]>({
-    queryKey: getListInitiativeDirectoryQueryKey(communityId),
-    queryFn: () => listInitiativeDirectory(communityId),
-    enabled: communityId > 0 && communityWide && userEnabled,
-    ...rest,
+  return useListInitiativeDirectory(communityId, {
+    query: { enabled: communityId > 0 && communityWide && userEnabled, ...rest },
   });
 };
 
@@ -135,22 +117,19 @@ export const useInitiativeJoinRequests = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeJoinRequestRead[]>({
-    queryKey: getListJoinRequestsQueryKey(communityId, initiativeId!, params),
-    queryFn: () => listJoinRequests(communityId, initiativeId!, params),
-    enabled: communityId > 0 && initiativeId !== null && userEnabled,
-    ...rest,
+  return useListJoinRequests(communityId, initiativeId!, params, {
+    query: { enabled: communityId > 0 && initiativeId !== null && userEnabled, ...rest },
   });
 };
 
 export const useInitiative = (initiativeId: number | null, options?: QueryOpts<InitiativeRead>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeRead>({
-    queryKey: getGetInitiativeQueryKey(communityId, initiativeId!),
-    queryFn: () => getInitiative(communityId, initiativeId!),
-    enabled: initiativeId !== null && Number.isFinite(initiativeId) && userEnabled,
-    ...rest,
+  return useGetInitiative(communityId, initiativeId!, undefined, {
+    query: {
+      enabled: initiativeId !== null && Number.isFinite(initiativeId) && userEnabled,
+      ...rest,
+    },
   });
 };
 
@@ -166,13 +145,13 @@ export const useInitiativeRoster = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeMemberListResponse>({
-    queryKey: getGetInitiativeMembersQueryKey(communityId, initiativeId!, params),
-    queryFn: () => getInitiativeMembers(communityId, initiativeId!, params),
-    enabled: initiativeId !== null && userEnabled,
-    // Keep the page on screen while the next one (or the next search) loads.
-    placeholderData: keepPreviousData,
-    ...rest,
+  return useGetInitiativeMembers(communityId, initiativeId!, params, {
+    query: {
+      enabled: initiativeId !== null && userEnabled,
+      // Keep the page on screen while the next one (or the next search) loads.
+      placeholderData: keepPreviousData,
+      ...rest,
+    },
   });
 };
 
@@ -256,27 +235,19 @@ const invalidateInitiativeMembersAndList = (initiativeId: number) =>
 
 export const useCreateInitiative = (options?: MutationOpts<InitiativeRead, InitiativeCreate>) => {
   const { t } = useTranslation("initiatives");
-  const communityId = useActiveCommunityId();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    // The generated InitiativeCreate carries one `{plural}_enabled` field per
-    // toggleable tool — no hand-maintained field list to drift.
-    mutationFn: async (data: InitiativeCreate) => {
-      return createInitiative(communityId, data);
+  return useCommunityMutation<InitiativeRead, InitiativeCreate>(
+    {
+      // The generated InitiativeCreate carries one `{plural}_enabled` field per
+      // toggleable tool — no hand-maintained field list to drift.
+      mutationFn: (communityId, data) => createInitiative(communityId, data),
+      invalidate: (initiative) => {
+        toast.success(t("createDialog.created", { name: initiative.name }));
+        return invalidate(q.allInitiatives());
+      },
+      errorKey: "initiatives:createDialog.createError",
     },
-    onSuccess: (...args) => {
-      toast.success(t("createDialog.created", { name: args[0].name }));
-      void invalidate(q.allInitiatives());
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "initiatives:createDialog.createError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };
 
 export const useUpdateInitiative = (
@@ -404,7 +375,9 @@ export const useAddInitiativeMember = (
       initiativeId: number;
       data: Parameters<typeof addInitiativeMember>[2];
     }
-  >
+  >,
+  /** What a failure says. */
+  errorKey?: string
 ) =>
   useCommunityMutation<
     InitiativeRead,
@@ -417,12 +390,15 @@ export const useAddInitiativeMember = (
       mutationFn: (communityId, { initiativeId, data }) =>
         addInitiativeMember(communityId, initiativeId, data),
       invalidate: (_data, { initiativeId }) => invalidateInitiativeMembersAndList(initiativeId),
+      errorKey,
     },
     options
   );
 
 export const useRemoveInitiativeMember = (
-  options?: MutationOpts<void, { initiativeId: number; userId: number }>
+  options?: MutationOpts<void, { initiativeId: number; userId: number }>,
+  /** What a failure says. Omit where the caller reports it itself. */
+  errorKey?: string
 ) =>
   useCommunityMutation<void, { initiativeId: number; userId: number }>(
     {
@@ -430,6 +406,7 @@ export const useRemoveInitiativeMember = (
         await removeInitiativeMember(communityId, initiativeId, userId);
       },
       invalidate: (_data, { initiativeId }) => invalidateInitiativeMembersAndList(initiativeId),
+      errorKey,
     },
     options
   );
@@ -442,7 +419,9 @@ export const useUpdateInitiativeMember = (
       userId: number;
       data: Parameters<typeof updateInitiativeMember>[3];
     }
-  >
+  >,
+  /** What a failure says. */
+  errorKey?: string
 ) =>
   useCommunityMutation<
     InitiativeRead,
@@ -456,6 +435,7 @@ export const useUpdateInitiativeMember = (
       mutationFn: (communityId, { initiativeId, userId, data }) =>
         updateInitiativeMember(communityId, initiativeId, userId, data),
       invalidate: (_data, { initiativeId }) => invalidateInitiativeMembersAndList(initiativeId),
+      errorKey,
     },
     options
   );

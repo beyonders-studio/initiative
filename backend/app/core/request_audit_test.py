@@ -3,11 +3,10 @@
 import logging
 
 import pytest
-
-from starlette.datastructures import Headers
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from prometheus_client import REGISTRY
+from starlette.datastructures import Headers
 
 from app.core import audit_context, metrics, request_audit
 from app.core.audit_events import AuditEventType
@@ -19,7 +18,6 @@ from app.core.request_audit import (
     server_error,
 )
 from app.testing import emitted, in_request_tasks
-
 
 VERSION = "/api/v1/version"
 SIGN_IN = "/api/v1/auth/token"

@@ -1,16 +1,14 @@
 import { MessageCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CustomStatusOutput, UserSelfUpdate } from "@/api/generated/initiativeAPI.schemas";
-import { EmojiPicker } from "@/components/EmojiPicker";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { EmojiField } from "@/ui/emoji-picker";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** Mirrors ``STATUS_TEXT_MAX_LENGTH`` on the server. */
 const STATUS_MAX_LENGTH = 40;
@@ -94,18 +92,22 @@ export const StatusEditor = ({
   const [emoji, setEmoji] = useState(status.emoji ?? null);
   const [text, setText] = useState(status.text ?? "");
 
-  useEffect(() => {
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (prevStatus.emoji !== status.emoji || prevStatus.text !== status.text) {
+    setPrevStatus(status);
     setEmoji(status.emoji ?? null);
     setText(status.text ?? "");
-  }, [status.emoji, status.text]);
+  }
 
-  const save = useUpdateCurrentUser({
-    onSuccess: async () => {
-      onDone?.();
-      await onSaved?.();
+  const save = useUpdateCurrentUser(
+    {
+      onSuccess: async () => {
+        onDone?.();
+        await onSaved?.();
+      },
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error, "profiles:status.failed")),
-  });
+    "profiles:status.failed"
+  );
 
   const commit = (next: { emoji: string | null; text: string | null }) =>
     save.mutate({ custom_status: next } as UserSelfUpdate);
@@ -118,7 +120,7 @@ export const StatusEditor = ({
       </div>
       <div className="flex gap-2">
         <div className="w-28 shrink-0">
-          <EmojiPicker
+          <EmojiField
             id="profile-status-emoji"
             value={emoji}
             onChange={setEmoji}

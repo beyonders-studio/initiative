@@ -7,38 +7,32 @@
  * initiative" places it in each initiative that exists now; one created later
  * is placed here like any other.
  *
- * Each initiative the plug-in is placed in also says which of its roles can open
- * the plug-in there. Those roles load when the seat opens that initiative's
- * chooser, not for the whole roster up front.
+ * Who uses it in an initiative is that initiative's roles' answer, so each
+ * initiative it is placed in links to its Roles page.
  *
  * Absent for a plug-in with no initiative surface to place: there would be nothing
  * for the choice to move.
  */
 
-import { ChevronDown, Loader2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useSetPluginPlacementRoles, useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
-import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
+import { useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+import { useCommunityPath } from "@/lib/communityUrl";
 import { declaredPages, hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
+import { initiativeRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export interface PluginPlacementPanelProps {
   plugin: CommunityPluginDetail;
 }
-
-/** The initiatives the plug-in is placed in. */
-const placedIds = (plugin: CommunityPluginDetail): number[] =>
-  (plugin.placements ?? []).map((one) => one.initiative_id);
 
 export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
   const { t } = useTranslation(["plugins", "common"]);
@@ -50,7 +44,7 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
   const update = useUpdateCommunityPlugin(plugin.id);
   // What the admin is choosing right now. Seeded from the plug-in and kept locally
   // so ticking several initiatives is one decision, saved per change.
-  const [chosen, setChosen] = useState<number[]>(() => placedIds(plugin));
+  const [chosen, setChosen] = useState<number[]>(() => plugin.placed_initiative_ids);
   // Whether the admin asked to pick initiatives one by one. Until they do, an
   // plug-in placed in every initiative there is reads as "every current one".
   const [picking, setPicking] = useState(false);
@@ -71,10 +65,7 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
   // Roles decide who opens the plug-in's page and who is drawn its fields,
   // sections or actions on items, so a plug-in with any of those has them.
   const offersRoles = hasInitiativeSurfaces(plugin.definition);
-  // The roles each stored placement allows, by initiative.
-  const placedRoles = new Map(
-    (plugin.placements ?? []).map((one) => [one.initiative_id, one.role_ids] as const)
-  );
+  const placed = new Set(plugin.placed_initiative_ids);
   const everywhere = roster.length > 0 && roster.every((one) => chosen.includes(one.id));
   const mode = picking || !everywhere ? "some" : "all";
 
@@ -94,9 +85,8 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
         await update.mutateAsync({ placed_initiative_ids: live });
         settled.current = live;
       })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, "plugins:error"));
-      })
+      // The update says when it fails; the queue only has to carry on.
+      .catch(() => undefined)
       .finally(() => {
         outstanding.current -= 1;
         // Nothing else is coming, so the panel now shows what the server took:
@@ -149,19 +139,14 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
         </div>
       </RadioGroup>
 
-      {mode === "all" && offersRoles && placedRoles.size > 0 && (
+      {mode === "all" && offersRoles && placed.size > 0 && (
         <div className="space-y-2 border-l pl-4">
           {roster
-            .filter((initiative) => placedRoles.has(initiative.id))
+            .filter((initiative) => placed.has(initiative.id))
             .map((initiative) => (
               <div key={initiative.id} className="flex items-center justify-between gap-2">
                 <span className="text-sm">{initiative.name}</span>
-                <PlacementRoles
-                  pluginId={plugin.id}
-                  initiativeId={initiative.id}
-                  initiativeName={initiative.name}
-                  roleIds={placedRoles.get(initiative.id) ?? []}
-                />
+                <RolesLink initiativeId={initiative.id} initiativeName={initiative.name} />
               </div>
             ))}
         </div>
@@ -170,10 +155,9 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
       {mode === "some" && (
         <div className="space-y-2 border-l pl-4">
           {initiatives.isLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t("common:loading")}
-            </div>
+            <SkeletonRegion>
+              <SkeletonLines lines={3} />
+            </SkeletonRegion>
           ) : (
             roster.map((initiative) => (
               <div key={initiative.id} className="flex items-center gap-2">
@@ -188,17 +172,10 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
                 >
                   {initiative.name}
                 </Label>
-                {/* Only a placement the server holds has roles to choose. */}
-                {offersRoles &&
-                  chosen.includes(initiative.id) &&
-                  placedRoles.has(initiative.id) && (
-                    <PlacementRoles
-                      pluginId={plugin.id}
-                      initiativeId={initiative.id}
-                      initiativeName={initiative.name}
-                      roleIds={placedRoles.get(initiative.id) ?? []}
-                    />
-                  )}
+                {/* Only a placement the server holds has roles to set. */}
+                {offersRoles && chosen.includes(initiative.id) && placed.has(initiative.id) && (
+                  <RolesLink initiativeId={initiative.id} initiativeName={initiative.name} />
+                )}
               </div>
             ))
           )}
@@ -207,107 +184,33 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
           )}
         </div>
       )}
+
+      {offersRoles && (
+        <p className="text-muted-foreground text-xs">{t("plugins:placement.roles.note")}</p>
+      )}
     </section>
   );
 }
 
-interface PlacementRolesProps {
-  pluginId: number;
+/** The Roles page of one initiative the plug-in is placed in, where its roles
+ *  are given the plug-in's permissions. */
+function RolesLink({
+  initiativeId,
+  initiativeName,
+}: {
   initiativeId: number;
   initiativeName: string;
-  /** The roles the stored placement allows. */
-  roleIds: number[];
-}
-
-/** Who can open the plug-in in one initiative, chosen from a popover. */
-function PlacementRoles({ pluginId, initiativeId, initiativeName, roleIds }: PlacementRolesProps) {
-  const { t } = useTranslation(["plugins", "common"]);
-  const [open, setOpen] = useState(false);
-
+}) {
+  const { t } = useTranslation("plugins");
+  const gp = useCommunityPath();
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1 px-2 text-muted-foreground text-xs"
-          aria-label={t("plugins:placement.roles.open", { name: initiativeName })}
-        >
-          {roleIds.length === 0
-            ? t("plugins:placement.roles.adminsOnly")
-            : t("plugins:placement.roles.count", { count: roleIds.length })}
-          <ChevronDown className="h-3 w-3" aria-hidden />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 space-y-3">
-        <div className="space-y-1">
-          <h4 className="font-medium text-sm">{t("plugins:placement.roles.title")}</h4>
-          <p className="text-muted-foreground text-xs">
-            {t("plugins:placement.roles.adminsAlways")}
-          </p>
-        </div>
-        {/* Mounted only while open, so the roles load for this one initiative. */}
-        {open && (
-          <PlacementRoleChoices pluginId={pluginId} initiativeId={initiativeId} roleIds={roleIds} />
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function PlacementRoleChoices({
-  pluginId,
-  initiativeId,
-  roleIds,
-}: Omit<PlacementRolesProps, "initiativeName">) {
-  const { t } = useTranslation(["plugins", "common"]);
-  const roles = useInitiativeRoles(initiativeId);
-  const setRoles = useSetPluginPlacementRoles(pluginId);
-  // Seeded from the stored placement each time the chooser opens, then kept
-  // to what each save returns.
-  const [chosen, setChosen] = useState<number[]>(roleIds);
-
-  const toggle = (roleId: number, on: boolean) => {
-    const before = chosen;
-    const next = on ? [...chosen, roleId] : chosen.filter((one) => one !== roleId);
-    setChosen(next);
-    setRoles.mutate(
-      { initiativeId, roleIds: next },
-      {
-        onSuccess: (placement) => setChosen(placement.role_ids),
-        onError: () => setChosen(before),
-      }
-    );
-  };
-
-  if (roles.isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {(roles.data ?? []).map((role) => (
-        <div key={role.id} className="flex items-center gap-2">
-          <Checkbox
-            id={`placement-role-${pluginId}-${initiativeId}-${role.id}`}
-            checked={chosen.includes(role.id)}
-            // One save at a time: each sends the whole set.
-            disabled={setRoles.isPending}
-            onCheckedChange={(state) => toggle(role.id, state === true)}
-          />
-          <Label
-            htmlFor={`placement-role-${pluginId}-${initiativeId}-${role.id}`}
-            className="font-normal"
-          >
-            {role.display_name}
-          </Label>
-        </div>
-      ))}
-    </div>
+    <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground text-xs">
+      <Link
+        to={gp(`${initiativeRoute(initiativeId)}/settings/roles`)}
+        aria-label={t("placement.roles.open", { name: initiativeName })}
+      >
+        {t("placement.roles.link")}
+      </Link>
+    </Button>
   );
 }

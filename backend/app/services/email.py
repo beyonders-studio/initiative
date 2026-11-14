@@ -1,34 +1,35 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import html as _html
+import logging
 import re
 import smtplib
 import ssl
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Mapping, Sequence
+from typing import Literal
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings as app_config
 from app.core.email_i18n import email_t
+from app.core.encryption import SALT_SMTP_PASSWORD, decrypt_field
 from app.core.notification_categories import CATEGORY_SPECS, NotificationCategory
-from app.core.encryption import decrypt_field, SALT_SMTP_PASSWORD
+from app.core.user_display import handle_of
 from app.models.platform.access_grant import LEVEL_LABEL_KEYS
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
 from app.services.platform import app_settings as app_settings_service
-from app.core.user_display import handle_of
 
 try:  # premailer inlines our <style> rules so they survive Gmail/Outlook stripping <style>
     from premailer import transform as _premailer_transform
 except Exception:  # pragma: no cover - optional dependency guard
-    _premailer_transform = None  # ty: ignore[invalid-assignment]
+    _premailer_transform = None
 
 logger = logging.getLogger(__name__)
 
@@ -528,7 +529,7 @@ def render_digest(
         # that rather than as something it is not.
         try:
             spec = CATEGORY_SPECS[NotificationCategory(category)]
-        except (KeyError, ValueError):
+        except KeyError, ValueError:
             return email_t("digest.noCommunity.other", locale=locale)
         if spec.guild_scoped:
             return email_t("digest.noCommunity.other", locale=locale)
@@ -1395,26 +1396,28 @@ def access_grant_pieces(
     )
 
 
-def initiative_join_request_pieces(
+def join_request_pieces(
     user: User,
     *,
+    of: Literal["initiative", "community"],
     event: str,
-    initiative_name: str,
+    name: str,
     requester: str | None = None,
     message: str | None = None,
 ) -> EmailPieces:
-    """One initiative join-request lifecycle event.
+    """One join-request lifecycle event, for an initiative or a community.
 
     ``event`` is one of ``requested`` | ``approved`` | ``denied``. ``requester``
-    and ``message`` belong to ``requested`` only — that one goes to the
-    initiative's managers and carries what they need to decide; the other two go
-    to the requester and carry the outcome.
+    and ``message`` belong to ``requested`` only — that one goes to whoever
+    answers and carries what they need to decide; the other two go to the
+    requester and carry the outcome.
 
     No link: these are guild-scoped, so the notice they ride on fills in its
     guild-aware smart link.
     """
     locale = _user_locale(user)
-    base = f"initiativeJoinRequest.{event}"
+    base = f"{of}JoinRequest.{event}"
+    named = {f"{of}Name": name}
     # The requester's note is their own free text. email_t escapes interpolated
     # values in the `email` namespace, so it lands in the HTML part as literal
     # text; the line is omitted entirely when they wrote nothing, rather than
@@ -1425,19 +1428,9 @@ def initiative_join_request_pieces(
         else ""
     )
     return EmailPieces(
-        subject=email_t(
-            f"{base}.subject",
-            locale=locale,
-            initiativeName=initiative_name,
-            escape=False,
-        ),
+        subject=email_t(f"{base}.subject", locale=locale, escape=False, **named),
         headline=email_t(f"{base}.title", locale=locale),
-        body=email_t(
-            f"{base}.body",
-            locale=locale,
-            initiativeName=initiative_name,
-            requester=requester or "",
-        )
+        body=email_t(f"{base}.body", locale=locale, requester=requester or "", **named)
         + note,
         link_label=email_t(f"{base}.buttonLabel", locale=locale),
     )

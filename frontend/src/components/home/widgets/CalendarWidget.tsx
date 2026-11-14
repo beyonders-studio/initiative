@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 
 import { MyCalendar } from "@/components/calendar/MyCalendar";
 import { HomeWidgetCard } from "@/components/home/HomeWidgetCard";
-import { ToolFilterButton } from "@/components/initiativeTools/shared/ToolFilterPanel";
+import { ToolFilterButton } from "@/components/tools/ToolFilterPanel";
 
 export const CalendarWidget = () => {
   const { t } = useTranslation("home");

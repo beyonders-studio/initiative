@@ -11,6 +11,7 @@ import type { ReactionGroup, ReactionToggle } from "@/api/generated/initiativeAP
 import { ReactionTarget } from "@/api/generated/initiativeAPI.schemas";
 
 import { ReactionBar } from "./ReactionBar";
+import { ReactionChip } from "./ReactionChip";
 
 const THUMBS = "👍";
 const PARTY = "🎉";
@@ -44,8 +45,12 @@ describe("ReactionBar", () => {
       buildReactionGroup({ emoji: PARTY, count: 1 }),
     ]);
 
-    expect(screen.getByRole("button", { name: /👍, 3 reactions/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /🎉, 1 reaction/i })).toBeInTheDocument();
+    const thumbs = screen.getByRole("button", { name: /👍, 3 reactions/i });
+    expect(thumbs).toHaveTextContent("3");
+    // A chip's emoji is in colour; only the quick thumbs up waits in grey.
+    expect(screen.getByText(THUMBS)).not.toHaveClass("grayscale");
+    // One of something is what the emoji already says.
+    expect(screen.getByRole("button", { name: /🎉, 1 reaction/i })).toHaveTextContent(/^🎉$/);
   });
 
   it("marks the viewer's own reaction as pressed", () => {
@@ -132,5 +137,20 @@ describe("ReactionBar", () => {
     expect(screen.getByRole("button", { name: /👍, 2 reactions/i })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /add a reaction/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /react with/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("ReactionChip", () => {
+  it("keeps its emoji grey until pressed, where asked, and shows its count", () => {
+    const { rerender } = renderWithProviders(
+      <ReactionChip emoji={THUMBS} count={0} pressed={false} greyscale size="lg" />
+    );
+    expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(THUMBS)).toHaveClass("grayscale");
+    expect(screen.getByText("0")).toBeInTheDocument();
+
+    rerender(<ReactionChip emoji={THUMBS} count={1} pressed greyscale size="lg" />);
+    expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(THUMBS)).not.toHaveClass("grayscale");
   });
 });

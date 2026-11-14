@@ -2,6 +2,7 @@ import type { UserStatus } from "@/api/generated/initiativeAPI.schemas";
 import i18n from "@/i18n";
 import { ANONYMIZED_INITIALS, getInitials } from "@/lib/initials";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
+import type { Member } from "@/ui/member-picker";
 
 /**
  * The minimum shape of a user object needed to render a display name.
@@ -88,14 +89,6 @@ export const isAnonymizedUser = (user: DisplayableUser | null | undefined): bool
   user?.status === "anonymized";
 
 /**
- * True when the account is no longer in use — deactivated by its owner, or
- * anonymized. Its handle still renders; this drives the muted styling and the
- * badge that say so, rather than replacing the name.
- */
-export const isInactiveUser = (user: DisplayableUser | null | undefined): boolean =>
-  user?.status === "anonymized" || user?.status === "deactivated";
-
-/**
  * Whether we hold enough of a user to name them — i.e. whether
  * {@link getUserDisplayName} would return something real rather than the
  * caller's fallback. Pickers use this to decide which selected ids they still
@@ -131,3 +124,11 @@ export const getAvatarSrc = (user: AvatarSourceUser | null | undefined): string 
   if (!user) return undefined;
   return resolveUploadUrl(user.avatar_url ?? undefined) || undefined;
 };
+
+/** A person as a picker draws them. */
+export const toMember = (user: DisplayableUser & AvatarSourceUser & { id: number }): Member => ({
+  id: user.id,
+  name: getUserDisplayName(user),
+  picture: getAvatarSrc(user),
+  initials: getInitialsForUser(user),
+});

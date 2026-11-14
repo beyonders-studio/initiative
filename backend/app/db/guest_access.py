@@ -52,7 +52,12 @@ class GuestAccess(str, Enum):
 #: scheduler's own record, and operations intake, which the community's staff
 #: runs.
 _NOT_GUEST_SURFACE: frozenset[str] = frozenset(
-    {"event_reminder_dispatches", "intake_bindings", "intake_cases"}
+    {
+        "event_reminder_dispatches",
+        "intake_bindings",
+        "intake_cases",
+        "idea_votes",
+    }
 )
 
 #: The tables no tool governs that a guest reaches, by name.
@@ -96,6 +101,7 @@ _NAMED: dict[str, GuestAccess] = {
     # the guest rung).
     "custom_role_members": GuestAccess.read,
     "custom_roles": GuestAccess.read,
+    "custom_role_plugin_permissions": GuestAccess.read,
 }
 
 
@@ -163,6 +169,10 @@ GUEST_ROWS: dict[str, str] = {
         "custom_roles.id IN (SELECT cm.role_id FROM custom_role_members cm"
         f" WHERE cm.user_id = {_UID})"
     ),
+    "custom_role_plugin_permissions": (
+        "custom_role_plugin_permissions.role_id IN (SELECT cm.role_id"
+        f" FROM custom_role_members cm WHERE cm.user_id = {_UID})"
+    ),
     # Only the sharing rows that reach them: not who else something is
     # shared with.
     "resource_grants": (
@@ -177,7 +187,7 @@ GUEST_ROWS: dict[str, str] = {
     # Files of the initiatives they reach, as a member of one reads them, and
     # their own; none that belongs to the whole community.
     "uploads": (
-        f"(uploads.created_by = {_UID}"
+        f"((uploads.created_by_kind = 'member' AND uploads.created_by = {_UID})"
         f" OR uploads.initiative_id = ANY ({_MEMBER_OF})"
         f" OR uploads.initiative_id = ANY ({_P.guest_items}))"
     ),

@@ -18,7 +18,7 @@ writes the guild's own schema: a tool's listing through that tool's importer
 (below), a plug-in through the guild's plug-in routes.
 """
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -33,16 +33,20 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.api.deps import (
-    RLSSessionDep,
-    GuildContextDep,
     CurrentUser,
+    GuildContextDep,
+    RLSSessionDep,
 )
+from app.core.audit_events import AuditEventType
 from app.core.messages import ImportEngineMessages, MarketplaceMessages
+from app.core.user_display import handle_of
+from app.db import cohorts
 from app.db.query import build_paginated_response
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import MarketplaceListing
 from app.schemas.platform.marketplace import (
     ListingKind,
+    ListingOffer,
     ListingSource,
     ListingStartFrom,
     ListingUnavailable,
@@ -56,8 +60,13 @@ from app.schemas.platform.marketplace import (
     MarketplaceShareResult,
     serialize_listing_summary,
 )
+from app.services import audit as audit_service
 from app.services.marketplace import catalog as catalog_service
-from app.services.marketplace import plugin_entitlements, registration_lookup
+from app.services.marketplace import (
+    local_listings,
+    plugin_entitlements,
+    registration_lookup,
+)
 from app.services.marketplace.definitions import TOOL_LISTING_KINDS
 from app.services.marketplace.installs import (
     count_install,
@@ -65,31 +74,32 @@ from app.services.marketplace.installs import (
     listing_is_offered,
     resolve_listing_install,
 )
-from app.services.marketplace import local_listings
 from app.services.marketplace.listing_assets import (
     MAX_IMAGE_BYTES,
     MAX_LISTING_IMAGES,
     UploadedImageError,
     store_uploaded_image,
 )
-from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 from app.services.marketplace.publish_profile import export_for_listing
 from app.services.marketplace.tool_listings import (
     example_is_generated,
     install_tool_listing,
     listing_example,
 )
-from app.core.audit_events import AuditEventType
-from app.core.user_display import handle_of
-from app.db import cohorts
-from app.services import audit as audit_service
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import billing_ping
+from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 
 router = APIRouter()
 
 
 MAX_PAGE_SIZE = 100
+
+#: The reader's language, which billing words an offer in.
+LocaleQuery = Annotated[
+    str, Query(max_length=35, pattern=r"^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$")
+]
 
 
 def _unavailable(
@@ -111,9 +121,9 @@ async def list_marketplace_listings(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
-    kind: Optional[ListingKind] = Query(default=None),  # type: ignore[valid-type]
-    search: Optional[str] = Query(default=None, max_length=200),
-    source: Optional[List[ListingSource]] = Query(default=None),  # type: ignore[valid-type]
+    kind: ListingKind | None = Query(default=None),  # type: ignore[valid-type]
+    search: str | None = Query(default=None, max_length=200),
+    source: list[ListingSource] | None = Query(default=None),  # type: ignore[valid-type]
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=24, ge=1, le=MAX_PAGE_SIZE),
 ) -> MarketplaceListingPage:
@@ -159,13 +169,27 @@ async def list_marketplace_listings(
     )
 
 
-async def _detail(session, listing: MarketplaceListing) -> MarketplaceListingDetail:
+async def _offer(guild_id: int, uid: str, locale: str) -> ListingOffer | None:
+    """How billing sells listing ``uid`` to this community, in ``locale``, or
+    ``None`` when it has no answer. Shown as given: nothing here reasons
+    about it."""
+    offer = await billing_ping.plugin_offer(guild_id, listing_uid=uid, locale=locale)
+    return ListingOffer.model_validate(offer.model_dump()) if offer else None
+
+
+async def _detail(
+    session, listing: MarketplaceListing, locale: str
+) -> MarketplaceListingDetail:
     """A listing's page, or the answer the shelf gives by leaving it out.
 
     Two things put a listing out of reach, and both read as *not found* here
     because both are already true of the shelf: a plug-in whose service this
     deployment does not run, and a dashboard whose plug-in this guild has not
     installed.
+
+    A listing that wants an entitlement this community lacks, whether it is
+    not installed yet or installed with its statement inactive, carries how
+    billing sells it here, asked for this response only in ``locale``.
     """
     latest = await catalog_service.get_listing_version(
         session, listing.latest_version_id
@@ -187,6 +211,11 @@ async def _detail(session, listing: MarketplaceListing) -> MarketplaceListingDet
         listing.uid,
         await plugin_entitlements.gated_listings(guild_id, [listing]),
     )
+    if (
+        summary.unavailable is not None
+        and summary.unavailable.reason == ListingUnavailableReason.entitlement_required
+    ):
+        summary.unavailable.offer = await _offer(guild_id, listing.uid, locale)
     definition = dict(latest.definition) if latest else {}
     # What the install dialog asks the seat about, from the version it would
     # install and the registration's ceiling. Empty for anything not a plug-in.
@@ -242,6 +271,7 @@ async def resolve_marketplace_listing(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
+    locale: LocaleQuery = "en",
 ) -> MarketplaceListingDetail:
     """The listing a code names.
 
@@ -257,7 +287,7 @@ async def resolve_marketplace_listing(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MarketplaceMessages.LISTING_NOT_FOUND,
         )
-    return await _detail(session, listing)
+    return await _detail(session, listing, locale)
 
 
 @router.get("/listings/{public_id}", response_model=MarketplaceListingDetail)
@@ -266,6 +296,7 @@ async def read_marketplace_listing(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
+    locale: LocaleQuery = "en",
 ) -> MarketplaceListingDetail:
     """One listing, with what it would install and every version it has."""
     listing = await catalog_service.get_listing(session, public_id)
@@ -274,7 +305,7 @@ async def read_marketplace_listing(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MarketplaceMessages.LISTING_NOT_FOUND,
         )
-    return await _detail(session, listing)
+    return await _detail(session, listing, locale)
 
 
 @router.post(
@@ -356,10 +387,10 @@ async def share_to_marketplace(
     entity_id: Annotated[int, Form()],
     name: Annotated[str, Form()],
     description: Annotated[str, Form()],
-    example_entity_id: Annotated[Optional[int], Form()] = None,
-    long_description: Annotated[Optional[str], Form()] = None,
-    release_notes: Annotated[Optional[str], Form()] = None,
-    listing_uid: Annotated[Optional[str], Form()] = None,
+    example_entity_id: Annotated[int | None, Form()] = None,
+    long_description: Annotated[str | None, Form()] = None,
+    release_notes: Annotated[str | None, Form()] = None,
+    listing_uid: Annotated[str | None, Form()] = None,
     images: Annotated[list[UploadFile], File()] = [],  # noqa: B006 — FastAPI reads the default, never mutates it
 ) -> MarketplaceShareResult:
     """Share an item from this community to the deployment's marketplace.

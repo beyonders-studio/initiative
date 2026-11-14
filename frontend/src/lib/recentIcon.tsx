@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 import { type PersonalItemRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { fileIcon } from "@/lib/fileIcon";
 import { TOOL_ICONS } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * Render the entity-specific icon for a tool in a list of them: a recent tab,

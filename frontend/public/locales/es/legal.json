@@ -19,7 +19,7 @@
     "body": "{{appName}} guarda algunas cosas en este navegador para funcionar: lo que mantiene tu sesión, el tema que elegiste y lo que tenías abierto.",
     "nothingOptional": "Nada más. No se guarda ninguna otra cosa y nada te sigue por otros sitios.",
     "optionalIntro": "Más allá de eso, tú decides.",
-    "spamCheck": "Si creas una cuenta, el formulario de registro carga una comprobación antispam de {{provider}}, que coloca una cookie propia.",
+    "spamCheck": "El formulario de registro, y el que te envía un código de inicio de sesión por correo, cargan una comprobación antispam de {{provider}}, que coloca una cookie propia.",
     "readMore": "Qué se guarda",
     "alwaysOn": "Siempre activas",
     "rejectAll": "Rechazar opcionales",

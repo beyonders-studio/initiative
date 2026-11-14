@@ -47,11 +47,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.core.config import settings  # noqa: E402
-from app.core.intake import IntakeStream  # noqa: E402
-from app.db.session import SystemSessionLocal  # noqa: E402
-
-from seed import (  # noqa: E402
+from seed import (
     access_grants,
     accounts,
     calendars,
@@ -62,6 +58,7 @@ from seed import (  # noqa: E402
     directory,
     files,
     guilds,
+    ideas,
     initiatives,
     operations,
     posts,
@@ -71,16 +68,20 @@ from seed import (  # noqa: E402
     tickets,
     wikis,
 )
-from seed.state import clean, seed_status  # noqa: E402
+from seed.state import clean, seed_status
+
+from app.core.config import settings
+from app.core.intake import IntakeStream
+from app.db.session import SystemSessionLocal
 
 #: Each community's content, in the order it is written. Tags come first so
-#: anything can carry one; archiving waits for the end (see ``projects``).
+#: anything can carry one. Comments wait until it is committed, and archiving
+#: until they are in (see ``comments`` and ``projects``).
 AREAS = (
     initiatives,
     tags,
     projects,
     files,
-    comments,
     counters,
     dashboards,
     calendars,
@@ -116,6 +117,9 @@ async def seed() -> None:
             for area in AREAS:
                 print(f"  Creating {area.__name__.rsplit('.', 1)[-1]}...")
                 await area.seed(c)
+            await session.commit()
+            print("  Creating comments...")
+            await comments.seed(c)
             await projects.apply_archives(c)
             await session.commit()
             seeded[key] = c.guild
@@ -140,9 +144,15 @@ async def seed() -> None:
         )
         await session.commit()
 
+        await guilds.name_members(session, users)
+        await session.commit()
+
         print("  Filing tickets, reports and a hold...")
         filed = await tickets.seed(session, users, seeded["primary"])
         print(f"  {filed} cases waiting in {operations.OPERATIONS_GUILD_NAME}")
+        published = await ideas.seed(session, ops_guild, users)
+        if published:
+            print(f"  {published} ideas published on the Ideas board")
 
         # Last of all: seed_status reads the grants as the sign a seed finished.
         print("\n  Creating PAM access grants...")

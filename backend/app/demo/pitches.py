@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
 from sqlalchemy import exists, func, or_, tuple_, update
 from sqlmodel import col, select
-from sqlmodel.sql.expression import SelectOfScalar
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql.expression import SelectOfScalar
 
 from app.core import usernames
 from app.core.config import settings
@@ -32,7 +32,13 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.demo import accounts
 from app.models.platform.demo import DemoSandbox, LinkState
-from app.models.platform.guild import CommunityRole, CommunityStatus, Guild, GuildInvite
+from app.models.platform.guild import (
+    CommunityJoinPolicy,
+    CommunityRole,
+    CommunityStatus,
+    Guild,
+    GuildInvite,
+)
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
@@ -270,7 +276,7 @@ async def _list(session: AsyncSession, guild: Guild, card: DemoDirectoryCard) ->
     """Put the community in the directory with ``card``, and the directory
     on. Staged."""
     await rules.put(session, "community_directory_enabled", True)
-    guild.is_community = True
+    guild.join_policy = CommunityJoinPolicy.open.value
     guild.categories = guilds_service.normalize_categories(
         [category.value for category in card.categories]
     )
@@ -287,7 +293,7 @@ async def delete_pitch(session: AsyncSession, pitch_id: int) -> bool:
     session."""
     if not await is_pitch(session, pitch_id):
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         update(GuildInvite)
         .where(
@@ -451,7 +457,7 @@ async def make_link(
         session,
         guild_id=pitch_id,
         created_by=None,
-        expires_at=datetime.now(timezone.utc) + lifetime,
+        expires_at=datetime.now(UTC) + lifetime,
         max_uses=max_redemptions,
         guest_days=COPY_DAYS,
         guest_role=role,
@@ -464,7 +470,7 @@ async def revoke_link(session: AsyncSession, invite_id: int) -> bool:
     invite = await session.get(GuildInvite, invite_id)
     if invite is None or not await is_pitch(session, invite.guild_id):
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     invite.expires_at = min(invite.expires_at or now, now)
     session.add(invite)
     return True

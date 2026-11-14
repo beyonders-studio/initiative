@@ -19,14 +19,13 @@ stays in ``public``.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.session import SystemSessionLocal
 from app.models.platform.user import User
 from app.services.platform.retention import ACCOUNT_DELETION
-
 
 ACCOUNT_PURGE_POLL_SECONDS = 3600
 
@@ -52,6 +51,6 @@ async def purge_due_accounts(session: AsyncSession, *, now: datetime) -> int:
 async def process_account_purges() -> None:
     """One pass of the account-purge loop. Idempotent and safe to run on a
     schedule even when nothing is due."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with SystemSessionLocal() as session:
         await purge_due_accounts(session, now=now)

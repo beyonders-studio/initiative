@@ -8,7 +8,7 @@ self-hoster must find nothing here at all.
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.core.config import settings
 from app.core.messages import LegalMessages

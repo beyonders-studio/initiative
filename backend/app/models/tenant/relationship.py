@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
+    REAL,
     BigInteger,
     CheckConstraint,
     Column,
@@ -9,14 +9,10 @@ from sqlalchemy import (
     DateTime,
     Index,
     Integer,
-    REAL,
     String,
     text,
 )
 from sqlmodel import Field
-
-from app.db.registry_checks import FROM_REGISTRY
-from app.models.tenant._mixins import CreatedByMixin
 
 from app.core.relationships import (
     ENDPOINT_KIND_VALUES,
@@ -25,6 +21,8 @@ from app.core.relationships import (
     SYMMETRIC_TYPES,
     RelationshipType,
 )
+from app.db.registry_checks import FROM_REGISTRY
+from app.models.tenant._mixins import CreatedByMixin
 
 #: Vocabularies frozen into CHECK constraints from the registries, so a column
 #: can never hold a value nothing knows how to read or authorize.
@@ -134,7 +132,7 @@ class EntityRelationship(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None, sa_column=Column(BigInteger, primary_key=True, autoincrement=True)
     )
     #: Filled by trigger from the source endpoint. RLS does not read it — the
@@ -147,13 +145,13 @@ class EntityRelationship(CreatedByMixin, table=True):
     #: A finer word for an edge that obeys its primitive's rule. Ships unused;
     #: the column exists so the API and read schemas do not move when the first
     #: subtype lands.
-    subtype: Optional[str] = Field(
+    subtype: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
     target_type: str = Field(sa_column=Column(String(32), nullable=False))
     target_id: int = Field(sa_column=Column(Integer, nullable=False))
 
-    source_node: Optional[int] = Field(
+    source_node: int | None = Field(
         default=None,
         sa_column=Column(
             BigInteger,
@@ -161,7 +159,7 @@ class EntityRelationship(CreatedByMixin, table=True):
             nullable=False,
         ),
     )
-    target_node: Optional[int] = Field(
+    target_node: int | None = Field(
         default=None,
         sa_column=Column(
             BigInteger,
@@ -174,16 +172,16 @@ class EntityRelationship(CreatedByMixin, table=True):
     #: it is the sample weight any future scoring reads, and it decides whether
     #: a removal is remembered.
     provenance: str = Field(sa_column=Column(String(16), nullable=False))
-    confidence: Optional[float] = Field(
+    confidence: float | None = Field(
         default=None, sa_column=Column(REAL, nullable=True)
     )
 
     #: ``created_by`` comes from the mixin: nullable, and filled by the
-    #: ``fn_set_created_by`` trigger from the request's user. A row copied in by
+    #: ``fn_set_author`` trigger from the request's user. A row copied in by
     #: a migration has nobody to name and keeps NULL, which is the honest answer
     #: — the junctions it came from recorded no attributor either.
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -192,7 +190,7 @@ class EntityRelationship(CreatedByMixin, table=True):
     #: destroys irrecoverably — that a person linked two things and then took it
     #: back. Only a MANUAL removal tombstones: an edge withdrawn because someone
     #: edited the sentence that implied it asserts nothing.
-    removed_at: Optional[datetime] = Field(
+    removed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: No ``foreign_key=`` here, for the reason ``SoftDeleteMixin.deleted_by``
@@ -200,4 +198,4 @@ class EntityRelationship(CreatedByMixin, table=True):
     #: auto-determine the join for relationships that already reach it through
     #: ``created_by``. Removal is read through the service, never an ORM
     #: relationship.
-    removed_by: Optional[int] = Field(default=None, nullable=True)
+    removed_by: int | None = Field(default=None, nullable=True)

@@ -17,7 +17,7 @@ session or continue one.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -31,12 +31,6 @@ from sqlalchemy import (
     Uuid,
 )
 from sqlmodel import Field, SQLModel
-
-#: Olm's pre-key message — carries what the recipient needs to derive a new
-#: session.
-MESSAGE_TYPE_PREKEY = 0
-#: An ordinary message on a session that already exists.
-MESSAGE_TYPE_NORMAL = 1
 
 
 class DmQueueItem(SQLModel, table=True):
@@ -71,6 +65,6 @@ class DmQueueItem(SQLModel, table=True):
     message_type: int = Field(sa_column=Column(SmallInteger, nullable=False))
     payload: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

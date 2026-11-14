@@ -1,50 +1,132 @@
 /**
- * Where a ceremony runs: the app's own credential manager on Android, the
- * browser everywhere else, and the browser again for a server the phone would
- * not let the app act for.
+ * Where a prompt runs: the app's own plug-in on Android and the Windows
+ * desktop app, the system browser in every other app and for a server the
+ * plug-in could not act for, and the page in a browser. The ceremony around it
+ * is the page's either way.
  */
+import { Browser } from "@capacitor/browser";
+import { waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   platform: "android",
   getPasskey: vi.fn(),
+  createPasskey: vi.fn(),
   finishPasskeyStepUp: vi.fn(),
+  beginPasskeySignUp: vi.fn(),
+  finishPasskeySignUp: vi.fn(),
+  finishPasskeySignIn: vi.fn(),
+}));
+
+/** The app's storage, kept apart from the module so it outlives a restart. */
+const store = vi.hoisted(() => new Map<string, string>());
+
+vi.mock("@/lib/storage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/storage")>()),
+  getItem: (key: string) => store.get(key) ?? null,
+  setItem: async (key: string, value: string) => {
+    store.set(key, value);
+  },
+  removeItem: async (key: string) => {
+    store.delete(key);
+  },
 }));
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
-    isNativePlatform: () => false,
+    isNativePlatform: () => mocks.platform !== "web",
     getPlatform: () => mocks.platform,
     isPluginAvailable: (name: string) => name === "Passkeys",
   },
 }));
 
 vi.mock("@capawesome/capacitor-passkeys", () => ({
-  Passkeys: { getPasskey: (options: unknown) => mocks.getPasskey(options) },
+  Passkeys: {
+    getPasskey: (options: unknown) => mocks.getPasskey(options),
+    createPasskey: (options: unknown) => mocks.createPasskey(options),
+  },
 }));
 
 vi.mock("@/api/generated/auth/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/generated/auth/auth")>()),
   beginPasskeyStepUp: () => Promise.resolve({ options: { challenge: "c", rpId: "example.com" } }),
   finishPasskeyStepUp: (body: unknown) => mocks.finishPasskeyStepUp(body),
+  beginPasskeySignUp: (body: unknown) => mocks.beginPasskeySignUp(body),
+  finishPasskeySignUp: (body: unknown) => mocks.finishPasskeySignUp(body),
+  beginPasskeySignIn: () => Promise.resolve({ options: { challenge: "i", rpId: "example.com" } }),
+  finishPasskeySignIn: (body: unknown) => mocks.finishPasskeySignIn(body),
+}));
+
+// A browser that would run a ceremony, so an app is seen refusing one anyway.
+vi.mock("@simplewebauthn/browser", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@simplewebauthn/browser")>()),
+  browserSupportsWebAuthn: () => true,
+}));
+
+vi.mock("@/api/generated/access-grants/access-grants", () => ({
+  beginBreakGlassPasskey: () =>
+    Promise.resolve({ options: { challenge: "b", rpId: "example.com" } }),
 }));
 
 import { setStoredServerUrl } from "@/lib/serverStorage";
 
-import { appRunsPasskeys, PasskeyNeedsBrowserError, stepUpWithPasskey } from "./passkeys";
+import {
+  appRunsPasskeys,
+  assertForBreakGlass,
+  describePasskeyPromptError,
+  passkeysRunHere,
+  signInWithPasskey,
+  signUpWithPasskey,
+  stepUpWithPasskey,
+  takeBrowserAnswer,
+} from "./passkeys";
+
+const STEP_UP_OPTIONS = { challenge: "c", rpId: "example.com" };
+
+/** The address the app last opened the system browser at. */
+const opened = () => new URL(vi.mocked(Browser.open).mock.calls.at(-1)?.[0].url ?? "");
+
+/** The id of the prompt the app last sent the browser. */
+const lastPrompt = () => new URLSearchParams(opened().hash.slice(1)).get("prompt") ?? "";
+
+/** A link the browser's page hands back. */
+const callback = (params: Record<string, string>) =>
+  new URL(`initiative://passkey/callback?${new URLSearchParams(params)}`);
+
+/** What the browser's page hands back for the prompt it was sent. */
+const answer = (params: Record<string, string>) =>
+  takeBrowserAnswer(callback({ prompt: lastPrompt(), ...params }));
 
 beforeEach(() => {
   mocks.platform = "android";
+  vi.mocked(Browser.open).mockClear();
+  vi.mocked(Browser.addListener).mockClear();
+  mocks.beginPasskeySignUp.mockResolvedValue({
+    options: { challenge: "s", rp: { id: "example.com" } },
+  });
+  store.clear();
   setStoredServerUrl("https://one.example.com/api/v1");
 });
 
 describe("appRunsPasskeys", () => {
-  it("is the Android app's, not a browser's or iOS's", () => {
+  it("is the Android and desktop apps', not a browser's or iOS's", () => {
+    expect(appRunsPasskeys()).toBe(true);
+    mocks.platform = "electron";
     expect(appRunsPasskeys()).toBe(true);
     mocks.platform = "ios";
     expect(appRunsPasskeys()).toBe(false);
     mocks.platform = "web";
     expect(appRunsPasskeys()).toBe(false);
+  });
+});
+
+describe("passkeysRunHere", () => {
+  it("holds in every app, which has the browser where it has no plug-in", () => {
+    expect(passkeysRunHere()).toBe(true);
+    mocks.platform = "ios";
+    expect(passkeysRunHere()).toBe(true);
+    mocks.platform = "web";
+    expect(passkeysRunHere()).toBe(true);
   });
 });
 
@@ -61,17 +143,62 @@ describe("a ceremony in the app", () => {
     });
   });
 
+  it("tells the desktop plug-in which server to act for", async () => {
+    mocks.platform = "electron";
+    mocks.getPasskey.mockResolvedValue({ id: "cred" });
+    mocks.finishPasskeyStepUp.mockResolvedValue({ access_token: "t" });
+
+    await stepUpWithPasskey();
+
+    expect(mocks.getPasskey).toHaveBeenCalledWith({
+      challenge: "c",
+      rpId: "example.com",
+      origin: "https://one.example.com",
+    });
+  });
+
+  it("makes an account and answers break-glass through the plug-in too", async () => {
+    mocks.createPasskey.mockResolvedValue({ id: "new" });
+    mocks.finishPasskeySignUp.mockResolvedValue({ access_token: "t" });
+    mocks.getPasskey.mockResolvedValue({ id: "cred" });
+
+    await signUpWithPasskey({ email: "a@example.com" } as never);
+    expect(mocks.createPasskey).toHaveBeenCalledWith({ challenge: "s", rp: { id: "example.com" } });
+    // The begin carries the S256 of the verifier the finish carries.
+    const { code_challenge } = mocks.beginPasskeySignUp.mock.calls[0][0];
+    const { code_verifier, credential } = mocks.finishPasskeySignUp.mock.calls[0][0];
+    expect(credential).toEqual({ id: "new" });
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code_verifier));
+    expect(code_challenge).toBe(
+      btoa(String.fromCharCode(...new Uint8Array(digest)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "")
+    );
+
+    await expect(assertForBreakGlass()).resolves.toEqual({ id: "cred" });
+    expect(mocks.getPasskey).toHaveBeenCalledWith({ challenge: "b", rpId: "example.com" });
+  });
+
   it("sends a server the phone refused to the browser, and only that server", async () => {
     mocks.getPasskey.mockRejectedValue({ code: "DOMAIN_NOT_ASSOCIATED" });
+    mocks.finishPasskeyStepUp.mockResolvedValue({ access_token: "t" });
 
-    await expect(stepUpWithPasskey()).rejects.toBeInstanceOf(PasskeyNeedsBrowserError);
+    // The same press goes on in the browser.
+    const done = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
+    await done;
     expect(appRunsPasskeys()).toBe(false);
 
     setStoredServerUrl("https://two.example.com/api/v1");
     expect(appRunsPasskeys()).toBe(true);
 
     // A second refusal keeps the first.
-    await expect(stepUpWithPasskey()).rejects.toBeInstanceOf(PasskeyNeedsBrowserError);
+    const again = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(2));
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
+    await again;
     setStoredServerUrl("https://one.example.com/api/v1");
     expect(appRunsPasskeys()).toBe(false);
   });
@@ -81,5 +208,131 @@ describe("a ceremony in the app", () => {
 
     await expect(stepUpWithPasskey()).rejects.toMatchObject({ name: "NotAllowedError" });
     expect(appRunsPasskeys()).toBe(true);
+  });
+
+  it("reads the browser's own names, which the desktop plug-in passes on", async () => {
+    mocks.platform = "electron";
+    mocks.getPasskey.mockRejectedValue({ code: "InvalidStateError" });
+    await expect(stepUpWithPasskey()).rejects.toMatchObject({ name: "InvalidStateError" });
+
+    mocks.getPasskey.mockRejectedValue({ code: "SecurityError" });
+    const refused = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    await answer({ error: "NotAllowedError" });
+    await expect(refused).rejects.toMatchObject({ name: "NotAllowedError" });
+  });
+});
+
+describe("a prompt in the system browser", () => {
+  beforeEach(() => {
+    mocks.platform = "ios";
+    mocks.finishPasskeyStepUp.mockReset().mockResolvedValue({ access_token: "t" });
+  });
+
+  it("runs on the server's page and finishes with the answer it hands back", async () => {
+    const done = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+
+    expect(`${opened().origin}${opened().pathname}${opened().search}`).toBe(
+      "https://one.example.com/login?passkey=1"
+    );
+    expect(JSON.parse(new URLSearchParams(opened().hash.slice(1)).get("get") ?? "")).toEqual(
+      STEP_UP_OPTIONS
+    );
+
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
+    await done;
+    expect(mocks.finishPasskeyStepUp).toHaveBeenCalledWith({ credential: { id: "cred" } });
+    expect(Browser.close).toHaveBeenCalled();
+  });
+
+  it("ends the way the browser's prompt ended", async () => {
+    const done = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    await answer({ error: "NotAllowedError" });
+
+    const ended = await done.catch((err: unknown) => err);
+    expect(describePasskeyPromptError(ended)).toBe("auth:login.passkeyCancelled");
+    expect(mocks.finishPasskeyStepUp).not.toHaveBeenCalled();
+  });
+
+  it("ends when the browser is closed without an answer", async () => {
+    const done = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.addListener).toHaveBeenCalledTimes(1));
+    const [event, closed] = vi.mocked(Browser.addListener).mock.calls[0] as unknown as [
+      string,
+      () => void,
+    ];
+    expect(event).toBe("browserFinished");
+    closed();
+
+    await expect(done).rejects.toMatchObject({ name: "NotAllowedError" });
+  });
+
+  it("puts an older prompt down for a newer one", async () => {
+    const first = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    const second = stepUpWithPasskey();
+
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(2));
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
+    await second;
+  });
+
+  it("drops an answer from another prompt's page", async () => {
+    const done = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+
+    await takeBrowserAnswer(callback({ prompt: "an-older-one", credential: "{}" }));
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
+    await done;
+    expect(mocks.finishPasskeyStepUp).toHaveBeenCalledWith({ credential: { id: "cred" } });
+  });
+
+  it("finishes a sign-in whose answer starts the app afresh, and says where it was headed", async () => {
+    // The phone closed the app while the browser was in front.
+    void signInWithPasskey({ deviceName: "iPhone", next: "/c/4/projects/9" }).catch(
+      () => undefined
+    );
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    const prompt = lastPrompt();
+    vi.resetModules();
+    const restarted = await import("./passkeys");
+    mocks.finishPasskeySignIn.mockResolvedValue({ access_token: "t" });
+
+    await expect(
+      restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
+    ).resolves.toEqual({ token: { access_token: "t" }, next: "/c/4/projects/9" });
+    expect(mocks.finishPasskeySignIn).toHaveBeenCalledWith({
+      credential: { id: "cred" },
+      device_name: "iPhone",
+      code_verifier: expect.any(String),
+    });
+    // Once.
+    await expect(
+      restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
+    ).resolves.toBeNull();
+  });
+
+  it("leaves a sign-in for a server the app has left unfinished", async () => {
+    void signInWithPasskey({ deviceName: "iPhone" }).catch(() => undefined);
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    const prompt = lastPrompt();
+    vi.resetModules();
+    const restarted = await import("./passkeys");
+    setStoredServerUrl("https://two.example.com/api/v1");
+    mocks.finishPasskeySignIn.mockReset();
+
+    await expect(
+      restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
+    ).resolves.toBeNull();
+    expect(mocks.finishPasskeySignIn).not.toHaveBeenCalled();
+  });
+
+  it("leaves other links to whoever takes them", async () => {
+    await expect(
+      takeBrowserAnswer(new URL("initiative://oidc/callback?code=x"))
+    ).resolves.toBeNull();
   });
 });

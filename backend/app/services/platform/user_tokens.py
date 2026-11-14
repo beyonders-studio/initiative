@@ -5,12 +5,13 @@ The table is read and written on the system engine alone, like
 ``app_admin``.
 """
 
-from datetime import datetime, timedelta, timezone
-from hashlib import sha256
 import secrets
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from hashlib import sha256
+from typing import Any
 
-from sqlmodel import col, select, delete, update as sql_update
+from sqlmodel import col, delete, select
+from sqlmodel import update as sql_update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.user import User
@@ -18,7 +19,6 @@ from app.models.platform.user_token import UserToken, UserTokenPurpose
 from app.services.auth import challenges as challenge_service
 from app.services.auth import sessions as session_service
 from app.services.platform import api_keys as api_keys_service
-
 
 DEFAULT_TOKEN_TTL_MINUTES = 60
 
@@ -80,7 +80,7 @@ async def create_token(
     if purpose is not UserTokenPurpose.account_change:
         await _delete_existing_tokens(session, user_id, purpose, user_email_id)
     token_value = secrets.token_urlsafe(48)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    expires_at = datetime.now(UTC) + timedelta(minutes=expires_minutes)
     token = UserToken(
         user_id=user_id,
         token=_hash_token(token_value),
@@ -102,7 +102,7 @@ async def get_valid_token(
     *,
     token: str,
     purpose: UserTokenPurpose,
-) -> Optional[UserToken]:
+) -> UserToken | None:
     stmt = select(UserToken).where(
         UserToken.token == _hash_token(token),
         UserToken.purpose == purpose,
@@ -113,7 +113,7 @@ async def get_valid_token(
         return None
     if record.consumed_at is not None:
         return None
-    if record.expires_at < datetime.now(timezone.utc):
+    if record.expires_at < datetime.now(UTC):
         return None
     return record
 
@@ -124,7 +124,7 @@ async def consume_token(
     token: str,
     purpose: UserTokenPurpose,
     commit: bool = True,
-) -> Optional[UserToken]:
+) -> UserToken | None:
     """Spend a live token and return it, or ``None``.
 
     One conditional update claims it, so a token is spent once however many
@@ -133,7 +133,7 @@ async def consume_token(
     ``commit=False`` stages the spend, for a caller whose work and spend must
     land together, so a link whose work failed stays good.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claimed = (
         await session.exec(
             sql_update(UserToken)
@@ -155,7 +155,7 @@ async def consume_token(
 
 
 async def purge_expired_tokens(session: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = delete(UserToken).where(UserToken.expires_at < now)
     await session.exec(stmt)
     await session.commit()

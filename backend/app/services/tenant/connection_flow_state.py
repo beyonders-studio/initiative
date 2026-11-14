@@ -21,7 +21,6 @@ import hashlib
 import json
 import secrets
 from dataclasses import dataclass, replace
-from typing import Optional
 
 from cryptography.fernet import InvalidToken
 
@@ -66,7 +65,7 @@ class ConnectionFlowState:
     install_id: int
     connection_id: str
     #: The member connecting their own account; ``None`` for the community's.
-    user_id: Optional[int]
+    user_id: int | None
     #: The signed-in person who started the flow, and the only one who may
     #: finish it.
     started_by: int
@@ -77,9 +76,9 @@ class ConnectionFlowState:
     return_path: str
     phase: str
     #: The id an installation-style flow's setup address returned.
-    installation_id: Optional[str] = None
+    installation_id: str | None = None
 
-    def authorizing(self, installation_id: Optional[str]) -> "ConnectionFlowState":
+    def authorizing(self, installation_id: str | None) -> ConnectionFlowState:
         """The same flow, on its way to the authorization endpoint."""
         return replace(self, phase="authorize", installation_id=installation_id)
 
@@ -95,7 +94,7 @@ def new_state(
     guild_id: int,
     install_id: int,
     connection_id: str,
-    user_id: Optional[int],
+    user_id: int | None,
     started_by: int,
     return_path: str,
     pkce: bool,
@@ -132,7 +131,7 @@ def encode_state(state: ConnectionFlowState) -> str:
 
 
 def decode_state(
-    token: Optional[str], *, max_age_seconds: int = STATE_MAX_AGE_SECONDS
+    token: str | None, *, max_age_seconds: int = STATE_MAX_AGE_SECONDS
 ) -> ConnectionFlowState:
     """The state a callback carries, or :class:`FlowStateError`."""
     if not token:

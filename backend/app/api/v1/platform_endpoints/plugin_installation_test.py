@@ -24,47 +24,48 @@ else in this build moves ``config_state`` off ``unverified``.
 """
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
-from httpx import AsyncClient
-from sqlalchemy import delete, update
+from httpx2 import AsyncClient
+from sqlalchemy import any_, delete, literal, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import seal_install_token
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
 from app.core.messages import PluginChannelMessages, PluginMessages
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.core.plugin_access_token import seal_install_token
 from app.models.platform.guild import CommunityRole
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher
 from app.models.platform.user import User
 from app.models.tenant.event_outbox import EventOutbox
-from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.initiative import InitiativeMember, InitiativeRule
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
+from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
 from app.services.marketplace import plugin_refs
 from app.services.marketplace.registration_lookup import invalidate_registrations
-from app.services.tenant import plugin_channels as channels_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import plugin_channels as channels_service
+from app.services.tenant.initiatives import create_custom_role
 from app.testing import (
-    create_plugin_user_connection,
-    create_plugin_service_registration,
-    create_property_definition,
-    create_property_value,
-    create_guild,
-    create_guild_plugin,
-    create_project,
-    create_resource_grant,
     create_calendar,
     create_calendar_event,
+    create_guild,
+    create_guild_plugin,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
+    create_project,
+    create_property_definition,
+    create_property_value,
+    create_resource_grant,
     create_task,
     create_user,
     guild_url,
@@ -73,7 +74,6 @@ from app.testing import (
     route_session_to_guild,
 )
 from app.testing.plugin_clients import CLIENT, install_headers, install_plugin
-
 
 BASE = "/api/v1/plugin-platform/installation"
 SHOP = "tests.shop"
@@ -185,7 +185,7 @@ async def _member_connection(
             else None
         ),
         status="blocked" if blocked else ("connected" if with_secret else "pending"),
-        blocked_at=datetime.now(timezone.utc) if blocked else None,
+        blocked_at=datetime.now(UTC) if blocked else None,
     )
 
 
@@ -1193,10 +1193,14 @@ async def _shown_board(
             )
         )
     ).one()
-    await session.exec(
-        update(PluginPlacement)
-        .where(PluginPlacement.install_id == installed.plugin.id)
-        .values(role_ids=[role_id])
+    session.add(
+        InitiativeRule(
+            initiative_id=installed.placed.id,
+            initiative_role_id=role_id,
+            install_id=installed.plugin.id,
+            key="use",
+            enabled=True,
+        )
     )
     await session.commit()
     written = await client.put(
@@ -1210,6 +1214,22 @@ async def _shown_board(
     )
     assert written.status_code == 200, written.text
     return installed, member, task
+
+
+async def _viewer(session: AsyncSession, acting_user, installed):
+    """A reader in the placed initiative whose role is no manager's and was
+    not given the install's ``use``."""
+    await route_session_to_guild(session, installed.guild.id)
+    await create_custom_role(
+        session, initiative_id=installed.placed.id, name="viewer", display_name="Viewer"
+    )
+    await session.commit()
+    return await acting_user(
+        guild_role=CommunityRole.member,
+        guild=installed.guild,
+        initiative=installed.placed,
+        initiative_role="viewer",
+    )
 
 
 def _shown(rows: list[MetadataValue]) -> dict[str, bool]:
@@ -1231,7 +1251,7 @@ class TestShownValues:
     ):
         """On every write, and again when the install moves to a version that
         declares other fields; the install's own values never."""
-        installed, _member, task = await _shown_board(
+        installed, _member, _task = await _shown_board(
             client, session, acting_user, role_session
         )
         await client.put(
@@ -1319,8 +1339,9 @@ class TestShownValues:
     async def test_values_reach_whom_the_plugins_actions_would(
         self, client: AsyncClient, session: AsyncSession, acting_user, role_session
     ):
-        """The install on, placed in the task's initiative with a role the
-        reader holds (or the reader its admin), and the reader old enough."""
+        """The install on, placed in the task's initiative, the reader's role
+        given its ``use`` (or the reader a manager there, or its admin), and
+        the reader old enough."""
         installed, member, task = await _shown_board(
             client, session, acting_user, role_session
         )
@@ -1330,6 +1351,7 @@ class TestShownValues:
             initiative=installed.placed,
             initiative_role="project_manager",
         )
+        viewer = await _viewer(session, acting_user, installed)
         shown = [(installed.plugin.id, "github.issue", 123)]
 
         async def drawn(actor=member) -> list:
@@ -1348,7 +1370,8 @@ class TestShownValues:
 
         assert await drawn() == shown
         assert await drawn(installed.seat) == shown
-        assert await drawn(manager) == [], "a role the placement does not allow"
+        assert await drawn(manager) == shown
+        assert await drawn(viewer) == [], "a role not given the install's use"
 
         await change(
             definition={**installed.plugin.definition, "minimum_age": {"default": 16}}
@@ -1446,12 +1469,7 @@ class TestShownValues:
         project = await session.get(Project, task.project_id)
         assert project is not None
         other = await create_task(session, project)
-        manager = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=installed.guild,
-            initiative=installed.placed,
-            initiative_role="project_manager",
-        )
+        viewer = await _viewer(session, acting_user, installed)
         issue = f"plugin:{installed.plugin.id}:github.issue"
         listing = f"plugin:{installed.plugin.id}:{PULLS}"
 
@@ -1478,7 +1496,7 @@ class TestShownValues:
         assert await listed("gt", 200) == set()
         assert await listed("is_null", True) == {other.id}
         assert await listed("is_null", False) == {task.id}
-        assert await listed("eq", 123, manager) == {task.id, other.id}
+        assert await listed("eq", 123, viewer) == {task.id, other.id}
         assert await listed("eq", pulls[0]["url"], field=listing) == {task.id}
         assert await listed("eq", "merged", field=listing, facet="status") == {task.id}
         assert await listed("in_", ["open"], field=listing, facet="status") == set()
@@ -1697,7 +1715,9 @@ class TestShownValues:
             await route_session_to_guild(session, installed.guild.id)
             session.expunge_all()
             rows = await session.exec(
-                select(EventOutbox).where(EventOutbox.changed.any("plugin_values"))
+                select(EventOutbox).where(
+                    literal("plugin_values") == any_(EventOutbox.changed)
+                )
             )
             return [
                 (e.resource_type, e.resource_id, e.action, e.actor_install_id)

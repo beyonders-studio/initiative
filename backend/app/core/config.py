@@ -12,7 +12,6 @@ from typing import Annotated
 from urllib.parse import urlsplit
 
 from pydantic import (
-    AliasChoices,
     BeforeValidator,
     EmailStr,
     Field,
@@ -24,7 +23,6 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from starlette.requests import Request
-
 
 # App identity/shape — deliberately constants, not settings: the SPA, the
 # docs-CSP route, and the OpenAPI export all assume this prefix, so making it
@@ -86,6 +84,8 @@ CSP_EMBED_FRAME_ORIGINS = [
     "https://docs.google.com",
     "https://miro.com",
     "https://airtable.com",
+    "https://platform.twitter.com",
+    "https://embed.reddit.com",
 ]
 
 
@@ -114,9 +114,12 @@ CSP_CAPTCHA_ORIGINS: dict[str, list[str]] = {
 
 # Origins the SPA fetches non-script assets from via fetch()/XHR, used to build
 # the connect-src directive. The spell checker lazy-loads its English dictionary
-# (.aff/.dic) from jsDelivr — see frontend/src/lib/spell-check.ts.
+# (.aff/.dic) from jsDelivr — see frontend/src/lib/kitHost.ts. The Help
+# panel reads the user guide's search index from the published help center
+# (frontend/src/hooks/useHelpIndex.ts).
 CSP_CONNECT_ORIGINS = [
     "https://cdn.jsdelivr.net",
+    "https://beyonders-studio.github.io",
 ]
 
 # Origins the SPA loads web fonts from (font-src). The bundled Excalidraw
@@ -504,13 +507,13 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _scanner_has_its_token(self) -> "Settings":
+    def _scanner_has_its_token(self) -> Settings:
         if self.UPLOAD_SCANNER_URL and not self.UPLOAD_SCANNER_TOKEN:
             raise ValueError("UPLOAD_SCANNER_URL needs UPLOAD_SCANNER_TOKEN")
         return self
 
     @model_validator(mode="after")
-    def _kms_root_names_its_key(self) -> "Settings":
+    def _kms_root_names_its_key(self) -> Settings:
         if self.STORAGE_ENCRYPTION == "gcp_kms" and not self.STORAGE_ENCRYPTION_KMS_KEY:
             raise ValueError(
                 'STORAGE_ENCRYPTION="gcp_kms" needs STORAGE_ENCRYPTION_KMS_KEY: '
@@ -583,7 +586,7 @@ class Settings(BaseSettings):
     _database_logins_derived: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
-    def _resolve_database_logins(self) -> "Settings":
+    def _resolve_database_logins(self) -> Settings:
         has_plugin, has_admin = (
             bool(self.DATABASE_URL_APP),
             bool(self.DATABASE_URL_ADMIN),
@@ -678,6 +681,21 @@ class Settings(BaseSettings):
         HTTPS.
         """
         return urlsplit(self.APP_URL.strip()).scheme == "https"
+
+    @property
+    def app_origin(self) -> str | None:
+        """The public app's origin as a browser names it: ``scheme://host`` with
+        a port only where it is not the scheme's default. ``None`` when
+        ``APP_URL`` is not a whole URL."""
+        parts = urlsplit(self.APP_URL.strip())
+        if not parts.scheme or not parts.hostname:
+            return None
+        scheme = parts.scheme.lower()
+        hostname = parts.hostname
+        host = f"[{hostname}]" if ":" in hostname else hostname
+        default = {"https": 443, "http": 80}.get(scheme)
+        port = f":{parts.port}" if parts.port not in (None, default) else ""
+        return f"{scheme}://{host}{port}"
 
     # APP_URL should point to the frontend entry so redirect URIs resolve correctly
     APP_URL: str = "http://localhost:5173"
@@ -916,9 +934,6 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY_ID: str | None = None
     S3_SECRET_ACCESS_KEY: str | None = None
     S3_USE_PATH_STYLE: bool = False
-    # Read only by migration 0137's one-time seed, which has shipped and cannot
-    # change. Nothing at runtime reads it.
-    S3_KMS_KEY_ID: str | None = None
     # Migration safety net: while cutting a deployment over from "local" to "s3",
     # set true so a read that misses in S3 falls back to the local filesystem
     # (serves blobs not yet copied by the backfill). Turn off once the backfill is
@@ -985,18 +1000,9 @@ class Settings(BaseSettings):
     # so this does nothing there whatever it is set to.
     EXPORT_PRESIGNED_DOWNLOADS: bool = False
     # First/bootstrap user — becomes the platform `owner` tier (there is no
-    # superuser concept). The legacy FIRST_SUPERUSER_* env names are accepted
-    # as aliases so existing deployments keep working.
-    FIRST_OWNER_EMAIL: EmailStr | None = Field(
-        default=None,
-        validation_alias=AliasChoices("FIRST_OWNER_EMAIL", "FIRST_SUPERUSER_EMAIL"),
-    )
-    FIRST_OWNER_PASSWORD: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "FIRST_OWNER_PASSWORD", "FIRST_SUPERUSER_PASSWORD"
-        ),
-    )
+    # superuser concept).
+    FIRST_OWNER_EMAIL: EmailStr | None = None
+    FIRST_OWNER_PASSWORD: str | None = None
     DISABLE_GUILD_CREATION: bool = False
     # Runs this deployment as the product demo.
     DEMO_MODE: bool = False
@@ -1193,6 +1199,12 @@ class Settings(BaseSettings):
     # resolved address regardless of this setting.
     WEBHOOK_ALLOW_PRIVATE_TARGETS: bool = False
 
+    # Local-dev only: when true and APP_URL is on this machine (localhost,
+    # 127.0.0.1, ::1), the server takes what only Initiative Cloud takes —
+    # feedback and the ideas board — so they can be tried locally. Ignored for
+    # any other APP_URL. scripts/dev-ports.sh turns it on for the dev servers.
+    DEV_AS_CLOUD: bool = False
+
     BEHIND_PROXY: bool = (
         False  # Set True when behind nginx/load balancer to trust X-Forwarded-For
     )
@@ -1295,7 +1307,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     # The required field (SECRET_KEY) is loaded from the environment by
     # pydantic-settings, which ty can't see.
-    return Settings()  # ty: ignore[missing-argument]
+    return Settings()
 
 
 settings = get_settings()

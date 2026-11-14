@@ -3,10 +3,10 @@ and a moderator suspending a community under a ``moderate`` grant."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -24,7 +24,7 @@ async def _moderate_grant(
 ) -> AccessGrant:
     """A live ``moderate`` grant on ``guild``, approved by somebody else."""
     approver = await create_user(session, role=UserRole.operator)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = AccessGrant(
         user_id=user.id,
         guild_id=guild.id,
@@ -61,7 +61,7 @@ async def _set_status(
     at: datetime | None = None,
 ) -> None:
     guild.status = status.value
-    guild.status_changed_at = at or datetime.now(timezone.utc)
+    guild.status_changed_at = at or datetime.now(UTC)
     session.add(guild)
     await session.commit()
 
@@ -218,7 +218,7 @@ async def test_suspending_a_deleted_community_stops_its_countdown_and_lifting_re
     moderator = await create_user(session, role=UserRole.moderator)
     guild = await create_guild(session)
     guild_id = guild.id
-    long_ago = datetime.now(timezone.utc) - timedelta(days=3650)
+    long_ago = datetime.now(UTC) - timedelta(days=3650)
     await _set_status(session, guild, CommunityStatus.deleted, at=long_ago)
     await _moderate_grant(session, user=moderator, guild=guild)
 
@@ -229,7 +229,7 @@ async def test_suspending_a_deleted_community_stops_its_countdown_and_lifting_re
     assert suspended.json()["lifts_to"] == "deleted"
 
     await set_rls_context(session, Unattributed())
-    assert await purge_due_guilds(session, now=datetime.now(timezone.utc)) == 0
+    assert await purge_due_guilds(session, now=datetime.now(UTC)) == 0
     session.expire_all()
     kept = (await session.exec(select(Guild).where(Guild.id == guild_id))).one()
     assert kept.status == CommunityStatus.suspended.value

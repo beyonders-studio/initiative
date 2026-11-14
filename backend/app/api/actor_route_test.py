@@ -11,13 +11,15 @@ design puts them.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any, Iterator, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any
 
 import pytest
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from fastapi.routing import iter_route_contexts
 from pydantic import BaseModel
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
@@ -25,9 +27,9 @@ from sqlmodel import select
 
 from app.api.actor_route import ActorRoute
 from app.api.deps import ActorContext, ActorSessionDep, plugin_scope, route_plugin_scope
-from app.core.plugin_access_token import seal_install_token
 from app.core.identity_boundary import GuildId, PersonId
 from app.core.messages import PluginMessages
+from app.core.plugin_access_token import seal_install_token
 from app.db.guild_standing import InstallContext
 from app.main import app
 from app.models.platform.guild import CommunityRole
@@ -37,12 +39,12 @@ from app.models.platform.identity_ref import (
     IdentityPurpose,
     IdentityRef,
 )
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace import plugin_refs
 from app.testing import (
-    create_plugin_service_registration,
     create_guild_plugin,
+    create_plugin_service_registration,
     route_as,
     route_session_to_guild,
 )
@@ -64,7 +66,7 @@ class _People(BaseModel):
     guild_id: GuildId
     creator: PersonId
     people: list[_Person]
-    reviewer: Optional[PersonId] = None
+    reviewer: PersonId | None = None
 
 
 class _Naming(BaseModel):
@@ -96,7 +98,7 @@ async def _assign(
     body: _Naming,
     actor: Annotated[ActorContext, Depends(_write)],
     session: ActorSessionDep,
-    reviewer: Optional[PersonId] = None,
+    reviewer: PersonId | None = None,
 ) -> _Naming:
     _state["before_handler"] = len(_state.get("statements", []))
     _state["received"] = {
@@ -128,7 +130,7 @@ def _mounted():
 
 
 @contextmanager
-def _counting() -> Iterator[list[str]]:
+def _counting() -> Generator[list[str]]:
     """Every statement any engine runs meanwhile, in order."""
     statements: list[str] = []
     _state["statements"] = statements
@@ -221,8 +223,9 @@ def test_every_route_that_names_a_scope_is_an_actor_route():
     that admits one is served by it."""
     offenders = [
         f"{sorted(getattr(route, 'methods', ()))} {getattr(route, 'path', route)}"
-        for route in app.routes
-        if route_plugin_scope(route) is not None and not isinstance(route, ActorRoute)
+        for route in iter_route_contexts(app.routes)
+        if route_plugin_scope(route) is not None
+        and not isinstance(route.original_route, ActorRoute)
     ]
     assert offenders == []
 
@@ -433,7 +436,7 @@ async def test_a_replaced_reference_resolves_for_its_grace_window(
         await session.exec(
             text(
                 "UPDATE public.identity_refs SET retired_at = :at WHERE ref = :ref"
-            ).bindparams(at=datetime.now(timezone.utc) - ago, ref=replaced)
+            ).bindparams(at=datetime.now(UTC) - ago, ref=replaced)
         )
         await session.commit()
         response = await client.post(

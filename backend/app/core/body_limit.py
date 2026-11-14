@@ -19,8 +19,9 @@ Limits are read per request, so test-time monkeypatches apply.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, TypeVar
 
 from starlette.datastructures import Headers
 
@@ -120,15 +121,18 @@ class BodySizeLimitMiddleware:
 
         async def tracking_send(message):
             nonlocal response_started, replaced
-            if over_limit and not response_started:
-                # The framework converted the aborted body read into its own
-                # error response (FastAPI reports a 400 body-parse failure);
-                # the true cause is the size cap — answer 413 instead.
-                if message["type"] == "http.response.start":
-                    replaced = True
-                    response_started = True
-                    await _send_413(send, code)
-                    return
+            # The framework converted the aborted body read into its own
+            # error response (FastAPI reports a 400 body-parse failure);
+            # the true cause is the size cap — answer 413 instead.
+            if (
+                over_limit
+                and not response_started
+                and message["type"] == "http.response.start"
+            ):
+                replaced = True
+                response_started = True
+                await _send_413(send, code)
+                return
             if replaced and message["type"] == "http.response.body":
                 return  # swallow the framework error body; ours already went
             if message["type"] == "http.response.start":
@@ -159,7 +163,7 @@ def _bound_for(scope, headers: Headers) -> tuple[int, str]:
 def _content_length(headers: Headers) -> int | None:
     try:
         return int(headers["content-length"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         return None
 
 

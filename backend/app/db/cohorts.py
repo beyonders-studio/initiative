@@ -27,8 +27,9 @@ commits, on a session from the community's cohort, registered with
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncIterator, Mapping
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import event
 from sqlalchemy.engine import make_url
@@ -228,7 +229,7 @@ def system_sessionmaker(guild_id: int | None) -> async_sessionmaker[AsyncSession
 
 
 @asynccontextmanager
-async def system_session(guild_id: int | None) -> AsyncIterator[AsyncSession]:
+async def system_session(guild_id: int | None) -> AsyncGenerator[AsyncSession]:
     """A system session from ``guild_id``'s cohort, or from the platform system
     pool when it is ``None``. The caller routes it and commits. Work across
     communities made on it gives each community a system session from that
@@ -239,7 +240,7 @@ async def system_session(guild_id: int | None) -> AsyncIterator[AsyncSession]:
 
 
 @asynccontextmanager
-async def as_system(session: AsyncSession) -> AsyncIterator[AsyncSession]:
+async def as_system(session: AsyncSession) -> AsyncGenerator[AsyncSession]:
     """``session`` when it already works in its community as the platform, else
     a session routed there as the platform, committed on the way out. For the
     cleanup a person's or an installed plug-in's request makes of rows that
@@ -281,7 +282,7 @@ def read_sessionmaker(guild_id: int) -> async_sessionmaker[AsyncSession]:
 
 
 @asynccontextmanager
-async def read_session(guild_id: int) -> AsyncIterator[AsyncSession]:
+async def read_session(guild_id: int) -> AsyncGenerator[AsyncSession]:
     """A read-only session from :func:`read_sessionmaker`."""
     async with read_sessionmaker(guild_id)() as session:
         if not settings.DATABASE_URL_QUERY:
@@ -320,7 +321,7 @@ def addressed_guild_id(path_params: Mapping[str, Any]) -> int | None:
         return None
     try:
         return int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -340,7 +341,7 @@ def mark_system_session(session: AsyncSession) -> None:
 @asynccontextmanager
 async def community_session(
     parent: AsyncSession, guild_id: int, *, read_only: bool = True
-) -> AsyncIterator[AsyncSession]:
+) -> AsyncGenerator[AsyncSession]:
     """A session from ``guild_id``'s cohort of the same kind as ``parent``, for
     one community's part of work across several. ``parent`` is a request-path
     session or one from :func:`system_session`. Read-only unless ``read_only``
@@ -359,7 +360,7 @@ async def community_session(
         yield session
 
 
-def note_route(connection: "Connection | None", guild_id: int | None) -> None:
+def note_route(connection: Connection | None, guild_id: int | None) -> None:
     """Record that ``connection`` is serving ``guild_id``'s community, and
     count it when that community is outside the connection's cohort.
 

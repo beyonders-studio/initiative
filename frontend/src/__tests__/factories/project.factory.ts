@@ -1,7 +1,8 @@
-import type {
-  ProjectRead,
-  TaskStatusCategory,
-  TaskStatusRead,
+import {
+  ActorKind,
+  type ProjectRead,
+  type TaskStatusCategory,
+  type TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
 
 import { ownerCan } from "./can";
@@ -76,6 +77,8 @@ export function buildProject(overrides: Partial<ProjectRead> = {}): ProjectRead 
     initiative_id: 1,
     community_id: 1,
     created_by: null,
+    created_by_kind: ActorKind.system,
+    created_by_install: null,
     start_date: null,
     end_date: null,
     created_at: "2026-01-15T00:00:00.000Z",

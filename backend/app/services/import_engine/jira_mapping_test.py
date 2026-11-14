@@ -291,7 +291,7 @@ def _mapped(**kw):
             [{"statuses": [_status("To Do", "new"), _status("Done", "done")]}],
         ),
         issues=kw.pop("issues", [_issue("ACME-1", "One"), _issue("ACME-2", "Two")]),
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         **kw,
     )
 
@@ -715,7 +715,7 @@ def test_comments_survive_into_a_real_envelope():
                 },
             )
         ],
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         include_comments=True,
     ).envelope
     parsed = ProjectExportEnvelope.model_validate(envelope)
@@ -838,14 +838,14 @@ def test_a_project_mapped_a_page_at_a_time_is_the_project_mapped_whole():
         _issue("ACME-4", "Four", priority={"name": "Lowest"}),
     ]
     files = {"ACME-3": [_stored("spec.pdf", "k-spec.pdf")]}
-    shared = dict(
-        project={"key": "ACME", "name": "Acme Board"},
-        issue_type_statuses=[
+    shared = {
+        "project": {"key": "ACME", "name": "Acme Board"},
+        "issue_type_statuses": [
             {"statuses": [_status("To Do", "new"), _status("Done", "done")]}
         ],
-        app_version="0.0.0-test",
-        field_catalog=catalog,
-    )
+        "app_version": "0.78.0-test",
+        "field_catalog": catalog,
+    }
 
     whole = jm.build_project_envelope(issues=issues, files_by_issue=files, **shared)
     mapper = jm.ProjectMapper(**shared)

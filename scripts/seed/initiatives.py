@@ -17,7 +17,6 @@ from app.models.tenant.initiative import (
     InitiativeRule,
 )
 from app.services.tenant.initiatives import create_builtin_roles, creator_role
-
 from seed.common import Community
 
 #: What the seeder calls the initiative it hangs each community's content

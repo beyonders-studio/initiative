@@ -1,6 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import type { BillingPortalPage } from "@/hooks/useBillingPortal";
+import { BillingForwardPage } from "@/pages/community/settings/usage/BillingForwardPage";
 
 /**
  * Forwards to the billing portal for one community, for links sent by email.
@@ -13,7 +14,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
   validateSearch: (search: Record<string, unknown>): { page: BillingPortalPage } => ({
     page: search.page === "upgrade" ? "upgrade" : "manage",
   }),
-  component: lazyRouteComponent(() =>
-    import("@/pages/BillingForwardPage").then((m) => ({ default: m.BillingForwardPage }))
-  ),
+  component: BillingForwardPage,
 });

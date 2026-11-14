@@ -41,9 +41,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
-import httpx
+import httpx2
 from sqlalchemy import exists
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -56,11 +56,7 @@ from app.db import cohorts
 from app.db.guild_standing import GuildContext
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import plugin_data
-from app.services.marketplace.declarative import (
-    action_change,
-    request_refusal,
-    typed_params,
-)
+from app.services.marketplace.declarative import action_change, typed_params
 from app.services.marketplace.expressions import UNDEFINED
 from app.services.marketplace.plugin_data import PluginDataError
 from app.services.marketplace.plugin_refs import PluginNameRefused, ensure_plugin_ref
@@ -68,7 +64,10 @@ from app.services.marketplace.registration_lookup import (
     RegistrationSnapshot,
     is_declarative,
 )
-from app.services.marketplace.service_plugins import PLATFORM_CODES, is_admin_only
+from app.services.marketplace.service_plugins import (
+    PLATFORM_CODES,
+    surface_permission,
+)
 from app.services.tenant import guild_plugins, metadata, plugin_config
 from app.services.tenant.guild_plugins import SurfaceAccess
 from app.services.tenant.plugin_channels import PluginChannelError
@@ -133,8 +132,8 @@ def _failed(detail: str) -> PluginDataError:
 
 def _answers(
     action: Mapping[str, Any],
-    endpoint: Optional[Mapping[str, Any]],
-    params: Optional[Mapping[str, Any]],
+    endpoint: Mapping[str, Any] | None,
+    params: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """What the reader answered for the parameters the action asks for, held
     to the endpoint's declaration of them (:func:`plugin_data.validate_params`,
@@ -152,7 +151,7 @@ def _answers(
 
 
 def _on_elements(
-    definition: Optional[Mapping[str, Any]], action_id: str, kind: str, element: str
+    definition: Mapping[str, Any] | None, action_id: str, kind: str, element: str
 ) -> bool:
     """Whether a list field on this kind of item offers the action on each of
     its elements, and ``element`` is one's ``ref``."""
@@ -174,17 +173,11 @@ async def _actor(
     user_id: int,
 ) -> tuple[str, dict[str, str], dict[str, dict[str, Any]]]:
     """Whose credential a declarative action's call runs on, and the handles
-    and non-secret fields it runs with
-    (:func:`~app.services.marketplace.plugin_data._resolve_connections`): the
-    first of the endpoint's ``actors`` the reader's call can run as,
-    ``member`` on the reader's own connections and ``installation`` on the
-    community's: its ``requires`` met, and every connection its requests name
-    for that actor able to travel
-    (:func:`~app.services.marketplace.declarative.request_refusal`).
-    An endpoint naming no actors runs as the reader when its
-    first request carries an interactive connection, and as the installation
-    when it carries a static one. When none can, the best one's refusal is
-    the answer."""
+    and non-secret fields it runs with: the first of the endpoint's ``actors``
+    the reader's call can run as (:func:`plugin_data.first_actor`). An
+    endpoint naming no actors runs as the reader when its first request
+    carries an interactive connection, and as the installation when it
+    carries a static one."""
     actors = endpoint.get("actors")
     if not isinstance(actors, list) or not actors:
         request = (endpoint.get("steps") or [endpoint])[0]["request"]
@@ -193,25 +186,9 @@ async def _actor(
         )
         interactive = (connection or {}).get("scope") == "interactive"
         actors = ["member" if interactive else "installation"]
-    refusals: list[PluginDataError] = []
-    for actor in actors:
-        try:
-            refs, fields = await plugin_data._resolve_connections(
-                session,
-                plugin=plugin,
-                endpoint=endpoint,
-                user_id=user_id if actor == "member" else None,
-                actor=actor,
-            )
-        except PluginDataError as exc:
-            refusals.append(exc)
-            continue
-        refused = request_refusal(plugin.definition, endpoint, refs, actor)
-        if refused is not None:
-            refusals.append(refused)
-            continue
-        return actor, refs, fields
-    raise refusals[0]
+    return await plugin_data.first_actor(
+        session, plugin=plugin, endpoint=endpoint, user_id=user_id, actors=actors
+    )
 
 
 async def _act(
@@ -220,13 +197,13 @@ async def _act(
     plugin: GuildPlugin,
     registration: RegistrationSnapshot,
     action: dict[str, Any],
-    endpoint: Optional[dict[str, Any]],
+    endpoint: dict[str, Any] | None,
     item: dict[str, Any],
     params: Mapping[str, Any],
-    element: Optional[str],
+    element: str | None,
     guild_id: int,
     user_id: int,
-    transport: httpx.AsyncBaseTransport | None,
+    transport: httpx2.AsyncBaseTransport | None,
 ) -> None:
     """Do what a declarative action declares, as the SDK's ``runAction``
     does: the call its endpoint makes, when it names one, with ``params``,
@@ -253,7 +230,7 @@ async def _act(
     if endpoint is not None:
 
         async def read(
-            request: httpx.Request | plugin_data.Answered,
+            request: httpx2.Request | plugin_data.Answered,
         ) -> dict[str, Any]:
             return await plugin_data._read_body(request, transport=transport)
 
@@ -286,7 +263,7 @@ async def _act(
     installed = plugin_config.install_settings(plugin)
     answered = typed_params(endpoint, params) if endpoint is not None else {}
 
-    async def made(held: dict[str, Any]) -> Optional[dict[str, Any]]:
+    async def made(held: dict[str, Any]) -> dict[str, Any] | None:
         return await action_change(
             action["write"],
             item=item,
@@ -315,9 +292,9 @@ async def run_action(
     context: GuildContext,
     user_id: int,
     age_allows: bool,
-    params: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
-    transport: httpx.AsyncBaseTransport | None = None,
+    params: Mapping[str, Any] | None = None,
+    element: str | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     """Run one of the install's actions on one item for the reader, and return
     the values the install shows on it afterwards, by key.
@@ -374,21 +351,23 @@ async def run_action(
     install_id = int(plugin.id or 0)
     initiative_id, title = await _item(session, kind, entity_id, context)
     offered = guild_plugins.surface_access(
-        {
-            **guild_plugins.ITEM_SURFACE,
-            "admin_only": is_admin_only(action) or is_admin_only(endpoint),
-        },
+        plugin,
+        {**guild_plugins.ITEM_SURFACE, "permission": surface_permission(action)},
+        context=context,
         initiative_id=initiative_id,
-        placement_role_ids=await guild_plugins.placement_role_ids(
-            session, install_id, initiative_id
-        ),
-        is_guild_admin=context.is_admin,
-        member_role_ids=context.member_role_ids,
+        placed=await guild_plugins.is_placed(session, install_id, initiative_id),
         age_allows=age_allows,
     )
     if offered is SurfaceAccess.too_young:
         raise PluginDataError(GuildPluginMessages.AGE_RESTRICTED, 403)
-    if offered is not SurfaceAccess.open:
+    # An endpoint it calls that names a permission answers to it too.
+    named = (endpoint or {}).get("permission")
+    if offered is not SurfaceAccess.open or not (
+        named is None
+        or guild_plugins.holds_permission(
+            context, plugin, named, initiative_id=initiative_id
+        )
+    ):
         raise _not_offered()
     if not await _reads(
         plugin, registration, guild_id=context.guild_id, kind=kind, entity_id=entity_id
@@ -431,7 +410,7 @@ async def run_action(
         session.expunge_all()
         await session.rollback()
 
-        async def read(request: httpx.Request | plugin_data.Answered) -> None:
+        async def read(request: httpx2.Request | plugin_data.Answered) -> None:
             await plugin_data._read_body(request, transport=transport)
 
         await plugin_data._call_plugin(

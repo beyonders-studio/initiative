@@ -17,19 +17,18 @@ grant. These tests state what that grant is and what it permits:
   account's own passkeys.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
-
-from app.services.auth import sign_in_locks
-from app.services.auth import totp as totp_service
 
 from app.core import auth_context
 from app.core.login_methods import SecondFactorRequirement
-from app.models.platform.guild import Guild, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild
 from app.models.platform.user import UserRole
+from app.services.auth import sign_in_locks
+from app.services.auth import totp as totp_service
 from app.services.platform import access_grants as access_grants_service
 from app.services.platform import rules
 from app.testing import (
@@ -278,7 +277,7 @@ def _next_code(secret: str) -> str:
     """
     import pyotp
 
-    at = datetime.now(timezone.utc) + timedelta(seconds=totp_service.TOTP_PERIOD)
+    at = datetime.now(UTC) + timedelta(seconds=totp_service.TOTP_PERIOD)
     return pyotp.TOTP(secret).at(at)
 
 

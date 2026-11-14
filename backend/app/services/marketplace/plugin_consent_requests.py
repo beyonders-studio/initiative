@@ -13,21 +13,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import select
 
 from app.db import cohorts
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import GuildMembership
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserStatus
-from app.models.tenant.plugin_member_consent import ConsentAccess, ConsentStatus
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.plugin_member_consent import ConsentAccess, ConsentStatus
 from app.services.platform import notice_outbox
 from app.services.tenant import plugin_member_consents
-from app.db.request_context import SystemGuild, Unattributed
 
 __all__ = [
     "ConsentMemberNotInInitiative",
@@ -51,11 +50,11 @@ class ConsentRequestLimited(Exception):
 class RecordedRequest:
     """The request as it stands, and whether this call made it."""
 
-    purpose: Optional[str]
+    purpose: str | None
     label: str
-    initiative_id: Optional[int]
+    initiative_id: int | None
     requested_access: ConsentAccess
-    granted_access: Optional[ConsentAccess]
+    granted_access: ConsentAccess | None
     status: ConsentStatus
     requested_at: datetime
     created: bool
@@ -72,12 +71,12 @@ async def record_request(
     guild_id: int,
     install_id: int,
     user_id: int,
-    purpose: Optional[str],
+    purpose: str | None,
     label: str,
-    initiative_id: Optional[int],
+    initiative_id: int | None,
     access: ConsentAccess,
     may_create: bool = True,
-) -> Optional[RecordedRequest]:
+) -> RecordedRequest | None:
     """Record the request, or find the one already made, and notify the member
     the first time.
 

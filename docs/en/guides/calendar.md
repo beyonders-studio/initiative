@@ -4,132 +4,227 @@ icon: lucide/calendar-days
 
 # Calendar & events
 
-The calendar is for things that happen at a time: meetings, rehearsals, deadlines, shifts, performances, and the AGM that nobody wants to attend but everybody has to.
+The calendar is for things that happen at a time: practices, rehearsals, shifts, the game, and the annual meeting nobody wants to attend but everybody has to.
 
-Tasks have dates too, and they turn up on your [personal calendar](your-space.md#my-calendar) alongside events. The difference: a task is something *you do*, an event is something *you turn up to*. Some weeks the second category is more restful.
+Tasks have dates too, and they show on the calendar beside events. The difference is that a task is something you do and an event is something you show up to, which some weeks is the more restful of the two.
 
-## Creating an event
+An initiative can hold several calendars (games, practices, the snack schedule), and each has its own color and its own sharing. Events live in a calendar and take its color.
 
-On an initiative's **Calendar**, click a slot and **Create Event** opens. On a phone, the **+** at the bottom of the screen opens it too. You can set:
+## Turn on the calendar
 
-| | |
-|---|---|
-| **Title** | What it is. |
-| **Description** | The detail — agenda, what to bring, where to park. |
-| **Location** | A place, or a link for anything online. |
-| **Start and end** | Or tick **all day** and skip the times. |
-| **Color** | So rehearsals and meetings are distinguishable at a glance. |
-| **Attendees** | The people invited. |
-| **Repeat** | If it happens more than once. See [Repeating events](#repeating-events). |
+The calendar is off in a new initiative. An initiative manager switches it on:
 
-![The initiative calendar with events](../images/tools/calendar.png)
+1. Open **Initiative settings**.
+2. On the **Details** tab, find **Tools**.
+3. Turn on **Calendar**.
 
-The calendar's event page can [require fields](layouts.md#required-fields), a location say, for every event in the initiative. **Create Event** waits until they're filled, and an older event without one shows the gap.
+A **Calendar** tab appears in the initiative. Turning it off later hides it without deleting anything.
 
-To make another one like an event you already have, open it and use **Duplicate** under its title. The copy invites the same people afresh. On a repeating event opened at one of its dates, Initiative asks whether you mean that date, which becomes an event of its own, or the whole series, which brings the dates you changed on their own with it.
+## Make a calendar
 
-## Repeating events
+Making one takes a role in the initiative that can create calendars. If you don't see **New Calendar**, ask an initiative manager.
 
-Pick **Repeat** and choose daily, every weekday, weekly, monthly or annually. **Custom…** covers the awkward ones: the second Tuesday, the last Friday, the first weekday of the month, the 1st and the 15th.
+1. Open the initiative's **Calendar** tab.
+2. Select the title at the top (it says **All calendars** or a calendar's name).
+3. Select **New Calendar**.
+4. Type a **Calendar name**, and a description if you like.
+5. Pick a **Color**.
+6. Optional: open **Advanced options** to choose who can see it.
+7. Select **New Calendar**.
 
-The form lists the next few dates underneath, so you can check it means what you meant before twelve people turn up on the wrong Tuesday. **Ends** stops it on a date, after a number of times, or never.
+## Add an event
+
+Adding an event takes edit access to a calendar. If you can see a calendar but can't add to it, ask whoever owns it.
+
+1. Open the initiative's **Calendar** tab.
+2. Click the day or time slot it happens in, or select **Create Event**. On a phone, the **+** at the bottom does the same.
+3. If there's more than one calendar, pick the **Calendar**.
+4. Type a **Title**.
+5. Set the **Start** and **End**, with their times, or tick **All day**.
+6. Fill in whatever else you need: **Location** (a place or a link for anything online), **Description**, **Repeat**, **Attendees** and tags.
+7. Select **Create Event**.
+
+You're added as an attendee, and anyone else you added is invited (see [Invite people](#invite-people-to-an-event)). The initiative can [require](layouts.md#required-fields) some fields of every event, a location say; then **Create Event** waits until they're filled.
+
+To change an event later, open it and change any field on its page. Each saves as you go. To delete one, open it, select **More actions** (the **⋯**) › **Delete Event**, and confirm. It goes to the trash, and attendees who hadn't declined hear that it's canceled.
+
+![An initiative's calendar in Month view, with its events and dated tasks](../images/tools/calendar.webp#only-light)
+![An initiative's calendar in Month view, with its events and dated tasks](../images/tools/calendar.dark.webp#only-dark)
+
+## Make an event repeat
+
+1. Open the event, or start a new one.
+2. Under **Repeat**, pick **Daily**, **Every weekday (Mon–Fri)**, weekly, monthly or annually on that date, or **Custom…**.
+3. For **Custom…**, set the **Frequency**, how often (**Repeat every**), which days, and when it **Ends**: **Never**, **On date**, or **After number of occurrences**.
+4. On an event that already exists, select **Save**.
+
+**Custom…** covers the awkward ones: the second Tuesday, the last Friday, the first weekday of the month, the 1st and the 15th. The form lists the next few dates under **Next:**, so you can check it means what you meant before twelve people show up on the wrong Tuesday.
 
 Every date shows on the calendar, and every date sends its own reminder.
 
-### Changing one date
+## Change or delete one date of a repeating event
 
-Move, rename, re-invite or delete a repeating event — on its own page, or by dragging it on the calendar — and Initiative asks which dates you mean:
+Change, move or delete a repeating event, on its page or by dragging it on the calendar, and Initiative asks which dates you mean:
 
-| | |
+| Choice | What changes |
 |---|---|
-| **Just this event** | This date changes. The rest carry on as they were. |
-| **Events after this point** | This date and everything after it. The earlier ones stay as they happened. |
-| **All events in the series** | The lot. |
+| **Just this event** | This date only. The rest carry on as they were. |
+| **Events after this point** | This date and everything after it. Earlier ones stay as they happened. |
+| **All events in the series** | Every date. |
 
-A few more things live on a repeating event:
+Pick one and select **Save** (or **Delete**).
 
-- **Skipped dates.** Deleting just one date skips it. The event's page lists every **Skipped date** with **Restore** beside it, for when the cancelled rehearsal turns out to be happening after all.
-- **Extra dates.** **Add a date** puts in a one-off, like the bonus session the week before the show.
-- **Make this its own event** lifts one date out of the series entirely. It keeps everything it had, and the series skips that date.
+A date changed on its own says "One occurrence of a repeating event." at the top, with **Open the series** to get back to the rest. To change one date in several ways, open it from the calendar and select **Change just this occurrence** under **Repeat**.
 
-A date changed on its own says so at the top, with **Open the series** to get back to the rest.
+## Skip a date, bring it back, or add one
 
-## RSVPs
+Open the series (the event itself, not one of its dates):
 
-Invited people answer **Accepted**, **Declined**, **Tentative**, or leave it sitting at **Pending**. You get to see who's actually coming, which is the entire reason anybody sends an invitation in the first place.
+- To skip a date, open it from the calendar, select **More actions** › **Delete Event** and pick **Just this event**. The series lists it under **Skipped dates**, with **Restore** beside it, for when the canceled practice turns out to be happening after all.
+- **Add a date** puts in a one-off, like the bonus practice the week before the big game. Pick the date and time and select **Add a date**. It's listed under **Extra dates**.
 
-Pending isn't a rude answer, incidentally. It's the default, and it nearly always means "haven't opened it yet" rather than "am refusing to engage".
+## Take one date out of the series
 
-On a repeating event, each date gets its own answer. Accepting one Tuesday is not accepting every Tuesday until the end of time.
+To lift one date out entirely, so it becomes an ordinary event with everything it had:
 
-Anyone who can see an event can RSVP to it, and answering adds them to the attendees. For a guest list rather than an open door, turn off **Anyone who can see it may RSVP** on the event's page: then only the people you added can answer. A repeating event's dates all follow the series.
+1. Open the date from the calendar.
+2. Open **More actions** (the **⋯**).
+3. Select **Make this its own event**.
 
-## Reminders
+The series skips that date from then on.
 
-Each person sets their **own** reminder on an event: at the start, or a chosen number of minutes, hours or days beforehand.
+## Move an event by dragging
 
-Yours doesn't affect anybody else's — so the person who needs an hour's warning and the person who needs three days and a follow-up can both be accommodated without negotiating.
+Drag an event to another day in the **Month** or **Week** view, or to another time in the **Day** view. It keeps its length. A repeating event asks which dates you mean. Dated tasks drag the same way.
 
-Reminders run on **your timezone**, which Initiative guesses from your browser when you sign up and usually gets right.
+## Duplicate an event
 
-If your reminders are arriving at genuinely baffling hours, this is the thing to check: **My Settings → Preferences**.
+1. Open the event.
+2. Open **More actions** (the **⋯**).
+3. Select **Duplicate**.
 
-## Views, importing and exporting
+The copy invites the same people afresh. On a repeating event opened at one of its dates, Initiative asks whether you mean that date, which becomes an event of its own, or the whole series, which brings along the dates you changed on their own.
 
-See your events by **day, week, month, year, or as a list**.
+## Invite people to an event
 
-The page's title picks which calendars to show. It reads **All calendars**, a count, or the one calendar's name, so you can tell at a glance when something's switched off. That choice is yours alone — hiding the five-a-side fixtures does not hide them from the people actually playing five-a-side.
+Inviting takes edit access to the event.
 
-Dated tasks from the initiative's projects show up too. **Project tasks**, under **Filters**, turns them off, and the same panel narrows them by status and priority.
+1. Open the event.
+2. Under **Attendees**, select **Add attendee**.
+3. Pick the people.
 
-Events **import and export as standard `.ics` files**, which every other calendar app on earth speaks.
+Each person gets an invitation in the bell, and by email or push if they've left those on (**Assigned to you** in their [notification settings](notifications.md#choose-what-you-hear-about)). Attendees also hear when the event changes or is canceled, unless they declined.
 
-| To export | Where | Who |
-|---|---|---|
-| The events you can see | **Export · iCalendar (.ics)** in the page's **More actions** menu, beside **Import .ics**: every date of the calendars on screen, in one file | Anyone who can see them |
-| A whole calendar | That calendar's **Settings → Advanced**, which also offers a file Initiative can import back | Whoever could also delete it |
+## Answer an invitation
 
-So you can pull a whole season's fixtures in at once, or push the rehearsal schedule straight into everyone's phone calendar — including the members who will never, under any circumstances, open Initiative.
+1. Open the event.
+2. Under **RSVP**, pick **Accepted**, **Tentative** or **Declined**.
 
-Repeats go both ways too, with their skipped dates and any date changed on its own.
+Everyone starts at **Pending**, which nearly always means "haven't opened it yet" rather than "refusing to engage". On a repeating event, each date gets its own answer: accepting one Tuesday isn't accepting every Tuesday until the end of time. People following the event hear about answers.
 
-### Subscribing from another calendar app
+## Let only invited people answer
 
-A file is a snapshot. A **subscription** keeps itself up to date. **Subscribe**, in the same **More actions** menu, gives each calendar its own link for Google Calendar, Apple Calendar or Outlook, so it stays a separate calendar there. **Get link**, then **Copy link** or **Open in calendar app**.
+Anyone who can see an event can answer it, and answering adds them to the attendees. For a guest list rather than an open door:
 
-- **The link is yours.** It shows that calendar's events as you see them, and every refresh checks you still can.
-- **It arrives with a proper name**: the calendar's, then its initiative's (or the community's), in the time zone from your [Preferences](../account/index.md). Some calendar apps only read the name when you subscribe, so a rename here may not reach them.
-- **Keep it to yourself.** Anyone holding it can read that calendar. It's shown once; getting a new one stops the old one working.
-- **It's a personal [API key](../account/api-keys-and-integrations.md) underneath**, good for that one calendar's feed and nothing else. Delete it under **My Settings → Security**. Events the other app already copied stay there.
+1. Open the event.
+2. Turn off **Anyone who can see it may RSVP**.
 
-No **Subscribe** in the menu? The community has switched off your [API access](../security/community-security.md#api-access), or the initiative keeps its content in.
+Then only the attendees you added can answer. The dates of a repeating event all follow the series.
+
+## Get reminded before an event
+
+Reminders go to everyone attending an event who hasn't declined, at a lead time each person picks once for all their events. It starts at 15 minutes.
+
+1. Open **My Settings**.
+2. Select **Notifications**.
+3. In the **Assigned to you** row, set **Remind me**: **At the time of the event**, 5, 10, 15 or 30 minutes, 1 hour, or 1 day before.
+
+So the person who needs a day's warning and the person who needs five minutes can both be happy without negotiating. The switches in that same row turn reminders (and invitations) on or off for each channel. See [Notifications](notifications.md#choose-what-you-hear-about).
+
+## Choose which calendars you see
+
+1. Select the title at the top of the **Calendar** tab.
+2. Tick the calendars to show, or **All calendars**.
+
+The title reads **All calendars**, a count, or the one calendar's name, so you can tell at a glance when something's switched off. The choice is yours alone: hiding the soccer games doesn't hide them from the people playing soccer.
+
+The gear beside each calendar in that list opens its settings.
+
+## Switch views and filter
+
+Pick **Day**, **Week**, **Month**, **Year** or **List** beside the title. **Today** jumps back to now.
+
+**Filters** narrows what's shown:
+
+- **Tasks** turns dated tasks from the initiative's projects on or off, and **Project tasks** picks which projects' tasks show.
+- **Dates** limits the range.
+- Status, priority and metadata filters narrow the tasks and events further.
+- Presets, when the initiative's calendar layout offers any, apply a saved set of filters in one go.
+
+[My Calendar](your-space.md#my-calendar) gathers events and dated tasks from every community you're in, on one screen. If you belong to three groups that each believe their thing is the only thing happening in your week, that's the page that settles it.
+
+## Import events from a .ics file
+
+Pull a whole season's games in at once from any calendar app that exports `.ics` files (most do).
+
+1. Open the initiative's **Calendar** tab.
+2. Open **More actions** (the **⋯**).
+3. Select **Import .ics**.
+4. Select **Choose .ics file** and pick it.
+5. Pick the calendar to put the events in.
+6. Check the count, then select **Import Events**.
+
+Repeating events come in repeating, with their skipped dates and any date changed on its own. If an event can't be imported (one with no start date, say), the dialog names it.
+
+## Export events to a .ics file
+
+To push the schedule into everyone's phone calendar, including the members who will never under any circumstances open Initiative:
+
+1. Open the **Calendar** tab.
+2. Open **More actions** (the **⋯**).
+3. Select **Export · iCalendar (.ics)**.
+
+You get every date of the calendars on screen, in one file, and anyone who can see them can do this. To export one whole calendar as a `.ics` file or an **Importable file (.json)**, open its settings (the gear beside it under the title), select the **Advanced** tab, and use **Export**; that's for whoever can also delete the calendar.
+
+An initiative with **Keep content in this initiative** switched on doesn't export at all.
+
+## Subscribe from another calendar app
+
+A file is a snapshot. A subscription keeps itself up to date in Google Calendar, Apple Calendar or Outlook, as a separate calendar there.
+
+1. Open the **Calendar** tab.
+2. Open **More actions** (the **⋯**).
+3. Select **Subscribe**.
+4. Beside the calendar you want, select **Get link**.
+5. Select **Copy link** and paste it into your calendar app, or select **Open in calendar app**.
+
+- **The link is yours.** It shows that calendar's events as you see them, and every refresh checks you still can. It arrives named after the calendar and its initiative.
+- **Keep it to yourself.** Anyone holding it can read that calendar. **Get a new link** stops the old one working.
+- **It's a personal [API key](../account/api-keys-and-integrations.md) underneath**, good for that one calendar's feed and nothing else. Remove it under **My Settings** › **Security**. Events the other app already copied stay there.
+
+No **Subscribe** in the menu? Your community has switched off [API access](../security/community-security.md#api-access), or the initiative keeps its content in.
 
 ??? techspec "Repeats in files and the API"
     A repeat is an RFC 5545 rule (`RRULE`, with `EXDATE` for skipped dates and `RDATE` for extra ones), kept in UTC. In an `.ics` file, a date changed on its own is a second `VEVENT` with the series' `UID` and a `RECURRENCE-ID`. Over the API, `PATCH` and `DELETE` on a repeating event take `scope` (`this`, `following`, `all`) and the `occurrence` they start from.
 
-!!! tip "The one calendar that knows everything"
-    [My Calendar](your-space.md#my-calendar) gathers events *and* dated tasks from every community you're in, on one screen.
-
-    If you belong to three groups that each quietly believe their thing is the only thing happening in your week, this is the page that settles the argument.
-
 ## Calendars for the whole community
 
-Some things belong to everybody rather than to one effort: bank holidays, the monthly social, game nights, the fortnight when the office is shut and nobody can find out why.
+Some things belong to everybody rather than one initiative: holidays, the monthly potluck, game nights, the two weeks the office is closed and nobody can find out why.
 
-Those go in the **Community calendar** plug-in, which a community admin adds from the [marketplace](plugins-and-marketplace.md). It shows up in the sidebar's Plug-ins section and opens on every calendar the community shares, overlaid in one view.
+Those go in the **Community calendar** plug-in, which a community admin adds from the [marketplace](plugins-and-marketplace.md). It shows up in the sidebar's **Plug-ins** section, opens on every calendar the community shares, and arrives with one calendar.
 
-It arrives with one calendar, and community calendars belong to the admins: only an admin sees **New Calendar** there. One for holidays, one for socials, one per team, as many as the community needs. A new one starts readable by *everyone in the community*, and members add events to the calendars shared with them. So a community calendar is a way to post a schedule that everybody follows and nobody can accidentally edit.
+- **New Calendar** there is for community admins, and anyone given the **Community calendars** job in a [custom role](communities.md). One for holidays, one for socials, one per team, as many as you need.
+- Who can add events depends on each calendar's **Access**, so a community calendar can be a schedule everybody reads and only a few can change.
+- Pick which you see from the title, the same as anywhere else.
 
-Pick which ones you see from the title, the same as anywhere else.
+Community calendars hold the community's own events and no tasks. Removing the plug-in sends all its calendars to the trash together, where they can be recovered.
 
-Community calendars hold the community's own events and nothing else — no tasks, no project work. Removing the plug-in sends all of its calendars to the trash together, where they can be recovered.
+## Share a calendar, or change its color
 
-## Sharing and comments
+Open the calendar's settings from the gear beside it under the title.
 
-Calendars share like every other tool: **Viewer**, **Editor**, **Owner**, or open to the whole initiative, with bulk editing from the list view. Each calendar has its own comment thread, switchable off under **Settings → Details**.
+- **Details** holds its name, description, **Color**, tags, metadata and the **Comments** switch.
+- **Access** sets who can view, add events, or own it: **Viewer**, **Editor**, **Owner**, or everyone in the initiative. See [Sharing projects & files](../sharing/sharing-projects-and-files.md).
+- **Advanced** has **Export**, **Archive** and **Delete**.
 
-## Related
-
-- [Your space](your-space.md#my-calendar) — everything you're expected at, in one place.
-- [Notifications](notifications.md) — event invites and reminders.
-- [Plug-ins & the marketplace](plugins-and-marketplace.md) — where the community calendar comes from.
+Events follow their calendar's sharing.

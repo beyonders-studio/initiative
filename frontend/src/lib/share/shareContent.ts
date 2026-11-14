@@ -8,10 +8,10 @@ import {
   type SerializedEditorState,
 } from "lexical";
 
-import { $createImageNode, ImageNode } from "@/components/ui/editor/nodes/image-node";
 import { imageMarkdown } from "@/lib/markdownEditing";
 import { RESERVED_SIGILS } from "@/lib/mentions";
 import type { ReceivedShare } from "@/lib/share/pendingShare";
+import { $createImageNode, ImageNode } from "@/ui/editor/nodes/image-node";
 
 /** The backend's `MAX_TITLE_LENGTH`: the most a name or title may hold. */
 const MAX_TITLE_LENGTH = 255;

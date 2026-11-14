@@ -30,7 +30,7 @@ import re
 import time
 from dataclasses import dataclass
 
-import httpx
+import httpx2
 from cryptography.fernet import InvalidToken
 from sqlalchemy import update
 from sqlmodel import select
@@ -87,7 +87,7 @@ def is_handle(push_token: str) -> bool:
     return _HANDLE.fullmatch(push_token) is not None
 
 
-async def current_server_id(client: httpx.AsyncClient) -> str | None:
+async def current_server_id(client: httpx2.AsyncClient) -> str | None:
     """This server's relay id, registering first if it has none; the app asks
     the relay for a handle under it. None while registering fails."""
     held = await credentials(client)
@@ -111,7 +111,7 @@ SERVER_NAME = "Initiative server"
 async def _load_stored() -> tuple[str, str] | None:
     """The stored credential, or None. One that no longer decrypts under
     ``SECRET_KEY`` is cleared, so the next registration can replace it."""
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async with db_session.SystemSessionLocal() as system_session:
         row = (
@@ -136,8 +136,8 @@ async def _load_stored() -> tuple[str, str] | None:
 async def _store(server_id: str, key: str) -> tuple[str, str] | None:
     """Keep a new registration unless another process already kept one, and
     answer whichever is stored."""
-    from app.db import session as db_session  # noqa: PLC0415
-    from app.services.platform.app_settings import (  # noqa: PLC0415
+    from app.db import session as db_session
+    from app.services.platform.app_settings import (
         _ensure_secrets_row,
     )
 
@@ -159,7 +159,7 @@ async def _store(server_id: str, key: str) -> tuple[str, str] | None:
 
 async def _clear_stored(server_id: str) -> None:
     """Clear the stored credential, if it is still this one."""
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async with db_session.SystemSessionLocal() as system_session:
         await system_session.exec(
@@ -170,12 +170,12 @@ async def _clear_stored(server_id: str) -> None:
         await system_session.commit()
 
 
-async def _register(client: httpx.AsyncClient) -> tuple[str, str] | None:
+async def _register(client: httpx2.AsyncClient) -> tuple[str, str] | None:
     try:
         response = await client.post(
             f"{PUSH_RELAY_URL}/v1/servers", json={"name": SERVER_NAME}
         )
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         logger.warning("push relay: could not register: %s", exc)
         return None
     if response.status_code != 201:
@@ -188,7 +188,7 @@ async def _register(client: httpx.AsyncClient) -> tuple[str, str] | None:
     try:
         body = response.json()
         server_id, key = body["server_id"], body["server_key"]
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         logger.error("push relay: registration answered without a credential")
         return None
     if not (
@@ -203,7 +203,7 @@ async def _register(client: httpx.AsyncClient) -> tuple[str, str] | None:
     return server_id, key
 
 
-async def credentials(client: httpx.AsyncClient) -> tuple[str, str] | None:
+async def credentials(client: httpx2.AsyncClient) -> tuple[str, str] | None:
     """This server's relay id and key, registering first if it has none.
 
     None when there is no credential and registering failed; a later call
@@ -250,7 +250,7 @@ async def forget(server_id: str) -> None:
     logger.warning("push relay: %s is no longer accepted; registering again", server_id)
 
 
-async def android_config(client: httpx.AsyncClient) -> AndroidConfig | None:
+async def android_config(client: httpx2.AsyncClient) -> AndroidConfig | None:
     """The relay's Android Firebase settings, or None if it could not say."""
     global _android
     now = time.monotonic()
@@ -269,7 +269,7 @@ async def android_config(client: httpx.AsyncClient) -> AndroidConfig | None:
         return config
 
 
-async def _fetch_android_config(client: httpx.AsyncClient) -> AndroidConfig | None:
+async def _fetch_android_config(client: httpx2.AsyncClient) -> AndroidConfig | None:
     held = await credentials(client)
     if held is None:
         return None
@@ -279,7 +279,7 @@ async def _fetch_android_config(client: httpx.AsyncClient) -> AndroidConfig | No
             f"{PUSH_RELAY_URL}/v1/android-config",
             headers={"Authorization": authorization(server_id, key)},
         )
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         logger.warning("push relay: could not read the Android settings: %s", exc)
         return None
     if response.status_code == 401:
@@ -300,7 +300,7 @@ async def _fetch_android_config(client: httpx.AsyncClient) -> AndroidConfig | No
             api_key=str(body["api_key"]),
             sender_id=str(body["sender_id"]),
         )
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         logger.error("push relay: the Android settings were not readable")
         return None
 

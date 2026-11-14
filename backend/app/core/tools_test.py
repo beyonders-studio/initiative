@@ -13,6 +13,7 @@ The plain ``set(registry) == set(enum)`` rows live together in
 """
 
 import pytest
+from fastapi.routing import iter_route_contexts
 
 from app.core.tools import Tool
 
@@ -104,7 +105,7 @@ def test_every_tool_is_commentable():
     # its CommentTarget — or an extra that forgets its column — fails here.
     from sqlalchemy import inspect as sa_inspect
 
-    from app.core.tools import COMMENTABLE_EXTRAS, COMMENT_TARGETS, KINDS
+    from app.core.tools import COMMENT_TARGETS, COMMENTABLE_EXTRAS, KINDS
     from app.db.initiative_rls import _COMMENT_PARENTS
     from app.models.tenant.comment import Comment
     from app.schemas.tenant.comment import COMMENT_TARGET_FIELDS
@@ -193,7 +194,7 @@ def test_every_tool_carries_the_comment_switch():
         columns = {c.name for c in sa_inspect(target.model).persist_selectable.columns}
         assert "comments_enabled" in columns, tool
 
-    routes = {getattr(route, "path", "") for route in app.routes}
+    routes = {getattr(route, "path", "") for route in iter_route_contexts(app.routes)}
     assert any(path.endswith("/tools/{tool}/{tool_id}/comments") for path in routes)
 
 

@@ -15,33 +15,34 @@ make it usable in production:
 * **The kill switch outranks the flag**, and clearing the flag deletes nothing.
 """
 
+from datetime import UTC
+from typing import Any, ClassVar
+
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.platform.intake_setup import set_operations_guild
-from app.services.tenant.initiatives import get_moderator_role
 from app.services.tenant import mandatory_plugins
 from app.services.tenant.mandatory_plugins import backfill_mandatory_plugins
 from app.testing import (
-    create_plugin_service_registration,
     create_guild,
-    create_guild_plugin,
     create_guild_membership,
+    create_guild_plugin,
     create_initiative,
     create_marketplace_listing,
+    create_plugin_service_registration,
     create_user,
     get_auth_headers,
     marketplace_uid,
     route_session_to_guild,
 )
-from app.db.request_context import SystemGuild
-
 
 PROVIDED_ID = "platform.provided"
 PROVIDED_UID = marketplace_uid("provided")
@@ -199,7 +200,7 @@ class TestBackfill:
         its data, and the sweep comes round before the plug-in has answered. An
         install now would be handed the names the erase is about to drop, so
         the guild is skipped and gets it on a pass after the erase is done."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from sqlalchemy import update
 
@@ -226,7 +227,7 @@ class TestBackfill:
         await session.exec(
             update(PluginCommunityHook)
             .where(PluginCommunityHook.guild_id == guild_id)
-            .values(done_at=datetime.now(timezone.utc), outcome="delivered")
+            .values(done_at=datetime.now(UTC), outcome="delivered")
         )
         await session.commit()
 
@@ -382,10 +383,7 @@ class TestPlacement:
                 select(PluginPlacement).where(PluginPlacement.install_id == plugin.id)
             )
         ).all()
-        placed = {row.initiative_id: list(row.role_ids) for row in rows}
-        role = await get_moderator_role(session, initiative_id=before.id)
-        assert role is not None
-        assert placed == {before.id: [role.id]}
+        assert {row.initiative_id for row in rows} == {before.id}
 
     async def test_an_install_already_there_is_left_as_the_seat_set_it(
         self, session: AsyncSession, mandatory_registration
@@ -483,7 +481,7 @@ class TestScopesOnAnInstallAlreadyThere:
 
     PUBLIC_ID = "platform.scoped-later"
     UID = marketplace_uid("scopedlater")
-    DEFINITION = {
+    DEFINITION: ClassVar[dict[str, Any]] = {
         "plugin_kind": "service",
         "service": {
             "public_id": "platform.scoped-later",

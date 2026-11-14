@@ -5,9 +5,9 @@ session proved with a passkey, and cancelled by the sweep where the account no
 longer allows it by the time it is due.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.account_change_hold import AccountChangeHold, HeldChangeKind
@@ -59,7 +59,7 @@ async def test_the_waiting_change_is_read_and_cancelled(
     assert again.json()["detail"] == "HELD_CHANGE_NOT_FOUND"
     assert (await client.get(HELD, headers=headers)).json() is None
 
-    due = datetime.now(timezone.utc) + held_changes.HOLD_FOR
+    due = datetime.now(UTC) + held_changes.HOLD_FOR
     assert await held_changes.apply_due(session, now=due) == 0
     assert (
         await addresses.primary_address(session, user_id=user.id)
@@ -114,7 +114,7 @@ async def test_a_change_the_account_no_longer_allows_is_cancelled_when_due(
     await addresses.set_primary_for_user(session, user_id=user_id, address_id=spare.id)
     await session.commit()
 
-    due = datetime.now(timezone.utc) + held_changes.HOLD_FOR
+    due = datetime.now(UTC) + held_changes.HOLD_FOR
     assert await held_changes.apply_due(session, now=due) == 0
     assert await held_changes.pending_for_user(session, user_id=user_id) is None
     assert await addresses.primary_address(session, user_id=user_id) == (

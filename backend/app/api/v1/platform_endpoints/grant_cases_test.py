@@ -3,10 +3,10 @@ what the case is told, what a grant did, and the case's list of grants."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,12 +21,12 @@ from app.models.platform.user import User
 from app.models.tenant.case_grant import CaseGrant
 from app.models.tenant.comment import Comment
 from app.models.tenant.intake import IntakeBinding
+from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import grant_cases
 from app.services.platform.intake import CaseRefs, open_case
-from app.services.tenant.soft_delete import hard_purge_entity
 from app.services.tenant import task_statuses as task_statuses_service
-from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.services.tenant.soft_delete import hard_purge_entity
 from app.testing import (
     Actor,
     create_access_grant,
@@ -290,7 +290,7 @@ async def test_the_case_lists_its_grants(
 
 
 async def _live_grant(session: AsyncSession, *, user, guild, case: int, ago, **extra):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return await create_access_grant(
         session,
         user=user,
@@ -346,7 +346,7 @@ async def test_a_live_grant_reports_hourly_and_an_ended_one_in_full(
         ago=timedelta(minutes=90),
     )
     grant_id = grant.id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for minutes, method, target_type in (
         (60, "GET", "task"),
         (50, "GET", "task"),
@@ -391,7 +391,7 @@ async def test_a_live_grant_reports_hourly_and_an_ended_one_in_full(
 
 
 def test_a_digest_lists_only_so_many_changes():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     shown = [
         AccessGrantActivity(
             grant_id=1,
@@ -738,7 +738,7 @@ async def test_a_grant_whose_case_is_gone_is_closed_out_untold(
     # served.
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
     trashed = (await session.exec(select(Task).where(Task.id == task_id))).one()
-    trashed.deleted_at = datetime.now(timezone.utc)
+    trashed.deleted_at = datetime.now(UTC)
     session.add(trashed)
     await session.commit()
     await set_rls_context(session, Unattributed())
@@ -859,7 +859,7 @@ async def test_a_security_case_may_tell_the_community_once_access_ends(
     assert await _letters(session, seat_id) == []
 
     # Both halves of the pair serve the case, and have since ended.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grants = (
         await session.exec(
             select(AccessGrant).where(AccessGrant.user_id == broke.json()["user_id"])

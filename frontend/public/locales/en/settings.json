@@ -11,7 +11,19 @@
       "privacy": "Privacy"
     },
     "loginRequired": "You need to be logged in to manage your profile.",
-    "goToLogin": "Go to login"
+    "goToLogin": "Go to login",
+    "version": "Initiative v{{version}}"
+  },
+  "settingsSection": {
+    "whenYouSave": "When you save",
+    "change": "Change",
+    "changeRule": "Change {{rule}}",
+    "on": "On",
+    "off": "Off",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours"
   },
   "communityLayout": {
     "title": "Community settings",
@@ -72,8 +84,6 @@
   "addresses": {
     "title": "Email addresses",
     "description": "Any confirmed address signs you in, and account mail reaches all of them.",
-    "loadFailed": "Your addresses could not be loaded.",
-    "retry": "Try again",
     "primary": "Primary",
     "unverified": "Unconfirmed",
     "makePrimary": "Make primary",
@@ -117,10 +127,7 @@
     "waits": "This change waits until {{date}}. Every address on your account has been emailed about it."
   },
   "security": {
-    "loadingDevices": "Loading devices…",
-    "devicesError": "Unable to load devices.",
     "unknownDevice": "Unknown device",
-    "revokeDialogCancel": "Cancel",
     "revoking": "Revoking…",
     "revokeError": "Unable to revoke device access",
     "newKeyTitle": "New API key",
@@ -143,8 +150,6 @@
     "nameRequired": "Name is required",
     "createSuccess": "API key created",
     "createError": "Unable to create API key",
-    "loadingKeys": "Loading API keys…",
-    "keysError": "Unable to load API keys.",
     "noKeys": "No API keys yet.",
     "statusExpired": "Expired",
     "statusDisabled": "Disabled",
@@ -193,10 +198,6 @@
     "deleteDialogDescription": "Anything that uses {{name}} stops working straight away."
   },
   "ai": {
-    "loading": "Loading AI settings…",
-    "loadError": "Unable to load AI settings.",
-    "enabled": "Enabled",
-    "disabled": "Disabled",
     "providerFieldLabel": "Provider",
     "providerPlaceholder": "Select a provider",
     "modelLabel": "Model",
@@ -211,16 +212,9 @@
   "communityAI": {
     "title": "Community AI",
     "adminOnly": "Only community admins can manage AI connections.",
-    "connectionsTitle": "Community connections",
-    "connectionsDescription": "Define the AI connections members of this community can use.",
     "disabledDescription": "AI features are turned off for the platform.",
-    "managedByPlatform": "AI connections are managed at the platform level. Members set their own key in their profile settings.",
-    "managedByServer": "Whoever runs this server manages AI for this community.",
-    "switchTitle": "AI in this community",
-    "switchLabel": "Allow AI features",
-    "switchHelp": "Off, nothing in this community is sent to an AI provider, whichever connection the server or the community sets up.",
-    "switchSaved": "AI setting saved",
-    "switchError": "Couldn't save the AI setting."
+    "managedByPlatform": "AI connections are managed at the platform level.",
+    "managedByServer": "Whoever runs this server manages AI for this community."
   },
   "platformAI": {
     "title": "Platform AI",
@@ -236,9 +230,7 @@
     "saveMode": "Save",
     "savingMode": "Saving…",
     "modeSaved": "AI settings updated",
-    "modeSaveError": "Unable to update AI settings",
-    "connectionsTitle": "Platform connections",
-    "connectionsDescription": "Define the AI connections every community uses."
+    "modeSaveError": "Unable to update AI settings"
   },
   "marketplaceRegistry": {
     "title": "Marketplace registry",
@@ -276,6 +268,11 @@
   },
   "interface": {
     "colorTheme": "Color theme",
+    "mode": "Light or dark",
+    "eventThemes": {
+      "label": "Event themes",
+      "description": "Dress the app up for holidays and events."
+    },
     "colorThemeDescription": "Choose a color theme for the application.",
     "weekStartsOn": "Week starts on",
     "weekStartsOnDescription": "Choose which day to show first on calendars and date pickers.",
@@ -296,13 +293,32 @@
     "updateError": "Unable to update interface preferences",
     "themeDescriptions": {
       "kobold": "The classic Initiative theme with deep indigo tones.",
-      "displacer": "Catppuccin-inspired soothing pastel theme (Latte/Macchiato).",
-      "strahd": "Dark gothic theme with purple accents (Dracula/Alucard).",
+      "catppuccin": "Soothing pastels: Latte in light mode, and Frappé, Macchiato or Mocha in dark.",
+      "dracula": "Purple accents: Alucard in light mode, Dracula in dark.",
       "unicorn": "Full-spectrum neon rainbow — loud and proud.",
       "darkKnight": "AMOLED black theme with dark red and yellow accents.",
       "orc": "Earthy green theme with vivid orc-skin green accents. ORC ORC ORC!",
-      "aboleth": "Monokai-inspired dark lair with vivid bioluminescent accent colors."
+      "monokai": "Vivid lime, cyan, purple, orange and pink accents on warm neutrals.",
+      "nord": "Arctic blues and frosty greys: Snow Storm in light mode, Polar Night in dark.",
+      "elemental": "A metallic sheen across the app, in the element you choose."
     },
+    "themeVariants": {
+      "elemental": {
+        "copper": "Copper",
+        "silver": "Silver",
+        "gold": "Gold",
+        "roseGold": "Rose gold",
+        "lapis": "Lapis",
+        "cobalt": "Cobalt",
+        "emerald": "Emerald",
+        "garnet": "Garnet",
+        "amethyst": "Amethyst",
+        "obsidian": "Obsidian"
+      }
+    },
+    "themeVariantGroup": "{{theme}} variants",
+    "useVariantForDark": "Use {{variant}} for dark mode",
+    "useVariant": "Use {{variant}}",
     "taskCompletionVisualFeedback": {
       "label": "Task completion feedback",
       "description": "A bit of fun when you finish a task you were assigned to.",
@@ -550,8 +566,6 @@
     "platformOnly": "Only the platform owner can manage branding settings.",
     "colorsTitle": "Brand colors",
     "colorsDescription": "Customize the accent colors for light and dark mode.",
-    "loadingInterface": "Loading interface settings…",
-    "interfaceError": "Unable to load interface settings.",
     "lightModeLabel": "Light mode accent",
     "lightModeHelp": "Buttons, highlights, and focus states use this color while the app is in light mode.",
     "darkModeLabel": "Dark mode accent",
@@ -626,8 +640,6 @@
   "email": {
     "platformOnly": "Only the platform owner can manage email settings.",
     "title": "SMTP email",
-    "loading": "Loading email settings…",
-    "loadError": "Unable to load email settings.",
     "hostLabel": "Host",
     "hostPlaceholder": "smtp.mailprovider.com",
     "portLabel": "Port",
@@ -655,8 +667,6 @@
   },
   "push": {
     "platformOnly": "Only the platform owner can manage push notification settings.",
-    "loading": "Loading push notification settings…",
-    "loadError": "Unable to load push notification settings.",
     "title": "Firebase Cloud Messaging",
     "description": "Optional. Without a service account key, push notifications go through BeyondersStudio's push relay and these fields can stay empty. With one, Android pushes go through your own Firebase project; iPhone pushes always use the relay.",
     "enabledLabel": "Send push notifications",
@@ -691,8 +701,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "A check that the person signing up, or asking for an emailed sign-in code, is not a bot.",
-    "on": "On",
-    "off": "Off",
     "providerLabel": "Provider",
     "providers": {
       "off": "None",
@@ -705,15 +713,12 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Leave blank to keep the saved secret key.",
     "incomplete": "The captcha comes on once a provider, a site key and a secret key are all saved.",
-    "save": "Save captcha settings",
-    "saving": "Saving…",
+    "missingKeys": "not on until its site key and secret key are saved",
     "saved": "Captcha settings saved",
     "error": "Unable to save captcha settings"
   },
   "auth": {
     "platformOnly": "Only the platform owner can manage authentication settings.",
-    "loading": "Loading auth settings…",
-    "loadError": "Unable to load auth settings.",
     "postLoginRedirect": "Post-login redirect:",
     "mobileCallback": "Mobile app callback:",
     "deploymentTitle": "This deployment",
@@ -740,7 +745,7 @@
       "communitiesRequire_one": "{{count}} community requires a sign-in through a provider of its own.",
       "communitiesRequire_other": "{{count}} communities require a sign-in through a provider of their own.",
       "totp": {
-        "label": "Enable two-factor authentication",
+        "label": "Authenticator app",
         "help": "Let people protect their account with a code from an authenticator app. Each person turns it on for themselves; this is whether the server offers it at all."
       },
       "passkey": {
@@ -753,7 +758,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "How long people stay signed in",
+      "title": "Session length",
       "description": "The longest anybody may go before signing in again, however much they use the app. Separate from being signed out for not using it.",
       "label": "Hours",
       "placeholder": "No limit",
@@ -762,21 +767,23 @@
       "error": "We couldn't save the session limit.",
       "idleLabel": "Idle minutes",
       "idlePlaceholder": "No limit",
+      "idleDetail_one": "idle sessions end after {{count}} minute",
+      "idleDetail_other": "idle sessions end after {{count}} minutes",
+      "idleDefault": "idle sessions end on the window set when the server was deployed",
       "idleHint": "How long a session may sit untouched before it ends. Leave blank to keep the window set when the server was deployed. Using the app counts as touching it, so this only runs down once somebody has stopped. A community held to the compliance standard shortens it further for its own members."
     },
     "breachedPasswordCheck": {
-      "title": "Breached passwords",
-      "description": "Turn away a new password that has already turned up in a data breach.",
-      "label": "Check new passwords against known breaches",
-      "onHelp": "Only the first five characters of the password's hash leave this server. The password itself never does.",
-      "offHelp": "New passwords are not checked. Turn this off only where this server cannot reach the internet.",
+      "title": "Breached password check",
+      "description": "Turns away a new password that has already turned up in a data breach. Only the first five characters of its hash leave this server, never the password itself.",
+      "onLabel": "Check new passwords against known breaches",
+      "offLabel": "Don't check, for a server that cannot reach the internet",
       "enabledToast": "New passwords are checked against known breaches.",
       "disabledToast": "New passwords are no longer checked against known breaches.",
       "error": "We couldn't change the breached password check."
     },
     "secondFactorRequirement": {
-      "title": "Two-factor authentication",
-      "description": "Whether people here have to hold a second factor — an authenticator app or a passkey — as well as a way to sign in.",
+      "title": "Second factor",
+      "description": "Who has to hold a second factor, an authenticator app or a passkey, as well as a way to sign in.",
       "levels": {
         "nobody": {
           "label": "Nobody has to",
@@ -798,23 +805,22 @@
       "present": "Enter a code",
       "saved": "Saved. People this covers are asked at their next request.",
       "error": "We couldn't save that.",
-      "noMethod": "Permit the authenticator app or passkeys first — with neither offered there is nothing to ask people for.",
+      "noMethod": "Offer the authenticator app or passkeys first. With neither offered, there is nothing to ask people for.",
       "providers": {
         "title": "Providers whose sign-in counts",
         "help": "A sign-in through one of these answers the requirement above, because the provider reports running a second factor of its own. The same answer as on the provider's own page."
       }
     },
     "factorMethods": {
-      "title": "Two-factor authentication",
-      "description": "What this server offers as a second factor. Whether anybody has to hold one is the next setting.",
+      "title": "Second factors offered",
+      "description": "Which second factors people can set up. Whether anybody has to hold one is the Second factor rule.",
       "saved": "Two-factor authentication updated.",
       "saveError": "Could not change two-factor authentication.",
-      "followsWaysIn": "A passkey proves the device and the person in one go, so it answers this as well as opening a session. Whether passkeys are offered is decided under Ways in."
+      "setUnderWaysIn": "Set under Ways in",
+      "none": "None"
     }
   },
   "platformUsers": {
-    "loading": "Loading users…",
-    "loadError": "Unable to load users.",
     "filterPlaceholder": "Filter by handle…",
     "columnId": "User ID",
     "columnHandle": "Handle",
@@ -849,8 +855,8 @@
     },
     "roleDescriptions": {
       "member": "Standard access to their own communities. No platform-wide privileges.",
-      "support": "Read-only platform visibility (users, communities) and can request time-bound access to a community.",
-      "moderator": "Everything Support can do, plus user management (suspend/reactivate) and content moderation.",
+      "support": "Everything Moderator can do, plus account recovery (sign-in, second factor, reactivation), and can request time-bound read or read & write access to a community.",
+      "moderator": "Sees the platform's users and communities, moderates accounts and content, suspends accounts, and can request time-bound moderation access to a community.",
       "operator": "Manages users, communities, and roles platform-wide, with cross-community data access and approves access requests.",
       "owner": "Full control, including app-wide configuration (auth, branding, email, AI). The only role that can manage configuration."
     },
@@ -937,8 +943,6 @@
         "title": "Cases",
         "count_one": "{{count}} open case they filed or that is about them.",
         "count_other": "{{count}} open cases they filed or that are about them.",
-        "loading": "Loading cases…",
-        "loadError": "Could not load their cases.",
         "filed": "Filed by them",
         "about": "About them",
         "help": "Opening a case needs access to the project it is kept in."
@@ -1019,7 +1023,7 @@
     "requestDescription": "Ask for temporary, scoped access to a community. Approvers grant it and it auto-expires.",
     "breakGlass": {
       "title": "Break glass",
-      "description": "Self-issue emergency access to a community — approved instantly, scoped to that community, and auto-expiring. Read & write acts as a full community admin. Every break-glass grant is recorded.",
+      "description": "Self-issue emergency access to a community — approved instantly, scoped to that community, and auto-expiring. It lets you edit the content already there and change the community's own settings. Every break-glass grant is recorded.",
       "reasonPlaceholder": "Why you need emergency access (e.g. incident #123)",
       "submit": "Break glass",
       "activated": "Break-glass access activated",
@@ -1068,7 +1072,6 @@
     "actionError": "Action failed",
     "expiresIn": "expires in {{minutes}}m",
     "minutes": "{{minutes}}m",
-    "loadMore": "Load more",
     "status": {
       "pending": "Pending",
       "approved": "Approved",
@@ -1120,15 +1123,12 @@
   },
   "pluginServices": {
     "platformOnly": "Only platform owners can manage plug-in services.",
-    "loading": "Loading plug-in services…",
-    "loadError": "Unable to load plug-in services.",
     "title": "Plug-in services",
     "description": "The plug-ins this deployment runs. A plug-in's listing says what it is and may do; here you give where it answers and the keys it signs with.",
     "empty": "No plug-in services yet. A plug-in appears here when its listing arrives, or once you add it.",
     "addService": "Add plug-in service",
     "edit": "Edit",
     "delete": "Delete",
-    "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving…",
     "enabledLabel": "Enabled",
@@ -1242,8 +1242,6 @@
     "title": "Community limits",
     "description": "Set per-community caps on storage and on the number of users. Lowering a limit below current usage blocks new uploads or members, but never removes existing files or members.",
     "platformOnly": "You need a platform staff role to see communities.",
-    "loading": "Loading communities…",
-    "loadError": "Could not load communities. Please try again.",
     "filterByName": "Filter communities by name",
     "unlimitedPlaceholder": "Unlimited",
     "helpText": "Storage limits are in GB; user limits are a member count. Both save automatically — leave a field blank for unlimited.",
@@ -1298,7 +1296,7 @@
       "guestsHelp": "How many guests they may have at once. 0 takes no new guests, and those already in stay until their time ends. Leave blank for no limit.",
       "storageHelp": "How much they may store, in gigabytes. Leave blank for no limit.",
       "bannerLabel": "Banner artwork",
-      "bannerHelp": "Let them upload a banner image. Without it they pick a banner colour instead, and any banner already uploaded keeps showing.",
+      "bannerHelp": "Let them upload a banner image. Without it they pick a banner color instead, and any banner already uploaded keeps showing.",
       "supportLabel": "Help requests",
       "supportHelp": "Let their members send a help request. Off, the Ask for help control opens the FAQ instead.",
       "supportNeedsIntake": "Nowhere to send a help request yet. Bind the support stream to a project under Platform settings › Intake, and this can be switched on.",
@@ -1323,7 +1321,6 @@
       "storageLabel": "Storage limit",
       "decidesForItself": "What it decides for itself",
       "deleted": "Deleted",
-      "pluginSummariesUnavailable": "Plug-in usage could not be loaded.",
       "narrowings": {
         "title": "Who it counts as its own",
         "help": "This community says which arrivals on a provider are its people. It names the values itself, so agreeing is what lets them join on arrival — until then the connection works only for the people already in it.",
@@ -1386,8 +1383,6 @@
   },
   "providerPlacement": {
     "description": "Place the people a sign-in provider signs in — by the group or directory it reports — in a community, and in an initiative there if you name one.",
-    "loading": "Loading placement rules…",
-    "loadError": "Could not load placement rules. Please try again.",
     "platformOnly": "Sign-in placement is managed by platform operators and owners.",
     "everywhere": {
       "label": "Apply placement rules to every community",
@@ -1454,8 +1449,6 @@
   },
   "storage": {
     "platformOnly": "Only platform owners can configure storage.",
-    "loading": "Loading storage settings…",
-    "loadError": "Failed to load storage settings.",
     "title": "Object storage",
     "description": "Choose where uploaded files and attachments are stored. Defaults to the local filesystem; switch to an S3-compatible store for scalable or shared deployments.",
     "backendLabel": "Storage backend",
@@ -1463,7 +1456,7 @@
     "backendS3": "S3-compatible",
     "backendHelp": "Local stores files on the server disk. S3 works with any S3-compatible store, such as a self-hosted Garage or MinIO instance, or Cloudflare R2.",
     "cutoverTitle": "Switching to S3 doesn't move existing files",
-    "cutoverHelp": "Save these settings, run Test connection, then use Backfill below to copy existing local files into the bucket. Switch the backend to S3 only once the backfill completes — optionally keep \"Serve missing objects from local\" on during a verification window.",
+    "cutoverHelp": "Run Test connection first. Then save with \"Serve missing objects from local\" on: new files go to the bucket, and a file that isn't there yet is read from disk. Copy the existing files across with Backfill below, and turn the fallback off once it completes with nothing failed.",
     "bucketLabel": "Bucket",
     "bucketPlaceholder": "my-initiative-uploads",
     "regionLabel": "Region",
@@ -1488,7 +1481,7 @@
     "testSuccess": "Connection successful.",
     "testError": "Connection failed.",
     "backfillTitle": "Backfill local files to S3",
-    "backfillHelp": "Copies every existing local upload into the configured bucket. Idempotent and safe to re-run; run it before switching the backend to S3.",
+    "backfillHelp": "Copies every existing local upload into the bucket, skipping what is already there, so it is safe to run again. It runs once S3 is the saved backend.",
     "startBackfill": "Start backfill",
     "backfillRunning": "Backfill running…",
     "backfillStarted": "Backfill started.",
@@ -1505,19 +1498,19 @@
     "setByDeployment": "Whoever runs this server sets this for your community.",
     "shareUrl": {
       "title": "Member sign-in link",
-      "description": "Share this link with members — it offers this community's sign-in providers and brings them straight into the community.",
-      "copy": "Copy link",
+      "description": "Offers these providers and brings people straight into {{community}}.",
+      "copy": "Copy",
       "copied": "Sign-in link copied"
     },
     "policy": {
-      "title": "Sign-in requirement",
-      "description": "Control which sign-in a session must have used before it can access this community.",
-      "openLabel": "Open",
-      "openHelp": "Any signed-in member can access this community.",
-      "requiredLabel": "Require single sign-on",
-      "requiredHelp": "Members can only access this community after signing in with the selected provider.",
+      "title": "Members' sign-in",
+      "description": "What members need before they can open {{community}}.",
+      "openLabel": "Any signed-in account",
+      "openHelp": "Members sign in however this server allows.",
+      "requiredLabel": "Through our providers",
+      "requiredHelp": "Only a sign-in through the provider you pick counts.",
       "providerPlaceholder": "Choose a provider…",
-      "noProviders": "Connect a provider under Who gets in first.",
+      "noProviders": "Connect a provider under Sign-in providers first.",
       "saved": "Sign-in requirement saved",
       "error": "Could not save the sign-in requirement",
       "selfUnsatisfied": "Your current session hasn't signed in with {{providerName}} yet. Sign in with it once to confirm it works before requiring it.",
@@ -1528,22 +1521,44 @@
       "presentPasskey": "Present passkey",
       "anyProvider": "Any of our sign-in providers",
       "anyProviderHelp": "Members can come in through any provider this community has set up. Signing in somewhere else on this deployment does not count.",
-      "requireFactor": "Also require a second factor",
-      "requireFactorHelp": "Members must have presented a code from their authenticator app in this session. They can add one without signing out.",
       "requirePasskey": "Also require a passkey",
       "requirePasskeyHelp": "Members must have signed in with a passkey, or presented one, in this session. They can add one without signing out.",
-      "factorRequiredByPlatform": "Your server already asks everybody here for a second factor, so there's nothing to add."
+      "save": "Save requirement",
+      "value": {
+        "through": "Through {{provider}}",
+        "throughWithPasskey": "Through {{provider}}, with a passkey",
+        "any": "Through any of our providers",
+        "anyWithPasskey": "Through any of our providers, with a passkey",
+        "passkey": "With a passkey"
+      },
+      "impact": {
+        "provider": "Members who came in another way are asked to sign in through {{provider}} the next time they open {{community}}. Nobody is signed out.",
+        "anyProvider": "Members who came in another way are asked to sign in through one of your providers the next time they open {{community}}. Nobody is signed out.",
+        "passkey": "Members who haven't used a passkey in this session are asked for one the next time they open {{community}}. Nobody is signed out.",
+        "selfProvider": "If your own session hasn't used {{provider}} yet, you sign in with it once before this saves.",
+        "selfOther": "If your own session doesn't meet this yet, you're asked to before it saves.",
+        "neverThrough_one": "{{count}} of {{total}} members has never signed in through {{provider}}.",
+        "neverThrough_other": "{{count}} of {{total}} members have never signed in through {{provider}}.",
+        "neverThroughAny_one": "{{count}} of {{total}} members has never signed in through any of your providers.",
+        "neverThroughAny_other": "{{count}} of {{total}} members have never signed in through any of your providers.",
+        "noPasskey_one": "{{count}} of {{total}} members holds no passkey yet.",
+        "noPasskey_other": "{{count}} of {{total}} members hold no passkey yet."
+      }
     },
     "sessionLimit": {
-      "title": "Session length",
-      "allowLabel": "Sign in again every twelve hours",
+      "title": "Sign in again every 12 hours",
       "saved": "Session limit saved",
       "error": "Could not save the session limit",
-      "help": "For communities that have been asked to cap how long people stay signed in. It applies to your members everywhere, not only here."
+      "description": "For communities that have been asked to cap how long people stay signed in.",
+      "offLabel": "Off",
+      "onLabel": "Sign in again every 12 hours",
+      "onDetail": "these members sign in again everywhere on this server",
+      "offDetail": "your server's session length applies",
+      "impact": "It applies to these members in every community on this server, not only here."
     },
     "connections": {
-      "title": "Which sign-ins are yours",
-      "description": "People sign in to this deployment. Say which of its sign-in providers count as your community's, and who on them counts as yours.",
+      "title": "Sign-in providers",
+      "description": "The providers your members sign in with, and which of their accounts count as yours.",
       "connect": "Connect a provider",
       "connected": "Provider connected",
       "connectError": "Could not change that connection",
@@ -1551,15 +1566,10 @@
       "disconnected": "Provider disconnected",
       "disconnectTitle": "Disconnect {{name}}?",
       "disconnectDescription": "It stops counting as yours: the button comes off your sign-in page and nobody new arrives through it. Nobody is signed out and no account changes. If you require a sign-in through it, lift that first.",
-      "empty": "No providers connected yet — your members sign in the usual way.",
       "noneOffered": "Whoever runs this deployment has not offered any providers to connect to yet.",
       "notReady": "Unavailable",
-      "narrowedTo": "Only accounts whose {{claim}} is {{values}}",
+      "narrowedTo": "{{claim}}: {{values}}",
       "anyoneItVouchesFor": "Anyone this provider vouches for",
-      "dialogTitle": "Connect a sign-in provider",
-      "dialogDescription": "Pick the provider your members use, then say which accounts on it are yours.",
-      "providerLabel": "Provider",
-      "providerPlaceholder": "Choose one",
       "claimLabel": "Whose accounts count as yours",
       "claimHelp": "Communities here are separate, so say which accounts on this provider are yours — a Google Workspace domain, an Entra tenant, a group. Only those people count as your community's.",
       "claimPlaceholder": "Pick what identifies your people",
@@ -1567,7 +1577,7 @@
       "claimValuesPlaceholder": "example.com, example.org",
       "autoJoinLabel": "Join them to this community",
       "autoJoinHelp": "Anyone who counts as yours becomes a member the first time they sign in. Leave it off to invite people yourself.",
-      "joinsOnArrival": "New arrivals join automatically",
+      "joinsOnArrival": "new arrivals join",
       "claimOptions": {
         "hd": "Google Workspace domain",
         "tid": "Microsoft Entra tenant",
@@ -1575,26 +1585,26 @@
         "domain": "Domain",
         "other": "Another claim…"
       },
-      "inherited": "From the deployment",
+      "inherited": "From your server",
       "makeItOurs": "Make it ours",
       "claimNameLabel": "Claim name",
       "claimNamePlaceholder": "e.g. org, realm",
       "joinsOnceAgreed": "Will join matching arrivals on sight once whoever runs this server agrees these values are yours. Until then it admits them, and joining is by invitation.",
-      "acceptsPlacementLabel": "Let the deployment place people from this provider",
-      "acceptsPlacementHelp": "The deployment's placement rules for this provider can add people here, beside your own rules."
+      "acceptsPlacementLabel": "Let your server place people",
+      "saved": "Connection saved",
+      "turnOff": "Turn off",
+      "turnOn": "Turn on"
     },
     "rules": {
-      "title": "Where your people land",
-      "description": "Your provider reports which groups somebody is in. Say what those groups mean here — who joins as a member, who joins as an admin, and which initiative they start in.",
+      "title": "Where people land",
       "add": "Add a rule",
       "added": "Rule added",
       "addError": "Could not add that rule",
       "empty": "No rules yet — people arriving through your providers join with nothing in particular.",
-      "connectFirst": "Connect a provider first, then say what its groups mean.",
       "noGroupsBadge": "No groups reported",
       "noGroupsHint": "Whoever runs this deployment has not told this provider where its groups live, so this rule will not match anybody until they do.",
-      "landsInCommunity": "Arriving through {{provider}} — joins as {{role}}",
-      "landsInInitiative": "Arriving through {{provider}} — joins as {{role}}, and {{initiative}} as {{initiativeRole}}",
+      "landsInCommunity": "Through {{provider}}, joins as {{role}}",
+      "landsInInitiative": "Through {{provider}}, joins as {{role}}, and {{initiative}} as {{initiativeRole}}",
       "dialogDescription": "Name a group your provider reports, and say where the people in it belong.",
       "providerLabel": "Provider",
       "providerPlaceholder": "Choose one",
@@ -1616,14 +1626,14 @@
       "removeTitle": "Remove this rule?",
       "removeDescription": "People carrying {{group}} stop being placed here, and anyone this rule put here loses that standing the next time they sign in through that provider.",
       "deployment": {
-        "title": "Set by the deployment",
-        "description": "Placement rules whoever runs this deployment wrote for its providers, naming this community. They place people here beside your own rules once you let a provider's rules in on its connection.",
-        "everywhere": "The deployment applies its placement rules to every community."
-      }
-    },
-    "sections": {
-      "whoGetsIn": "Who gets in",
-      "onWhatTerms": "On what terms"
+        "description": "Rules your server wrote for its providers that name this community. They place people here beside your own rules once that provider's connection lets your server place people.",
+        "everywhere": "Your server applies its placement rules to every community.",
+        "count_one": "{{count}} rule from your server",
+        "count_other": "{{count}} rules from your server"
+      },
+      "saved": "Rule saved",
+      "saveError": "Could not save that rule",
+      "editTitle": "Edit rule"
     },
     "emptyState": {
       "title": "Nothing connected yet",
@@ -1649,7 +1659,6 @@
           "prompt": "Whether this becomes the only way in."
         }
       },
-      "skip": "Skip this",
       "ruleTitle": "A first group",
       "ruleHelp": "Optional. Name a group your provider reports and where its people land. You can add more later.",
       "requireLabel": "Require members to arrive through this provider",
@@ -1657,46 +1666,73 @@
     },
     "secondFactor": {
       "title": "Second factor",
-      "description": "Whether reaching this community asks for one.",
-      "allowLabel": "Require a second factor",
-      "help": "Members must have presented a second factor in this session. Which kinds count is the deployment's answer, not this community's — they can add one without signing out.",
-      "askedByPlatform": "Your server already asks everybody here for a second factor, so there's nothing to add.",
+      "description": "Whether opening {{community}} asks for a second factor in each session.",
       "saved": "Second factor saved.",
-      "error": "Could not save the second-factor requirement."
+      "error": "Could not save the second-factor requirement.",
+      "offLabel": "Not required",
+      "onLabel": "Required in each session",
+      "guestsToo": "guests too",
+      "impact": "Everyone who opens {{community}}, guests included, presents an authenticator code or a passkey in each session. They can add one without signing out.",
+      "withoutFactor_one": "{{count}} of {{total}} people here holds no authenticator or passkey yet.",
+      "withoutFactor_other": "{{count}} of {{total}} people here hold no authenticator or passkey yet."
     },
     "guestPolicy": {
-      "title": "Guests' sign-in requirement",
-      "description": "Control which sign-in a guest's session must have used before it can reach this community. You don't have to meet it yourself.",
-      "openHelp": "Any signed-in guest can reach what they were given.",
-      "requiredHelp": "Guests can only reach this community after signing in with the selected provider.",
+      "title": "Guests' sign-in",
+      "description": "What guests need before they can open {{community}}. You don't have to meet it yourself.",
+      "openHelp": "Guests sign in however this server allows.",
       "anyProviderHelp": "Guests can come in through any provider this community has set up. Signing in somewhere else on this deployment does not count.",
       "requirePasskeyHelp": "Guests must have signed in with a passkey, or presented one, in this session. They can add one without signing out.",
       "saved": "Guests' sign-in requirement saved",
       "error": "Could not save the guests' sign-in requirement",
-      "save": "Save the guests' sign-in requirement"
+      "impact": {
+        "provider": "Guests who came in another way are asked to sign in through {{provider}} the next time they open {{community}}. Nobody is signed out.",
+        "anyProvider": "Guests who came in another way are asked to sign in through one of your providers the next time they open {{community}}. Nobody is signed out.",
+        "passkey": "Guests who haven't used a passkey in this session are asked for one the next time they open {{community}}. Nobody is signed out.",
+        "neverThrough_one": "{{count}} of {{total}} guests has never signed in through {{provider}}.",
+        "neverThrough_other": "{{count}} of {{total}} guests have never signed in through {{provider}}.",
+        "neverThroughAny_one": "{{count}} of {{total}} guests has never signed in through any of your providers.",
+        "neverThroughAny_other": "{{count}} of {{total}} guests have never signed in through any of your providers.",
+        "noPasskey_one": "{{count}} of {{total}} guests holds no passkey yet.",
+        "noPasskey_other": "{{count}} of {{total}} guests hold no passkey yet."
+      }
     },
     "guestStay": {
-      "title": "Guest stays",
+      "title": "Longest guest stay",
       "description": "Guest invites and extensions never run longer than this. Guests already here keep their end date.",
       "label": "Longest a guest may stay (days)",
       "hint_one": "Leave blank to use the server's limit of {{count}} day, which is also the most you can set.",
       "hint_other": "Leave blank to use the server's limit of {{count}} days, which is also the most you can set.",
       "saved": "Longest guest stay saved",
       "error": "Could not save the longest guest stay",
-      "save": "Save the longest guest stay"
+      "value_one": "{{count}} day",
+      "value_other": "{{count}} days",
+      "defaultDetail": "your server's limit",
+      "ceilingDetail": "your server allows up to {{days}}"
+    },
+    "setByServer": "Set by your server",
+    "intro": "How people sign in to {{community}}, what they need to get in, and what leaves the community.",
+    "signInRules": {
+      "title": "Sign-in rules",
+      "description": "What somebody needs before they can open {{community}}.",
+      "members": "Members",
+      "guests": "Guests"
+    },
+    "groupRules": {
+      "title": "Group rules",
+      "description": "What the groups your providers report mean here. Each takes hold the next time somebody signs in.",
+      "add": "Add"
     }
   },
   "authProviders": {
     "title": "Identity providers",
     "description": "The single sign-on providers people sign in with. Each one gets its own button on the sign-in page.",
     "addProvider": "Add provider",
-    "loading": "Loading providers…",
     "empty": "No providers configured yet.",
-    "disabledBadge": "Disabled",
     "editTitle": "Edit sign-in provider",
     "dialogDescription": "OpenID Connect provider details. The callback URL for your IdP is /api/v1/auth/{slug}/callback on this server.",
     "slugLabel": "Slug",
     "slugHelp": "Lowercase letters, numbers, and dashes. Fixed after creation — it forms the sign-in URLs.",
+    "slugFixed": "Fixed once the provider is added, because its sign-in addresses are made from it.",
     "slugInvalid": "Use lowercase letters, numbers, and dashes; no leading or trailing dash.",
     "displayNameLabel": "Display name",
     "issuerLabel": "Issuer URL",
@@ -1778,11 +1814,12 @@
   },
   "aiConnections": {
     "title": "Connections",
-    "subtitle": "Each connection is a destination — a provider, model, and optional shared key.",
+    "subtitle_community": "The AI providers and models members of this community can use.",
+    "subtitle_platform": "The AI providers and models communities on this server can use.",
+    "locked": "Turn AI on under Security to use these connections.",
     "add": "Add connection",
+    "toggleLabel": "Use {{label}}",
     "empty": "No connections yet. Add one to enable AI features.",
-    "loading": "Loading connections…",
-    "loadError": "Unable to load connections.",
     "defaultBadge": "Default",
     "keySet": "Shared key set",
     "noKey": "No shared key",
@@ -1814,13 +1851,10 @@
     "modelHintPick": "Pick a model to finish setting up this connection.",
     "needsModel": "Needs a model",
     "customHint": "Any server that speaks the OpenAI API: vLLM, llama.cpp, LM Studio, LocalAI, or a gateway such as LiteLLM. Give the address up to /v1.",
-    "enabledLabel": "Enabled",
-    "enabledDescription": "Allow members to use this connection.",
     "defaultLabel": "Default connection",
     "defaultDescription": "Members use this connection unless they pick another.",
     "save": "Save connection",
     "saving": "Saving…",
-    "cancel": "Cancel",
     "communitiesLabel": "Communities",
     "communitiesPlaceholder": "Give it to a community…",
     "communitiesSearch": "Search communities…",
@@ -1849,6 +1883,7 @@
     "ageGateOffConfirm": "Everyone here is 18 or older",
     "defaultDmLabel": "Direct messages for new accounts",
     "defaultDmHelpText": "The policy an account starts on. Read once, when the account is made — changing it opens no account that already exists and closes none either. “Private” is the shipped default; on it, people become reachable one at a time as they choose to be.",
+    "whileMessagesOff": "used once direct messages are on",
     "directMessagesLabel": "Let people message each other",
     "directMessagesHelpText": "My Messages, and the connections and requests behind it. Messages are end-to-end encrypted, so nobody running this deployment can read them — turn this off where private messaging does not belong rather than to oversee it.",
     "directMessagesReversibleNote": "Turning this off hides My Messages and refuses new ones; it deletes nothing. Conversations, connections and settings are all still there if you turn it back on.",
@@ -1866,8 +1901,7 @@
       "neverHint": "Nothing is deleted on a timer. A community stays on hold until somebody lifts the hold or deletes it.",
       "saved_one": "Communities on hold are deleted after {{count}} day.",
       "saved_other": "Communities on hold are deleted after {{count}} days.",
-      "savedNever": "Communities on hold are never deleted automatically.",
-      "save": "Save how long communities stay on hold"
+      "savedNever": "Communities on hold are never deleted automatically."
     },
     "retention": {
       "title": "Keeping deleted communities",
@@ -1878,8 +1912,7 @@
       "neverHint": "Nothing is destroyed on a timer. Deleted communities stay in the list below until somebody restores one.",
       "saved_one": "Deleted communities are kept for {{count}} day.",
       "saved_other": "Deleted communities are kept for {{count}} days.",
-      "savedNever": "Deleted communities are kept indefinitely.",
-      "save": "Save how long communities are kept"
+      "savedNever": "Deleted communities are kept indefinitely."
     },
     "accountRetention": {
       "title": "Keeping deleted accounts",
@@ -1890,8 +1923,7 @@
       "neverHint": "Nothing is erased on a timer. Deleted accounts stay in the users table until somebody comes back or restores one.",
       "saved_one": "Deleted accounts are kept for {{count}} day.",
       "saved_other": "Deleted accounts are kept for {{count}} days.",
-      "savedNever": "Deleted accounts are kept indefinitely.",
-      "save": "Save how long accounts are kept"
+      "savedNever": "Deleted accounts are kept indefinitely."
     },
     "engagementRankingLabel": "Let communities rank results by engagement",
     "engagementRankingHelpText": "When off, no community on this server ranks by engagement, whatever its own setting.",
@@ -1901,9 +1933,10 @@
     "guestsEnabledHelpText": "Communities can invite people for a set number of days. Guests take no seat and see only what they were given. While this is off, no guest gets in.",
     "guestsEnabledToast": "Communities can have guests.",
     "guestsDisabledToast": "Guests are turned off.",
+    "maxGuestDaysTitle": "Longest guest stay",
     "maxGuestDaysLabel": "Longest a guest may stay (days)",
     "maxGuestDaysHelpText": "No guest stays longer than this, whatever a community sets.",
-    "maxGuestDaysSave": "Save the longest guest stay",
+    "whileGuestsOff": "used once guests are allowed",
     "maxGuestDaysSaved_one": "Guests stay {{count}} day at most.",
     "maxGuestDaysSaved_other": "Guests stay {{count}} days at most.",
     "joinAndCreateTitle": "Who may join and create",
@@ -1915,18 +1948,24 @@
     "communityCreationHelpText": "When off, only people who manage communities on this server can create one, and only invited people can sign up.",
     "communityCreationEnabledToast": "Anyone can create a community.",
     "communityCreationDisabledToast": "Only people who manage communities can create one.",
+    "creationDailyLimitTitle": "Daily limit per account",
     "creationDailyLimitLabel": "Communities one account may create per day",
     "creationDailyLimitHelpText": "0 means no limit. People who manage communities are not held to it.",
-    "creationDailyLimitSave": "Save the daily community limit",
+    "whileCreationOff": "used once anyone can create a community",
+    "creationDailyLimitValue_one": "{{count}} community a day",
+    "creationDailyLimitValue_other": "{{count}} communities a day",
     "creationDailyLimitSaved_one": "Each account may create {{count}} community a day.",
     "creationDailyLimitSaved_other": "Each account may create {{count}} communities a day.",
     "creationDailyLimitSavedNone": "There is no daily limit on new communities.",
+    "exportAndDeletionTitle": "Exports and deletion",
     "exportCooldownLabel": "Hours between community exports",
     "exportCooldownHelpText": "How long a community waits before it can export everything again. 0 means no wait.",
-    "exportCooldownSave": "Save the time between community exports",
     "exportCooldownSaved_one": "Communities wait {{count}} hour between exports.",
     "exportCooldownSaved_other": "Communities wait {{count}} hours between exports.",
-    "exportCooldownSavedNone": "Communities can export without waiting."
+    "exportCooldownSavedNone": "Communities can export without waiting.",
+    "noLimit": "No limit",
+    "noWait": "No wait",
+    "exportCooldownTitle": "Time between exports"
   },
   "account": {
     "passwordTitle": "Password",
@@ -2013,7 +2052,6 @@
   "twoFactor": {
     "title": "Two-factor authentication",
     "description": "Ask for a code from an authenticator app after a password or emailed code, and whenever a community or this server asks for a second factor.",
-    "loading": "Checking…",
     "on": "On",
     "notSetUp": "Signing in doesn't ask for a code from an app.",
     "setUp": "Set up two-factor authentication",
@@ -2049,7 +2087,6 @@
     "regenerateError": "Could not make new codes.",
     "disableError": "Could not turn that off.",
     "codePlaceholder": "123456",
-    "statusError": "Couldn't check whether two-factor is on. Reload the page to try again.",
     "copyUnavailable": "Couldn't copy — write the codes down instead.",
     "notOffered": "This deployment does not offer the authenticator app.",
     "passwordlessCodes": "Your account signs in without a password. These codes are how you set one again if you lose your passkey."
@@ -2057,13 +2094,11 @@
   "passkeys": {
     "title": "Passkeys",
     "description": "Sign in with your device's fingerprint, face or screen lock instead of your password.",
-    "loading": "Checking…",
-    "listError": "Couldn't check which passkeys this account holds. Reload the page to try again.",
     "empty": "No passkeys yet.",
     "emptyHint": "A passkey lives on your phone, your laptop or your password manager, and works only on this site.",
     "add": "Add a passkey",
     "addTitle": "Add a passkey",
-    "addPrompt": "Give it a name you'll recognise later. Your browser asks for the rest.",
+    "addPrompt": "Give it a name you'll recognize later. Your browser asks for the rest.",
     "nameLabel": "Name",
     "namePlaceholder": "Laptop, phone, security key",
     "passwordLabel": "Current password",
@@ -2091,7 +2126,6 @@
     "unsupported": "This browser can't make a passkey. Open this page in an up-to-date browser instead.",
     "siteUnsupported": "Passkeys need this site to have a proper domain name and https. Whoever runs it can put that right.",
     "limitReached": "This account holds as many passkeys as it can ({{limit}}). Remove one to add another.",
-    "addFromBrowser": "A passkey is added from a browser signed in to this site. Add opens one for you.",
     "notOffered": "This site doesn't offer passkeys. The ones you have are kept.",
     "error": "That didn't work. Try again."
   },
@@ -2114,7 +2148,11 @@
     "valuesHint": "Separate several with commas. A community's own connection replaces this outright, so nothing here is merged with what a community says."
   },
   "platformSecurity": {
-    "description": "How long anybody may stay signed in, the captcha asked of anybody new, and what a notification may leave the app carrying."
+    "description": "How long anybody may stay signed in, the captcha asked of anybody new, and what a notification may leave the app carrying.",
+    "signInRules": {
+      "title": "Sign-in rules",
+      "description": "What every account on this server is asked when it signs in."
+    }
   },
   "notificationDelivery": {
     "title": "Notifications that leave the app",
@@ -2137,37 +2175,38 @@
       "offHelp": "A notification that leaves the app names what it is about: who acted, and on what."
     }
   },
-  "communityNotifications": {
-    "title": "Notifications that leave the app",
-    "description": "What this community's notifications carry once they leave. The server answers the same three questions for everybody, and the stricter answer applies.",
-    "saved": "Notification settings saved",
-    "error": "Could not save notification settings",
+  "communityPrivacy": {
+    "title": "Privacy",
+    "description": "What leaves {{community}}, and what it keeps about activity.",
+    "saved": "Privacy setting saved",
+    "error": "Could not save that setting",
     "push": {
       "label": "Phone and desktop notifications",
       "onHelp": "This community's notifications reach members' phones and desktop apps.",
       "offHelp": "Nothing about this community is sent to a phone or the desktop app. Members still get the bell, and email if it is on.",
-      "platformHelp": "This server sends nothing to a phone or the desktop app, so there is nothing here to decide."
+      "platformHelp": "your server sends nothing to phones or the desktop app"
     },
     "email": {
       "label": "Email notifications",
       "onHelp": "This community's notifications reach members' mailboxes.",
       "offHelp": "No notification email is sent about this community. Sign-in codes and password resets are the account's own and still go.",
-      "platformHelp": "This server sends no notification email, so there is nothing here to decide."
+      "platformHelp": "your server sends no notification email"
     },
     "redact": {
       "label": "Hide notification details",
       "onHelp": "Notifications about this community say the kind of thing that happened once they leave the app. Members see all of it here.",
       "offHelp": "Notifications about this community name what they are about once they leave the app.",
-      "platformHelp": "This server hides notification details everywhere, so this community is already covered."
+      "platformHelp": "your server hides notification details everywhere"
+    },
+    "ai": {
+      "label": "AI features",
+      "help": "Lets members use AI features in this community. Turned off, nothing here is sent to an AI provider."
+    },
+    "ranking": {
+      "label": "Rank search by engagement",
+      "help": "Search lists what more members have recently opened or worked on higher. Only a rough level is kept for each item, never who opened it or how many times, and it's never shared outside this community.",
+      "platformHelp": "your server has turned engagement ranking off for every community"
     }
-  },
-  "communityEngagementRanking": {
-    "title": "Search order",
-    "label": "Rank search results by community engagement",
-    "help": "Search lists what more members have recently opened or worked on higher. Only a rough level is kept for each item, never who opened it or how many times, and it's never shared outside this community.",
-    "platformHelp": "This server has turned engagement ranking off for every community.",
-    "saved": "Search order saved.",
-    "error": "Couldn't save the search order."
   },
   "billingInsights": {
     "title": "Billing insights",
@@ -2227,11 +2266,10 @@
     },
     "rungFixed": "Who a role is for can't change once it is made.",
     "surfacesLabel": "What it holds",
+    "pluginsLabel": "What it holds of the plug-ins",
     "notYours": "You don't hold this yourself, so you can't give it.",
     "holdsNothing": "Holds nothing yet.",
     "builtIn": "Built-in",
-    "loading": "Loading roles",
-    "loadError": "Couldn't load the roles.",
     "closed": "Whoever runs this server has closed custom roles for this community. The roles it has keep applying.",
     "deleteTitle": "Delete {{name}}?",
     "deleteDescription": "People holding it go back to their plain role.",
@@ -2295,8 +2333,7 @@
     "setByDeployment": "Whoever runs this server defines this role. You can give it to people here, but not change or delete it."
   },
   "customRoleRules": {
-    "title": "Custom roles by group",
-    "description": "Give a custom role to whoever signs in carrying a group. A sign-in reads these in order and the first group it carries decides; a role somebody gave by hand stays theirs.",
+    "title": "Custom roles · the first match decides",
     "add": "Add role rule",
     "empty": "No group gives a custom role yet.",
     "gives": "Through {{provider}}, gives {{role}}",
@@ -2305,7 +2342,7 @@
     "remove": "Remove rule",
     "removeTitle": "Remove this rule?",
     "removeDescription": "People in {{group}} keep the role it gave until they next sign in.",
-    "dialogDescription": "Whoever signs in through this provider carrying the group gets the role, unless an earlier rule matches first.",
+    "dialogDescription": "Whoever signs in through this provider carrying the group gets the role, unless an earlier rule matches first. A role somebody gave by hand stays theirs.",
     "roleLabel": "Custom role",
     "rolePlaceholder": "Choose a role",
     "added": "Rule added",
@@ -2313,8 +2350,8 @@
     "orderError": "Couldn't reorder the rules",
     "removeError": "Couldn't remove the rule",
     "closed": "Your server has switched custom roles off for this community. These rules keep applying; nobody here can change them.",
-    "loading": "Loading rules…",
-    "loadError": "Couldn't load the rules.",
-    "retry": "Try again"
+    "editTitle": "Edit role rule",
+    "saved": "Rule saved",
+    "saveError": "Couldn't save the rule"
   }
 }

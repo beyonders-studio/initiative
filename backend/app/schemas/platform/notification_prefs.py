@@ -5,8 +5,7 @@ this build has rather than carrying its own copy of the list. Adding a category
 is then one entry in ``app.core.notification_categories`` and four locale files.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
@@ -16,12 +15,12 @@ from app.core.notification_categories import (
     NotificationCategory,
 )
 from app.models.platform.user_notification_prefs import DigestCadence, EmailCadence
+from app.schemas.base import SanitizedBaseModel
 from app.services.platform.notification_prefs import (
     DEFAULT_DIGEST_CLOCK,
     DEFAULT_DIGEST_WEEKDAY,
     MAX_PAUSE_DAYS,
 )
-from app.schemas.base import SanitizedBaseModel
 
 
 def _valid_clock(value: str) -> str:
@@ -134,7 +133,7 @@ class NotificationPreferencesRead(SanitizedBaseModel):
     categories: list[NotificationCategoryRead]
     #: Account-wide overrides. Sparse — absent means the registry default.
     settings: dict[str, dict[str, bool]] = Field(default_factory=dict)
-    quiet_hours: Optional[QuietHours] = None
+    quiet_hours: QuietHours | None = None
     #: When email goes out. Always present — an account that has chosen nothing
     #: reads its own defaults here rather than the page carrying a copy.
     email: EmailSchedule = Field(default_factory=EmailSchedule)
@@ -142,7 +141,7 @@ class NotificationPreferencesRead(SanitizedBaseModel):
     #: for the same reason ``email`` is.
     digests: dict[NotificationCategory, DigestSchedule] = Field(default_factory=dict)
     #: The stand-down in force, or None. A lapsed one reads as None.
-    pause: Optional[PauseRead] = None
+    pause: PauseRead | None = None
     #: Whether to hold off while the account is plainly already looking.
     respect_presence: bool = True
     communities: list[CommunityNotificationSettings] = Field(
@@ -181,39 +180,39 @@ class NotificationPreferencesUpdate(SanitizedBaseModel):
     channels: list[NotificationChannelSet] = Field(default_factory=list)
     rows: list[CommunityRowSet] = Field(default_factory=list)
     mutes: list[CommunityMuteSet] = Field(default_factory=list)
-    quiet_hours: Optional[QuietHours] = None
+    quiet_hours: QuietHours | None = None
     #: Explicit, because ``quiet_hours: null`` is indistinguishable from
     #: "not mentioned" in a partial write.
     clear_quiet_hours: bool = False
-    email: Optional[EmailSchedule] = None
+    email: EmailSchedule | None = None
     #: Digests whose schedule moved, each stored whole.
     digests: dict[NotificationCategory, DigestSchedule] = Field(default_factory=dict)
     #: When a stand-down begins. Omitted means now, which is the ordinary case;
     #: a date is how somebody books next week's holiday before they go.
-    pause_from: Optional[datetime] = None
+    pause_from: datetime | None = None
     #: When it ends. Every pause has one: permanent silence is what the
     #: category grid and the community mute are for, and both are visible on
     #: the page that owns them.
-    pause_until: Optional[datetime] = None
+    pause_until: datetime | None = None
     #: Explicit, for the same reason ``clear_quiet_hours`` is. This is what
     #: "Resume" sends, and it releases everything the pause was holding.
     clear_pause: bool = False
-    respect_presence: Optional[bool] = None
+    respect_presence: bool | None = None
 
     @field_validator("pause_from", "pause_until")
     @classmethod
-    def _aware(cls, value: Optional[datetime]) -> Optional[datetime]:
+    def _aware(cls, value: datetime | None) -> datetime | None:
         if value is None:
             return None
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
 
     @model_validator(mode="after")
-    def _a_real_window(self) -> "NotificationPreferencesUpdate":
+    def _a_real_window(self) -> NotificationPreferencesUpdate:
         if self.pause_until is None:
             if self.pause_from is not None:
                 raise ValueError("a pause needs an end date")
             return self
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start = self.pause_from or now
         if self.pause_until <= start:
             raise ValueError("a pause must end after it begins")

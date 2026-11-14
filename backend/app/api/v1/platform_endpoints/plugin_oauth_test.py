@@ -10,15 +10,16 @@ from __future__ import annotations
 import time
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.plugin_access_token import (
     ACCESS_TOKEN_PREFIX,
-    PluginAccessToken,
     InstallAccessToken,
+    PluginAccessToken,
     unseal_access_token,
 )
 from app.models.platform.plugin_service_registration import (
@@ -31,14 +32,13 @@ from app.services.marketplace.plugin_refs import ensure_plugin_guild_ref
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_updates
 from app.testing import route_session_to_guild
+from app.testing.audit import emitted
 from app.testing.plugin_clients import (
     CLIENT,
     InstalledPlugin,
     install_plugin,
     mint_client_assertion,
 )
-from app.core.audit_events import AuditEventType
-from app.testing.audit import emitted
 
 TOKEN_URL = "/api/v1/plugin-platform/oauth/token"
 INSTALLATIONS_URL = "/api/v1/plugin-platform/installations"

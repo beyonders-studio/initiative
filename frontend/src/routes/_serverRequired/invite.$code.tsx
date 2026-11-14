@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { InvitePage } from "@/pages/signIn/InvitePage";
 
 export const Route = createFileRoute("/_serverRequired/invite/$code")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/CommunityInvitePage").then((m) => ({ default: m.CommunityInvitePage }))
-  ),
+  component: InvitePage,
 });

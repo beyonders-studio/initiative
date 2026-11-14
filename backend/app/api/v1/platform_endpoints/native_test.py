@@ -2,15 +2,15 @@
 
 The native (Capacitor) app polls these to decide whether to download a matching web bundle.
 A local dev/test checkout has no ``/app/ota`` directory, so the endpoints must 404 cleanly;
-when an image ships the artifacts, the manifest must advertise a checksum that actually
-matches the served zip.
+when an image ships the artifacts, the manifest names the bundle and, in a release image,
+carries its signed statement.
 """
 
 from __future__ import annotations
 
 import hashlib
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.api.v1.platform_endpoints import native
 from app.core.messages import NativeMessages
@@ -30,21 +30,18 @@ async def test_download_404_when_bundle_absent(client: AsyncClient):
     assert response.json()["detail"] == NativeMessages.OTA_BUNDLE_NOT_AVAILABLE
 
 
-async def test_manifest_advertises_matching_checksum(
+async def test_manifest_names_the_bundle_and_its_statement(
     client: AsyncClient, tmp_path, monkeypatch
 ):
-    """The checksum in the manifest must be the sha256 of the exact zip the download
-    endpoint serves — the updater rejects the bundle otherwise."""
+    """The manifest names the bundle, and carries the signed statement the updater
+    verifies the zip against when the image has one."""
     bundle = tmp_path / "bundle.zip"
     bundle.write_bytes(b"PK\x03\x04 fake zip payload")
     digest = hashlib.sha256(bundle.read_bytes()).hexdigest()
-    checksum = tmp_path / "bundle.sha256"
-    checksum.write_text(f"{digest}\n")
 
     statement = tmp_path / "statement.json"
     signature = tmp_path / "statement.sig"
     monkeypatch.setattr(native, "_BUNDLE_PATH", bundle)
-    monkeypatch.setattr(native, "_CHECKSUM_PATH", checksum)
     monkeypatch.setattr(native, "_STATEMENT_PATH", statement)
     monkeypatch.setattr(native, "_SIGNATURE_PATH", signature)
 
@@ -53,8 +50,6 @@ async def test_manifest_advertises_matching_checksum(
     body = response.json()
     assert body["version"] == __version__
     assert body["url"] == "/api/v1/native/bundle/download"
-    assert body["checksum"] == digest
-    assert isinstance(body["minNativeVersion"], str)
     # An image built without the release key carries no statement.
     assert "statement" not in body and "signature" not in body
 

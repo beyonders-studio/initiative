@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import socket
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import patch
 
@@ -19,17 +19,17 @@ from sqlmodel import select
 
 from app.core.audit_events import AuditEventType
 from app.core.messages import PluginMessages, WebhookSubscriptionMessages
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.marketplace import plugin_refs
 from app.testing import create_guild_plugin, emitted, route_session_to_guild
 from app.testing.plugin_clients import (
     CLIENT,
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
-
 
 _WEBHOOK_HOST = "hooks.example.com"
 _FAKE_INFOS = [
@@ -116,7 +116,10 @@ async def test_an_install_subscribes_to_what_its_scopes_read(
 
     row = await _row(session, installed.guild.id, body["id"])
     assert row.plugin_install_id == installed.plugin.id
-    assert row.created_by is None
+    assert (row.created_by, row.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
     assert row.initiative_id == installed.placed.id
 
     (line,) = emitted(capfd, AuditEventType.WEBHOOK_CREATED)
@@ -267,11 +270,11 @@ async def test_a_subscription_keeps_its_names_while_the_registration_is_redone(
     """A subscription a plug-in registered is named in that plug-in's sector,
     by the public id its install pinned, so deleting the registration and
     making it again changes nothing a person reading it sees."""
+    from app.db.request_context import Unattributed
+    from app.db.session import set_rls_context
     from app.models.platform.plugin_service_registration import (
         PluginServiceRegistration,
     )
-    from app.db.request_context import Unattributed
-    from app.db.session import set_rls_context
     from app.services.marketplace.registration_lookup import invalidate_registrations
     from app.testing import create_plugin_service_registration
     from app.testing.plugin_clients import LISTING, client_jwks
@@ -391,8 +394,8 @@ async def test_an_install_cannot_remove_what_it_did_not_register(
         hmac_secret="x" * 64,
         event_types=["files.created"],
         active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     session.add(theirs)
     await session.commit()

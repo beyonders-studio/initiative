@@ -1,7 +1,8 @@
-import { ChevronDown, FileDown, Loader2 } from "lucide-react";
+import { ChevronDown, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useExportJob } from "@/hooks/useExportJob";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useExportJob } from "@/hooks/useExportJob";
+} from "@/ui/dropdown-menu";
 
 export interface ExportFormatOption {
   /** The ``format`` query value ("pdf", "csv", "xlsx", "md", "json"). */
@@ -81,14 +81,14 @@ export function ExportButton({
     <Button
       variant={variant}
       size="sm"
-      disabled={busy}
+      pending={busy}
       aria-label={idleLabel}
       title={idleLabel}
       onClick={menuMode ? undefined : () => void handleExport(formats[0])}
     >
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+      <FileDown className="h-4 w-4" />
       <span className="hidden sm:inline">{busy ? t("export.preparing") : idleLabel}</span>
-      {withChevron && !busy && <ChevronDown className="h-3 w-3 opacity-60" />}
+      {withChevron && <ChevronDown className="h-3 w-3 opacity-60" />}
     </Button>
   );
 

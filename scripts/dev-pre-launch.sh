@@ -10,6 +10,25 @@
 # attempt. A seed cut short that way is cleared at the top of the next launch.
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# This is the one command a fresh clone needs. What it needs from the machine is
+# named here, with the way to get each, before anything starts.
+missing=false
+need() {
+    command -v "$1" >/dev/null 2>&1 && return 0
+    echo "Missing $1: $2" >&2
+    missing=true
+}
+need docker "install Docker (https://docs.docker.com/get-started/get-docker/)"
+need uv "install uv (https://docs.astral.sh/uv/getting-started/installation/)"
+need node "install Node.js 26.12.1 or newer (https://nodejs.org/)"
+need pnpm "run corepack enable pnpm"
+if [ "$missing" = false ] && ! docker info >/dev/null 2>&1; then
+    echo "Docker is installed but not running. Start it, then run this again." >&2
+    missing=true
+fi
+[ "$missing" = false ] || exit 1
+
 # This checkout's ports, log paths and frontend API URLs. The main working tree
 # keeps 8000/5173; linked worktrees get their own pair so several run at once.
 . "$SCRIPT_DIR/dev-ports.sh"

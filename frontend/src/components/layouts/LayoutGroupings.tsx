@@ -3,20 +3,21 @@ import { ArrowDown, ArrowUp, Eye, EyeClosed } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { DateBucket, LayoutGrouping } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type {
+  DateBucket,
+  LayoutGrouping,
+  TaskListRead,
+} from "@/api/generated/initiativeAPI.schemas";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useGroupables } from "@/hooks/useTaskGroupings";
-import type { ListLayout } from "@/lib/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
+import type { GroupMove } from "@/lib/layouts/taskGroupings";
+import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import type { ListLayout } from "@/ui/layouts/draft";
+import type { FieldDef } from "@/ui/layouts/fields";
 import {
   DATE_BUCKETS,
   groupingsFor,
@@ -24,11 +25,10 @@ import {
   MAX_GROUPINGS,
   MAX_HIDDEN_GROUPS,
   type OfferedGrouping,
-} from "@/lib/layouts/grouping";
-import { cn } from "@/lib/utils";
-import type { TranslateFn } from "@/types/i18n";
-
-import type { LayoutEdits } from "./LayoutEditor";
+} from "@/ui/layouts/grouping";
+import type { LayoutEdits } from "@/ui/layouts/LayoutEditor";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const NOT_GROUPED = "__none__";
 
@@ -165,13 +165,12 @@ export const LayoutGroupings = ({
           {translate("layouts:groupings.full", { count: MAX_GROUPINGS })}
         </p>
       ) : null}
-      <div className="space-y-1">
-        <Label htmlFor="layout-group-by">{translate("layouts:groupings.startsOn")}</Label>
+      <Field label={translate("layouts:groupings.startsOn")} className="space-y-1">
         <Select
           value={groupBy ?? NOT_GROUPED}
           onValueChange={(value) => change(entries, value === NOT_GROUPED ? null : value)}
         >
-          <SelectTrigger id="layout-group-by">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -183,7 +182,7 @@ export const LayoutGroupings = ({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
     </div>
   );
 };
@@ -201,9 +200,9 @@ export const CanvasGrouping = ({
   disabled,
   onToggle,
 }: {
-  offered: OfferedGrouping[];
+  offered: OfferedGrouping<TaskListRead, GroupMove>[];
   /** The grouping picked, once its groups are in. */
-  active?: OfferedGrouping;
+  active?: OfferedGrouping<TaskListRead, GroupMove>;
   grouping: GroupingState;
   onGroupingChange: (next: GroupingState) => void;
   /** A save is under way, and nothing changes until it answers. */

@@ -40,12 +40,12 @@
   "errors": {
     "communityContext": "Der Community-Kontext für diese Aufgabe konnte nicht ermittelt werden.",
     "statusUpdate": "Aufgabenstatus konnte nicht aktualisiert werden.",
-    "statusNoMatch": "Aufgabenstatus konnte nicht aktualisiert werden. Kein passender Status gefunden."
+    "statusNoMatch": "Aufgabenstatus konnte nicht aktualisiert werden. Kein passender Status gefunden.",
+    "reorder": "Die Aufgabe konnte nicht verschoben werden."
   },
   "updating": "Wird aktualisiert…",
   "projectFallback": "Projekt #{{id}}",
   "edit": {
-    "loadingTask": "Aufgabe wird geladen…",
     "notFound": "Aufgabe nicht gefunden",
     "notFoundDescription": "Diese Aufgabe wurde möglicherweise gelöscht oder du bist einem ungültigen Link gefolgt.",
     "noAccess": "Zugriff verweigert",
@@ -53,7 +53,6 @@
     "backToProjects": "← Zurück zu den Projekten",
     "loadProjectError": "Der Projektkontext für diese Aufgabe konnte nicht geladen werden.",
     "createdBy": "Erstellt von {{name}} · {{time}}",
-    "createdAt": "Erstellt {{time}}",
     "readOnlyNoAccess": "Du hast nur Lesezugriff auf dieses Projekt, daher sind die Aufgabenfelder deaktiviert.",
     "readOnlyArchived": "Dieses Projekt ist archiviert. Hebe die Archivierung in den Projekteinstellungen auf, um Aufgaben zu bearbeiten.",
     "aiGenerate": "Mit KI generieren",
@@ -112,22 +111,17 @@
       "days_other": "{{count}} Tage",
       "any": "Beliebiges Datum"
     },
-    "loadError": "Fokusliste derzeit nicht verfügbar.",
     "truncated": "Die ersten {{shown}} werden angezeigt. Verkleinere den Zeitraum für eine kürzere Liste.",
     "settingsHint": "Angeheftete Aufgaben erscheinen immer, unabhängig von diesen Einstellungen."
   },
   "myTasks": {
     "title": "Meine Aufgaben",
     "noCommunity": "Keine Community",
-    "loadError": "Deine Aufgaben konnten nicht geladen werden.",
     "groupByDate": "Datum",
     "groupByCommunity": "Community"
   },
   "myCalendar": {
     "title": "Mein Kalender"
-  },
-  "tagTasks": {
-    "loadError": "Aufgaben konnten nicht geladen werden."
   },
   "ai": {
     "fromComments_one": "Ohne den Kommentar der Aufgabe geschrieben, er passte nicht hinein.",
@@ -182,11 +176,9 @@
   "move": {
     "title": "Aufgabe in ein anderes Projekt verschieben",
     "description": "Wähle ein Zielprojekt innerhalb der aktuellen Community aus. Du kannst Aufgaben nur in Projekte verschieben, in denen du die Berechtigung hast, neue Arbeit zu erstellen.",
-    "loadError": "Beschreibbare Projekte konnten nicht geladen werden.",
-    "loading": "Verfügbare Projekte werden geladen…",
     "noProjects": "Du hast noch keine anderen beschreibbaren Projekte verfügbar.",
     "searchPlaceholder": "Projekte suchen…",
-    "statusResetWarning": "Beim Verschieben dieser Aufgabe wird ihr Status auf ‘Backlog’ zurückgesetzt.",
+    "statusResetWarning": "Beim Verschieben erhält diese Aufgabe den Standardstatus des Zielprojekts.",
     "moving": "Wird verschoben…",
     "moveTask": "Aufgabe verschieben"
   },
@@ -199,8 +191,7 @@
     "noInitiatives": "Keine Initiativen in dieser Community gefunden.",
     "noProjects": "Keine Projekte in dieser Initiative gefunden.",
     "back": "Zurück",
-    "searchProjects": "Projekte suchen…",
-    "loadMore": "Mehr laden"
+    "searchProjects": "Projekte suchen…"
   },
   "bulkEdit": {
     "title": "Aufgaben bearbeiten",

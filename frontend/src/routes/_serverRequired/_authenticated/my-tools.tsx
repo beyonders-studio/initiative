@@ -1,6 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { validatePage } from "@/lib/routeSearch";
+import { ToolsPage } from "@/pages/my/ToolsPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/my-tools")({
   /** `tool` is a tool's route segment ("projects", "counter-groups", …). It is
@@ -30,7 +31,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/my-tools")
     made: search.made === "me" ? "me" : undefined,
     communities: typeof search.communities === "string" ? search.communities : undefined,
   }),
-  component: lazyRouteComponent(() =>
-    import("@/pages/user/MyToolsPage").then((m) => ({ default: m.MyToolsPage }))
-  ),
+  component: ToolsPage,
 });

@@ -20,7 +20,12 @@ The checks, in order, each with its own refusal:
    ``member`` for a member token (``actor_not_supported``);
 6. a caller confined to an initiative finds the target placed there too
    (``target_not_placed``);
-7. a member token's member is named to the target by the target's own
+7. a member token's member holds the permission the endpoint names, or
+   ``use``, in the target as they would opening it themselves: in the
+   initiative the caller is confined to, or else in one the target is placed
+   in (``permission_required``). A call made as the community answers to the
+   seat's grant alone;
+8. a member token's member is named to the target by the target's own
    reference, which the caller never sees.
 
 A read goes through the widget path's response cache, keyed also by the
@@ -31,28 +36,31 @@ cached and never retried.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any
 
-import httpx
+import httpx2
 from sqlalchemy import or_, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_scopes import plugin_scope
 from app.core.messages import PluginDataMessages, PluginHubMessages
+from app.core.plugin_scopes import plugin_scope
 from app.db.guild_standing import ISSUABLE_SCOPES_SQL
-from app.db.session import clear_rls_context, set_rls_context
-from app.models.tenant.plugin_member_consent import PluginMemberConsent, ConsentAccess
-from app.models.tenant.plugin_placement import PluginPlacement
+from app.db.request_context import SystemGuild
+from app.db.session import clear_rls_context, require_guild_context, set_rls_context
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_member_consent import ConsentAccess, PluginMemberConsent
+from app.models.tenant.plugin_placement import PluginPlacement
+from app.services.cross_guild import gather_across_guilds
 from app.services.marketplace import plugin_data
-from app.services.marketplace.plugin_data import PluginDataError, CallingPlugin
+from app.services.marketplace.plugin_data import CallingPlugin, PluginDataError
 from app.services.marketplace.plugin_refs import PluginNameRefused, ensure_plugin_ref
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
-from app.services.marketplace.service_plugins import is_admin_only
+from app.services.marketplace.service_plugins import surface_permission
+from app.services.tenant.guild_plugins import holds_permission, placed_initiative_ids
 from app.services.tenant.plugin_channels import owns_install
-from app.db.request_context import SystemGuild
 
 __all__ = [
     "INSTALLATION",
@@ -80,10 +88,10 @@ class HubCaller:
     client_id: str
     token_scopes: frozenset[str]
     #: The initiative the token is confined to, when it is.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     #: The member a member token acts for, and the purpose they consented to.
-    member_user_id: Optional[int] = None
-    purpose: Optional[str] = None
+    member_user_id: int | None = None
+    purpose: str | None = None
 
     @property
     def actor(self) -> str:
@@ -113,7 +121,7 @@ def _refuse(code: str, status_code: int) -> PluginDataError:
 
 def _callable_endpoint(
     definition: Mapping[str, Any] | None, endpoint_id: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """One endpoint of the pinned definition a caller may invoke, or None."""
     return plugin_data.endpoint_by_id(
         definition, endpoint_id, directions=_CALLABLE_DIRECTIONS
@@ -161,7 +169,7 @@ async def _placed(session: AsyncSession, install_id: int, initiative_id: int) ->
     ).first() is not None
 
 
-def _hub_cache_key(base: str, caller: HubCaller, member_ref: Optional[str]) -> str:
+def _hub_cache_key(base: str, caller: HubCaller, member_ref: str | None) -> str:
     """The widget path's key, with everything else the answer may depend on:
     who called, on whose behalf, and where."""
     return (
@@ -177,7 +185,7 @@ async def call_plugin(
     target_public_id: str,
     endpoint_id: str,
     params: Mapping[str, Any],
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> HubAnswer:
     """Check one call against checks 2–7 and make it.
 
@@ -223,8 +231,7 @@ async def call_plugin(
         endpoint = _callable_endpoint(target.definition, endpoint_id)
         if endpoint is None:
             raise _refuse(PluginDataMessages.ENDPOINT_NOT_FOUND, 404)
-        # An endpoint for the community's admins alone is not offered to plug-ins.
-        if endpoint.get("public") is not True or is_admin_only(endpoint):
+        if endpoint.get("public") is not True:
             raise _refuse(PluginHubMessages.ENDPOINT_NOT_PUBLIC, 403)
 
         actors = endpoint.get("actors")
@@ -259,6 +266,34 @@ async def call_plugin(
         clear_rls_context(session)
         await session.rollback()
 
+    if caller.actor == MEMBER:
+        # Asked as opening the target would ask it, of the member entered
+        # through the seam a request of theirs takes: in the initiative
+        # the caller is confined to, or else in any the target is placed in.
+        permission = surface_permission(endpoint)
+
+        async def holds(routed: AsyncSession, _guild_id: int) -> list[bool]:
+            context = require_guild_context(routed)
+            where = await placed_initiative_ids(routed, int(target.id or 0))
+            if caller.initiative_id is not None:
+                where &= {caller.initiative_id}
+            return [
+                any(
+                    holds_permission(context, target, permission, initiative_id=here)
+                    for here in where
+                )
+            ]
+
+        if not any(
+            await gather_across_guilds(
+                session,
+                {int(caller.member_user_id or 0): [caller.guild_id]},
+                holds,
+                on_behalf=True,
+            )
+        ):
+            raise _refuse(PluginDataMessages.PERMISSION_REQUIRED, 403)
+
     member_user_id = caller.member_user_id
     try:
         member_ref = (
@@ -279,7 +314,7 @@ async def call_plugin(
         initiative_id=caller.initiative_id,
     )
 
-    async def read(request: httpx.Request | plugin_data.Answered) -> dict[str, Any]:
+    async def read(request: httpx2.Request | plugin_data.Answered) -> dict[str, Any]:
         return await plugin_data._read_body(request, transport=transport)
 
     async def call() -> dict[str, Any]:

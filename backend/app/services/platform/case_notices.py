@@ -18,8 +18,6 @@ the settings page offers the category only to them.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -63,7 +61,7 @@ async def opened(
     *,
     task: Task,
     stream: IntakeStream,
-    filer_id: Optional[int],
+    filer_id: int | None,
 ) -> None:
     """Tell everyone who can read case ``task`` that it opened. Whoever filed
     it is not told of their own case."""

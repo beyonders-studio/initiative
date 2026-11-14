@@ -5,36 +5,36 @@ from __future__ import annotations
 import json
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 from sqlmodel import select
 
+from app.core.intake import CaseField, IntakeStream
 from app.core.moderation import ReportOutcome, ReportVenue
 from app.core.tools import Tool
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
-from app.core.intake import CaseField, IntakeStream
+from app.models.tenant.comment import Comment
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition, MetadataValue
-from app.models.tenant.comment import Comment
 from app.models.tenant.moderation import ModerationReport, ModerationReportReporter
-from app.models.tenant.task import Task
 from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.models.tenant.task import Task
 from app.testing import (
-    create_resource_grant,
     create_comment,
     create_guild,
-    create_initiative,
-    create_project,
     create_guild_membership,
+    create_initiative,
     create_initiative_member,
     create_marketplace_listing,
+    create_project,
+    create_resource_grant,
     create_task,
     create_user,
     emitted,
     get_auth_headers,
     make_operations_community,
 )
-from app.db.request_context import SystemGuild, Unattributed
 
 
 async def _report(client: AsyncClient, actor, **body) -> Response:

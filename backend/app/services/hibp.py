@@ -18,8 +18,7 @@ from __future__ import annotations
 import hashlib
 import logging
 
-import httpx
-
+import httpx2
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ _HEADERS = {
     "User-Agent": "initiative-plugin",
     "Add-Padding": "true",
 }
-_TIMEOUT = httpx.Timeout(2.0)
+_TIMEOUT = httpx2.Timeout(2.0)
 
 
 async def is_password_breached(password: str) -> bool:
@@ -50,7 +49,7 @@ async def is_password_breached(password: str) -> bool:
     # ValueError on FIPS-enforcing OpenSSL builds (SHA-1 is disallowed
     # there for security uses, but the HIBP k-anonymity scheme uses it
     # purely as a content fingerprint for an external lookup). Without
-    # this flag, the exception escapes the ``httpx.HTTPError`` handler
+    # this flag, the exception escapes the ``httpx2.HTTPError`` handler
     # below and turns every password change into a 500 instead of
     # failing open.
     sha1 = (
@@ -61,13 +60,13 @@ async def is_password_breached(password: str) -> bool:
     prefix, suffix = sha1[:5], sha1[5:]
 
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        async with httpx2.AsyncClient(timeout=_TIMEOUT) as client:
             response = await client.get(
                 _RANGE_URL.format(prefix=prefix), headers=_HEADERS
             )
             response.raise_for_status()
             body = response.text
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         logger.warning("HIBP lookup failed; allowing password (fail-open): %s", exc)
         return False
 

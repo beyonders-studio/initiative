@@ -1,9 +1,13 @@
-"""Comments on tasks and files."""
+"""Comments on tasks and files, each written by its author on their own
+request session, so the change log says who commented and the activity feed
+has the week's conversation to show."""
 
 from __future__ import annotations
 
+from app.api.deps import establish_guild_access
+from app.db import cohorts
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
-
 from seed.common import Community
 
 #: Each comment names the ``task`` or ``file`` it is on, by title.
@@ -167,13 +171,24 @@ COMMENTS: dict[str, list[dict]] = {
 
 
 async def seed(c: Community) -> None:
+    """Write the comments in order, after the community's content is
+    committed (an author's session cannot see it before) and before anything
+    is archived (archived content takes no comments)."""
     for d in COMMENTS[c.key]:
-        comment = Comment(
-            content=d["content"],
-            created_by=c.users[d["author"]].id,
-            task_id=c.tasks[d["task"]].id if "task" in d else None,
-            file_id=c.files[d["file"]].id if "file" in d else None,
-        )
-        c.session.add(comment)
-        await c.session.flush()
-        c.ids["comments"].append(comment.id)
+        author = c.users[d["author"]]
+        session = cohorts.request_sessionmaker(c.guild.id)()
+        try:
+            account = await session.merge(author, load=False)
+            await establish_guild_access(session, account, c.guild.id)
+            comment = Comment(
+                content=d["content"],
+                created_by=author.id,
+                created_by_kind=ActorKind.member,
+                task_id=c.tasks[d["task"]].id if "task" in d else None,
+                file_id=c.files[d["file"]].id if "file" in d else None,
+            )
+            session.add(comment)
+            await session.commit()
+            c.ids["comments"].append(comment.id)
+        finally:
+            await session.close()

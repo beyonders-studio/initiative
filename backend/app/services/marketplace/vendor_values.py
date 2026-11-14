@@ -28,22 +28,24 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any
 
 from cryptography.fernet import InvalidToken
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_PLUGIN_VENDOR, decrypt_field, encrypt_field
 from app.core.messages import PluginServiceMessages
 from app.db import session as db_session
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.marketplace import (
     MarketplaceListing,
     MarketplaceListingVersion,
 )
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,7 @@ def required_keys(definition: Mapping[str, Any] | None) -> list[str]:
 
 
 async def listing_definitions(
-    session: AsyncSession, listing_uids: Iterable[Optional[str]]
+    session: AsyncSession, listing_uids: Iterable[str | None]
 ) -> dict[str, dict[str, Any]]:
     """Each listing's latest definition, by uid, in one statement."""
     wanted = {uid for uid in listing_uids if uid}
@@ -164,15 +166,18 @@ def _checked(field: Mapping[str, Any] | None, value: str) -> str:
         raise _bad("empty value")
     if len(text) > MAX_VENDOR_VALUE_LENGTH:
         raise _bad("value too long")
-    if field is not None and field.get("type") == "url":
-        if not text.startswith(("https://", "http://")) or " " in text:
-            raise _bad("not a URL")
+    if (
+        field is not None
+        and field.get("type") == "url"
+        and (not text.startswith(("https://", "http://")) or " " in text)
+    ):
+        raise _bad("not a URL")
     return text
 
 
 def apply_vendor_values(
     row: PluginServiceRegistration,
-    submitted: Mapping[str, Optional[str]],
+    submitted: Mapping[str, str | None],
     *,
     definition: Mapping[str, Any] | None,
 ) -> list[str]:
@@ -267,7 +272,7 @@ def _decrypt_all(stored: Mapping[str, Any], *, public_id: str) -> dict[str, str]
             continue
         try:
             values[key] = decrypt_field(ciphertext, SALT_PLUGIN_VENDOR)
-        except (InvalidToken, UnicodeDecodeError):
+        except InvalidToken, UnicodeDecodeError:
             logger.warning(
                 "plug-in services: %r vendor value %r does not decrypt", public_id, key
             )

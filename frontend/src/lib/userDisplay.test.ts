@@ -5,9 +5,7 @@ import {
   getUserDisplayName,
   getUserHandle,
   hasDisplayName,
-  isInactiveUser,
 } from "@/lib/userDisplay";
-import { slugifyUsername } from "@/lib/usernames";
 
 const withHandle = { id: 7, username: "foobar", discriminator: 12 };
 
@@ -59,41 +57,9 @@ describe("getUserDisplayName", () => {
   });
 });
 
-describe("isInactiveUser", () => {
-  it("covers both ways an account stops being used", () => {
-    expect(isInactiveUser({ ...withHandle, status: "active" })).toBe(false);
-    expect(isInactiveUser({ ...withHandle, status: "deactivated" })).toBe(true);
-    expect(isInactiveUser({ ...withHandle, status: "anonymized" })).toBe(true);
-  });
-});
-
 describe("hasDisplayName", () => {
   it("is true as soon as there is a handle", () => {
     expect(hasDisplayName(withHandle)).toBe(true);
     expect(hasDisplayName({ id: 7 })).toBe(false);
-  });
-});
-
-describe("slugifyUsername", () => {
-  it("offers first initial and last name, as the server seeds", () => {
-    expect(slugifyUsername("Lee Janzen")).toBe("ljanzen");
-    expect(slugifyUsername("Ada Lovelace King")).toBe("aking");
-    expect(slugifyUsername("Élodie Martin")).toBe("emartin");
-  });
-
-  it("lets a single-word name stand on its own", () => {
-    expect(slugifyUsername("Jordan")).toBe("jordan");
-    expect(slugifyUsername("  Jordan  ")).toBe("jordan");
-  });
-
-  it("offers nothing for an address", () => {
-    // An address is never the source of a handle, here or on the server.
-    expect(slugifyUsername("jordan@example.com")).toBe("");
-  });
-
-  it("offers nothing when too little survives", () => {
-    expect(slugifyUsername("")).toBe("");
-    expect(slugifyUsername("!!")).toBe("");
-    expect(slugifyUsername("Jo")).toBe("");
   });
 });

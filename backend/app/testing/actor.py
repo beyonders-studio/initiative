@@ -31,7 +31,7 @@ from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild, GuildMembership
 from app.models.platform.user import User, UserRole
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -99,38 +99,47 @@ async def make_actor(
         role = UserRole(role)
 
     user = await create_user(session, role=role, **overrides)
-    actor = Actor(user=user, headers=get_auth_headers(user))
+    headers = get_auth_headers(user)
 
     if guild_role is None:
         if initiative is not None or project is not None:
             raise ValueError("initiative/project require a guild_role")
-        return actor
+        return Actor(user=user, headers=headers)
 
     if isinstance(guild_role, str):
         guild_role = CommunityRole(guild_role)
-    actor.guild = guild if guild is not None else await create_guild(session)
-    actor.membership = await create_guild_membership(
-        session, user=user, guild=actor.guild, role=guild_role
+    in_guild = guild if guild is not None else await create_guild(session)
+    membership = await create_guild_membership(
+        session, user=user, guild=in_guild, role=guild_role
     )
 
+    in_initiative: Initiative | None = None
     if initiative is True:
         if initiative_role != "project_manager":
             raise ValueError(
                 "initiative=True makes the actor the creator (PM); pass an "
                 "existing initiative to join it with initiative_role="
             )
-        actor.initiative = await create_initiative(session, actor.guild, user)
+        in_initiative = await create_initiative(session, in_guild, user)
     elif isinstance(initiative, Initiative):
-        actor.initiative = initiative
+        in_initiative = initiative
         await create_initiative_member(
             session, initiative, user, role_name=initiative_role
         )
 
+    in_project: Project | None = None
     if project is True:
-        if actor.initiative is None:
+        if in_initiative is None:
             raise ValueError("project=True requires initiative")
-        actor.project = await create_project(session, actor.initiative, user)
+        in_project = await create_project(session, in_initiative, user)
     elif isinstance(project, Project):
-        actor.project = project
+        in_project = project
 
-    return actor
+    return Actor(
+        user=user,
+        headers=headers,
+        guild=in_guild,
+        membership=membership,
+        initiative=in_initiative,
+        project=in_project,
+    )

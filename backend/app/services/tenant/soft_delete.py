@@ -32,20 +32,20 @@ cleanup runs before the DELETE so blobs on disk and ``Upload`` rows pinned only 
 the doomed files are also removed.
 """
 
+from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import Iterable, Optional
 
+from sqlalchemy.orm import undefer
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from sqlalchemy.orm import undefer
-
+from app.core.clock import utcnow
 from app.db import gucs
 from app.db.frozen import PARK, RELEASED_NAMES
 from app.db.query import ids_in
 from app.db.session import raise_flag
 from app.db.soft_delete_filter import select_including_deleted
-from app.models.tenant._mixins import SoftDeleteMixin
+from app.models.tenant._mixins import ActorKind, SoftDeleteMixin
 from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
@@ -59,7 +59,6 @@ from app.services.tenant.lifecycle_tree import (
     set_columns,
     subtree_levels,
 )
-from app.core.clock import utcnow
 
 __all__ = [
     "CASCADE_CHILDREN",
@@ -124,8 +123,8 @@ async def _reclaim_name(session: AsyncSession, row: SoftDeleteMixin) -> None:
 
 
 def _compute_purge_at(
-    deleted_at: datetime, retention_days: Optional[int]
-) -> Optional[datetime]:
+    deleted_at: datetime, retention_days: int | None
+) -> datetime | None:
     if retention_days is None:
         return None
     return deleted_at + timedelta(days=retention_days)
@@ -169,8 +168,8 @@ async def trash(
     session: AsyncSession,
     entity: SoftDeleteMixin,
     *,
-    deleted_by_user_id: Optional[int],
-) -> Optional[int]:
+    deleted_by_user_id: int | None,
+) -> int | None:
     """Put ``entity`` in the bin under the retention of the guild the session
     is routed to, and return that retention in days (``None``: kept until
     purged by hand). Caller commits."""
@@ -200,8 +199,8 @@ async def soft_delete_entity(
     session: AsyncSession,
     entity: SoftDeleteMixin,
     *,
-    deleted_by_user_id: Optional[int],
-    retention_days: Optional[int],
+    deleted_by_user_id: int | None,
+    retention_days: int | None,
 ) -> None:
     """Stamp the entity and every active descendant as soft-deleted.
 
@@ -215,6 +214,7 @@ async def soft_delete_entity(
     values = {
         "deleted_at": deleted_at,
         "deleted_by": deleted_by_user_id,
+        "deleted_by_kind": None if deleted_by_user_id is None else ActorKind.member,
         "purge_at": _compute_purge_at(deleted_at, retention_days),
     }
 
@@ -259,7 +259,12 @@ async def restore_entity(
     levels = await subtree_levels(
         session, [entity], where=lambda model: model.deleted_at == matching
     )
-    cleared = {"deleted_at": None, "deleted_by": None, "purge_at": None}
+    cleared = {
+        "deleted_at": None,
+        "deleted_by": None,
+        "deleted_by_kind": None,
+        "purge_at": None,
+    }
     for level in levels:
         await _write_level(session, level, cleared)
     _settle_collections(session, levels, "restored_files")
@@ -282,8 +287,8 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     from app.services.tenant import (
         engagement_levels,
         metadata,
-        reactions,
         personal_items,
+        reactions,
         relationships,
         tool_layouts,
     )
@@ -392,6 +397,7 @@ async def _leave_tombstones(session: AsyncSession, ids: set[int]) -> set[str]:
         comment.removal_id = None
         comment.deleted_at = None
         comment.deleted_by = None
+        comment.deleted_by_kind = None
         comment.purge_at = None
         session.add(comment)
     await session.flush()
@@ -431,12 +437,12 @@ async def hard_purge_entities(
     stored names returned include the evidence objects of doomed cases and
     reports, which live in the same storage.
     """
-    from app.services.tenant.files import unlink_references_to_file
     from app.services.tenant.attachments import (
         purge_file_uploads,
         purge_initiative_uploads,
         purge_pasted_images,
     )
+    from app.services.tenant.files import unlink_references_to_file
 
     roots = list(entities)
     if not roots:

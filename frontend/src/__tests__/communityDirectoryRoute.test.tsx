@@ -17,9 +17,9 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DirectoryCommunityRead } from "@/api/generated/initiativeAPI.schemas";
-import { AppSidebar } from "@/components/AppSidebar";
 import { CommunitySidebar } from "@/components/communities/CommunitySidebar";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/sidebar/AppSidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 import type { CommunityEntry } from "@/hooks/useCommunities";
 import { routeTree } from "@/routeTree.gen";
 
@@ -42,6 +42,8 @@ const directory = vi.fn();
 vi.mock("@/hooks/useCommunityDirectory", () => ({
   useDirectoryCommunities: (params: unknown) => directory(params),
   useJoinDirectoryCommunity: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useAskToJoinDirectoryCommunity: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useWithdrawDirectoryJoinRequest: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 const community: DirectoryCommunityRead = {
@@ -55,6 +57,8 @@ const community: DirectoryCommunityRead = {
   member_count: 12,
   online_count: 0,
   already_member: false,
+  join_policy: "open",
+  request_pending: false,
 };
 
 const DIRECTORY_ROUTE_ID = "/_serverRequired/_authenticated/communities";

@@ -7,13 +7,12 @@ against the dashboard.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.testing import emitted
-
 
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 

@@ -26,9 +26,8 @@ request path holds ``SELECT`` and a policy admitting ``client``, the sector an
 account's own access token names it by (``services.auth.subject``).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -173,7 +172,7 @@ class IdentityRef(SQLModel, table=True):
         Index("ix_identity_refs_retired_at", "retired_at"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     #: The value the other party holds, prefix and all.
     ref: str = Field(sa_column=Column(String(REF_MAX_LENGTH), nullable=False))
@@ -191,24 +190,24 @@ class IdentityRef(SQLModel, table=True):
 
     #: Which guild the sector belongs to, for ``plugin``. NULL for a
     #: platform-wide sector such as ``billing``.
-    sector_guild_id: Optional[int] = Field(
+    sector_guild_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     #: Which plug-in inside that guild is the sector, by its registration's
     #: ``public_id``, for ``plugin``. A name rather than a row id: an install
     #: row goes at uninstall and a registration row can be deleted and made
     #: again, and the reference has to outlast both.
-    sector_plugin: Optional[str] = Field(
+    sector_plugin: str | None = Field(
         default=None,
         sa_column=Column(String(SECTOR_PLUGIN_MAX_LENGTH), nullable=True),
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: When this value was replaced. NULL while it is the live one; set by a
     #: re-issue, after which the row stays resolvable for the grace window.
-    retired_at: Optional[datetime] = Field(
+    retired_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

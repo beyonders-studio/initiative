@@ -51,8 +51,6 @@
     "allPosts": "All posts",
     "unreadOnly": "Unread only"
   },
-  "loading": "Loading posts...",
-  "loadError": "Failed to load posts.",
   "creating": "Posting...",
   "saving": "Saving...",
   "notFound": "Post not found",

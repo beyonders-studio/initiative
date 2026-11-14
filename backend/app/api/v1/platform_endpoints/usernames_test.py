@@ -6,13 +6,12 @@ one in that guild.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.testing import create_guild, create_guild_membership, create_user
 from app.testing.factories import get_auth_headers
-
 
 REGISTRATION = {
     "email": "handle-new@example.com",

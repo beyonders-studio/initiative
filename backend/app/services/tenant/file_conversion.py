@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +63,7 @@ def _refuse(code: int, detail: str) -> HTTPException:
 
 
 async def convert(
-    session: AsyncSession, guild_id: int, file: File, *, user_id: int
+    session: AsyncSession, guild_id: int, file: File
 ) -> tuple[list[FileVersion], list[str]]:
     """Make ``file`` the type it converts to, from its current version, and
     delete its versions. Returns the deleted versions and the URLs of the
@@ -118,7 +118,6 @@ async def convert(
                     filename=picture.filename,
                     data=picture.data,
                     content_type=picture.content_type,
-                    created_by=user_id,
                     initiative_id=file.initiative_id,
                 )
             )
@@ -131,7 +130,7 @@ async def convert(
         file.file_type = spec.converts_to
         file.content = content
         file.yjs_state = None
-        file.updated_at = datetime.now(timezone.utc)
+        file.updated_at = datetime.now(UTC)
         session.add(file)
     except BaseException:
         # Nothing has committed, so the pictures stored so far are nobody's.

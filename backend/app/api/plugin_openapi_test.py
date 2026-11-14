@@ -12,12 +12,12 @@ from typing import Annotated, Any
 
 import pytest
 from fastapi import Depends, FastAPI
-from fastapi.routing import APIRoute
-from httpx import AsyncClient
+from fastapi.routing import APIRoute, iter_route_contexts
+from httpx2 import AsyncClient
 
+from app.api.deps import ActorContext, plugin_scope, route_plugin_scope_declaration
 from app.api.plugin_openapi import COMMUNITY_PREFIX, build_plugin_openapi
 from app.db.search_index import written_columns
-from app.api.deps import ActorContext, plugin_scope, route_plugin_scope_declaration
 from app.main import app, plugin_openapi
 from app.services.marketplace.plugin_api import PLUGIN_API_VERSION
 from app.services.tenant.attachments import _upload_columns
@@ -61,16 +61,21 @@ def _nodes(node: Any) -> Iterator[dict[str, Any]]:
 def test_every_plugin_route_is_in_the_plugin_document_once_with_its_scope():
     main = app.openapi()
     expected: dict[str, tuple[str, str, Any]] = {}
-    for route in app.routes:
-        if not isinstance(route, APIRoute) or not route.include_in_schema:
+    for route in iter_route_contexts(app.routes):
+        original, full_path = route.original_route, route.path_format
+        if (
+            not isinstance(original, APIRoute)
+            or full_path is None
+            or not route.include_in_schema
+        ):
             continue
         declaration = route_plugin_scope_declaration(route)
-        for method in route.methods:
-            operation = main["paths"][route.path_format][method.lower()]
-            assert operation.get("x-plugin-scope") == declaration, route.path_format
+        for method in route.methods or ():
+            operation = main["paths"][full_path][method.lower()]
+            assert operation.get("x-plugin-scope") == declaration, full_path
             if declaration is not None:
-                path = route.path_format.removeprefix(COMMUNITY_PREFIX)
-                expected[route.name] = (method.lower(), path, declaration)
+                path = full_path.removeprefix(COMMUNITY_PREFIX)
+                expected[original.name] = (method.lower(), path, declaration)
 
     published = [
         (operation["operationId"], (method, path, operation["x-plugin-scope"]))

@@ -5,27 +5,27 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
-from app.core.messages import ImageMessages, AttachmentMessages
+from app.core.messages import AttachmentMessages, ImageMessages
 from app.models.platform.user import User
 from app.schemas.tenant.attachment import AttachmentUploadResponse
+from app.services import storage_config
+from app.services.storage import get_guild_storage
+from app.services.tenant import attachments as attachments_service
 from app.services.tenant.attachments import (
     IMAGE_SUFFIXES,
     MAX_IMAGE_BYTES,
-    detect_document_image_type,
-    FileTooLargeError,
     PASTED_IMAGE_PREFIX,
+    FileTooLargeError,
+    detect_document_image_type,
     enforce_storage_quota,
     new_upload_filename,
     read_upload_bounded,
     store_upload,
 )
-from app.services import storage_config
-from app.services.tenant import attachments as attachments_service
-from app.services.storage import get_guild_storage
 
 router = APIRouter()
 
@@ -34,7 +34,6 @@ ImageUploadUser = Annotated[User, Depends(get_current_active_user)]
 
 async def _store_image(
     *,
-    current_user: User,
     session: RLSSessionDep,
     guild_id: int,
     file: UploadFile,
@@ -89,7 +88,6 @@ async def _store_image(
         filename=filename,
         data=contents,
         content_type=content_type,
-        created_by=current_user.id,
     )
     await session.commit()
 
@@ -112,7 +110,6 @@ async def upload_attachment(
     file: UploadFile = File(...),
 ) -> AttachmentUploadResponse:
     return await _store_image(
-        current_user=current_user,
         session=session,
         guild_id=guild_context.guild_id,
         file=file,
@@ -136,7 +133,6 @@ async def upload_pasted_image(
     purging what it is in, deletes it once nothing else shows it.
     """
     return await _store_image(
-        current_user=current_user,
         session=session,
         guild_id=guild_context.guild_id,
         file=file,

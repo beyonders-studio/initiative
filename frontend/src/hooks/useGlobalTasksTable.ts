@@ -1,15 +1,11 @@
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearch } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  ListMyTasksParams,
-  SortField,
-  TaskListResponse,
-} from "@/api/generated/initiativeAPI.schemas";
-import { getListMyTasksQueryKey, listMyTasks } from "@/api/generated/tasks/tasks";
+import type { ListMyTasksParams, SortField } from "@/api/generated/initiativeAPI.schemas";
+import { getListMyTasksQueryOptions, useListMyTasks } from "@/api/generated/tasks/tasks";
 import { useTaskColumnLimits } from "@/hooks/useColumnLimits";
 import { useCommunities } from "@/hooks/useCommunities";
 import { deviceJSON, LIST, type ListViewSpec, useListView, viewKey } from "@/hooks/useListView";
@@ -24,7 +20,7 @@ import {
   taskSpecConditions,
   taskTableSorting,
 } from "@/lib/filters/taskFilters";
-import { browserTimezone } from "@/lib/timezones";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 const SORT_DEFAULTS: SortField[] = [
   { field: "date_group", dir: "asc" },
@@ -206,15 +202,15 @@ export function useGlobalTasksTable(own?: OwnTaskFilters) {
     };
   }, [filters, page, pageSize, sorting, userTimezone]);
 
-  const tasksQuery = useQuery<TaskListResponse>({
-    queryKey: getListMyTasksQueryKey(tasksParams),
-    queryFn: () => listMyTasks(tasksParams),
-    placeholderData: keepPreviousData,
-    // Nothing is worth asking for until the saved filters and sort are in
-    // hand: a request built on the defaults would be thrown away the moment
-    // they arrive, and its rows would sit under the saved sort's headers in
-    // the meantime.
-    enabled: preferencesLoaded,
+  const tasksQuery = useListMyTasks(tasksParams, {
+    query: {
+      placeholderData: keepPreviousData,
+      // Nothing is worth asking for until the saved filters and sort are in
+      // hand: a request built on the defaults would be thrown away the moment
+      // they arrive, and its rows would sit under the saved sort's headers in
+      // the meantime.
+      enabled: preferencesLoaded,
+    },
   });
 
   const prefetchPage = useCallback(
@@ -225,11 +221,7 @@ export function useGlobalTasksTable(own?: OwnTaskFilters) {
         page: targetPage,
       };
 
-      void localQueryClient.prefetchQuery({
-        queryKey: getListMyTasksQueryKey(prefetchParams),
-        queryFn: () => listMyTasks(prefetchParams),
-        staleTime: 30_000,
-      });
+      void localQueryClient.prefetchQuery(getListMyTasksQueryOptions(prefetchParams));
     },
     [tasksParams, localQueryClient]
   );

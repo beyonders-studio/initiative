@@ -19,17 +19,17 @@ import pytest
 
 from app.services.marketplace import service_plugins
 from app.services.marketplace.definitions import (
+    GUILD_INSTALLABLE_PLUGIN_KINDS,
     KIND_AUDIENCE,
     LISTING_AUDIENCES,
     LISTING_KINDS,
-    kinds_for_audience,
-    PLUGIN_KINDS,
-    GUILD_INSTALLABLE_PLUGIN_KINDS,
     LISTING_SOURCES,
+    PLUGIN_KINDS,
     ListingDefinitionError,
-    plugin_widget_type,
-    normalize_publisher,
+    kinds_for_audience,
     normalize_listing_definition,
+    normalize_publisher,
+    plugin_widget_type,
     published_by_us,
     reserved_prefix_problem,
 )
@@ -597,7 +597,80 @@ class TestConnections:
         with pytest.raises(ListingDefinitionError, match=problem):
             _normalize(vendor=VENDOR, connections=connections, webhooks=webhooks)
 
-    @pytest.mark.parametrize("key", ["access_token", "removed_at"])
+    @staticmethod
+    def _shop() -> tuple[list[dict], dict]:
+        """A shop an admin types in, which the plug-in checks, signing its
+        webhooks with a secret of its own."""
+        connections = [
+            {
+                "id": "shop",
+                "scope": "static",
+                "label": _label(),
+                "fields": [
+                    {"key": "url", "type": "url", "label": _label(), "required": True},
+                    {"key": "key", "type": "secret", "label": _label()},
+                    _managed("store_id"),
+                    {**_managed("hook_secret"), "type": "secret"},
+                ],
+                "after_connect": True,
+            },
+            {
+                "id": "workspace",
+                "scope": "static",
+                "label": _label(),
+                "flow": FLOW,
+                "fields": [_managed()],
+            },
+        ]
+        webhooks = {
+            "verify": {
+                "scheme": "hmac_sha256",
+                "header": "X-Shop-Signature",
+                "encoding": "base64",
+                "secret": "{hook_secret}",
+            },
+            "dedup": "X-Shop-Delivery",
+            "route": {
+                "header": "x-shop-store",
+                "connection": "shop",
+                "field": "store_id",
+            },
+        }
+        return connections, webhooks
+
+    def test_a_typed_connection_the_plugin_checks_signs_its_own_webhooks(self):
+        connections, webhooks = self._shop()
+        kept = _normalize(vendor=VENDOR, connections=connections, webhooks=webhooks)
+        assert kept["connections"][0]["after_connect"] is True
+        assert "after_connect" not in kept["connections"][1]
+        assert kept["webhooks"]["verify"]["secret"] == "{hook_secret}"
+
+    @pytest.mark.parametrize(
+        ("change", "problem"),
+        [
+            (lambda c, w: w["verify"].update(secret="{key}"), "verify.secret"),
+            (lambda c, w: w["verify"].update(secret="{store_id}"), "verify.secret"),
+            (lambda c, w: w["verify"].update(secret="{owner}"), "verify.secret"),
+            (lambda c, w: c[0].pop("after_connect"), "which it does not call"),
+            (lambda c, w: c[1].update(after_connect=True), "a flow names its own"),
+            (lambda c, w: c[0].update(after_connect="yes"), "true or false"),
+        ],
+        ids=[
+            "a typed secret",
+            "a managed value that is not a secret",
+            "another connection's field",
+            "managed fields nothing fills",
+            "beside a flow",
+            "not a boolean",
+        ],
+    )
+    def test_a_connection_secret_comes_from_its_after_connect(self, change, problem):
+        connections, webhooks = self._shop()
+        change(connections, webhooks)
+        with pytest.raises(ListingDefinitionError, match=problem):
+            _normalize(vendor=VENDOR, connections=connections, webhooks=webhooks)
+
+    @pytest.mark.parametrize("key", ["access_token", "removed_at", "account_label"])
     def test_a_field_may_not_take_a_reserved_key(self, key: str):
         with pytest.raises(ListingDefinitionError, match="is reserved for"):
             _normalize(
@@ -683,6 +756,7 @@ class TestConnections:
                             "label": _label("Token"),
                         }
                     ],
+                    "after_connect": True,
                     "unexpected": "dropped",
                 }
             ]
@@ -701,6 +775,7 @@ class TestConnections:
                         "managed": True,
                     }
                 ],
+                "after_connect": True,
                 "access_hint": {"api": "Storefront API", "scopes": ["read_items"]},
             }
         ]
@@ -814,11 +889,7 @@ class TestEndpoints:
     def test_a_read_endpoint_stores_no_audience(self):
         endpoint = _with_source()["endpoints"][0]
         assert "visibility" not in endpoint
-        assert endpoint["admin_only"] is False
-
-    def test_a_write_endpoint_may_be_admin_only(self):
-        endpoint = _with_source(direction="write", admin_only=True)["endpoints"][0]
-        assert endpoint["admin_only"] is True
+        assert "permission" not in endpoint
 
     def test_a_cache_window_is_clamped_rather_than_refused(self):
         definition = _with_source(cache_ttl_seconds=10_000_000)
@@ -1005,7 +1076,7 @@ class TestPages:
         page = {
             "id": "orders",
             "path": "/page/orders",
-            "admin_only": True,
+            "permission": "use",
             "name": _label("Orders"),
         }
         page.update(overrides)
@@ -1026,8 +1097,8 @@ class TestPages:
                 "id": "orders",
                 "path": "/page/orders",
                 "scopes": ["community"],
-                "admin_only": True,
                 "name": {"en": "Orders"},
+                "permission": "use",
             }
         ]
 
@@ -1121,12 +1192,9 @@ class TestWhereASurfaceRenders:
         assert self._page(scopes=["community", "community"])["scopes"] == ["community"]
 
 
-class TestAdminOnlySurfaces:
-    """``admin_only`` is the one audience a manifest may still name.
-
-    Who else opens a surface is the community's to choose, per initiative and
-    role, so the manifest says only whether a surface is for admins alone.
-    """
+class TestSurfacePermissions:
+    """A surface names the permission it answers to; who holds it is the
+    community's to choose, with its own roles."""
 
     def _page(self, **overrides) -> dict:
         page = {
@@ -1136,29 +1204,29 @@ class TestAdminOnlySurfaces:
             "scopes": ["initiative"],
         }
         page.update(overrides)
-        return _normalize(features=["pages"], pages=[page])["pages"][0]
+        return _normalize(
+            features=["pages"],
+            pages=[page],
+            permissions=[{"id": "board", "level": "initiative", "name": _label("B")}],
+        )["pages"][0]
 
-    def test_saying_nothing_is_not_admin_only(self):
-        assert self._page()["admin_only"] is False
+    def test_saying_nothing_stores_nothing(self):
+        assert "permission" not in self._page()
 
-    @pytest.mark.parametrize(
-        "scopes", [["community"], ["initiative"], ["community", "initiative"]]
-    )
-    def test_any_surface_may_be_admin_only(self, scopes):
-        assert self._page(scopes=scopes, admin_only=True)["admin_only"] is True
+    def test_it_names_one_declared_where_it_is_held(self):
+        assert self._page(permission="board")["permission"] == "board"
+        with pytest.raises(ListingDefinitionError, match="community level"):
+            self._page(permission="board", scopes=["community", "initiative"])
 
-    @pytest.mark.parametrize("value", ["true", 1, None, []])
-    def test_anything_but_a_boolean_is_refused(self, value):
-        if value is None:
-            # Absent and null read the same: the default.
-            assert self._page(admin_only=value)["admin_only"] is False
-            return
-        with pytest.raises(ListingDefinitionError, match="admin_only"):
-            self._page(admin_only=value)
+    @pytest.mark.parametrize("value", [True, 1, [], "Not An Id"])
+    def test_anything_but_an_identifier_is_refused(self, value):
+        with pytest.raises(ListingDefinitionError, match="permission"):
+            self._page(permission=value)
 
-    def test_the_retired_audience_term_is_refused(self):
-        with pytest.raises(ListingDefinitionError, match="visibility"):
-            self._page(visibility="initiative_manager")
+    @pytest.mark.parametrize("term", ["visibility", "admin_only"])
+    def test_the_retired_audience_terms_are_refused(self, term):
+        with pytest.raises(ListingDefinitionError, match=term):
+            self._page(**{term: True})
 
 
 class TestEmissions:
@@ -1341,10 +1409,8 @@ class TestFieldsPartsAndActions:
             ],
         }
         for tree in (widest, _nested(service_plugins.MAX_PART_DEPTH)):
-            assert (
-                _items(lambda b: b["parts"][0].update(tree=tree))["parts"][0]["tree"]
-                == tree
-            )
+            items = _items(lambda b, tree=tree: b["parts"][0].update(tree=tree))
+            assert items["parts"][0]["tree"] == tree
 
     @pytest.mark.parametrize(
         ("change", "problem"),

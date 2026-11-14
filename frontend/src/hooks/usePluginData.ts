@@ -4,31 +4,28 @@
  * Two queries with deliberately different shapes.
  *
  * The **catalog** is per community and shared by every widget on the canvas: one
- * request tells the page which plug-ins contribute widgets, which module draws each
- * one, and what each source declares. It changes only when a plug-in is installed,
- * upgraded, or turned off, so it is cached generously.
+ * request tells the page which plug-ins contribute widgets and read endpoints,
+ * which module draws each widget, and what each source declares. It changes only
+ * when a plug-in is installed, upgraded, or turned off, so it is cached
+ * generously.
  *
- * The **data** query is per widget, per viewer, and carries the dashboard the
- * widget sits on — the surface whose gates decide the read. Its `staleTime`
+ * The **data** query is a plug-in widget's preview in its config dialog, read
+ * with the parameters on the form; a placed widget is answered with its canvas.
+ * It names the dashboard the widget is configured for. Its `staleTime`
  * comes from the plug-in's own `cache_ttl_seconds`, capped here as well as on the
  * server: a plug-in asking for a day of freshness would otherwise decide how stale
  * a dashboard may look, and the number crossing the wire is a request rather
  * than a promise.
- *
- * Two widgets bound to the same source with the same parameters share a key, so
- * a canvas showing one plug-in's data twice issues one request — the same collapse
- * the server does across viewers, done here across tiles.
  */
 
 import { useQuery } from "@tanstack/react-query";
 
+import { useReadPluginWidgetCatalog } from "@/api/generated/plugins/plugins";
 import {
   getPluginData,
   getPluginParamOptions,
-  getPluginWidgetCatalog,
   type PluginDataResponse,
   type PluginParamOptionsResponse,
-  type PluginWidgetCatalogResponse,
 } from "@/api/pluginData";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -38,16 +35,12 @@ import { useCommunities } from "@/hooks/useCommunities";
  *  must not be the thing that decides. */
 export const MAX_PLUGIN_STALE_SECONDS = 300;
 
-export const pluginWidgetCatalogKey = (communityId: number) =>
-  ["plugin-widget-catalog", communityId] as const;
-
 export const pluginDataKey = (
   communityId: number,
   pluginId: number,
   endpointId: string,
   dashboardId: number,
-  params: Record<string, unknown> | undefined,
-  widgetId?: string
+  params: Record<string, unknown> | undefined
 ) =>
   [
     "plugin-data",
@@ -55,29 +48,26 @@ export const pluginDataKey = (
     pluginId,
     endpointId,
     dashboardId,
-    // Two widgets on one dashboard may read the same endpoint and ask
-    // different things of its rows, so what each of them gets back is its own
-    // answer. The upstream call is still shared — that sharing is the server's.
-    widgetId ?? null,
-    // Canonical, so two widgets that bound the same parameters in a different
-    // order still share one request. Parameter values are scalars, so a sorted
-    // entry list is the whole of it.
+    // Canonical, so the same parameters answered in a different order are
+    // one request. Parameter values are scalars, so a sorted entry list is the
+    // whole of it.
     JSON.stringify(Object.entries(params ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))),
   ] as const;
 
-/** Which widgets this community's installed plug-ins contribute. Enabled installs only —
- *  a disabled plug-in's widgets have nothing to draw. */
+/** Which widgets and read endpoints this community's installed plug-ins contribute.
+ *  Enabled installs only — a disabled plug-in's widgets have nothing to draw. */
 export const usePluginWidgetCatalog = (enabled = true) => {
   const communityId = useActiveCommunityId();
   // A guest reaches no plug-in of the community's.
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  return useQuery<PluginWidgetCatalogResponse>({
-    queryKey: pluginWidgetCatalogKey(communityId),
-    queryFn: () => getPluginWidgetCatalog(communityId),
-    enabled: enabled && communityWide && Number.isFinite(communityId) && communityId > 0,
-    // Installing or upgrading a plug-in invalidates this explicitly; between those
-    // it is effectively static for the page's lifetime.
-    staleTime: 5 * 60_000,
+  return useReadPluginWidgetCatalog(communityId, {
+    query: {
+      enabled: enabled && communityWide && Number.isFinite(communityId) && communityId > 0,
+      // Keyed under the plug-ins' path, so installing or upgrading one
+      // refreshes it; between those it is effectively static for the page's
+      // lifetime.
+      staleTime: 5 * 60_000,
+    },
   });
 };
 
@@ -86,28 +76,24 @@ export interface PluginDataQuery {
   endpointId: string | undefined;
   dashboardId: number | undefined;
   params?: Record<string, unknown>;
-  /** Which widget is asking. Only matters where its binding carries a
-   *  statement: the server runs the one it has stored, never one sent here. */
-  widgetId?: string;
   /** The source's declared freshness, in seconds. Capped before use. */
   cacheTtlSeconds?: number;
   enabled?: boolean;
 }
 
-/** One plug-in data source, for this viewer, on this dashboard. */
+/** One plug-in data source, for this viewer, previewed for this dashboard. */
 export const usePluginData = ({
   pluginId,
   endpointId,
   dashboardId,
   params,
-  widgetId,
   cacheTtlSeconds,
   enabled = true,
 }: PluginDataQuery) => {
   const communityId = useActiveCommunityId();
   // Fail closed: without a community, an install, a source *and* the dashboard the
-  // widget sits on, there is nothing to ask for. A preview has none of them,
-  // which is how it issues no request at all.
+  // widget is configured for, there is nothing to ask for. A widget not on a
+  // dashboard yet has none, which is how it issues no request at all.
   const ready =
     enabled &&
     Number.isFinite(communityId) &&
@@ -120,14 +106,7 @@ export const usePluginData = ({
   const staleSeconds = Math.max(0, Math.min(cacheTtlSeconds ?? 0, MAX_PLUGIN_STALE_SECONDS));
 
   return useQuery<PluginDataResponse>({
-    queryKey: pluginDataKey(
-      communityId,
-      pluginId ?? 0,
-      endpointId ?? "",
-      dashboardId ?? 0,
-      params,
-      widgetId
-    ),
+    queryKey: pluginDataKey(communityId, pluginId ?? 0, endpointId ?? "", dashboardId ?? 0, params),
     queryFn: () =>
       getPluginData({
         communityId,
@@ -135,13 +114,12 @@ export const usePluginData = ({
         endpointId: endpointId as string,
         dashboardId: dashboardId as number,
         params,
-        widgetId,
       }),
     enabled: ready,
     staleTime: staleSeconds * 1000,
-    // A plug-in that is down should not be hammered from every open tile, and the
-    // tile has something useful to draw meanwhile: React Query keeps serving the
-    // last good rows for the stale window while the error is shown.
+    // A plug-in that is down is not asked again straight away, and the preview
+    // has something useful to draw meanwhile: React Query keeps serving the last
+    // good rows for the stale window while the error is shown.
     retry: false,
   });
 };
@@ -153,7 +131,8 @@ export const pluginParamOptionsKey = (
   pluginId: number,
   endpointId: string,
   param: string,
-  params: Record<string, unknown> | undefined
+  params: Record<string, unknown> | undefined,
+  initiativeId: number
 ) =>
   [
     "plugin-param-options",
@@ -161,6 +140,7 @@ export const pluginParamOptionsKey = (
     pluginId,
     endpointId,
     param,
+    initiativeId,
     JSON.stringify(Object.entries(params ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))),
   ] as const;
 
@@ -169,6 +149,8 @@ export interface PluginParamOptionsQuery {
   endpointId: string | undefined;
   param: string;
   params?: Record<string, unknown>;
+  /** The initiative the form is filled in. */
+  initiativeId: number;
   enabled?: boolean;
 }
 
@@ -190,6 +172,7 @@ export const usePluginParamOptions = ({
   endpointId,
   param,
   params,
+  initiativeId,
   enabled = true,
 }: PluginParamOptionsQuery) => {
   const communityId = useActiveCommunityId();
@@ -202,7 +185,14 @@ export const usePluginParamOptions = ({
     endpointId.length > 0;
 
   return useQuery<PluginParamOptionsResponse>({
-    queryKey: pluginParamOptionsKey(communityId, pluginId ?? 0, endpointId ?? "", param, params),
+    queryKey: pluginParamOptionsKey(
+      communityId,
+      pluginId ?? 0,
+      endpointId ?? "",
+      param,
+      params,
+      initiativeId
+    ),
     queryFn: () =>
       getPluginParamOptions({
         communityId,
@@ -210,6 +200,7 @@ export const usePluginParamOptions = ({
         endpointId: endpointId as string,
         param,
         params,
+        initiativeId,
       }),
     enabled: ready,
     staleTime: 60_000,

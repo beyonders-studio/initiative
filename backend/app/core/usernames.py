@@ -13,6 +13,7 @@ allocation that talks to the database lives in
 
 from __future__ import annotations
 
+import itertools
 import secrets
 import unicodedata
 from typing import Final
@@ -197,7 +198,7 @@ def validate(name: str) -> str:
         raise UsernameError(UsernameMessages.INVALID_CHARACTERS)
     if any(
         first in _SEPARATORS and second in _SEPARATORS
-        for first, second in zip(candidate, candidate[1:])
+        for first, second in itertools.pairwise(candidate)
     ):
         raise UsernameError(UsernameMessages.INVALID_CHARACTERS)
     if candidate in RESERVED:
@@ -235,9 +236,12 @@ def slugify(seed: str | None) -> str | None:
     for character in folded:
         if character in _LOWER or character in _DIGITS:
             kept.append(character)
-        elif character in _SEPARATORS or character.isspace():
-            if kept and kept[-1] != "-":
-                kept.append("-")
+        elif (
+            (character in _SEPARATORS or character.isspace())
+            and kept
+            and kept[-1] != "-"
+        ):
+            kept.append("-")
 
     slug = "".join(kept).strip("-")[:MAX_LENGTH].rstrip("-")
     # A name has to start with a letter, and digits alone would read as a

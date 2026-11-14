@@ -12,33 +12,28 @@
  * and the settings alike.
  */
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
-  type DetailLayoutDefinitionInput,
-  type DetailLayoutRead,
-  type DetailLayoutWrite,
   type GetLayoutsParams,
   type LayoutTarget,
-  type ListLayoutRead,
-  type ListLayoutReadKind,
-  type ListLayoutWrite,
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getGetInitiativeLayoutsQueryKey,
   getGetLayoutsQueryKey,
-  getInitiativeLayouts,
-  getLayouts,
+  getGetLayoutsQueryOptions,
   putDefaultLayout,
   putLayout,
   resetLayout,
+  useGetInitiativeLayouts,
+  useGetLayouts,
 } from "@/api/generated/layouts/layouts";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
+import type { LayoutChange } from "@/ui/layouts/layoutSet";
 
 /** The tools whose every instance lays out its own items: the backend's
  *  per-instance layout tools that draw a detail. */
@@ -58,22 +53,18 @@ export const sharedTarget = (tool: Tool, initiativeId: number): GetLayoutsParams
   initiative_id: initiativeId,
 });
 
-export const toolLayoutsQuery = (communityId: number, target: GetLayoutsParams) => ({
-  queryKey: getGetLayoutsQueryKey(communityId, target),
-  queryFn: () => getLayouts(communityId, target),
-});
-
 /** A target's layouts, or nothing while `target` is null. */
 export const useToolLayouts = (target: GetLayoutsParams | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<ToolLayoutSetRead>({
-    ...toolLayoutsQuery(communityId, target ?? instanceTarget(Tool.project, 0)),
-    enabled: target !== null,
-    // The client keeps previous data by default, which across a target switch
-    // would show the last target's layouts — and its `can_configure`, which
-    // gates the editor. Showing one target's permissions while another loads
-    // is not a stale list, it is the wrong answer.
-    placeholderData: undefined,
+  return useGetLayouts(communityId, target ?? instanceTarget(Tool.project, 0), {
+    query: {
+      enabled: target !== null,
+      // The client keeps previous data by default, which across a target switch
+      // would show the last target's layouts — and its `can_configure`, which
+      // gates the editor. Showing one target's permissions while another loads
+      // is not a stale list, it is the wrong answer.
+      placeholderData: undefined,
+    },
   });
 };
 
@@ -88,7 +79,7 @@ export const useReadToolLayouts = () => {
   const communityId = useActiveCommunityId();
   const queryClient = useQueryClient();
   return (target: GetLayoutsParams) =>
-    queryClient.fetchQuery(toolLayoutsQuery(communityId, target));
+    queryClient.fetchQuery(getGetLayoutsQueryOptions(communityId, target));
 };
 
 /** Every project's layouts in an initiative the reader can open, for its
@@ -96,49 +87,12 @@ export const useReadToolLayouts = () => {
 export const useInitiativeLayouts = (initiativeId: number) => {
   const communityId = useActiveCommunityId();
   const params = { initiative_id: initiativeId };
-  return useQuery({
-    queryKey: getGetInitiativeLayoutsQueryKey(communityId, params),
-    queryFn: () => getInitiativeLayouts(communityId, params),
+  return useGetInitiativeLayouts(communityId, params, {
     // Another initiative's projects, while this one's load, would be listed
     // under this one's addresses.
-    placeholderData: undefined,
+    query: { placeholderData: undefined },
   });
 };
-
-const isList = (layout: ListLayoutRead | DetailLayoutRead): layout is ListLayoutRead =>
-  "is_default" in layout;
-
-/** The ways a target lists what it holds, in the order its tool draws them. */
-export const listLayouts = (set: Pick<ToolLayoutSetRead, "layouts"> | undefined) =>
-  (set?.layouts ?? []).filter(isList);
-
-/** The target's details, in the order its tool draws them. */
-export const detailLayouts = (set: Pick<ToolLayoutSetRead, "layouts"> | undefined) =>
-  (set?.layouts ?? []).filter((layout): layout is DetailLayoutRead => !isList(layout));
-
-/** One detail's layout as changed, or null where it is drawn as shipped. */
-export const detailLayoutOf = (
-  set: ToolLayoutSetRead | undefined,
-  kind: DetailLayoutRead["kind"],
-  /** For a detail laid out per type (a project's task page), which type's. */
-  taskTypeId?: number | null
-): DetailLayoutDefinitionInput | null => {
-  const layout = detailLayouts(set).find(
-    (each) => each.kind === kind && (each.task_type_id ?? null) === (taskTypeId ?? null)
-  );
-  return layout?.updated_at ? (layout.definition as DetailLayoutDefinitionInput) : null;
-};
-
-/** One change to a target's layouts: one saved, one put back as shipped, or
- *  the list it opens on. */
-export type LayoutChange =
-  | { save: ListLayoutWrite | DetailLayoutWrite }
-  | {
-      reset: ListLayoutReadKind | DetailLayoutRead["kind"];
-      /** For a detail laid out per type: which type's page. */
-      taskTypeId?: number;
-    }
-  | { opensOn: ListLayoutReadKind };
 
 /** Make `changes`, one request each, in order, writing each answer to the
  *  target's set as it comes. Each layout keeps its own date: nothing else is

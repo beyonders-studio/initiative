@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints.auth_test import (
@@ -21,7 +21,6 @@ from app.api.v1.platform_endpoints.auth_test import (
 from app.core.audit_events import AuditEventType
 from app.testing import emitted
 from app.testing.factories import create_user
-
 
 REGISTERED_EMAIL = "registered-audit@example.com"
 

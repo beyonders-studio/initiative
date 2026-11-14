@@ -16,7 +16,8 @@ What the statement may say, and what running it may cost, are answered in
 :mod:`app.services.query`.
 """
 
-from typing import Annotated, Iterable
+from collections.abc import Iterable
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -25,10 +26,11 @@ from app.db.session import routed_context
 from app.schemas.field_catalog import FieldDescription
 from app.schemas.sql_query import (
     QueryBuildRequest,
-    QueryFilterGroupSpec,
-    QueryFilterNode,
     QueryBuildResponse,
     QueryColumnDescription,
+    QueryFilterGroupSpec,
+    QueryFilterNode,
+    QueryPluginDescription,
     QueryRequest,
     QueryResponse,
     QueryShapeResponse,
@@ -37,7 +39,8 @@ from app.schemas.sql_query import (
 from app.services import fields as fields_registry
 from app.services import query as query_service
 from app.services.query import build as query_builder
-from app.services.query.resolve import SheetCall
+from app.services.query import plugins as query_plugins
+from app.services.query.resolve import PluginCall, SheetCall
 
 router = APIRouter()
 
@@ -50,10 +53,13 @@ async def describe_query(
 ) -> QueryShapeResponse:
     """Say what one statement would return, without running it.
 
-    Costs a plan and no rows, so a builder may ask as often as it likes.
+    Costs a plan and no rows, so a builder may ask as often as it likes: a
+    plug-in it reads is described from its declaration, not called.
     """
     columns, statement = await query_service.describe(
-        payload.sql,
+        await query_plugins.with_rows(
+            session, payload.sql, initiative_id=payload.initiative_id, fetch=False
+        ),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
@@ -61,6 +67,7 @@ async def describe_query(
         columns=_described(columns),
         relations=list(statement.relations),
         sheets=_sheets(statement),
+        plugins=_plugins(statement),
     )
 
 
@@ -75,6 +82,19 @@ def _sheets(statement: query_service.ResolvedQuery) -> list[QuerySheetDescriptio
             ],
         )
         for alias, sheet in statement.sheets
+    ]
+
+
+def _plugins(statement: query_service.ResolvedQuery) -> list[QueryPluginDescription]:
+    """The plug-in endpoints a statement read, as both endpoints describe them."""
+    return [
+        QueryPluginDescription(
+            alias=alias,
+            fields=[
+                FieldDescription(**entry) for entry in fields_registry.describe(rows)
+            ],
+        )
+        for alias, rows in statement.plugins
     ]
 
 
@@ -100,8 +120,10 @@ async def run_query(
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
 ) -> QueryResponse:
     """Read one statement and return its rows."""
-    result = await query_service.run(
-        payload.sql,
+    result = await query_service.execute(
+        await query_plugins.with_rows(
+            session, payload.sql, initiative_id=payload.initiative_id
+        ),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
@@ -127,7 +149,9 @@ async def build_query(
     """
     sql = query_builder.build(_spec(payload))
     columns, statement = await query_service.describe(
-        sql,
+        await query_plugins.with_rows(
+            session, sql, initiative_id=payload.initiative_id, fetch=False
+        ),
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
@@ -136,6 +160,7 @@ async def build_query(
         columns=_described(columns),
         relations=list(statement.relations),
         sheets=_sheets(statement),
+        plugins=_plugins(statement),
     )
 
 
@@ -157,6 +182,18 @@ def _spec(payload: QueryBuildRequest) -> query_builder.QuerySpec:
         dataset=payload.dataset,
         sheet=SheetCall(file=payload.sheet.file, range=payload.sheet.range)
         if payload.sheet
+        else None,
+        plugin=PluginCall(
+            plugin=payload.plugin.plugin,
+            endpoint=payload.plugin.endpoint,
+            params=tuple(
+                sorted(
+                    (name, tuple(value) if isinstance(value, list) else value)
+                    for name, value in payload.plugin.params.items()
+                )
+            ),
+        )
+        if payload.plugin
         else None,
         columns=tuple(
             query_builder.Column(

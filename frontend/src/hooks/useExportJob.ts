@@ -13,7 +13,7 @@ import {
 } from "@/lib/exportDownload";
 import { toast } from "@/lib/mascotToast";
 import { getItem, removeItem, setItem } from "@/lib/storage";
-import { browserTimezone } from "@/lib/timezones";
+import { browserTimezone } from "@/ui/lib/timezones";
 
 const POLL_MS = 2000;
 const TERMINAL = new Set(["done", "failed", "expired"]);

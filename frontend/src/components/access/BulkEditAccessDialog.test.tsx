@@ -42,6 +42,7 @@ const roles: InitiativeRoleRead[] = [
     override_share_restrictions: false,
     position: 0,
     permissions: {},
+    plugin_permissions: [],
     member_count: 1,
   },
 ];

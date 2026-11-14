@@ -39,18 +39,18 @@ from sqlalchemy import ColumnElement, and_, func, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
+from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.post import Post
-from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services import notifications as notifications_service
 from app.services.notifications import PluginAuthor
-from app.models.platform.notification import NotificationType
-from app.core.tools import Tool
 from app.services.platform import accounts as accounts_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import post_polls as post_polls_service
 from app.services.tenant import posts as posts_service
-from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 logger = logging.getLogger(__name__)
@@ -92,23 +92,16 @@ async def announce_post(
 
 
 async def _author_of(session: AsyncSession, post: Post) -> User | PluginAuthor | None:
-    """Who posted a notice, for its announcement: the person, or the installed
-    plug-in whose install owns it. ``None`` when that account or install is gone."""
-    if post.created_by is not None:
-        return await accounts_service.load_one(post.created_by)
-    install_id = next(
-        (
-            grant.plugin_install_id
-            for grant in post.grants or []
-            if grant.plugin_install_id is not None
-            and grant.level == ResourceAccessLevel.owner
-        ),
-        None,
-    )
-    if install_id is None:
+    """Who posted a notice, for its announcement: the member, or the installed
+    plug-in. ``None`` for Initiative's, or when that account or install is gone."""
+    if post.created_by is None:
         return None
+    if post.created_by_kind == ActorKind.member:
+        return await accounts_service.load_one(post.created_by)
     name = (
-        await session.exec(select(GuildPlugin.name).where(GuildPlugin.id == install_id))
+        await session.exec(
+            select(GuildPlugin.name).where(GuildPlugin.id == post.created_by)
+        )
     ).first()
     return PluginAuthor(name=name) if name is not None else None
 

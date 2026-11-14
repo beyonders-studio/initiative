@@ -3,7 +3,7 @@ fresh process, destroyed with the community, and the backfill that encrypts
 what was stored before."""
 
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,8 @@ from sqlalchemy import text
 from app.core import storage_crypto
 from app.core.config import settings
 from app.db import session as db_session
+from app.models.tenant._mixins import ActorKind
+from app.models.tenant.pending_upload import PendingUpload
 from app.services import storage_config, storage_encryption, storage_keys
 from app.services.storage import (
     EVIDENCE_KEY_PREFIX,
@@ -20,7 +22,6 @@ from app.services.storage import (
     LocalFilesystemStorage,
     get_guild_storage,
 )
-from app.models.tenant.pending_upload import PendingUpload
 from app.services.storage_keys import DatabaseKeyStore, Keyring, LocalRoot
 from app.testing import route_session_to_guild
 from app.testing.factories import create_guild, create_user
@@ -118,7 +119,6 @@ async def test_the_backfill_encrypts_what_was_stored_before(session: Any) -> Non
 
     storage = get_guild_storage(guild.id)
     assert isinstance(storage, EncryptedStorage)
-    assert storage.is_encrypted("before.txt") is True
     assert (
         plain.resolve_readable("before.txt")
         .read_bytes()
@@ -145,6 +145,7 @@ async def _arriving(session: Any, guild_id: int, key: str, *, encrypted: bool) -
         PendingUpload(
             id=key.removeprefix("resumable-"),
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             purpose="file",
             filename="big.mov",
             length=100,
@@ -152,7 +153,7 @@ async def _arriving(session: Any, guild_id: int, key: str, *, encrypted: bool) -
             blob_state={"store": "local", "enc": {}}
             if encrypted
             else {"store": "local"},
-            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(days=1),
         )
     )
     await session.commit()

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.blueprints.intake import blueprint_for
+from app.blueprints.intake import (
+    CATEGORY_FIELD,
+    RELEASE_FIELD,
+    SHIPPED_STATUS,
+    blueprint_for,
+)
 from app.core.intake import (
     CASE_FIELD_TYPES,
     STREAM_FIELDS,
@@ -43,16 +48,45 @@ def test_every_stream_ships_a_blueprint_that_parses(stream: IntakeStream):
 
 @pytest.mark.parametrize("stream", list(IntakeStream))
 def test_a_blueprint_defines_exactly_the_streams_case_fields(stream: IntakeStream):
-    """The writer fills these by name, so the two declarations must agree."""
+    """The writer fills these by name, so the two declarations must agree.
+    They are the initiative's properties; a project's own fields are not."""
     envelope = blueprint_for(stream)
     defined = {
-        definition.name: definition.type for definition in envelope.property_definitions
+        definition.name: definition.type
+        for definition in envelope.property_definitions
+        if not definition.project
     }
     expected = {
         field.value: MetadataType(CASE_FIELD_TYPES[field])
         for field in STREAM_FIELDS[stream]
     }
     assert defined == expected
+
+
+@pytest.mark.parametrize("stream", list(IntakeStream))
+def test_only_the_ideas_blueprint_has_the_fields_and_status_its_binding_names(
+    stream: IntakeStream,
+):
+    """Setting the Ideas board up names its category and release fields and
+    its shipped status by name, so the blueprint must have them."""
+    envelope = blueprint_for(stream)
+    own = {
+        definition.name: definition.type
+        for definition in envelope.property_definitions
+        if definition.project
+    }
+    if stream is not IntakeStream.ideas:
+        assert own == {}
+        return
+    assert own == {
+        CATEGORY_FIELD: MetadataType.select,
+        RELEASE_FIELD: MetadataType.text,
+    }
+    shipped = [s for s in envelope.task_statuses if s.name == SHIPPED_STATUS]
+    assert [s.category for s in shipped] == [TaskStatusCategory.done]
+    assert any(
+        s.category == TaskStatusCategory.in_progress for s in envelope.task_statuses
+    )
 
 
 @pytest.mark.parametrize("stream", list(IntakeStream))

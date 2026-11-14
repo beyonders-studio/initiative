@@ -28,22 +28,24 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Mapping, Optional
+from typing import Any
 from urllib.parse import quote
 
-import httpx
+import httpx2
 from cryptography.fernet import InvalidToken
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_VENDOR_SETUP, decrypt_field, encrypt_field
 from app.core.messages import PluginServiceMessages
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.marketplace import MarketplaceListing
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.services.auth import challenges as challenge_service
 from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace import vendor_values as vendor_values_service
@@ -91,7 +93,7 @@ _CODE_CHARS = frozenset(
 _MAX_CODE = 128
 
 #: Injectable for tests: the transport the conversion uses.
-http_transport: httpx.AsyncBaseTransport | None = None
+http_transport: httpx2.AsyncBaseTransport | None = None
 
 
 @dataclass(frozen=True)
@@ -105,7 +107,7 @@ class VendorSetupStart:
     state: str
 
 
-def setup_kind(definition: Mapping[str, Any] | None) -> Optional[str]:
+def setup_kind(definition: Mapping[str, Any] | None) -> str | None:
     """The vendor setup flow a manifest declares, when it is one this build
     runs."""
     setup = ((definition or {}).get("vendor") or {}).get("setup")
@@ -124,7 +126,7 @@ def redirect_url(registration_id: int) -> str:
 
 async def _manifest(
     session: AsyncSession, row: PluginServiceRegistration
-) -> tuple[Optional[int], dict[str, Any]]:
+) -> tuple[int | None, dict[str, Any]]:
     """The registration's listing version and its manifest, as they are now."""
     version = (
         await session.exec(
@@ -139,7 +141,7 @@ async def _manifest(
     return version, definition or {}
 
 
-def _organization(value: Optional[str]) -> Optional[str]:
+def _organization(value: str | None) -> str | None:
     cleaned = (value or "").strip()
     if not cleaned:
         return None
@@ -159,7 +161,7 @@ async def start(
     session: AsyncSession,
     registration_id: int,
     *,
-    organization: Optional[str],
+    organization: str | None,
     actor_user_id: int,
 ) -> VendorSetupStart:
     """Build the manifest for the plug-in's GitHub App, owned by ``organization``
@@ -266,7 +268,7 @@ async def _convert(code: str) -> dict[str, Any]:
         )
         body = response.json() if response.status_code < 400 else None
     except (
-        httpx.HTTPError,
+        httpx2.HTTPError,
         ResponseTooLargeError,
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,
@@ -318,7 +320,7 @@ async def complete(
             logger.info("plug-in services: a vendor setup no longer fits (%s)", exc)
             raise _expired() from exc
     answer = await _convert(code)
-    values: dict[str, Optional[str]] = {}
+    values: dict[str, str | None] = {}
     for key, name in mapping.items():
         value = answer.get(name)
         if isinstance(value, bool) or not isinstance(value, (str, int)):

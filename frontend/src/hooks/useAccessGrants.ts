@@ -1,32 +1,26 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   approveAccessGrant,
   breakGlassAccess,
-  breakGlassRequirements,
   cancelAccessRequest,
   createAccessRequest,
   denyAccessGrant,
-  getBreakGlassRequirementsQueryKey,
   getListAccessGrantQueueQueryKey,
   getListAccessGrantsQueryKey,
-  getListGrantCasesQueryKey,
-  getReadAccessGrantLimitsQueryKey,
   listAccessGrantQueue,
   listAccessGrants,
-  listGrantCases,
-  readAccessGrantLimits,
   revokeAccessGrant,
+  useBreakGlassRequirements as useBreakGlassRequirementsQuery,
+  useListGrantCases,
+  useReadAccessGrantLimits,
 } from "@/api/generated/access-grants/access-grants";
 import type {
   AccessGrantApprove,
   AccessGrantCreate,
-  AccessGrantLimits,
   AccessGrantListResponse,
   AccessGrantRead,
   BreakGlassCreate,
-  BreakGlassRequirements,
-  GrantCaseList,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
@@ -94,11 +88,7 @@ export const useAccessGrantQueue = (status: string | undefined, opts?: { live?: 
  * — requires access.request. The request form offers durations up to it.
  */
 export const useAccessGrantLimits = (options?: { enabled?: boolean }) =>
-  useQuery<AccessGrantLimits>({
-    queryKey: getReadAccessGrantLimitsQueryKey(),
-    queryFn: () => readAccessGrantLimits(),
-    enabled: options?.enabled ?? true,
-  });
+  useReadAccessGrantLimits({ query: { enabled: options?.enabled ?? true } });
 
 /**
  * The open operations cases a grant may be asked for, the reader's own first,
@@ -107,11 +97,7 @@ export const useAccessGrantLimits = (options?: { enabled?: boolean }) =>
  */
 export const useGrantCases = (options?: { enabled?: boolean; search?: string }) => {
   const params = options?.search ? { search: options.search } : undefined;
-  return useQuery<GrantCaseList>({
-    queryKey: getListGrantCasesQueryKey(params),
-    queryFn: () => listGrantCases(params),
-    enabled: options?.enabled,
-  });
+  return useListGrantCases(params, { query: { enabled: options?.enabled } });
 };
 
 export const useCreateAccessRequest = (
@@ -122,6 +108,7 @@ export const useCreateAccessRequest = (
     {
       mutationFn: (payload) => createAccessRequest(payload),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.requestError",
     },
     options
   );
@@ -135,6 +122,7 @@ export const useApproveAccessGrant = (
     {
       mutationFn: ({ grantId, payload }) => approveAccessGrant(grantId, payload ?? {}),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.actionError",
     },
     options
   );
@@ -146,6 +134,7 @@ export const useDenyAccessGrant = (options?: MutationOpts<AccessGrantRead, numbe
     {
       mutationFn: (grantId) => denyAccessGrant(grantId),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.actionError",
     },
     options
   );
@@ -157,6 +146,7 @@ export const useRevokeAccessGrant = (options?: MutationOpts<AccessGrantRead, num
     {
       mutationFn: (grantId) => revokeAccessGrant(grantId),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.actionError",
     },
     options
   );
@@ -169,14 +159,14 @@ export const useRevokeAccessGrant = (options?: MutationOpts<AccessGrantRead, num
  * of the caller — so the form asks rather than inferring it.
  */
 export const useBreakGlassRequirements = () =>
-  useQuery<BreakGlassRequirements>({
-    queryKey: getBreakGlassRequirementsQueryKey(),
-    queryFn: () => breakGlassRequirements(),
-    // Somebody else enrolling changes this answer, and nothing here would know
-    // to invalidate it — so it is read fresh on mount rather than inheriting
-    // the shared staleness window.
-    staleTime: 0,
-    refetchOnMount: "always",
+  useBreakGlassRequirementsQuery({
+    query: {
+      // Somebody else enrolling changes this answer, and nothing here would know
+      // to invalidate it — so it is read fresh on mount rather than inheriting
+      // the shared staleness window.
+      staleTime: 0,
+      refetchOnMount: "always",
+    },
   });
 
 /**
@@ -201,6 +191,7 @@ export const useCancelAccessRequest = (options?: MutationOpts<void, number>) => 
     {
       mutationFn: (grantId) => cancelAccessRequest(grantId),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.cancelError",
     },
     options
   );

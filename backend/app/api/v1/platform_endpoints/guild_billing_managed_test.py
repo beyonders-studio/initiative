@@ -9,7 +9,7 @@ and to the answers they give when refusing.
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -17,7 +17,6 @@ from app.api.v1.platform_endpoints.break_glass_test import _enrol_factor, _next_
 from app.models.platform.guild import CommunityRole
 from app.testing import create_guild, create_guild_membership, create_user
 from app.testing.billing_managed import billing_manages_plans
-
 
 GUILDS = "/api/v1/settings/communities"
 

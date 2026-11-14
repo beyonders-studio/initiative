@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterator, Optional
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from securesystemslib.signer import CryptoSigner
 from tuf.api import exceptions as tuf_errors
@@ -101,11 +102,11 @@ class TufRepository:
         #: it names, whether its role file is published, and the key that
         #: file is actually signed with (another one, to make it fail).
         self.package_delegated = False
-        self.package_signer: Optional[CryptoSigner] = None
+        self.package_signer: CryptoSigner | None = None
         self.package_published = False
-        self.package_signed_by: Optional[CryptoSigner] = None
+        self.package_signed_by: CryptoSigner | None = None
         self._version = 0
-        self.root = Root(expires=datetime.now(timezone.utc) + timedelta(days=365))
+        self.root = Root(expires=datetime.now(UTC) + timedelta(days=365))
         for role, signer in self.signers.items():
             self.root.add_key(signer.public_key, role)
         self._sign_root()
@@ -136,7 +137,7 @@ class TufRepository:
     # --- content ------------------------------------------------------------------
 
     def add_publisher(
-        self, prefix: str, *, name: Optional[str] = None, verified: bool = True
+        self, prefix: str, *, name: str | None = None, verified: bool = True
     ) -> None:
         self.publisher_signers[prefix] = CryptoSigner.generate_ed25519()
         self.content.setdefault(prefix, {})
@@ -159,10 +160,10 @@ class TufRepository:
         kind: str = "plugin",
         name: str = "A thing",
         versions: tuple[str, ...] = ("1.0.0",),
-        definition: Optional[dict[str, Any]] = None,
-        registration: Optional[dict[str, Any]] = None,
+        definition: dict[str, Any] | None = None,
+        registration: dict[str, Any] | None = None,
         images: int = 1,
-        extra: Optional[dict[str, Any]] = None,
+        extra: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Publish one listing under ``prefix``: its entry, a manifest per
         version, an avatar and ``images`` pictures. Returns the entry."""
@@ -234,9 +235,6 @@ class TufRepository:
     def remove_terms(self, uid: str) -> None:
         self.content["package"].pop(f"entitlements/{uid}.json", None)
 
-    def set_entry(self, prefix: str, uid: str, entry: dict[str, Any]) -> None:
-        self.content[prefix][f"publishers/{prefix}/{uid}/listing.json"] = _dump(entry)
-
     def remove_listing(self, prefix: str, uid: str) -> None:
         base = f"publishers/{prefix}/{uid}/"
         for path in [p for p in self.content[prefix] if p.startswith(base)]:
@@ -247,13 +245,13 @@ class TufRepository:
     def publish(
         self,
         *,
-        timestamp_expires: Optional[datetime] = None,
-        publisher_expires: Optional[datetime] = None,
+        timestamp_expires: datetime | None = None,
+        publisher_expires: datetime | None = None,
     ) -> None:
         """Sign a new version of every role and serve the result."""
         self._version += 1
         version = self._version
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = Snapshot(version=version, expires=now + timedelta(days=7))
 
         roles: dict[str, DelegatedRole] = {}
@@ -331,13 +329,13 @@ class TufRepository:
             directory, _, name = path.rpartition("/")
             self.files[f"targets/{directory}/{_sha(data)}.{name}"] = data
 
-    def served_path(self, path: str, prefix: Optional[str] = None) -> str:
+    def served_path(self, path: str, prefix: str | None = None) -> str:
         """Where the current bytes of target ``path`` are served."""
         data = self.content[prefix or "targets"][path]
         directory, _, name = path.rpartition("/")
         return f"targets/{directory}/{_sha(data)}.{name}"
 
-    def fetcher(self) -> "RepositoryFetcher":
+    def fetcher(self) -> RepositoryFetcher:
         return RepositoryFetcher(self)
 
     def bundle(self) -> bytes:

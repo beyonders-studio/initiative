@@ -9,33 +9,33 @@ Sharing and archiving are proved for every tool in ``tool_grants_test`` and
 
 import json
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool
-from app.models.platform.guild import CommunityRole
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tools import Tool
+from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import TaskStatus, TaskStatusCategory
 from app.services.tenant import tags as tags_service
+from app.testing import checklist_items, route_session_to_guild
 from app.testing.factories import (
     create_file,
     create_guild,
-    create_relationship,
     create_guild_membership,
     create_initiative,
     create_project,
+    create_relationship,
     create_resource_grant,
     create_tag,
     create_task,
     create_task_status,
 )
-from app.testing import checklist_items, route_session_to_guild
 
 
 async def test_list_projects_as_admin_shows_all(
@@ -214,7 +214,7 @@ async def test_list_projects_shows_archived_only_when_asked(
 ):
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     project = await create_project(
-        session, admin.initiative, admin.user, archived_at=datetime.now(timezone.utc)
+        session, admin.initiative, admin.user, archived_at=datetime.now(UTC)
     )
 
     response = await client.get(admin.g("/projects/"), headers=admin.headers)
@@ -518,7 +518,7 @@ async def test_create_project_without_dates_leaves_them_unset(
 
 
 def _as_utc(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(value)
 
 
 async def _tasks_by_title(
@@ -555,20 +555,20 @@ async def test_create_from_template_shifts_task_dates(
         session,
         template,
         title="Kickoff",
-        start_date=datetime(2026, 1, 5, 9, 0, tzinfo=timezone.utc),
-        due_date=datetime(2026, 1, 7, 17, 0, tzinfo=timezone.utc),
+        start_date=datetime(2026, 1, 5, 9, 0, tzinfo=UTC),
+        due_date=datetime(2026, 1, 7, 17, 0, tzinfo=UTC),
     )
     await create_task(
         session,
         template,
         title="Three weeks in",
-        due_date=datetime(2026, 1, 26, 12, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 1, 26, 12, 0, tzinfo=UTC),
     )
     await create_task(
         session,
         template,
         title="Invoices",
-        due_date=datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 1, 15, 12, 0, tzinfo=UTC),
         recurrence="RRULE:FREQ=MONTHLY",
     )
 
@@ -587,17 +587,13 @@ async def test_create_from_template_shifts_task_dates(
 
     tasks = await _tasks_by_title(client, admin, response.json()["id"])
     kickoff = tasks["Kickoff"]
-    assert _as_utc(kickoff["start_date"]) == datetime(
-        2026, 4, 6, 9, 0, tzinfo=timezone.utc
-    )
-    assert _as_utc(kickoff["due_date"]) == datetime(
-        2026, 4, 8, 17, 0, tzinfo=timezone.utc
-    )
+    assert _as_utc(kickoff["start_date"]) == datetime(2026, 4, 6, 9, 0, tzinfo=UTC)
+    assert _as_utc(kickoff["due_date"]) == datetime(2026, 4, 8, 17, 0, tzinfo=UTC)
     assert _as_utc(tasks["Three weeks in"]["due_date"]) == datetime(
-        2026, 4, 27, 12, 0, tzinfo=timezone.utc
+        2026, 4, 27, 12, 0, tzinfo=UTC
     )
     assert _as_utc(tasks["Invoices"]["due_date"]) == datetime(
-        2026, 4, 15, 12, 0, tzinfo=timezone.utc
+        2026, 4, 15, 12, 0, tzinfo=UTC
     )
 
 
@@ -772,13 +768,13 @@ async def test_create_from_undated_template_anchors_on_earliest_task(
         session,
         template,
         title="First",
-        due_date=datetime(2026, 1, 5, 10, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 1, 5, 10, 0, tzinfo=UTC),
     )
     await create_task(
         session,
         template,
         title="Two weeks later",
-        due_date=datetime(2026, 1, 19, 10, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 1, 19, 10, 0, tzinfo=UTC),
     )
 
     response = await client.post(
@@ -795,10 +791,10 @@ async def test_create_from_undated_template_anchors_on_earliest_task(
 
     tasks = await _tasks_by_title(client, admin, response.json()["id"])
     assert _as_utc(tasks["First"]["due_date"]) == datetime(
-        2026, 6, 1, 10, 0, tzinfo=timezone.utc
+        2026, 6, 1, 10, 0, tzinfo=UTC
     )
     assert _as_utc(tasks["Two weeks later"]["due_date"]) == datetime(
-        2026, 6, 15, 10, 0, tzinfo=timezone.utc
+        2026, 6, 15, 10, 0, tzinfo=UTC
     )
 
 
@@ -820,7 +816,7 @@ async def test_create_from_template_end_date_only_anchors_on_end(
         session,
         template,
         title="Final review",
-        due_date=datetime(2026, 1, 26, 15, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 1, 26, 15, 0, tzinfo=UTC),
     )
 
     response = await client.post(
@@ -837,7 +833,7 @@ async def test_create_from_template_end_date_only_anchors_on_end(
 
     tasks = await _tasks_by_title(client, admin, response.json()["id"])
     assert _as_utc(tasks["Final review"]["due_date"]) == datetime(
-        2026, 8, 24, 15, 0, tzinfo=timezone.utc
+        2026, 8, 24, 15, 0, tzinfo=UTC
     )
 
 
@@ -859,8 +855,8 @@ async def test_create_from_template_without_dates_copies_task_dates_verbatim(
         session,
         template,
         title="Kickoff",
-        start_date=datetime(2026, 1, 5, 9, 0, tzinfo=timezone.utc),
-        due_date=datetime(2026, 1, 26, 12, 0, tzinfo=timezone.utc),
+        start_date=datetime(2026, 1, 5, 9, 0, tzinfo=UTC),
+        due_date=datetime(2026, 1, 26, 12, 0, tzinfo=UTC),
     )
 
     response = await client.post(
@@ -876,12 +872,8 @@ async def test_create_from_template_without_dates_copies_task_dates_verbatim(
 
     tasks = await _tasks_by_title(client, admin, response.json()["id"])
     kickoff = tasks["Kickoff"]
-    assert _as_utc(kickoff["start_date"]) == datetime(
-        2026, 1, 5, 9, 0, tzinfo=timezone.utc
-    )
-    assert _as_utc(kickoff["due_date"]) == datetime(
-        2026, 1, 26, 12, 0, tzinfo=timezone.utc
-    )
+    assert _as_utc(kickoff["start_date"]) == datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
+    assert _as_utc(kickoff["due_date"]) == datetime(2026, 1, 26, 12, 0, tzinfo=UTC)
 
 
 async def test_update_project_sets_and_clears_dates(
@@ -1408,7 +1400,7 @@ async def test_project_counts_by_initiative(
         admin.initiative,
         admin.user,
         name="Archived",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
     await create_project(
         session, admin.initiative, admin.user, name="Template", is_template=True

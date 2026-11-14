@@ -13,9 +13,9 @@ from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.backup_export import ManifestPerson
 from app.schemas.tenant.project_export import ProjectExportEnvelope
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.common import handle_key
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     parse_envelope,

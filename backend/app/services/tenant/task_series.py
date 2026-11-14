@@ -28,7 +28,7 @@ Nothing here commits.
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 from types import EllipsisType
 from typing import Any
 
@@ -48,11 +48,11 @@ from app.models.tenant.task import (
     TaskType,
 )
 from app.schemas.recurrence import OccurrenceScope
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import personal_items
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
-from app.services.tenant import descriptions as descriptions_service
-from app.services.tenant import personal_items
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_creation import next_position, set_task_assignees
@@ -329,9 +329,9 @@ async def _limited_hourly_due(
     if limit is None:
         return next_due
     local_day = (max(now, due) if skipping else now).astimezone(zone).date()
-    lower = datetime.combine(local_day, time.min, zone).astimezone(timezone.utc)
+    lower = datetime.combine(local_day, time.min, zone).astimezone(UTC)
     upper = datetime.combine(local_day + timedelta(days=1), time.min, zone).astimezone(
-        timezone.utc
+        UTC
     )
     series = task.series_id or task.id
     history = (
@@ -355,15 +355,15 @@ async def _limited_hourly_due(
         return next_due
     reset = datetime.combine(
         local_day + timedelta(days=1), first_due.astimezone(zone).time(), zone
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     # Date filters may have moved next_due several days beyond the elapsed
     # interval. A daily reset starts a new hourly grid on its chosen day.
     base = max(now, due) if skipping else now
     parsed = recurrence.parse(task.recurrence)
     interval = parsed.rule.get("INTERVAL", [1])[0]
-    earliest = base.astimezone(timezone.utc).replace(
-        second=0, microsecond=0
-    ) + timedelta(hours=interval)
+    earliest = base.astimezone(UTC).replace(second=0, microsecond=0) + timedelta(
+        hours=interval
+    )
     reset = max(reset, earliest)
     # Find the next allowed day independently of the elapsed hourly interval;
     # a long interval's grid must not skip otherwise eligible reset days.
@@ -376,7 +376,7 @@ async def _limited_hourly_due(
     candidate = starts[0]
     anchor = datetime.combine(
         candidate.astimezone(zone).date(), first_due.astimezone(zone).time(), zone
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     starts = recurrence.first(
         task.recurrence, max(anchor, earliest), task.recurrence_shift, 1
     )
@@ -431,7 +431,7 @@ async def reschedule_hourly(
                     minimum,
                     datetime.combine(
                         day, minimum.astimezone(zone).time(), zone
-                    ).astimezone(timezone.utc),
+                    ).astimezone(UTC),
                 )
                 starts = recurrence.first(
                     task.recurrence, minimum, task.recurrence_shift, 1
@@ -577,6 +577,7 @@ async def _next_task(
             position=await next_position(session, task.project_id),
             series_id=task.series_id,
             created_by=task.created_by,
+            created_by_kind=task.created_by_kind,
         )
     following.task_status = default_status
     for field in ("title", "description", "priority"):

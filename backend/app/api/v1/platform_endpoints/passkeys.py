@@ -18,7 +18,6 @@ scope a policy to.
 import logging
 import uuid
 from typing import Annotated
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -26,10 +25,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
 from app.api.deps import (
-    FactorExemptUser,
-    require_first_party_session,
-    SystemSessionDep,
     CurrentUser,
+    FactorExemptUser,
+    SystemSessionDep,
+    require_first_party_session,
 )
 from app.api.v1.platform_endpoints.change_assessment import is_risky
 from app.api.v1.platform_endpoints.held_changes import (
@@ -41,7 +40,6 @@ from app.api.v1.platform_endpoints.password_recheck import (
     require_password_or_recent_proof,
 )
 from app.api.v1.platform_endpoints.session_opening import (
-    MOBILE_CALLBACK_URI,
     open_session,
     record_sign_in_failure,
     require_passkeys_allowed,
@@ -49,10 +47,10 @@ from app.api.v1.platform_endpoints.session_opening import (
     upgrade_session,
 )
 from app.core.audit_events import AuditEventType
-from app.core.user_display import handle_of
 from app.core.login_methods import LoginMethod
-from app.core.messages import AuthMessages, NativeMessages
+from app.core.messages import AuthMessages
 from app.core.rate_limit import limiter
+from app.core.user_display import handle_of
 from app.db.session import get_session
 from app.models.platform.account_change_hold import HeldChangeKind
 from app.models.platform.user import User, may_sign_in
@@ -67,7 +65,6 @@ from app.schemas.platform.passkey import (
     PasskeyRemove,
     PasskeyRename,
     PasskeySignInFinish,
-    PasskeySignInResult,
     PasskeySignInStart,
     PasskeyStepUpFinish,
 )
@@ -77,7 +74,6 @@ from app.services import audit as audit_service
 from app.services import email as email_service
 from app.services.auth import account_changes, addresses, held_changes
 from app.services.auth import challenges as challenge_service
-from app.services.auth import native_handoff
 from app.services.auth import identity as identity_service
 from app.services.auth import passkeys as passkey_service
 from app.services.auth.assurance import passkey_amr
@@ -97,9 +93,6 @@ FirstPartyOnly = Depends(require_first_party_session)
 _REGISTER_PURPOSES = (challenge_service.ChallengePurpose.passkey_register,)
 _SIGN_IN_PURPOSES = (challenge_service.ChallengePurpose.passkey_sign_in,)
 _STEP_UP_PURPOSES = (challenge_service.ChallengePurpose.passkey_step_up,)
-
-#: What a phone's device list shows when the relay page sent no name.
-_DEFAULT_DEVICE_NAME = "Mobile Device"
 
 
 def _read(row: UserPasskey) -> PasskeyRead:
@@ -381,27 +374,28 @@ async def begin_passkey_sign_in(
     # the ceremony rather than for a person, and the assertion that answers it
     # is what names one. Stored as the browser will write it back — the same
     # unpadded base64url the options carry — so the finish route can look the
-    # row up by what it reads out of the signed client data.
+    # row up by what it reads out of the signed client data. An app's sign-in
+    # is bound to the app's challenge, so only the app can finish it.
     await challenge_service.create(
         system_session,
         user_id=None,
         purpose=challenge_service.ChallengePurpose.passkey_sign_in,
         value=bytes_to_base64url(ceremony.challenge),
+        answer=payload.code_challenge or None,
     )
     await system_session.commit()
     return PasskeyAuthenticationOptions(options=ceremony.options)
 
 
-@router.post("/passkeys/authenticate/finish", response_model=PasskeySignInResult)
+@router.post("/passkeys/authenticate/finish", response_model=Token)
 async def finish_passkey_sign_in(
     request: Request,
     response: Response,
     session: SessionDep,
     system_session: SystemSessionDep,
     payload: PasskeySignInFinish,
-) -> PasskeySignInResult:
-    """Open the session a passkey earned — or, for a phone signing in through
-    its browser, hand back the address the app is waiting at.
+) -> Token:
+    """Open the session a passkey earned.
 
     Every ceremony verifies the person as well as the device, so an assertion
     is a multi-factor authentication on its own and no code is asked for after
@@ -414,6 +408,7 @@ async def finish_passkey_sign_in(
         user_id=None,
         credential=payload.credential,
         purposes=_SIGN_IN_PURPOSES,
+        code_verifier=payload.code_verifier,
     )
     if isinstance(presented, passkey_service.PresentationRefused):
         if presented.reason is not None:
@@ -460,35 +455,8 @@ async def finish_passkey_sign_in(
         )
     user_id, token_version = user.id, user.token_version
 
-    if payload.mobile and payload.code_challenge:
-        # The relay page in the phone's system browser hands the app a one-time
-        # code; the app opens the session with it (see native_handoff).
-        code = await native_handoff.issue(
-            system_session,
-            app_challenge=payload.code_challenge,
-            handoff=native_handoff.Handoff(
-                user_id=user_id,
-                method="passkey",
-                amr=passkey_amr(backed_up=presented.backed_up),
-                device_name=payload.device_name.strip() or _DEFAULT_DEVICE_NAME,
-            ),
-        )
-        # One commit for the code, the spent challenge and the counter.
-        await system_session.commit()
-        return PasskeySignInResult(
-            redirect_to=f"{MOBILE_CALLBACK_URI}?{urlencode({'code': code})}"
-        )
-    if payload.mobile:
-        # An app bundle from before the code flow began this sign-in. It can
-        # only be handed a session through the code, so it is asked to update.
-        await system_session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=NativeMessages.APP_UPDATE_REQUIRED,
-        )
-
     # The spent challenge and the credential's counter commit with the session.
-    token = await open_session(
+    return await open_session(
         request,
         response,
         system_session,
@@ -496,8 +464,8 @@ async def finish_passkey_sign_in(
         token_version=token_version,
         amr=passkey_amr(backed_up=presented.backed_up),
         audit_detail={"method": "passkey", "passkey_id": presented.passkey_id},
+        device_name=payload.device_name.strip() or None,
     )
-    return PasskeySignInResult(access_token=token.access_token)
 
 
 @router.post("/step-up/passkey/begin", response_model=PasskeyAuthenticationOptions)

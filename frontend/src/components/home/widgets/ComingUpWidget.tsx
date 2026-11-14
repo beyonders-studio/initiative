@@ -16,25 +16,20 @@ import { type ListMyCalendarEntriesParams, Tool } from "@/api/generated/initiati
 import { utcDateKey } from "@/components/calendar/eventCalendarEntry";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
 import { ToolIconTile } from "@/components/initiatives/ToolSkeletons";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useMyCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useLiveClockValue } from "@/hooks/useRelativeTime";
 import { communityPath } from "@/lib/communityUrl";
-import { dateTimeFormat } from "@/lib/intl";
-import { formatCompactTime } from "@/lib/timeFormat";
-import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { formatCompactTime } from "@/ui/lib/timeFormat";
+import { browserTimezone } from "@/ui/lib/timezones";
+import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
 
@@ -181,7 +176,7 @@ export const ComingUpWidget = ({ options }: HomeWidgetProps) => {
           ))}
         </div>
       ) : entriesQuery.isError ? (
-        <p className="text-destructive text-sm">{t("widgets.comingUp.loadError")}</p>
+        <StatusMessage onRetry={entriesQuery.refetch} />
       ) : groups.length === 0 ? (
         <HomeWidgetNotice
           icon={CalendarClock}
@@ -237,13 +232,12 @@ export const ComingUpWidget = ({ options }: HomeWidgetProps) => {
 export const ComingUpSettings = ({ options, onChange }: HomeWidgetSettingsProps) => {
   const { t } = useTranslation("home");
   return (
-    <div className="space-y-2">
-      <Label htmlFor="coming-up-days">{t("widgets.comingUp.days")}</Label>
+    <Field label={t("widgets.comingUp.days")}>
       <Select
         value={String(daysOf(options))}
         onValueChange={(value) => onChange({ ...options, days: Number(value) })}
       >
-        <SelectTrigger id="coming-up-days">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -254,6 +248,6 @@ export const ComingUpSettings = ({ options, onChange }: HomeWidgetSettingsProps)
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   );
 };

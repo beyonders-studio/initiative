@@ -19,30 +19,32 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
+from app.core.file_types import FileType
 from app.core.tools import Tool
-from app.db.plugin_rls import PLUGIN_REFUSED_TABLES, PLUGIN_TABLE_ACCESS
 from app.db.authorization import IN_POLICY
 from app.db.guild_ddl import PLUGIN_POLICY_TABLES, render_guild_rls_ddl
 from app.db.install_standing_test import (
     _install,
     _route,
 )
+from app.db.plugin_rls import PLUGIN_REFUSED_TABLES, PLUGIN_TABLE_ACCESS
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.comment import Comment
-from app.core.file_types import FileType
+from app.models.tenant.contact import Contact
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.tag import Tag
 from app.testing import (
-    create_resource_grant,
     create_calendar,
     create_calendar_event,
     create_comment,
     create_file,
+    create_guild_plugin,
+    create_resource_grant,
     create_tag,
     route_as,
     route_session_to_guild,
@@ -57,7 +59,7 @@ _INSTALL_LEG = IN_POLICY.install_id
 
 _POLICY = re.compile(
     r"^CREATE POLICY (\w+) ON (\w+) AS (PERMISSIVE|RESTRICTIVE) FOR (\w+)\n  (.*?);$",
-    re.M | re.S,
+    re.MULTILINE | re.DOTALL,
 )
 
 
@@ -370,6 +372,72 @@ async def test_a_narrowed_token_reaches_nothing_of_the_community_as_a_whole(
     assert (await narrowed.exec(calendars)).all() == []
     assert (await narrowed.exec(events)).all() == []
     await narrowed.rollback()
+
+
+async def test_a_community_contact_goes_to_the_community_contacts_install(
+    session, acting_user, role_session
+):
+    """The standing names the community contacts plug-in's install, and the
+    database gives a contact an install makes outside any initiative to it,
+    shared with every member to read. With no such install it is refused, and
+    the install writes no such row itself."""
+    install = await _install(
+        session, acting_user, role_session, granted=["contacts:write"]
+    )
+
+    s, context = await _route(role_session, install, ["contacts:write"])
+    assert context.community_contacts_install is None
+    s.add(Contact(initiative_id=None, name="Bloom & Co"))
+    with pytest.raises(DBAPIError, match="holds the community's contacts"):
+        await s.flush()
+    await s.rollback()
+
+    holder = await create_guild_plugin(
+        session,
+        install.guild,
+        install.seat.user,
+        definition={"plugin_kind": "tool_instance", "tool": Tool.contact.value},
+        plugin_kind="tool_instance",
+    )
+    s, context = await _route(role_session, install, ["contacts:write"])
+    assert context.community_contacts_install == holder.id
+    made = Contact(initiative_id=None, name="Bloom & Co")
+    s.add(made)
+    await s.flush()
+    s.add(
+        ResourceGrant(
+            resource_type=Tool.contact.value,
+            resource_id=made.id,
+            plugin_install_id=holder.id,
+            level=ResourceAccessLevel.write,
+        )
+    )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        await s.flush()
+    await s.rollback()
+
+    s, _ = await _route(role_session, install, ["contacts:write"])
+    made = Contact(initiative_id=None, name="Bloom & Co")
+    s.add(made)
+    await s.flush()
+    made_id = made.id
+    await s.commit()
+    await route_session_to_guild(session, install.guild.id)
+    grants = (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == Tool.contact.value,
+                ResourceGrant.resource_id == made_id,
+            )
+        )
+    ).all()
+    assert {
+        (g.level, g.plugin_install_id, g.user_id, g.all_initiative_members)
+        for g in grants
+    } == {
+        (ResourceAccessLevel.owner, holder.id, None, False),
+        (ResourceAccessLevel.read, None, None, True),
+    }
 
 
 # ---------------------------------------------------------------------------

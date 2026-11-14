@@ -27,8 +27,8 @@ or, for a shared tool, by the initiative's managers and the community's admin
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -93,7 +93,7 @@ class ToolLayout(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -103,11 +103,11 @@ class ToolLayout(CreatedByMixin, table=True):
         )
     )
     tool: str = Field(sa_column=Column(String(32), nullable=False))
-    tool_id: Optional[int] = Field(default=None, sa_column=Column(Integer))
+    tool_id: int | None = Field(default=None, sa_column=Column(Integer))
     kind: str = Field(sa_column=Column(String(32), nullable=False))
     #: The type of task a project's task page is for; None for every other
     #: layout. Goes with its type.
-    task_type_id: Optional[int] = Field(
+    task_type_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("task_types.id", ondelete="CASCADE"), index=True
@@ -115,10 +115,10 @@ class ToolLayout(CreatedByMixin, table=True):
     )
     definition: dict[str, Any] = Field(sa_column=Column(JSONB, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

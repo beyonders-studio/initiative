@@ -6,16 +6,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import app.db.init_db as init_db
 from app.core.config import settings
 from app.core.encryption import hash_email
-from app.db import schema_provisioning
+from app.db import init_db, schema_provisioning
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import Guild
-from app.models.platform.user_email import UserEmail
 from app.models.platform.user import User
+from app.models.platform.user_email import UserEmail
 from app.services.platform import guilds as guilds_service
-from app.db.request_context import SystemGuild
 
 
 async def test_init_owner_cleans_up_when_guild_seed_fails(engine, monkeypatch):
@@ -50,7 +49,7 @@ async def test_init_owner_cleans_up_when_guild_seed_fails(engine, monkeypatch):
     async with test_sessions() as pre:
         guilds_before = len((await pre.exec(select(Guild))).all())
 
-    with pytest.raises(Exception):
+    with pytest.raises(guilds_service.GuildProvisionError):
         await init_db.init_owner()
 
     async with test_sessions() as check:
@@ -93,6 +92,19 @@ def test_stamp_this_image_has_passes():
     revisions, head = init_db.migration_chain()
     assert init_db._require_image_knows([head]) is None
     assert init_db._require_image_knows(sorted(revisions)[:5]) is None
+
+
+def test_a_stamp_before_the_baseline_names_the_release_to_start():
+    """A database from before the collapse is told which release to start
+    first, in place of alembic's "Can't locate revision"."""
+    baseline, release = init_db.migration_floor()
+    assert init_db._refuse_below_floor(baseline) is None
+
+    for stamp in ("20200101_0001", "ae1027a6acf"):
+        with pytest.raises(SystemExit) as refused:
+            init_db._refuse_below_floor(stamp)
+        assert stamp in str(refused.value)
+        assert f"Start {release}" in str(refused.value)
 
 
 def test_unreadable_chain_is_left_to_alembic(monkeypatch):

@@ -119,6 +119,15 @@
     "gantt": "The project's tasks on a timeline, by their dates, joined to what each depends on.",
     "calendar": "The project's tasks on a calendar, by their dates."
   },
+  "lists": {
+    "table": "Table",
+    "board": "Board",
+    "gantt": "Gantt",
+    "calendar": "Calendar",
+    "masonry": "Masonry",
+    "grid": "Grid",
+    "timeline": "Timeline"
+  },
   "noEvents": "This initiative has no events this year. Add one to see its detail here.",
   "eventDetail": {
     "name": "Event detail",
@@ -192,7 +201,10 @@
     },
     "weekOf": "Week of {{date}}",
     "quarter": "Q{{quarter}} {{year}}",
-    "bucket": "How {{name}} is grouped"
+    "bucket": "How {{name}} is grouped",
+    "noValue": "No {{name}}",
+    "checked": "{{name}}: yes",
+    "unchecked": "{{name}}: no"
   },
   "limits": {
     "heading": "Column limits",
@@ -305,5 +317,6 @@
     "confirm": "Continue",
     "retypeTitle": "What the {{type}} page asks for",
     "moveTitle": "What {{project}} asks for"
-  }
+  },
+  "moreOptions": "More options"
 }

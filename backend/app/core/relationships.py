@@ -113,11 +113,6 @@ SYMMETRIC_TYPES: frozenset[RelationshipType] = frozenset(
     t for t, spec in SPECS.items() if spec.symmetric
 )
 
-#: Types a walk may follow past a single hop.
-TRANSITIVE_TYPES: frozenset[RelationshipType] = frozenset(
-    t for t, spec in SPECS.items() if spec.transitive
-)
-
 #: Types nobody asserts by hand. They are read out of a body when it is saved
 #: and withdrawn when it is edited, so the manual surface neither makes one nor
 #: takes one back — editing the sentence is how you do both.

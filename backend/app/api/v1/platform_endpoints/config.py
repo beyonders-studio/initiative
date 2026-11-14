@@ -11,28 +11,27 @@ Unauthenticated: the SPA needs this before any user is logged in.
 import json
 import secrets
 from string import Template
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.api.deps import SessionDep
-from app.core.cookie_categories import active_cookie_categories
 from app.core.config import (
     CAPACITOR_NATIVE_ORIGINS,
     captcha_frame_content_security_policy,
     settings,
 )
+from app.core.cookie_categories import active_cookie_categories
 from app.core.security import (
     billing_insights_handoff_enabled,
     billing_support_handoff_enabled,
 )
-from app.services.platform.billing import billing_managed
 from app.core.version import get_min_desktop_version, get_min_native_version
 from app.services import captcha as captcha_service
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
+from app.services.platform.billing import billing_managed
 from app.services.tenant.attachments import MAX_FILE_SIZE
 
 router = APIRouter()
@@ -85,12 +84,12 @@ class BillingConfig(BaseModel):
 class AppConfig(BaseModel):
     """Public, runtime-injected configuration consumed by the SPA at boot."""
 
-    captcha: Optional[CaptchaConfig] = None
-    billing: Optional[BillingConfig] = None
+    captcha: CaptchaConfig | None = None
+    billing: BillingConfig | None = None
     # Where the SPA sends page views, errors and Web Vitals, once a browser
     # has granted the ``analytics`` category. ``None`` (the default) ⇒ the SPA
     # loads no measurement at all.
-    faro_collector_url: Optional[str] = None
+    faro_collector_url: str | None = None
     # Whether the SPA reports each page it opens to ``/page-views``. True only
     # where Prometheus reads the counts (``METRICS_TOKEN`` is set).
     count_page_views: bool = False
@@ -164,7 +163,7 @@ async def get_app_config(session: SessionDep) -> AppConfig:
     # against a secret that no longer verifies, or none rendered while
     # registration demands one. One function, one answer, and it reads the
     # settings row rather than the environment.
-    captcha: Optional[CaptchaConfig] = None
+    captcha: CaptchaConfig | None = None
     public_captcha = await captcha_service.public_config()
     if public_captcha is not None:
         captcha = CaptchaConfig(provider=public_captcha[0], site_key=public_captcha[1])

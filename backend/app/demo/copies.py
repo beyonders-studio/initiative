@@ -14,7 +14,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from sqlalchemy import exists, func, or_
@@ -106,7 +106,7 @@ async def redeem(
         )
         # Checked again once the link is locked.
         link = await _live(session, await _link(session, token, lock=True))
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         role = CommunityRole(link.guest_role)
         expires_at = now + timedelta(days=link.guest_days or 1)
         sandbox = (
@@ -342,7 +342,7 @@ async def pool_pass() -> None:
     async with cohorts.system_session(None) as lock:
         if not await advisory_lock(lock, LockNamespace.DEMO_POOL, wait=False):
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await expire_copies(now)
         await sales.forget_leads(now - sales.LEAD_LIFETIME)
         while await _pool_short():
@@ -394,7 +394,7 @@ async def _destroy_copy(session: AsyncSession, guild_id: int) -> None:
         return
     if guild.status != CommunityStatus.deleted.value:
         guild.status = CommunityStatus.deleted.value
-        guild.status_changed_at = datetime.now(timezone.utc)
+        guild.status_changed_at = datetime.now(UTC)
         session.add(guild)
         await session.commit()
     # Only the account the copy was made for: anyone else its guest was
@@ -447,7 +447,7 @@ async def clean_up() -> None:
     community and that somebody can sign in to."""
     async with cohorts.system_session(None) as session:
         await set_rls_context(session, Unattributed())
-        cutoff = datetime.now(timezone.utc) - CLEANUP_AFTER
+        cutoff = datetime.now(UTC) - CLEANUP_AFTER
         host = await accounts.demo_host(session)
         in_use = exists().where(
             GuildInvite.guild_id == Guild.id,

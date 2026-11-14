@@ -38,6 +38,20 @@
       "body": "Your request to join {{initiative}} was declined"
     }
   },
+  "community": {
+    "joinRequested": {
+      "title": "New request to join",
+      "body": "{{requester}} asked to join {{community}}"
+    },
+    "joinApproved": {
+      "title": "Request to join approved",
+      "body": "You're now a member of {{community}}"
+    },
+    "joinDenied": {
+      "title": "Request to join declined",
+      "body": "Your request to join {{community}} was declined"
+    }
+  },
   "project": {
     "added": {
       "title": "New Project Added",

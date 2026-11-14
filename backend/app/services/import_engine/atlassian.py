@@ -24,16 +24,18 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import math
 import random
 import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import AsyncIterator, Awaitable, BinaryIO, Callable
+from typing import BinaryIO
 from urllib.parse import urlsplit
 
-import httpx
+import httpx2
 
 from app.core.messages import ImportEngineMessages
 from app.schemas.tenant.atlassian import (
@@ -130,7 +132,7 @@ BACKOFF_BASE_SECONDS = 1.0
 JITTER_FRACTION = 0.25
 
 
-def _retry_after_seconds(response: httpx.Response) -> float | None:
+def _retry_after_seconds(response: httpx2.Response) -> float | None:
     """The wait a ``Retry-After`` header asks for, or ``None`` without one.
 
     The header is either a number of seconds or an HTTP date. Anything that
@@ -146,12 +148,12 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
     except ValueError:
         try:
             when = parsedate_to_datetime(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
         if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
-        seconds = (when - datetime.now(timezone.utc)).total_seconds()
-    if seconds != seconds:  # NaN
+            when = when.replace(tzinfo=UTC)
+        seconds = (when - datetime.now(UTC)).total_seconds()
+    if math.isnan(seconds):
         return None
     return max(0.0, seconds)
 
@@ -246,7 +248,7 @@ def normalize_site_url(raw: str) -> str:
 
 
 @asynccontextmanager
-async def _deadline(seconds: float, path: str) -> AsyncIterator[None]:
+async def _deadline(seconds: float, path: str) -> AsyncGenerator[None]:
     """Run the block within ``seconds``, or end it as the site being
     unreachable."""
     try:
@@ -343,8 +345,8 @@ async def get_file(
 
 
 async def _follow(
-    response: httpx.Response, path: str, *, max_bytes: int, sink: BinaryIO
-) -> httpx.Response:
+    response: httpx2.Response, path: str, *, max_bytes: int, sink: BinaryIO
+) -> httpx2.Response:
     """The one redirect a download is allowed, fetched without credentials."""
     location = response.headers.get("location") or ""
     if urlsplit(location).scheme != "https":
@@ -363,7 +365,7 @@ async def _follow(
         raise ImportEngineError(ImportEngineMessages.IMPORT_TOO_LARGE)
     except WebhookTargetUrlPrivateError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_PRIVATE_HOST)
-    except (WebhookTargetUrlError, httpx.TimeoutException, httpx.TransportError):
+    except WebhookTargetUrlError, httpx2.TimeoutException, httpx2.TransportError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
 
 
@@ -377,7 +379,7 @@ async def _send(
     accept: str = "application/json",
     max_bytes: int,
     sink: BinaryIO | None = None,
-) -> httpx.Response:
+) -> httpx2.Response:
     """One call, with a ``429`` waited out under ``retry``; ``sink`` is as for
     :func:`request_public_target`.
 
@@ -423,7 +425,7 @@ async def _request(
     accept: str = "application/json",
     max_bytes: int,
     sink: BinaryIO | None = None,
-) -> httpx.Response:
+) -> httpx2.Response:
     """Send one request, with the transport's failures turned into codes."""
     url = f"{credential.site_url}{path}"
     try:
@@ -445,12 +447,12 @@ async def _request(
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_PRIVATE_HOST)
     except WebhookTargetUrlError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
-    except (httpx.TimeoutException, httpx.TransportError):
+    except httpx2.TimeoutException, httpx2.TransportError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
     return response
 
 
-def _parse(response: httpx.Response, path: str) -> object:
+def _parse(response: httpx2.Response, path: str) -> object:
     """A non-throttled answer as JSON, or the code for what went wrong."""
     if response.status_code in (401, 403):
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_AUTH)

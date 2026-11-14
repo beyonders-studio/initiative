@@ -19,7 +19,7 @@ links to them, and a mention of a page links to the page it became.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
@@ -29,6 +29,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.tenant.import_envelopes import WikiEnvelope, WikiPageEnvelope
@@ -38,8 +39,8 @@ from app.services.import_engine.common import (
     parse_datetime,
     unique_name_in_initiative,
 )
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     PropertyRestore,
     TagRestore,
@@ -48,12 +49,12 @@ from app.services.import_engine.importers._base import (
 )
 from app.services.import_engine.links import links_to_pages, wiki_page_slug_ref
 from app.services.import_engine.mentions import MENTION_HANDLE, place_mention_node
-from app.services.import_engine.references import note_or_settle
 from app.services.import_engine.people import (
     PeopleMap,
     quoted_account,
     user_reference_handles,
 )
+from app.services.import_engine.references import note_or_settle
 from app.services.tenant.names import slugify, unique_slug
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class WikiImporter:
     def validate(self, envelope: dict[str, Any]) -> BaseModel:
         return parse_envelope(WikiEnvelope, envelope)
 
-    def people(self, validated: BaseModel) -> list["ManifestPerson"]:
+    def people(self, validated: BaseModel) -> list[ManifestPerson]:
         """Whoever wrote a page, and whoever a page mentions, most-named
         first — both are placed through the people step's answer."""
         from app.schemas.tenant.backup_export import ManifestPerson
@@ -182,6 +183,7 @@ class WikiImporter:
             description=env.description,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             **settings,
         )
         session.add(wiki)
@@ -229,6 +231,7 @@ class WikiImporter:
                 is_draft=page_env.is_draft,
                 content=page_env.content or {},
                 created_by=author if author is not None else importer.id,
+                created_by_kind=ActorKind.member,
                 # When it was written, where the envelope says so. Absent
                 # leaves the model's own default — the moment of the import,
                 # which is the only time this row can honestly claim.
@@ -494,8 +497,8 @@ async def _upload_file(
     the tags (created, matched) restoring it took. One
     whose file is not stored here — left out of the zip, or refused on the way
     in — or is not a type an uploaded file holds is not created."""
-    from app.db.session import routed_guild_id
     from app.core.file_types import type_of_media
+    from app.db.session import routed_guild_id
     from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.services.tenant import file_versions
@@ -520,6 +523,7 @@ async def _upload_file(
         content={},
         initiative_id=target_initiative.id,
         created_by=importer.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(file)
     await session.flush()
@@ -534,6 +538,7 @@ async def _upload_file(
         session,
         file,
         created_by=importer.id,
+        created_by_kind=ActorKind.member,
         file_url=f"/uploads/{routed_guild_id(session)}/{key}",
         original_filename=filename,
         file_content_type=content_type,
@@ -568,7 +573,6 @@ async def _write_comments(
     source's name beside it, never under somebody else's face. A reply whose
     parent did not come stands on its own.
     """
-    from datetime import timezone
 
     from app.models.tenant.comment import Comment
     from app.services.import_engine.comment_markdown import comment_markdown
@@ -591,11 +595,12 @@ async def _write_comments(
             wiki_page_id=row.id,
             content=body,
             created_by=author if author is not None else importer.id,
+            created_by_kind=ActorKind.member,
             imported_author_name=None
             if author is not None
             else (source_name[:200] or None),
             parent_comment_id=written.get(comment_env.reply_to_ref or ""),
-            created_at=created or datetime.now(timezone.utc),
+            created_at=created or datetime.now(UTC),
         )
         session.add(comment)
         if context is not None and links_to_pages(body):

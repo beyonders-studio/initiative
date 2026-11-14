@@ -3,21 +3,17 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { communityPath, isCommunityScopedPath } from "@/lib/communityUrl";
-import { normalizeLegacyTarget } from "@/lib/entityResolver";
+import { Button } from "@/ui/button";
 
 const normalizeTarget = (raw: string): string => {
   const decoded = decodeURIComponent(raw);
   if (!decoded) {
     return "/";
   }
-  const path = decoded.startsWith("/") ? decoded : `/${decoded}`;
-  // Smart links minted before tools were addressed inside their initiative are
-  // still arriving from stored notification rows; map them onto the resolver.
-  return normalizeLegacyTarget(path);
+  return decoded.startsWith("/") ? decoded : `/${decoded}`;
 };
 
 export const NavigatePage = () => {
@@ -116,7 +112,7 @@ export const NavigatePage = () => {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="flex min-h-app flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="font-medium text-base text-destructive">{error}</p>
         <Button onClick={() => router.navigate({ to: "/", replace: true })}>
           {t("navigate.goHome")}
@@ -126,7 +122,7 @@ export const NavigatePage = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+    <div className="flex min-h-app flex-col items-center justify-center gap-3 px-6 text-center">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       <p className="text-muted-foreground text-sm">
         {isProcessing ? t("navigate.redirecting") : t("navigate.finalizing")}

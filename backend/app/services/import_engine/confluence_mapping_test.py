@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-
 from app.schemas.tenant.import_envelopes import WikiEnvelope
 from app.services.import_engine import confluence_mapping as cm
 from app.services.import_engine.confluence_attachments import PageMedia
 from app.services.import_engine.jira_attachments import StoredImage
-
 
 SITE = "https://acme.atlassian.net"
 SPACE = {
@@ -36,7 +34,7 @@ def build(pages, users=None, **kw):
         pages=pages,
         users=users or {},
         site_url=SITE,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         **kw,
     )
 

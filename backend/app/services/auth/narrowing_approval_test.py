@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.models.platform.guild import Guild
 from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.schemas.platform.settings import (
     CommunityProviderConnectionCreate,
@@ -161,3 +162,42 @@ async def test_nobody_joins_on_arrival_until_the_values_are_agreed(
         session, provider_id=row.provider_id, user_id=arriving.id, claims=claims
     )
     assert joined == [row.guild_id]
+
+    # A community they are already in is not a new arrival.
+    joined = await join_on_arrival(
+        session, provider_id=row.provider_id, user_id=arriving.id, claims=claims
+    )
+    assert joined == []
+
+
+async def test_a_community_that_refuses_an_arrival_leaves_the_sign_in_alone(
+    session: AsyncSession,
+):
+    """A listed community keeps out an account whose age answer is under its
+    minimum; joining on arrival skips it rather than failing the sign-in."""
+    from datetime import UTC, datetime
+
+    from app.services.auth.guild_provider_connections import join_on_arrival
+    from app.services.platform import rules
+
+    await rules.put(session, "community_directory_enabled", True)
+    await rules.put(session, "community_age_gate_enabled", True)
+    row = await _connection(session, auto_join=True)
+    guild = await session.get(Guild, row.guild_id)
+    assert guild is not None
+    guild.join_policy = "open"
+    guild.categories = ["other"]
+    guild.has_adult_content = False
+    session.add(guild)
+    arriving = await create_user(session, age_confirmed_at=None)
+    arriving.age_below_minimum_at = datetime.now(UTC)
+    session.add(arriving)
+    await session.commit()
+
+    joined = await join_on_arrival(
+        session,
+        provider_id=row.provider_id,
+        user_id=arriving.id,
+        claims={NARROWED_CLAIM: NARROWED_VALUE},
+    )
+    assert joined == []

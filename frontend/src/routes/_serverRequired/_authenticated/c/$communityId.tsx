@@ -8,12 +8,12 @@ import {
   CommunityStatusNotice,
   communityStatusNoticeApplies,
 } from "@/components/communities/CommunityStatusNotice";
-import { StatusMessage } from "@/components/StatusMessage";
-import { CommunityHomeSkeleton, PageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { HelpLink } from "@/components/support/HelpLink";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useToolPageTitle } from "@/hooks/useToolPageTitle";
 import { prefetchViewPreferences } from "@/lib/viewPreferences";
+import { CommunityHomeSkeleton, PageSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId")({
   beforeLoad: async ({ context, params, cause }) => {
@@ -80,12 +80,12 @@ function ToolPageTitle() {
 }
 
 function CommunityLoading({ communityId }: { communityId: number }) {
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const atHome = pathname === `/c/${communityId}` || pathname === `/c/${communityId}/`;
   return atHome ? <CommunityHomeSkeleton /> : <PageSkeleton />;
 }
 
-export function CommunityLayout() {
+function CommunityLayout() {
   const { t } = useTranslation("communities");
   const params = useParams({ from: "/_serverRequired/_authenticated/c/$communityId" });
   const communityId = Number(params.communityId);
@@ -111,7 +111,7 @@ export function CommunityLayout() {
 
   if (!community) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-app items-center justify-center">
         <StatusMessage
           icon={<ShieldAlert />}
           title={t("notMember.title")}
@@ -128,7 +128,7 @@ export function CommunityLayout() {
   // see it listed, and land here rather than on a page of refusals.
   if (closed) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-app items-center justify-center">
         <StatusMessage
           icon={<Lock />}
           title={t("closed.title")}

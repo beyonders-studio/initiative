@@ -11,16 +11,17 @@ import json
 import pytest
 from sqlmodel import select
 
-from app.core.rules import SetBy
-from app.services.platform import rules
 from app.core.intake import IntakeStream, meta
 from app.core.messages import SupportMessages, TicketMessages
+from app.core.rules import SetBy
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.services.platform import rules
 from app.testing import (
     create_guild,
     create_initiative,
@@ -28,10 +29,18 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
-from app.db.request_context import SystemGuild, Unattributed
-
 
 TICKETS = "/api/v1/me/tickets"
+
+#: The device and page a filing was sent from, as a client sends it.
+DEVICE = {
+    "app_version": "0.70.0",
+    "platform": "web",
+    "locale": "en-GB",
+    "theme": "dark",
+    "route": "/c/$communityId/i/$initiativeId",
+    "viewport": "md",
+}
 
 
 async def _ask(client, actor, guild_id, **body):
@@ -100,7 +109,12 @@ async def operations(session):
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=ops_project.id))
     await session.commit()
     await set_rls_context(session, Unattributed())
-    return {"guild": ops_guild, "project": ops_project}
+    return {
+        "guild": ops_guild,
+        "initiative": ops_initiative,
+        "project": ops_project,
+        "staff": staff,
+    }
 
 
 async def test_support_is_off_until_the_operator_turns_it_on(client, acting_user):
@@ -232,7 +246,8 @@ async def test_without_a_form_the_streams_address_is_offered(
 ):
     """Where nothing is set up to receive a stream, its address is the way to
     reach the people who run the deployment — the stream's own, else the
-    general one, never another stream's."""
+    general one, never another stream's. Feedback goes to Initiative Cloud
+    instead, from any other server."""
     member = await acting_user(guild_role=CommunityRole.member)
     await _set_contacts(
         session, general="ops@example.org", security="security@example.org"
@@ -244,10 +259,7 @@ async def test_without_a_form_the_streams_address_is_offered(
         "contact": "security@example.org",
     }
     assert _offer(offered["support"]) == {"mode": "email", "contact": "ops@example.org"}
-    assert _offer(offered["feedback"]) == {
-        "mode": "email",
-        "contact": "ops@example.org",
-    }
+    assert _offer(offered["feedback"]) == {"mode": "cloud", "contact": None}
 
 
 async def test_a_report_is_always_a_form(client, session, acting_user):
@@ -375,11 +387,17 @@ async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
 ):
     """The asker is recorded as the case's filer, with their subject, and what
     they wrote opens the case under their name, said to them — the start of
-    the conversation with them rather than a description somebody rewrites."""
+    the conversation with them rather than a description somebody rewrites.
+    The device they asked from goes to the team, in the description."""
     member = await acting_user(guild_role=CommunityRole.member)
     await _set_support(session, member.guild.id, True)
     response = await _ask(
-        client, member, member.guild.id, subject="Lost my phone", body="Help."
+        client,
+        member,
+        member.guild.id,
+        subject="Lost my phone",
+        body="Help.",
+        context=DEVICE,
     )
     assert response.status_code == 202, response.text
 
@@ -387,6 +405,9 @@ async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
     case = (await session.exec(select(IntakeCase))).one()
     assert case.filer_user_id == member.user.id
     assert case.filer_subject == "Lost my phone"
+    task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
+    for value in DEVICE.values():
+        assert f"`{value}`" in task.description
     (opening,) = (
         await session.exec(select(Comment).where(Comment.task_id == case.task_id))
     ).all()

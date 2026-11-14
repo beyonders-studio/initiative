@@ -3,41 +3,40 @@
 import io
 import json
 import zipfile
+from datetime import UTC
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy.orm import undefer
 
+from app.core.tools import CHILD_KINDS, KINDS, Tool
+from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.data_job import DataJob, DataJobStatus
+from app.schemas.tenant.tag import annotated_tags
 from app.services import data_jobs
 from app.services.guild_sweeps import Scope, each_guild
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine import worker as import_worker
+from app.services.import_engine.atlassian_test import answered
 from app.services.storage import get_guild_storage
-from app.core.tools import CHILD_KINDS, KINDS, Tool
+from app.services.tenant import tags as tags_service
+from app.testing import drain_notices
 from app.testing.factories import (
-    create_child_entity,
-    create_tool_entity,
     assign_tag,
-    guild_administration,
     create_calendar_event,
+    create_child_entity,
     create_counter_group,
     create_file,
     create_import_job,
     create_initiative,
     create_tag,
     create_task,
+    create_tool_entity,
     grant_role_permission,
-    png_bytes,
+    guild_administration,
     route_session_to_guild,
 )
-from app.services.import_engine import limits as import_limits
-from app.services.import_engine.atlassian_test import answered
-from app.schemas.tenant.tag import annotated_tags
-from app.services.tenant import tags as tags_service
-from app.db.request_context import SystemGuild
-from app.testing import drain_notices
-
 
 # ---------------------------------------------------------------------------
 # Import engine: envelope imports + job lifecycle
@@ -80,17 +79,18 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     group = await create_counter_group(session, a.initiative, a.user, name="Party Gold")
-    from app.models.tenant.counter import Counter as C
     from decimal import Decimal
+
+    from app.models.tenant.counter import Counter as C
 
     session.add(
         C(
             counter_group_id=group.id,
             name="GP",
             count=Decimal("42.5"),
-            step=Decimal("1"),
-            initial_count=Decimal("0"),
-            position=Decimal("0"),
+            step=Decimal(1),
+            initial_count=Decimal(0),
+            position=Decimal(0),
         )
     )
     await assign_tag(session, group, await create_tag(session, a.guild, name="Loot"))
@@ -143,7 +143,6 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
     from sqlmodel import select
 
     from app.core.file_types import FileType
-
     from app.models.tenant.file import File
 
     a = await acting_user(
@@ -412,8 +411,8 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
         MetadataValue,
     )
     from app.testing.factories import (
-        create_property_definition,
         create_counter,
+        create_property_definition,
         create_property_value,
     )
 
@@ -686,13 +685,13 @@ async def test_stale_running_import_fails_closed_not_reapplied(
 ):
     """A running row older than the stale threshold is FAILED, never re-run
     (an interrupted apply may have committed rows already)."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    stale_time = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_time = datetime.now(UTC) - timedelta(minutes=30)
     job = await create_import_job(
         session,
         a.guild,
@@ -853,7 +852,7 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
     return {
         "type": "initiative-backup",
         "schema_version": 1,
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "exported_at": "2026-07-15T00:00:00+00:00",
         "exported_by_handle": "tester#0001",
         "source_instance_url": None,
@@ -877,6 +876,7 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
         "entries": entries or [],
         "assets": assets or [],
         "skipped": [],
+        "people": [],
     }
 
 
@@ -968,7 +968,7 @@ async def _run_import_worker(monkeypatch, role_session):
     monkeypatch.setattr(
         import_worker, "_open_user_session", lambda _guild_id: user_session
     )
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
 
 async def test_backup_import_end_to_end_with_assets(
@@ -983,7 +983,6 @@ async def test_backup_import_end_to_end_with_assets(
     from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative, InitiativeMember
-
     from app.testing.factories import create_upload
 
     a = await acting_user(
@@ -1211,9 +1210,10 @@ def test_reject_non_flat_asset_keys_unit():
         return BackupManifest(
             type="initiative-backup",
             schema_version=1,
-            app_version="0.0.0-test",
+            app_version="0.78.0-test",
             exported_at="2026-07-15T00:00:00+00:00",
             guild={"id": 1, "name": "g"},
+            people=[],
             include_uploads=True,
             initiatives=[],
             entries=entries or [],
@@ -1279,151 +1279,14 @@ async def test_backup_confirm_include_map_skips_tools(
     assert job["result"]["per_tool"]["counter_group"]["created"] == 0
 
 
-async def test_an_archive_from_before_files_restores_its_documents(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """An archive written while files were documents names them that way: the
-    manifest's tool and switch, the envelope type and the key holding the
-    file's type. A restore reads each as the file it is."""
-    from sqlmodel import select
-
-    from app.core.file_types import FileType
-
-    from app.models.tenant.file import File
-
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    envelope = {
-        "type": "initiative-document",
-        "schema_version": 1,
-        "document_type": "url",
-        "name": "Old link",
-        "content": {"url": "https://example.com"},
-        "tags": [],
-        "properties": [],
-    }
-    entry = {
-        "path": "initiatives/1-restored/documents/1-old-link.json",
-        "tool": "document",
-        "type": "initiative-document",
-        "schema_version": 1,
-        "entity_id": 1,
-        "title": "Old link",
-        "initiative_id": 1,
-        "tags": [],
-        "properties": [],
-        "asset": None,
-    }
-    manifest = _minimal_manifest(entries=[entry])
-    manifest["initiatives"][0]["tools"] = {"document": "included"}
-    job = await _apply_backup(
-        client,
-        a,
-        _make_backup_zip(manifest, {entry["path"]: json.dumps(envelope).encode()}),
-        monkeypatch,
-        role_session,
-    )
-    assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["file"]["created"] == 1
-
-    await route_session_to_guild(session, a.guild.id)
-    restored = (await session.exec(select(File).where(File.name == "Old link"))).one()
-    assert restored.file_type == FileType.url
-
-
-async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
-    client, acting_user, session, monkeypatch, role_session
-):
-    """An archive written while galleries were a tool carries a gallery entry.
-    A restore makes each picture a file of the initiative and gathers the
-    files into a collection named as the gallery was, made as the Gallery
-    shape with each caption its file's Caption."""
-    from sqlmodel import select
-
-    from app.models.tenant.collection import Collection, CollectionFile
-    from app.models.tenant.file import File
-    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
-
-    a = await acting_user(
-        guild_role=CommunityRole.superadmin, initiative=True, project=True
-    )
-    payload = png_bytes()
-    path = "initiatives/1-restored/galleries/1-old-wall"
-    envelope = {
-        "type": "initiative-gallery",
-        "schema_version": 1,
-        "name": "Old wall",
-        "tags": [],
-        "properties": [],
-        "images": [
-            {
-                "storage_key": "shot.png",
-                "title": "Shot",
-                "caption": "From the pier",
-                "content_type": "image/png",
-                "size_bytes": len(payload),
-                "original_filename": "shot.png",
-            }
-        ],
-    }
-    entry = {
-        "path": f"{path}.json",
-        "tool": "gallery",
-        "type": "initiative-gallery",
-        "schema_version": 1,
-        "entity_id": 1,
-        "title": "Old wall",
-        "initiative_id": 1,
-        "tags": [],
-        "properties": [],
-        "asset": None,
-    }
-    manifest = _minimal_manifest(
-        entries=[entry],
-        assets=[
-            _asset_record(
-                "shot.png",
-                size_bytes=len(payload),
-                content_type="image/png",
-                referenced_by=[path],
-            )
-        ],
-    )
-    manifest["initiatives"][0]["tools"] = {"gallery": "included"}
-    job = await _apply_backup(
-        client,
-        a,
-        _make_backup_zip(
-            manifest,
-            {entry["path"]: json.dumps(envelope).encode(), "assets/shot.png": payload},
-        ),
-        monkeypatch,
-        role_session,
-    )
-    assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["file"]["created"] == 1
-
-    await route_session_to_guild(session, a.guild.id)
-    restored = (
-        await session.exec(select(Collection).where(Collection.name == "Old wall"))
-    ).one()
-    files = (
-        await session.exec(
-            select(File.name, MetadataValue.value_text)
-            .join(CollectionFile, CollectionFile.file_id == File.id)
-            .join(MetadataValue, MetadataValue.entity_id == File.id)
-            .join(
-                MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id
-            )
-            .where(
-                CollectionFile.collection_id == restored.id,
-                MetadataDefinition.collection_id == restored.id,
-                MetadataDefinition.name == "Caption",
-            )
-        )
-    ).all()
-    assert files == [("Shot", "From the pier")]
+async def test_an_archive_from_before_the_floor_is_refused(client, acting_user):
+    """An archive from before 0.78 names tools, kinds and references as they
+    were then, so it is refused rather than half restored."""
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    old = _make_backup_zip({**_minimal_manifest(), "app_version": "0.77.1"})
+    refused = await _upload_backup(client, a, old)
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "IMPORT_ARCHIVE_TOO_OLD"
 
 
 async def test_restored_collections_keep_their_own_files_and_cover(
@@ -1920,7 +1783,7 @@ async def test_backup_staged_expiry_and_cancel(
     """An unconfirmed staged backup expires via GC (payload deleted); a
     staged backup can also be cancelled; a cancelled/expired one can't be
     confirmed."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1934,7 +1797,7 @@ async def test_backup_staged_expiry_and_cancel(
 
     await route_session_to_guild(session, a.guild.id)
     row = await session.get(DataJob, job_id)
-    row.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    row.expires_at = datetime.now(UTC) - timedelta(hours=1)
     session.add(row)
     await session.commit()
 
@@ -2106,9 +1969,10 @@ async def test_backup_asset_restore_guards_actual_bytes_not_declarations(
     manifest = BackupManifest(
         type="initiative-backup",
         schema_version=1,
-        app_version="0.0.0-test",
+        app_version="0.78.0-test",
         exported_at="2026-07-15T00:00:00+00:00",
         guild={"id": 1, "name": "g"},
+        people=[],
         include_uploads=True,
         initiatives=[],
         entries=[],
@@ -2143,7 +2007,6 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
     from sqlmodel import select
 
     from app.core.file_types import FileType
-
     from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.testing import route_session_to_guild
@@ -2383,7 +2246,7 @@ async def test_project_envelope_carries_comments_dates_and_links(
     arrives attributed to the person who ran the import, with its original
     author named in the text rather than impersonated.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from sqlmodel import select
 
@@ -2399,7 +2262,7 @@ async def test_project_envelope_carries_comments_dates_and_links(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    written_at = datetime(2024, 3, 4, 9, 30, tzinfo=timezone.utc)
+    written_at = datetime(2024, 3, 4, 9, 30, tzinfo=UTC)
     blocker = await create_task(
         session, a.project, title="Pour the footings", created_at=written_at
     )
@@ -2473,7 +2336,7 @@ async def test_envelope_link_out_of_the_file_is_counted(client, acting_user, ses
     envelope = {
         "type": "initiative-project",
         "schema_version": 1,
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "exported_at": "2026-07-15T00:00:00+00:00",
         "project": {"name": "Imported Board"},
         "tags": [],
@@ -2722,12 +2585,12 @@ async def test_a_stale_fetch_is_re_claimed_not_failed(
     nothing to duplicate — the partial payload is thrown away and the job
     starts over.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlmodel import select
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    long_ago = datetime.now(timezone.utc) - timedelta(hours=3)
+    long_ago = datetime.now(UTC) - timedelta(hours=3)
     job = await create_import_job(
         session,
         a.guild,
@@ -2772,7 +2635,7 @@ def _project_envelope_with_comment(author_handle: str, author_name: str) -> dict
     return {
         "type": "initiative-project",
         "schema_version": 1,
-        "app_version": "0.0.0-test",
+        "app_version": "0.78.0-test",
         "exported_at": "2026-07-15T00:00:00+00:00",
         "project": {"name": "Imported Board"},
         "tags": [],
@@ -3708,76 +3571,6 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     assert "mentionHandle" not in mention
 
 
-async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
-    client, acting_user, session
-):
-    """A ``[[ ]]`` link in an envelope an older build wrote comes in as the
-    reference to its file it always was, as a restore reads one. A
-    spreadsheet's cells are what was typed, and come in as written."""
-    from sqlmodel import select
-
-    from app.models.tenant.file import File
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    target = await _second_initiative(session, a, files_enabled=True)
-    spec = await create_file(session, target, a.user, name="Spec")
-    envelope = {
-        "type": "initiative-file",
-        "schema_version": 1,
-        "file_type": "lexical",
-        "name": "Minutes",
-        "content": _editor_state(
-            {"type": "wikilink", "documentId": spec.id, "documentTitle": "Spec"}
-        ),
-    }
-
-    resp = await _import_envelope(client, a, envelope, target.id)
-    assert resp.status_code == 201, resp.text
-
-    file = (
-        await session.exec(
-            select(File)
-            .where(File.initiative_id == target.id, File.name == "Minutes")
-            .options(undefer(File.content))
-        )
-    ).one()
-    [node] = file.content["root"]["children"][0]["children"]
-    assert (node["type"], node["entityType"], node["entityId"]) == (
-        "entity-mention",
-        "file",
-        spec.id,
-    )
-
-    cells = {"0:0": "#doc[Spec](7)", "0:1": "#gallery-image[Sample](12)"}
-    resp = await _import_envelope(
-        client,
-        a,
-        {
-            "type": "initiative-file",
-            "schema_version": 1,
-            "file_type": "sheet",
-            "name": "Budget",
-            "content": {
-                "schema_version": 3,
-                "kind": "spreadsheet",
-                "sheets": [{"id": "s1", "name": "Sheet 1", "cells": cells}],
-            },
-        },
-        target.id,
-    )
-    assert resp.status_code == 201, resp.text
-    sheet = (
-        await session.exec(
-            select(File)
-            .where(File.initiative_id == target.id, File.name == "Budget")
-            .options(undefer(File.content))
-        )
-    ).one()
-    assert sheet.content["sheets"][0]["cells"] == cells
-
-
 def _reference_node(entity_type: str, entity_id: int, text: str) -> dict:
     return {
         "type": "entity-mention",
@@ -3968,9 +3761,9 @@ async def test_a_restored_reference_points_at_the_restored_copy(
     restored bodies' references are edges from the start, as a save's are."""
     from sqlmodel import select
 
+    from app.api.v1.tenant_endpoints.exports_test import _export, _rendered_zip
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.api.v1.tenant_endpoints.exports_test import _export, _rendered_zip
     from app.models.tenant.relationship import EntityRelationship
     from app.services.import_engine.references import SOURCE_REF
     from app.services.tenant.relationships import Endpoint
@@ -4366,7 +4159,7 @@ async def test_confirm_refuses_a_malformed_people_map(client, acting_user, sessi
 # ---------------------------------------------------------------------------
 
 
-def _structural_entry(type_: str, payload: dict, initiative_id=1):  # noqa: D401
+def _structural_entry(type_: str, payload: dict, initiative_id=1):
     """One of the two files describing the initiative rather than its content."""
     name = type_.removeprefix("initiative-")
     entry = {
@@ -4568,26 +4361,26 @@ async def test_backup_structure_never_overwrites_what_is_already_there(
 
 def _atlassian_site(*, jira_status=200, confluence_status=200):
     """Stub one Atlassian site for the endpoint's egress."""
-    import httpx
+    import httpx2
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "/rest/api/3/project/search" in url:
             if jira_status != 200:
-                return httpx.Response(jira_status, json={})
-            return httpx.Response(
+                return httpx2.Response(jira_status, json={})
+            return httpx2.Response(
                 200, json={"values": [{"id": "1", "key": "ACME", "name": "Acme"}]}
             )
         if "/rest/api/3/search/approximate-count" in url:
-            return httpx.Response(200, json={"count": 12})
+            return httpx2.Response(200, json={"count": 12})
         if "/wiki/api/v2/spaces" in url:
             if confluence_status != 200:
-                return httpx.Response(confluence_status, json={})
-            return httpx.Response(
+                return httpx2.Response(confluence_status, json={})
+            return httpx2.Response(
                 200, json={"results": [{"id": "9", "key": "DOCS", "name": "Docs"}]}
             )
         if "/wiki/rest/api/search" in url:
-            return httpx.Response(200, json={"totalSize": 4})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"totalSize": 4})
+        return httpx2.Response(404, json={})
 
     return fake_request
 
@@ -4700,7 +4493,7 @@ def _jira_site(
     a fetch. ``catalog`` is the site's field list and ``boards`` maps a board
     id to its name.
     """
-    import httpx
+    import httpx2
 
     probe = _atlassian_site()
     requested: list[str] = []
@@ -4710,30 +4503,30 @@ def _jira_site(
         if on_request is not None:
             await on_request(url)
         if any(f"/rest/api/3/project/{key}" in url for key in locked):
-            return httpx.Response(403, json={})
+            return httpx2.Response(403, json={})
         if "/rest/api/3/project/search" in url:
             return await probe(method, url, headers=headers, json=json)
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=_JIRA_STATUSES)
+            return httpx2.Response(200, json=_JIRA_STATUSES)
         if "/rest/api/3/project/" in url:
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": f"{key} Board"})
+            return httpx2.Response(200, json={"key": key, "name": f"{key} Board"})
         if "/rest/api/3/search/jql" in url:
-            return httpx.Response(200, json={"issues": issues or []})
+            return httpx2.Response(200, json={"issues": issues or []})
         if "/rest/agile/1.0/board?" in url:
-            return httpx.Response(404, json={})
+            return httpx2.Response(404, json={})
         if "/attachment/content/" in url and files:
             attachment_id = url.split("/attachment/content/")[1].split("?")[0]
             if attachment_id in files:
                 return await answered(
-                    method, url, httpx.Response(200, content=files[attachment_id]), kw
+                    method, url, httpx2.Response(200, content=files[attachment_id]), kw
                 )
         if url.endswith("/rest/api/3/field") and catalog is not None:
-            return httpx.Response(200, json=catalog)
+            return httpx2.Response(200, json=catalog)
         if "/rest/agile/1.0/board/" in url and boards:
             board_id = int(url.rsplit("/", 1)[-1])
             if board_id in boards:
-                return httpx.Response(
+                return httpx2.Response(
                     200, json={"id": board_id, "name": boards[board_id]}
                 )
         return await probe(method, url, headers=headers, json=json)
@@ -5795,7 +5588,7 @@ def _confluence_site(
     *, pages, users=None, labels=None, attachments=None, files=None, comments=None
 ):
     """Stub a Confluence site answering a connect and a fetch of one space."""
-    import httpx
+    import httpx2
 
     probe = _atlassian_site()
     names: dict[str, str] = users or {}
@@ -5807,22 +5600,22 @@ def _confluence_site(
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "-comments" in url:
             path = url.split("/wiki/api/v2/")[1].split("?")[0]
-            return httpx.Response(200, json={"results": threads.get(path, [])})
+            return httpx2.Response(200, json={"results": threads.get(path, [])})
         if "/attachments?" in url:
             page_id = url.split("/pages/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 200, json={"results": page_attachments.get(page_id, [])}
             )
         if "/child/attachment/" in url:
             att_id = url.split("/child/attachment/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 302, headers={"location": f"https://media.example.com/{att_id}"}
             )
         if url.startswith("https://media.example.com/"):
             blob = blobs[url.rsplit("/", 1)[1]]
-            return await answered(method, url, httpx.Response(200, content=blob), kw)
+            return await answered(method, url, httpx2.Response(200, content=blob), kw)
         if "/wiki/api/v2/spaces?keys=" in url:
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "results": [
@@ -5831,16 +5624,16 @@ def _confluence_site(
                 },
             )
         if "/wiki/api/v2/spaces/9/pages" in url:
-            return httpx.Response(200, json={"results": pages})
+            return httpx2.Response(200, json={"results": pages})
         if "/labels" in url:
             page_id = url.split("/pages/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={"results": [{"name": n} for n in page_labels.get(page_id, [])]},
             )
         if url.endswith("/wiki/api/v2/users-bulk"):
             wanted = (json or {}).get("accountIds") or []
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "results": [
@@ -6455,7 +6248,7 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
     to the page is a mention of the wiki page, and the page the issue lists
     under "Confluence pages" is related to its task. Found through the job
     itself — the Jira key property is unticked here, and it still joins."""
-    import httpx
+    import httpx2
     from sqlmodel import select
 
     from app.models.tenant.relationship import EntityRelationship
@@ -6498,7 +6291,7 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
 
     async def both(method, url, *, headers=None, json=None, timeout=None, **kw):
         if url.endswith("/remotelink"):
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json=[
                     {
@@ -6683,7 +6476,7 @@ async def test_a_community_runs_one_import_at_a_time(
     assert await _status(client, a, first) == DataJobStatus.done.value
     assert await _status(client, a, second) == DataJobStatus.queued.value
 
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
     assert await _status(client, a, second) == DataJobStatus.done.value
 
 
@@ -6708,7 +6501,7 @@ async def test_a_process_starts_no_more_than_its_slots(
 
     assert len(started) == 1
     await asyncio.gather(*started)
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
 
 async def test_the_sweep_leaves_a_job_this_process_is_running(
@@ -6717,12 +6510,12 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
     """A row that looks stale but belongs to a job this process is running is
     not failed out from under it."""
     import asyncio
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    stale_time = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_time = datetime.now(UTC) - timedelta(minutes=30)
     job = await create_import_job(
         session,
         a.guild,

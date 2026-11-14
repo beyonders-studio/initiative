@@ -15,16 +15,18 @@ import { TaskCompletionEffectHost } from "@/components/effects/TaskCompletionEff
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { CommunityProvider, useCommunities } from "@/hooks/useCommunities";
+import { EventThemeProvider } from "@/hooks/useEventTheme";
 import { KeepScreenAwakeProvider } from "@/hooks/useKeepScreenAwake";
-import { PrideProvider } from "@/hooks/usePride";
 import { useRouteGuardSync } from "@/hooks/useRouteGuardSync";
 import { ServerProvider, useServer } from "@/hooks/useServer";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { connectKit } from "@/lib/kitHost";
 import { prepareOfflineCache } from "@/lib/offlineBoot";
 import { bindOnlineManagerToDevice } from "@/lib/onlineStatus";
 import { queryClient } from "@/lib/queryClient";
-import { getStoredServerUrl } from "@/lib/serverStorage";
+import { adoptStoredServerUrl } from "@/lib/serverStorage";
 import { initStorage } from "@/lib/storage";
+import { noteDayOfUse } from "@/lib/storeReview";
 import { sellsOnThisDevice } from "@/lib/storeSelling";
 import { router } from "@/router";
 import { registerServiceWorker } from "@/serviceWorkerRegistration";
@@ -61,15 +63,20 @@ const InnerApp = () => {
 
 async function bootstrap() {
   await initStorage();
+  connectKit();
+
+  // On native, set the API base URL immediately from storage so requests
+  // reach the real backend before React effects run (avoids race condition
+  // where child provider effects fire before ServerProvider's useEffect).
+  // Before the offline cache, which is kept per server.
+  const storedUrl = Capacitor.isNativePlatform() ? adoptStoredServerUrl() : null;
+  if (storedUrl) setApiBaseUrl(storedUrl);
 
   // What this device last loaded, if it is still ours and still fresh. Decided
   // before render so a launch with no signal has its content in hand rather
   // than waiting on a request that will not answer.
   const offlinePersist = await prepareOfflineCache();
 
-  // On native, set the API base URL immediately from storage so requests
-  // reach the real backend before React effects run (avoids race condition
-  // where child provider effects fire before ServerProvider's useEffect).
   if (Capacitor.isNativePlatform()) {
     // Confirm this web bundle booted so the OTA updater doesn't roll it back. If an applied
     // bundle never reaches this point within appReadyTimeout, Capgo reverts to the last-good
@@ -90,14 +97,12 @@ async function bootstrap() {
       console.debug("SplashScreen.hide failed (plugin unavailable):", error);
     }
 
-    const storedUrl = getStoredServerUrl();
-    if (storedUrl) {
-      setApiBaseUrl(storedUrl);
-    }
-
     // Ask the store early, so plan wording and buttons are settled by the time
     // anything shows them. Not awaited: nothing waits on it to render.
     void sellsOnThisDevice();
+
+    // A launch is a day of use, which the store review prompt waits for.
+    noteDayOfUse();
 
     // Before the first query runs: a restored cache is only worth having if
     // React Query leaves it on screen instead of refetching over it while
@@ -121,7 +126,7 @@ async function bootstrap() {
       <Suspense fallback={null}>
         <AppErrorBoundary>
           <ThemeProvider>
-            <PrideProvider>
+            <EventThemeProvider>
               <KeepScreenAwakeProvider>
                 <ServerProvider>
                   {withQueryClient(
@@ -133,7 +138,7 @@ async function bootstrap() {
                   )}
                 </ServerProvider>
               </KeepScreenAwakeProvider>
-            </PrideProvider>
+            </EventThemeProvider>
           </ThemeProvider>
         </AppErrorBoundary>
       </Suspense>

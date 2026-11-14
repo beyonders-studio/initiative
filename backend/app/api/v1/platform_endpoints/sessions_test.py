@@ -2,21 +2,20 @@
 
 import uuid
 from types import SimpleNamespace
-from typing import Optional
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints import session_opening
 from app.api.v1.platform_endpoints import sessions as sessions_endpoints
 from app.api.v1.platform_endpoints import users as users_endpoints
+from app.api.v1.platform_endpoints.dm_transport_test import _registration
 from app.core import auth_context
 from app.core.security import get_password_hash
+from app.models.platform.dm_device import DmDevice
 from app.models.platform.user import UserStatus
 from app.services import content_sockets
-from app.services.platform import api_keys as api_keys_service
-from app.services.platform.ws_auth import authenticate_ws_token
 from app.services.content_sockets import (
     WS_CREDENTIAL_ENDED,
     ContentSockets,
@@ -25,8 +24,8 @@ from app.services.content_sockets import (
     Wire,
     resource_room,
 )
-from app.api.v1.platform_endpoints.dm_transport_test import _registration
-from app.models.platform.dm_device import DmDevice
+from app.services.platform import api_keys as api_keys_service
+from app.services.platform.ws_auth import authenticate_ws_token
 from app.testing import create_user, get_auth_headers
 
 CHROME_MAC = (
@@ -67,10 +66,12 @@ async def _sign_in(
 
 async def _keep_messages(client: AsyncClient, signed_in, seed: int) -> str:
     """Register a message key store under the session ``signed_in`` opened."""
+    headers = {"Authorization": f"Bearer {signed_in.json()['access_token']}"}
+    me = await client.get("/api/v1/me", headers=headers)
     registered = await client.post(
         "/api/v1/me/dm/devices",
-        json=_registration(seed),
-        headers={"Authorization": f"Bearer {signed_in.json()['access_token']}"},
+        json=_registration(me.json()["id"], seed),
+        headers=headers,
     )
     assert registered.status_code == 201, registered.text
     return registered.json()["device_id"]
@@ -313,9 +314,9 @@ class _Socket:
     """Stands in for a content WebSocket: records the code it was closed with."""
 
     def __init__(self) -> None:
-        self.closed: Optional[int] = None
+        self.closed: int | None = None
 
-    async def close(self, code: Optional[int] = None) -> None:
+    async def close(self, code: int | None = None) -> None:
         self.closed = code
 
 

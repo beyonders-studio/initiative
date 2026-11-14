@@ -7,7 +7,6 @@ export type TicketTitleT = TFunction<any>;
 const TOPIC_KEYS: Record<string, string> = {
   support: "intake:help.topics",
   security: "intake:security.topics",
-  feedback: "intake:feedback.topics",
   moderation: "intake:moderationTopics",
 };
 

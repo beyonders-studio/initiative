@@ -13,6 +13,7 @@ import { Route as ServerRequiredRouteImport } from './routes/_serverRequired'
 import { Route as ServerRequiredAuthenticatedRouteImport } from './routes/_serverRequired/_authenticated'
 import { Route as ServerRequiredDemoRouteImport } from './routes/_serverRequired/demo'
 import { Route as ServerRequiredDownloadRouteImport } from './routes/_serverRequired/download'
+import { Route as ServerRequiredFeedbackRouteImport } from './routes/_serverRequired/feedback'
 import { Route as ServerRequiredForgotPasswordRouteImport } from './routes/_serverRequired/forgot-password'
 import { Route as ServerRequiredLoginRouteImport } from './routes/_serverRequired/login'
 import { Route as ServerRequiredPricingRouteImport } from './routes/_serverRequired/pricing'
@@ -23,7 +24,6 @@ import { Route as ServerRequiredVerifyEmailRouteImport } from './routes/_serverR
 import { Route as ServerRequiredWelcomeRouteImport } from './routes/_serverRequired/welcome'
 import { Route as PluginsConnectedRouteImport } from './routes/plugins.connected'
 import { Route as ServerRequiredAuthenticatedIndexRouteImport } from './routes/_serverRequired/_authenticated/index'
-import { Route as ServerRequiredAuthenticatedAnnouncementsRouteImport } from './routes/_serverRequired/_authenticated/announcements'
 import { Route as ServerRequiredAuthenticatedCommunitiesRouteImport } from './routes/_serverRequired/_authenticated/communities'
 import { Route as ServerRequiredAuthenticatedLicencesRouteImport } from './routes/_serverRequired/_authenticated/licences'
 import { Route as ServerRequiredAuthenticatedMarketplaceRouteImport } from './routes/_serverRequired/_authenticated/marketplace'
@@ -38,7 +38,10 @@ import { Route as ServerRequiredAuthenticatedUserStatsRouteImport } from './rout
 import { Route as ServerRequiredAccountNotMeRouteImport } from './routes/_serverRequired/account.not-me'
 import { Route as ServerRequiredInviteCodeRouteImport } from './routes/_serverRequired/invite.$code'
 import { Route as ServerRequiredLegalSlugRouteImport } from './routes/_serverRequired/legal.$slug'
+import { Route as ServerRequiredOauthAuthorizeRouteImport } from './routes/_serverRequired/oauth.authorize'
 import { Route as ServerRequiredOidcCallbackRouteImport } from './routes/_serverRequired/oidc.callback'
+import { Route as ServerRequiredSuggestionsIndexRouteImport } from './routes/_serverRequired/suggestions.index'
+import { Route as ServerRequiredSuggestionsTaskIdRouteImport } from './routes/_serverRequired/suggestions.$taskId'
 import { Route as ServerRequiredWhatsNewIndexRouteImport } from './routes/_serverRequired/whats-new.index'
 import { Route as ServerRequiredWhatsNewVersionRouteImport } from './routes/_serverRequired/whats-new.$version'
 import { Route as ServerRequiredAuthenticatedCCommunityIdRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId'
@@ -208,6 +211,11 @@ const ServerRequiredDownloadRoute = ServerRequiredDownloadRouteImport.update({
   path: '/download',
   getParentRoute: () => ServerRequiredRoute,
 } as any)
+const ServerRequiredFeedbackRoute = ServerRequiredFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => ServerRequiredRoute,
+} as any)
 const ServerRequiredForgotPasswordRoute =
   ServerRequiredForgotPasswordRouteImport.update({
     id: '/forgot-password',
@@ -260,12 +268,6 @@ const ServerRequiredAuthenticatedIndexRoute =
   ServerRequiredAuthenticatedIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => ServerRequiredAuthenticatedRoute,
-  } as any)
-const ServerRequiredAuthenticatedAnnouncementsRoute =
-  ServerRequiredAuthenticatedAnnouncementsRouteImport.update({
-    id: '/announcements',
-    path: '/announcements',
     getParentRoute: () => ServerRequiredAuthenticatedRoute,
   } as any)
 const ServerRequiredAuthenticatedCommunitiesRoute =
@@ -351,10 +353,28 @@ const ServerRequiredLegalSlugRoute = ServerRequiredLegalSlugRouteImport.update({
   path: '/legal/$slug',
   getParentRoute: () => ServerRequiredRoute,
 } as any)
+const ServerRequiredOauthAuthorizeRoute =
+  ServerRequiredOauthAuthorizeRouteImport.update({
+    id: '/oauth/authorize',
+    path: '/oauth/authorize',
+    getParentRoute: () => ServerRequiredRoute,
+  } as any)
 const ServerRequiredOidcCallbackRoute =
   ServerRequiredOidcCallbackRouteImport.update({
     id: '/oidc/callback',
     path: '/oidc/callback',
+    getParentRoute: () => ServerRequiredRoute,
+  } as any)
+const ServerRequiredSuggestionsIndexRoute =
+  ServerRequiredSuggestionsIndexRouteImport.update({
+    id: '/suggestions/',
+    path: '/suggestions/',
+    getParentRoute: () => ServerRequiredRoute,
+  } as any)
+const ServerRequiredSuggestionsTaskIdRoute =
+  ServerRequiredSuggestionsTaskIdRouteImport.update({
+    id: '/suggestions/$taskId',
+    path: '/suggestions/$taskId',
     getParentRoute: () => ServerRequiredRoute,
   } as any)
 const ServerRequiredWhatsNewIndexRoute =
@@ -1520,6 +1540,7 @@ export interface FileRoutesByFullPath {
   '/': typeof ServerRequiredAuthenticatedIndexRoute
   '/demo': typeof ServerRequiredDemoRoute
   '/download': typeof ServerRequiredDownloadRoute
+  '/feedback': typeof ServerRequiredFeedbackRoute
   '/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/login': typeof ServerRequiredLoginRoute
   '/pricing': typeof ServerRequiredPricingRoute
@@ -1529,7 +1550,6 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof ServerRequiredVerifyEmailRoute
   '/welcome': typeof ServerRequiredWelcomeRoute
   '/plugins/connected': typeof PluginsConnectedRoute
-  '/announcements': typeof ServerRequiredAuthenticatedAnnouncementsRoute
   '/communities': typeof ServerRequiredAuthenticatedCommunitiesRoute
   '/licences': typeof ServerRequiredAuthenticatedLicencesRoute
   '/marketplace': typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -1544,8 +1564,11 @@ export interface FileRoutesByFullPath {
   '/account/not-me': typeof ServerRequiredAccountNotMeRoute
   '/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/legal/$slug': typeof ServerRequiredLegalSlugRoute
+  '/oauth/authorize': typeof ServerRequiredOauthAuthorizeRoute
   '/oidc/callback': typeof ServerRequiredOidcCallbackRoute
+  '/suggestions/$taskId': typeof ServerRequiredSuggestionsTaskIdRoute
   '/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
+  '/suggestions/': typeof ServerRequiredSuggestionsIndexRoute
   '/whats-new/': typeof ServerRequiredWhatsNewIndexRoute
   '/c/$communityId': typeof ServerRequiredAuthenticatedCCommunityIdRouteWithChildren
   '/my-tickets/$taskId': typeof ServerRequiredAuthenticatedMyTicketsTaskIdRoute
@@ -1699,6 +1722,7 @@ export interface FileRoutesByTo {
   '/': typeof ServerRequiredAuthenticatedIndexRoute
   '/demo': typeof ServerRequiredDemoRoute
   '/download': typeof ServerRequiredDownloadRoute
+  '/feedback': typeof ServerRequiredFeedbackRoute
   '/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/login': typeof ServerRequiredLoginRoute
   '/pricing': typeof ServerRequiredPricingRoute
@@ -1708,7 +1732,6 @@ export interface FileRoutesByTo {
   '/verify-email': typeof ServerRequiredVerifyEmailRoute
   '/welcome': typeof ServerRequiredWelcomeRoute
   '/plugins/connected': typeof PluginsConnectedRoute
-  '/announcements': typeof ServerRequiredAuthenticatedAnnouncementsRoute
   '/communities': typeof ServerRequiredAuthenticatedCommunitiesRoute
   '/licences': typeof ServerRequiredAuthenticatedLicencesRoute
   '/marketplace': typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -1722,8 +1745,11 @@ export interface FileRoutesByTo {
   '/account/not-me': typeof ServerRequiredAccountNotMeRoute
   '/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/legal/$slug': typeof ServerRequiredLegalSlugRoute
+  '/oauth/authorize': typeof ServerRequiredOauthAuthorizeRoute
   '/oidc/callback': typeof ServerRequiredOidcCallbackRoute
+  '/suggestions/$taskId': typeof ServerRequiredSuggestionsTaskIdRoute
   '/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
+  '/suggestions': typeof ServerRequiredSuggestionsIndexRoute
   '/whats-new': typeof ServerRequiredWhatsNewIndexRoute
   '/my-tickets/$taskId': typeof ServerRequiredAuthenticatedMyTicketsTaskIdRoute
   '/profile/account': typeof ServerRequiredAuthenticatedProfileAccountRoute
@@ -1863,6 +1889,7 @@ export interface FileRoutesById {
   '/_serverRequired/_authenticated': typeof ServerRequiredAuthenticatedRouteWithChildren
   '/_serverRequired/demo': typeof ServerRequiredDemoRoute
   '/_serverRequired/download': typeof ServerRequiredDownloadRoute
+  '/_serverRequired/feedback': typeof ServerRequiredFeedbackRoute
   '/_serverRequired/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/_serverRequired/login': typeof ServerRequiredLoginRoute
   '/_serverRequired/pricing': typeof ServerRequiredPricingRoute
@@ -1872,7 +1899,6 @@ export interface FileRoutesById {
   '/_serverRequired/verify-email': typeof ServerRequiredVerifyEmailRoute
   '/_serverRequired/welcome': typeof ServerRequiredWelcomeRoute
   '/plugins/connected': typeof PluginsConnectedRoute
-  '/_serverRequired/_authenticated/announcements': typeof ServerRequiredAuthenticatedAnnouncementsRoute
   '/_serverRequired/_authenticated/communities': typeof ServerRequiredAuthenticatedCommunitiesRoute
   '/_serverRequired/_authenticated/licences': typeof ServerRequiredAuthenticatedLicencesRoute
   '/_serverRequired/_authenticated/marketplace': typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -1887,9 +1913,12 @@ export interface FileRoutesById {
   '/_serverRequired/account/not-me': typeof ServerRequiredAccountNotMeRoute
   '/_serverRequired/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/_serverRequired/legal/$slug': typeof ServerRequiredLegalSlugRoute
+  '/_serverRequired/oauth/authorize': typeof ServerRequiredOauthAuthorizeRoute
   '/_serverRequired/oidc/callback': typeof ServerRequiredOidcCallbackRoute
+  '/_serverRequired/suggestions/$taskId': typeof ServerRequiredSuggestionsTaskIdRoute
   '/_serverRequired/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
   '/_serverRequired/_authenticated/': typeof ServerRequiredAuthenticatedIndexRoute
+  '/_serverRequired/suggestions/': typeof ServerRequiredSuggestionsIndexRoute
   '/_serverRequired/whats-new/': typeof ServerRequiredWhatsNewIndexRoute
   '/_serverRequired/_authenticated/c/$communityId': typeof ServerRequiredAuthenticatedCCommunityIdRouteWithChildren
   '/_serverRequired/_authenticated/my-tickets/$taskId': typeof ServerRequiredAuthenticatedMyTicketsTaskIdRoute
@@ -2045,6 +2074,7 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/download'
+    | '/feedback'
     | '/forgot-password'
     | '/login'
     | '/pricing'
@@ -2054,7 +2084,6 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/welcome'
     | '/plugins/connected'
-    | '/announcements'
     | '/communities'
     | '/licences'
     | '/marketplace'
@@ -2069,8 +2098,11 @@ export interface FileRouteTypes {
     | '/account/not-me'
     | '/invite/$code'
     | '/legal/$slug'
+    | '/oauth/authorize'
     | '/oidc/callback'
+    | '/suggestions/$taskId'
     | '/whats-new/$version'
+    | '/suggestions/'
     | '/whats-new/'
     | '/c/$communityId'
     | '/my-tickets/$taskId'
@@ -2224,6 +2256,7 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/download'
+    | '/feedback'
     | '/forgot-password'
     | '/login'
     | '/pricing'
@@ -2233,7 +2266,6 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/welcome'
     | '/plugins/connected'
-    | '/announcements'
     | '/communities'
     | '/licences'
     | '/marketplace'
@@ -2247,8 +2279,11 @@ export interface FileRouteTypes {
     | '/account/not-me'
     | '/invite/$code'
     | '/legal/$slug'
+    | '/oauth/authorize'
     | '/oidc/callback'
+    | '/suggestions/$taskId'
     | '/whats-new/$version'
+    | '/suggestions'
     | '/whats-new'
     | '/my-tickets/$taskId'
     | '/profile/account'
@@ -2387,6 +2422,7 @@ export interface FileRouteTypes {
     | '/_serverRequired/_authenticated'
     | '/_serverRequired/demo'
     | '/_serverRequired/download'
+    | '/_serverRequired/feedback'
     | '/_serverRequired/forgot-password'
     | '/_serverRequired/login'
     | '/_serverRequired/pricing'
@@ -2396,7 +2432,6 @@ export interface FileRouteTypes {
     | '/_serverRequired/verify-email'
     | '/_serverRequired/welcome'
     | '/plugins/connected'
-    | '/_serverRequired/_authenticated/announcements'
     | '/_serverRequired/_authenticated/communities'
     | '/_serverRequired/_authenticated/licences'
     | '/_serverRequired/_authenticated/marketplace'
@@ -2411,9 +2446,12 @@ export interface FileRouteTypes {
     | '/_serverRequired/account/not-me'
     | '/_serverRequired/invite/$code'
     | '/_serverRequired/legal/$slug'
+    | '/_serverRequired/oauth/authorize'
     | '/_serverRequired/oidc/callback'
+    | '/_serverRequired/suggestions/$taskId'
     | '/_serverRequired/whats-new/$version'
     | '/_serverRequired/_authenticated/'
+    | '/_serverRequired/suggestions/'
     | '/_serverRequired/whats-new/'
     | '/_serverRequired/_authenticated/c/$communityId'
     | '/_serverRequired/_authenticated/my-tickets/$taskId'
@@ -2599,6 +2637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServerRequiredDownloadRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
+    '/_serverRequired/feedback': {
+      id: '/_serverRequired/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof ServerRequiredFeedbackRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
     '/_serverRequired/forgot-password': {
       id: '/_serverRequired/forgot-password'
       path: '/forgot-password'
@@ -2667,13 +2712,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof ServerRequiredAuthenticatedIndexRouteImport
-      parentRoute: typeof ServerRequiredAuthenticatedRoute
-    }
-    '/_serverRequired/_authenticated/announcements': {
-      id: '/_serverRequired/_authenticated/announcements'
-      path: '/announcements'
-      fullPath: '/announcements'
-      preLoaderRoute: typeof ServerRequiredAuthenticatedAnnouncementsRouteImport
       parentRoute: typeof ServerRequiredAuthenticatedRoute
     }
     '/_serverRequired/_authenticated/communities': {
@@ -2774,11 +2812,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServerRequiredLegalSlugRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
+    '/_serverRequired/oauth/authorize': {
+      id: '/_serverRequired/oauth/authorize'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize'
+      preLoaderRoute: typeof ServerRequiredOauthAuthorizeRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
     '/_serverRequired/oidc/callback': {
       id: '/_serverRequired/oidc/callback'
       path: '/oidc/callback'
       fullPath: '/oidc/callback'
       preLoaderRoute: typeof ServerRequiredOidcCallbackRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/suggestions/': {
+      id: '/_serverRequired/suggestions/'
+      path: '/suggestions'
+      fullPath: '/suggestions/'
+      preLoaderRoute: typeof ServerRequiredSuggestionsIndexRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/suggestions/$taskId': {
+      id: '/_serverRequired/suggestions/$taskId'
+      path: '/suggestions/$taskId'
+      fullPath: '/suggestions/$taskId'
+      preLoaderRoute: typeof ServerRequiredSuggestionsTaskIdRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
     '/_serverRequired/whats-new/': {
@@ -4449,7 +4508,6 @@ const ServerRequiredAuthenticatedSettingsPlatformRouteWithChildren =
   )
 
 interface ServerRequiredAuthenticatedRouteChildren {
-  ServerRequiredAuthenticatedAnnouncementsRoute: typeof ServerRequiredAuthenticatedAnnouncementsRoute
   ServerRequiredAuthenticatedCommunitiesRoute: typeof ServerRequiredAuthenticatedCommunitiesRoute
   ServerRequiredAuthenticatedLicencesRoute: typeof ServerRequiredAuthenticatedLicencesRoute
   ServerRequiredAuthenticatedMarketplaceRoute: typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -4473,8 +4531,6 @@ interface ServerRequiredAuthenticatedRouteChildren {
 
 const ServerRequiredAuthenticatedRouteChildren: ServerRequiredAuthenticatedRouteChildren =
   {
-    ServerRequiredAuthenticatedAnnouncementsRoute:
-      ServerRequiredAuthenticatedAnnouncementsRoute,
     ServerRequiredAuthenticatedCommunitiesRoute:
       ServerRequiredAuthenticatedCommunitiesRoute,
     ServerRequiredAuthenticatedLicencesRoute:
@@ -4524,6 +4580,7 @@ interface ServerRequiredRouteChildren {
   ServerRequiredAuthenticatedRoute: typeof ServerRequiredAuthenticatedRouteWithChildren
   ServerRequiredDemoRoute: typeof ServerRequiredDemoRoute
   ServerRequiredDownloadRoute: typeof ServerRequiredDownloadRoute
+  ServerRequiredFeedbackRoute: typeof ServerRequiredFeedbackRoute
   ServerRequiredForgotPasswordRoute: typeof ServerRequiredForgotPasswordRoute
   ServerRequiredLoginRoute: typeof ServerRequiredLoginRoute
   ServerRequiredPricingRoute: typeof ServerRequiredPricingRoute
@@ -4535,8 +4592,11 @@ interface ServerRequiredRouteChildren {
   ServerRequiredAccountNotMeRoute: typeof ServerRequiredAccountNotMeRoute
   ServerRequiredInviteCodeRoute: typeof ServerRequiredInviteCodeRoute
   ServerRequiredLegalSlugRoute: typeof ServerRequiredLegalSlugRoute
+  ServerRequiredOauthAuthorizeRoute: typeof ServerRequiredOauthAuthorizeRoute
   ServerRequiredOidcCallbackRoute: typeof ServerRequiredOidcCallbackRoute
+  ServerRequiredSuggestionsTaskIdRoute: typeof ServerRequiredSuggestionsTaskIdRoute
   ServerRequiredWhatsNewVersionRoute: typeof ServerRequiredWhatsNewVersionRoute
+  ServerRequiredSuggestionsIndexRoute: typeof ServerRequiredSuggestionsIndexRoute
   ServerRequiredWhatsNewIndexRoute: typeof ServerRequiredWhatsNewIndexRoute
   ServerRequiredCommunityCommunityIdLoginRoute: typeof ServerRequiredCommunityCommunityIdLoginRoute
 }
@@ -4546,6 +4606,7 @@ const ServerRequiredRouteChildren: ServerRequiredRouteChildren = {
     ServerRequiredAuthenticatedRouteWithChildren,
   ServerRequiredDemoRoute: ServerRequiredDemoRoute,
   ServerRequiredDownloadRoute: ServerRequiredDownloadRoute,
+  ServerRequiredFeedbackRoute: ServerRequiredFeedbackRoute,
   ServerRequiredForgotPasswordRoute: ServerRequiredForgotPasswordRoute,
   ServerRequiredLoginRoute: ServerRequiredLoginRoute,
   ServerRequiredPricingRoute: ServerRequiredPricingRoute,
@@ -4557,8 +4618,11 @@ const ServerRequiredRouteChildren: ServerRequiredRouteChildren = {
   ServerRequiredAccountNotMeRoute: ServerRequiredAccountNotMeRoute,
   ServerRequiredInviteCodeRoute: ServerRequiredInviteCodeRoute,
   ServerRequiredLegalSlugRoute: ServerRequiredLegalSlugRoute,
+  ServerRequiredOauthAuthorizeRoute: ServerRequiredOauthAuthorizeRoute,
   ServerRequiredOidcCallbackRoute: ServerRequiredOidcCallbackRoute,
+  ServerRequiredSuggestionsTaskIdRoute: ServerRequiredSuggestionsTaskIdRoute,
   ServerRequiredWhatsNewVersionRoute: ServerRequiredWhatsNewVersionRoute,
+  ServerRequiredSuggestionsIndexRoute: ServerRequiredSuggestionsIndexRoute,
   ServerRequiredWhatsNewIndexRoute: ServerRequiredWhatsNewIndexRoute,
   ServerRequiredCommunityCommunityIdLoginRoute:
     ServerRequiredCommunityCommunityIdLoginRoute,

@@ -1,4 +1,4 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { validatePage } from "@/lib/routeSearch";
 import {
@@ -6,6 +6,7 @@ import {
   isSearchCategory,
   type SearchCategory,
 } from "@/lib/searchResults";
+import { SearchPage } from "@/pages/community/search/SearchPage";
 
 /** What the reader searched for, which slice they are reading, and how far in.
  *  All optional — `/search` with nothing on it is the empty search page. */
@@ -29,7 +30,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
     // Only ever present when on, so the default stays out of the URL.
     archived: search.archived === true || search.archived === "true" ? true : undefined,
   }),
-  component: lazyRouteComponent(() =>
-    import("@/pages/SearchPage").then((m) => ({ default: m.SearchPage }))
-  ),
+  component: SearchPage,
 });

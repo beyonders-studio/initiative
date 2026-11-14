@@ -1,33 +1,9 @@
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { LazyImage } from "@/components/shared/LazyImage";
-import { Lightbox, type LightboxItem } from "@/components/shared/Lightbox";
-import { cn } from "@/lib/utils";
-
-interface Picture {
-  src: string;
-  alt: string;
-}
-
-interface Scope {
-  register: (element: HTMLElement, picture: Picture) => () => void;
-  open: (element: HTMLElement) => void;
-}
-
-const ScopeContext = createContext<Scope | null>(null);
-
-/** The `ImageLightboxScope` a picture is drawn inside, or null outside one —
- *  for a picture that is not a `ProseImage`, such as an editor's. */
-export const useImageLightbox = () => useContext(ScopeContext);
+import { LazyImage } from "@/ui/lazy-image";
+import { cn } from "@/ui/lib/utils";
+import { useImageLightbox } from "@/ui/lightbox";
 
 /** Set by a rendered link: a picture inside one is what the link opens, so
  *  the link keeps the click. */
@@ -36,58 +12,6 @@ const InLinkContext = createContext(false);
 export const InLink = ({ children }: { children: ReactNode }) => (
   <InLinkContext value>{children}</InLinkContext>
 );
-
-const inReadingOrder = ([a]: [Node, Picture], [b]: [Node, Picture]) =>
-  a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-
-/**
- * One block of rendered prose whose pictures open full size. Every
- * `ProseImage` inside it — and every picture in an editor being read — pages
- * with the others, in the order they are read, so a description with five
- * screenshots is one lightbox rather than five.
- */
-export const ImageLightboxScope = ({ children }: { children: ReactNode }) => {
-  const pictures = useRef(new Map<HTMLElement, Picture>());
-  const [items, setItems] = useState<LightboxItem[]>([]);
-  const [index, setIndex] = useState(0);
-  const [open, setOpen] = useState(false);
-
-  const scope = useMemo<Scope>(
-    () => ({
-      register: (element, picture) => {
-        pictures.current.set(element, picture);
-        return () => {
-          pictures.current.delete(element);
-        };
-      },
-      open: (element) => {
-        const ordered = [...pictures.current].sort(inReadingOrder);
-        setItems(ordered.map(([, picture], position) => ({ id: position, ...picture })));
-        setIndex(
-          Math.max(
-            0,
-            ordered.findIndex(([each]) => each === element)
-          )
-        );
-        setOpen(true);
-      },
-    }),
-    []
-  );
-
-  return (
-    <ScopeContext value={scope}>
-      {children}
-      <Lightbox
-        open={open}
-        onOpenChange={setOpen}
-        items={items}
-        index={index}
-        onIndexChange={setIndex}
-      />
-    </ScopeContext>
-  );
-};
 
 interface ProseImageProps {
   src: string;
@@ -109,8 +33,8 @@ interface ProseImageProps {
  * width, capped at the column's, rather than being stretched to fill it.
  */
 export const ProseImage = ({ src, alt = "", title, className, fill = false }: ProseImageProps) => {
-  const { t } = useTranslation("common");
-  const scope = useContext(ScopeContext);
+  const { t } = useTranslation("ui");
+  const scope = useImageLightbox();
   const inLink = useContext(InLinkContext);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const register = scope?.register;

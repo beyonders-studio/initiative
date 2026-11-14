@@ -5,11 +5,11 @@ from __future__ import annotations
 from sqlmodel import select
 
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import Counter
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
-
 from seed.common import Community, share
 
 
@@ -91,7 +91,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "w4",
                     "progress",
                     "SELECT count(completed_at) AS finished, count(*) AS total FROM tasks",
-                    (0, 2, 6, 2),
+                    (0, 2, 6, 3),
                     title="Arc completion",
                 ),
                 widget(
@@ -99,7 +99,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "gantt",
                     "SELECT title, start_date, due_date FROM tasks "
                     "WHERE start_date IS NOT NULL ORDER BY start_date",
-                    (0, 4, 12, 6),
+                    (0, 5, 12, 6),
                     title="Session schedule",
                     options={"scale": "week"},
                 ),
@@ -181,7 +181,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "progress",
                     "SELECT count AS reading, max AS capacity FROM counters "
                     "WHERE id = {counter_id}",
-                    (0, 0, 4, 2),
+                    (0, 0, 4, 3),
                     title="Hull integrity",
                     counter=("Fleet Status", "Hull Integrity"),
                 ),
@@ -189,7 +189,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "w2",
                     "stat",
                     "SELECT count AS days FROM counters WHERE id = {counter_id}",
-                    (4, 0, 3, 2),
+                    (4, 0, 3, 3),
                     title="Days to Kepler-442b",
                     counter=("Fleet Status", "Days to Kepler-442b"),
                 ),
@@ -208,7 +208,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "SELECT s.category AS stage, count(*) AS tasks FROM tasks t "
                     "JOIN task_statuses s ON t.task_status_id = s.id "
                     "GROUP BY s.category",
-                    (0, 2, 7, 4),
+                    (0, 3, 7, 4),
                     title="Work by status",
                     options={"mark": "pie"},
                 ),
@@ -217,7 +217,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "table",
                     "SELECT title, priority, due_date FROM tasks "
                     "WHERE completed_at IS NULL ORDER BY due_date",
-                    (0, 6, 12, 5),
+                    (0, 7, 12, 5),
                     title="Open work",
                 ),
             ],
@@ -236,7 +236,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "progress",
                     "SELECT count AS reading, max AS capacity FROM counters "
                     "WHERE id = {counter_id}",
-                    (0, 0, 4, 2),
+                    (0, 0, 4, 3),
                     title="Hull",
                     counter=("The Crimson Maiden", "Hull HP"),
                 ),
@@ -245,7 +245,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "progress",
                     "SELECT count AS reading, max AS capacity FROM counters "
                     "WHERE id = {counter_id}",
-                    (4, 0, 4, 2),
+                    (4, 0, 4, 3),
                     title="Crew morale",
                     counter=("The Crimson Maiden", "Crew Morale"),
                 ),
@@ -253,7 +253,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "w3",
                     "stat",
                     "SELECT count AS days FROM counters WHERE id = {counter_id}",
-                    (8, 0, 4, 2),
+                    (8, 0, 4, 3),
                     title="Rations left",
                     counter=("The Crimson Maiden", "Rations (days)"),
                 ),
@@ -264,7 +264,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "FROM tasks WHERE completed_at IS NOT NULL "
                     "GROUP BY date_trunc('day', completed_at) "
                     "ORDER BY date_trunc('day', completed_at)",
-                    (0, 2, 6, 4),
+                    (0, 3, 6, 4),
                     title="Voyage work",
                     options={"mark": "line"},
                 ),
@@ -274,7 +274,7 @@ DASHBOARDS: dict[str, list[dict]] = {
                     "SELECT p.name AS project, count(t.completed_at) AS finished, count(*) AS total "
                     "FROM projects p JOIN tasks t ON t.project_id = p.id "
                     "GROUP BY p.name ORDER BY p.name",
-                    (6, 2, 6, 4),
+                    (6, 3, 6, 4),
                     title="Voyage legs",
                     options={"breakdown": "each"},
                 ),
@@ -333,6 +333,7 @@ async def seed(c: Community) -> None:
                 }
             ),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
         )
         c.session.add(dashboard)
         await c.session.flush()

@@ -11,11 +11,11 @@ from __future__ import annotations
 from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.wiki import Wiki, WikiPage, WikiPageOrder, WikiReadingWidth
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant.names import slugify
-
 from seed.common import Community, chip, heading, lexical, para, share, tag
 
 #: Each wiki, shared with the initiative for reading; the display settings
@@ -50,8 +50,10 @@ WIKIS: dict[str, list[dict]] = {
                     "turns travellers back the way they came.",
                     "sections": {
                         "Where to start": [
-                            "Start with Vallaki if the party has just arrived. Start "
-                            "with Castle Ravenloft if they have done something unwise.",
+                            (
+                                "Start with Vallaki if the party has just arrived. Start "
+                                "with Castle Ravenloft if they have done something unwise."
+                            ),
                             "Everything below is somewhere in this valley. Nothing leaves it.",
                         ],
                         "The weather": "Overcast, always. Rain most evenings. The sun "
@@ -1158,6 +1160,7 @@ async def seed(c: Community) -> None:
             name=d["name"],
             description=d.get("description"),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
             page_order=d.get("page_order", WikiPageOrder.manual),
             reading_width=d.get("reading_width", WikiReadingWidth.wide),
             contents_depth=d.get("contents_depth", 3),
@@ -1178,6 +1181,7 @@ async def seed(c: Community) -> None:
                 slug=slugify(pd["title"], fallback=f"page-{position}"),
                 content=_body(pd),
                 created_by=c.users[pd.get("created_by", d["created_by"])].id,
+                created_by_kind=ActorKind.member,
             )
             c.session.add(page)
             await c.session.flush()

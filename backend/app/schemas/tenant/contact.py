@@ -3,7 +3,7 @@ reach them."""
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any
 from urllib.parse import urlsplit
 
 from pydantic import EmailStr, Field, field_validator
@@ -11,6 +11,7 @@ from pydantic import EmailStr, Field, field_validator
 from app.core.messages import ContactMessages
 from app.schemas.base import SanitizedBaseModel, TitleStr, reject_null
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.tool import ToolSummaryBase
@@ -67,7 +68,7 @@ class ContactWebsite(ContactDetail):
         address = value if "://" in value else f"https://{value}"
         try:
             parts = urlsplit(address)
-            parts.port  # a port that is not a number raises
+            _ = parts.port  # a port that is not a number raises
         except ValueError:
             raise ValueError(ContactMessages.WEBSITE_INVALID) from None
         if (
@@ -84,36 +85,32 @@ class ContactCreate(PropertiesOnCreate):
     is_organization: bool = False
     #: Several of each, in the order they are shown; the first is the one a
     #: table shows.
-    emails: List[ContactEmail] = Field(default_factory=list, max_length=MAX_DETAILS)
-    phones: List[ContactPhone] = Field(default_factory=list, max_length=MAX_DETAILS)
-    addresses: List[ContactAddress] = Field(
+    emails: list[ContactEmail] = Field(default_factory=list, max_length=MAX_DETAILS)
+    phones: list[ContactPhone] = Field(default_factory=list, max_length=MAX_DETAILS)
+    addresses: list[ContactAddress] = Field(
         default_factory=list, max_length=MAX_DETAILS
     )
-    websites: List[ContactWebsite] = Field(default_factory=list, max_length=MAX_DETAILS)
+    websites: list[ContactWebsite] = Field(default_factory=list, max_length=MAX_DETAILS)
     #: Which initiative the contact belongs to, or ``None`` for one of the
     #: community's contacts, which the community contacts plug-in holds.
-    initiative_id: Optional[int] = None
-    tag_ids: Optional[List[int]] = None
+    initiative_id: int | None = None
+    tag_ids: list[int] | None = None
     # Initial sharing — the same grant list the PUT /grants endpoint takes.
     # Defaults to Viewer for all initiative members, which at community scope
     # reads as every member of the community.
-    grants: List[ResourceGrantSchema] = Field(default_factory=initiative_readable)
+    grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
 class ContactUpdate(SanitizedBaseModel):
     """A change to a contact. Only what is sent is written; a list sent
     replaces the one there."""
 
-    name: Optional[TitleStr] = Field(default=None, min_length=1, max_length=255)
-    is_organization: Optional[bool] = None
-    emails: Optional[List[ContactEmail]] = Field(default=None, max_length=MAX_DETAILS)
-    phones: Optional[List[ContactPhone]] = Field(default=None, max_length=MAX_DETAILS)
-    addresses: Optional[List[ContactAddress]] = Field(
-        default=None, max_length=MAX_DETAILS
-    )
-    websites: Optional[List[ContactWebsite]] = Field(
-        default=None, max_length=MAX_DETAILS
-    )
+    name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
+    is_organization: bool | None = None
+    emails: list[ContactEmail] | None = Field(default=None, max_length=MAX_DETAILS)
+    phones: list[ContactPhone] | None = Field(default=None, max_length=MAX_DETAILS)
+    addresses: list[ContactAddress] | None = Field(default=None, max_length=MAX_DETAILS)
+    websites: list[ContactWebsite] | None = Field(default=None, max_length=MAX_DETAILS)
 
     _required = reject_null(
         "name", "is_organization", "emails", "phones", "addresses", "websites"
@@ -126,21 +123,21 @@ class ContactOrganization(SanitizedBaseModel):
     id: int
     name: str
     #: NULL when it is a community contact.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
 
 
-class ContactSummary(ToolSummaryBase):
+class ContactSummary(ToolSummaryBase[ToolCan]):
     #: NULL on a community contact.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     name: str
     is_organization: bool = False
-    emails: List[ContactDetail] = Field(default_factory=list)
-    phones: List[ContactDetail] = Field(default_factory=list)
-    addresses: List[ContactDetail] = Field(default_factory=list)
-    websites: List[ContactWebsite] = Field(default_factory=list)
+    emails: list[ContactDetail] = Field(default_factory=list)
+    phones: list[ContactDetail] = Field(default_factory=list)
+    addresses: list[ContactDetail] = Field(default_factory=list)
+    websites: list[ContactWebsite] = Field(default_factory=list)
     #: A person's organization, read from their ``part_of`` link where the
     #: reader can open both; filled for a list page, None on a single read.
-    organization: Optional[ContactOrganization] = None
+    organization: ContactOrganization | None = None
 
 
 class ContactRead(ContactSummary):
@@ -148,4 +145,4 @@ class ContactRead(ContactSummary):
 
 
 class ContactListResponse(PageMeta):
-    items: List[ContactSummary]
+    items: list[ContactSummary]

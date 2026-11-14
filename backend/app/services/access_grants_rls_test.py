@@ -9,13 +9,17 @@ tests write the row and then enter through the seam, on the real request login
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.guild_standing import GuildContext
+from app.db.request_context import ContentGrantee, Platform
 from app.db.schema_provisioning import guild_schema_name
 from app.db.session import set_rls_context
+from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.file import File
-from app.models.platform.user import UserRole
 from app.services.platform import app_settings as app_settings_service
 from app.testing import (
     create_access_grant,
@@ -25,8 +29,6 @@ from app.testing import (
     create_user,
 )
 from app.testing.schema_harness import route_session_to_guild
-from app.db.guild_standing import GuildContext
-from app.db.request_context import ContentGrantee, Platform
 
 
 async def _set_app_user(session: AsyncSession) -> None:
@@ -53,6 +55,7 @@ async def test_pam_read_grant_sees_only_granted_guild(
         name="Alpha Doc",
         content={},
         created_by=owner.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(doc_a)
     await session.commit()
@@ -118,7 +121,7 @@ async def test_pam_read_grant_sees_only_granted_guild(
 
         # Read grant is read-only: the read-only role has no write on the schema,
         # so a write is denied at the role level (raises permission denied).
-        with pytest.raises(Exception):
+        with pytest.raises(DBAPIError):
             await session.exec(
                 text("UPDATE projects SET name = 'hacked' WHERE name = 'Alpha'")
             )
@@ -185,6 +188,7 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
         initiative_id=init.id,
         name="Stats",
         created_by=owner.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(cg)
     await session.commit()
@@ -243,7 +247,7 @@ async def test_no_pam_flag_sees_nothing(session: AsyncSession):
         # content is denied at the catalog/role boundary, so the grantee sees
         # nothing.
         await _set_app_user(session)
-        with pytest.raises(Exception):
+        with pytest.raises(DBAPIError):
             await session.exec(
                 text(f'SELECT id FROM "{guild_schema_name(guild.id)}".projects')
             )

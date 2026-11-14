@@ -24,10 +24,9 @@ be imported by ``tenancy`` and by the build-time generator alike.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
-from typing import Callable, Iterable, Optional
 
-from app.db import gucs
 from app.core.plugin_scopes import tool_resource
 from app.core.reactions import ReactionTarget
 from app.core.relationships import (
@@ -39,28 +38,29 @@ from app.core.relationships import (
     RelationshipType,
 )
 from app.core.tools import (
+    CONTENT_KINDS,
     DEFAULT_ENABLED_TOOLS,
     INSTALL_METADATA_KIND,
-    CONTENT_KINDS,
     ITEM_KINDS,
     KINDS,
-    PROPERTY_TARGETS,
     LAYOUT_INSTANCE_TABLES,
+    PROPERTY_TARGETS,
     Tool,
 )
-from app.models.platform.guild import AdminSurface
-from app.models.tenant.batched_notice import BatchedNoticeKind
-from app.db.presence import present, present_to_member
+from app.db import gucs
 from app.db.authorization import (
     COMMUNITY_ROWS,
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
     STANDING,
+    in_body,
     plugin_narrowed,
     plugin_scope,
-    in_body,
     sql_values,
 )
+from app.db.presence import present, present_to_member
+from app.models.platform.guild import AdminSurface
+from app.models.tenant.batched_notice import BatchedNoticeKind
 
 #: The legs a policy reads, off this statement's standing.
 _P = IN_POLICY
@@ -138,7 +138,7 @@ def _parent_chain(frm: str, tie: str, id_expr: str, *hops: tuple[str, str]) -> s
     """
     built = ", ".join(_parent(table, column) for table, column in hops)
     return (
-        f"COALESCE((SELECT jsonb_build_array({built}) "  # noqa: S608
+        f"COALESCE((SELECT jsonb_build_array({built}) "
         f"FROM {frm} WHERE {tie} = {id_expr}), {NO_PARENTS})"
     )
 
@@ -190,7 +190,7 @@ class DacPath:
     via: tuple[tuple[str, str], ...] = ()
 
 
-def _switch_leg(tool: "Tool", initiative: str) -> str:
+def _switch_leg(tool: Tool, initiative: str) -> str:
     """Whether ``tool`` is switched on for ``initiative``, for this reader."""
     return (
         f"({_GUILD_ADMIN} OR {_PAM_ANY} OR {initiative} IS NULL"
@@ -395,10 +395,6 @@ _FROM_CONTENT = f"'{Provenance.content.value}'"
 #: :mod:`app.db.authorization`.
 _GUILD_ADMIN = _P.system_or_admin
 
-#: An installed plug-in acting in this community on a token that is not narrowed
-#: to one initiative.
-_UNNARROWED_INSTALL = _P.unnarrowed_install
-
 #: A live PAM window, either level. Used where a leg is about what a guild has
 #: switched on rather than about what one person may reach.
 _PAM_ANY = _P.pam_any
@@ -441,7 +437,7 @@ def via_full_access(parent: str, fk: str) -> InitiativePath:
     return InitiativePath(
         predicate=predicate,
         initiative_expr=lambda r: (
-            f"(SELECT {parent}.initiative_id FROM {parent} "  # noqa: S608
+            f"(SELECT {parent}.initiative_id FROM {parent} "
             f"WHERE {parent}.id = {r}.{fk})"
         ),
         parents=lambda r: _one_parent(parent, f"{r}.{fk}"),
@@ -468,8 +464,9 @@ def direct_or_guild(tool: Tool) -> InitiativePath:
     decide: every member reads it as its sharing allows, and making or
     changing it is for the holders of its tool's surface (or a live write
     grant), or the installed plug-in's on a token not narrowed to one
-    initiative — and, where the tool says so (``COMMUNITY_ROWS``), for whoever
-    its sharing lets write it. Sharing still applies on top, which is how the
+    initiative, as itself or for a member holding that surface — and, where
+    the tool says so (``COMMUNITY_ROWS``), for whoever its sharing lets write
+    it. Sharing still applies on top, which is how the
     admin decides who writes what the row holds. ``resource_actions`` asks the
     same writer for ``edit``.
     """
@@ -534,7 +531,7 @@ def via(parent: str, fk: str, *, parent_pk: str = "id") -> InitiativePath:
     return InitiativePath(
         predicate=predicate,
         initiative_expr=lambda r: (
-            f"(SELECT {parent}.initiative_id FROM {parent} "  # noqa: S608
+            f"(SELECT {parent}.initiative_id FROM {parent} "
             f"WHERE {parent}.{parent_pk} = {r}.{fk})"
         ),
         parents=lambda r: _one_parent(parent, f"{r}.{fk}"),
@@ -559,7 +556,7 @@ def via_task_project(fk: str = "task_id") -> InitiativePath:
     return InitiativePath(
         predicate=predicate,
         initiative_expr=lambda r: (
-            f"(SELECT pr.initiative_id FROM tasks tk "  # noqa: S608
+            f"(SELECT pr.initiative_id FROM tasks tk "
             f"JOIN projects pr ON pr.id = tk.project_id WHERE tk.id = {r}.{fk})"
         ),
         parents=lambda r: _parent_chain(
@@ -582,7 +579,7 @@ def via_post_poll(fk: str = "poll_id") -> InitiativePath:
             f"AND {_access('po.initiative_id', w)})"
         ),
         initiative_expr=lambda r: (
-            f"(SELECT po.initiative_id FROM post_polls pp "  # noqa: S608
+            f"(SELECT po.initiative_id FROM post_polls pp "
             f"JOIN posts po ON po.id = pp.post_id WHERE pp.id = {r}.{fk})"
         ),
         # A poll has no route of its own — the notice that asks the question is
@@ -604,7 +601,7 @@ def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
             f"AND {_access('cal.initiative_id', w)})"
         ),
         initiative_expr=lambda r: (
-            f"(SELECT cal.initiative_id FROM calendar_events ce "  # noqa: S608
+            f"(SELECT cal.initiative_id FROM calendar_events ce "
             f"JOIN calendars cal ON cal.id = ce.calendar_id WHERE ce.id = {r}.{fk})"
         ),
         parents=lambda r: _parent_chain(
@@ -765,7 +762,7 @@ def comments_path() -> InitiativePath:
 
     def locate(r: str) -> str:
         lookups = ", ".join(
-            f"(SELECT {p.initiative} FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"  # noqa: S608
+            f"(SELECT {p.initiative} FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"
             for p in _COMMENT_PARENTS
         )
         return f"COALESCE({lookups})"
@@ -774,7 +771,7 @@ def comments_path() -> InitiativePath:
         # Same COALESCE as the locator, over the same joins: the first parent
         # that resolves is the one parent a comment has.
         lookups = ", ".join(
-            "(SELECT jsonb_build_array("  # noqa: S608
+            "(SELECT jsonb_build_array("
             + ", ".join(_parent(table, column) for table, column in p.chain)
             + f") FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"
             for p in _COMMENT_PARENTS
@@ -812,7 +809,7 @@ def _target_path(
     def locate(r: str) -> str:
         arms = " ".join(
             f"WHEN '{kind}' THEN "
-            f"(SELECT {path.initiative_expr('rt')} FROM {table} rt "  # noqa: S608
+            f"(SELECT {path.initiative_expr('rt')} FROM {table} rt "
             f"WHERE rt.id = {r}.target_id)"
             for kind, (table, path) in legs.items()
         )
@@ -821,7 +818,7 @@ def _target_path(
     def chain(r: str) -> str:
         arms = " ".join(
             f"WHEN '{kind}' THEN "
-            f"(SELECT {path.parents('rt')} FROM {table} rt "  # noqa: S608
+            f"(SELECT {path.parents('rt')} FROM {table} rt "
             f"WHERE rt.id = {r}.target_id)"
             for kind, (table, path) in legs.items()
         )
@@ -867,7 +864,7 @@ def batched_notices_path() -> InitiativePath:
 
 
 def _relationship_end(
-    r: str, side: str, render: Callable[["InitiativePath", str], str]
+    r: str, side: str, render: Callable[[InitiativePath, str], str]
 ) -> str:
     """One end of an edge, read through the registry entry of whatever it names.
 
@@ -879,7 +876,7 @@ def _relationship_end(
     still being assembled when the callers are defined.
     """
     arms = " ".join(
-        f"WHEN '{kind.value}' THEN (SELECT {render(path, 'rl')} "  # noqa: S608
+        f"WHEN '{kind.value}' THEN (SELECT {render(path, 'rl')} "
         f"FROM {endpoint.table} rl WHERE rl.id = {r}.{side}_id)"
         for kind, endpoint in ENDPOINT_KINDS.items()
         if (path := INITIATIVE_PATHS.get(endpoint.table)) is not None
@@ -1101,7 +1098,7 @@ def _entity_readable(t: str, kinds: Iterable[str]) -> str:
     """
     tables = entity_tables()
     arms = " ".join(
-        f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {tables[kind]} re "  # noqa: S608
+        f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {tables[kind]} re "
         f"WHERE re.id = {t}.entity_id)"
         for kind in kinds
     )
@@ -1143,7 +1140,7 @@ def metadata_values_path() -> InitiativePath:
             # admin, and whoever reads it where the definition is shown.
             items = ", ".join(f"'{kind}'" for kind in ITEM_KINDS)
             return (
-                f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+                f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "
                 f"WHERE md.id = {t}.property_id AND (CASE WHEN {on_install}"
                 f" THEN md.install_id IS NOT NULL AND {t}.entity_id = md.install_id"
                 f" ELSE (md.install_id IS NULL OR {t}.entity_type IN ({items}))"
@@ -1153,13 +1150,13 @@ def metadata_values_path() -> InitiativePath:
             )
         held = f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id)"
         field = (
-            f"{t}.entity_type = '{Tool.file.value}' AND EXISTS (SELECT 1 "  # noqa: S608
+            f"{t}.entity_type = '{Tool.file.value}' AND EXISTS (SELECT 1 "
             f"FROM collection_files cf WHERE cf.collection_id = md.collection_id "
             f"AND cf.file_id = {t}.entity_id) AND {_access('md.initiative_id', True)}"
             f" AND {_collection_writer('md.initiative_id')}"
         )
         on_task = (
-            f"{t}.entity_type = 'task' AND EXISTS (SELECT 1 FROM tasks tk "  # noqa: S608
+            f"{t}.entity_type = 'task' AND EXISTS (SELECT 1 FROM tasks tk "
             f"WHERE tk.id = {t}.entity_id AND tk.project_id = md.project_id)"
         )
         # One call asks of the item what its owner's values take: an edit of
@@ -1171,7 +1168,7 @@ def metadata_values_path() -> InitiativePath:
             f"{need}, {STANDING})"
         )
         return (
-            f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+            f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "
             f"WHERE md.id = {t}.property_id AND ({unowned} OR {own}"
             f" OR ({_P.admin} AND NOT {on_install})) AND (CASE"
             f" WHEN md.collection_id IS NOT NULL THEN ({field})"
@@ -1364,7 +1361,8 @@ def webhook_subscription_path() -> InitiativePath:
     nothing to decide", which admits any member. A guild-wide subscription
     reports across every initiative, so reaching it is the holder of
     ``AdminSurface.webhooks``'s — the admin rung, which already spans them — or
-    an installed plug-in's whose token is not narrowed to one initiative. A plug-in sees and changes only the
+    an installed plug-in's whose token is not narrowed to one initiative, acting
+    as itself or for a member who holds that surface. A plug-in sees and changes only the
     subscriptions it registered (the ``plugin_scope_*`` policies), and what one
     delivers is capped by where the plug-in is placed and the scopes it holds.
     """
@@ -1372,7 +1370,7 @@ def webhook_subscription_path() -> InitiativePath:
         predicate=lambda t, w: (
             f"(CASE WHEN {t}.initiative_id IS NULL "
             f"THEN ({_P.system} OR {_P.holds(AdminSurface.webhooks)}"
-            f" OR {_UNNARROWED_INSTALL}) "
+            f" OR {_P.unnarrowed_install(AdminSurface.webhooks)}) "
             f"ELSE {_access(f'{t}.initiative_id', w)} END)"
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",
@@ -1425,7 +1423,7 @@ def _unstamped_leg(t: str, kind_column: str, id_column: str) -> str:
     tables = {k.value: k.table for k in KINDS.values() if k.standalone}
     tables["comment"] = "comments"
     arms = " ".join(
-        f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {table} sk"  # noqa: S608
+        f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {table} sk"
         f" WHERE sk.id = {t}.{id_column})"
         for kind, table in tables.items()
     )
@@ -1485,7 +1483,8 @@ def uploads_path() -> InitiativePath:
     return InitiativePath(
         predicate=lambda t, w: (
             f"(CASE WHEN {t}.claimed_at IS NULL"
-            f" THEN ({t}.created_by = {gucs.USER_ID.once} OR {_P.system})"
+            f" THEN (({t}.created_by_kind = 'member'"
+            f" AND {t}.created_by = {gucs.USER_ID.once}) OR {_P.system})"
             f" ELSE {_access(f'{t}.initiative_id', w)} END)"
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",
@@ -1522,7 +1521,7 @@ def evidence_path() -> InitiativePath:
     return InitiativePath(
         predicate=predicate,
         initiative_expr=lambda r: (
-            f"COALESCE((SELECT mr.initiative_id FROM moderation_reports mr "  # noqa: S608
+            f"COALESCE((SELECT mr.initiative_id FROM moderation_reports mr "
             f"WHERE mr.id = {r}.report_id), {case.initiative_expr(r)})"
         ),
     )
@@ -1564,7 +1563,7 @@ def metadata_definitions_path() -> InitiativePath:
         return f"({t}.project_id IS NULL OR {sharing.predicate(t, c, w)})"
 
     def predicate(t: str, w: bool) -> str:
-        seen = f"EXISTS (SELECT 1 FROM collections c WHERE c.id = {t}.collection_id)"  # noqa: S608
+        seen = f"EXISTS (SELECT 1 FROM collections c WHERE c.id = {t}.collection_id)"
         if w:
             seen = f"({seen} AND {_collection_writer(f'{t}.initiative_id')})"
         plugin = (
@@ -1659,7 +1658,7 @@ def content_kind_path() -> InitiativePath:
     def locate(r: str) -> str:
         arms = " ".join(
             f"WHEN '{etype}' THEN "
-            f"(SELECT {initiative_of(tbl, 're')} FROM {tbl} re WHERE re.id = {r}.entity_id)"  # noqa: S608
+            f"(SELECT {initiative_of(tbl, 're')} FROM {tbl} re WHERE re.id = {r}.entity_id)"
             for etype, tbl in CONTENT_KIND_TABLES.items()
         )
         return f"(CASE {r}.entity_type {arms} END)"
@@ -1742,6 +1741,8 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # A case is read exactly as hard as the task it describes, so it hangs off
     # the task rather than off the project column it is keyed by.
     "intake_cases": via_task_project("task_id"),
+    # The votes for an idea are read as hard as the task that is the idea.
+    "idea_votes": via_task_project("task_id"),
     # What a person attached: reached as its report or its case is.
     "evidence": evidence_path(),
     # Two hops -> post_polls -> posts
@@ -1783,7 +1784,7 @@ class NamedPerson:
     clear: bool = False
     #: The rows that keep the person, as a condition on ``t``, where ``%1$I``
     #: is the schema: what records something they did, rather than names them.
-    kept: Optional[str] = None
+    kept: str | None = None
 
 
 NAMED_PEOPLE: tuple[NamedPerson, ...] = (
@@ -2077,7 +2078,7 @@ def relationships_report_on_both_ends() -> tuple[ReportsAs, ...]:
 
         def id_of(r: str) -> str:
             arms = " ".join(
-                f"WHEN '{kind.value}' THEN (SELECT {id_expr('rl')} "  # noqa: S608
+                f"WHEN '{kind.value}' THEN (SELECT {id_expr('rl')} "
                 f"FROM {ENDPOINT_KINDS[kind].table} rl WHERE rl.id = {r}.{side}_id)"
                 for kind, (_, id_expr) in reports.items()
             )
@@ -2120,7 +2121,7 @@ def values_report_on_their_target(kinds: Iterable[str], facet: str) -> ReportsAs
 
     def id_of(r: str) -> str:
         arms = " ".join(
-            f"WHEN '{target}' THEN (SELECT {id_expr('pv')} "  # noqa: S608
+            f"WHEN '{target}' THEN (SELECT {id_expr('pv')} "
             f"FROM {tables[target]} pv WHERE pv.id = {r}.entity_id)"
             for target, (_, id_expr) in reports.items()
         )
@@ -2163,7 +2164,7 @@ def poll_options_report_on_their_post() -> ReportsAs:
     return ReportsAs(
         resource_types=frozenset({"posts"}),
         id_expr=lambda r: (
-            f"(SELECT post_polls.post_id FROM post_polls "  # noqa: S608
+            f"(SELECT post_polls.post_id FROM post_polls "
             f"WHERE post_polls.id = {r}.poll_id)"
         ),
         facet="poll",
@@ -2242,6 +2243,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "moderation_report_reporters": Silent("the reporters behind one report"),
     "moderation_actions": Silent("the moderation log, read on its own surface"),
     "intake_cases": Silent("the key -> task map; the task is what a subscriber hears"),
+    "idea_votes": Silent("who voted; the vote sweep tells voters what moved"),
     "uploads": Silent("a stored file; the content showing it is what changed"),
     "evidence": Silent("an attached file; its case or report is what changed"),
     # -- Guild-level tables that emit ---------------------------------------
@@ -2379,14 +2381,14 @@ EVENT_SOURCES["relationships"] = Emit(reports_as=relationships_report_on_both_en
 # reader is shown is the plug-in's own and changes nothing a reader sees.
 EVENT_SOURCES["metadata_values"] = Emit(
     quiet_when=lambda r: (
-        "EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+        "EXISTS (SELECT 1 FROM metadata_definitions md "
         f"WHERE md.id = {r}.property_id AND md.install_id IS NOT NULL"
         f" AND NOT {r}.entity_type = ANY (md.shown_on))"
     ),
     reports_as=replace(
         values_report_on_their_target(PROPERTY_TARGETS, "properties"),
         facet_expr=lambda r: (
-            "(CASE WHEN EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+            "(CASE WHEN EXISTS (SELECT 1 FROM metadata_definitions md "
             f"WHERE md.id = {r}.property_id AND md.install_id IS NOT NULL)"
             " THEN 'plugin_values' ELSE 'properties' END)"
         ),

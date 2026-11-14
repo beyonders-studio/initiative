@@ -5,16 +5,16 @@ the account while it sits there, the two ways back, and when the erasure that
 used to run immediately actually runs.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import OperatorMessages
 from app.core.rules import DEFAULT_ACCOUNT_RETENTION_DAYS
-from app.models.platform.guild import GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.user import (
     ABSENT_STATUSES,
     SIGN_IN_STATUSES,
@@ -29,7 +29,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-
 
 PASSWORD = "testpassword123"
 
@@ -277,9 +276,7 @@ async def test_each_account_is_erased_and_told_once(
     user = await create_user(session)
     await _delete_own_account(client, user)
     session.expunge_all()
-    later = datetime.now(timezone.utc) + timedelta(
-        days=DEFAULT_ACCOUNT_RETENTION_DAYS + 1
-    )
+    later = datetime.now(UTC) + timedelta(days=DEFAULT_ACCOUNT_RETENTION_DAYS + 1)
 
     async with SystemSessionLocal() as other_sweep:
         await other_sweep.exec(
@@ -302,16 +299,13 @@ async def test_the_purge_leaves_every_other_status_alone(session: AsyncSession):
         user = await create_user(session)
         row = (await session.exec(select(User).where(User.id == user.id))).one()
         row.status = status
-        row.status_changed_at = datetime.now(timezone.utc) - timedelta(days=365)
+        row.status_changed_at = datetime.now(UTC) - timedelta(days=365)
         session.add(row)
         kept.append(user.id)
     await session.commit()
     session.expunge_all()
 
-    assert (
-        await account_purge.purge_due_accounts(session, now=datetime.now(timezone.utc))
-        == 0
-    )
+    assert await account_purge.purge_due_accounts(session, now=datetime.now(UTC)) == 0
     for user_id in kept:
         row = (await session.exec(select(User).where(User.id == user_id))).one()
         assert row.status != UserStatus.anonymized
@@ -339,7 +333,7 @@ async def test_a_deployment_can_keep_deleted_accounts_forever(
     session.expunge_all()
     assert (
         await account_purge.purge_due_accounts(
-            session, now=datetime.now(timezone.utc) + timedelta(days=3650)
+            session, now=datetime.now(UTC) + timedelta(days=3650)
         )
         == 0
     )
@@ -474,9 +468,7 @@ async def test_the_purge_erases_an_account_the_age_answer_closed(
 
     user = await create_user(session, age_confirmed_at=None)
     await users_service.refuse_account_for_age(session, user)
-    later = datetime.now(timezone.utc) + timedelta(
-        days=DEFAULT_ACCOUNT_RETENTION_DAYS + 1
-    )
+    later = datetime.now(UTC) + timedelta(days=DEFAULT_ACCOUNT_RETENTION_DAYS + 1)
 
     assert await account_purge.purge_due_accounts(session, now=later) == 1
 

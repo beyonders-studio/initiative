@@ -31,11 +31,12 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable, get_args
+from typing import get_args
 
 import pytest
-from fastapi.routing import APIWebSocketRoute
+from fastapi.routing import APIWebSocketRoute, iter_route_contexts
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -48,6 +49,7 @@ from app.db.request_context import (
     Billing,
     ContentGrantee,
     Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
@@ -59,10 +61,10 @@ from app.db.request_context import (
 )
 from app.db.schema_provisioning import guild_schema_name
 from app.db.session import routed_context, set_rls_context
+from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.main import app
 from app.services.content_sockets import sockets
 from app.testing import (
     Actor,
@@ -70,11 +72,11 @@ from app.testing import (
     create_counter_group,
     create_file,
     create_project,
+    create_resource_grant,
+    create_user,
     create_wiki,
     create_wiki_page,
     get_auth_token,
-    create_resource_grant,
-    create_user,
     route_as,
     route_as_install,
 )
@@ -194,6 +196,16 @@ async def _as_filer(w: World, s) -> None:
     await set_rls_context(s, Filer(guild_id=w.guild_id, user_id=w.member_id))
 
 
+async def _as_idea_reader(w: World, s) -> None:
+    """Anybody reading the published ideas from outside the community: its
+    ideas role, provisioned as choosing it for operations work does."""
+    from app.db import operations_schema
+
+    await operations_schema.provision_operations(w.guild_id)
+    _FILER_GUILDS.append(w.guild_id)
+    await set_rls_context(s, IdeaReader(guild_id=w.guild_id, user_id=w.member_id))
+
+
 def _as(user: str, **kwargs) -> Route:
     return lambda w, s: route_as(
         s, user_id=getattr(w, f"{user}_id"), guild_id=w.guild_id, **kwargs
@@ -264,6 +276,16 @@ SCENARIOS: tuple[Scenario, ...] = (
     # Their cases' columns and nothing of the projects: refused outright.
     Scenario(
         "filer", Filer, "app_user", _as_filer, _NONE, _NONE, names_community=False
+    ),
+    # Published ideas' columns and nothing of the projects: refused outright.
+    Scenario(
+        "idea reader",
+        IdeaReader,
+        "app_user",
+        _as_idea_reader,
+        _NONE,
+        _NONE,
+        names_community=False,
     ),
     Scenario(
         "billing",
@@ -441,7 +463,11 @@ async def test_every_socket_admits_through_the_seam(
             f"{base}/collaboration/wiki-pages/{page.id}/collaborate"
         ),
     }
-    served = {r.path for r in app.routes if isinstance(r, APIWebSocketRoute)}
+    served = {
+        r.path
+        for r in iter_route_contexts(app.routes)
+        if isinstance(r.original_route, APIWebSocketRoute)
+    }
     stream = "/api/v1/notifications/stream"
     assert served == {*channels, stream}
 

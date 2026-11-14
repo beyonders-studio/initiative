@@ -10,17 +10,18 @@ in the envelope are informational and dropped."""
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
-from app.db.session import routed_guild_id
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
+from app.db.session import routed_guild_id
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import DEFAULT_CALENDAR_COLOR, Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
@@ -39,8 +40,8 @@ from app.services.import_engine.common import (
     parse_datetime,
     unique_name_in_initiative,
 )
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,
@@ -71,7 +72,7 @@ class CalendarImporter(NamesPeopleInPassing):
         envelope: CalendarEnvelope = validated  # ty: ignore[invalid-assignment] — validate() returned this model
         return len(envelope.events) + 1
 
-    def people(self, validated: BaseModel) -> list["ManifestPerson"]:
+    def people(self, validated: BaseModel) -> list[ManifestPerson]:
         """Everyone a person property or a mention names, and every attendee:
         the people step says who each of them is here."""
         from app.schemas.tenant.backup_export import ManifestPerson
@@ -112,6 +113,7 @@ class CalendarImporter(NamesPeopleInPassing):
             color=env.color or DEFAULT_CALENDAR_COLOR,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
         )
         session.add(calendar)
         await session.flush()
@@ -247,6 +249,7 @@ class CalendarImporter(NamesPeopleInPassing):
             recurrence=repeat,
             recurrence_shift=shift,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             # When the event was written down, not when it happens. Absent
             # leaves the model default: the moment of the import.
             **_created_at(item),
@@ -345,7 +348,7 @@ def _created_at(item: EventEnvelopeItem) -> dict[str, datetime]:
 
 def _nearest_midnight(value: datetime) -> datetime:
     return datetime.combine(
-        (value.astimezone(timezone.utc) + timedelta(hours=12)).date(),
+        (value.astimezone(UTC) + timedelta(hours=12)).date(),
         time(),
-        timezone.utc,
+        UTC,
     )

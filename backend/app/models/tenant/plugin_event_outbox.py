@@ -15,8 +15,8 @@ Written by the system engine alone and read by the poller.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, Column, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
@@ -26,7 +26,7 @@ from sqlmodel import Field, SQLModel
 class PluginEventOutbox(SQLModel, table=True):
     __tablename__ = "plugin_event_outbox"
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None,
         sa_column=Column(BigInteger, primary_key=True, autoincrement=True),
     )
@@ -36,7 +36,7 @@ class PluginEventOutbox(SQLModel, table=True):
     txn_id: int = Field(sa_column=Column(BigInteger, nullable=False, index=True))
 
     occurred_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
 
@@ -51,7 +51,7 @@ class PluginEventOutbox(SQLModel, table=True):
     event_type: str = Field(sa_column=Column(String(length=200), nullable=False))
 
     #: The initiative the event is about, or NULL for one about the community.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
 

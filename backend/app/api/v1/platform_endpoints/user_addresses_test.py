@@ -7,9 +7,9 @@ holds it, and an account always keeps a proven address and a primary.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -270,9 +270,9 @@ async def test_the_last_proven_address_is_not_removed(
     )
     assert moved.status_code == 200, moved.text
 
-    original = [
+    original = next(
         i for i in await _listing(client, user) if i["email"] == "proven@example.com"
-    ][0]
+    )
     gone = await client.post(
         f"/api/v1/me/emails/{original['id']}/remove",
         json=CONFIRM,
@@ -728,7 +728,7 @@ async def test_a_primary_move_from_a_new_sign_in_waits_until_it_is_due(
     assert second.status_code == 409, second.text
     assert second.json()["detail"] == "ACCOUNT_CHANGE_PENDING"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     assert await held_changes.apply_due(session, now=now) == 0
     primaries = [i["email"] for i in await _listing(client, user) if i["is_primary"]]
     assert primaries == ["waits@example.com"]

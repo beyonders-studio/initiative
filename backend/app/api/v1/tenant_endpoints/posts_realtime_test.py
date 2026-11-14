@@ -10,9 +10,10 @@ moment it goes up — posted outright, or stamped later by the scheduler — is 
 moment the room hears about it.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Self
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -20,7 +21,6 @@ from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.post import Post
 from app.services.content_sockets import sockets
-from app.testing.sockets import FakeWebSocket, settle, watch_events_bus
 from app.services.tenant import room_sink
 from app.services.tenant.post_publication import publish_due_posts
 from app.testing import (
@@ -34,6 +34,7 @@ from app.testing import (
     route_session_to_guild,
     route_system,
 )
+from app.testing.sockets import FakeWebSocket, settle, watch_events_bus
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
@@ -59,7 +60,7 @@ class _Room:
         self._user_id = user_id
         self.socket = FakeWebSocket()
 
-    async def __aenter__(self) -> "_Room":
+    async def __aenter__(self) -> Self:
         watch_events_bus(
             self._guild_id, [self._initiative_id], self.socket, user_id=self._user_id
         )
@@ -127,7 +128,7 @@ async def test_a_scheduled_draft_says_nothing_until_it_goes_up(
     """A draft is nobody else's business, so no board is told to refetch."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _posts_enabled(session, a.initiative)
-    later = datetime.now(timezone.utc) + timedelta(days=1)
+    later = datetime.now(UTC) + timedelta(days=1)
 
     async with _Room(a.guild.id, a.initiative.id) as room:
         response = await client.post(
@@ -150,7 +151,7 @@ async def test_publishing_a_draft_now_tells_the_room(
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _posts_enabled(session, a.initiative)
-    later = datetime.now(timezone.utc) + timedelta(days=1)
+    later = datetime.now(UTC) + timedelta(days=1)
     created = await client.post(
         a.g("/posts/"),
         headers=a.headers,
@@ -289,7 +290,7 @@ async def test_the_scheduler_tells_the_room_when_a_draft_comes_due(
 
     post = await create_post(session, initiative, author)
     post.published_at = None
-    post.scheduled_for = datetime.now(timezone.utc) - timedelta(minutes=1)
+    post.scheduled_for = datetime.now(UTC) - timedelta(minutes=1)
     session.add(post)
     await session.commit()
     post_id, guild_id, initiative_id = post.id, guild.id, initiative.id
@@ -299,9 +300,7 @@ async def test_the_scheduler_tells_the_room_when_a_draft_comes_due(
         # community with nobody behind it.
         async with cohorts.system_session(guild_id) as system:
             await route_system(system, guild_id=guild_id)
-            assert await publish_due_posts(system, now=datetime.now(timezone.utc)) == [
-                post_id
-            ]
+            assert await publish_due_posts(system, now=datetime.now(UTC)) == [post_id]
             await system.commit()
         await room.catch_up()
 

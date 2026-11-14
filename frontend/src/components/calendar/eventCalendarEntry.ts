@@ -2,6 +2,7 @@ import type {
   CalendarEventSummary,
   CalendarEventUpdateScope,
 } from "@/api/generated/initiativeAPI.schemas";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 
 import type { CalendarEntry } from "./CalendarView";
 
@@ -45,9 +46,6 @@ export type EventEntryMeta = {
   seriesId: number | null;
 };
 
-/** A calendar's color when none is set — the server's own default. */
-export const DEFAULT_CALENDAR_COLOR = "#6366f1";
-
 /**
  * The calendar entry for one event, drawn in its calendar's color.
  *
@@ -68,7 +66,7 @@ export const buildEventCalendarEntry = (
   startAt: event.all_day ? `${utcDateKey(event.start_at)}T00:00:00` : event.start_at,
   endAt: event.all_day ? `${utcDateKey(event.end_at)}T23:59:59` : event.end_at,
   allDay: event.all_day,
-  color: calendarColor ?? DEFAULT_CALENDAR_COLOR,
+  color: calendarColor ?? DEFAULT_COLOR,
   attendees: (event.attendee_previews ?? []).map((att) => ({
     name: att.name,
     avatarUrl: att.avatar_url,

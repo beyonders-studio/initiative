@@ -53,11 +53,6 @@
     "contact": "A contact",
     "collection": "A collection"
   },
-  "paging": {
-    "newer": "Newer",
-    "older": "Older",
-    "page": "Page {{page}}"
-  },
   "report": {
     "action": "Report",
     "title": "Report this",
@@ -97,7 +92,6 @@
     "roles_one": "{{count}} role",
     "roles_other": "{{count}} roles"
   },
-  "loadFailed": "Could not load that. Try again.",
   "hold": {
     "title": "Hold for the platform",
     "description": "The platform keeps this exactly as it is. Nobody in this community can see, change or delete it until the platform releases it.",

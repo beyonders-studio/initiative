@@ -2,10 +2,10 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Initiative plug-in API",
-    "version": "10.0.0",
+    "version": "10.1.1",
     "x-initiative-source": {
-      "version": "0.77.1",
-      "commit": "d862d0ebdc3360b92d6a6ceeafee1d945577cdfc"
+      "version": "0.78.0",
+      "commit": "1562389f16c51c04a73c4aa442d31c2a80aaa128"
     }
   },
   "servers": [
@@ -7755,6 +7755,135 @@
       }
     },
     "/calendar-events/": {
+      "get": {
+        "tags": [
+          "calendar-events"
+        ],
+        "summary": "List Calendar Events",
+        "description": "The events starting in the window, by start: a repeating one once for\neach of its occurrences there, ``original_start`` naming it, and one\nmoved on its own at its new time. The calendar's entries list draws the\nsame events beside tasks and projects for a person; this is the events\nalone, for an installed plug-in too.\n\n``start_after``/``start_before`` are required; the window may span at most\n``MAX_CALENDAR_WINDOW``. ``calendar_ids`` and ``initiative_id`` narrow it.",
+        "operationId": "list_calendar_events",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarEventSummary"
+                  },
+                  "title": "Response List Calendar Events"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "calendars:read",
+        "parameters": [
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Initiative Id"
+            }
+          },
+          {
+            "name": "calendar_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Calendar Ids"
+            }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
+            "name": "start_after",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Start After"
+            }
+          },
+          {
+            "name": "start_before",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Start Before"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
       "post": {
         "tags": [
           "calendar-events"
@@ -7987,6 +8116,81 @@
         "summary": "Detach Occurrence",
         "description": "Copy the occurrence at ``start`` out into an event of its own, which\nthe series then skips.",
         "operationId": "detach_occurrence",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OccurrenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "calendars:write",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/calendar-events/{event_id}/occurrences/skip": {
+      "post": {
+        "tags": [
+          "calendar-events"
+        ],
+        "summary": "Skip Occurrence",
+        "description": "Skip the series' occurrence at ``start``, as deleting just that one\ndoes: its attendees hear it is cancelled, and restoring it brings it\nback. Requires write access on the calendar.",
+        "operationId": "skip_occurrence",
         "security": [
           {
             "PluginToken": []
@@ -10311,7 +10515,7 @@
           "properties"
         ],
         "summary": "Set Properties",
-        "description": "Replace the custom property values on one tool or sub-tool, or with\n``merge`` write only the ones named and leave the rest, and change options\nof multi-select values against what each holds.\n\nRequires write on the tool that governs it: a tool itself, or the tool a\nsub-tool sits in (a task's project, an event's calendar). Each value's\ndefinition must belong to the same initiative, so a row that belongs to no\ninitiative carries none. Values are validated against each definition's\ntype and options. An installed plug-in names the person a person-valued\nproperty holds by its reference for them. An empty list clears them all.",
+        "description": "Replace the custom property values on one tool or sub-tool, or with\n``merge`` write only the ones named and leave the rest, change options of\nmulti-select values and step counters against what each holds.\n\nRequires write on the tool that governs it: a tool itself, or the tool a\nsub-tool sits in (a task's project, an event's calendar). Each value's\ndefinition must belong to the same initiative, so a row that belongs to no\ninitiative carries none. Values are validated against each definition's\ntype and options. An installed plug-in names the person a person-valued\nproperty holds by its reference for them. An empty list clears them all.",
         "operationId": "set_properties",
         "security": [
           {
@@ -10754,6 +10958,16 @@
   },
   "components": {
     "schemas": {
+      "ActorKind": {
+        "type": "string",
+        "enum": [
+          "member",
+          "plugin",
+          "system"
+        ],
+        "title": "ActorKind",
+        "description": "Who did something to a row: what its ``created_by`` (made it) or\n``deleted_by`` (put it in the trash) names."
+      },
       "ArchivableType": {
         "type": "string",
         "enum": [
@@ -11112,6 +11326,32 @@
       },
       "CalendarEventRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "title": {
             "type": "string",
             "maxLength": 255,
@@ -11228,18 +11468,6 @@
             "type": "string",
             "x-identity": "community"
           },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
           "properties": {
             "items": {
               "$ref": "#/components/schemas/PropertySummary"
@@ -11296,10 +11524,37 @@
             },
             "type": "array",
             "title": "Extra Starts"
+          },
+          "next_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Start"
+          },
+          "next_occurrence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Occurrence"
           }
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "title",
           "description",
           "location",
@@ -11315,7 +11570,6 @@
           "calendar_id",
           "initiative_id",
           "community_id",
-          "created_by",
           "properties",
           "tags",
           "can",
@@ -11324,9 +11578,219 @@
           "attendees",
           "overridden_fields",
           "skipped_starts",
-          "extra_starts"
+          "extra_starts",
+          "next_start",
+          "next_occurrence"
         ],
         "title": "CalendarEventRead"
+      },
+      "CalendarEventSummary": {
+        "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "all_day": {
+            "type": "boolean",
+            "title": "All Day",
+            "default": false
+          },
+          "rsvp_open": {
+            "type": "boolean",
+            "title": "Rsvp Open",
+            "default": true
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "recurrence_shift": {
+            "type": "integer",
+            "title": "Recurrence Shift",
+            "default": 0
+          },
+          "original_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Start"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "calendar_id": {
+            "type": "integer",
+            "title": "Calendar Id"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ContentCan"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "attendee_previews": {
+            "items": {
+              "$ref": "#/components/schemas/PluginPerson"
+            },
+            "type": "array",
+            "title": "Attendee Previews"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
+          "title",
+          "description",
+          "location",
+          "start_at",
+          "end_at",
+          "all_day",
+          "rsvp_open",
+          "recurrence",
+          "id",
+          "recurrence_shift",
+          "original_start",
+          "series_id",
+          "calendar_id",
+          "initiative_id",
+          "community_id",
+          "properties",
+          "tags",
+          "can",
+          "created_at",
+          "updated_at",
+          "attendee_previews"
+        ],
+        "title": "CalendarEventSummary"
       },
       "CalendarEventUpdate": {
         "properties": {
@@ -11569,6 +12033,32 @@
       },
       "CalendarRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -11588,33 +12078,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -11676,16 +12143,28 @@
             "maxLength": 32,
             "title": "Color",
             "default": "#6366f1"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
           }
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -11694,12 +12173,39 @@
           "grants",
           "name",
           "description",
-          "color"
+          "color",
+          "initiative_id"
         ],
         "title": "CalendarRead"
       },
       "CalendarSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -11719,33 +12225,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -11807,16 +12290,28 @@
             "maxLength": 32,
             "title": "Color",
             "default": "#6366f1"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
           }
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -11825,7 +12320,8 @@
           "grants",
           "name",
           "description",
-          "color"
+          "color",
+          "initiative_id"
         ],
         "title": "CalendarSummary"
       },
@@ -12208,6 +12704,32 @@
       },
       "CollectionFileSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -12227,26 +12749,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -12287,6 +12793,10 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "featured_image_url": {
             "anyOf": [
@@ -12457,12 +12967,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -12470,6 +12981,7 @@
           "properties",
           "grants",
           "name",
+          "initiative_id",
           "featured_image_url",
           "is_template",
           "initiative",
@@ -12536,6 +13048,32 @@
       },
       "CollectionRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -12594,18 +13132,6 @@
           },
           "hidden_files": {
             "$ref": "#/components/schemas/HiddenFiles"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -12678,6 +13204,9 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "id",
           "initiative_id",
           "community_id",
@@ -12687,7 +13216,6 @@
           "cover",
           "file_count",
           "hidden_files",
-          "created_by",
           "created_at",
           "updated_at",
           "archived_at",
@@ -12801,7 +13329,8 @@
                 "enum": [
                   "number",
                   "stars",
-                  "bar"
+                  "bar",
+                  "clock"
                 ]
               },
               {
@@ -13158,6 +13687,32 @@
       },
       "CommentRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "content": {
             "type": "string",
             "title": "Content",
@@ -13289,18 +13844,6 @@
             "type": "integer",
             "title": "Id"
           },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
           "parent_comment_id": {
             "anyOf": [
               {
@@ -13390,6 +13933,9 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "content",
           "task_id",
           "wiki_page_id",
@@ -13403,7 +13949,6 @@
           "wiki_id",
           "contact_id",
           "id",
-          "created_by",
           "parent_comment_id",
           "created_at",
           "updated_at",
@@ -13638,6 +14183,36 @@
         ],
         "title": "ContactListResponse"
       },
+      "ContactOrganization": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ContactOrganization",
+        "description": "The organization a person is ``part_of``."
+      },
       "ContactPhone": {
         "properties": {
           "label": {
@@ -13661,6 +14236,32 @@
       },
       "ContactRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -13680,33 +14281,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -13744,6 +14322,17 @@
             "type": "array",
             "title": "Grants"
           },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -13776,37 +14365,76 @@
           },
           "websites": {
             "items": {
-              "$ref": "#/components/schemas/ContactDetail"
+              "$ref": "#/components/schemas/ContactWebsite"
             },
             "type": "array",
             "title": "Websites"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
           "tags",
           "properties",
           "grants",
+          "initiative_id",
           "name",
           "is_organization",
           "emails",
           "phones",
           "addresses",
-          "websites"
+          "websites",
+          "organization"
         ],
         "title": "ContactRead"
       },
       "ContactSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -13826,33 +14454,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -13890,6 +14495,17 @@
             "type": "array",
             "title": "Grants"
           },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -13922,32 +14538,45 @@
           },
           "websites": {
             "items": {
-              "$ref": "#/components/schemas/ContactDetail"
+              "$ref": "#/components/schemas/ContactWebsite"
             },
             "type": "array",
             "title": "Websites"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
           "tags",
           "properties",
           "grants",
+          "initiative_id",
           "name",
           "is_organization",
           "emails",
           "phones",
           "addresses",
-          "websites"
+          "websites",
+          "organization"
         ],
         "title": "ContactSummary"
       },
@@ -14287,6 +14916,32 @@
       },
       "CounterGroupRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -14306,26 +14961,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -14381,6 +15020,10 @@
               }
             ],
             "title": "Description"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "preview": {
             "anyOf": [
@@ -14406,12 +15049,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -14420,6 +15064,7 @@
           "grants",
           "name",
           "description",
+          "initiative_id",
           "preview",
           "counters"
         ],
@@ -14427,6 +15072,32 @@
       },
       "CounterGroupSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -14446,26 +15117,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -14522,6 +15177,10 @@
             ],
             "title": "Description"
           },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
           "preview": {
             "anyOf": [
               {
@@ -14539,12 +15198,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -14553,6 +15213,7 @@
           "grants",
           "name",
           "description",
+          "initiative_id",
           "preview"
         ],
         "title": "CounterGroupSummary",
@@ -14756,6 +15417,92 @@
           "count"
         ],
         "title": "CounterSetCountRequest"
+      },
+      "CounterSettings-Input": {
+        "properties": {
+          "step": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "title": "Step",
+            "default": 1
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "initial": {
+            "type": "number",
+            "title": "Initial",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "CounterSettings",
+        "description": "How a counter field moves: by ``step`` a tap, never past ``min`` or\n``max``, and back to ``initial`` on a reset. A counter with no value\nholds ``initial``."
+      },
+      "CounterSettings-Output": {
+        "properties": {
+          "step": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "title": "Step",
+            "default": 1
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "initial": {
+            "type": "number",
+            "title": "Initial",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "min",
+          "max",
+          "initial"
+        ],
+        "title": "CounterSettings",
+        "description": "How a counter field moves: by ``step`` a tap, never past ``min`` or\n``max``, and back to ``initial`` on a reset. A counter with no value\nholds ``initial``."
       },
       "CounterSortDirection": {
         "type": "string",
@@ -15263,6 +16010,32 @@
       },
       "FileRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -15282,26 +16055,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -15342,6 +16099,10 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "featured_image_url": {
             "anyOf": [
@@ -15537,12 +16298,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -15550,6 +16312,7 @@
           "properties",
           "grants",
           "name",
+          "initiative_id",
           "featured_image_url",
           "is_template",
           "initiative",
@@ -15575,6 +16338,32 @@
       },
       "FileSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -15594,26 +16383,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -15654,6 +16427,10 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "featured_image_url": {
             "anyOf": [
@@ -15812,12 +16589,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -15825,6 +16603,7 @@
           "properties",
           "grants",
           "name",
+          "initiative_id",
           "featured_image_url",
           "is_template",
           "initiative",
@@ -16014,6 +16793,32 @@
       },
       "FileVersionRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -16055,17 +16860,6 @@
             ],
             "title": "Original Filename"
           },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -16079,12 +16873,14 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "id",
           "version_number",
           "file_content_type",
           "file_size",
           "original_filename",
-          "created_by",
           "created_at",
           "is_current"
         ],
@@ -16580,6 +17376,9 @@
           "user_reference",
           "currency",
           "scale",
+          "counter",
+          "file",
+          "signature",
           "link",
           "badge",
           "json"
@@ -17055,6 +17854,32 @@
       },
       "PostRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -17074,26 +17899,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -17136,6 +17945,10 @@
             "maxLength": 255,
             "minLength": 1,
             "title": "Name"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "author": {
             "anyOf": [
@@ -17283,12 +18096,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -17296,6 +18110,7 @@
           "properties",
           "grants",
           "name",
+          "initiative_id",
           "author",
           "excerpt",
           "pinned_at",
@@ -17557,6 +18372,32 @@
       },
       "ProjectRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -17576,26 +18417,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -17686,6 +18511,10 @@
             ],
             "title": "End Date"
           },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
           "owner_id": {
             "anyOf": [
               {
@@ -17764,12 +18593,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -17781,6 +18611,7 @@
           "icon",
           "start_date",
           "end_date",
+          "initiative_id",
           "owner_id",
           "is_template",
           "pinned_at",
@@ -17977,6 +18808,16 @@
               }
             ]
           },
+          "counter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CounterSettings-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "initiative_id": {
             "type": "integer",
             "title": "Initiative Id"
@@ -18162,6 +19003,16 @@
               }
             ]
           },
+          "counter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CounterSettings-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -18211,6 +19062,7 @@
           "color",
           "options",
           "currency",
+          "counter",
           "id",
           "initiative_id",
           "project_id",
@@ -18276,6 +19128,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CounterSettings-Input"
               },
               {
                 "type": "null"
@@ -18372,6 +19234,25 @@
         "title": "PropertyOptionsChange",
         "description": "Options put on and taken off one multi-select value, against the value\nas it stands when the change is written rather than a list that replaces\nit, so two people changing different options of it both stand."
       },
+      "PropertyStep": {
+        "properties": {
+          "property_id": {
+            "type": "integer",
+            "title": "Property Id"
+          },
+          "up": {
+            "type": "boolean",
+            "title": "Up"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property_id",
+          "up"
+        ],
+        "title": "PropertyStep",
+        "description": "One step of a counter, up or down, from the value it holds when the\nstep is written, so two people stepping it at once both count."
+      },
       "PropertySummary": {
         "properties": {
           "property_id": {
@@ -18453,9 +19334,19 @@
               }
             ]
           },
+          "counter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CounterSettings-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "value": {
             "title": "Value",
-            "description": "Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it."
+            "description": "Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. For file, a file: id, name, file_type and smart_link_url, or its id alone where the reader cannot open it. For signature, the signer as user (a person, shaped as user_reference's), the name they typed and when they signed: user, name and signed_at. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it."
           }
         },
         "type": "object",
@@ -18469,6 +19360,7 @@
           "key",
           "options",
           "currency",
+          "counter",
           "value"
         ],
         "title": "PropertySummary",
@@ -18540,6 +19432,14 @@
             "type": "array",
             "maxItems": 100,
             "title": "Options"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyStep"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Steps"
           }
         },
         "type": "object",
@@ -19122,6 +20022,32 @@
       },
       "TaskListRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -19259,18 +20185,6 @@
               }
             ],
             "title": "Archived At"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "assignees": {
             "items": {
@@ -19446,6 +20360,9 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "title",
           "priority",
           "start_date",
@@ -19466,7 +20383,6 @@
           "completed_at",
           "position",
           "archived_at",
-          "created_by",
           "assignees",
           "recurrence_occurrence_count",
           "recurrence_shift",
@@ -19676,6 +20592,32 @@
       },
       "TaskRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -19808,18 +20750,6 @@
               }
             ],
             "title": "Archived At"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "creator": {
             "anyOf": [
@@ -19972,6 +20902,9 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "title",
           "priority",
           "start_date",
@@ -19991,7 +20924,6 @@
           "completed_at",
           "position",
           "archived_at",
-          "created_by",
           "creator",
           "assignees",
           "recurrence_occurrence_count",
@@ -21193,6 +22125,32 @@
       },
       "WikiPageRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -21238,18 +22196,6 @@
           "slug": {
             "type": "string",
             "title": "Slug"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -21359,6 +22305,9 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "id",
           "wiki_id",
           "community_id",
@@ -21368,7 +22317,6 @@
           "is_draft",
           "title",
           "slug",
-          "created_by",
           "created_at",
           "updated_at",
           "headings",
@@ -21387,6 +22335,32 @@
       },
       "WikiPageSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -21432,18 +22406,6 @@
           "slug": {
             "type": "string",
             "title": "Slug"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -21523,6 +22485,9 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "id",
           "wiki_id",
           "community_id",
@@ -21532,7 +22497,6 @@
           "is_draft",
           "title",
           "slug",
-          "created_by",
           "created_at",
           "updated_at",
           "headings",
@@ -21649,6 +22613,32 @@
       },
       "WikiRead": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -21668,26 +22658,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -21744,6 +22718,10 @@
               }
             ],
             "title": "Description"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "home_page_id": {
             "anyOf": [
@@ -21812,12 +22790,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -21826,6 +22805,7 @@
           "grants",
           "name",
           "description",
+          "initiative_id",
           "home_page_id",
           "page_order",
           "contents_depth",
@@ -21851,6 +22831,32 @@
       },
       "WikiSummary": {
         "properties": {
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_kind": {
+            "$ref": "#/components/schemas/ActorKind"
+          },
+          "created_by_install": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Install"
+          },
           "archived_at": {
             "anyOf": [
               {
@@ -21870,26 +22876,10 @@
             "type": "integer",
             "title": "Id"
           },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
           "community_id": {
             "title": "Community Id",
             "type": "string",
             "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
           },
           "created_at": {
             "type": "string",
@@ -21946,6 +22936,10 @@
               }
             ],
             "title": "Description"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
           },
           "home_page_id": {
             "anyOf": [
@@ -22011,12 +23005,13 @@
         },
         "type": "object",
         "required": [
+          "created_by",
+          "created_by_kind",
+          "created_by_install",
           "archived_at",
           "can",
           "id",
-          "initiative_id",
           "community_id",
-          "created_by",
           "created_at",
           "updated_at",
           "comments_enabled",
@@ -22025,6 +23020,7 @@
           "grants",
           "name",
           "description",
+          "initiative_id",
           "home_page_id",
           "page_order",
           "contents_depth",

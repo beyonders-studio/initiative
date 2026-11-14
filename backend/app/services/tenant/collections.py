@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import delete
 from sqlalchemy.orm import selectinload
@@ -42,16 +42,15 @@ from app.models.tenant.file import File
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.schemas.tenant.collection import (
     CollectionShapeEntry,
-    CollectionShapeMetadata,
     CollectionShapeGroup,
+    CollectionShapeMetadata,
 )
 from app.schemas.tenant.property import PropertyDefinitionRead
 from app.schemas.tenant.tool_layout import PROPERTY_FIELD_PREFIX
 from app.services.tenant import comments as comments_service
-from app.services.tenant import named_people
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import named_people, tool_layouts
 from app.services.tenant import tags as tags_service
-from app.services.tenant import tool_layouts
 
 
 async def get_collection(
@@ -102,7 +101,7 @@ async def add_files(
     collection: Collection,
     file_ids: Iterable[int],
     *,
-    added_by: Optional[int],
+    added_by: int | None,
 ) -> list[int]:
     """Put these files in the collection, leaving out any already there, and
     return the ones added. The caller has checked the reader can open them.
@@ -133,7 +132,7 @@ async def add_files(
         ).all()
     )
     added = [file_id for file_id in wanted if file_id not in present]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add_all(
         CollectionFile(
             collection_id=collection.id,
@@ -166,7 +165,7 @@ async def remove_files(
     # metadata's values on the files go while the files are still in it.
     if collection.cover_file_id in wanted:
         collection.cover_file_id = None
-    collection.updated_at = datetime.now(timezone.utc)
+    collection.updated_at = datetime.now(UTC)
     session.add(collection)
     await session.flush()
     await metadata_service.drop_collection_values(session, collection.id, wanted)
@@ -231,7 +230,7 @@ class Card:
     files the reader can see, and the one standing for it."""
 
     file_count: int = 0
-    cover: Optional[File] = None
+    cover: File | None = None
 
 
 async def cards(session: AsyncSession, rows: Sequence[Collection]) -> dict[int, Card]:
@@ -465,12 +464,12 @@ class _Settle:
     together once it commits."""
 
     guild_id: int
-    actor_id: Optional[int]
+    actor_id: int | None
     collections: set[int] = field(default_factory=set)
     left_files: set[int] = field(default_factory=set)
     restored_files: set[int] = field(default_factory=set)
 
-    def join(self, other: "_Settle") -> None:
+    def join(self, other: _Settle) -> None:
         self.collections |= other.collections
         self.left_files |= other.left_files
         self.restored_files |= other.restored_files
@@ -536,7 +535,7 @@ async def settle(
     collection_ids: Sequence[int] = (),
     file_ids: Sequence[int] = (),
     restored_files: Sequence[int] = (),
-    actor_id: Optional[int],
+    actor_id: int | None,
 ) -> None:
     """Trash the named collections, and those holding ``file_ids``, that hold
     no live file, and take anybody who can open none of the files of the rest

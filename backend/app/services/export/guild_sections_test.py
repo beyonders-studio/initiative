@@ -80,11 +80,11 @@ def test_builtin_source_is_a_known_listing_source():
 async def test_the_roles_section_carries_each_role_and_who_holds_it(
     session, acting_user
 ):
+    from app.db.request_context import SystemGuild
+    from app.db.session import set_rls_context
     from app.models.platform.guild import CommunityRole
     from app.models.tenant.custom_role import CustomRole, CustomRoleMember
     from app.services.export.guild_sections import GUILD_SECTIONS, SectionContext
-    from app.db.request_context import SystemGuild
-    from app.db.session import set_rls_context
     from app.testing.schema_harness import route_session_to_guild
 
     admin = await acting_user(guild_role=CommunityRole.admin)

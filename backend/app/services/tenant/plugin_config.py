@@ -12,8 +12,9 @@ Two custody rules run through everything here:
   field are encrypted per key and stored; a read reports only whether a value is
   present. Nothing in the API returns one, to anybody.
 * **Managed keys are not typed at all.** A field the manifest marks ``managed``
-  is written by the plug-in itself when it completes a vendor flow, so this path
-  refuses one rather than letting a form overwrite it.
+  is written from the plug-in's ``after_connect`` answer, when a vendor flow
+  completes or when a typed connection that declares ``after_connect`` is
+  saved, so this path refuses one rather than letting a form overwrite it.
 
 A guild-wide connection is not always typed. One that declares a ``flow`` is
 established by Initiative instead
@@ -44,22 +45,24 @@ from __future__ import annotations
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
-from app.core.errors import CodedError
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
+from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages
 from app.services.marketplace.manifest_values import is_unique_setting_value
 
 __all__ = [
-    "REMOVED_AT",
-    "RESERVED_TOKEN_KEYS",
-    "PluginConfigError",
-    "ConfigState",
+    "ACCOUNT_LABEL",
+    "CONFIG_STATES",
     "MAX_CONFIG_VALUE_LENGTH",
     "MAX_SECRET_VALUE_LENGTH",
-    "CONFIG_STATES",
+    "REMOVED_AT",
+    "RESERVED_TOKEN_KEYS",
+    "ConfigState",
+    "PluginConfigError",
     "apply_connection_values",
+    "checks_typed_values",
     "config_state",
     "connection_by_id",
     "connection_id_for_ref",
@@ -93,11 +96,23 @@ CONFIG_STATES: frozenset[str] = frozenset({"unverified", "ok", "invalid"})
 #: plain map until the connection is read ``ok`` or connected again.
 REMOVED_AT = "removed_at"
 
+#: The account the plug-in's ``after_connect`` said a typed connection's values
+#: belong to, kept in its plain map.
+ACCOUNT_LABEL = "account_label"
+
 #: Where a connection's flow keeps its tokens, beside its declared fields: the
 #: two tokens sealed in the secrets map, the two expiry times (epoch seconds)
-#: in the plain map. :data:`REMOVED_AT` is kept in the plain map the same way.
+#: in the plain map. :data:`REMOVED_AT` and :data:`ACCOUNT_LABEL` are kept in
+#: the plain map the same way.
 RESERVED_TOKEN_KEYS: frozenset[str] = frozenset(
-    {"access_token", "refresh_token", "expires_at", "refresh_expires_at", REMOVED_AT}
+    {
+        "access_token",
+        "refresh_token",
+        "expires_at",
+        "refresh_expires_at",
+        REMOVED_AT,
+        ACCOUNT_LABEL,
+    }
 )
 
 #: Long enough that a handle is never guessed, short enough to sit in a URL the
@@ -130,7 +145,7 @@ class ConfigState:
 
     needs_config: bool
     state: str
-    detail: Optional[str] = None
+    detail: str | None = None
 
 
 # --- reading the pinned definition ------------------------------------------
@@ -146,7 +161,7 @@ def definition_connections(definition: dict[str, Any] | None) -> list[dict[str, 
 
 def connection_by_id(
     definition: dict[str, Any] | None, connection_id: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     for connection in definition_connections(definition):
         if connection.get("id") == connection_id:
             return connection
@@ -171,7 +186,7 @@ def install_settings(plugin: Any) -> dict[str, Any]:
     }
 
 
-def token_of(connection: Mapping[str, Any] | None) -> Optional[dict[str, Any]]:
+def token_of(connection: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """The connection's ``token``, when it declares one."""
     token = (connection or {}).get("token")
     return token if isinstance(token, dict) else None
@@ -187,6 +202,18 @@ def runs_vendor_flow(connection: dict[str, Any] | None) -> bool:
     whole guild are the same flow run by different people.
     """
     return bool(connection) and isinstance(connection.get("flow"), dict)
+
+
+def checks_typed_values(connection: Mapping[str, Any] | None) -> bool:
+    """Whether the plug-in's ``after_connect`` checks what an admin types into
+    this connection before it is stored: a guild-wide connection without a
+    flow that declares ``after_connect``."""
+    return (
+        bool(connection)
+        and connection.get("scope") == "static"
+        and not isinstance(connection.get("flow"), dict)
+        and connection.get("after_connect") is True
+    )
 
 
 # --- the handle a guild-wide flow is joined by -------------------------------
@@ -220,7 +247,7 @@ def guild_connection_ref(plugin: Any, connection_id: str) -> str:
     return refs[connection_id]
 
 
-def connection_id_for_ref(plugin: Any, connection_ref: str) -> Optional[str]:
+def connection_id_for_ref(plugin: Any, connection_ref: str) -> str | None:
     """Which guild connection a handle names, or ``None`` for none of them.
 
     ``None`` is the ordinary answer for a member's ref, which this install keeps
@@ -282,7 +309,7 @@ def _coerce(field: dict[str, Any], value: Any) -> Any:
         return text
 
     if field_type == "url":
-        if not (text.startswith("https://") or text.startswith("http://")):
+        if not text.startswith(("https://", "http://")):
             raise PluginConfigError(GuildPluginMessages.CONFIG_INVALID_VALUE)
         if " " in text:
             raise PluginConfigError(GuildPluginMessages.CONFIG_INVALID_VALUE)
@@ -291,7 +318,7 @@ def _coerce(field: dict[str, Any], value: Any) -> Any:
     return text
 
 
-def setting_value(setting: Mapping[str, Any], value: Any) -> Optional[str]:
+def setting_value(setting: Mapping[str, Any], value: Any) -> str | None:
     """A value submitted for ``setting``, as it is kept: one line of text, or
     ``None`` to clear a setting that is not unique.
 
@@ -414,12 +441,16 @@ def prune_to_definition(
     those values bought it.
     """
     # A connection with a flow keeps its tokens and its removal mark too, under
-    # the reserved keys.
+    # the reserved keys, and a checked typed one its account.
     declared: dict[str, set[str]] = {
         connection["id"]: {
             field["key"] for field in _fields(connection) if "key" in field
         }
-        | (RESERVED_TOKEN_KEYS if runs_vendor_flow(connection) else set())
+        | (
+            RESERVED_TOKEN_KEYS
+            if runs_vendor_flow(connection) or checks_typed_values(connection)
+            else set()
+        )
         for connection in definition_connections(definition)
         if isinstance(connection.get("id"), str)
     }

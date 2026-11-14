@@ -11,20 +11,14 @@
 
 import { Link } from "@tanstack/react-router";
 import { LayoutTemplate, type LucideIcon, Store, Timer } from "lucide-react";
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { HOME_WIDGETS } from "@/components/home/widgets";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { HOME_GRID_COLUMNS, type HomeLayout, type HomeWidget } from "@/lib/home/layout";
 import { HOME_PRESET_IDS, type HomePresetId, presetLayout } from "@/lib/home/presets";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { WizardOption } from "@/ui/wizard-dialog";
 
 export type HomeLayoutChoice = HomePresetId | "blank";
 
@@ -76,33 +70,6 @@ export function LayoutMap({ layout }: { layout: HomeLayout }) {
   );
 }
 
-/** One layout to pick: its map, its name, and what it is for. */
-function LayoutChoice({
-  map,
-  name,
-  description,
-  onPick,
-}: {
-  map: ReactNode;
-  name: string;
-  description: string;
-  onPick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onPick}
-      className="flex h-full w-full flex-col gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
-    >
-      {map}
-      <span className="space-y-1">
-        <span className="block font-medium text-sm">{name}</span>
-        <span className="block text-muted-foreground text-xs">{description}</span>
-      </span>
-    </button>
-  );
-}
-
 export function HomeLayoutsDialog({ open, onOpenChange, mode, onPick }: HomeLayoutsDialogProps) {
   const { t } = useTranslation("home");
   const choices: HomeLayoutChoice[] =
@@ -120,8 +87,9 @@ export function HomeLayoutsDialog({ open, onOpenChange, mode, onPick }: HomeLayo
         <ul className="grid grid-cols-fill-56/3 gap-3">
           {choices.map((choice) => (
             <li key={choice}>
-              <LayoutChoice
-                map={
+              <WizardOption
+                className="h-full flex-col items-stretch"
+                icon={
                   choice === "blank" ? (
                     <div
                       aria-hidden="true"
@@ -133,13 +101,13 @@ export function HomeLayoutsDialog({ open, onOpenChange, mode, onPick }: HomeLayo
                     <LayoutMap layout={presetLayout(choice)} />
                   )
                 }
-                name={choice === "blank" ? t("views.blank.name") : t(`presets.${choice}.name`)}
+                title={choice === "blank" ? t("views.blank.name") : t(`presets.${choice}.name`)}
                 description={
                   choice === "blank"
                     ? t("views.blank.description")
                     : t(`presets.${choice}.description`)
                 }
-                onPick={() => {
+                onClick={() => {
                   onPick(choice);
                   onOpenChange(false);
                 }}

@@ -13,18 +13,15 @@ guild or any other, keep the version they chose.
 """
 
 import pytest
-from httpx import AsyncClient
-from sqlmodel.ext.asyncio.session import AsyncSession
-
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.services.marketplace.plugin_api import PLUGIN_API_VERSION
-from app.testing import create_marketplace_listing, marketplace_uid
-from app.testing import route_as
-
+from app.testing import create_marketplace_listing, marketplace_uid, route_as
 
 INSTALL_UID = marketplace_uid("sprinthealth")
 WITHDRAWN_UID = marketplace_uid("withdrawn")

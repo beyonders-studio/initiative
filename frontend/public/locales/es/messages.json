@@ -1,7 +1,7 @@
 {
   "title": "Mis mensajes",
   "backToNav": "Volver a la navegación",
-  "encryptedNotice": "Cifrado de extremo a extremo. Solo tú y la otra persona pueden leerlos.",
+  "encryptedNotice": "Cifrado de extremo a extremo. Solo las personas de esta conversación pueden leerlos.",
   "empty": {
     "title": "Elige una conversación"
   },
@@ -33,7 +33,6 @@
     "empty": "Todavía nadie en tus comunidades ha activado los mensajes.",
     "noCommunities": "Nadie que mostrar. Todavía no compartes comunidad con nadie.",
     "unreachable": "No disponible",
-    "showMore": "Mostrar más",
     "addToGroup": "Añadir a {{name}} a un grupo",
     "removeFromGroup": "Quitar a {{name}}",
     "groupHint": "A todas las personas aquí se les preguntará antes de unirse.",
@@ -57,7 +56,6 @@
   "recipientHasNoDevice": "{{name}} todavía no ha configurado los mensajes cifrados, así que no se pudo entregar.",
   "peerDevicesChanged": "Los dispositivos de {{name}} han cambiado",
   "deviceFailed": "No se pudieron configurar los mensajes cifrados en este dispositivo.",
-  "loading": "Cargando…",
   "unsupportedBrowser": "Los mensajes cifrados necesitan una conexión segura y un navegador capaz de ejecutarlos. Comprueba que la dirección empiece por https (o sea localhost), o prueba con la aplicación.",
   "start": {
     "waiting": "Esperando a que acepten. Cuando lo hagan, podréis escribiros.",

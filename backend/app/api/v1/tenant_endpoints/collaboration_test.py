@@ -10,23 +10,39 @@ native. A ``?token=`` in the URL authenticates nothing here.
 import asyncio
 import base64
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from pycrdt import Doc, Text
 from sqlalchemy.orm import undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool
 from app.api.content_socket import MSG_AUTH
 from app.api.v1.tenant_endpoints.collaboration import MSG_AWARENESS
+from app.core.file_types import FileType
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.core.search import SearchEntityType
 from app.core.security import create_upload_token
+from app.core.tools import Tool
 from app.core.user_display import handle_of
 from app.models.platform.access_grant import AccessGrant
-from app.core.file_types import FileType
+from app.models.platform.guild import CommunityRole
+from app.models.platform.user import UserRole
 from app.models.tenant.file import File
 from app.models.tenant.wiki import WikiPage
+from app.services import editor_engine
+from app.services import permissions as permissions_service
+from app.services.content_sockets import resource_room
+from app.services.platform import rules
+from app.services.tenant import body_states
+from app.services.tenant import collaboration as collaboration_module
+from app.services.tenant.collaboration import (
+    CollaborationManager,
+    collaboration_manager,
+)
+from app.services.tenant.collaborative_resources import resource_for
 from app.testing import (
     create_file,
     create_user,
@@ -34,24 +50,8 @@ from app.testing import (
     create_wiki_page,
     get_auth_headers,
     get_auth_token,
+    route_as,
 )
-from app.core.search import SearchEntityType
-from app.services import editor_engine
-from app.services.tenant import body_states
-from app.services.tenant.collaboration import (
-    CollaborationManager,
-    collaboration_manager,
-)
-from app.services.tenant import collaboration as collaboration_module
-from app.services.tenant.collaborative_resources import resource_for
-from app.services.content_sockets import resource_room
-from app.models.platform.guild import CommunityRole
-from app.models.platform.user import UserRole
-from app.services import permissions as permissions_service
-from app.testing import route_as
-from app.core.login_methods import LoginMethod
-from app.core.rules import SignInRequirement
-from app.services.platform import rules
 
 WHITEBOARD = {"elements": [], "appState": {}, "files": {}}
 
@@ -461,7 +461,7 @@ async def test_a_non_member_is_refused(
 
 async def _approved_grant(session, *, user, guild, owner, level: str) -> AccessGrant:
     """An approved, currently-live access grant for ``user`` on ``guild``."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = AccessGrant(
         user_id=user.id,
         guild_id=guild.id,

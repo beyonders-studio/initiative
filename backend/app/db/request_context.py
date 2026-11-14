@@ -22,8 +22,9 @@ this system makes cannot be constructed.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from app.db import gucs
 from app.db.guild_standing import GuildContext, InstallContext, standing_values
@@ -39,13 +40,14 @@ __all__ = [
     "ContentGrantee",
     "ContextShapeError",
     "Filer",
-    "SignIn",
+    "IdeaReader",
     "Install",
     "Member",
     "Platform",
     "RequestContext",
     "Route",
     "SettingsGrantee",
+    "SignIn",
     "SystemGuild",
     "SystemMaintenance",
     "Unattributed",
@@ -82,7 +84,7 @@ class SignIn:
     #: The providers the credential proved.
     providers: tuple[int, ...] = ()
     #: What those providers asserted, ``{"<provider id>": {claim: [values]}}``.
-    claims: Optional[Mapping[str, Any]] = None
+    claims: Mapping[str, Any] | None = None
     #: The assurance markers the credential recorded.
     amr: frozenset[str] = frozenset()
     #: The account answers the deployment's own second-factor rule.
@@ -106,7 +108,7 @@ class SignIn:
         }
 
 
-def _guild_role(guild_id: int, kind: "GuildRoleKind") -> str:
+def _guild_role(guild_id: int, kind: GuildRoleKind) -> str:
     from app.db.schema_provisioning import guild_role_name
 
     return guild_role_name(guild_id, kind)
@@ -121,11 +123,11 @@ def _guild_schemas(guild_id: int, *, query: bool = False) -> tuple[str, ...]:
     return (schema,) if query else (schema, "public")
 
 
-def _tier_role(tier: Optional[str]) -> str:
+def _tier_role(tier: str | None) -> str:
     return role_name(platform_tier(tier)) if tier is not None else "none"
 
 
-def _check_tier(tier: Optional[str]) -> None:
+def _check_tier(tier: str | None) -> None:
     if tier is not None and tier not in PLATFORM_ROUTES:
         raise ContextShapeError(f"Invalid platform_role: {tier!r}")
 
@@ -162,7 +164,7 @@ class Platform:
     """
 
     user_id: int
-    tier: Optional[str] = None
+    tier: str | None = None
     guild_id: None = field(default=None, init=False, repr=False)
     attributed = True
 
@@ -210,8 +212,8 @@ def _grant_flags(standing: Any, read: bool, write: bool) -> tuple[bool, bool]:
 
 
 def _person_values(
-    shape: "Member | ContentGrantee | SettingsGrantee",
-    community: dict[gucs.Guc, Optional[int]],
+    shape: Member | ContentGrantee | SettingsGrantee,
+    community: dict[gucs.Guc, int | None],
     *,
     pam_read: bool,
     pam_write: bool,
@@ -250,12 +252,12 @@ class Member:
     guild_id: int
     user_id: int
     standing: GuildContext
-    tier: Optional[str] = None
+    tier: str | None = None
     sign_in: SignIn = SignIn()
     read_only: bool = False
     seat: bool = False
     query: bool = False
-    scope_initiative_id: Optional[int] = None
+    scope_initiative_id: int | None = None
     attributed = True
 
     def __post_init__(self) -> None:
@@ -309,14 +311,14 @@ class ContentGrantee:
 
     guild_id: int
     user_id: int
-    standing: Optional[GuildContext] = None
+    standing: GuildContext | None = None
     read_write: bool = False
     settings: bool = False
-    tier: Optional[str] = None
+    tier: str | None = None
     sign_in: SignIn = SignIn()
     seat: bool = False
     query: bool = False
-    scope_initiative_id: Optional[int] = None
+    scope_initiative_id: int | None = None
     attributed = True
 
     def __post_init__(self) -> None:
@@ -364,7 +366,7 @@ class SettingsGrantee:
     guild_id: int
     user_id: int
     standing: GuildContext
-    tier: Optional[str] = None
+    tier: str | None = None
     sign_in: SignIn = SignIn()
     seat: bool = False
     attributed = True
@@ -418,9 +420,9 @@ class Install:
     standing: InstallContext
     token_client_id: str
     token_scopes: frozenset[str] = frozenset()
-    scope_initiative_id: Optional[int] = None
-    member_user_id: Optional[int] = None
-    token_purpose: Optional[str] = None
+    scope_initiative_id: int | None = None
+    member_user_id: int | None = None
+    token_purpose: str | None = None
     user_id: None = field(default=None, init=False, repr=False)
     attributed = True
 
@@ -510,6 +512,43 @@ class Filer:
         )
 
 
+# --- Somebody reading the published ideas ----------------------------------------
+
+
+@dataclass(frozen=True)
+class IdeaReader:
+    """Anybody reading the published ideas, signed in or not, in the
+    operations community.
+
+    Not a member and not a grantee: routed into the one role that exists for
+    this, ``guild_<id>_ideas``, whose grants and row policies admit the
+    published ideas and their votes and nothing else (see
+    ``app.db.operations_schema``). The account, where there is one, is what
+    the reader's own vote is told apart by.
+    """
+
+    guild_id: int
+    user_id: int | None = None
+
+    @property
+    def attributed(self) -> bool:
+        return self.user_id is not None
+
+    def __post_init__(self) -> None:
+        if self.guild_id is None:
+            raise ContextShapeError("an ideas routing names the community")
+
+    def route(self) -> Route:
+        from app.db.operations_schema import ideas_role_name
+
+        values: dict[gucs.Guc, Any] = {}
+        if self.user_id is not None:
+            values[gucs.USER_ID] = self.user_id
+        return Route(
+            values, ideas_role_name(self.guild_id), _guild_schemas(self.guild_id)
+        )
+
+
 # --- Nobody behind it ---------------------------------------------------------
 
 
@@ -559,18 +598,19 @@ class SystemMaintenance:
         )
 
 
-RequestContext = Union[
-    Unattributed,
-    Platform,
-    Billing,
-    Member,
-    ContentGrantee,
-    SettingsGrantee,
-    Install,
-    Filer,
-    SystemGuild,
-    SystemMaintenance,
-]
+RequestContext = (
+    Unattributed
+    | Platform
+    | Billing
+    | Member
+    | ContentGrantee
+    | SettingsGrantee
+    | Install
+    | Filer
+    | IdeaReader
+    | SystemGuild
+    | SystemMaintenance
+)
 
 #: The shapes a reader's own SQL may run as on the query surface.
 QUERYABLE = (Member, ContentGrantee)

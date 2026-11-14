@@ -16,7 +16,6 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-
 _LOCALES_DIR = Path(__file__).resolve().parent.parent / "locales"
 
 #: The languages this deployment writes email in — the locale directories

@@ -8,22 +8,21 @@ an in-flight transaction.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-
-from app.db.session import set_rls_context
-from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from sqlmodel import select, update
 
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.event_outbox import EventOutbox
+from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.webhook_delivery import WebhookDelivery
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services import outbox_ledger, sweep_timers
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.tenant import change_log, expiry, outbox_poller
-from app.db.request_context import SystemGuild
-
 
 #: Stand-ins for what this subscriber calls the guild and the person who wrote.
 #: Minted by the poller before it builds an envelope — these tests are about
@@ -33,32 +32,32 @@ _ACTOR_REF = "uweb_9dYkR2pLmX7vQzB4nT6sHfA3eJwC8gUx"
 
 
 def _subscription(**overrides) -> WebhookSubscription:
-    defaults = dict(
-        id=7,
-        guild_id=1,
-        initiative_id=None,
-        created_by=3,
-        target_url="https://example.test/hook",
-        hmac_secret="s3cret",
-        event_types=["tasks.created", "tasks.updated"],
-        active=True,
-    )
+    defaults = {
+        "id": 7,
+        "guild_id": 1,
+        "initiative_id": None,
+        "created_by": 3,
+        "target_url": "https://example.test/hook",
+        "hmac_secret": "s3cret",
+        "event_types": ["tasks.created", "tasks.updated"],
+        "active": True,
+    }
     defaults.update(overrides)
     return WebhookSubscription(**defaults)
 
 
 def _row(row_id: int, txn_id: int, **overrides) -> EventOutbox:
-    defaults = dict(
-        id=row_id,
-        txn_id=txn_id,
-        occurred_at=datetime(2026, 8, 15, tzinfo=timezone.utc),
-        actor_user_id=3,
-        initiative_id=11,
-        resource_type="tasks",
-        resource_id=100 + row_id,
-        action="created",
-        changed=[],
-    )
+    defaults = {
+        "id": row_id,
+        "txn_id": txn_id,
+        "occurred_at": datetime(2026, 8, 15, tzinfo=UTC),
+        "actor_user_id": 3,
+        "initiative_id": 11,
+        "resource_type": "tasks",
+        "resource_id": 100 + row_id,
+        "action": "created",
+        "changed": [],
+    }
     defaults.update(overrides)
     return EventOutbox(**defaults)
 
@@ -148,12 +147,13 @@ async def test_every_subscription_in_a_guild_is_drained(
             WebhookSubscription(
                 initiative_id=None,
                 created_by=user_id,
+                created_by_kind=ActorKind.member,
                 target_url=f"https://example.test/hook-{index}",
                 hmac_secret=f"secret-{index}",
                 event_types=["tasks.created"],
                 active=True,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
         )
     await session.commit()
@@ -166,7 +166,7 @@ async def test_every_subscription_in_a_guild_is_drained(
     monkeypatch.setattr(poller, "_drain_subscription", _record)
     monkeypatch.setattr(poller, "_subscribed", set())
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await poller.drain_guild(session, guild_id, now=now)
 
     assert len(drained) == 3, (
@@ -209,12 +209,13 @@ async def test_ledger_delivers_each_transaction_once(
         WebhookSubscription(
             initiative_id=None,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
             active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
     )
     await session.commit()
@@ -229,18 +230,18 @@ async def test_ledger_delivers_each_transaction_once(
 
     system = await role_session("app_admin")
 
-    await poller.drain_guild(system, guild_id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, guild_id, now=datetime.now(UTC))
     first_pass = len(sent)
     assert first_pass > 0, "no transaction was delivered"
 
-    await poller.drain_guild(system, guild_id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, guild_id, now=datetime.now(UTC))
     assert len(sent) == first_pass, (
         "a settled transaction was delivered twice — the ledger row should make "
         "it ineligible on every later pass"
     )
 
     assert (await session.exec(select(WebhookDelivery))).all()
-    aged = datetime.now(timezone.utc) - change_log.RETENTION - timedelta(hours=1)
+    aged = datetime.now(UTC) - change_log.RETENTION - timedelta(hours=1)
     await session.exec(update(EventOutbox).values(occurred_at=aged))
     await session.commit()
     await each_guild(
@@ -269,12 +270,13 @@ async def test_a_refused_batch_is_retried_not_lost_or_overtaken(
         WebhookSubscription(
             initiative_id=None,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
             active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
     )
     await session.commit()
@@ -289,7 +291,7 @@ async def test_a_refused_batch_is_retried_not_lost_or_overtaken(
 
     system = await role_session("app_admin")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await poller.drain_guild(system, guild_id, now=now)
     assert len(attempts) == 1
 
@@ -331,12 +333,13 @@ async def test_repeated_refusals_escalate_the_backoff(
         WebhookSubscription(
             initiative_id=None,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
             active=True,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
     )
     await session.commit()
@@ -349,7 +352,7 @@ async def test_repeated_refusals_escalate_the_backoff(
     system = await role_session("app_admin")
 
     intervals: list[float] = []
-    moment = datetime.now(timezone.utc)
+    moment = datetime.now(UTC)
     for _ in range(3):
         await poller.drain_guild(system, guild_id, now=moment)
         await set_rls_context(session, SystemGuild(guild_id))
@@ -398,12 +401,13 @@ async def test_an_exhausted_batch_is_dead_lettered_and_unblocks_the_backlog(
     subscription = WebhookSubscription(
         initiative_id=None,
         created_by=user_id,
+        created_by_kind=ActorKind.member,
         target_url="https://example.test/hook",
         hmac_secret="secret",
         event_types=["tasks.created"],
         active=True,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     session.add(subscription)
     await session.commit()
@@ -421,7 +425,7 @@ async def test_an_exhausted_batch_is_dead_lettered_and_unblocks_the_backlog(
     system = await role_session("app_admin")
 
     txn_a: int | None = None
-    moment = datetime.now(timezone.utc)
+    moment = datetime.now(UTC)
     for _ in range(len(outbox_ledger.BACKOFF_SECONDS)):
         await poller.drain_guild(system, guild_id, now=moment)
         await set_rls_context(session, SystemGuild(guild_id))
@@ -546,7 +550,11 @@ def test_the_envelope_names_the_plugin_that_wrote():
 
 
 def _reach(**overrides) -> outbox_poller.InstallReach:
-    defaults = dict(live=True, placed=frozenset({11}), readable=frozenset({"projects"}))
+    defaults = {
+        "live": True,
+        "placed": frozenset({11}),
+        "readable": frozenset({"projects"}),
+    }
     defaults.update(overrides)
     return outbox_poller.InstallReach(**defaults)
 
@@ -632,15 +640,15 @@ _GH_EVENT = "plugin.tests.gh.issue_opened"
 
 
 def _plugin_event(**overrides) -> PluginEventOutbox:
-    defaults = dict(
-        id=1,
-        txn_id=500,
-        occurred_at=datetime(2026, 9, 25, tzinfo=timezone.utc),
-        install_id=9,
-        event_type=_GH_EVENT,
-        initiative_id=None,
-        payload={"number": 12},
-    )
+    defaults = {
+        "id": 1,
+        "txn_id": 500,
+        "occurred_at": datetime(2026, 9, 25, tzinfo=UTC),
+        "install_id": 9,
+        "event_type": _GH_EVENT,
+        "initiative_id": None,
+        "payload": {"number": 12},
+    }
     defaults.update(overrides)
     return PluginEventOutbox(**defaults)
 

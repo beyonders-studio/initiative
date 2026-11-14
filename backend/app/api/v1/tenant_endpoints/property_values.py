@@ -7,13 +7,11 @@ and how a row reaches it come from the properties seam
 moment it exists.
 """
 
-from typing import Annotated, Any, List
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
-from app.core.errors import CodedError
-from app.core.tools import KINDS
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
@@ -22,7 +20,9 @@ from app.api.deps import (
     ActorUserDep,
     plugin_scope_by,
 )
+from app.core.errors import CodedError
 from app.core.plugin_scopes import tool_resource
+from app.core.tools import KINDS
 from app.schemas.tenant.property import (
     PropertySummary,
     PropertyTarget,
@@ -49,7 +49,7 @@ PropertiesWrite = Annotated[
 ]
 
 
-@router.put("/{target}/{entity_id}", response_model=List[PropertySummary])
+@router.put("/{target}/{entity_id}", response_model=list[PropertySummary])
 async def set_properties(
     target: PropertyTarget,
     entity_id: int,
@@ -57,7 +57,7 @@ async def set_properties(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: PropertiesWrite,
-) -> List[PropertySummary]:
+) -> list[PropertySummary]:
     """Replace the custom property values on one tool or sub-tool, or with
     ``merge`` write only the ones named and leave the rest, change options of
     multi-select values and step counters against what each holds.
@@ -109,7 +109,7 @@ async def set_properties(
             steps=payload.steps,
         )
         await required_fields.refuse_emptied(session, required)
-    except (HTTPException, CodedError):
+    except HTTPException, CodedError:
         await session.rollback()
         raise
     await session.commit()

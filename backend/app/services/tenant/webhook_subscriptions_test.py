@@ -16,13 +16,14 @@ exercised here.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.testing.schema_harness import route_session_to_guild
 
@@ -31,11 +32,12 @@ async def _subscribe(
     session: AsyncSession, *, guild_id: int, user_id: int, initiative_id: int | None
 ) -> None:
     await route_session_to_guild(session, guild_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         WebhookSubscription(
             initiative_id=initiative_id,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
@@ -80,7 +82,7 @@ async def test_delivery_outlives_the_account_that_registered_it(
     await create_task(session, project)
     session.expunge_all()
 
-    await poller.drain_guild(system, guild_id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, guild_id, now=datetime.now(UTC))
     assert sent, "an erased registrant ended a subscription that should outlive them"
 
 
@@ -130,7 +132,7 @@ async def test_an_initiative_subscription_hears_only_that_initiative(
     await create_task(session, other_project)
     session.expunge_all()
 
-    await poller.drain_guild(system, guild_id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, guild_id, now=datetime.now(UTC))
 
     named = {
         change["initiative_id"] for envelope in sent for change in envelope["changes"]
@@ -162,7 +164,7 @@ async def test_a_community_subscription_hears_every_initiative(
     await create_task(session, other_project)
     session.expunge_all()
 
-    await poller.drain_guild(system, guild_id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, guild_id, now=datetime.now(UTC))
 
     named = {
         change["initiative_id"] for envelope in sent for change in envelope["changes"]
@@ -183,15 +185,15 @@ _EMITTERS = {_GH_EVENT: "tests.gh"}
 def _install_context(**overrides):
     from app.db.guild_standing import InstallContext
 
-    defaults = dict(
-        guild_id=1,
-        install_id=4,
-        client_id="tests.plugin",
-        token_scopes=frozenset({"files:read"}),
-        live=True,
-        member_initiatives=(11, 12),
-        install_read=("files",),
-    )
+    defaults = {
+        "guild_id": 1,
+        "install_id": 4,
+        "client_id": "tests.plugin",
+        "token_scopes": frozenset({"files:read"}),
+        "live": True,
+        "member_initiatives": (11, 12),
+        "install_read": ("files",),
+    }
     defaults.update(overrides)
     return InstallContext(**defaults)
 
@@ -216,6 +218,15 @@ def _install_context(**overrides):
         ),
         pytest.param(
             {"guild_admin": True}, ["demo.link_opened"], None, id="demo-event-admin"
+        ),
+        pytest.param(
+            {"member_user_id": 7, "member_surfaces": ("webhooks",)},
+            ["files.created"],
+            None,
+            id="member-holding-webhooks",
+        ),
+        pytest.param(
+            {"member_user_id": 7}, ["files.created"], 12, id="member-in-initiative"
         ),
     ],
 )
@@ -259,6 +270,12 @@ def test_an_install_may_subscribe_within_its_standing(
             ["demo.lead_left"],
             None,
             id="demo-event-without-admin-standing",
+        ),
+        pytest.param(
+            {"member_user_id": 7},
+            ["files.created"],
+            None,
+            id="member-community-wide-without-webhooks",
         ),
     ],
 )
@@ -313,7 +330,10 @@ async def test_an_install_registers_a_subscription_naming_no_person(
     )
     row = await _install_subscribes(role_session, install)
     assert row.plugin_install_id == install.plugin.id
-    assert row.created_by is None
+    assert (row.created_by, row.created_by_kind) == (
+        install.plugin.id,
+        ActorKind.plugin,
+    )
     assert row.initiative_id is None
 
 
@@ -369,8 +389,8 @@ async def _withdraw(session, role_session, install, what: str) -> None:
     from app.models.platform.plugin_service_registration import (
         PluginServiceRegistration,
     )
-    from app.models.tenant.plugin_placement import PluginPlacement
     from app.models.tenant.guild_plugin import GuildPlugin
+    from app.models.tenant.plugin_placement import PluginPlacement
     from app.services.marketplace.registration_lookup import invalidate_registrations
 
     session.expunge_all()
@@ -412,8 +432,8 @@ async def test_an_install_hears_what_it_writes_and_is_named_for_it(
 ):
     """An install's subscription carries the files of the initiative it
     is placed in, and names the plug-in when the plug-in wrote the change."""
-    from app.db.install_standing_test import CLIENT, _install, _route
     from app.core.file_types import FileType
+    from app.db.install_standing_test import CLIENT, _install, _route
     from app.models.tenant.file import File
     from app.services.tenant import outbox_poller as poller
     from app.testing import create_file
@@ -441,7 +461,7 @@ async def test_an_install_hears_what_it_writes_and_is_named_for_it(
     await s.commit()
     made_id = made.id
 
-    await poller.drain_guild(system, install.guild.id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
 
     changes = {
         change["resource"]["id"]: envelope
@@ -473,14 +493,14 @@ async def test_an_install_hears_nothing_once_its_reach_is_withdrawn(
     session.expunge_all()
     before = await create_file(session, install.a, install.seat.user)
     session.expunge_all()
-    await poller.drain_guild(system, install.guild.id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
     assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [before.id]
 
     await _withdraw(session, role_session, install, what)
     await create_file(session, install.a, install.seat.user)
     session.expunge_all()
     system.expunge_all()
-    await poller.drain_guild(system, install.guild.id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
     assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [before.id]
 
 
@@ -495,7 +515,7 @@ async def test_a_plugins_event_is_kept_until_the_subscriber_accepts_it(
     from app.schemas.tenant.webhook_subscription import WebhookSubscriptionCreate
     from app.services.tenant import outbox_poller as poller
     from app.services.tenant.webhook_subscriptions import create_install_subscription
-    from app.testing import create_plugin_service_registration, create_guild_plugin
+    from app.testing import create_guild_plugin, create_plugin_service_registration
 
     install = await _install(
         session, acting_user, role_session, granted=["plugins:tests.gh"], placed="a"
@@ -545,7 +565,7 @@ async def test_a_plugins_event_is_kept_until_the_subscriber_accepts_it(
 
     monkeypatch.setattr(poller, "deliver", _refuse_the_first)
     system = await role_session("app_admin")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await poller.drain_guild(system, install.guild.id, now=now)
     system.expunge_all()
     await poller.drain_guild(system, install.guild.id, now=now + timedelta(hours=2))
@@ -572,20 +592,20 @@ async def test_a_declarative_plugins_event_reaches_a_subscriber_as_a_containers_
     the same plug-in emitting the same event from a container delivers."""
     from app.core.plugin_access_token import seal_install_token
     from app.db import cohorts
+    from app.db.install_standing_test import _install, _route
     from app.db.request_context import SystemGuild
     from app.db.session import set_rls_context
-    from app.services.tenant import plugin_hooks
-    from app.db.install_standing_test import _install, _route
     from app.models.platform.plugin_service_registration import RegistrationKind
     from app.models.tenant.guild_plugin import GuildPlugin
     from app.schemas.tenant.webhook_subscription import WebhookSubscriptionCreate
     from app.services.marketplace.registration_lookup import invalidate_registrations
     from app.services.tenant import outbox_poller as poller
+    from app.services.tenant import plugin_hooks
     from app.services.tenant.webhook_subscriptions import create_install_subscription
     from app.testing import (
-        create_plugin_service_registration,
         create_guild_plugin,
         create_marketplace_listing,
+        create_plugin_service_registration,
         sealed_vendor_values,
     )
     from app.testing.fake_vendor import FakeVendor, declarative_github
@@ -648,7 +668,7 @@ async def test_a_declarative_plugins_event_reaches_a_subscriber_as_a_containers_
     async with cohorts.system_session(install.guild.id) as worker:
         await set_rls_context(worker, SystemGuild(install.guild.id))
         await plugin_hooks.run_due(worker, install.guild.id)
-    await poller.drain_guild(system, install.guild.id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
     [declared] = sent
     assert declared["changes"] == [
         {
@@ -697,7 +717,7 @@ async def test_a_declarative_plugins_event_reaches_a_subscriber_as_a_containers_
     )
     assert emitted.status_code == 202, emitted.text
     system.expunge_all()
-    await poller.drain_guild(system, install.guild.id, now=datetime.now(timezone.utc))
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
     [_, contained] = sent
 
     def _same(envelope: dict) -> dict:

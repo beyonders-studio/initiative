@@ -1,11 +1,9 @@
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import {
+  approveCommunityJoinRequest,
+  denyCommunityJoinRequest,
   extendCommunityGuest,
   makeCommunityGuestAMember,
   setMemberApiAccess,
@@ -24,21 +22,28 @@ import type {
   UserRead,
   UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { useSearchInitiativeMembers } from "@/api/generated/initiatives/initiatives";
+import {
+  getGetInitiativeQueryOptions,
+  getSearchInitiativeMembersQueryOptions,
+  useSearchInitiativeMembers,
+} from "@/api/generated/initiatives/initiatives";
 import {
   deleteOwnAccount,
   exportUsersCsv,
   getListDecorationPacksQueryKey,
   getListMyDecorationsQueryKey,
-  getListRosterQueryKey,
   getListUsersQueryKey,
+  getSearchUsersQueryOptions,
   installDecorationPack,
-  listRoster,
-  listUsers,
+  liftBan,
+  liftMemberTimeout,
   removeDecorationPack,
+  timeOutMember,
   updateMe,
+  useListBans,
   useListDecorationPacks,
   useListMyDecorations,
+  useListUsers,
   useReadUserCommunities,
   useReadUserProfile,
   useSearchUsers,
@@ -49,8 +54,10 @@ import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { downloadBlob } from "@/lib/csv";
+import { toMember } from "@/lib/userDisplay";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import type { SearchMembers } from "@/ui/member-picker";
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -64,39 +71,9 @@ export const useUsers = (
   options?: QueryOpts<UserCommunityMemberListResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<UserCommunityMemberListResponse>({
-    queryKey: getListUsersQueryKey(communityId, params),
-    queryFn: () => listUsers(communityId, params),
+  return useListUsers(communityId, params, {
     // Keep the page on screen while the next one (or the next search) loads.
-    placeholderData: keepPreviousData,
-    ...options,
-  });
-};
-
-/** People per page of the sidebar roster. */
-const ROSTER_PAGE_SIZE = 50;
-
-/**
- * The active community's people roster, grown a page at a time.
- *
- * Presence is read when the page is served and not pushed, so it refetches
- * every minute while it is open. A guest has no roster to read.
- */
-export const useCommunityRoster = () => {
-  const communityId = useActiveCommunityId();
-  const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  return useInfiniteQuery({
-    queryKey: getListRosterQueryKey(communityId),
-    queryFn: ({ pageParam }) =>
-      listRoster(communityId, {
-        page: pageParam,
-        page_size: ROSTER_PAGE_SIZE,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (last) => (last.has_next ? last.page + 1 : undefined),
-    enabled: communityId > 0 && communityWide,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -204,6 +181,7 @@ const useDecorationPackMutation = (
         // the account the form reads from has changed too.
         void invalidate(q.currentUser());
       },
+      errorKey: "profiles:store.failed",
     },
     options
   );
@@ -347,17 +325,67 @@ export const useMemberSearch = (
   return scope.type === "initiative" ? initiativeQuery : communityQuery;
 };
 
+/**
+ * {@link useMemberSearch} as a function a picker calls when it searches, for
+ * the active community: the same requests, through the same cache.
+ */
+export const useSearchMembers = (): SearchMembers => {
+  const queryClient = useQueryClient();
+  const communityId = useActiveCommunityId();
+  return useCallback<SearchMembers>(
+    async (scope, query) => {
+      const ids = "ids" in query ? query.ids : undefined;
+      const params = {
+        ...memberSearchParams("search" in query ? query.search : undefined, ids),
+        page_size: ids ? USER_ID_LOOKUP_MAX : USER_SEARCH_PAGE_SIZE,
+      };
+      const options = { query: { staleTime: 30_000 } };
+      if (scope.type === "initiative") {
+        const { initiativeId } = scope;
+        if (initiativeId == null) return [];
+        // Asked only where the reader may read the roster, which a guest
+        // given items there may not.
+        const initiative = await queryClient.ensureQueryData(
+          getGetInitiativeQueryOptions(communityId, initiativeId)
+        );
+        if (!initiative.can.roster) return [];
+        const page = await queryClient.fetchQuery(
+          getSearchInitiativeMembersQueryOptions(communityId, initiativeId, params, options)
+        );
+        return page.items.map(toMember);
+      }
+      if (scope.type === "canOpen" && scope.id == null) return [];
+      const page = await queryClient.fetchQuery(
+        getSearchUsersQueryOptions(
+          communityId,
+          scope.type === "canOpen"
+            ? { ...params, tool: scope.tool, resource_id: scope.id }
+            : params,
+          options
+        )
+      );
+      return page.items.map(toMember);
+    },
+    [queryClient, communityId]
+  );
+};
+
 export type { UserSummary };
 
 // ── Mutations ───────────────────────────────────────────────────────────────
 
 type UpdateCurrentUserVars = Parameters<typeof updateMe>[0];
 
-export const useUpdateCurrentUser = (options?: MutationOpts<UserRead, UpdateCurrentUserVars>) =>
+export const useUpdateCurrentUser = (
+  options?: MutationOpts<UserRead, UpdateCurrentUserVars>,
+  /** What a failure says. Omit where the caller reports it itself. */
+  errorKey?: string
+) =>
   useApiMutation<UserRead, UpdateCurrentUserVars>(
     {
       mutationFn: (data) => updateMe(data),
       invalidate: () => invalidate(q.currentUser()),
+      errorKey,
     },
     options
   );
@@ -368,6 +396,27 @@ export const useDeleteOwnAccount = (
   useApiMutation<AccountDeletionResponse, AccountDeletionRequest>(
     {
       mutationFn: (data) => deleteOwnAccount(data),
+      errorKey: "settings:deleteAccount.deleteError",
+    },
+    options
+  );
+
+type AnswerCommunityJoinRequestVars = { communityId: number; requestId: number; approved: boolean };
+
+/** Answer one request to join the community. Approving adds a member, so the
+ *  roster re-reads with the queue. */
+export const useAnswerCommunityJoinRequest = (
+  options?: MutationOpts<void, AnswerCommunityJoinRequestVars>
+) =>
+  useApiMutation<void, AnswerCommunityJoinRequestVars>(
+    {
+      mutationFn: ({ communityId, requestId, approved }) =>
+        approved
+          ? approveCommunityJoinRequest(communityId, requestId)
+          : denyCommunityJoinRequest(communityId, requestId),
+      invalidate: (_data, { communityId }) =>
+        invalidate(q.communityJoinRequests(communityId), q.communityMembers()),
+      errorKey: "communities:users.joinRequestError",
     },
     options
   );
@@ -384,6 +433,7 @@ export const useUpdateCommunityMembership = (
           role: data.role,
         } as Parameters<typeof updateCommunityMembership>[2]),
       invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:users.failedToUpdateRole",
     },
     options
   );
@@ -415,6 +465,7 @@ export const useSetMemberApiAccess = (options?: MutationOpts<void, SetMemberApiA
         );
         return invalidate(q.communityMembers());
       },
+      errorKey: "communities:users.apiAccessError",
     },
     options
   );
@@ -429,6 +480,7 @@ export const useExtendGuest = (options?: MutationOpts<void, GuestVars & { days: 
       mutationFn: ({ communityId, userId, days }) =>
         extendCommunityGuest(communityId, userId, { days }),
       invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:guests.extendError",
     },
     options
   );
@@ -446,10 +498,51 @@ export const useMakeGuestAMember = (options?: MutationOpts<void, GuestVars>) => 
         void refreshCommunities();
         return invalidate(q.communityMembers());
       },
+      errorKey: "communities:guests.makeMemberError",
     },
     options
   );
 };
+
+/** Everybody the active community has banned, the most recent first. */
+export const useCommunityBans = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useListBans(useActiveCommunityId(), { query: { enabled } });
+
+type MemberVars = { userId: number };
+
+/** Lift a ban, so they can be invited or join again. */
+export const useLiftBan = (options?: MutationOpts<void, MemberVars>) =>
+  useCommunityMutation<void, MemberVars>(
+    {
+      mutationFn: (communityId, { userId }) => liftBan(communityId, userId),
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:bans.liftError",
+    },
+    options
+  );
+
+/** Hold a member's content read-only until `endsAt`. Replaces a timeout they have. */
+export const useTimeOutMember = (options?: MutationOpts<void, MemberVars & { endsAt: Date }>) =>
+  useCommunityMutation<void, MemberVars & { endsAt: Date }>(
+    {
+      mutationFn: (communityId, { userId, endsAt }) =>
+        timeOutMember(communityId, userId, { ends_at: endsAt.toISOString() }),
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:timeOut.error",
+    },
+    options
+  );
+
+/** End a member's timeout early. */
+export const useLiftMemberTimeout = (options?: MutationOpts<void, MemberVars>) =>
+  useCommunityMutation<void, MemberVars>(
+    {
+      mutationFn: (communityId, { userId }) => liftMemberTimeout(communityId, userId),
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:timeOut.liftError",
+    },
+    options
+  );
 
 type SetDisplayNameVars = { communityId: number; userId?: number; displayName: string | null };
 
@@ -470,6 +563,7 @@ export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayN
       },
       invalidate: () =>
         invalidate(q.communityContent(), q.communityMembers(), q.people(), q.allCommunities()),
+      errorKey: "communities:displayName.saveFailed",
     },
     options
   );
@@ -493,6 +587,7 @@ export const useExportCommunityUsersCsv = (
         })) as Blob;
         downloadBlob(blob, filename);
       },
+      errorKey: "communities:users.exportError",
     },
     options
   );

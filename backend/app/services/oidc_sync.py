@@ -11,21 +11,20 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.db import post_commit
-from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership, CommunityRole
-from app.services import audit as audit_service
-from app.services.auth import guild_provider_connections as guild_connections
-from app.services.guild_sweeps import Scope, each_guild
-from app.services.platform import provider_placement
-from app.services.platform import account_stream
-from app.services.platform import guilds as guilds_service
-from app.services.tenant import custom_roles as custom_roles_service
-from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
-from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
+from app.models.platform.guild import GUILD_ADMIN_ROLES, CommunityRole, GuildMembership
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
     OIDCMappingTargetType,
 )
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
+from app.services import audit as audit_service
+from app.services.auth import guild_provider_connections as guild_connections
+from app.services.guild_sweeps import Scope, each_guild
+from app.services.platform import guilds as guilds_service
+from app.services.platform import provider_placement
+from app.services.tenant import custom_roles as custom_roles_service
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +139,7 @@ async def sync_oidc_assignments(
     provider_id: int,
     claim_values: set[str],
     claims: dict,
+    arrived: Collection[int] = (),
 ) -> OIDCSyncResult:
     """Reconcile guild/initiative memberships against one provider's claims.
 
@@ -152,6 +152,9 @@ async def sync_oidc_assignments(
     ``claim_values`` are the groups the provider asserted; ``claims`` is the
     whole verified set, which says whose tenant the arrival belongs to. A rule
     applies only where its community counts the arrival as one of its own.
+    ``arrived`` are the communities this sign-in joined the person to before
+    the sync, without their auto-join initiatives (``join_on_arrival``); they
+    are enrolled here, after the rules, as the sync's own new members are.
 
     Must be called with a system session.
     """
@@ -204,11 +207,9 @@ async def sync_oidc_assignments(
             continue
         gid = mapping.guild_id
         role = mapping.guild_role
-        if gid not in guild_roles:
-            guild_roles[gid] = role
-        elif _GUILD_ROLE_PRIORITY.get(role, 0) > _GUILD_ROLE_PRIORITY.get(
-            guild_roles[gid], 0
-        ):
+        if gid not in guild_roles or _GUILD_ROLE_PRIORITY.get(
+            role, 0
+        ) > _GUILD_ROLE_PRIORITY.get(guild_roles[gid], 0):
             guild_roles[gid] = role
         if mapping.target_type == OIDCMappingTargetType.initiative:
             initiative_rules.setdefault(gid, []).append(mapping)
@@ -290,12 +291,12 @@ async def sync_oidc_assignments(
     # --- Guild memberships (shared) ---
     # Apply matched guild roles, and ensure a membership exists for every
     # matched guild, so an initiative member can be added below.
-    # Guilds this sync admits the user to for the first time, as a plain member.
-    # They are as new to the guild as an invite redeemer, so the guild's
-    # auto-join initiatives take them in the same way (below, in each guild's
-    # half). Admins are left out for the same reason the invite path leaves
-    # them out — standing access already, and no member role to hold.
-    newly_admitted_guilds: set[int] = set()
+    # Guilds this sign-in admits the user to for the first time, as a plain
+    # member. They are as new to the guild as an invite redeemer, so the
+    # guild's auto-join initiatives take them in the same way (below, in each
+    # guild's half). Admins are left out for the same reason the invite path
+    # leaves them out — standing access already, and no member role to hold.
+    newly_admitted_guilds: set[int] = set(arrived)
     # Communities the rules matched that took nobody new: their initiatives do
     # not take the account either.
     kept_out: set[int] = set()
@@ -318,48 +319,29 @@ async def sync_oidc_assignments(
                     session.add(membership)
                     result.guilds_updated.append(guild_id)
         else:
-            # A listed community is open to anyone signed in, so the age rule
-            # holds however somebody arrived — and this is the way in with
-            # nobody at a keyboard to be asked, so what counts is the answer
-            # already on the record. An account that has never been asked is
-            # admitted: not knowing is not the same as knowing they are too
-            # young, and a private guild never puts the question at all.
-            #
-            # The guild is asked first, so a private one — which is most of
-            # them, and which the rule does not touch — costs no lookup of
-            # the account.
-            if await guilds_service.is_listed_in_directory(
-                session, guild_id=guild_id
-            ) and await guilds_service.is_known_under_age(session, user_id=user_id):
+            # A community that takes nobody new from its rules leaves this
+            # account out of it, and the sign-in goes on. The cap's lock is
+            # held to the commit, taken in ascending order as
+            # ``join_on_arrival`` takes it.
+            role = CommunityRole(desired)
+            try:
+                await guilds_service.ensure_membership(
+                    session,
+                    guild_id=guild_id,
+                    user_id=user_id,
+                    role=role,
+                    oidc_provider_id=provider_id,
+                    via=_VIA,
+                    # Enrolled in each guild's half, after the claims.
+                    auto_join=False,
+                )
+            except guilds_service.ADMISSION_REFUSALS as exc:
                 logger.info(
-                    "guild %s is listed; the age answer on record keeps this "
-                    "account out of it",
-                    guild_id,
+                    "guild %s takes nobody new from its rules: %s", guild_id, exc
                 )
                 kept_out.add(guild_id)
                 continue
-            # A seat is a seat however somebody arrives: a full community
-            # takes nobody new from its rules either. The cap's lock is held
-            # to the commit, taken in ascending order as ``join_on_arrival``
-            # takes it.
-            try:
-                await guilds_service.assert_member_capacity(session, guild_id=guild_id)
-            except guilds_service.GuildCapacityError:
-                logger.info("guild %s is full; its rules place nobody new", guild_id)
-                kept_out.add(guild_id)
-                continue
-            role = CommunityRole(desired)
-            await _create_guild_membership(
-                session,
-                user_id=user_id,
-                guild_id=guild_id,
-                role=role,
-                provider_id=provider_id,
-            )
             result.guilds_added.append(guild_id)
-            # Nobody was at a keyboard for this one — it is the case the
-            # standing checks exist for. Their tabs re-read the account.
-            account_stream.queue_account_signal(session, user_id, "membership")
             if role not in GUILD_ADMIN_ROLES:
                 newly_admitted_guilds.add(guild_id)
     await session.flush()
@@ -400,7 +382,10 @@ async def sync_oidc_assignments(
     await session.commit()
 
     # --- Initiative resolution + membership (each guild's half) ---
+    visited: set[int] = set()
+
     async def sync_initiatives(guild_session: AsyncSession, gid: int) -> None:
+        visited.add(gid)
         # Each initiative the matched rules place people in, at the strongest
         # role they name there: a manager role first, then the lowest position.
         keys = provider_placement.placed(initiative_rules.get(gid, ()))
@@ -529,6 +514,16 @@ async def sync_oidc_assignments(
         await each_guild(
             [(Scope.LIVE, sync_initiatives)], name="oidc-sync", only=relevant_guilds
         )
+    # A closed community (suspended or on hold) is not visited above, and its
+    # rules wait for it to reopen; its new members are enrolled in its auto-join
+    # initiatives now, as joining it any other way enrols them.
+    unvisited = sorted(newly_admitted_guilds - visited)
+    for gid in unvisited:
+        guilds_service.enroll_new_member_in_auto_join_initiatives(
+            session, guild_id=gid, user_id=user_id, role=CommunityRole.member
+        )
+    if unvisited:
+        await session.commit()
     return result
 
 
@@ -540,47 +535,6 @@ async def _get_guild_membership(
         GuildMembership.user_id == user_id,
     )
     return (await session.exec(stmt)).one_or_none()
-
-
-async def _create_guild_membership(
-    session: AsyncSession,
-    *,
-    user_id: int,
-    guild_id: int,
-    role: CommunityRole,
-    provider_id: int,
-) -> GuildMembership:
-    from sqlalchemy import func as sa_func
-
-    # Calculate next position
-    max_pos = (
-        await session.exec(
-            select(sa_func.max(GuildMembership.position)).where(
-                GuildMembership.user_id == user_id
-            )
-        )
-    ).one_or_none()
-    next_pos = (max_pos if max_pos is not None else -1) + 1
-
-    membership = GuildMembership(
-        guild_id=guild_id,
-        user_id=user_id,
-        role=role,
-        position=next_pos,
-        oidc_provider_id=provider_id,
-    )
-    session.add(membership)
-    await session.flush()
-    await _record(
-        session,
-        event_type=AuditEventType.GUILD_MEMBER_ADDED,
-        target_user_id=user_id,
-        guild_id=guild_id,
-        target_type="guild",
-        target_id=guild_id,
-        detail={"role": role.value, "via": _VIA},
-    )
-    return membership
 
 
 async def _get_initiative_membership(

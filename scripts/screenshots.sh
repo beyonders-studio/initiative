@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Take the release screenshots (frontend/e2e/shots) of this checkout's running
-# dev environment, light and dark, into docs/images/releases/ (published with
-# the docs site, not shipped in the app).
+# Take the screenshots (frontend/e2e/shots) of this checkout's running dev
+# environment, light and dark: release pictures into docs/images/releases/,
+# and the help center's (e2e/shots/help) into docs/en/images/. Both are
+# published with the docs site, not shipped in the app.
 #
 #   pnpm screenshots                            # every shot
+#   pnpm screenshots e2e/shots/help             # the help center's
 #   pnpm screenshots e2e/shots/gantt.shot.ts    # one
 #
 # Start the dev environment with its seed data first (scripts/dev-pre-launch.sh).

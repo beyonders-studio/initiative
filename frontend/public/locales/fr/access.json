@@ -61,10 +61,6 @@
     "selectPeople": "Sélectionner des personnes…",
     "selectPeopleToRevoke": "Sélectionner des personnes à révoquer…",
     "permissionLevel": "Niveau de permission",
-    "rolesSelected_one": "{{count}} rôle sélectionné",
-    "rolesSelected_other": "{{count}} rôles sélectionnés",
-    "peopleSelected_one": "{{count}} personne sélectionnée",
-    "peopleSelected_other": "{{count}} personnes sélectionnées",
     "grantRoles_one": "Accorder {{count}} rôle",
     "grantRoles_other": "Accorder {{count}} rôles",
     "revokeRoles_one": "Révoquer {{count}} rôle",
@@ -160,8 +156,6 @@
     "batchTitle": "Demandes d'accès",
     "answered": "Déjà traitée",
     "answeredDescription": "Il n'y a plus rien à traiter ici.",
-    "loading": "Chargement des demandes…",
-    "loadError": "Impossible de charger ces demandes.",
     "error": "Impossible d'envoyer votre réponse. Veuillez réessayer."
   }
 }

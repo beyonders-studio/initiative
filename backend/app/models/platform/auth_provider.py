@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -26,11 +25,6 @@ class AuthProviderKind(str, Enum):
     oidc = "oidc"
     oauth2 = "oauth2"
     broker = "broker"
-
-
-# Mirror the CHECK constraint declared in the migration. Keep in sync with
-# ``20260705_0131_create_auth_identity_tables.py``.
-AUTH_PROVIDER_KINDS: tuple[str, ...] = tuple(k.value for k in AuthProviderKind)
 
 
 class AuthProvider(SQLModel, table=True):
@@ -59,7 +53,7 @@ class AuthProvider(SQLModel, table=True):
         UniqueConstraint("slug", name="uq_auth_providers_slug"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     slug: str = Field(sa_column=Column(String(64), nullable=False))
     display_name: str = Field(sa_column=Column(String(128), nullable=False))
@@ -73,17 +67,15 @@ class AuthProvider(SQLModel, table=True):
     )
 
     # OIDC / OAuth2 discovery + client identity (non-secret).
-    issuer: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    client_id: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-    scopes: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    role_claim_path: Optional[str] = Field(
+    issuer: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    client_id: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    scopes: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    role_claim_path: str | None = Field(
         default=None, sa_column=Column(Text, nullable=True)
     )
 
     # Broker only: the claim carrying the upstream tenant id (e.g. organization_id).
-    connection_claim: Optional[str] = Field(
+    connection_claim: str | None = Field(
         default=None, sa_column=Column(String(64), nullable=True)
     )
 
@@ -104,25 +96,23 @@ class AuthProvider(SQLModel, table=True):
     )
 
     # Login-button rendering.
-    icon: Optional[str] = Field(
-        default=None, sa_column=Column(String(64), nullable=True)
-    )
-    button_style: Optional[str] = Field(
+    icon: str | None = Field(default=None, sa_column=Column(String(64), nullable=True))
+    button_style: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         # onupdate (Python-side, no DDL) so provider CRUD in Phase 1 bumps this
         # automatically — the codebase otherwise sets updated_at in the service,
         # which a future endpoint could forget.
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
-            onupdate=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(UTC),
         ),
     )

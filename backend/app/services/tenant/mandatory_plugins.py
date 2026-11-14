@@ -44,7 +44,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import text
 from sqlmodel import col, select
@@ -69,9 +68,9 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "BackfillResult",
+    "assign_install_settings",
     "backfill_mandatory_plugins",
     "install_mandatory_plugins",
-    "assign_install_settings",
     "mandatory_grant",
 ]
 
@@ -104,8 +103,8 @@ def mandatory_grant(
 
 
 async def _installer_user_id(
-    session: AsyncSession, *, guild_id: int, preferred: Optional[int] = None
-) -> Optional[int]:
+    session: AsyncSession, *, guild_id: int, preferred: int | None = None
+) -> int | None:
     """Who an automatic install is recorded against.
 
     The install row names a person because every other install does, and a
@@ -132,7 +131,7 @@ async def install_mandatory_plugins(
     session: AsyncSession,
     *,
     guild_id: int,
-    created_by: Optional[int] = None,
+    created_by: int | None = None,
 ) -> list[str]:
     """Install every mandatory plug-in this guild does not have yet.
 
@@ -238,7 +237,7 @@ async def install_mandatory_plugins(
             continue
         present.add(registration.public_id)
         await session.flush()
-        await guild_plugins_service.place_in_every_initiative(session, plugin)
+        await guild_plugins_service.set_placed_initiatives(session, plugin, None)
         await plugin_schedules.reconcile(
             guild_id, plugin.id, definition, session=session
         )

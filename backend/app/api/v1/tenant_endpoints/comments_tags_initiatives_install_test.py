@@ -18,21 +18,22 @@ from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.relationship import EntityRelationship
 from app.testing import (
-    guild_url,
     create_comment,
     create_file,
     create_property_definition,
     create_tag,
-    route_session_to_guild,
     drain_notices,
+    guild_url,
+    route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
     share_with_members,
 )
@@ -168,7 +169,10 @@ async def test_posts_as_itself_and_the_notices_name_the_plugin(
 
     await route_session_to_guild(session, guild_id)
     stored = await session.get(Comment, body["id"])
-    assert stored is not None and stored.created_by is None
+    assert stored is not None and (stored.created_by, stored.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
 
     # The member it answered hears of the reply, and the file's owner of
     # the comment: both from the plug-in, by its name.

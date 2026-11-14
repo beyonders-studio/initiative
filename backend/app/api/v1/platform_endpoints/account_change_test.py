@@ -7,12 +7,12 @@ from a copy sent to an address older than the newest one involved.
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_EMAIL, decrypt_field
@@ -79,7 +79,7 @@ async def _send(
         change=change,
         also_to=also_to,
     )
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     return dict(links)
 
 
@@ -94,7 +94,7 @@ async def _address(
         source=addresses.SOURCE_ADDED,
         verified=True,
         is_primary=False,
-        now=datetime.now(timezone.utc),
+        now=datetime.now(UTC),
     )
     await session.commit()
     if primary:
@@ -204,7 +204,7 @@ async def test_a_link_holds_only_while_its_address_stands_on_the_same_proof(
     await session.commit()
     assert (await client.post(READ, json={"token": token})).status_code == 400
 
-    again.verified_at = datetime.now(timezone.utc)
+    again.verified_at = datetime.now(UTC)
     session.add(again)
     await session.commit()
     for route in (READ, SIGN_OUT):
@@ -224,7 +224,7 @@ async def test_an_address_removed_before_its_copy_goes_gets_no_link(
     await session.delete(spare)
     await session.commit()
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     assert mailed["gone-first@example.com"] is None
     assert mailed["keeps@example.com"] is not None
 
@@ -344,7 +344,7 @@ async def test_undoing_a_removal_puts_the_address_back_over_the_later_ones(
         change={"notice": "address.removed", **record},
         also_to=["original@example.com"],
     )
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     token = mailed["original@example.com"]
 
     read = await client.post(READ, json={"token": token})
@@ -383,7 +383,7 @@ async def test_a_removal_undo_works_over_a_minted_primary(
         source=addresses.SOURCE_SYNTHETIC,
         verified=True,
         is_primary=False,
-        now=datetime.now(timezone.utc),
+        now=datetime.now(UTC),
     )
     older.is_primary = False
     session.add(older)
@@ -400,12 +400,10 @@ async def test_a_removal_undo_works_over_a_minted_primary(
         headers=await signed_in_headers(session, user),
     )
     assert held.status_code == 202, held.text
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
-    await held_changes.apply_due(
-        session, now=datetime.now(timezone.utc) + held_changes.HOLD_FOR
-    )
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
+    await held_changes.apply_due(session, now=datetime.now(UTC) + held_changes.HOLD_FOR)
     mailed.clear()
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
 
     response = await client.post(UNDO, json={"token": mailed["older-sso@example.com"]})
     assert response.status_code == 200, response.text
@@ -443,12 +441,10 @@ async def test_undoing_a_move_off_a_minted_primary_makes_the_clicker_primary(
         headers=await signed_in_headers(session, user),
     )
     assert held.status_code == 202, held.text
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
-    await held_changes.apply_due(
-        session, now=datetime.now(timezone.utc) + held_changes.HOLD_FOR
-    )
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
+    await held_changes.apply_due(session, now=datetime.now(UTC) + held_changes.HOLD_FOR)
     mailed.clear()
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     token = mailed["kept@example.com"]
 
     read = await client.post(READ, json={"token": token})
@@ -481,7 +477,7 @@ async def test_the_newest_address_removed_gets_no_link(session: AsyncSession, ma
         change={"notice": "address.removed", **record},
         also_to=["removed-newest@example.com"],
     )
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     assert mailed["removed-newest@example.com"] is None
     assert mailed["owner@example.com"] is not None
 
@@ -546,7 +542,7 @@ async def test_a_waiting_change_is_cancelled_from_an_older_address(
     )
     assert held.status_code == 202, held.text
     mailed.clear()
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     links = dict(mailed)
 
     response = await client.post(READ, json={"token": links["moves-to@example.com"]})
@@ -561,7 +557,7 @@ async def test_a_waiting_change_is_cancelled_from_an_older_address(
     response = await client.post(UNDO, json={"token": links["holder@example.com"]})
     assert response.status_code == 200, response.text
     assert await held_changes.pending_for_user(session, user_id=user_id) is None
-    due = datetime.now(timezone.utc) + held_changes.HOLD_FOR
+    due = datetime.now(UTC) + held_changes.HOLD_FOR
     assert await held_changes.apply_due(session, now=due) == 0
     assert await _primary(session, user_id) == "holder@example.com"
 
@@ -570,7 +566,7 @@ async def test_a_waiting_change_is_cancelled_from_an_older_address(
     await held_changes.hold(
         session, single, kind=HeldChangeKind.second_factor_off, session_id=None
     )
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     response = await client.post(READ, json={"token": mailed["only-one@example.com"]})
     assert response.json()["undo"] == "hold"
 

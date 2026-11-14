@@ -21,11 +21,10 @@ from __future__ import annotations
 import time
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import community_plan
 from app.core import config as config_module
 from app.core.login_methods import LoginMethod
 from app.models.platform.billing import BillingJti
@@ -40,6 +39,7 @@ from app.services.tenant.attachments import (
 from app.testing import (
     billing_boundary,
     billing_guild_ref,
+    community_plan,
     create_guest,
     create_guild,
     create_guild_membership,
@@ -48,6 +48,7 @@ from app.testing import (
     drain_notices,
 )
 from app.testing.schema_harness import route_session_to_guild
+from app.testing.sockets import settle
 
 LISTING = "PAYDAPP0000001"
 
@@ -186,18 +187,29 @@ async def test_a_malformed_batch_is_refused_after_verification(client: AsyncClie
 
 
 async def test_a_newer_version_lands_and_an_older_one_changes_nothing(
-    client: AsyncClient, session: AsyncSession
+    client: AsyncClient, session: AsyncSession, account_socket
 ):
     guild = await create_guild(session)
     guild_id = guild.id
+    member = await create_user(session)
+    await create_guild_membership(session, user=member, guild=guild)
+    await session.commit()
     ref = await billing_guild_ref(guild_id)
+    tab = account_socket(member.id)
 
     first = await _sync(client, (guild_id, 5, _fields(tier_name="Gold")))
     assert first.status_code == 200, first.text
     assert first.json() == {"results": [{"community_ref": ref, "version": 5}]}
+    await settle()
+    # The plan is on the member's community list, so their open tab reads it again.
+    assert [(frame["resource"], frame["action"]) for frame in tab.sent] == [
+        ("account", "community")
+    ]
     older = await _sync(client, (guild_id, 4, _fields(tier_name="Silver")))
     same = await _sync(client, (guild_id, 5, _fields(tier_name="Silver")))
     assert older.json() == same.json() == first.json()
+    await settle()
+    assert len(tab.sent) == 1
 
     administration = await _administration(session, guild_id)
     assert (administration.tier_name, administration.billing_version) == ("Gold", 5)

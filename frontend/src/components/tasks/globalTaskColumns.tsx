@@ -7,19 +7,11 @@ import {
   type TaskStatusRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
-import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
-import { SortHeader } from "@/components/SortIcon";
-import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { TaskPrioritySelector } from "@/components/tasks/TaskPrioritySelector";
-import { TaskStatusSelector } from "@/components/tasks/TaskStatusSelector";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { TaskBlockersHoverCard } from "@/components/tools/projects/TaskBlockersHoverCard";
+import { TaskDescriptionHoverCard } from "@/components/tools/projects/TaskDescriptionHoverCard";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
-import { type FieldColumnOptions, fieldColumn } from "@/lib/layouts/columns";
-import type { FieldDef, LayoutEnv } from "@/lib/layouts/fields";
-import { summarizeStored } from "@/lib/recurrence";
+import { taskColumnId } from "@/lib/layouts/tasks";
 import {
   dateSortingFn,
   firstName,
@@ -27,11 +19,21 @@ import {
   prioritySortingFn,
   textSortingFn,
 } from "@/lib/sorting";
-import type { AppColumnDef } from "@/lib/table";
 import { getTaskDateStatus, getTaskDateStatusLabel } from "@/lib/taskDateStatus";
 import { entityRefRoute, initiativeRoute, toolDetailRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { type FieldColumnOptions, fieldColumn } from "@/ui/layouts/columns";
+import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { summarizeStored } from "@/ui/recurrence/recurrence";
+import { SortHeader } from "@/ui/sort-icon";
+
+import { TaskChecklistProgress } from "./TaskChecklistProgress";
+import { TaskPrioritySelector } from "./TaskPrioritySelector";
+import { TaskStatusSelector } from "./TaskStatusSelector";
 
 interface GlobalTaskColumnsOptions {
   activeCommunityId: number | null;
@@ -57,14 +59,14 @@ interface GlobalTaskColumnsOptions {
   isPinned?: (task: TaskListRead) => boolean;
   togglePin?: (task: TaskListRead) => void;
   /** The page's fields, from `taskFields`. */
-  fields: ReadonlyMap<string, FieldDef>;
-  env: LayoutEnv;
+  fields: ReadonlyMap<string, FieldDef<TaskListRead>>;
+  env: LayoutEnv<TaskListRead>;
 }
 
 interface SharedTaskColumnsOptions<T extends TaskListRead> {
   /** The table's fields, from `taskFields`. */
-  fields: ReadonlyMap<string, FieldDef>;
-  env: LayoutEnv;
+  fields: ReadonlyMap<string, FieldDef<TaskListRead>>;
+  env: LayoutEnv<TaskListRead>;
   isPriorityDisabled: (task: T) => boolean;
 }
 
@@ -80,7 +82,7 @@ export function sharedTaskColumns<T extends TaskListRead>({
 }: SharedTaskColumnsOptions<T>) {
   // `taskFields` holds every built-in.
   const column = (id: string, options: FieldColumnOptions<T>) =>
-    fieldColumn<T>(fields.get(id) as FieldDef, env, options);
+    fieldColumn<T>(fields.get(id)!, env, { id: taskColumnId(id), ...options });
   const dateGroup: AppColumnDef<T> = {
     id: "date group",
     accessorFn: (task) => getTaskDateStatus(task.start_date, task.due_date),
@@ -244,7 +246,7 @@ export function globalTaskColumns({
           <div className="flex min-w-60 flex-col text-left">
             <div className="flex">
               <Link
-                to={env.taskHref(task)}
+                to={env.itemHref(task)}
                 className="flex w-full items-center gap-2 font-medium text-foreground hover:underline"
               >
                 {task.title}

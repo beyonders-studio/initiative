@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
@@ -141,7 +141,7 @@ async def test_an_expired_upload_is_thrown_away(
     await route_session_to_guild(session, owner.guild.id)
     upload = (await session.exec(select(PendingUpload))).one()
     key = upload.staging_key
-    upload.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    upload.expires_at = datetime.now(UTC) - timedelta(minutes=1)
     session.add(upload)
     await session.commit()
 
@@ -187,7 +187,7 @@ async def test_an_upload_held_by_one_request_refuses_another(
     await route_session_to_guild(session, owner.guild.id)
     upload = (await session.exec(select(PendingUpload))).one()
     upload.lease_token = "another"
-    upload.lease_until = datetime.now(timezone.utc) + timedelta(minutes=1)
+    upload.lease_until = datetime.now(UTC) + timedelta(minutes=1)
     session.add(upload)
     await session.commit()
 

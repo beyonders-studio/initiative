@@ -11,12 +11,12 @@ from sqlalchemy.orm import undefer
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.tenant.task_types import get_default_type
+from app.core.file_types import FileType
 from app.db.schema_provisioning import guild_schema_name
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.user import User
-from app.core.file_types import FileType
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -27,6 +27,7 @@ from app.services.tenant.soft_delete import (
     restore_entity,
     soft_delete_entity,
 )
+from app.services.tenant.task_types import get_default_type
 from app.testing.factories import (
     create_file,
     create_guild,
@@ -258,7 +259,9 @@ async def test_soft_delete_file_preserves_uploads(session: AsyncSession):
     upload = Upload(
         filename="abc123.png",
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         size_bytes=1234,
+        content_type="image/png",
     )
     session.add(upload)
     await session.commit()
@@ -270,6 +273,7 @@ async def test_soft_delete_file_preserves_uploads(session: AsyncSession):
         content={"text": "uses /uploads/abc123.png"},
         featured_image_url="/uploads/abc123.png",
         created_by=user.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(doc)
     await session.commit()
@@ -309,7 +313,9 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
     upload = Upload(
         filename="file_v2.png",
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         size_bytes=1234,
+        content_type="image/png",
     )
     session.add(upload)
     await session.commit()
@@ -323,6 +329,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
         content={},
         featured_image_url="/uploads/file_v2.png",
         created_by=user.id,
+        created_by_kind=ActorKind.member,
     )
     # The decoy uses /uploads/fileXv2.png embedded in content. Without
     # escaping, the LIKE pattern '%/uploads/file_v2.png%' matches the
@@ -334,6 +341,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
         file_type=FileType.lexical,
         content={"src": "/uploads/fileXv2.png"},
         created_by=user.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(doomed)
     session.add(decoy)
@@ -373,6 +381,7 @@ async def test_purging_a_file_keeps_a_version_a_page_shows(session: AsyncSession
         session,
         doomed,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         file_url=f"/uploads/{guild.id}/alone.png",
         file_content_type="image/png",
     )
@@ -392,8 +401,8 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     otherwise a user could click Restore on the reply, leaving its
     parent_comment_id pointing at a still-trashed row.
     """
-    from app.models.tenant.comment import Comment
     from app.models.platform.guild import CommunityRole
+    from app.models.tenant.comment import Comment
     from app.testing.factories import (
         create_guild_membership,
         get_auth_headers,
@@ -411,6 +420,7 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     parent = Comment(
         task_id=task.id,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         content="Top-level",
     )
     session.add(parent)
@@ -420,6 +430,7 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     reply = Comment(
         task_id=task.id,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         content="Reply",
         parent_comment_id=parent.id,
     )
@@ -525,12 +536,20 @@ async def test_purging_a_uploaded_file_takes_every_version(session: AsyncSession
         original_filename=names[0],
     )
     session.add_all(
-        Upload(filename=name, created_by=user.id, size_bytes=10) for name in names
+        Upload(
+            filename=name,
+            created_by=user.id,
+            created_by_kind=ActorKind.member,
+            size_bytes=10,
+            content_type="image/png",
+        )
+        for name in names
     )
     newest = await file_versions.add_version(
         session,
         doomed,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         file_url=f"/uploads/{names[1]}",
         file_content_type="application/pdf",
         original_filename=names[1],
@@ -917,16 +936,16 @@ async def _file(
     from app.core.tools import Tool
     from app.models.tenant._mixins import tool_models
     from app.models.tenant.calendar_event import CalendarEvent
+    from app.models.tenant.collection import Collection
     from app.models.tenant.comment import Comment
     from app.models.tenant.counter import Counter
-    from app.models.tenant.collection import Collection
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
         TOOL_FACTORIES,
         create_calendar_event,
+        create_collection,
         create_comment,
         create_counter,
-        create_collection,
         create_task,
         create_wiki_page,
     )

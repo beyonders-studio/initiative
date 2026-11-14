@@ -29,24 +29,22 @@ transaction.
 import json
 import time
 from collections import defaultdict
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Collection,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
 )
 
 from fastapi import HTTPException, status
@@ -63,11 +61,13 @@ from sqlalchemy import (
     insert,
     literal,
     literal_column,
+    not_,
     or_,
     true,
     tuple_,
     values,
 )
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import SQLModel, col, delete, select
@@ -120,11 +120,6 @@ from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
 from app.schemas.query import FilterOp
-from app.services.marketplace import contract
-from app.services.marketplace.expressions import UNDEFINED
-from app.services.marketplace.manifest_values import is_identifier, is_metadata_key
-from app.services.marketplace.registration_lookup import RegistrationSnapshot
-from app.services.marketplace.widget_meta import in_language
 from app.schemas.tenant.property import (
     MAX_PROPERTY_FILTERS,
     CounterSettings,
@@ -135,8 +130,12 @@ from app.schemas.tenant.property import (
     PropertyValueInput,
 )
 from app.services import audit as audit_service
+from app.services.marketplace import contract
+from app.services.marketplace.expressions import UNDEFINED
+from app.services.marketplace.manifest_values import is_identifier, is_metadata_key
+from app.services.marketplace.registration_lookup import RegistrationSnapshot
+from app.services.marketplace.widget_meta import in_language
 from app.services.tenant import named_people, tool_layouts
-
 
 _HTTP_URL_ADAPTER = TypeAdapter(AnyHttpUrl)
 
@@ -165,14 +164,14 @@ class PropertyLinkSpec:
     target: str
     model: type[SQLModel]
     tool: Tool
-    via: Optional[str]
-    changed: Optional[ValuesChanged] = None
+    via: str | None
+    changed: ValuesChanged | None = None
     shared: bool = True
 
     def governing_id(self, row: Any) -> int:
         return row.id if self.via is None else getattr(row, self.via)
 
-    def governing(self, row: Any, initiative_id: Optional[int]) -> Any:
+    def governing(self, row: Any, initiative_id: int | None) -> Any:
         """What decides who may be named on ``row``."""
         if not self.shared:
             return named_people.Governing.of_collection(row)
@@ -242,7 +241,7 @@ def _of(target: str, entity_ids: Iterable[int]) -> Any:
     )
 
 
-def _carried(row: Any, collection_id: Optional[int]) -> Any:
+def _carried(row: Any, collection_id: int | None) -> Any:
     """The definitions people write on ``row`` together: the initiative's
     properties and, on a task, its project's metadata; or with
     ``collection_id`` that collection's metadata, on a file in it."""
@@ -258,7 +257,7 @@ def _carried(row: Any, collection_id: Optional[int]) -> Any:
     )
 
 
-def _project_of(row: Any) -> Optional[int]:
+def _project_of(row: Any) -> int | None:
     """The project whose metadata ``row`` carries: a task's own."""
     return row.project_id if isinstance(row, Task) else None
 
@@ -281,7 +280,7 @@ _NUMBER_TYPES = frozenset(
 )
 
 #: The range of a scale.
-SCALE_RANGE = range(0, 101)
+SCALE_RANGE = range(101)
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +288,7 @@ SCALE_RANGE = range(0, 101)
 # ---------------------------------------------------------------------------
 
 
-def _empty_columns() -> Dict[str, Any]:
+def _empty_columns() -> dict[str, Any]:
     """Return all typed value columns set to None (baseline for an update)."""
     return {col: None for col in VALUE_COLUMNS}
 
@@ -362,7 +361,7 @@ def _coerce_datetime(raw: Any) -> datetime:
         return raw
     if isinstance(raw, str):
         try:
-            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            return datetime.fromisoformat(raw)
         except ValueError as exc:
             raise _bad_value() from exc
     raise _bad_value()
@@ -381,9 +380,9 @@ def _coerce_url(raw: Any) -> str:
     return candidate
 
 
-def _option_slugs(defn: MetadataDefinition) -> Set[str]:
+def _option_slugs(defn: MetadataDefinition) -> set[str]:
     options = defn.options or []
-    slugs: Set[str] = set()
+    slugs: set[str] = set()
     for opt in options:
         slug = (
             opt.get("value") if isinstance(opt, dict) else getattr(opt, "value", None)
@@ -395,12 +394,12 @@ def _option_slugs(defn: MetadataDefinition) -> Set[str]:
 
 def _parsed_options(
     defn: MetadataDefinition, language: str = "en"
-) -> List[PropertyOption]:
+) -> list[PropertyOption]:
     """``defn``'s options, each labelled in ``language`` where it is labelled
     in several (a plug-in's, :func:`_option`)."""
     if not defn.options:
         return []
-    parsed: List[PropertyOption] = []
+    parsed: list[PropertyOption] = []
     for raw in defn.options:
         if isinstance(raw, PropertyOption):
             parsed.append(raw)
@@ -432,14 +431,12 @@ def _is_empty_value(raw_value: Any) -> bool:
         return True
     if isinstance(raw_value, str) and not raw_value.strip():
         return True
-    if isinstance(raw_value, (list, tuple)) and len(raw_value) == 0:
-        return True
-    return False
+    return isinstance(raw_value, (list, tuple)) and len(raw_value) == 0
 
 
 def _validate_value_for_type(
     defn: MetadataDefinition, raw_value: Any
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return the typed-column dict for ``raw_value`` under ``defn``.
 
     When ``raw_value`` is "empty" (None, blank string, empty list) the
@@ -494,8 +491,8 @@ def _validate_value_for_type(
         if not isinstance(raw_value, (list, tuple)):
             raise _bad_value()
         valid = _option_slugs(defn)
-        slugs: List[str] = []
-        seen: Set[str] = set()
+        slugs: list[str] = []
+        seen: set[str] = set()
         for entry in raw_value:
             slug = _coerce_text(entry)
             if slug not in valid:
@@ -527,11 +524,11 @@ async def write_values(
     row: Any,
     values: Sequence[PropertyValueInput],
     *,
-    initiative_id: Optional[int],
-    removed: Optional[Sequence[int]] = None,
+    initiative_id: int | None,
+    removed: Sequence[int] | None = None,
     options: Sequence[PropertyOptionsChange] = (),
     steps: Sequence[PropertyStep] = (),
-    collection_id: Optional[int] = None,
+    collection_id: int | None = None,
 ) -> bool:
     """Replace every property value on ``row`` with ``values``, but the
     signatures ``values`` doesn't name. Given ``removed``, write only the
@@ -667,7 +664,7 @@ async def write_values(
                     detail=PropertyMessages.SIGNER_ONLY,
                 )
             cols["value_user_id"] = signer.user_id
-            cols["value_datetime"] = datetime.now(timezone.utc)
+            cols["value_datetime"] = datetime.now(UTC)
             await audit_service.record(
                 session,
                 event_type=AuditEventType.SIGNATURE_SIGNED,
@@ -733,7 +730,7 @@ async def _in_turn(
 
 def _options_changed(
     defn: MetadataDefinition, stored: list[str], change: PropertyOptionsChange
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """The typed columns of a multi-select value once ``change`` is applied to
     the options it holds. What it holds stays, in its order, an option the
     definition has since dropped included; only what ``change`` adds is held
@@ -755,8 +752,8 @@ def _options_changed(
 
 
 def _stepped(
-    defn: MetadataDefinition, stored: Optional[Decimal], step: PropertyStep
-) -> Dict[str, Any]:
+    defn: MetadataDefinition, stored: Decimal | None, step: PropertyStep
+) -> dict[str, Any]:
     """The typed columns of a counter once ``step`` is taken from what it
     holds, or from its initial value where it holds none, within its
     bounds."""
@@ -775,11 +772,11 @@ async def set_values(
     row: Any,
     values: Sequence[PropertyValueInput],
     *,
-    initiative_id: Optional[int],
-    removed: Optional[Sequence[int]] = None,
+    initiative_id: int | None,
+    removed: Sequence[int] | None = None,
     options: Sequence[PropertyOptionsChange] = (),
     steps: Sequence[PropertyStep] = (),
-    collection_id: Optional[int] = None,
+    collection_id: int | None = None,
 ) -> None:
     """The whole write a person or a plug-in makes: resolve a plug-in's person
     references, write the values (all of them, or with ``removed`` only those
@@ -800,7 +797,7 @@ async def set_values(
     # it was; and signing the row leaves it as it was, so a later signature
     # doesn't read as a change since an earlier one.
     if changed and collection_id is None and hasattr(row, "updated_at"):
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         session.add(row)
     await session.flush()
     spec = link_for(row)
@@ -826,7 +823,7 @@ async def write_on_create(
 async def write_on_update(
     session: AsyncSession,
     row: Any,
-    values: Optional[Sequence[PropertyValueInput]],
+    values: Sequence[PropertyValueInput] | None,
     *,
     merge: bool = False,
 ) -> None:
@@ -842,7 +839,7 @@ async def _write_in_place(
     row: Any,
     values: Sequence[PropertyValueInput],
     *,
-    removed: Optional[Sequence[int]] = None,
+    removed: Sequence[int] | None = None,
 ) -> None:
     """``values`` onto ``row`` in the caller's transaction, held to the row's
     own initiative as the policies read it."""
@@ -884,7 +881,7 @@ async def copy_values(
     pairs = values(
         column("source_id", Integer), column("copy_id", Integer), name="pairs"
     ).data(list(copies.items()))
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     names = ["entity_type", "entity_id", "property_id", *VALUE_COLUMNS]
     held = [getattr(MetadataValue, c) for c in VALUE_COLUMNS]
     unsigned = MetadataDefinition.type != MetadataType.signature
@@ -950,8 +947,8 @@ async def copy_definitions(
     definitions: Sequence[MetadataDefinition],
     *,
     initiative_id: int,
-    project_id: Optional[int] = None,
-    collection_id: Optional[int] = None,
+    project_id: int | None = None,
+    collection_id: int | None = None,
 ) -> dict[int, int]:
     """Give a project or a collection made in this transaction copies of
     ``definitions``, none of their values. Answers the copy of each, by the
@@ -1084,7 +1081,7 @@ async def promote(
                     offered.add(option.get("value"))
                     options.append(option)
         target.options = options
-    target.updated_at = datetime.now(timezone.utc)
+    target.updated_at = datetime.now(UTC)
     session.add(target)
     await session.flush()
 
@@ -1101,7 +1098,7 @@ async def promote(
             table.c.created_at,
         )
         .where(table.c.property_id.in_(ids))
-        .distinct(table.c.entity_type, table.c.entity_id, table.c.ref)
+        .ext(distinct_on(table.c.entity_type, table.c.entity_id, table.c.ref))
         .order_by(
             table.c.entity_type,
             table.c.entity_id,
@@ -1263,7 +1260,7 @@ async def property_values_by_row_id(
 # ---------------------------------------------------------------------------
 
 
-def _number_to_json(v: Optional[Decimal]) -> Optional[float]:
+def _number_to_json(v: Decimal | None) -> float | None:
     if v is None:
         return None
     # Represent as float for JSON serialization; callers needing exact
@@ -1272,7 +1269,7 @@ def _number_to_json(v: Optional[Decimal]) -> Optional[float]:
 
 
 def _rehydrate_value(
-    defn: MetadataDefinition, row: Any, user: Optional[MemberProfile]
+    defn: MetadataDefinition, row: Any, user: MemberProfile | None
 ) -> Any:
     ptype = defn.type
     if ptype in {MetadataType.text, MetadataType.url, MetadataType.select}:
@@ -1306,7 +1303,7 @@ def _rehydrate_value(
     return None  # pragma: no cover
 
 
-def _person(user_id: Optional[int], user: Optional[MemberProfile]) -> Any:
+def _person(user_id: int | None, user: MemberProfile | None) -> Any:
     """The person a value names, as a reader is shown them: the same person
     shape the rest of the API ships, from the guild projection, so the name
     is the one set in this guild; their id alone where it is not read."""
@@ -1321,7 +1318,7 @@ def _person(user_id: Optional[int], user: Optional[MemberProfile]) -> Any:
     }
 
 
-def _file(file_id: Optional[int], file: Optional[File]) -> Any:
+def _file(file_id: int | None, file: File | None) -> Any:
     """The file a value names, as a reader is shown it: what draws its icon
     and, for a link, where it points; its id alone where it is not read, or
     is in the trash."""
@@ -1335,11 +1332,11 @@ def _file(file_id: Optional[int], file: Optional[File]) -> Any:
     }
 
 
-def summaries_from_rows(rows: Iterable[MetadataValue]) -> List[PropertySummary]:
+def summaries_from_rows(rows: Iterable[MetadataValue]) -> list[PropertySummary]:
     """:class:`PropertySummary` list from value rows with ``definition``
     (and ``value_user`` and ``value_file`` where they apply) loaded, sorted by
     name."""
-    summaries: List[PropertySummary] = []
+    summaries: list[PropertySummary] = []
     for row in rows:
         defn = row.definition
         if defn is None:
@@ -1366,8 +1363,8 @@ async def summaries_by_id(
     target: str,
     entity_ids: Iterable[int],
     *,
-    collection_id: Optional[int] = None,
-) -> dict[int, List[PropertySummary]]:
+    collection_id: int | None = None,
+) -> dict[int, list[PropertySummary]]:
     """Every value the reader reads on these ``target`` rows, as summaries, by
     row id: the initiative's properties, a task's project metadata, a file's
     metadata of each collection it is in, and the values plug-ins show on an
@@ -1425,7 +1422,7 @@ async def annotate_properties(session: AsyncSession, entities: Iterable[Any]) ->
 async def count_orphaned_values(
     session: AsyncSession,
     defn_id: int,
-    valid_slugs: Set[str],
+    valid_slugs: set[str],
 ) -> int:
     """Count attached values whose option slug is no longer valid.
 
@@ -1451,7 +1448,7 @@ async def count_orphaned_values(
     stmt_json = select(func.count()).where(
         MetadataValue.property_id == defn_id,
         MetadataValue.value_json.is_not(None),
-        ~MetadataValue.value_json.op("<@")(valid_list),
+        not_(MetadataValue.value_json.contained_by(valid_list)),
     )
     return (await session.exec(stmt_text)).one() + (await session.exec(stmt_json)).one()
 
@@ -1532,7 +1529,7 @@ def _coerce_filter_scalar(property_type: MetadataType, raw: Any) -> Any:
             if isinstance(raw, datetime):
                 return raw
             if isinstance(raw, str):
-                return datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+                return datetime.fromisoformat(raw.strip())
             return None
         if property_type in PERSON_TYPES or property_type is MetadataType.file:
             if isinstance(raw, bool):
@@ -1546,7 +1543,7 @@ def _coerce_filter_scalar(property_type: MetadataType, raw: Any) -> Any:
         if isinstance(raw, str):
             return raw
         return str(raw)
-    except (InvalidOperation, ValueError, TypeError):
+    except InvalidOperation, ValueError, TypeError:
         return None
 
 
@@ -1722,14 +1719,14 @@ def build_single_property_clause(
 
 def build_property_filter_clauses(
     target: str,
-    conditions: Sequence["ParsedPropertyFilter"],
-    defs_map: Dict[int, MetadataDefinition],
-) -> List[Any]:
+    conditions: Sequence[ParsedPropertyFilter],
+    defs_map: dict[int, MetadataDefinition],
+) -> list[Any]:
     """The WHERE-clause list for a set of parsed property filters on
     ``target`` rows. Unknown / inaccessible property ids are skipped: RLS on
     ``property_definitions`` decided visibility when ``defs_map`` was loaded.
     """
-    clauses: List[Any] = []
+    clauses: list[Any] = []
     for cond in conditions:
         defn = defs_map.get(cond.property_id)
         if defn is None:
@@ -1749,7 +1746,7 @@ class ParsedPropertyFilter:
     the hot path — these are ephemeral parser outputs.
     """
 
-    __slots__ = ("property_id", "op", "value")
+    __slots__ = ("op", "property_id", "value")
 
     def __init__(self, property_id: int, op: Any, value: Any) -> None:
         self.property_id = property_id
@@ -1777,7 +1774,7 @@ def normalize_is_null_value(raw: Any) -> bool:
     )
 
 
-def parse_property_filters(raw: Optional[str]) -> List[ParsedPropertyFilter]:
+def parse_property_filters(raw: str | None) -> list[ParsedPropertyFilter]:
     """Parse the ``property_filters`` query param into validated conditions.
 
     Raises :class:`ValueError` on malformed input (caller converts to 400).
@@ -1804,7 +1801,7 @@ def parse_property_filters(raw: Optional[str]) -> List[ParsedPropertyFilter]:
     if len(payload) > MAX_PROPERTY_FILTERS:
         raise ValueError(f"too many property filters (max {MAX_PROPERTY_FILTERS})")
 
-    parsed: List[ParsedPropertyFilter] = []
+    parsed: list[ParsedPropertyFilter] = []
     for entry in payload:
         if not isinstance(entry, dict):
             raise ValueError("each property filter must be an object")
@@ -1828,7 +1825,7 @@ def parse_property_filters(raw: Optional[str]) -> List[ParsedPropertyFilter]:
 async def load_definitions_by_ids(
     session: AsyncSession,
     definition_ids: Iterable[int],
-) -> Dict[int, MetadataDefinition]:
+) -> dict[int, MetadataDefinition]:
     """Load property definitions by id: the initiative's properties and a
     project's or a collection's metadata, never a plug-in's, whose values a
     list filters and groups by through its plug-in fields alone
@@ -1849,7 +1846,7 @@ async def load_definitions_by_ids(
 
 
 async def property_filter_clauses(
-    session: AsyncSession, target: str, raw: Optional[str]
+    session: AsyncSession, target: str, raw: str | None
 ) -> list:
     """WHERE clauses for the ``property_filters`` a list of ``target`` carries.
 
@@ -2071,12 +2068,12 @@ def _is_state(value: Any) -> bool:
 
 def _stored(
     defn: MetadataDefinition, value: Any, people: _People, *, element: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """The columns that keep ``value`` under a plug-in's ``defn``: its typed
     column, ``value_json`` and ``value_text`` for a link or a badge, and its
     ``state``. ``element`` is one element of a list field's value, its ``ref``
     already taken. Raises for a value that is not one of the type's."""
-    cols: Dict[str, Any] = {**_empty_columns(), "state": None}
+    cols: dict[str, Any] = {**_empty_columns(), "state": None}
     kind = defn.type
     if kind is MetadataType.json:
         cols["value_json"] = (
@@ -2152,9 +2149,7 @@ def _stored(
         if not isinstance(figure, str):
             raise _invalid()
         moment = _plugin_coerced(_coerce_datetime, figure)
-        cols["value_datetime"] = (
-            moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
-        )
+        cols["value_datetime"] = moment if moment.tzinfo else moment.replace(tzinfo=UTC)
     elif kind is MetadataType.multi_select:
         valid = _option_slugs(defn)
         if not isinstance(figure, list) or not all(
@@ -2237,7 +2232,7 @@ def assembled(rows: Iterable[tuple[str, str, Any]]) -> dict[str, Any]:
 
 
 async def _installed(
-    session: AsyncSession, install_id: int, keys: Optional[Collection[str]] = None
+    session: AsyncSession, install_id: int, keys: Collection[str] | None = None
 ) -> dict[str, MetadataDefinition]:
     """The install's definitions by key: every one, or those of ``keys``."""
     query = select(MetadataDefinition).where(
@@ -2285,7 +2280,7 @@ async def _readable(session: AsyncSession, kind: str, entity_id: int) -> bool:
     return bool(await session.scalar(exists().where(table.c.id == entity_id).select()))
 
 
-def _fields_on(declared: Any, kind: Optional[str] = None) -> list[dict[str, Any]]:
+def _fields_on(declared: Any, kind: str | None = None) -> list[dict[str, Any]]:
     """The fields a pinned definition, or its ``fields`` alone, declares: on
     ``kind``, or on any."""
     fields = declared.get("fields") if isinstance(declared, dict) else declared
@@ -2298,12 +2293,7 @@ def _fields_on(declared: Any, kind: Optional[str] = None) -> list[dict[str, Any]
     ]
 
 
-def shown_keys(definition: Any, kind: str) -> frozenset[str]:
-    """The keys a pinned definition declares as fields on ``kind``."""
-    return frozenset(field["key"] for field in _fields_on(definition, kind))
-
-
-def _declared(field: Optional[Mapping[str, Any]], key: str) -> Dict[str, Any]:
+def _declared(field: Mapping[str, Any] | None, key: str) -> dict[str, Any]:
     """What a definition of ``key`` is under the pinned ``field`` declaring
     it, or under none."""
     if field is None:
@@ -2336,7 +2326,7 @@ _SELECT_TYPES = frozenset({MetadataType.select, MetadataType.multi_select})
 _OPTION_LABEL_LENGTH = 100
 
 
-def _option(declared: Mapping[str, Any]) -> Dict[str, Any]:
+def _option(declared: Mapping[str, Any]) -> dict[str, Any]:
     """A manifest field's option as a definition keeps one: a property's
     option (``PropertyOption``), labelled as English reads it, with every
     language the manifest labels it in beside, by tag (``labels``), which a
@@ -2345,7 +2335,7 @@ def _option(declared: Mapping[str, Any]) -> Dict[str, Any]:
         str(tag): str(text)[:_OPTION_LABEL_LENGTH]
         for tag, text in (declared.get("label") or {}).items()
     }
-    option: Dict[str, Any] = {
+    option: dict[str, Any] = {
         "value": declared.get("value"),
         "label": in_language(labels, "en") or str(declared.get("value")),
         "labels": labels,
@@ -2364,7 +2354,7 @@ async def _defined(
     missing = [key for key in keys if key not in found]
     if missing:
         declared = {field["key"]: field for field in _fields_on(fields)}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         statement = pg_insert(MetadataDefinition).values(
             [
                 {
@@ -2511,11 +2501,11 @@ async def write(
     session: AsyncSession,
     context: InstallContext,
     kind: str,
-    entity_id: Optional[int],
+    entity_id: int | None,
     changes: Sequence[Change],
     pinned: Callable[[], Awaitable[Any]],
     *,
-    made: Optional[Callable[[dict[str, Any]], Awaitable[Sequence[Change]]]] = None,
+    made: Callable[[dict[str, Any]], Awaitable[Sequence[Change]]] | None = None,
 ) -> dict[str, Any]:
     """Make ``changes``, in turn, to the install's values on one item, or on
     itself. Answers every value it keeps there now (:func:`assembled`).
@@ -2654,8 +2644,8 @@ async def write(
             PluginChannelMessages.METADATA_LIMIT_REACHED, status_code=409
         )
 
-    now = datetime.now(timezone.utc)
-    kept: dict[tuple[str, str], tuple[Any, Dict[str, Any]]] = {}
+    now = datetime.now(UTC)
+    kept: dict[tuple[str, str], tuple[Any, dict[str, Any]]] = {}
     for key, elements in held.items():
         for ref, value in elements.items():
             if (key, ref) not in written:
@@ -2743,7 +2733,7 @@ async def holders(
     key: str,
     value: str,
     *,
-    limit: Optional[int] = None,
+    limit: int | None = None,
 ) -> list[tuple[str, int]]:
     """The items the install can read holding ``value`` under ``key``, a list
     holding it as an element's ref, in kind and id order: every one, or the
@@ -2876,7 +2866,7 @@ def _targeted(answer: Any) -> list[tuple[dict[str, Any], Change]]:
 @asynccontextmanager
 async def _as_install(
     plugin: GuildPlugin, registration: RegistrationSnapshot, guild_id: int
-) -> AsyncIterator[
+) -> AsyncGenerator[
     tuple[
         AsyncSession,
         Callable[[], Awaitable[InstallContext]],
@@ -3028,7 +3018,7 @@ async def _lock_fields(
 
 
 async def sync_definitions(
-    guild_id: int, install_id: int, *, session: Optional[AsyncSession] = None
+    guild_id: int, install_id: int, *, session: AsyncSession | None = None
 ) -> None:
     """Bring the install's definitions up to date with its pinned version,
     after it moves to another: each key's type, list field, options and
@@ -3079,27 +3069,37 @@ async def sync_definitions(
                 continue
             for name, value in cols.items():
                 setattr(row, name, value)
-        defn.updated_at = datetime.now(timezone.utc)
+        defn.updated_at = datetime.now(UTC)
     await session.flush()
 
 
 class _Offered:
-    """Whether a reader is drawn an install's values in an initiative: it is
-    placed there with a role the reader holds (or the reader is the
-    community's admin), and the reader is old enough for it. Each pair is
-    decided once, and the reader's age read only if a plug-in asks for one."""
+    """Whether a reader is drawn an install's field in an initiative it is
+    placed in: the reader holds the field's permission there
+    (:meth:`GuildContext.holds_plugin_permission`) and is old enough for the
+    plug-in. Each install's age is decided once, and the reader's age read
+    only if a plug-in asks for one."""
 
     def __init__(self, context: GuildContext) -> None:
         self._context = context
         self._viewer: Any = None
-        self._known: dict[tuple[int, int], bool] = {}
+        self._old_enough: dict[int, bool] = {}
 
     async def __call__(
-        self, install_id: int, initiative_id: int, roles: Any, minimum: Any
+        self,
+        install_id: int,
+        initiative_id: int,
+        field: Any,
+        permissions: Any,
+        minimum: Any,
     ) -> bool:
-        from app.services.tenant import guild_plugins, plugin_age
+        from app.services.marketplace.service_plugins import (
+            members_hold,
+            surface_permission,
+        )
+        from app.services.tenant import plugin_age
 
-        if (install_id, initiative_id) not in self._known:
+        if install_id not in self._old_enough:
             old_enough = True
             if minimum is not None:
                 self._viewer = self._viewer or await plugin_age.current_viewer(
@@ -3108,28 +3108,24 @@ class _Offered:
                 old_enough = plugin_age.age_allows(
                     {"minimum_age": minimum}, self._viewer
                 )
-            self._known[(install_id, initiative_id)] = (
-                guild_plugins.surface_access(
-                    guild_plugins.ITEM_SURFACE,
-                    initiative_id=initiative_id,
-                    placement_role_ids=list(roles or ()),
-                    is_guild_admin=self._context.is_admin,
-                    member_role_ids=self._context.member_role_ids,
-                    age_allows=old_enough,
-                )
-                is guild_plugins.SurfaceAccess.open
-            )
-        return self._known[(install_id, initiative_id)]
+            self._old_enough[install_id] = old_enough
+        permission = surface_permission(field)
+        return self._old_enough[install_id] and self._context.holds_plugin_permission(
+            install_id,
+            permission,
+            initiative_id=initiative_id,
+            members=members_hold({"permissions": permissions}, permission),
+        )
 
 
 async def _plugin_summaries(
     session: AsyncSession, target: str, ids: Sequence[int]
-) -> dict[int, List[PropertySummary]]:
+) -> dict[int, list[PropertySummary]]:
     """The shown plug-in values on items of one kind, by item id, a list's as
-    an array (:func:`assembled`): those of the installs whose actions the
-    reader could run there — on, placed in the item's initiative with a role
-    the reader holds (or the reader its admin), and the reader old enough for
-    the plug-in (``guild_plugins.surface_access``). One query for the page.
+    an array (:func:`assembled`): those of installs that are on and placed in
+    the item's initiative, whose field's permission the reader holds there and
+    whose plug-in they are old enough for (:class:`_Offered`). One query for
+    the page, and one for its installs' declarations.
 
     ``session`` is the reader's, so which values it reads is the table's
     policies' answer; which installs' values are drawn is decided here. An
@@ -3146,8 +3142,6 @@ async def _plugin_summaries(
                 MetadataDefinition,
                 MetadataValue,
                 PluginPlacement.initiative_id,
-                PluginPlacement.role_ids,
-                GuildPlugin.definition["minimum_age"],
             )
             .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
             .join(GuildPlugin, GuildPlugin.id == MetadataDefinition.install_id)
@@ -3166,13 +3160,39 @@ async def _plugin_summaries(
             .order_by(MetadataDefinition.id, *NEWEST_FIRST)
         )
     ).all()
+    # Each install's fields, permissions and minimum age, read once each.
+    declares = {
+        install_id: (fields, permissions, minimum)
+        for install_id, fields, permissions, minimum in await session.exec(
+            select(
+                GuildPlugin.id,
+                GuildPlugin.definition["fields"],
+                GuildPlugin.definition["permissions"],
+                GuildPlugin.definition["minimum_age"],
+            ).where(
+                col(GuildPlugin.id).in_(
+                    sorted({int(defn.install_id or 0) for defn, _, _ in rows})
+                )
+            )
+        )
+    }
     offered = _Offered(context)
     definitions: dict[int, MetadataDefinition] = {}
     held: dict[tuple[int, int], list[Any]] = defaultdict(list)
-    for defn, row, initiative_id, roles, minimum in rows:
-        if await offered(int(defn.install_id or 0), initiative_id, roles, minimum):
-            definitions[defn.id] = defn
-            held[(row.entity_id, defn.id)].append(row)
+    for defn, row, initiative_id in rows:
+        install_id = int(defn.install_id or 0)
+        fields, permissions, minimum = declares[install_id]
+        field = next(
+            (
+                entry
+                for entry in (fields if isinstance(fields, list) else ())
+                if isinstance(entry, dict) and entry.get("key") == defn.key
+            ),
+            None,
+        )
+        if await offered(install_id, initiative_id, field, permissions, minimum):
+            definitions[int(defn.id or 0)] = defn
+            held[(row.entity_id, int(defn.id or 0))].append(row)
     # A select's options in the reader's language, read once for the page.
     language = "en"
     if any(
@@ -3193,7 +3213,7 @@ async def _plugin_summaries(
     people = await _shown_people(
         session, (row for kept in held.values() for row in kept)
     )
-    found: dict[int, List[PropertySummary]] = defaultdict(list)
+    found: dict[int, list[PropertySummary]] = defaultdict(list)
     for (item_id, defn_id), kept in held.items():
         defn = definitions[defn_id]
         told = [_told(defn, row, people) for row in kept]
@@ -3241,13 +3261,14 @@ async def filter_fields(
     if not wanted or context is None or context.guest:
         return {}
     installs = sorted({install for install, _ in wanted})
-    # Each install's fields and minimum age, read once each.
+    # Each install's fields, permissions and minimum age, read once each.
     declares = {
-        install_id: (fields, minimum)
-        for install_id, fields, minimum in await session.exec(
+        install_id: (fields, permissions, minimum)
+        for install_id, fields, permissions, minimum in await session.exec(
             select(
                 GuildPlugin.id,
                 GuildPlugin.definition["fields"],
+                GuildPlugin.definition["permissions"],
                 GuildPlugin.definition["minimum_age"],
             ).where(GuildPlugin.enabled.is_(True), col(GuildPlugin.id).in_(installs))
         )
@@ -3262,18 +3283,16 @@ async def filter_fields(
         )
     }
     placements = await session.exec(
-        select(
-            PluginPlacement.install_id,
-            PluginPlacement.initiative_id,
-            PluginPlacement.role_ids,
-        ).where(col(PluginPlacement.install_id).in_(list(declares)))
+        select(PluginPlacement.install_id, PluginPlacement.initiative_id).where(
+            col(PluginPlacement.install_id).in_(list(declares))
+        )
     )
     offered = _Offered(context)
     reach: dict[tuple[int, str], set[int]] = defaultdict(set)
     # The facets of each field's states.
     facets: dict[tuple[int, str], frozenset[str]] = {}
-    for install_id, initiative_id, roles in placements.all():
-        fields, minimum = declares[install_id]
+    for install_id, initiative_id in placements.all():
+        fields, permissions, minimum = declares[install_id]
         for field in _fields_on(fields, "task"):
             pair = (install_id, field["key"])
             if pair not in wanted or pair not in definitions:
@@ -3282,7 +3301,7 @@ async def filter_fields(
             facets[pair] = frozenset(
                 map(str, states if isinstance(states, dict) else ())
             )
-            if await offered(install_id, initiative_id, roles, minimum):
+            if await offered(install_id, initiative_id, field, permissions, minimum):
                 reach[pair].add(initiative_id)
     return {
         wanted[pair]: FilterField(definitions[pair], facets[pair], frozenset(found))

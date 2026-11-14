@@ -1,6 +1,6 @@
 """Tests for OIDC provider discovery.
 
-Outbound fetches are stubbed with ``httpx.MockTransport`` (injected via
+Outbound fetches are stubbed with ``httpx2.MockTransport`` (injected via
 ``client_factory`` — no network), so metadata parsing, the issuer-match check,
 the https guards, and caching are exercised in isolation.
 """
@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import asyncio
 
-import httpx
+import httpx2
 import pytest
 
 from app.services.auth.oidc.discovery import (
     DiscoveryError,
     OidcDiscovery,
 )
-
 
 ISSUER = "https://idp.example.com"
 
@@ -48,16 +47,16 @@ class _Endpoint:
         self._response = response
 
     def factory(self):
-        def handler(request: httpx.Request) -> httpx.Response:
+        def handler(request: httpx2.Request) -> httpx2.Response:
             self.calls += 1
             resp = self._response
             return resp(request) if callable(resp) else resp
 
-        return lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        return lambda: httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
 
 
-def _json(payload) -> httpx.Response:
-    return httpx.Response(200, json=payload)
+def _json(payload) -> httpx2.Response:
+    return httpx2.Response(200, json=payload)
 
 
 # --- happy path -------------------------------------------------------------
@@ -78,12 +77,14 @@ async def test_fetches_and_parses_metadata():
 async def test_requests_the_well_known_url():
     seen = {}
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen["url"] = str(request.url)
         return _json(_doc())
 
     discovery = OidcDiscovery(
-        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client_factory=lambda: httpx2.AsyncClient(
+            transport=httpx2.MockTransport(handler)
+        )
     )
     # A trailing slash on the configured issuer must not double up the path.
     await discovery.fetch(f"{ISSUER}/")
@@ -93,12 +94,14 @@ async def test_requests_the_well_known_url():
 async def test_already_well_known_issuer_not_doubled():
     seen = {}
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         seen["url"] = str(request.url)
         return _json(_doc())
 
     discovery = OidcDiscovery(
-        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client_factory=lambda: httpx2.AsyncClient(
+            transport=httpx2.MockTransport(handler)
+        )
     )
     await discovery.fetch(f"{ISSUER}/.well-known/openid-configuration")
     assert seen["url"] == f"{ISSUER}/.well-known/openid-configuration"
@@ -173,7 +176,7 @@ async def test_non_object_document_rejected():
 
 
 async def test_http_error_raises_discovery_error():
-    endpoint = _Endpoint(httpx.Response(500, text="down"))
+    endpoint = _Endpoint(httpx2.Response(500, text="down"))
     discovery = OidcDiscovery(client_factory=endpoint.factory())
 
     with pytest.raises(DiscoveryError):

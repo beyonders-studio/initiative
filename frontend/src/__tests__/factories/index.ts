@@ -2,7 +2,6 @@ export { buildActivityEntry } from "./activity.factory";
 export {
   buildCalendarEvent,
   buildCalendarEventSummary,
-  buildEventAttendee,
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
@@ -28,6 +27,7 @@ export {
   resetCounter as resetDmCounter,
 } from "./dm.factory";
 export { buildFileSummary, resetCounter as resetFileCounter } from "./file.factory";
+export { buildIdea, buildIdeaStatus, resetCounter as resetIdeaCounter } from "./idea.factory";
 export {
   buildInitiative,
   buildInitiativeDirectoryEntry,
@@ -41,6 +41,7 @@ export {
   buildMarketplaceListing,
   buildMarketplaceListingDetail,
   buildMarketplaceVersion,
+  buildPluginCatalogEntry,
   buildProjectListingEnvelope,
   resetCounter as resetMarketplaceCounter,
 } from "./marketplace.factory";
@@ -117,6 +118,7 @@ import { resetCounter as resetContactCounter } from "./contact.factory";
 import { resetCounter as resetDataJobCounter } from "./dataJob.factory";
 import { resetCounter as resetDmCounter } from "./dm.factory";
 import { resetCounter as resetFileCounter } from "./file.factory";
+import { resetCounter as resetIdeaCounter } from "./idea.factory";
 import { resetCounter as resetInitiativeCounter } from "./initiative.factory";
 import { resetCounter as resetMarketplaceCounter } from "./marketplace.factory";
 import { resetCounter as resetNotificationCounter } from "./notification.factory";
@@ -129,6 +131,7 @@ import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory
 import { resetCounter as resetTagCounter } from "./tag.factory";
 import { resetCounter as resetTaskCounter } from "./task.factory";
 import { resetCounter as resetTaskTypeCounter } from "./taskType.factory";
+import { resetCounter as resetTrashCounter } from "./trash.factory";
 import { resetCounter as resetUserCounter } from "./user.factory";
 import { resetCounter as resetWikiCounter } from "./wiki.factory";
 
@@ -159,4 +162,6 @@ export function resetFactories(): void {
   resetContactCounter();
   resetCalendarEventCounter();
   resetShareRequestCounter();
+  resetTrashCounter();
+  resetIdeaCounter();
 }

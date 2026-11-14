@@ -8,7 +8,7 @@
  * ask again.
  */
 
-import { Check, Eye, Loader2, Lock, Pencil } from "lucide-react";
+import { Check, Eye, Lock, Pencil } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,23 +19,18 @@ import type {
   ShareRequestCreate,
   ShareStanding,
 } from "@/api/generated/initiativeAPI.schemas";
-import { StatusMessage } from "@/components/StatusMessage";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCreateShareRequest, useShareStanding } from "@/hooks/useShareRequests";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { StatusMessage } from "@/ui/status-message";
+import { Textarea } from "@/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Mirrors the backend's limit on a request's note, which is the authority. */
 const NOTE_MAX_LENGTH = 1000;
@@ -108,10 +103,8 @@ const RequestAccessForm = ({ target, level, onSent, className }: RequestAccessFo
           </ToggleGroup>
         </div>
       )}
-      <div className="space-y-2">
-        <Label htmlFor={`${id}-note`}>{t("request.note")}</Label>
+      <Field label={t("request.note")}>
         <Textarea
-          id={`${id}-note`}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder={t("request.notePlaceholder")}
@@ -119,10 +112,9 @@ const RequestAccessForm = ({ target, level, onSent, className }: RequestAccessFo
           rows={3}
           disabled={create.isPending}
         />
-      </div>
+      </Field>
       <div className="flex justify-end">
-        <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? <Loader2 className="animate-spin" /> : null}
+        <Button type="submit" pending={create.isPending}>
           {t("request.submit")}
         </Button>
       </div>
@@ -172,7 +164,7 @@ export const RequestAccessDialog = ({
   const { t } = useTranslation("access");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title ?? t("request.submit")}</DialogTitle>
           <DialogDescription>{description ?? t("request.description")}</DialogDescription>

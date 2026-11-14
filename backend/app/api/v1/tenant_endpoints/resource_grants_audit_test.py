@@ -12,7 +12,7 @@ tool's sharing runs through.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole

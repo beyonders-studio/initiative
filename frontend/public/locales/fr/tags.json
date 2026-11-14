@@ -9,7 +9,6 @@
     "delete": "Supprimer",
     "deleteTitle": "Supprimer l'étiquette ?",
     "deleteDescription": "L'étiquette « {{name}} » sera envoyée à la corbeille et masquée de toutes les tâches, projets et fichiers qui l'utilisent. Vous pouvez la restaurer depuis Paramètres → Corbeille avant la fin de la période de rétention.",
-    "deleted": "Étiquette supprimée",
     "saving": "Enregistrement…",
     "save": "Enregistrer",
     "toolTab": "{{tool}} ({{count}})",
@@ -22,8 +21,7 @@
     },
     "columns": {
       "in": "Dans"
-    },
-    "loadError": "Impossible de charger ce qui porte cette étiquette."
+    }
   },
   "manage": {
     "edit": "Modifier les étiquettes",
@@ -49,11 +47,7 @@
     "creating": "Création en cours…",
     "create": "Créer",
     "searchPlaceholder": "Rechercher ou créer des étiquettes…",
-    "loading": "Chargement…",
-    "existingTags": "Étiquettes existantes",
-    "noTagsFound": "Aucune étiquette trouvée.",
     "createTag": "Créer « {{name}} »",
-    "selected": "{{count}} sélectionné(e)(s)",
     "filterLabel": "Tags",
     "anyTag": "N'importe quel tag"
   },

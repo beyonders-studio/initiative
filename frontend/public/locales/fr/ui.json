@@ -1,0 +1,288 @@
+{
+  "loading": "Chargement…",
+  "loadError": "Impossible de charger ceci.",
+  "tryAgain": "Réessayer",
+  "loadMore": "Afficher plus",
+  "clear": "Effacer",
+  "next": "Suivant",
+  "previous": "Précédent",
+  "selectAll": "Tout sélectionner",
+  "combobox": {
+    "placeholder": "Sélectionner une option",
+    "search": "Rechercher",
+    "noResults": "Aucun résultat"
+  },
+  "copy": {
+    "label": "Copier",
+    "copied": "Copié !",
+    "unavailable": "Copie impossible — copiez-le à la main"
+  },
+  "dateRange": {
+    "any": "Toutes les dates",
+    "fromOnly": "À partir du {{date}}",
+    "untilOnly": "Jusqu’au {{date}}",
+    "thisMonth": "Ce mois-ci",
+    "lastMonth": "Le mois dernier",
+    "thisQuarter": "Ce trimestre",
+    "thisYear": "Cette année",
+    "fromLabel": "Du",
+    "untilLabel": "Au",
+    "open": "Ouvert",
+    "fromRemove": "Retirer la date de début",
+    "untilRemove": "Retirer la date de fin",
+    "clear": "Effacer les dates"
+  },
+  "datePicker": {
+    "pickDate": "Choisir une date",
+    "pickDateTime": "Choisir une date et une heure",
+    "typeDate": "Saisir ou choisir une date",
+    "time": "Heure",
+    "invalidDate": "Saisissez une date valide.",
+    "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété."
+  },
+  "days": {
+    "today": "Aujourd'hui",
+    "yesterday": "Hier"
+  },
+  "emojiPicker": {
+    "pick": "Choisir un emoji",
+    "searchPlaceholder": "Rechercher un emoji…",
+    "empty": "Aucun emoji trouvé.",
+    "prompt": "Sélectionnez un emoji…"
+  },
+  "fileDrop": {
+    "release": "Dépose-le ici",
+    "unsupported": "Ce type de fichier ne peut pas être envoyé ici."
+  },
+  "imagePicker": {
+    "chooseImage": "Choisir une image",
+    "takePhoto": "Prendre une photo",
+    "chooseFromLibrary": "Choisir dans la galerie",
+    "chooseFile": "Choisir un fichier",
+    "permission": "Initiative a besoin d'accéder à votre appareil photo et à vos photos. Autorisez-le dans les réglages de l'appareil, puis réessayez.",
+    "unavailable": "Cet appareil n'a pas d'appareil photo pour prendre une photo.",
+    "failed": "Cette photo n'a pas pu être lue. Réessayez."
+  },
+  "lightbox": {
+    "open": "Voir cette image en taille réelle",
+    "openNamed": "Voir {{name}} en taille réelle",
+    "title": "Image",
+    "description": "Utilisez les flèches ou faites glisser pour passer d’une image à l’autre.",
+    "position": "{{current}} / {{total}}",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "close": "Fermer"
+  },
+  "memberPicker": {
+    "userWithId": "Utilisateur n° {{id}}",
+    "you": "Vous",
+    "remove": "Retirer {{name}}",
+    "clearAll": "Effacer les assignés"
+  },
+  "multiSelect": {
+    "empty": "Aucune option disponible",
+    "allSelected": "Tout est sélectionné",
+    "countSelected": "{{count}} sélectionné",
+    "clearAll": "Tout effacer"
+  },
+  "pagination": {
+    "perPage": "Par page :",
+    "rangeOf": "{{start}}–{{end}} sur {{total}}"
+  },
+  "pullToRefresh": {
+    "pull": "Tirez pour actualiser",
+    "release": "Relâchez pour actualiser",
+    "refreshing": "Actualisation…"
+  },
+  "rowActions": {
+    "label": "Actions",
+    "labelFor": "Actions pour {{subject}}"
+  },
+  "table": {
+    "select": "Sélectionner",
+    "exitSelection": "Quitter la sélection",
+    "enableSelectionMode": "Activer le mode sélection",
+    "exitSelectionMode": "Quitter le mode sélection",
+    "resetSorting": "Réinitialiser le tri",
+    "groupBy": "Regrouper par",
+    "chooseGrouping": "Choisir un regroupement",
+    "none": "Aucun",
+    "columns": "Colonnes",
+    "options": "Options du tableau",
+    "selectRow": "Sélectionner la ligne",
+    "rowsSelected": "{{selected}} ligne(s) sélectionnée(s) sur {{total}}",
+    "rowsSelectedFiltered": "{{selected}} sélectionnée(s) ({{total}} correspondent au filtre)",
+    "noResults": "Aucun résultat.",
+    "filter": "Filtrer…"
+  },
+  "wizard": {
+    "stepOf": "Étape {{current}} sur {{total}}"
+  },
+  "cancel": "Annuler",
+  "close": "Fermer",
+  "done": "Terminé",
+  "save": "Enregistrer",
+  "breadcrumb": "Fil d'Ariane",
+  "confirm": {
+    "continue": "Continuer",
+    "working": "Veuillez patienter…"
+  },
+  "carousel": {
+    "previous": "Diapositive précédente",
+    "next": "Diapositive suivante"
+  },
+  "colorPicker": {
+    "pick": "Choisir une couleur",
+    "mode": "Mode"
+  },
+  "iconPicker": {
+    "search": "Rechercher une icône…",
+    "placeholder": "Sélectionner une icône",
+    "empty": "Aucune icône trouvée",
+    "other": "Autre"
+  },
+  "fieldSave": {
+    "saving": "Enregistrement…",
+    "saved": "Enregistré",
+    "failed": "Échec de l'enregistrement",
+    "changed": "Cela a changé pendant que vous le modifiiez"
+  },
+  "boardColumn": {
+    "collapse": "Replier {{name}}",
+    "expand": "Développer {{name}}"
+  },
+  "recurrence": {
+    "repeat": "Répétition",
+    "doesNotRepeat": "Ne se répète pas",
+    "daily": "Tous les jours",
+    "everyWeekday": "Tous les jours ouvrés (lun.–ven.)",
+    "weeklyOn": "Chaque semaine le {{day}}",
+    "monthlyOnDay": "Chaque mois le {{day}}",
+    "annuallyOn": "Chaque année le {{day}} {{month}}",
+    "custom": "Personnalisé…",
+    "frequency": "Fréquence",
+    "frequencyDaily": "Quotidienne",
+    "frequencyWeekly": "Hebdomadaire",
+    "frequencyMonthly": "Mensuelle",
+    "frequencyYearly": "Annuelle",
+    "repeatEvery": "Répéter tous les",
+    "repeatEveryDays": "jours",
+    "repeatEveryWeeks": "semaines",
+    "repeatEveryMonths": "mois",
+    "repeatEveryYears": "ans",
+    "repeatOn": "Répéter le",
+    "on": "Le",
+    "position": "Position",
+    "positionFirst": "Premier",
+    "positionSecond": "Deuxième",
+    "positionThird": "Troisième",
+    "positionFourth": "Quatrième",
+    "positionFifth": "Cinquième",
+    "positionLast": "Dernier",
+    "weekday": "Jour de la semaine",
+    "ends": "Fin",
+    "endsNever": "Jamais",
+    "endsOnDate": "À une date",
+    "endsAfterCount": "Après un nombre d'occurrences",
+    "repeatStrategy": "Mode de répétition",
+    "selectStrategy": "Sélectionner un mode",
+    "strategyOnSchedule": "Selon le calendrier",
+    "strategyAfterCompletion": "Après achèvement",
+    "strategyOnScheduleDescription": "Une nouvelle tâche est créée selon un calendrier fixe, en fonction des dates.",
+    "strategyAfterCompletionDescription": "Une nouvelle tâche est créée à intervalle fixe après l'achèvement de la précédente.",
+    "mode": {
+      "day_of_month": "Jours du mois",
+      "weekday": "Un jour de la semaine du mois",
+      "weekdays": "Chaque jour de la semaine choisi",
+      "set": "Le premier ou le dernier des jours choisis"
+    },
+    "lastDay": "Dernier",
+    "months": "Mois",
+    "nextDates": "Prochaines :",
+    "hourlyAfterCompletion": "Toutes les heures (après achèvement)",
+    "everyHour": "Toutes les heures",
+    "frequencyHourly": "Toutes les heures",
+    "repeatEveryHours": "heures",
+    "dailyLimit": "Maximum par jour (facultatif)",
+    "unlimited": "Sans limite",
+    "hourlyCompletionHelp": "Chaque achèvement programme la tâche suivante après le nombre d’heures choisi. Laissez le maximum vide pour répéter en continu. Avec un maximum, lorsqu’il est atteint ou que minuit est dépassé, le jour suivant commence à l’heure de la première tâche, plus tard si nécessaire pour respecter le délai. Le décompte quotidien utilise le fuseau horaire de la personne qui termine la tâche.",
+    "limitInvalid": "Non enregistré. Saisissez un maximum quotidien entier de 1 à 24, ou laissez le champ vide pour ne pas fixer de limite.",
+    "hourlyNeedsDueDate": "Définissez une date et une heure d’échéance pour la première tâche avant d’enregistrer une répétition horaire.",
+    "weekdays": {
+      "monday": "lundi",
+      "tuesday": "mardi",
+      "wednesday": "mercredi",
+      "thursday": "jeudi",
+      "friday": "vendredi",
+      "saturday": "samedi",
+      "sunday": "dimanche"
+    },
+    "weekdaysShort": {
+      "monday": "Lun.",
+      "tuesday": "Mar.",
+      "wednesday": "Mer.",
+      "thursday": "Jeu.",
+      "friday": "Ven.",
+      "saturday": "Sam.",
+      "sunday": "Dim."
+    },
+    "summary": {
+      "doesNotRepeat": "Ne se répète pas",
+      "repeats": "Se répète {{schedule}}",
+      "everySingular": "chaque {{unit}}",
+      "everyPlural": "à intervalle de {{count}} {{unit}}",
+      "day": "jour",
+      "days": "jours",
+      "week": "semaine",
+      "weeks": "semaines",
+      "month": "mois",
+      "months": "mois",
+      "year": "année",
+      "years": "années",
+      "onWeekdays": "le {{weekdays}}",
+      "onDay": "le jour {{day}}",
+      "onPositionWeekday": "le {{position}} {{weekday}}",
+      "detailOfMonth": "{{detail}} en {{month}}",
+      "inMonth": "en {{month}}",
+      "afterCompletion": "après achèvement",
+      "untilDate": "jusqu'au {{date}}",
+      "forOccurrences": "pour {{count}} occurrences",
+      "custom": "Se répète selon un calendrier personnalisé",
+      "onDays": "les jours {{days}}",
+      "onLastDay": "le dernier jour",
+      "lastDayItem": "le dernier jour",
+      "onEveryWeekdays": "chaque {{weekdays}}",
+      "onFirstWorkDay": "le premier jour ouvré",
+      "onLastWorkDay": "le dernier jour ouvré",
+      "onFirstOf": "le premier {{weekdays}}",
+      "onLastOf": "le dernier {{weekdays}}",
+      "hour": "heure",
+      "hours": "heures",
+      "everyHour": "chaque heure",
+      "dailyLimit_one": "au maximum une fois par jour",
+      "dailyLimit_other": "au maximum {{count}} fois par jour",
+      "positions": {
+        "first": "premier",
+        "second": "deuxième",
+        "third": "troisième",
+        "fourth": "quatrième",
+        "fifth": "cinquième",
+        "last": "dernier"
+      },
+      "monthNames": {
+        "1": "janvier",
+        "2": "février",
+        "3": "mars",
+        "4": "avril",
+        "5": "mai",
+        "6": "juin",
+        "7": "juillet",
+        "8": "août",
+        "9": "septembre",
+        "10": "octobre",
+        "11": "novembre",
+        "12": "décembre"
+      }
+    }
+  }
+}

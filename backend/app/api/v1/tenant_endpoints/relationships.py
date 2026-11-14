@@ -24,16 +24,16 @@ behalf answers to them too:
   it. Asked of whichever end has the state — only projects and tasks do.
 """
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import union
 from sqlmodel import select
 
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
 from app.core.messages import RelationshipMessages
 from app.core.relationships import (
@@ -47,18 +47,19 @@ from app.core.relationships import (
 from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.models.platform.user import User
-from app.models.tenant.relationship import EntityRelationship
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.project import Project
+from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.schemas.tenant.relationship import (
     EndpointRef,
+    LinkedTaskRead,
     NeighbourhoodEdge,
     NeighbourhoodNode,
     NeighbourhoodRead,
     RelatedEnd,
     RelationshipCreate,
     RelationshipRead,
-    LinkedTaskRead,
     TaskEdgeRead,
     TaskEdgesRead,
 )
@@ -143,6 +144,7 @@ def _render(
         provenance=row.provenance,
         confidence=row.confidence,
         created_by=row.created_by,
+        created_by_kind=row.created_by_kind,
         created_at=row.created_at,
     )
 
@@ -175,16 +177,16 @@ async def _titles_for(
     return found
 
 
-@router.get("/", response_model=List[RelationshipRead])
+@router.get("/", response_model=list[RelationshipRead])
 async def list_relationships(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     entity: str = Query(description="The thing to list edges for, as `kind:id`"),
-    relationship_type: Optional[RelationshipType] = Query(default=None),
-    other_type: Optional[EndpointKind] = Query(default=None),
+    relationship_type: RelationshipType | None = Query(default=None),
+    other_type: EndpointKind | None = Query(default=None),
     direction: relationships_service.Direction = Query(default="both"),
-) -> List[RelationshipRead]:
+) -> list[RelationshipRead]:
     """Every live edge touching one thing, rendered from its side.
 
     ``direction=inbound`` is "what links here": the things naming this one,
@@ -392,16 +394,16 @@ async def create_relationship(
     return made
 
 
-@router.put("/", response_model=List[RelationshipRead])
+@router.put("/", response_model=list[RelationshipRead])
 async def replace_relationship_slice(
-    ids: List[int],
+    ids: list[int],
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     entity: str = Query(description="The thing whose edges are being set"),
     relationship_type: RelationshipType = Query(),
     other_type: EndpointKind = Query(),
-) -> List[RelationshipRead]:
+) -> list[RelationshipRead]:
     """Replace one slice of an entity's edges — what a multi-select does.
 
     Every id named has to resolve for this caller, so a slice cannot be used to
@@ -506,7 +508,7 @@ async def _may_remove(
     replace both ask this, so a slice cannot do what a DELETE refuses. A
     person's end is never the thing you can edit.
     """
-    if row.created_by == user_id:
+    if row.created_by_kind == ActorKind.member and row.created_by == user_id:
         return True
     for kind, entity_id in (
         (row.source_type, row.source_id),

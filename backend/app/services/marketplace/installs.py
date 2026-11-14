@@ -15,7 +15,6 @@ response.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -30,8 +29,7 @@ from app.models.platform.marketplace import (
 )
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import catalog as catalog_service
-from app.services.marketplace import plugin_api
-from app.services.marketplace import registration_lookup
+from app.services.marketplace import plugin_api, registration_lookup
 
 logger = logging.getLogger(__name__)
 
@@ -83,17 +81,28 @@ async def resolve_listing_install(
         raise ListingInstallError(MarketplaceMessages.LISTING_UNAVAILABLE)
     if not await listing_is_offered(session, listing):
         raise ListingInstallError(MarketplaceMessages.LISTING_NEEDS_PLUGIN)
+    # A refusal of the listing's current version names it, so an install that
+    # was offered it as an update can say which version cannot run here.
     version = await catalog_service.resolve_installable_version(session, listing)
     if version is None:
         # Either it has published nothing, or its current version needs a newer
         # plug-in. Silently installing an older one would be worse: the guild would
         # get something other than what the listing page showed them.
-        raise ListingInstallError(MarketplaceMessages.LISTING_VERSION_INCOMPATIBLE)
+        latest = await catalog_service.get_listing_version(
+            session, listing.latest_version_id
+        )
+        raise ListingInstallError(
+            MarketplaceMessages.LISTING_VERSION_INCOMPATIBLE,
+            params={"version": latest.version} if latest is not None else None,
+        )
     if not plugin_api.serves_plugin_api(version.min_plugin_api):
         # Built against a plug-in API contract this deployment does not serve:
         # a newer minor than it has, or another major. The same refusal as a
         # version needing a newer app, for the same reason.
-        raise ListingInstallError(MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE)
+        raise ListingInstallError(
+            MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE,
+            params={"version": version.version},
+        )
     if not already_installed and not await registration_lookup.plugin_is_offered(
         version.definition,
         guild_id=routed_guild_id(session),
@@ -144,7 +153,7 @@ async def listing_is_offered(
     return listing.bundled_with_uid in await installed_plugin_uids(session)
 
 
-async def count_install(guild_id: int, listing_id: Optional[int]) -> None:
+async def count_install(guild_id: int, listing_id: int | None) -> None:
     """Add one to a listing's install tally, after the install has committed.
 
     On a system session from the installing community's cohort, because the

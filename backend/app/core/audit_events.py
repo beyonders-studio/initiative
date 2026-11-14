@@ -18,6 +18,7 @@ streams; the envelope carries the fields that stitch them together downstream.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Self
 
 
 class AuditCategory(str, Enum):
@@ -65,7 +66,7 @@ class AuditEventType(str, Enum):
         category: AuditCategory,
         tier: int = 2,
         is_write: bool = True,
-    ) -> AuditEventType:
+    ) -> Self:
         member = str.__new__(cls, value)
         member._value_ = value
         member.category = category
@@ -296,11 +297,30 @@ class AuditEventType(str, Enum):
     #: one is recorded, and redeeming one is a ``GUILD_MEMBER_ADDED``.
     GUILD_INVITE_CREATED = "guild.invite_created", AuditCategory.AUTHORIZATION
     GUILD_INVITE_REVOKED = "guild.invite_revoked", AuditCategory.AUTHORIZATION
+    #: A request to join turned down. Approving one is a ``GUILD_MEMBER_ADDED``
+    #: ``via`` ``request``.
+    GUILD_JOIN_REQUEST_DENIED = (
+        "guild.join_request_denied",
+        AuditCategory.AUTHORIZATION,
+    )
     #: A guest's end moved. Becoming a guest is a ``GUILD_MEMBER_ADDED`` with
     #: ``guest_until`` in its detail, and leaving one a ``GUILD_MEMBER_REMOVED``.
     GUILD_GUEST_EXTENDED = "guild.guest_extended", AuditCategory.AUTHORIZATION
     #: A guest made a member: their time no longer ends, and they take a seat.
     GUILD_GUEST_MADE_MEMBER = "guild.guest_made_member", AuditCategory.AUTHORIZATION
+    #: Banned from a community, or the ban lifted. Being banned also removes
+    #: the membership, recorded as a ``GUILD_MEMBER_REMOVED`` beside it.
+    COMMUNITY_MEMBER_BANNED = "community.member_banned", AuditCategory.AUTHORIZATION
+    COMMUNITY_MEMBER_UNBANNED = "community.member_unbanned", AuditCategory.AUTHORIZATION
+    #: Timed out in a community until ``detail.ends_at``, or the timeout lifted.
+    COMMUNITY_MEMBER_TIMED_OUT = (
+        "community.member_timed_out",
+        AuditCategory.AUTHORIZATION,
+    )
+    COMMUNITY_MEMBER_TIMEOUT_LIFTED = (
+        "community.member_timeout_lifted",
+        AuditCategory.AUTHORIZATION,
+    )
     INITIATIVE_MEMBER_ADDED = "initiative.member_added", AuditCategory.AUTHORIZATION
     INITIATIVE_MEMBER_REMOVED = "initiative.member_removed", AuditCategory.AUTHORIZATION
     INITIATIVE_MEMBER_ROLE_CHANGED = (

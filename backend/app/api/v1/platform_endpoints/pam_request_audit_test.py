@@ -6,13 +6,12 @@ hour" and "an operator opened four hundred files" read differently.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
-from app.models.platform.guild import Guild, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild
 from app.testing import Actor, create_guild, emitted
-
 
 BREAK_GLASS = "/api/v1/access-grants/break-glass"
 PAM = AuditEventType.PAM_REQUEST

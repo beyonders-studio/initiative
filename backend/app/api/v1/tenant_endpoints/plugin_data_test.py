@@ -31,11 +31,12 @@ parameters, credentials, the cache, the in-flight cap, the minted token — runs
 for real.
 """
 
-from datetime import datetime, timezone
+import asyncio
+import json
+from datetime import UTC, datetime
 from urllib.parse import quote
 
-import json
-import httpx
+import httpx2
 import jwt
 import pytest
 from sqlmodel import delete, select
@@ -43,31 +44,36 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
-from app.core.messages import PluginDataMessages, GuildPluginMessages
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.core.messages import GuildPluginMessages, PluginDataMessages
+from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.models.platform.user import UserRole
+from app.models.tenant.dashboard import DashboardViewMode
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.initiative import InitiativeMember, InitiativeRule
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
-from app.models.tenant.task import Task
 from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.models.tenant.task import Task
+from app.services.marketplace import plugin_data as plugin_data_service
+from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
 from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
     ensure_plugin_ref,
 )
-from app.services.marketplace import plugin_data as plugin_data_service
-from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_connection_flows
-from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
-from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
-from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
-from app.models.platform.user import UserRole
+from app.services.tenant.initiatives import create_custom_role
+from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.testing import (
-    create_plugin_user_connection,
     create_access_grant,
+    create_dashboard,
+    create_guild_plugin,
     create_initiative,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
     create_project,
     create_property_definition,
     create_property_value,
@@ -75,12 +81,9 @@ from app.testing import (
     create_task,
     create_user,
     get_auth_headers,
-    create_plugin_service_registration,
-    create_dashboard,
-    create_guild_plugin,
     route_session_to_guild,
 )
-
+from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
 
 PLUGIN_UID = "SHPAPP00000001"
 PUBLIC_ID = "acme.shop"
@@ -89,8 +92,6 @@ PUBLIC_ID = "acme.shop"
 #: what every endpoint id has to be.
 ORDERS_SUMMARY = f"plugin.{PUBLIC_ID}.orders-summary"
 REVENUE = f"plugin.{PUBLIC_ID}.revenue"
-#: Pinned before ``admin_only`` existed, under the earlier contract's term.
-LEGACY_REPORT = f"plugin.{PUBLIC_ID}.legacy-report"
 MY_PRS = f"plugin.{PUBLIC_ID}.my-prs"
 REFUND = f"plugin.{PUBLIC_ID}.refund"
 #: The two reads that exist to fill a menu rather than a tile. Which shops
@@ -133,14 +134,17 @@ GITHUB_CONNECTION = {
 
 
 def _definition() -> dict:
-    """A service plug-in offering several sources: one for guild admins (and one
-    pinned as such under the earlier contract), one that runs on the caller's
-    own vendor account, and ordinary ones."""
+    """A service plug-in offering several sources: one naming a permission
+    members do not hold, one that runs on the caller's own vendor account, and
+    ordinary ones."""
     return {
         "plugin_kind": "service",
         "service": {"public_id": PUBLIC_ID, "protocol": 1},
         "features": ["endpoints", "widgets"],
         "connections": [ADMIN_CONNECTION, GITHUB_CONNECTION],
+        "permissions": [
+            {"id": "manage", "level": "initiative", "name": {"en": "Manage"}}
+        ],
         "endpoints": [
             {
                 "id": ORDERS_SUMMARY,
@@ -194,15 +198,9 @@ def _definition() -> dict:
             {
                 "id": REVENUE,
                 "direction": "read",
-                "admin_only": True,
+                "permission": "manage",
                 "cache_ttl_seconds": 0,
                 "returns": [{"key": "tiers", "type": "string", "list": True}],
-            },
-            {
-                "id": LEGACY_REPORT,
-                "direction": "read",
-                "visibility": "guild_admin",
-                "cache_ttl_seconds": 0,
             },
             {
                 "id": LIST_SHOPS,
@@ -261,7 +259,7 @@ def _definition() -> dict:
     }
 
 
-def _dashboard_definition(*endpoint_ids: str, sql: str | None = None) -> dict:
+def _dashboard_definition(*endpoint_ids: str) -> dict:
     return normalize_dashboard_definition(
         {
             "widgets": [
@@ -272,7 +270,6 @@ def _dashboard_definition(*endpoint_ids: str, sql: str | None = None) -> dict:
                         "source": "plugin",
                         "plugin_uid": PLUGIN_UID,
                         "endpoint_id": endpoint_id,
-                        **({"sql": sql} if sql else {}),
                     },
                 }
                 for index, endpoint_id in enumerate(endpoint_ids)
@@ -311,17 +308,19 @@ def _clean_cache():
 def upstream(monkeypatch):
     """Stand in for the plug-in service, recording every call it receives.
 
-    Returns a recorder whose ``calls`` holds the outgoing `httpx.Request`s — so a
+    Returns a recorder whose ``calls`` holds the outgoing `httpx2.Request`s — so a
     test can assert on the minted token and the URL — and whose ``rows`` and
     ``values`` are what the plug-in answers with next.
     """
 
     class Recorder:
         def __init__(self) -> None:
-            self.calls: list[httpx.Request] = []
+            self.calls: list[httpx2.Request] = []
             self.rows: list = [{"id": 1}]
             self.values: dict = {}
             self.error: Exception | None = None
+            #: Holds each call until this many are waiting together.
+            self.together: asyncio.Barrier | None = None
 
         @property
         def count(self) -> int:
@@ -331,6 +330,8 @@ def upstream(monkeypatch):
 
     async def _fake_read_answer(request, *, endpoint, transport=None):
         recorder.calls.append(request)
+        if recorder.together is not None:
+            await asyncio.wait_for(recorder.together.wait(), timeout=2)
         if recorder.error is not None:
             raise recorder.error
         return list(recorder.rows), dict(recorder.values)
@@ -364,9 +365,7 @@ async def _install(session: AsyncSession, actor, **overrides):
     )
 
 
-async def _workspace(
-    session: AsyncSession, acting_user, *sources: str, sql: str | None = None
-):
+async def _workspace(session: AsyncSession, acting_user, *sources: str):
     """A guild admin with a dashboards-enabled initiative, an installed plug-in, a
     live registration, and a dashboard binding the given sources."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -380,9 +379,23 @@ async def _workspace(
         session,
         a.initiative,
         a.user,
-        definition=_dashboard_definition(*(sources or (ORDERS_SUMMARY,)), sql=sql),
+        definition=_dashboard_definition(*(sources or (ORDERS_SUMMARY,))),
     )
     return a, plugin, dashboard
+
+
+async def _editor(session: AsyncSession, acting_user, a, dashboard):
+    """A member of the dashboard's initiative who may edit it."""
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    await create_resource_grant(
+        session, dashboard, level=ResourceAccessLevel.write, user=member.user
+    )
+    return member
 
 
 def _url(actor, plugin, endpoint_id: str, dashboard, **params) -> str:
@@ -445,6 +458,26 @@ class TestGates:
         assert response.status_code == 404
         assert upstream.count == 0
 
+    async def test_previewing_a_widget_takes_write_access_to_its_dashboard(
+        self, client, acting_user, session, upstream
+    ):
+        """Somebody who reads the dashboard reads its widgets with the canvas,
+        with the parameters each stores."""
+        a, plugin, dashboard = await _workspace(session, acting_user)
+        viewer = await acting_user(
+            guild_role=CommunityRole.member,
+            guild=a.guild,
+            initiative=a.initiative,
+            initiative_role="member",
+        )
+
+        response = await client.get(
+            _url(viewer, plugin, ORDERS_SUMMARY, dashboard, params='{"range":"7d"}'),
+            headers=viewer.headers,
+        )
+        assert response.status_code == 403
+        assert upstream.count == 0
+
     async def test_a_dashboard_is_not_a_key_to_every_source(
         self, client, acting_user, session, upstream
     ):
@@ -472,39 +505,30 @@ class TestGates:
         assert upstream.count == 0
 
 
-class TestAdminOnly:
-    @pytest.mark.parametrize("source", [REVENUE, LEGACY_REPORT])
-    async def test_an_admin_only_source_is_open_to_an_admin(
-        self, client, acting_user, session, upstream, source
+class TestPermission:
+    async def test_a_source_naming_a_permission_is_open_to_who_holds_it(
+        self, client, acting_user, session, upstream
     ):
-        a, plugin, dashboard = await _workspace(session, acting_user, source)
+        a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
 
         response = await client.get(
-            _url(a, plugin, source, dashboard), headers=a.headers
+            _url(a, plugin, REVENUE, dashboard), headers=a.headers
         )
         assert response.status_code == 200, response.text
 
-    @pytest.mark.parametrize("source", [REVENUE, LEGACY_REPORT])
-    async def test_an_admin_only_source_is_refused_to_a_member(
-        self, client, acting_user, session, upstream, source
+    async def test_it_is_refused_to_a_member_whose_role_does_not(
+        self, client, acting_user, session, upstream
     ):
-        """Checked against the caller's real guild role, on the pinned
-        definition — including one pinned under the earlier contract's
-        ``visibility: "guild_admin"`` — not against anything the request
-        supplied."""
-        a, plugin, dashboard = await _workspace(session, acting_user, source)
-        member = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        """Checked against the caller's role in the dashboard's initiative, on
+        the pinned definition, not against anything the request supplied."""
+        a, plugin, dashboard = await _workspace(session, acting_user, REVENUE)
+        member = await _editor(session, acting_user, a, dashboard)
 
         response = await client.get(
-            _url(member, plugin, source, dashboard), headers=member.headers
+            _url(member, plugin, REVENUE, dashboard), headers=member.headers
         )
         assert response.status_code == 403
-        assert response.json()["detail"] == PluginDataMessages.ADMIN_ONLY
+        assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
         assert upstream.count == 0
 
 
@@ -700,7 +724,7 @@ class TestConnections:
                 user_id=a.user.id,
                 connection_ref="cr_blocked",
                 status="blocked",
-                blocked_at=datetime.now(timezone.utc),
+                blocked_at=datetime.now(UTC),
             )
         )
         await session.commit()
@@ -767,15 +791,10 @@ class TestCache:
     async def test_repeat_reads_of_guild_data_cost_one_upstream_call(
         self, client, acting_user, session, upstream
     ):
-        """Twenty viewers of a dashboard are one call to the plug-in, which is what
-        keeps a single-replica community container comfortable."""
+        """Two people reading one source are one call to the plug-in, which is
+        what keeps a single-replica community container comfortable."""
         a, plugin, dashboard = await _workspace(session, acting_user)
-        member = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        member = await _editor(session, acting_user, a, dashboard)
 
         first = await client.get(
             _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
@@ -815,12 +834,7 @@ class TestCache:
         shared entry would show one person the other's data.
         """
         a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
-        b = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        b = await _editor(session, acting_user, a, dashboard)
         await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
         await _connect(session, plugin=plugin, user=b.user, ref="cr_bob")
 
@@ -941,6 +955,7 @@ class TestWidgetCatalog:
         entry = response.json()["items"][0]
         assert entry["plugin_uid"] == PLUGIN_UID
         assert entry["plugin_id"] == plugin.id
+        assert entry["public_id"] == PUBLIC_ID
 
         widget = entry["widgets"][0]
         assert widget["type"] == f"plugin:{PLUGIN_UID}:summary"
@@ -957,10 +972,8 @@ class TestWidgetCatalog:
         }
 
         sources = {source["id"]: source for source in entry["endpoints"]}
-        assert sources[REVENUE]["admin_only"] is True
-        assert sources[LEGACY_REPORT]["admin_only"] is True
-        assert sources[ORDERS_SUMMARY]["admin_only"] is False
-        assert "visibility" not in sources[LEGACY_REPORT]
+        assert sources[REVENUE]["permission"] == "manage"
+        assert sources[ORDERS_SUMMARY]["permission"] is None
         assert sources[ORDERS_SUMMARY]["cache_ttl_seconds"] == 60
 
     async def test_a_disabled_install_offers_no_widgets(
@@ -1137,12 +1150,13 @@ class TestParamOptions:
         assert response.status_code == 200, response.text
         assert response.json() == {"options": [], "unavailable": "unresolved"}
 
-    async def test_a_member_is_told_nothing_by_an_admin_only_source(
+    async def test_a_member_is_told_nothing_by_a_source_naming_a_permission(
         self, client, acting_user, session, upstream
     ):
-        """The source's own ``admin_only`` decides, exactly as it does for a
-        tile. A member asking for the values of a parameter sourced from an
-        admin-only read gets the same answer as one whose plug-in is down."""
+        """The source's own ``permission`` decides, exactly as it does for a
+        tile. A member asking for the values of a parameter sourced from a
+        read they do not hold gets the same answer as one whose plug-in is
+        down."""
         a, plugin, _ = await _workspace(session, acting_user)
         member = await acting_user(guild=a.guild, guild_role=CommunityRole.member)
 
@@ -1153,7 +1167,7 @@ class TestParamOptions:
         assert response.json() == {"options": [], "unavailable": "unresolved"}
         assert upstream.count == 0
 
-    async def test_a_member_fills_in_no_form_for_an_admin_only_endpoint(
+    async def test_a_member_fills_in_no_form_for_an_endpoint_they_do_not_hold(
         self, client, acting_user, session, upstream
     ):
         """Refused before the parameter is looked for: the form belongs to an
@@ -1165,7 +1179,7 @@ class TestParamOptions:
             _options_url(member, plugin, REVENUE, "anything"), headers=member.headers
         )
         assert response.status_code == 403
-        assert response.json()["detail"] == PluginDataMessages.ADMIN_ONLY
+        assert response.json()["detail"] == PluginDataMessages.PERMISSION_REQUIRED
         assert upstream.count == 0
 
     async def test_a_guild_admin_reads_that_same_source(
@@ -1174,8 +1188,12 @@ class TestParamOptions:
         a, plugin, _ = await _workspace(session, acting_user)
         upstream.rows = [{"tiers": "gold"}]
 
+        # Read where the form is filled in: the source names a permission.
         response = await client.get(
-            _options_url(a, plugin, ORDERS_SUMMARY, "tier"), headers=a.headers
+            _options_url(
+                a, plugin, ORDERS_SUMMARY, "tier", initiative_id=a.initiative.id
+            ),
+            headers=a.headers,
         )
         assert response.status_code == 200, response.text
         assert [o["value"] for o in response.json()["options"]] == ["gold"]
@@ -1391,16 +1409,12 @@ class TestListParams:
         assert upstream.count == 0
 
 
-class TestAStatementOverTheRows:
-    """A built-in widget pointed at a plug-in.
+class TestTheCanvas:
+    """A dashboard's widgets read a plug-in with what they store, in its
+    canvas read: a plug-in's own widget with its binding's parameters, and a
+    built-in widget with a statement that names the endpoint."""
 
-    The plug-in's own rows are read by its own module, by the names its manifest
-    declared. A statement is what lets a chart or a table be pointed at them
-    instead — evaluated here, over the answer the proxy already fetched, so
-    twenty viewers are still one upstream call.
-    """
-
-    async def test_the_widget_gets_what_its_statement_made_of_the_rows(
+    async def test_a_statement_and_a_plugin_widget_read_one_answer(
         self, client, session, acting_user, upstream
     ):
         upstream.rows = [
@@ -1408,79 +1422,107 @@ class TestAStatementOverTheRows:
             {"days": "mon", "totals": 4},
             {"days": "tue", "totals": 5},
         ]
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days AS day, sum(totals) AS total FROM rows GROUP BY days",
+        upstream.values = {"total": 12}
+        a, _plugin, dashboard = await _workspace(session, acting_user)
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": "own",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": "7d"},
+                        },
+                    },
+                    {
+                        "id": "chart",
+                        "type": "table",
+                        "binding": {
+                            "source": "query",
+                            "sql": f"SELECT o.days AS day, sum(o.totals) AS total "
+                            f"FROM plugin('{PUBLIC_ID}', 'orders-summary', "
+                            f"range => '7d') AS o GROUP BY o.days ORDER BY 1",
+                        },
+                    },
+                ]
+            }
         )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="w1"),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.json()
-        body = response.json()
-        assert body["table"]["columns"] == [
-            {"name": "day", "type": "text", "grain": None, "date_only": False},
-            {"name": "total", "type": "number", "grain": None, "date_only": False},
-        ]
-        assert body["table"]["rows"] == [["mon", 7.0], ["tue", 5.0]]
+        session.add(dashboard)
+        await session.commit()
 
-    async def test_two_outputs_of_one_name_both_survive(
+        response = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        assert response.status_code == 200, response.text
+        widgets = response.json()["widgets"]
+        assert widgets["own"]["plugin"]["rows"] == upstream.rows
+        assert widgets["own"]["plugin"]["values"] == {"total": 12}
+        assert widgets["chart"]["result"]["rows"] == [["mon", 7], ["tue", 5]]
+        assert upstream.count == 1
+        assert json.loads(upstream.calls[0].content)["params"] == {"range": "7d"}
+
+    async def test_plugins_are_called_together(
         self, client, session, acting_user, upstream
     ):
-        """Positional, for the reason every read of this surface is: a mapping
-        would keep one of the two."""
-        upstream.rows = [{"days": "mon", "totals": 3}]
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days, totals AS days FROM rows",
+        """Each widget's call is settled first, and then every plug-in is
+        called at once, so the canvas waits for the slowest of them."""
+        upstream.together = asyncio.Barrier(2)
+        a, _plugin, dashboard = await _workspace(session, acting_user)
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": f"w{days}",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": f"{days}d"},
+                        },
+                    }
+                    for days in (7, 30)
+                ]
+            }
         )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="w1"),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.json()
-        assert response.json()["table"]["rows"] == [["mon", 3]]
+        session.add(dashboard)
+        await session.commit()
 
-    async def test_a_binding_with_no_statement_is_untouched(
+        response = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        widgets = response.json()["widgets"]
+        assert widgets["w7"]["plugin"]["rows"] == [{"id": 1}]
+        assert widgets["w30"]["plugin"]["rows"] == [{"id": 1}]
+        assert upstream.count == 2
+
+    async def test_a_dashboard_run_as_its_initiative_calls_as_the_installation(
         self, client, session, acting_user, upstream
     ):
-        """The plug-in's own widget still reads its own rows, by its own names."""
-        a, plugin, dashboard = await _workspace(session, acting_user)
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
-        )
-        assert response.status_code == 200
-        body = response.json()
-        assert body["table"] is None
-        assert body["rows"] == [{"id": 1}]
+        """An endpoint on each member's own connection answers for one person,
+        so a dashboard everyone sees the same way says it needs one."""
+        a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
+        await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
 
-    async def test_the_statement_that_runs_is_the_stored_one(
-        self, client, session, acting_user, upstream
-    ):
-        """Naming a widget that is not on this dashboard changes nothing —
-        there is nowhere for a request to put a statement of its own."""
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days AS day FROM rows",
+        mine = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
         )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="nope"),
-            headers=a.headers,
+        dashboard.view_mode = DashboardViewMode.initiative.value
+        session.add(dashboard)
+        await session.commit()
+        everyones = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
         )
-        assert response.status_code == 200
-        # Untransformed, because no widget of that id binds this endpoint.
-        assert response.json()["table"] is None
 
-
-# ---------------------------------------------------------------------------
-# A declarative plug-in: Initiative calls the vendor itself
-# ---------------------------------------------------------------------------
+        assert mine.json()["widgets"]["w1"]["plugin"]["rows"] == [{"id": 1}]
+        assert (
+            everyones.json()["widgets"]["w1"]["error"]
+            == PluginDataMessages.CONNECTION_REQUIRED
+        )
+        assert upstream.count == 1
 
 
 class TestDeclarative:
@@ -1775,10 +1817,13 @@ LINK_ISSUE = f"plugin.{PUBLIC_ID}.link-issue"
 
 def _action_definition() -> dict:
     """One field and two actions on tasks, each running a write, the second
-    for the community's admins alone."""
+    naming a permission members do not hold."""
     return {
         "plugin_kind": "service",
         "service": {"public_id": PUBLIC_ID, "protocol": 1, "scopes": ["projects:read"]},
+        "permissions": [
+            {"id": "manage", "level": "initiative", "name": {"en": "Manage"}}
+        ],
         "endpoints": [{"id": LINK_ISSUE, "direction": "write"}],
         "fields": [
             {"key": "issue", "name": {"en": "Issue"}, "kind": "number", "on": ["task"]}
@@ -1797,7 +1842,7 @@ def _action_definition() -> dict:
                 "endpoint": LINK_ISSUE,
                 "on": ["task"],
                 "menu": False,
-                "admin_only": True,
+                "permission": "manage",
             },
         ],
     }
@@ -1811,7 +1856,7 @@ def _declarative_action_definition() -> dict:
     for the task's title on the community's connection and keeps the number
     found; ``tally`` adds one to it; ``unlink``, for a reader who has
     connected their own account, drops it with no call, keeping what it was;
-    ``relink`` is the community's admins' alone; ``label`` makes the label
+    ``relink`` names a permission members do not hold; ``label`` makes the label
     write as the reader, on the account its request names for the member,
     once they have connected it, and as the installation, on the community's,
     before; ``garble`` answers a targeted change where a change belongs;
@@ -1843,6 +1888,7 @@ def _declarative_action_definition() -> dict:
     )
     definition.update(
         scopes=["projects:read"],
+        permissions=[{"id": "manage", "level": "initiative", "name": {"en": "Manage"}}],
         fields=[
             {"key": "issue", "name": {"en": "Issue"}, "kind": "number", "on": ["task"]},
             {
@@ -1888,7 +1934,7 @@ def _declarative_action_definition() -> dict:
                         "requires": {"all_of": ["github"]},
                     },
                 ),
-                ("relink", {"write": '{"set": {"issue": 1}}', "admin_only": True}),
+                ("relink", {"write": '{"set": {"issue": 1}}', "permission": "manage"}),
                 ("label", {"endpoint": f"plugin.{PUBLIC_ID}.label"}),
                 (
                     "garble",
@@ -1910,7 +1956,7 @@ def plugin_write(monkeypatch):
 
     class Recorder:
         def __init__(self) -> None:
-            self.calls: list[httpx.Request] = []
+            self.calls: list[httpx2.Request] = []
             self.then = None
 
     recorder = Recorder()
@@ -1978,8 +2024,15 @@ async def _action_board(
         )
     ).one()
     session.add(
-        PluginPlacement(
-            install_id=plugin.id, initiative_id=admin.initiative.id, role_ids=[role_id]
+        PluginPlacement(install_id=plugin.id, initiative_id=admin.initiative.id)
+    )
+    session.add(
+        InitiativeRule(
+            initiative_id=admin.initiative.id,
+            initiative_role_id=role_id,
+            install_id=plugin.id,
+            key="use",
+            enabled=True,
         )
     )
     await session.commit()
@@ -2126,7 +2179,7 @@ class TestActions:
             ),
             ("member", "hidden", {}, 404, None),
             ("admin", "elsewhere", {}, 403, "ACTION_NOT_OFFERED"),
-            ("manager", "shared", {}, 403, "ACTION_NOT_OFFERED"),
+            ("viewer", "shared", {}, 403, "ACTION_NOT_OFFERED"),
             ("member", "shared", {"action": "relink"}, 403, "ACTION_NOT_OFFERED"),
             ("member", "mine", {}, 403, "ACTION_NOT_OFFERED"),
         ],
@@ -2135,7 +2188,7 @@ class TestActions:
             "an item kind the action is not on",
             "an item the viewer cannot read",
             "an initiative the install is not placed in",
-            "a role the placement does not allow",
+            "a role not given the install's use",
             "an action for the community's admins alone",
             "an item the install cannot read",
         ],
@@ -2154,11 +2207,20 @@ class TestActions:
     ):
         admin, member, plugin, tasks = await _action_board(session, acting_user)
         actors = {"admin": admin, "member": member}
-        actors["manager"] = await acting_user(
+        # A role no manager's and not given the install's use.
+        await route_session_to_guild(session, admin.guild.id)
+        await create_custom_role(
+            session,
+            initiative_id=admin.initiative.id,
+            name="viewer",
+            display_name="Viewer",
+        )
+        await session.commit()
+        actors["viewer"] = await acting_user(
             guild_role=CommunityRole.member,
             guild=admin.guild,
             initiative=admin.initiative,
-            initiative_role="project_manager",
+            initiative_role="viewer",
         )
         actor = actors[who]
 
@@ -2250,7 +2312,7 @@ class TestActions:
             session, acting_user, _declarative_action_definition()
         )
 
-        async def answer(request: httpx.Request) -> httpx.Response:
+        async def answer(request: httpx2.Request) -> httpx2.Response:
             await route_session_to_guild(session, member.guild.id)
             if unplace:
                 await session.exec(
@@ -2276,7 +2338,7 @@ class TestActions:
             return vendor.handle(request)
 
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(answer)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(answer)
         )
         response = await client.post(
             _run(member, plugin, "tally"),

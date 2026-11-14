@@ -19,8 +19,8 @@ from __future__ import annotations
 import enum
 import hashlib
 from collections.abc import Callable
-from typing import Any
 from dataclasses import dataclass, replace
+from typing import Any
 
 from sqlalchemy import JSON, DateTime, Enum, MetaData
 from sqlmodel import SQLModel
@@ -93,12 +93,12 @@ class ArchiveParent:
     def archived(self, row: str) -> str:
         if self.through is None:
             return (
-                f"EXISTS (SELECT 1 FROM {self.table} a WHERE a.id = {row}.{self.column}"  # noqa: S608 — registry names
+                f"EXISTS (SELECT 1 FROM {self.table} a WHERE a.id = {row}.{self.column}"
                 " AND a.archived_at IS NOT NULL)"
             )
         step, fk = self.through
         return (
-            f"EXISTS (SELECT 1 FROM {step} s JOIN {self.table} a ON a.id = s.{fk}"  # noqa: S608 — registry names
+            f"EXISTS (SELECT 1 FROM {step} s JOIN {self.table} a ON a.id = s.{fk}"
             f" WHERE s.id = {row}.{self.column} AND a.archived_at IS NOT NULL)"
         )
 
@@ -107,7 +107,7 @@ class ArchiveParent:
         if self.through is None:
             return f"{row}.{self.column} = $2"
         step, fk = self.through
-        return f"{row}.{self.column} IN (SELECT id FROM {step} WHERE {fk} = $2)"  # noqa: S608
+        return f"{row}.{self.column} IN (SELECT id FROM {step} WHERE {fk} = $2)"
 
 
 @dataclass(frozen=True)
@@ -207,7 +207,7 @@ def _current_filename(row: str, versions: str) -> str:
     """The uploaded filename of the version a row shows (its
     ``current_version_id`` in ``versions``), or empty where it shows none."""
     return (
-        f"coalesce((SELECT v.original_filename FROM {versions} v"  # noqa: S608 — stated names
+        f"coalesce((SELECT v.original_filename FROM {versions} v"
         f" WHERE v.id = {row}.current_version_id), '')"
     )
 
@@ -315,7 +315,7 @@ def _comment_dac(row: str) -> tuple[str, str]:
         ident = (
             f"{row}.{column}"
             if parent.tool_fk is None
-            else f"(SELECT {parent.tool_fk} FROM {parent.table} "  # noqa: S608 — names from the parent registry
+            else f"(SELECT {parent.tool_fk} FROM {parent.table} "
             f"WHERE id = {row}.{column})"
         )
         tools.append(
@@ -325,7 +325,7 @@ def _comment_dac(row: str) -> tuple[str, str]:
     return f"(CASE {' '.join(tools)} END)", f"(CASE {' '.join(ids)} END)"
 
 
-def _title_expr(source: "SearchSource", row: str = ROW) -> str:
+def _title_expr(source: SearchSource, row: str = ROW) -> str:
     """Row expression yielding a source's stored title."""
     if source.title_sql is not None:
         return source.title_sql(row)
@@ -355,7 +355,7 @@ def _flag_expr(table: str, flag: str, row: str) -> str | None:
     return f"{row}.{column}"
 
 
-def archive_parents(table: str, source: "SearchSource") -> tuple[ArchiveParent, ...]:
+def archive_parents(table: str, source: SearchSource) -> tuple[ArchiveParent, ...]:
     """What archiving takes a row of ``source`` with. A row that carries its
     own ``archived_at`` is stamped by the cascade and needs none; any other
     sits under its governing tool."""
@@ -372,7 +372,7 @@ def archive_parents(table: str, source: "SearchSource") -> tuple[ArchiveParent, 
     return (ArchiveParent(tool, source.dac_id),)
 
 
-def _archived_expr(table: str, source: "SearchSource", row: str) -> str | None:
+def _archived_expr(table: str, source: SearchSource, row: str) -> str | None:
     """Whether a row is archived: stamped itself, or under something that is."""
     legs = [_flag_expr(table, "archived", row)]
     legs += [parent.archived(row) for parent in archive_parents(table, source)]
@@ -380,7 +380,7 @@ def _archived_expr(table: str, source: "SearchSource", row: str) -> str | None:
     return f"({' OR '.join(present)})" if present else None
 
 
-def _written(table: str, source: "SearchSource") -> tuple[str, ...]:
+def _written(table: str, source: SearchSource) -> tuple[str, ...]:
     """The body columns somebody writes in: all of them, less a column that only
     names a kind (an enum, in the database or on the model) or another row (a
     foreign key)."""
@@ -400,7 +400,7 @@ def _written(table: str, source: "SearchSource") -> tuple[str, ...]:
     )
 
 
-def _mentions_expr(table: str, source: "SearchSource", row: str = ROW) -> str:
+def _mentions_expr(table: str, source: SearchSource, row: str = ROW) -> str:
     """Row expression yielding the people a source's body mentions, as words.
 
     A markdown mention in any written column, and in an editor state a mention
@@ -427,7 +427,7 @@ def _mentions_expr(table: str, source: "SearchSource", row: str = ROW) -> str:
     )
 
 
-def _body_expr(source: "SearchSource", row: str = ROW) -> str:
+def _body_expr(source: SearchSource, row: str = ROW) -> str:
     """Row expression yielding a source's body text."""
     if source.body_sql is not None:
         return source.body_sql(row)
@@ -569,6 +569,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "moderation_report_reporters": "who reported a thing; never a search result",
     "moderation_actions": "the moderation log, reached from its own surface",
     "intake_cases": "the key -> task map; the task it names is what is indexed",
+    "idea_votes": "who voted for an idea; never a search result",
     "evidence": "files attached to a report or a case, opened only through it",
     "personal_items": "one member's own opens, bookmarks and subscriptions",
     "engagement_levels": "how widely an item was engaged with, not content",
@@ -648,8 +649,8 @@ WRITE_FUNCTION = "public.search_entry_write"
 
 #: Splits one entity's text into chunks and replaces its rows. Shared by the
 #: refresh trigger and the reindex sweep so both produce identical entries.
-WRITE_FUNCTION_SQL = """
-CREATE OR REPLACE FUNCTION {write_fn}(
+WRITE_FUNCTION_SQL = f"""
+CREATE OR REPLACE FUNCTION {WRITE_FUNCTION}(
     p_schema      text,
     p_entity_type text,
     p_entity_id   integer,
@@ -678,8 +679,8 @@ DECLARE
     v_len   integer;
     v_cut   integer;
     v_space integer;
-    c_chunk constant integer := {chunk};
-    c_max   constant integer := {maxchunks};
+    c_chunk constant integer := {CHUNK_CHARS};
+    c_max   constant integer := {MAX_CHUNKS};
 BEGIN
     EXECUTE format(
         'DELETE FROM %I.search_entries WHERE entity_type = $1 AND entity_id = $2',
@@ -728,11 +729,11 @@ BEGIN
     END LOOP;
 END
 $write$;
-""".format(write_fn=WRITE_FUNCTION, chunk=CHUNK_CHARS, maxchunks=MAX_CHUNKS)
+"""
 
 
-SEARCH_FUNCTION_SQL = """
-CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger
+SEARCH_FUNCTION_SQL = f"""
+CREATE OR REPLACE FUNCTION {SEARCH_FUNCTION}() RETURNS trigger
     LANGUAGE plpgsql AS $search$
 DECLARE
     v_row        record;
@@ -798,7 +799,7 @@ BEGIN
         EXECUTE 'SELECT ' || TG_ARGV[9] INTO v_mentions USING v_row;
     END IF;
 
-    PERFORM {write_fn}(
+    PERFORM {WRITE_FUNCTION}(
         TG_TABLE_SCHEMA, TG_ARGV[1], v_entity, v_initiative,
         v_dac_tool, v_dac_id, v_title, v_body,
         v_archived, v_template, v_mentions
@@ -806,7 +807,7 @@ BEGIN
     RETURN NULL;
 END
 $search$;
-""".format(fn=SEARCH_FUNCTION, write_fn=WRITE_FUNCTION)
+"""
 
 
 def _dac_exprs(source: SearchSource) -> tuple[str, str]:
@@ -826,15 +827,15 @@ DEPENDENT_FUNCTION = "public.refresh_search_dependents"
 #: changed. The statement is rendered per dependency and passed whole, so a row
 #: rewritten here goes through the same expressions as one rewritten by its own
 #: trigger or by the sweep.
-DEPENDENT_FUNCTION_SQL = """
-CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger
+DEPENDENT_FUNCTION_SQL = f"""
+CREATE OR REPLACE FUNCTION {DEPENDENT_FUNCTION}() RETURNS trigger
     LANGUAGE plpgsql AS $dep$
 BEGIN
     EXECUTE TG_ARGV[0] USING TG_TABLE_SCHEMA, NEW.id;
     RETURN NULL;
 END
 $dep$;
-""".format(fn=DEPENDENT_FUNCTION)
+"""
 
 
 def _live_clause(table: str, row: str) -> str:
@@ -896,7 +897,7 @@ def _rewrite_trigger(
     """
     row = "t"
     statement = (
-        f"SELECT {_write_call(table, source, row, '$1')}"  # noqa: S608 — rendered
+        f"SELECT {_write_call(table, source, row, '$1')}"
         f" FROM {table} {row}"
         f" WHERE {rows.format(row=row)}{_live_clause(table, row)}"
     )
@@ -1089,7 +1090,7 @@ def reindex_statement(table: str, source: SearchSource) -> str:
     """
     row = "t"
     return (
-        f"SELECT {row}.id AS id,"  # noqa: S608 — registry-rendered
+        f"SELECT {row}.id AS id,"
         f" {_write_call(table, source, row, ':schema')}"
         f" FROM {table} {row}"
         f" WHERE {row}.id > :cursor{_live_clause(table, row)}"

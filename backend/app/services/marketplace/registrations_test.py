@@ -7,7 +7,7 @@ the operator.
 
 import json
 
-import httpx
+import httpx2
 import pytest
 from fastapi import HTTPException
 from sqlmodel import select
@@ -19,19 +19,18 @@ from app.models.platform.plugin_service_registration import (
     PluginServiceRegistration,
 )
 from app.models.platform.publisher import Publisher
+from app.services.marketplace import registrations as service
 from app.services.marketplace.catalog import (
     CatalogError,
     CatalogSourceConflict,
     upsert_listing,
 )
 from app.services.marketplace.plugin_keys import jwk_thumbprint
-from app.services.marketplace.vendor_values import load_vendor_values
-from app.services.marketplace import registrations as service
 from app.services.marketplace.registration_lookup import load_registrations
+from app.services.marketplace.vendor_values import load_vendor_values
 from app.testing import create_plugin_service_registration, sample_plugin_jwks
 from app.testing.fake_vendor import declarative_plugin
 from app.testing.tuf_repository import service_plugin_definition
-
 
 #: Where the deployment calls the plug-in.
 BASE_URL = "http://127.0.0.1:9100"
@@ -347,13 +346,13 @@ def _serving(*documents: dict):
     from then on."""
     fetched: list[str] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         fetched.append(str(request.url))
-        return httpx.Response(
+        return httpx2.Response(
             200, json=documents[min(len(fetched), len(documents)) - 1]
         )
 
-    return fetched, httpx.MockTransport(handler)
+    return fetched, httpx2.MockTransport(handler)
 
 
 async def test_connect_shows_the_fingerprints_of_the_set_the_plugin_serves(session):
@@ -454,14 +453,14 @@ async def test_connect_refuses_when_the_base_url_moved_during_the_read(
 @pytest.mark.parametrize(
     ("answer", "status", "code"),
     [
-        (httpx.Response(404), 502, PluginServiceMessages.KEYS_UNREADABLE),
+        (httpx2.Response(404), 502, PluginServiceMessages.KEYS_UNREADABLE),
         (
-            httpx.Response(200, content=b"<html>"),
+            httpx2.Response(200, content=b"<html>"),
             502,
             PluginServiceMessages.KEYS_UNREADABLE,
         ),
         (
-            httpx.Response(200, json={"keys": []}),
+            httpx2.Response(200, json={"keys": []}),
             400,
             PluginServiceMessages.INVALID_JWKS,
         ),
@@ -472,7 +471,7 @@ async def test_connect_refuses_what_is_not_a_key_set(session, answer, status, co
 
     with pytest.raises(HTTPException) as excinfo:
         await service.published_keys(
-            session, row.id, transport=httpx.MockTransport(lambda request: answer)
+            session, row.id, transport=httpx2.MockTransport(lambda request: answer)
         )
 
     assert (excinfo.value.status_code, excinfo.value.detail) == (status, code)
@@ -969,37 +968,6 @@ async def test_reconcile_reads_the_key_set_address(session, tmp_path, monkeypatc
     assert (await service.reconcile_from_config(session)).updated == 1
     row = await _registration(session, "acme.published")
     assert row.jwks_uri == f"{HTTPS_BASE_URL}/jwks.json"
-
-
-async def test_reconcile_ignores_grants_in_a_file_written_for_an_earlier_release(
-    session, tmp_path, monkeypatch, caplog
-):
-    """A registration no longer has grants. An entry that still names them is
-    applied without them and the pass says so, so the file does not stop a
-    boot."""
-    await _listed(session, "acme.earlier")
-    monkeypatch.setattr(
-        settings,
-        "PLUGIN_SERVICES_CONFIG",
-        _write_config(
-            tmp_path,
-            [
-                {
-                    "public_id": "acme.earlier",
-                    "base_url": BASE_URL,
-                    "grants": ["delegation", "plugin_directory"],
-                }
-            ],
-        ),
-    )
-
-    with caplog.at_level("WARNING", logger="app.services.marketplace.registrations"):
-        result = await service.reconcile_from_config(session)
-
-    assert (result.updated, result.skipped) == (1, 0)
-    assert any("names grants" in record.getMessage() for record in caplog.records)
-    row = await _registration(session, "acme.earlier")
-    assert not hasattr(row, "grants")
 
 
 async def test_reconcile_is_a_no_op_without_the_setting(session, monkeypatch):

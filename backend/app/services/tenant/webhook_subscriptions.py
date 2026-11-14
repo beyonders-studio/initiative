@@ -4,22 +4,24 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from sqlalchemy import func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core import webhook_events
+from app.core.audit_events import AuditEventType
+from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.messages import WebhookSubscriptionMessages
-from app.core import webhook_events
-from app.core.config import settings
 from app.core.plugin_scopes import plugin_scope
 from app.db import cohorts
-from app.db.session import set_rls_context
-from app.core.audit_events import AuditEventType
 from app.db.guild_standing import InstallContext
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.webhook_delivery import WebhookDelivery
 from app.models.tenant.webhook_subscription import WebhookSubscription
@@ -34,7 +36,6 @@ from app.services.marketplace.registration_lookup import (
 )
 from app.services.marketplace.service_plugins import ENDPOINT_ID_PREFIX
 from app.services.platform.intake import configured_operations_guild_id
-from app.db.request_context import SystemGuild
 
 #: The fields a rewrite reports as moved. ``fields`` is a list of names, so
 #: it is reported as having moved and never copied.
@@ -172,7 +173,8 @@ def assert_install_may_subscribe(
     - Every demo event needs the community-admin standing, held now: the
       token asking for it and the seat's grant holding it.
     - A token narrowed to one initiative subscribes to that initiative only.
-    - A community-wide subscription needs a token that is not narrowed.
+    - A community-wide subscription needs a token that is not narrowed, and
+      a member token's member holding the ``webhooks`` surface.
     - A named initiative is one the install is placed in.
 
     Delivery asks the same of the install again on every pass, against the
@@ -198,7 +200,9 @@ def assert_install_may_subscribe(
             raise refused
     narrowed = context.scope_initiative_id
     if initiative_id is None:
-        if narrowed is not None:
+        if narrowed is not None or not context.member_holds_surface(
+            AdminSurface.webhooks
+        ):
             raise refused
         return
     if narrowed is not None and initiative_id != narrowed:
@@ -283,7 +287,7 @@ async def create_subscription(
     session: AsyncSession,
     *,
     payload: WebhookSubscriptionCreate,
-    created_by: int | None,
+    actor_user_id: int | None,
     guild_id: int,
     plugin_install_id: int | None = None,
 ) -> tuple[WebhookSubscription, str]:
@@ -299,9 +303,10 @@ async def create_subscription(
     references for both at its install, and an envelope should arrive under
     those (``webhook_refs``).
 
-    ``created_by`` is the account this runs as, so it is also who the audit
-    record names. ``None`` for an installed plug-in acting as its community, which
-    names no person (:func:`create_install_subscription`).
+    ``actor_user_id`` is the account this runs as, who the audit record names:
+    ``None`` for an installed plug-in acting as its community, which names no
+    person (:func:`create_install_subscription`). The row's author is the
+    request's, stamped by the database.
     """
     await assert_vocabulary(
         list(payload.event_types),
@@ -311,11 +316,10 @@ async def create_subscription(
     )
 
     secret = _generate_hmac_secret()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     subscription = WebhookSubscription(
         initiative_id=payload.initiative_id,
-        created_by=created_by,
         plugin_install_id=plugin_install_id,
         target_url=str(payload.target_url),
         hmac_secret=secret,
@@ -332,7 +336,7 @@ async def create_subscription(
     await audit_service.record(
         session,
         event_type=AuditEventType.WEBHOOK_CREATED,
-        actor_user_id=created_by,
+        actor_user_id=actor_user_id,
         guild_id=guild_id,
         target_type="webhook_subscription",
         target_id=subscription.id,
@@ -374,7 +378,7 @@ async def create_install_subscription(
     return await create_subscription(
         session,
         payload=payload,
-        created_by=None,
+        actor_user_id=None,
         guild_id=context.guild_id,
         plugin_install_id=context.install_id,
     )
@@ -426,7 +430,7 @@ async def update_subscription(
 
     for field, value in data.items():
         setattr(subscription, field, value)
-    subscription.updated_at = datetime.now(timezone.utc)
+    subscription.updated_at = datetime.now(UTC)
 
     session.add(subscription)
     if actor_user_id is not None:
@@ -479,7 +483,7 @@ async def deactivate_for_install(
     ).all()
     for row in rows:
         row.active = False
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         session.add(row)
     return len(rows)
 

@@ -1,4 +1,5 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import type {
   SearchCommunityParams,
@@ -7,12 +8,11 @@ import type {
   SuggestCommunityParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getRecentCommunityQueryKey,
-  getSearchCommunityQueryKey,
-  getSuggestCommunityQueryKey,
-  recentCommunity,
-  searchCommunity,
-  suggestCommunity,
+  getRecentCommunityQueryOptions,
+  getSuggestCommunityQueryOptions,
+  useRecentCommunity,
+  useSearchCommunity,
+  useSuggestCommunity,
 } from "@/api/generated/search/search";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { QueryOpts } from "@/types/query";
@@ -29,11 +29,8 @@ export const useCommunitySearch = (
   options?: QueryOpts<SearchResults>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<SearchResults>({
-    queryKey: getSearchCommunityQueryKey(communityId, params),
-    queryFn: () => searchCommunity(communityId, params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useSearchCommunity(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -101,11 +98,8 @@ export const useCommunitySearchSuggest = (
   const communityId = useActiveCommunityId();
   const { filters, queryOptions } = splitFilters<SearchSuggestion[]>(options);
   const params: SuggestCommunityParams = { search: query, ...filters };
-  return useQuery<SearchSuggestion[]>({
-    queryKey: getSuggestCommunityQueryKey(communityId, params),
-    queryFn: () => suggestCommunity(communityId, params),
-    placeholderData: keepPreviousData,
-    ...queryOptions,
+  return useSuggestCommunity(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...queryOptions },
   });
 };
 
@@ -125,11 +119,7 @@ const useCommunityRecentSuggestions = (
   const communityId = useActiveCommunityId();
   const { filters, queryOptions } = splitFilters<SearchSuggestion[]>(options);
   const params = { ...filters };
-  return useQuery<SearchSuggestion[]>({
-    queryKey: getRecentCommunityQueryKey(communityId, params),
-    queryFn: () => recentCommunity(communityId, params),
-    ...queryOptions,
-  });
+  return useRecentCommunity(communityId, params, { query: queryOptions });
 };
 
 // One stable empty answer, so a picker's own memos do not recompute on every
@@ -184,4 +174,24 @@ export const useCommunityPickerSuggestions = (
     isLoading: active.isLoading,
     isFetching: active.isFetching,
   };
+};
+
+/**
+ * What a picker offers, as `useCommunityPickerSuggestions` asks it (the recent
+ * things until words are typed, then what they match), asked when the picker
+ * wants an answer rather than while it draws, and answered from the same
+ * cache: for a picker that takes its lookup as a function.
+ */
+export const usePickerSuggestionsNow = () => {
+  const communityId = useActiveCommunityId();
+  const queryClient = useQueryClient();
+  return useCallback(
+    (query: string, filters: SuggestFilters): Promise<SearchSuggestion[]> =>
+      query.trim()
+        ? queryClient.fetchQuery(
+            getSuggestCommunityQueryOptions(communityId, { ...filters, search: query })
+          )
+        : queryClient.fetchQuery(getRecentCommunityQueryOptions(communityId, filters)),
+    [communityId, queryClient]
+  );
 };

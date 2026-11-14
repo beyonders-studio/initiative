@@ -5,7 +5,7 @@ boundary — lives in
 ``app/api/v1/tenant_endpoints/task_completion_test.py``.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -13,7 +13,7 @@ import pytest
 from app.models.tenant.task import Task, TaskStatusCategory
 from app.services.tenant.task_completion import sync_completed_at
 
-NOW = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 EARLIER = NOW - timedelta(days=3)
 
 

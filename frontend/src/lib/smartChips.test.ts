@@ -10,7 +10,6 @@ import {
 import { nextAsk } from "@/hooks/useSmartChips";
 import {
   CHIP_ENTITY_TYPES,
-  CHIP_TONE_CLASSES,
   chipAspect,
   chipDisplay,
   chipEntityType,
@@ -19,6 +18,7 @@ import {
   isSmartChipKind,
   SMART_CHIP_KINDS,
 } from "@/lib/smartChips";
+import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 
 const iso = (date: string) => new Date(date).toISOString();
 const formatDate = () => "formatted";

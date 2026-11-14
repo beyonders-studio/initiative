@@ -3,7 +3,7 @@ crosses its threshold — however many instances counted it."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -32,7 +32,7 @@ from app.testing import (
 )
 
 #: Inside one ten-minute window, whenever the test runs.
-_AT = datetime(2026, 10, 9, 12, 1, tzinfo=timezone.utc)
+_AT = datetime(2026, 10, 9, 12, 1, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
@@ -177,7 +177,7 @@ async def test_old_windows_are_forgotten(session):
 
     async with cohorts.system_session(None) as system:
         gone = await security_signals.forget_old(
-            system, now=datetime(2026, 10, 20, tzinfo=timezone.utc)
+            system, now=datetime(2026, 10, 20, tzinfo=UTC)
         )
         await system.commit()
     assert gone >= 1

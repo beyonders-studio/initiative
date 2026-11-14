@@ -3,9 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useGlobalProjects } from "@/hooks/useProjects";
+import { Input } from "@/ui/input";
+import { LoadMore } from "@/ui/load-more";
+import { WizardOption } from "@/ui/wizard-dialog";
 
 interface ProjectPickerStepProps {
   communityId: number;
@@ -89,28 +90,18 @@ export function ProjectPickerStep({ communityId, initiativeId, onPick }: Project
       ) : (
         <>
           {filteredProjects.map((project) => (
-            <button
+            <WizardOption
               key={project.id}
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              icon={<ListTodo className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              title={project.name}
               onClick={() => onPick(project)}
-            >
-              <ListTodo className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="font-medium text-sm">{project.name}</span>
-            </button>
+            />
           ))}
-          {hasMoreProjects && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full"
-              onClick={() => setProjectPage((p) => p + 1)}
-              disabled={projectsQuery.isFetching}
-            >
-              {projectsQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("createWizard.loadMore")}
-            </Button>
-          )}
+          <LoadMore
+            hasMore={hasMoreProjects}
+            loading={projectsQuery.isFetching}
+            onLoadMore={() => setProjectPage((p) => p + 1)}
+          />
         </>
       )}
     </div>

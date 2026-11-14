@@ -12,15 +12,15 @@ import io
 import json
 import zipfile
 
-import httpx
+import httpx2
 import pytest
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import atlassian, jira_fetch
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.atlassian_bundle import BundleWriter
 from app.services.import_engine.atlassian_test import answered
 from app.services.import_engine.contract import ImportEngineError
-from app.services.import_engine import limits as import_limits
 
 
 @pytest.fixture(autouse=True)
@@ -71,18 +71,18 @@ def _site(monkeypatch, *, issues=None, pages=None, project_status=200, boards=Tr
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         calls.append({"method": method, "url": url, "json": json})
         if "/rest/api/3/project/" in url and url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
             if project_status != 200:
-                return httpx.Response(project_status, json={})
+                return httpx2.Response(project_status, json={})
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": f"{key} Board"})
+            return httpx2.Response(200, json={"key": key, "name": f"{key} Board"})
         if "/rest/agile/1.0/board?" in url:
             if not boards:
-                return httpx.Response(404, json={})
-            return httpx.Response(200, json={"values": [{"id": 7}]})
+                return httpx2.Response(404, json={})
+            return httpx2.Response(200, json={"values": [{"id": 7}]})
         if "/configuration" in url:
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "columnConfig": {
@@ -98,14 +98,14 @@ def _site(monkeypatch, *, issues=None, pages=None, project_status=200, boards=Tr
                 idx = state["page"]
                 state["page"] += 1
                 if idx >= len(pages):
-                    return httpx.Response(200, json={"issues": []})
+                    return httpx2.Response(200, json={"issues": []})
                 page_issues, next_token = pages[idx]
                 body = {"issues": page_issues}
                 if next_token:
                     body["nextPageToken"] = next_token
-                return httpx.Response(200, json=body)
-            return httpx.Response(200, json={"issues": issues or []})
-        return httpx.Response(404, json={})
+                return httpx2.Response(200, json=body)
+            return httpx2.Response(200, json={"issues": issues or []})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     return calls
@@ -119,7 +119,7 @@ async def _bundle(monkeypatch, **kw):
             CREDENTIAL,
             project_keys=kw.pop("project_keys", ["ACME"]),
             guild_id=1,
-            app_version="0.0.0-test",
+            app_version="0.78.0-test",
             store=writer.put_asset,
             **kw,
         )
@@ -132,7 +132,7 @@ async def _bundle(monkeypatch, **kw):
             guild_id=1,
             guild_name="Acme",
             target_initiative_id=42,
-            app_version="0.0.0-test",
+            app_version="0.78.0-test",
             site_url=CREDENTIAL.site_url,
         ).read_bytes()
     return bundle, fetched.report
@@ -230,7 +230,7 @@ async def test_a_narrowing_narrows_rather_than_replaces(monkeypatch):
     calls = _site(monkeypatch, issues=[])
     await _bundle(monkeypatch, jql_extra="created >= -30d")
 
-    jql = [c for c in calls if "search/jql" in c["url"]][0]["json"]["jql"]
+    jql = next(c for c in calls if "search/jql" in c["url"])["json"]["jql"]
     assert jql == 'project = "ACME" AND (created >= -30d) ORDER BY Rank ASC'
 
 
@@ -331,17 +331,17 @@ async def test_an_unreadable_project_is_counted_not_fatal(monkeypatch):
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "/rest/api/3/project/LOCKED" in url and not url.endswith("/statuses"):
-            return httpx.Response(403, json={})
+            return httpx2.Response(403, json={})
         if "/rest/api/3/project/" in url and url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": key})
+            return httpx2.Response(200, json={"key": key, "name": key})
         if "/rest/agile/1.0/board?" in url:
-            return httpx.Response(404, json={})
+            return httpx2.Response(404, json={})
         if "search/jql" in url:
-            return httpx.Response(200, json={"issues": [_issue("ACME-1", "One")]})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"issues": [_issue("ACME-1", "One")]})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     _payload, report = await _bundle(monkeypatch, project_keys=["ACME", "LOCKED"])
@@ -356,15 +356,15 @@ async def test_progress_hears_every_project_read_or_not(monkeypatch):
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "/rest/api/3/project/LOCKED" in url:
-            return httpx.Response(403, json={})
+            return httpx2.Response(403, json={})
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": key})
+            return httpx2.Response(200, json={"key": key, "name": key})
         if "search/jql" in url:
-            return httpx.Response(200, json={"issues": [_issue("ACME-1", "One")]})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"issues": [_issue("ACME-1", "One")]})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     heard: list[tuple[int, int, list[str]]] = []
@@ -407,7 +407,7 @@ async def test_being_throttled_stops_the_whole_fetch(monkeypatch):
     long one."""
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
-        return httpx.Response(429, json={})
+        return httpx2.Response(429, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     with pytest.raises(ImportEngineError) as exc:
@@ -464,12 +464,12 @@ async def test_a_throttled_board_lookup_is_not_mistaken_for_no_board(monkeypatch
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "/rest/agile/1.0/board" in url:
-            return httpx.Response(429, json={})
+            return httpx2.Response(429, json={})
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
-            return httpx.Response(200, json={"key": "ACME", "name": "ACME"})
-        return httpx.Response(200, json={"issues": []})
+            return httpx2.Response(200, json={"key": "ACME", "name": "ACME"})
+        return httpx2.Response(200, json={"issues": []})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     with pytest.raises(ImportEngineError) as exc:
@@ -487,14 +487,14 @@ def _two_projects(monkeypatch, issues_by_project):
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         calls.append({"url": url, "json": json})
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": key})
+            return httpx2.Response(200, json={"key": key, "name": key})
         if "search/jql" in url and json is not None:
             key = json["jql"].split('"')[1]
-            return httpx.Response(200, json={"issues": issues_by_project[key]})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"issues": issues_by_project[key]})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     return calls
@@ -610,7 +610,7 @@ async def test_the_field_catalog_is_read_once_and_counts_sum_across_projects(
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if url.endswith("/rest/api/3/field"):
             catalog_calls.append(url)
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json=[
                     {
@@ -622,17 +622,17 @@ async def test_the_field_catalog_is_read_once_and_counts_sum_across_projects(
                 ],
             )
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": key})
+            return httpx2.Response(200, json={"key": key, "name": key})
         if "search/jql" in url and json is not None:
             key = json["jql"].split('"')[1]
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={"issues": [_issue(f"{key}-1", "One", customfield_1=3)]},
             )
-        return httpx.Response(404, json={})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     _payload, report = await _bundle(monkeypatch, project_keys=["ACME", "OPS"])
@@ -668,16 +668,16 @@ def _sprint_site(monkeypatch, issues):
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if url.endswith("/rest/api/3/field"):
-            return httpx.Response(200, json=catalog)
+            return httpx2.Response(200, json=catalog)
         if "/rest/agile/1.0/board/3" in url:
-            return httpx.Response(200, json={"id": 3, "name": "Door team"})
+            return httpx2.Response(200, json={"id": 3, "name": "Door team"})
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
-            return httpx.Response(200, json={"key": "ACME", "name": "ACME"})
+            return httpx2.Response(200, json={"key": "ACME", "name": "ACME"})
         if "search/jql" in url:
-            return httpx.Response(200, json={"issues": issues})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"issues": issues})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
 
@@ -786,14 +786,14 @@ async def test_comments_come_with_their_issue_and_the_rest_are_paged_in(monkeypa
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "/comment?" in url:
             comment_calls.append(url)
-            return httpx.Response(200, json={"comments": rest, "total": 2})
+            return httpx2.Response(200, json={"comments": rest, "total": 2})
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
-            return httpx.Response(200, json={"key": "ACME", "name": "ACME"})
+            return httpx2.Response(200, json={"key": "ACME", "name": "ACME"})
         if "search/jql" in url:
             assert json is not None and "comment" in json["fields"]
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "issues": [
@@ -815,7 +815,7 @@ async def test_comments_come_with_their_issue_and_the_rest_are_paged_in(monkeypa
                     ]
                 },
             )
-        return httpx.Response(404, json={})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     payload, report = await _bundle(monkeypatch)
@@ -889,14 +889,16 @@ def _image_site(monkeypatch, issues, content=b"\x89PNG-bytes"):
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         calls.append({"url": url, "json": json})
         if "/attachment/content/" in url:
-            return await answered(method, url, httpx.Response(200, content=content), kw)
+            return await answered(
+                method, url, httpx2.Response(200, content=content), kw
+            )
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=STATUSES)
+            return httpx2.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:
-            return httpx.Response(200, json={"key": "ACME", "name": "ACME"})
+            return httpx2.Response(200, json={"key": "ACME", "name": "ACME"})
         if "search/jql" in url:
-            return httpx.Response(200, json={"issues": issues})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"issues": issues})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     return calls

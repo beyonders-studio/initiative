@@ -9,13 +9,15 @@ is pinned in ``user_stream_test``. What is left here is the inbox's half:
 * the notification service pokes the right person at the right moment.
 """
 
+from typing import ClassVar
+
 from sqlmodel import select
 
 from app.models.platform.notification import Notification, NotificationType
 from app.services.platform import user_notifications
 from app.services.platform.notification_stream import queue_signal
-from app.testing.sockets import settle
 from app.testing import create_user
+from app.testing.sockets import settle
 
 
 async def test_frame_carries_no_notification_content(session, account_socket) -> None:
@@ -287,7 +289,7 @@ async def test_queue_signal_ignores_a_missing_recipient() -> None:
     inside someone else's transaction."""
 
     class Session:
-        info: dict = {}
+        info: ClassVar[dict] = {}
 
     session = Session()
     queue_signal(session, None)

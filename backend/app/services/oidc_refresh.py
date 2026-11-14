@@ -4,17 +4,17 @@ import base64
 import binascii
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-import httpx
+import httpx2
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import (
+    SALT_OIDC_CLIENT_SECRET,
     decrypt_field,
     decrypt_token,
     encrypt_token,
-    SALT_OIDC_CLIENT_SECRET,
 )
 from app.db import session as db_session
 from app.models.platform.auth_provider import AuthProvider
@@ -38,10 +38,9 @@ _SYNC_INTERVAL = timedelta(minutes=15)
 async def _fetch_oidc_metadata(issuer_url: str) -> dict:
     normalized = issuer_url.rstrip("/")
     well_known_suffix = "/.well-known/openid-configuration"
-    if normalized.endswith(well_known_suffix):
-        normalized = normalized[: -len(well_known_suffix)]
+    normalized = normalized.removesuffix(well_known_suffix)
     discovery_url = f"{normalized}{well_known_suffix}"
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx2.AsyncClient(timeout=10) as client:
         resp = await client.get(discovery_url)
         resp.raise_for_status()
         return resp.json()
@@ -85,7 +84,7 @@ async def _refresh_and_sync_identity(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx2.AsyncClient(timeout=10) as client:
             token_resp = await client.post(token_endpoint, data=token_payload)
             if token_resp.status_code in (400, 401):
                 logger.warning(
@@ -121,10 +120,10 @@ async def _refresh_and_sync_identity(
             )
             userinfo_resp.raise_for_status()
             profile = userinfo_resp.json()
-    except httpx.HTTPStatusError:
+    except httpx2.HTTPStatusError:
         logger.exception("HTTP error during OIDC refresh for user %s", user.id)
         return False
-    except httpx.RequestError:
+    except httpx2.RequestError:
         logger.exception("Network error during OIDC refresh for user %s", user.id)
         return False
 
@@ -172,7 +171,7 @@ async def _refresh_and_sync_identity(
                 user.id,
                 ", ".join(missing),
             )
-            identity.last_synced_at = datetime.now(timezone.utc)
+            identity.last_synced_at = datetime.now(UTC)
             session.add(identity)
             await session.commit()
             return True
@@ -196,7 +195,7 @@ async def _refresh_and_sync_identity(
         len(sync_result.initiatives_removed),
     )
 
-    identity.last_synced_at = datetime.now(timezone.utc)
+    identity.last_synced_at = datetime.now(UTC)
     session.add(identity)
     await session.commit()
     return True
@@ -214,7 +213,7 @@ async def process_oidc_refresh_sync() -> None:
         provider_ids = (
             await session.exec(
                 select(AuthProvider.id).where(
-                    AuthProvider.enabled == True,  # noqa: E712
+                    AuthProvider.enabled == True,
                     provider_placement.syncs_placement(),
                     AuthProvider.issuer.is_not(None),
                     AuthProvider.client_id.is_not(None),
@@ -271,7 +270,7 @@ async def _sweep_provider(session: AsyncSession, provider: AuthProvider) -> None
         )
         return
 
-    cutoff = datetime.now(timezone.utc) - _SYNC_INTERVAL
+    cutoff = datetime.now(UTC) - _SYNC_INTERVAL
     stmt = (
         select(FederatedIdentity, FederatedIdentitySecret, User)
         .join(

@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import {
+  ActorKind,
   type CalendarEventRead,
   type RSVPStatus,
   SearchEntityType,
@@ -20,28 +21,14 @@ import {
   type UserPublic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { isRepeating, utcDateKey } from "@/components/calendar/eventCalendarEntry";
+import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
+import { TagsField } from "@/components/tags/TagsField";
 import {
   EventDateTimeFields,
   type EventTiming,
   eventRange,
-} from "@/components/initiativeTools/events/EventDateTimeFields";
-import { toDateKey, toTimeSlot } from "@/components/initiativeTools/events/eventDateTime";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
-import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+} from "@/components/tools/calendars/EventDateTimeFields";
+import { toDateKey, toTimeSlot } from "@/components/tools/calendars/eventDateTime";
 import { useAuth } from "@/hooks/useAuth";
 import {
   type EventPatch,
@@ -51,29 +38,48 @@ import {
   useOccurrenceAction,
   useUpdateEventRSVP,
 } from "@/hooks/useCalendarEvents";
-import { ItemDraftContext } from "@/hooks/useFieldSave";
+import { itemSaves } from "@/hooks/useFieldSave";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { referenceRef } from "@/lib/smartChips";
+import { eventRoute } from "@/lib/tools";
+import { getUserDisplayName, toMember } from "@/lib/userDisplay";
+import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { filledBy, hasAny, hasText, sentOr } from "@/ui/layouts/detailLayout";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  sameIds,
+  sameJson,
+  useFieldDraft,
+} from "@/ui/layouts/editing";
+import { TitleField } from "@/ui/layouts/fieldEditors";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { hour12Option } from "@/ui/lib/timeFormat";
+import { MemberPicker } from "@/ui/member-picker";
+import { RecurrenceEditor } from "@/ui/recurrence/RecurrenceEditor";
 import {
   allDayReference,
   fromStored,
   type RecurrenceRule,
   rulePayload,
   summarizeStored,
-} from "@/lib/recurrence";
-import { referenceRef } from "@/lib/smartChips";
-import { hour12Option } from "@/lib/timeFormat";
-import { eventRoute } from "@/lib/tools";
-import { getUserDisplayName } from "@/lib/userDisplay";
-import type { TranslateFn } from "@/types/i18n";
+} from "@/ui/recurrence/recurrence";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
-import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
+import { DescriptionField } from "./DescriptionField";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
-import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 
 /** What an event's detail shares with its parts, beside the event itself. */
 export interface EventLayoutContext {
@@ -499,16 +505,19 @@ const Attendees = ({ item: event }: EditorProps) => {
     sameIds
   );
   const users = useMemo(
-    () => event.attendees.flatMap((attendee) => (attendee.user ? [attendee.user] : [])),
+    () => event.attendees.flatMap((attendee) => (attendee.user ? [toMember(attendee.user)] : [])),
     [event.attendees]
   );
+  const searchMembers = useSearchMembers();
   return (
     <FieldFrame label={label} save={save} changed={draft.changed} keys={draft.keys}>
       {readOnly ? null : (
-        <MemberMultiSelect
+        <MemberPicker
+          multiple
+          searchMembers={searchMembers}
           scope={{ type: "canOpen", tool: Tool.calendar, id: event.calendar_id }}
-          selectedIds={draft.value}
-          selectedUsers={users}
+          value={draft.value}
+          selected={users}
           onChange={draft.edit}
           placeholder={t("addAttendee")}
           emptyMessage={t("noAttendees")}
@@ -571,8 +580,10 @@ const MyAnswer = ({ event }: { event: CalendarEventRead }) => {
   const mine = event.attendees.find((attendee) => attendee.user_id === user?.id);
   if (!mine) return null;
   return (
-    <section className="space-y-2 rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-      <Label htmlFor="event-rsvp">{t("rsvp")}</Label>
+    <Field
+      label={t("rsvp")}
+      className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm"
+    >
       <Select
         // Pending is no answer yet, so it shows as the placeholder rather
         // than as a choice.
@@ -585,7 +596,7 @@ const MyAnswer = ({ event }: { event: CalendarEventRead }) => {
         }
         disabled={answer.isPending}
       >
-        <SelectTrigger id="event-rsvp" className="w-[140px]">
+        <SelectTrigger className="w-[140px]">
           <SelectValue placeholder={t("rsvpPending")} />
         </SelectTrigger>
         <SelectContent>
@@ -594,7 +605,7 @@ const MyAnswer = ({ event }: { event: CalendarEventRead }) => {
           <SelectItem value="declined">{t("rsvpDeclined")}</SelectItem>
         </SelectContent>
       </Select>
-    </section>
+    </Field>
   );
 };
 
@@ -616,7 +627,7 @@ const TagsEditor = ({ item: event, label }: EditorProps) => {
 };
 
 /** An event's detail: its fields, its own parts and where it lives. */
-export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, EventPatch> = {
+export const EVENT_DETAIL: InitiativeDetail<CalendarEventRead, EventLayoutContext, EventPatch> = {
   spec: EVENT_LAYOUT,
   fields: eventFields,
   namespaces: ["calendars", "common"],
@@ -644,7 +655,7 @@ export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, Eve
     (event) => event.properties
   ),
   home: (event, context) => ({
-    saves: eventSaves(context.occurrence),
+    saves: itemSaves(eventSaves(context.occurrence), event.id),
     readOnly: context.readOnly,
     initiativeId: event.initiative_id,
     canOpen: { tool: Tool.calendar, id: event.calendar_id },
@@ -655,6 +666,7 @@ export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, Eve
     },
     actions: context.actions,
   }),
+  useExtension: useInitiativeExtension,
 };
 
 /** An event not yet added to `calendar`, over `range`, as its detail draws it
@@ -679,6 +691,8 @@ export const blankEvent = (
   initiative_id: calendar?.initiative_id ?? null,
   community_id: 0,
   created_by: null,
+  created_by_kind: ActorKind.system,
+  created_by_install: null,
   properties: [],
   tags: [],
   can: { edit: true },
@@ -690,4 +704,6 @@ export const blankEvent = (
   overridden_fields: [],
   skipped_starts: [],
   extra_starts: [],
+  next_start: null,
+  next_occurrence: null,
 });

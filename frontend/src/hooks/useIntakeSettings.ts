@@ -7,9 +7,8 @@
  * than only what somebody already configured.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
 import type {
+  FeedbackSwitchUpdate,
   IntakeBindingRead,
   IntakeBindingUpsert,
   IntakeContactUpdate,
@@ -20,15 +19,14 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   deleteBinding,
-  getReadIntakeOptionsQueryKey,
-  getReadIntakeSettingsQueryKey,
   importBlueprint,
-  readIntakeOptions,
-  readIntakeSettings,
+  updateFeedbackSwitch,
   updateGeneralContact,
   updateOperationsCommunity,
   updateStreamContact,
   upsertBinding,
+  useReadIntakeOptions,
+  useReadIntakeSettings,
 } from "@/api/generated/intake/intake";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
@@ -37,19 +35,11 @@ import type { QueryOpts } from "@/types/query";
 
 /** Where each stream lands, and when it last opened a case. */
 export const useIntakeSettings = (options?: QueryOpts<IntakeSettingsRead>) =>
-  useQuery<IntakeSettingsRead>({
-    queryKey: getReadIntakeSettingsQueryKey(),
-    queryFn: () => readIntakeSettings(),
-    ...options,
-  });
+  useReadIntakeSettings({ query: options });
 
 /** The operations community's initiatives, projects and statuses, for the pickers. */
 export const useIntakeOptions = (options?: QueryOpts<IntakeOptionsRead>) =>
-  useQuery<IntakeOptionsRead>({
-    queryKey: getReadIntakeOptionsQueryKey(),
-    queryFn: () => readIntakeOptions(),
-    ...options,
-  });
+  useReadIntakeOptions({ query: options });
 
 /**
  * Both reads are invalidated by every write: naming a community changes what
@@ -65,6 +55,7 @@ export const useUpdateOperationsCommunity = (
     {
       mutationFn: (data) => updateOperationsCommunity(data),
       invalidate: refreshIntake,
+      errorKey: "intake:community.saveError",
     },
     options
   );
@@ -76,6 +67,7 @@ export const useUpsertIntakeBinding = (
     {
       mutationFn: ({ stream, body }) => upsertBinding(stream, body),
       invalidate: refreshIntake,
+      errorKey: "intake:stream.saveError",
     },
     options
   );
@@ -90,6 +82,7 @@ export const useImportIntakeBlueprint = (
           initiative_id: initiativeId,
         }),
       invalidate: refreshIntake,
+      errorKey: "intake:stream.saveError",
     },
     options
   );
@@ -99,11 +92,25 @@ export const useDeleteIntakeBinding = (options?: MutationOpts<void, IntakeStream
     {
       mutationFn: (stream) => deleteBinding(stream),
       invalidate: refreshIntake,
+      errorKey: "intake:stream.saveError",
     },
     options
   );
 
 /** The deployment's catch-all contact address; `null` clears it. */
+/** Let people here send feedback to the Initiative team, or stop. */
+export const useUpdateFeedbackSwitch = (
+  options?: MutationOpts<IntakeSettingsRead, FeedbackSwitchUpdate>
+) =>
+  useApiMutation<IntakeSettingsRead, FeedbackSwitchUpdate>(
+    {
+      mutationFn: (data) => updateFeedbackSwitch(data),
+      invalidate: refreshIntake,
+      errorKey: "intake:feedbackSwitch.error",
+    },
+    options
+  );
+
 export const useUpdateIntakeGeneralContact = (
   options?: MutationOpts<IntakeSettingsRead, IntakeContactUpdate>
 ) =>

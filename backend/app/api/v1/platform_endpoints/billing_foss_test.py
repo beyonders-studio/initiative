@@ -27,7 +27,7 @@ import re
 from pathlib import Path
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
@@ -37,11 +37,11 @@ from app.models.platform.user import UserRole
 from app.services.platform import guilds as guilds_service
 from app.services.platform.guilds import GuildCapacityError
 from app.testing import (
-    guild_administration,
     create_guild,
     create_guild_membership,
     create_user,
     get_auth_headers,
+    guild_administration,
 )
 
 

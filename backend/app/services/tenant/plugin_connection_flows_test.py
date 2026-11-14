@@ -12,19 +12,21 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import time
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import cryptography.fernet
-import httpx
+import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import delete, text, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -55,9 +57,9 @@ from app.models.platform.plugin_service_registration import RegistrationKind
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_secret import GuildPluginSecret
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.plugin_hook_delivery import PluginHookDelivery
-from app.models.tenant.metadata import MetadataType
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.services.marketplace import declarative as declarative_service
@@ -66,6 +68,7 @@ from app.services.marketplace.registration_lookup import (
     invalidate_registrations,
     load_registrations,
 )
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import (
     plugin_connection_flows,
     plugin_connections,
@@ -73,7 +76,6 @@ from app.services.tenant import (
     plugin_revocation,
     plugin_schedules,
 )
-from app.services.tenant import metadata as metadata_service
 from app.services.tenant.plugin_connections import load_connection_secrets
 from app.testing import (
     create_access_grant,
@@ -421,13 +423,13 @@ async def _connected_row(
 def _during_refresh(monkeypatch, vendor: FakeVendor, write) -> None:
     """Run ``write`` while the vendor is answering a refresh."""
 
-    async def handle(request: httpx.Request) -> httpx.Response:
+    async def handle(request: httpx2.Request) -> httpx2.Response:
         if b"grant_type=refresh_token" in request.content:
             await write()
         return vendor.handle(request)
 
     monkeypatch.setattr(
-        plugin_connection_flows, "http_transport", httpx.MockTransport(handle)
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(handle)
     )
 
 
@@ -923,7 +925,7 @@ class TestTokens:
                 a.guild.id,
                 update(GuildPluginUserConnection)
                 .where(GuildPluginUserConnection.id == row.id)
-                .values(blocked_at=datetime.now(timezone.utc)),
+                .values(blocked_at=datetime.now(UTC)),
             )
 
         _during_refresh(monkeypatch, vendor, block)
@@ -1553,11 +1555,12 @@ class TestRevocation:
         assert [hook for hook in vendor.hooks if hook[0] == "revoke"] == []
         await sweep_timers.process_due_timers(outward=True)
 
-        name, body, authorization = next(h for h in vendor.hooks if h[0] == "revoke")
+        _name, body, authorization = next(h for h in vendor.hooks if h[0] == "revoke")
         assert body == {
             "connection": "hooked",
             "access_token": "gho_stored",
             "refresh_token": "ghr_stored",
+            "values": {},
         }
         claims = jwt.decode(
             authorization.removeprefix("Bearer "),
@@ -1615,11 +1618,12 @@ class TestRevocation:
 
         sent = [name for name, _body, _auth in vendor.hooks]
         assert sent == ["revoke", "uninstalled", "erase"]
-        name, body, _authorization = next(h for h in vendor.hooks if h[0] == "revoke")
+        _name, body, _authorization = next(h for h in vendor.hooks if h[0] == "revoke")
         assert body == {
             "connection": "hooked",
             "access_token": "gho_stored",
             "refresh_token": "ghr_stored",
+            "values": {},
         }
         revoke = (await rows())[0]
         assert revoke.done_at is not None and revoke.body == {}
@@ -1734,7 +1738,7 @@ async def _deliveries_due(session: AsyncSession, guild_id: int) -> None:
     await route_session_to_guild(session, guild_id)
     await session.exec(
         update(PluginHookDelivery).values(
-            taken_until=datetime.now(timezone.utc) - timedelta(seconds=1)
+            taken_until=datetime.now(UTC) - timedelta(seconds=1)
         )
     )
     await session.commit()
@@ -1778,7 +1782,8 @@ class TestVendorWebhooks:
         The second's connect of 42 is refused, storing nothing, until the
         registration shares routes, and then goes through. A delivery for 42
         is queued in each of the two, and each one's visit forwards it on a
-        lifecycle token naming that install; a redelivery forwards nothing."""
+        lifecycle token naming that install. A redelivery forwards nothing,
+        under its own id or another."""
         seats = [
             await acting_user(guild_role=CommunityRole.superadmin) for _ in range(3)
         ]
@@ -1838,6 +1843,12 @@ class TestVendorWebhooks:
 
         again = await client.post(HOOK_ROUTE, content=body, headers=headers)
         assert again.status_code == 202
+        replayed, renamed = vendor.webhook(
+            {"action": "opened", "installation": {"id": 42}}, delivery="delivery-2"
+        )
+        assert replayed == body
+        again = await client.post(HOOK_ROUTE, content=replayed, headers=renamed)
+        assert again.status_code == 202
         for seat in seats[:2]:
             await _delivered(session, seat.guild.id)
         assert len([name for name, _, _ in vendor.hooks if name == "webhook"]) == 2
@@ -1875,7 +1886,7 @@ class TestVendorWebhooks:
         await _delivered(session, seat.guild.id)
         [waiting] = await _deliveries(session, seat.guild.id)
         assert waiting.body is not None and waiting.attempts == 1
-        assert waiting.taken_until > datetime.now(timezone.utc)
+        assert waiting.taken_until > datetime.now(UTC)
 
         vendor.hook_status = 200
         await _deliveries_due(session, seat.guild.id)
@@ -1941,6 +1952,297 @@ class TestVendorWebhooks:
 
 
 # ---------------------------------------------------------------------------
+# A typed connection the plug-in checks
+# ---------------------------------------------------------------------------
+
+#: A shop an admin types in. The plug-in checks it, makes the shop's webhooks
+#: and answers the shop's id and the webhooks' secret, which signs them.
+SHOP = {
+    "id": "shop",
+    "scope": "static",
+    "label": {"en": "Shop"},
+    "fields": [
+        {"key": "url", "type": "url", "label": {"en": "Address"}, "required": True},
+        {"key": "key", "type": "secret", "label": {"en": "Key"}, "required": True},
+        {**_field("store_id"), "required": True},
+        {**_field("hook_secret"), "type": "secret", "required": True},
+    ],
+    "after_connect": True,
+}
+
+SHOP_DEFINITION = {
+    **DEFINITION,
+    "connections": [SHOP],
+    "webhooks": {
+        "verify": {
+            "scheme": "hmac_sha256",
+            "header": "X-Shop-Signature",
+            "encoding": "base64",
+            "secret": "{hook_secret}",
+        },
+        "dedup": "X-Shop-Delivery",
+        "route": {"header": "X-Shop-Store", "connection": "shop", "field": "store_id"},
+    },
+}
+
+
+def _checked(store_id: str, hook_secret: str) -> dict:
+    """What the plug-in answers once it has checked a shop."""
+    return {
+        "values": {"store_id": store_id, "hook_secret": hook_secret},
+        "account_label": "Acme shop",
+    }
+
+
+def _shop_delivery(
+    secret: str, *, store: str = "s-42", delivery: str = "d-1"
+) -> tuple[bytes, dict[str, str]]:
+    body = b'{"id": 7}'
+    signature = base64.b64encode(
+        hmac.new(secret.encode(), body, hashlib.sha256).digest()
+    ).decode()
+    return body, {
+        "Content-Type": "application/json",
+        "X-Shop-Signature": signature,
+        "X-Shop-Delivery": delivery,
+        "X-Shop-Store": store,
+    }
+
+
+class TestCheckedTypedConnection:
+    @pytest.fixture
+    async def shop(self, session: AsyncSession, registration):
+        return await create_marketplace_listing(
+            session,
+            uid=LISTING_UID,
+            public_id=PUBLIC_ID,
+            kind="plugin",
+            definition=SHOP_DEFINITION,
+        )
+
+    async def _save(self, client: AsyncClient, seat, plugin, values: dict):
+        return await client.put(
+            seat.g(f"/plugins/{plugin.id}/config"),
+            json={"values": {"shop": values}},
+            headers=seat.headers,
+        )
+
+    async def test_a_checked_shop_is_stored_and_signs_its_own_webhooks(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """The plug-in is sent what was typed and answers the shop's id, its
+        webhooks' secret and its account; all of it is stored and the shop's
+        id routes. A delivery is checked under that secret alone: one signed
+        with anything else, or naming a shop nobody connected, is refused."""
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+
+        response = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+
+        assert response.status_code == 200, response.text
+        [connection] = response.json()["connections"]
+        assert connection["account_label"] == "Acme shop"
+        assert connection["values"] == {
+            "url": "https://shop.example",
+            "store_id": "s-42",
+        }
+        assert all(connection["has_value"].values())
+        [(name, call, _)] = vendor.hooks
+        assert name == "after_connect"
+        assert (call["actor"], call["access_token"]) == ("installation", None)
+        assert call["values"] == {"url": "https://shop.example", "key": "ck_1"}
+        assert (await _reload(session, seat.guild.id, plugin.id)).config_state == "ok"
+        assert (await _indexed(session, seat.guild.id, plugin.id)).hook_route == "s-42"
+
+        for secret, store in [
+            (VENDOR_VALUES["webhook_secret"], "s-42"),
+            ("hook-secret-1", "s-99"),
+        ]:
+            body, headers = _shop_delivery(secret, store=store)
+            refused = await client.post(HOOK_ROUTE, content=body, headers=headers)
+            assert refused.status_code == 401
+        assert await _deliveries(session, seat.guild.id) == []
+
+        body, headers = _shop_delivery("hook-secret-1")
+        taken = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert taken.status_code == 202, taken.text
+        await _delivered(session, seat.guild.id)
+        assert [name for name, _, _ in vendor.hooks] == ["after_connect", "webhook"]
+
+    async def test_an_install_is_checked_under_the_secret_its_version_names(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """The listing now signs with each shop's own secret, but this install
+        is pinned to a version that signs with the vendor value: its
+        deliveries are checked under that, and only that."""
+        pinned = {
+            **SHOP_DEFINITION,
+            "webhooks": {
+                **SHOP_DEFINITION["webhooks"],
+                "verify": {
+                    **SHOP_DEFINITION["webhooks"]["verify"],
+                    "secret": "{vendor.webhook_secret}",
+                },
+            },
+        }
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, pinned)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        saved = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert saved.status_code == 200, saved.text
+
+        body, headers = _shop_delivery("hook-secret-1")
+        refused = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert refused.status_code == 401
+        body, headers = _shop_delivery(VENDOR_VALUES["webhook_secret"])
+        taken = await client.post(HOOK_ROUTE, content=body, headers=headers)
+        assert taken.status_code == 202, taken.text
+        assert len(await _deliveries(session, seat.guild.id)) == 1
+
+    async def test_a_shop_disconnected_while_it_is_checked_stays_disconnected(
+        self, client: AsyncClient, acting_user, session, vendor, shop, monkeypatch
+    ):
+        """A save whose connection changed while the plug-in checked stores
+        nothing, and the values it checked are revoked."""
+        from app.services import sweep_timers
+
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        first = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert first.status_code == 200, first.text
+
+        checking = plugin_connection_flows.after_connect
+
+        async def disconnecting(**kwargs):
+            answer = await checking(**kwargs)
+            gone = await client.delete(
+                seat.g(f"/plugins/{plugin.id}/connections/shop"), headers=seat.headers
+            )
+            assert gone.status_code == 204, gone.text
+            return answer
+
+        monkeypatch.setattr(plugin_connection_flows, "after_connect", disconnecting)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
+        second = await self._save(client, seat, plugin, {"key": "ck_2"})
+
+        assert second.status_code == 409
+        assert second.json()["detail"] == GuildPluginMessages.CONNECTION_NOT_CHECKED
+        stored = await _reload(session, seat.guild.id, plugin.id)
+        assert not stored.config and not stored.secret_fields
+        await post_commit.settle_all()
+        await sweep_timers.process_due_timers(outward=True)
+        revoked = [call["values"] for name, call, _ in vendor.hooks if name == "revoke"]
+        assert sorted(values["key"] for values in revoked) == ["ck_1", "ck_2"]
+
+    async def test_a_shop_another_community_holds_is_not_kept(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """Only one community connects a shop; the second's checked values are
+        revoked, so the plug-in removes what it made for them."""
+        from app.services import sweep_timers
+
+        first, second = [
+            await acting_user(guild_role=CommunityRole.superadmin) for _ in range(2)
+        ]
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        plugins = [
+            await _install(session, seat, SHOP_DEFINITION) for seat in (first, second)
+        ]
+        kept = await self._save(
+            client, first, plugins[0], {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert kept.status_code == 200, kept.text
+
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
+        taken = await self._save(
+            client, second, plugins[1], {"url": "https://shop.example", "key": "ck_2"}
+        )
+
+        assert taken.status_code == 409
+        assert taken.json()["detail"] == GuildPluginMessages.CONNECTION_TAKEN
+        stored = await _reload(session, second.guild.id, plugins[1].id)
+        assert not stored.config and not stored.secret_fields
+        await post_commit.settle_all()
+        await sweep_timers.process_due_timers(outward=True)
+        [revoked] = [call for name, call, _ in vendor.hooks if name == "revoke"]
+        assert revoked["values"] == {
+            "url": "https://shop.example",
+            "key": "ck_2",
+            "store_id": "s-42",
+            "hook_secret": "hook-secret-2",
+        }
+
+    async def test_a_refused_shop_stores_nothing(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = {"refuse": True}
+
+        response = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == GuildPluginMessages.CONNECTION_REFUSED
+        stored = await _reload(session, seat.guild.id, plugin.id)
+        assert not stored.config and not stored.secret_fields
+
+    async def test_replacing_or_clearing_a_shop_revokes_what_it_held(
+        self, client: AsyncClient, acting_user, session, vendor, shop
+    ):
+        """Saving again checks the merged values and revokes the shop they
+        replace; clearing revokes the rest. Each revocation is sent the values
+        the shop held, its secrets included."""
+        from app.services import sweep_timers
+
+        seat = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _install(session, seat, SHOP_DEFINITION)
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-1")
+        first = await self._save(
+            client, seat, plugin, {"url": "https://shop.example", "key": "ck_1"}
+        )
+        assert first.status_code == 200, first.text
+
+        vendor.after_connect_answer = _checked("s-42", "hook-secret-2")
+        second = await self._save(client, seat, plugin, {"key": "ck_2"})
+        assert second.status_code == 200, second.text
+        assert vendor.hooks[-1][1]["values"] == {
+            "url": "https://shop.example",
+            "key": "ck_2",
+        }
+        cleared = await client.delete(
+            seat.g(f"/plugins/{plugin.id}/connections/shop"), headers=seat.headers
+        )
+        assert cleared.status_code == 204, cleared.text
+        await post_commit.settle_all()
+        await sweep_timers.process_due_timers(outward=True)
+
+        revoked = [call for name, call, _ in vendor.hooks if name == "revoke"]
+        assert [call["values"] for call in revoked] == [
+            {
+                "url": "https://shop.example",
+                "key": key,
+                "store_id": "s-42",
+                "hook_secret": hook_secret,
+            }
+            for key, hook_secret in [
+                ("ck_1", "hook-secret-1"),
+                ("ck_2", "hook-secret-2"),
+            ]
+        ]
+        assert (await _indexed(session, seat.guild.id, plugin.id)).hook_route is None
+
+
+# ---------------------------------------------------------------------------
 # Schedules
 # ---------------------------------------------------------------------------
 
@@ -1956,7 +2258,7 @@ async def _due(
     session: AsyncSession, guild_id: int, schedule_id: str | None = None
 ) -> None:
     """Bring every schedule in the community due, or only the one named."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await route_session_to_guild(session, guild_id)
     due = update(PluginScheduleRun).values(next_due_at=now - timedelta(seconds=1))
     if schedule_id is not None:
@@ -2014,7 +2316,7 @@ class TestSchedules:
         await _install(session, seat)
         worker = await role_session()
 
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         await _due(session, guild_id)
         await _run_due(worker, guild_id)
         run = (await _runs(session, guild_id))["check-installation"]
@@ -2056,7 +2358,7 @@ class TestSchedules:
         waits = []
         for _ in range(4):
             await _due(session, guild_id)
-            before = datetime.now(timezone.utc)
+            before = datetime.now(UTC)
             await _run_due(worker, guild_id)
             run = (await _runs(session, guild_id))["check-installation"]
             minutes = round((run.next_due_at - before).total_seconds() / 60)
@@ -2233,7 +2535,7 @@ class TestDeclarativePlugins:
         assert len(await _events(session, seat.guild.id)) == 1
         [recorded] = await _deliveries(session, seat.guild.id)
         assert recorded.body is None
-        assert recorded.expires_at > datetime.now(timezone.utc) + timedelta(hours=23)
+        assert recorded.expires_at > datetime.now(UTC) + timedelta(hours=23)
 
     async def test_a_delivery_whose_changes_failed_is_tried_again(
         self,
@@ -2416,13 +2718,13 @@ class TestDeclarativePlugins:
         queued = await client.post(DECLARATIVE_HOOKS, content=body, headers=headers)
         assert queued.status_code == 202, queued.text
         await route_session_to_guild(session, seat.guild.id)
-        long_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        long_ago = datetime.now(UTC) - timedelta(days=2)
         await session.exec(update(PluginHookDelivery).values(expires_at=long_ago))
         await session.commit()
         async with cohorts.system_session(seat.guild.id) as worker:
             await set_rls_context(worker, SystemGuild(seat.guild.id))
             await plugin_hooks.expire_deliveries(
-                worker, SimpleNamespace(now=datetime.now(timezone.utc))
+                worker, SimpleNamespace(now=datetime.now(UTC))
             )
             await worker.commit()
         [waiting] = await _deliveries(session, seat.guild.id)
@@ -2433,7 +2735,7 @@ class TestDeclarativePlugins:
         assert len(await _events(session, seat.guild.id)) == 1
         [done] = await _deliveries(session, seat.guild.id)
         assert done.body is None
-        assert done.expires_at > datetime.now(timezone.utc) + timedelta(hours=23)
+        assert done.expires_at > datetime.now(UTC) + timedelta(hours=23)
 
     async def test_an_install_switched_on_is_delivered_to_at_once(
         self, client: AsyncClient, acting_user, session, vendor, declarative
@@ -2611,8 +2913,10 @@ class TestDeclarativePlugins:
         plugin = await _declarative_install(session, seat, config=_connected("42"))
 
         async def deliver(serial: int, action: str, installation: int = 42) -> tuple:
+            # Each delivery is its own event, with a body of its own: one
+            # whose body the install already has is not queued again.
             body, headers = vendor.webhook(
-                {"action": action, "installation": {"id": installation}},
+                {"action": action, "installation": {"id": installation}, "n": serial},
                 delivery=f"delivery-{serial}",
             )
             headers["X-GitHub-Event"] = "installation"
@@ -2810,7 +3114,7 @@ class TestDeclarativePlugins:
         await _due(session, guild_id, "workspace")
         await _run_due(worker, guild_id)
 
-        async def answer(request: httpx.Request) -> httpx.Response:
+        async def answer(request: httpx2.Request) -> httpx2.Response:
             if request.headers.get("host") == vendor.api_host:
                 await route_session_to_guild(session, guild_id)
                 await session.exec(
@@ -2830,7 +3134,7 @@ class TestDeclarativePlugins:
             return vendor.handle(request)
 
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(answer)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(answer)
         )
         vendor.api_answers = [{"status": 404}]
         await _due(session, guild_id, "workspace")
@@ -3073,7 +3377,7 @@ class TestDeclarativeSchedules:
         for _ in range(2):
             vendor.api_answers = [answer]
             await _due(session, guild_id)
-            before = datetime.now(timezone.utc)
+            before = datetime.now(UTC)
             await _run_due(worker, guild_id)
             run = (await _runs(session, guild_id))["sync"]
             minutes = round((run.next_due_at - before).total_seconds() / 60)
@@ -3100,12 +3404,12 @@ class TestDeclarativeSchedules:
         seat = await acting_user(guild_role=CommunityRole.superadmin)
         guild_id = seat.guild.id
         await _declarative_install(session, seat, definition=_syncing())
-        since = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        since = datetime(2026, 10, 1, tzinfo=UTC)
         await route_session_to_guild(session, guild_id)
         await session.exec(update(PluginScheduleRun).values(last_success_at=since))
         await session.commit()
         await _due(session, guild_id)
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
 
         await _run_due(await role_session(), guild_id)
 

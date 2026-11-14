@@ -35,10 +35,10 @@ from __future__ import annotations
 
 import contextvars
 import ipaddress
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Generator, MutableMapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 #: The longest client-supplied value that reaches a line. A user agent is
@@ -59,35 +59,35 @@ class RequestContext:
     """One request's own details, filled in as they become known."""
 
     request_id: str
-    source_ip: Optional[str] = None
-    user_agent: Optional[str] = None
+    source_ip: str | None = None
+    user_agent: str | None = None
     #: The country the trusted proxy says the request came from, for the
     #: decisions that depend on where somebody is. Never written to a line.
-    country: Optional[str] = None
+    country: str | None = None
     #: The account the request is being served as, once it has authenticated.
-    actor_user_id: Optional[int] = None
+    actor_user_id: int | None = None
     #: The community a grant or an install reaches, or the one a background
     #: job is working in; and the grant that reaches it.
-    guild_id: Optional[int] = None
-    grant_id: Optional[int] = None
-    access_level: Optional[str] = None
-    settings_grant_id: Optional[int] = None
-    settings_level: Optional[str] = None
+    guild_id: int | None = None
+    grant_id: int | None = None
+    access_level: str | None = None
+    settings_grant_id: int | None = None
+    settings_level: str | None = None
     #: Whether the grant was issued and approved by the same account, which is
     #: what breaking glass does.
-    break_glass: Optional[bool] = None
+    break_glass: bool | None = None
     #: The installed plug-in the request is being served as: its registration's
     #: ``public_id`` and the install in the community.
-    plugin: Optional[str] = None
-    install_id: Optional[int] = None
+    plugin: str | None = None
+    install_id: int | None = None
     #: The ASGI scope the request is served under. Routing fills in the route
     #: it matched and the path's parameters, which :func:`route_of` and
     #: :meth:`community_id` read.
-    scope: Optional[MutableMapping[str, Any]] = field(
+    scope: MutableMapping[str, Any] | None = field(
         default=None, repr=False, compare=False
     )
 
-    def community_id(self) -> Optional[int]:
+    def community_id(self) -> int | None:
         """The community the request's path names, else the one a grant, an
         install or a job named."""
         if self.scope is not None:
@@ -133,7 +133,7 @@ class RequestContext:
         return block
 
 
-_request: contextvars.ContextVar[Optional[RequestContext]] = contextvars.ContextVar(
+_request: contextvars.ContextVar[RequestContext | None] = contextvars.ContextVar(
     "audit_request_context", default=None
 )
 
@@ -143,7 +143,7 @@ def new_request_id() -> str:
     return uuid4().hex
 
 
-def clean_request_id(supplied: Optional[str]) -> Optional[str]:
+def clean_request_id(supplied: str | None) -> str | None:
     """``supplied`` if it is a plausible request id, else ``None``.
 
     An id arrives from a proxy and reaches a log line, so it is held to a
@@ -154,7 +154,7 @@ def clean_request_id(supplied: Optional[str]) -> Optional[str]:
     return supplied if all(char in _ID_CHARS for char in supplied) else None
 
 
-def _inet(address: Optional[str]) -> Optional[str]:
+def _inet(address: str | None) -> str | None:
     """``address`` as a stored ``inet`` accepts it, or ``None`` when it is not
     an address (a test client's ``testclient``, a socket with no peer).
 
@@ -172,10 +172,10 @@ def _inet(address: Optional[str]) -> Optional[str]:
 def begin(
     *,
     request_id: str,
-    source_ip: Optional[str] = None,
-    user_agent: Optional[str] = None,
-    country: Optional[str] = None,
-    scope: Optional[MutableMapping[str, Any]] = None,
+    source_ip: str | None = None,
+    user_agent: str | None = None,
+    country: str | None = None,
+    scope: MutableMapping[str, Any] | None = None,
 ) -> tuple[RequestContext, contextvars.Token]:
     """Open a request's context and return it with the token that closes it.
 
@@ -198,13 +198,13 @@ def end(token: contextvars.Token) -> None:
     _request.reset(token)
 
 
-def current() -> Optional[RequestContext]:
+def current() -> RequestContext | None:
     """This request's context, or ``None`` outside a request."""
     return _request.get()
 
 
 @contextmanager
-def job(name: str, *, guild_id: Optional[int] = None) -> Iterator[RequestContext]:
+def job(name: str, *, guild_id: int | None = None) -> Generator[RequestContext]:
     """Name one unit of background work — a worker's pass, a data job — for
     the lines written while it runs, as a request is named for its own.
 
@@ -220,7 +220,7 @@ def job(name: str, *, guild_id: Optional[int] = None) -> Iterator[RequestContext
 
 
 @contextmanager
-def visiting(guild_id: int) -> Iterator[None]:
+def visiting(guild_id: int) -> Generator[None]:
     """Name the community a sweep is visiting, for the lines written there.
 
     A copy of the pass's context rather than a change to it: a pass visits
@@ -238,10 +238,17 @@ def visiting(guild_id: int) -> Iterator[None]:
         _request.reset(token)
 
 
-def route_of(scope: MutableMapping[str, Any]) -> Optional[str]:
+def route_of(scope: MutableMapping[str, Any]) -> str | None:
     """The route as it is written, rather than as it was typed; ``None``
     when no route answered."""
-    path = getattr(scope.get("route"), "path", None)
+    # A route in an included router knows its path only without the router's
+    # prefix; FastAPI keeps the whole path on the context it ran it with.
+    context = scope.get("fastapi", {}).get("effective_route_context")
+    path = (
+        getattr(getattr(context, "starlette_route", None), "path_format", None)
+        or getattr(context, "path_format", None)
+        or getattr(scope.get("route"), "path", None)
+    )
     return path if isinstance(path, str) else None
 
 
@@ -252,14 +259,14 @@ def note_actor(user_id: int) -> None:
         context.actor_user_id = user_id
 
 
-def client_ip() -> Optional[str]:
+def client_ip() -> str | None:
     """The address this request came from, normalized; ``None`` outside a
     request or when it arrived from no address."""
     context = _request.get()
     return context.source_ip if context is not None else None
 
 
-def client_user_agent() -> Optional[str]:
+def client_user_agent() -> str | None:
     """The user agent this request named, cut to :data:`MAX_USER_AGENT`;
     ``None`` outside a request or when it named none."""
     context = _request.get()
@@ -268,13 +275,13 @@ def client_user_agent() -> Optional[str]:
 
 def note_grant(
     *,
-    actor_user_id: Optional[int],
+    actor_user_id: int | None,
     guild_id: int,
-    grant_id: Optional[int] = None,
-    access_level: Optional[str] = None,
-    settings_grant_id: Optional[int] = None,
-    settings_level: Optional[str] = None,
-    break_glass: Optional[bool] = None,
+    grant_id: int | None = None,
+    access_level: str | None = None,
+    settings_grant_id: int | None = None,
+    settings_level: str | None = None,
+    break_glass: bool | None = None,
 ) -> None:
     """Record that this request reaches ``guild_id`` through a grant.
 
@@ -306,13 +313,13 @@ def note_install(*, plugin: str, guild_id: int, install_id: int) -> None:
     context.install_id = install_id
 
 
-def envelope_context(*, caller: bool) -> Optional[dict[str, Any]]:
+def envelope_context(*, caller: bool) -> dict[str, Any] | None:
     """The ``context`` block for a line written now, or ``None``."""
     context = _request.get()
     return context.as_envelope(caller=caller) if context is not None else None
 
 
-def client_country() -> Optional[str]:
+def client_country() -> str | None:
     """The country this request came from, as the trusted proxy says;
     ``None`` outside a request or when it is not known."""
     context = _request.get()

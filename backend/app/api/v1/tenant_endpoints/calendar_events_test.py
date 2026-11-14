@@ -8,22 +8,22 @@ serialization on the event summary, and the calendar-entries reads' DAC filter
 (which keys off calendar sharing, not per-event grants).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
+from sqlalchemy import text
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import text
 
-from app.core.tools import Tool
-from app.db.schema_provisioning import guild_schema_name
 from app.core.messages import (
     CalendarEventMessages,
     CommonMessages,
     PropertyMessages,
 )
+from app.core.tools import Tool
+from app.db.schema_provisioning import guild_schema_name
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.calendar_event import CalendarEvent
@@ -38,16 +38,16 @@ from app.testing import (
     create_property_value,
     create_resource_grant,
     create_tag,
+    drain_notices,
     get_auth_headers,
     route_session_to_guild,
-    drain_notices,
 )
 
 
 def _around_now(**params: Any) -> dict[str, Any]:
     """A calendar-entries read of the events around now, where the factory
     puts them, without task markers."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "start_after": (now - timedelta(days=1)).isoformat(),
         "start_before": (now + timedelta(days=1)).isoformat(),
@@ -65,7 +65,7 @@ async def _drop_all_members_grant(session: AsyncSession, guild, calendar) -> Non
         delete(ResourceGrant).where(
             ResourceGrant.resource_type == "calendar",
             ResourceGrant.resource_id == calendar.id,
-            ResourceGrant.all_initiative_members == True,  # noqa: E712
+            ResourceGrant.all_initiative_members == True,
         )
     )
     await session.exec(text("SET search_path TO public"))
@@ -229,7 +229,7 @@ async def test_occurrence_query_requires_offset(
 async def test_event_summary_includes_tags(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    a, guild, initiative, calendar, event = await _setup_event(session, acting_user)
+    a, guild, initiative, _calendar, event = await _setup_event(session, acting_user)
 
     tag = await create_tag(session, guild, name="Priority", color="#ff0000")
 
@@ -260,7 +260,7 @@ async def test_event_summary_tags_default_empty(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """An event with no tags still serializes ``tags: []`` in the summary."""
-    a, guild, initiative, calendar, event = await _setup_event(session, acting_user)
+    a, _guild, initiative, _calendar, event = await _setup_event(session, acting_user)
 
     response = await client.get(
         a.g("/calendar-entries/"),
@@ -278,8 +278,8 @@ async def test_create_event_notifies_attendees_not_creator(
     (
         organizer,
         attendee,
-        guild,
-        initiative,
+        _guild,
+        _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
 
@@ -321,8 +321,8 @@ async def test_create_multi_day_timed_event_is_allowed(
     (
         organizer,
         _attendee,
-        guild,
-        initiative,
+        _guild,
+        _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
 
@@ -629,9 +629,7 @@ async def test_an_event_repeat_is_stored_as_picked(
     await route_session_to_guild(session, guild.id)
     standup = await session.get(CalendarEvent, created["Standup"]["id"])
     assert standup is not None
-    assert standup.recurrence_until == datetime(
-        2026, 10, 18, 22, 30, tzinfo=timezone.utc
-    )
+    assert standup.recurrence_until == datetime(2026, 10, 18, 22, 30, tzinfo=UTC)
 
     # Moved to noon, still Mondays in Berlin, and now Mondays in UTC too.
     moved = await client.patch(
@@ -683,8 +681,8 @@ async def test_create_event_rejects_end_before_start(
     (
         organizer,
         _attendee,
-        guild,
-        initiative,
+        _guild,
+        _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
 
@@ -726,10 +724,10 @@ async def test_create_event_requires_calendar_write(
 ):
     """A member with only read on the calendar can't create events in it."""
     (
-        organizer,
+        _organizer,
         attendee,
-        guild,
-        initiative,
+        _guild,
+        _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
 
@@ -803,7 +801,7 @@ async def test_a_move_into_another_initiative_drops_property_values(
     them. Values sent with the move reach every override, one that had its own
     included, since its own are gone."""
     a, guild, initiative, source, _ = await _setup_event(session, acting_user)
-    start = datetime(2026, 10, 5, 18, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 5, 18, tzinfo=UTC)
     series = await create_calendar_event(
         session,
         source,
@@ -908,8 +906,8 @@ async def test_delete_event_notifies_attendees(
     (
         organizer,
         attendee,
-        guild,
-        initiative,
+        _guild,
+        _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
     event = await create_calendar_event(
@@ -939,8 +937,8 @@ async def test_delete_event_skips_declined_attendees(
     (
         organizer,
         attendee,
-        guild,
-        initiative,
+        _guild,
+        _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
     event = await create_calendar_event(
@@ -1528,7 +1526,7 @@ async def test_a_copied_series_takes_its_changed_occurrences_and_one_goes_alone(
         _initiative,
         calendar,
     ) = await _setup_organizer_and_attendee(session, acting_user)
-    start = datetime(2026, 10, 5, 10, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 5, 10, tzinfo=UTC)
     weekly = await create_calendar_event(
         session,
         calendar,
@@ -1539,7 +1537,7 @@ async def test_a_copied_series_takes_its_changed_occurrences_and_one_goes_alone(
         end_at=start + timedelta(hours=1),
     )
     week = timedelta(days=7)
-    moved, renamed = [
+    moved, _renamed = [
         await create_calendar_event(
             session,
             calendar,

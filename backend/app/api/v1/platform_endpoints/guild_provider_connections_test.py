@@ -7,11 +7,14 @@ decides whether somebody arriving is one of theirs.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.login_methods import LoginMethod
 from app.core.messages import AuthProviderMessages, GuildMessages
+from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy, SignInRequirement
 from app.models.platform.guild import CommunityRole
+from app.services.platform import rules
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -20,9 +23,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-from app.core.login_methods import LoginMethod
-from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy, SignInRequirement
-from app.services.platform import rules
 
 
 async def _seat(session: AsyncSession, *, auth_options: list[str] | None = None):
@@ -389,6 +389,21 @@ async def test_the_seat_orders_the_groups_that_give_custom_roles(
     assert ordered.status_code == 200, ordered.text
     assert [r["claim_value"] for r in ordered.json()] == ["crew", "staff"]
 
+    # A rule's group is changed in place, and still cannot repeat another's.
+    renamed = await client.patch(
+        f"{url}/{ids[0]}", headers=headers, json={"claim_value": " deck "}
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["claim_value"] == "deck"
+    taken = await client.patch(
+        f"{url}/{ids[0]}", headers=headers, json={"claim_value": "CREW"}
+    )
+    assert taken.status_code == 409, taken.text
+    blank = await client.patch(
+        f"{url}/{ids[0]}", headers=headers, json={"claim_value": "   "}
+    )
+    assert blank.status_code == 422, blank.text
+
     await rules.put(
         session,
         SURFACE_CUSTOM_ROLES,
@@ -400,3 +415,7 @@ async def test_the_seat_orders_the_groups_that_give_custom_roles(
     closed = await client.delete(f"{url}/{ids[0]}", headers=headers)
     assert closed.status_code == 403
     assert closed.json()["detail"] == GuildMessages.COMMUNITY_SURFACE_CLOSED
+    unchanged = await client.patch(
+        f"{url}/{ids[0]}", headers=headers, json={"claim_value": "galley"}
+    )
+    assert unchanged.status_code == 403

@@ -14,23 +14,22 @@ are its adapter's in ``ADAPTERS``.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from math import ceil
-from typing import Annotated, Any, List, Literal, Optional, Union
-
-from pydantic import Field
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from starlette.background import BackgroundTask
+from pydantic import Field
 from sqlmodel import col, select
+from starlette.background import BackgroundTask
 
 from app.api.deps import (
     GuildContext,
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
     require_seat,
-    GuildContextDep,
 )
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
@@ -43,29 +42,29 @@ from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.schemas.query import DateBucket
 from app.schemas.tenant.backup_export import BackupEstimate
+from app.schemas.tenant.data_job import file_expired, serialize_data_job
+from app.schemas.tenant.export_job import CommunityExportStatus
 from app.schemas.tenant.tool_layout import (
     MAX_FIELD_ID_LENGTH,
     MAX_HIDDEN_GROUPS,
     MAX_NODES,
 )
-from app.schemas.tenant.data_job import file_expired, serialize_data_job
-from app.schemas.tenant.export_job import CommunityExportStatus
 from app.services import audit as audit_service
 from app.services import data_jobs
-from app.services.platform import rules
+from app.services.export import limits as export_limits
 from app.services.export.adapters import ADAPTERS
 from app.services.export.adapters.backup import (
     GuildExportAdapter,
     InitiativeExportAdapter,
 )
 from app.services.export.engine import InlineExport, start_export
+from app.services.membership import initiative_scope_clause
+from app.services.platform import rules
 from app.services.storage import (
     build_upload_response,
     content_disposition_attachment,
     get_guild_storage,
 )
-from app.services.export import limits as export_limits
-from app.services.membership import initiative_scope_clause
 from app.services.tenant.initiatives import keeps_content_in
 
 router = APIRouter()
@@ -96,9 +95,7 @@ def _allow_job(guild_context: GuildContext) -> bool:
     export stays available to all — it is a formatted read."""
     if guild_context.content_read_only:
         return False
-    if guild_context.is_pam:
-        return False
-    return True
+    return not guild_context.is_pam
 
 
 def _job_response(
@@ -118,7 +115,7 @@ async def _start_export(
     source: str,
     format: str,
     params: dict[str, Any],
-) -> Union[InlineExport, DataJob]:
+) -> InlineExport | DataJob:
     """Start an export through the engine: rendered here when it is small, or
     queued as a job the caller polls."""
     return await start_export(
@@ -133,7 +130,7 @@ async def _start_export(
 
 
 def _export_response(
-    result: Union[InlineExport, DataJob], guild_context: GuildContext
+    result: InlineExport | DataJob, guild_context: GuildContext
 ) -> Response:
     """The file itself for an inline export; ``202`` and the job for a queued
     one."""
@@ -152,13 +149,13 @@ async def export_tasks(
     # Literal so the HTTP layer 422s garbage and OpenAPI carries the enum;
     # grows as formats land. The registry still guards per-source combos.
     format: Literal["pdf", "csv", "xlsx", "md"] = Query(default="pdf"),
-    conditions: Optional[str] = Query(
+    conditions: str | None = Query(
         default=None, description="Same JSON filter conditions as the task list"
     ),
-    sorting: Optional[str] = Query(
+    sorting: str | None = Query(
         default=None, description="Same JSON sort fields as the task list"
     ),
-    tz: Optional[str] = Query(default=None, description="IANA timezone name"),
+    tz: str | None = Query(default=None, description="IANA timezone name"),
     include_archived: bool = Query(default=False),
     layout: Literal["table", "checklist", "detailed"] = Query(
         default="table",
@@ -169,7 +166,7 @@ async def export_tasks(
             "Ignored by csv/xlsx."
         ),
     ),
-    group_by: Optional[str] = Query(
+    group_by: str | None = Query(
         default=None,
         max_length=64,
         description=(
@@ -178,17 +175,15 @@ async def export_tasks(
             "list's order"
         ),
     ),
-    bucket: Optional[DateBucket] = Query(
+    bucket: DateBucket | None = Query(
         default=None, description="For a date: the bucket of the calendar it groups by"
     ),
-    hidden_groups: Optional[List[str]] = Query(
+    hidden_groups: list[str] | None = Query(
         default=None,
         max_length=MAX_HIDDEN_GROUPS,
         description="The keys of the groups the list leaves out",
     ),
-    columns: Optional[
-        List[Annotated[str, Field(max_length=MAX_FIELD_ID_LENGTH)]]
-    ] = Query(
+    columns: list[Annotated[str, Field(max_length=MAX_FIELD_ID_LENGTH)]] | None = Query(
         default=None,
         max_length=MAX_NODES,
         description=(
@@ -197,9 +192,7 @@ async def export_tasks(
             "The status follows them, as the table draws it."
         ),
     ),
-    detail: Optional[
-        List[Annotated[str, Field(max_length=MAX_FIELD_ID_LENGTH)]]
-    ] = Query(
+    detail: list[Annotated[str, Field(max_length=MAX_FIELD_ID_LENGTH)]] | None = Query(
         default=None,
         max_length=MAX_NODES,
         description=(
@@ -208,7 +201,7 @@ async def export_tasks(
             "``checklist`` and ``comments``"
         ),
     ),
-) -> Union[Response, JSONResponse]:
+) -> Response | JSONResponse:
     """Export the task list (the same visibility and filters as ``GET
     /tasks/``) as a formatted file. Small results render inline and return
     the file directly; large results return ``202`` with a queued job to poll
@@ -241,25 +234,25 @@ async def export_events(
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
     format: Literal["ics"] = Query(default="ics"),
-    initiative_id: Optional[int] = Query(default=None),
-    scope: Optional[Literal["community"]] = Query(default=None),
-    calendar_ids: Optional[List[int]] = Query(default=None),
-    exclude_calendar_ids: Optional[List[int]] = Query(
+    initiative_id: int | None = Query(default=None),
+    scope: Literal["community"] | None = Query(default=None),
+    calendar_ids: list[int] | None = Query(default=None),
+    exclude_calendar_ids: list[int] | None = Query(
         default=None, description="Calendars to leave out, such as hidden ones"
     ),
-    property_filters: Optional[str] = Query(
+    property_filters: str | None = Query(
         default=None, description="Same JSON property filters as the event list"
     ),
-    start_after: Optional[datetime] = Query(
+    start_after: datetime | None = Query(
         default=None, description="Same date range as the event list"
     ),
-    start_before: Optional[datetime] = Query(default=None),
-    tz: Optional[str] = Query(
+    start_before: datetime | None = Query(default=None),
+    tz: str | None = Query(
         default=None,
         max_length=64,
         description="IANA timezone for the file name's date",
     ),
-) -> Union[Response, JSONResponse]:
+) -> Response | JSONResponse:
     """Export calendar events (the same visibility and filters as ``GET
     /calendar-events/``) as one iCalendar file: every date, unless a range is
     given. A repeating event starting in the range travels whole, with its
@@ -285,7 +278,7 @@ async def export_events(
     return _export_response(result, guild_context)
 
 
-def _parse_json_param(raw: Optional[str]) -> Optional[dict]:
+def _parse_json_param(raw: str | None) -> dict | None:
     """`include`/`formats` arrive as JSON-string query params (the same
     convention as the task list's `conditions`). Shape validation happens in
     the adapter at count time; here we only reject non-JSON/non-object."""
@@ -314,7 +307,7 @@ _FILTERS_DESCRIPTION = (
 )
 
 
-async def _guild_export_available_at(session) -> Optional[datetime]:
+async def _guild_export_available_at(session) -> datetime | None:
     """When the next whole-community export may start — ``None`` for now.
 
     A whole community's content is not a thing to re-read on a loop. The bound
@@ -344,7 +337,7 @@ async def _guild_export_available_at(session) -> Optional[datetime]:
                         DataJobStatus.done,
                     )
                 ),
-                DataJob.created_at >= datetime.now(timezone.utc) - window,
+                DataJob.created_at >= datetime.now(UTC) - window,
             )
             .order_by(col(DataJob.created_at).desc())
             .limit(1)
@@ -359,7 +352,7 @@ async def _require_guild_cooldown_elapsed(session) -> None:
     available_at = await _guild_export_available_at(session)
     if available_at is None:
         return
-    seconds_left = (available_at - datetime.now(timezone.utc)).total_seconds()
+    seconds_left = (available_at - datetime.now(UTC)).total_seconds()
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail=ExportMessages.EXPORT_COOLDOWN_ACTIVE,
@@ -375,11 +368,11 @@ async def estimate_aggregate_export(
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
     scope: Literal["initiative", "community"] = Query(),
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None, description="Required when scope=initiative"
     ),
     include_uploads: bool = Query(default=True),
-    filters: Optional[str] = Query(default=None, description=_FILTERS_DESCRIPTION),
+    filters: str | None = Query(default=None, description=_FILTERS_DESCRIPTION),
 ) -> BackupEstimate:
     """Pre-flight numbers for the export wizard: per-tool entity counts and
     the uploads footprint (approximate — embedded document images resolve at
@@ -408,14 +401,14 @@ async def export_initiative(
     guild_context: GuildContextDep,
     initiative_id: int = Query(),
     mode: Literal["backup", "report"] = Query(default="backup"),
-    include: Optional[str] = Query(
+    include: str | None = Query(
         default=None,
         description=(
             'JSON object of tool→bool, e.g. {"project": true, "calendar": false}. '
             "Omitted = every tool."
         ),
     ),
-    formats: Optional[str] = Query(
+    formats: str | None = Query(
         default=None,
         description=(
             "Report mode: JSON object of tool→format; the file entry is a "
@@ -426,11 +419,11 @@ async def export_initiative(
     include_uploads: bool = Query(
         default=True, description="Backup mode: bundle referenced upload blobs"
     ),
-    filters: Optional[str] = Query(default=None, description=_FILTERS_DESCRIPTION),
-    tz: Optional[str] = Query(
+    filters: str | None = Query(default=None, description=_FILTERS_DESCRIPTION),
+    tz: str | None = Query(
         default=None, max_length=64, description="IANA timezone for report timestamps"
     ),
-) -> Union[Response, JSONResponse]:
+) -> Response | JSONResponse:
     """Export a whole initiative as one zip: ``backup`` bundles every included
     tool's importable JSON envelope plus a ``manifest.json`` (optionally with
     the upload blobs the files reference); ``report`` renders each tool in
@@ -480,21 +473,21 @@ async def export_community(
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
     mode: Literal["backup", "report"] = Query(default="backup"),
-    include: Optional[str] = Query(
+    include: str | None = Query(
         default=None, description="JSON object of tool→bool; omitted = every tool"
     ),
-    formats: Optional[str] = Query(
+    formats: str | None = Query(
         default=None,
         description="Report mode: JSON object of tool→format (see /exports/initiative)",
     ),
     include_uploads: bool = Query(
         default=True, description="Backup mode: bundle referenced upload blobs"
     ),
-    filters: Optional[str] = Query(default=None, description=_FILTERS_DESCRIPTION),
-    tz: Optional[str] = Query(
+    filters: str | None = Query(default=None, description=_FILTERS_DESCRIPTION),
+    tz: str | None = Query(
         default=None, max_length=64, description="IANA timezone for report timestamps"
     ),
-) -> Union[Response, JSONResponse]:
+) -> Response | JSONResponse:
     """Export the whole guild — every initiative the same way
     ``/exports/initiative`` exports one, in a single zip. The community's seat
     only (held outright; the adapter re-checks at render time so a vacated
@@ -710,7 +703,7 @@ async def download_export_artifact(
 
 #: The format asked for when none is. A file has none: which formats are
 #: valid depends on its type, so the caller names one.
-_DEFAULT_FORMATS: dict[Tool, Optional[str]] = {
+_DEFAULT_FORMATS: dict[Tool, str | None] = {
     Tool.file: None,
     Tool.calendar: "ics",
 }
@@ -723,6 +716,13 @@ _TOOL_FORMATS = {tool: ADAPTERS[tool_export_source(tool)].formats for tool in To
 #: is its adapter's answer, which the engine checks.
 _ALL_FORMATS = tuple(sorted({f for formats in _TOOL_FORMATS.values() for f in formats}))
 ToolExportFormat: Any = Literal[_ALL_FORMATS]  # ty: ignore[invalid-type-form]
+_FORMAT_DESCRIPTION = (
+    "One of the tool's export formats ("
+    + "; ".join(f"{t.value}: {', '.join(f)}" for t, f in _TOOL_FORMATS.items())
+    + "). ``json`` is the importable envelope. A file's formats depend on "
+    "its type, so it has no default; a calendar defaults to ``ics``, every "
+    "other tool to ``json``"
+)
 
 
 @router.get("/{tool}", response_model=None)
@@ -731,31 +731,26 @@ async def export_tool(
     session: RLSSessionDep,
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
-    ids: Optional[list[int]] = Query(
+    ids: list[int] | None = Query(
         default=None,
         description="What to export: one artifact per id, zipped when there is "
         "more than one",
     ),
-    format: Optional[ToolExportFormat] = Query(
-        default=None,
-        description="One of the tool's export formats ("
-        + "; ".join(f"{t.value}: {', '.join(f)}" for t, f in _TOOL_FORMATS.items())
-        + "). ``json`` is the importable envelope. A file's formats depend on "
-        "its type, so it has no default; a calendar defaults to ``ics``, every "
-        "other tool to ``json``",
+    format: ToolExportFormat | None = Query(
+        default=None, description=_FORMAT_DESCRIPTION
     ),
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None,
         description="Calendars only: with no ids, every calendar the caller may "
         "export in this initiative",
     ),
-    filters: Optional[str] = Query(
+    filters: str | None = Query(
         default=None,
         description="JSON object narrowing the export: the tool's own list "
         "filters, and for calendars an ``events`` date range "
         '(``{"events": {"start_after": …, "start_before": …}}``)',
     ),
-    tz: Optional[str] = Query(
+    tz: str | None = Query(
         default=None, max_length=64, description="IANA timezone for report timestamps"
     ),
 ) -> Response:

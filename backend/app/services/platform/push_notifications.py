@@ -2,20 +2,24 @@ import asyncio
 import json
 import logging
 import uuid
-from contextlib import nullcontext
+from collections.abc import Sequence
+from contextlib import AbstractAsyncContextManager, nullcontext
 from dataclasses import dataclass
-from typing import Any, AsyncContextManager, Dict, Optional, Sequence
+from typing import Any
 
-import httpx
+import httpx2
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.notification import NotificationType
 from app.models.platform.push_token import PushToken
-from app.services.platform import push_tokens
-
-from app.services.platform import push_config, push_relay, user_notifications
+from app.services.platform import (
+    push_config,
+    push_relay,
+    push_tokens,
+    user_notifications,
+)
 from app.services.platform.push_config import ResolvedPushConfig
 
 logger = logging.getLogger(__name__)
@@ -35,9 +39,12 @@ FCM_SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
 # in-app-only ones, which never push) falls back to the general channel; adding
 # a NEW channel id means a native release, so prefer an existing one.
 DEFAULT_CHANNEL = "default"
+# Both digests, Overdue tasks and Coming up, on one channel, muted or kept as
+# one. The id is the first digest's, which the installed app already registers.
+DIGEST_CHANNEL = "overdue_tasks"
 PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.task_assignment: "task_assignment",
-    NotificationType.overdue_tasks: "overdue_tasks",
+    NotificationType.overdue_tasks: DIGEST_CHANNEL,
     NotificationType.initiative_added: "initiative_added",
     # Join requests are initiative-membership news, so they ride the channel the
     # installed app already registers for it rather than asking for a new one
@@ -45,6 +52,10 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.initiative_join_requested: "initiative_added",
     NotificationType.initiative_join_approved: "initiative_added",
     NotificationType.initiative_join_denied: "initiative_added",
+    # And a community's, one level up.
+    NotificationType.community_join_requested: "initiative_added",
+    NotificationType.community_join_approved: "initiative_added",
+    NotificationType.community_join_denied: "initiative_added",
     # Asking for something in an initiative is the same kind of news, one
     # level down.
     NotificationType.share_requested: "initiative_added",
@@ -80,9 +91,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.event_cancelled: "calendar_events",
     NotificationType.event_rsvp: "calendar_events",
     NotificationType.event_reminder: "event_reminder",
-    # Tasks and events alike, which no channel the installed app registers
-    # describes, so the general one until the digests share a channel (#3065).
-    NotificationType.coming_up: DEFAULT_CHANNEL,
+    NotificationType.coming_up: DIGEST_CHANNEL,
     # A reminder too, so it rides the channel event reminders already register:
     # a new channel id would mean a native release.
     NotificationType.task_reminder: "event_reminder",
@@ -94,6 +103,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     # channel the installed app already registers rather than asking for a
     # new one — a new channel id would mean a native release.
     NotificationType.ticket_updated: "comments",
+    NotificationType.idea_updated: "comments",
     NotificationType.moderation_removal: "comments",
     NotificationType.moderation_warning: "comments",
     # Work landing on a person, so the channel task assignments use.
@@ -102,7 +112,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
 }
 
 
-def channel_for(notification_type: Optional[NotificationType]) -> str:
+def channel_for(notification_type: NotificationType | None) -> str:
     """Android channel id for a notification type."""
     if notification_type is None:
         return DEFAULT_CHANNEL
@@ -117,7 +127,7 @@ _credentials: tuple[str, service_account.Credentials] | None = None
 _refresh_lock = asyncio.Lock()
 
 
-async def _get_fcm_access_token(cfg: ResolvedPushConfig) -> Optional[str]:
+async def _get_fcm_access_token(cfg: ResolvedPushConfig) -> str | None:
     """An OAuth2 access token for the configured service account.
 
     Returns None if FCM is not configured or credentials are invalid.
@@ -152,15 +162,15 @@ async def _get_fcm_access_token(cfg: ResolvedPushConfig) -> Optional[str]:
 
 
 async def send_push_notification(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     *,
     push_token: str,
     title: str,
     body: str,
-    data: Optional[Dict[str, Any]] = None,
-    channel_id: Optional[str] = None,
+    data: dict[str, Any] | None = None,
+    channel_id: str | None = None,
     platform: str = "android",
-    badge: Optional[int] = None,
+    badge: int | None = None,
 ) -> tuple[bool, bool]:
     """Send a push notification to one device with FCM's HTTP v1 API.
 
@@ -213,7 +223,7 @@ async def send_push_notification(
             "through the push relay" if via_relay else "through FCM",
         )
         return (False, True)
-    relay_server_id: Optional[str] = None
+    relay_server_id: str | None = None
     if via_relay:
         held = await push_relay.credentials(client)
         if held is None:
@@ -304,7 +314,7 @@ async def send_push_notification(
             )
             return (False, False)
 
-    except httpx.TimeoutException:
+    except httpx2.TimeoutException:
         logger.warning("%s request timed out", service)
         return (False, False)
     except Exception:
@@ -324,15 +334,15 @@ class _Outcome:
 
 
 async def _send_to_devices(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     tokens: Sequence[PushToken],
     *,
     title: str,
     body: str,
-    data: Optional[Dict[str, Any]],
+    data: dict[str, Any] | None,
     channel_id: str,
-    badge: Optional[int] = None,
-    gate: AsyncContextManager[Any] | None = None,
+    badge: int | None = None,
+    gate: AbstractAsyncContextManager[Any] | None = None,
 ) -> _Outcome:
     """Send one push to each of these devices. ``gate`` bounds how many sends
     are in flight across a batch."""
@@ -374,7 +384,7 @@ class Push:
     notification_type: NotificationType
     title: str
     body: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     #: Only the devices these sign-ins registered; ``None`` for every device.
     session_ids: frozenset[uuid.UUID] | None = None
 
@@ -421,7 +431,7 @@ async def send_pushes(session: AsyncSession, pushes: Sequence[Push]) -> list[boo
         logger.exception("Could not read the unread counts for a batch of pushes")
         unread = None
     gate = asyncio.Semaphore(CONCURRENT_SENDS)
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx2.AsyncClient(timeout=10.0) as client:
         outcomes = await asyncio.gather(
             *(
                 _send_to_devices(
