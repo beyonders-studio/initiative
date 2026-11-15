@@ -25,6 +25,7 @@
     "configInvalid": "Setup problem",
     "provided": "Comes with Initiative",
     "unavailable": "Not set up on this server",
+    "readOnly": "Read-only",
     "configure": "Open settings",
     "version": "Version {{version}}",
     "autoUpdate": "Update automatically",

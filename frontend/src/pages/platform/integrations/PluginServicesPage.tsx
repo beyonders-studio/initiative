@@ -16,10 +16,9 @@ import { Capability, hasCapability } from "@/lib/permissions";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Label } from "@/ui/label";
+import { formatDate } from "@/ui/lib/formatDate";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
-import { Switch } from "@/ui/switch";
 
 import { PluginServiceFormDialog, type PluginServiceFormValues } from "./PluginServiceFormDialog";
 
@@ -32,7 +31,7 @@ const hasKeys = (registration: PluginServiceRegistrationRead): boolean =>
  * Deployment-level plug-in service registrations (`plugins.manage`).
  *
  * The operator edits a plug-in's deployment facts here: its addresses, keys and
- * reach, and the kill switch. What the plug-in is and may do comes from its
+ * reach, and whether it is suspended everywhere. What the plug-in is and may do comes from its
  * listing and is shown read-only.
  */
 export const PluginServicesPage = () => {
@@ -42,7 +41,7 @@ export const PluginServicesPage = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PluginServiceRegistrationRead | null>(null);
-  const [disabling, setDisabling] = useState<PluginServiceRegistrationRead | null>(null);
+  const [suspending, setSuspending] = useState<PluginServiceRegistrationRead | null>(null);
   const [deleting, setDeleting] = useState<PluginServiceRegistrationRead | null>(null);
 
   const servicesQuery = usePluginServices({ enabled: canManagePlugins });
@@ -131,20 +130,20 @@ export const PluginServicesPage = () => {
     );
   };
 
-  const setEnabled = (registration: PluginServiceRegistrationRead, enabled: boolean) => {
+  const setSuspended = (registration: PluginServiceRegistrationRead, suspended: boolean) => {
     updateService.mutate(
-      { registrationId: registration.id, data: { suspended: !enabled } },
+      { registrationId: registration.id, data: { suspended } },
       {
         onSuccess: () => {
-          setDisabling(null);
+          setSuspending(null);
           toast.success(
-            enabled
-              ? t("pluginServices.enabledToast", { name: registration.public_id })
-              : t("pluginServices.disabledToast", { name: registration.public_id })
+            suspended
+              ? t("pluginServices.suspendedToast", { name: registration.public_id })
+              : t("pluginServices.liftedToast", { name: registration.public_id })
           );
         },
         onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:pluginServices.toggleError")),
+          toast.error(getErrorMessage(error, "settings:pluginServices.suspensionError")),
       }
     );
   };
@@ -205,7 +204,9 @@ export const PluginServicesPage = () => {
                       )}
                       {registration.suspended_at != null && (
                         <Badge variant="outline" className="border-destructive text-destructive">
-                          {t("pluginServices.disabledBadge")}
+                          {t("pluginServices.suspendedBadge", {
+                            date: formatDate(registration.suspended_at),
+                          })}
                         </Badge>
                       )}
                       {!registration.publisher_enabled && (
@@ -258,25 +259,30 @@ export const PluginServicesPage = () => {
                   </div>
 
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <Label
-                        htmlFor={`plugin-service-enabled-${registration.id}`}
-                        className="text-muted-foreground text-xs"
-                      >
-                        {t("pluginServices.enabledLabel")}
-                      </Label>
-                      <Switch
-                        id={`plugin-service-enabled-${registration.id}`}
-                        checked={registration.suspended_at == null}
+                    {/* Lifting is safe; suspending cuts the plug-in off in every
+                        community, so that side confirms. */}
+                    {registration.suspended_at != null ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         disabled={updateService.isPending}
-                        onCheckedChange={(checked) => {
-                          // Turning it back on is safe; turning it off stops
-                          // the plug-in for every community, so that side confirms.
-                          if (checked) setEnabled(registration, true);
-                          else setDisabling(registration);
-                        }}
-                      />
-                    </div>
+                        onClick={() => setSuspended(registration, false)}
+                      >
+                        {t("pluginServices.lift")}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive"
+                        disabled={updateService.isPending}
+                        onClick={() => setSuspending(registration)}
+                      >
+                        {t("pluginServices.suspend")}
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       variant="outline"
@@ -325,7 +331,7 @@ export const PluginServicesPage = () => {
                     </p>
                   )}
                   {registration.suspended_at != null && (
-                    <p className="text-destructive">{t("pluginServices.disabledHelp")}</p>
+                    <p className="text-destructive">{t("pluginServices.suspendedHelp")}</p>
                   )}
                   {!registration.publisher_enabled && (
                     <p className="text-destructive">
@@ -360,17 +366,17 @@ export const PluginServicesPage = () => {
       />
 
       <ConfirmDialog
-        open={disabling !== null}
+        open={suspending !== null}
         onOpenChange={(open) => {
-          if (!open) setDisabling(null);
+          if (!open) setSuspending(null);
         }}
-        title={t("pluginServices.disableTitle", { name: disabling?.public_id ?? "" })}
-        description={t("pluginServices.disableDescription")}
-        confirmLabel={t("pluginServices.disableConfirm")}
+        title={t("pluginServices.suspendTitle", { name: suspending?.public_id ?? "" })}
+        description={t("pluginServices.suspendDescription")}
+        confirmLabel={t("pluginServices.suspend")}
         destructive
         isLoading={updateService.isPending}
         onConfirm={() => {
-          if (disabling) setEnabled(disabling, false);
+          if (suspending) setSuspended(suspending, true);
         }}
       />
 
