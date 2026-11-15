@@ -4,3 +4,9 @@ packages:
 allowBuilds:
   # Squirrel's installer; the Windows build is NSIS.
   electron-winstaller: false
+overrides:
+  # Build tooling (electron-builder, @electron/get, node-gyp) held below
+  # patched releases.
+  minimatch@>=7.0.0 <11.0.1: ^11.0.1
+  undici@>=4.0.0 <6.29.1: ^6.29.1
+  undici@>=7.0.0 <7.30.1: ^7.30.1

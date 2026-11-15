@@ -7,12 +7,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { currentHelp, updateHelp } from "@/components/help/helpStore";
+import { currentHelp, EMPTY_DRAFT, setHelpDraft, updateHelp } from "@/components/help/helpStore";
 
 import { HelpButton } from "./HelpButton";
 
 describe("HelpButton", () => {
-  afterEach(() => updateHelp({ open: false }));
+  afterEach(() => updateHelp({ open: false, draft: EMPTY_DRAFT }));
 
   it("opens Help and closes it again", async () => {
     renderWithProviders(<HelpButton />);
@@ -25,5 +25,11 @@ describe("HelpButton", () => {
 
     await userEvent.click(help);
     expect(currentHelp().open).toBe(false);
+  });
+
+  it("says when a request is half written", () => {
+    setHelpDraft({ text: "My card was charged twice" });
+    renderWithProviders(<HelpButton />);
+    expect(screen.getByRole("button", { name: "Help, Help request draft" })).toBeInTheDocument();
   });
 });

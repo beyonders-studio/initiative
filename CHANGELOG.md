@@ -10,10 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Plug-in states in a community.** Operators set each of a community's plug-ins active, read-only, on hold or deleted (uninstalled after 30 days); where billing sets plans, billing sets them. Moderators under a moderate grant suspend and lift one. On hold, deleted or suspended, the plug-in disappears from the community until it is back, and each plug-in is told its own status.
+- **Reload in the desktop app.** The title bar has a reload button beside Help, for a page that needs a fresh start.
 
 ### Changed
 
 - **Suspend a plug-in everywhere.** On Plug-in services, a plug-in is suspended rather than switched off, which also hides it from every community until it is lifted; one switched off before is suspended. A `PLUGIN_SERVICES_CONFIG` entry naming `enabled` is refused. In the API, a plug-in service takes `suspended` and reads `suspended_at` in place of `enabled`.
+- **A half-written help request is marked on Help.** A dot on the Help button, or on your account menu, replaces the pill that sat over the corner of the page.
+
+### Fixed
+
+- **Major Security fixes** A number of flagged high severity issues for installed packages have been resolved.
 
 ## [0.79.0] - 2026-11-13
 

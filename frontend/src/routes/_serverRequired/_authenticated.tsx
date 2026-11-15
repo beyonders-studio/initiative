@@ -29,7 +29,7 @@ import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { SidebarProvider } from "@/components/sidebar/sidebar";
 import { StartFlow } from "@/components/start/StartFlow";
 import { CreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
-import { FeedbackHost } from "@/components/tickets/FeedbackSheet";
+import { FeedbackHost } from "@/components/tickets/FeedbackDialog";
 import { CreateToolWizard } from "@/components/tools/CreateToolWizard";
 import { UpdatedNotice } from "@/components/updates/UpdatedNotice";
 import { UpdateReadyToast } from "@/components/updates/UpdateReadyToast";

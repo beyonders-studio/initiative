@@ -105,3 +105,11 @@ export const useHelpOpen = () =>
     () => state.open,
     () => false
   );
+
+/** Whether a request is half written, for the badge on the buttons that open Help. */
+export const useHelpDraftWaiting = () =>
+  useSyncExternalStore(
+    subscribe,
+    () => hasDraft(state.draft),
+    () => false
+  );

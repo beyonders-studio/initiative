@@ -1,5 +1,5 @@
 /**
- * Feedback from any server, on Initiative Cloud: the sheet's form as a page.
+ * Feedback from any server, on Initiative Cloud: the dialog's form as a page.
  *
  * Other servers open it with the device and page it was sent from in the
  * link's fragment, and a suggestion's page with that suggestion as `?idea=`
@@ -123,7 +123,7 @@ export const FeedbackPage = () => {
   if (!isCloudOrigin(getServerOrigin())) return <Navigate to="/" replace />;
 
   // Signed in, the server says whether it takes feedback now; where it
-  // doesn't, the page is its address or nothing, as the sheet is.
+  // doesn't, the page is its address or nothing, as the dialog is.
   const feedback = data?.feedback;
   if (user && feedback && feedback.mode !== TicketMode.form) {
     return feedback.mode === TicketMode.email && feedback.contact ? (

@@ -1,7 +1,7 @@
 /**
  * Filing a ticket: reporting something, or a security problem. Help requests
  * are asked from Help (`components/help/HelpPanel`), and feedback from its
- * own sheet.
+ * own dialog.
  *
  * One dialog for both, opened by a Report flag or the security report: a
  * report is about one thing, already chosen, so it holds the page still while
