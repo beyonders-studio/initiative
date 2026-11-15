@@ -481,10 +481,11 @@ async def uninstall_plugin(
     session: AsyncSession,
     plugin: GuildPlugin,
     *,
-    actor_user_id: int,
+    actor_user_id: int | None,
     erase: bool = False,
 ) -> None:
     """Remove an install, ending its access and trashing what it created.
+    ``actor_user_id`` is ``None`` for the sweep removing a deleted install.
 
     What the plug-in calls the community and its members is kept, so a later
     install brings the same names back. It is told ``uninstalled`` once the

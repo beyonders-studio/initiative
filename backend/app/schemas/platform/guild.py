@@ -28,6 +28,7 @@ from app.models.platform.guild import (
     CommunityRole,
     CommunityStatus,
 )
+from app.models.platform.plugin_install import PluginInstallStatus, PluginState
 from app.schemas.base import RawTextStr, RichTextStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 
@@ -474,6 +475,21 @@ class CommunityAction(str, Enum):
     request_access = "request_access"
     #: Grant oneself access to it.
     break_glass = "break_glass"
+    #: Its plug-ins, to suspend and lift each, under a live ``moderate``
+    #: grant on it.
+    plugins = "plugins"
+
+
+class CommunityPluginAction(str, Enum):
+    """What the reader may do to one of a community's plug-ins. Worked out by
+    the server per install."""
+
+    #: Suspend it in the community.
+    suspend = "suspend"
+    #: Lift its suspension there.
+    lift = "lift"
+    #: Set its status; not while billing sets the community's plan.
+    set_status = "set_status"
 
 
 class PlatformCommunityStorageRead(SanitizedBaseModel):
@@ -544,9 +560,38 @@ class PlatformCommunityStorageRead(SanitizedBaseModel):
 
 
 class CommunitySuspensionUpdate(SanitizedBaseModel):
-    """Suspend a community, or lift its suspension."""
+    """Suspend a community, or one of its plug-ins, or lift the suspension."""
 
     suspended: bool
+
+
+class CommunityPluginStatusUpdate(SanitizedBaseModel):
+    """Set the status of one of a community's plug-ins."""
+
+    status: PluginInstallStatus
+
+
+class CommunityPluginStateRead(SanitizedBaseModel):
+    """One of a community's plug-ins as staff see it."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    install_id: int
+    listing_uid: str
+    #: The community's name for it; null where its install is gone and its
+    #: row not yet swept.
+    name: str | None = None
+    status: PluginInstallStatus
+    #: Its state there: suspended, by the platform, by staff or by being out
+    #: of reach, otherwise its status.
+    state: PluginState
+    status_changed_at: datetime | None = None
+    #: When staff suspended it there; null while they have not.
+    suspended_at: datetime | None = None
+    #: When a deleted install is uninstalled; null unless it is deleted.
+    uninstall_at: datetime | None = None
+    #: What the reader may do to it, worked out for them.
+    allowed_actions: list[CommunityPluginAction] = Field(default_factory=list)
 
 
 class PlatformCommunityStorageListResponse(PageMeta):
