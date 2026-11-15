@@ -9,19 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Plug-in states in a community.** Operators set each of a community's plug-ins active, read-only, on hold or deleted (uninstalled after 30 days); where billing sets plans, billing sets them. Moderators under a moderate grant suspend and lift one. On hold, deleted or suspended, the plug-in disappears from the community until it is back, and each plug-in is told its own status.
 - **Reload in the desktop app.** The title bar has a reload button beside Help, for a page that needs a fresh start.
-
-- **Plug-ins in beta.** A plug-in can declare itself in beta, and the platform owner picks the communities that may use it on Plug-in services; nobody else can find, install or use it. The shelf and the listing page mark it **Beta**.
 
 ### Changed
 
-- **A plug-in says who can use it.** Whether a plug-in is for every community, the operations community or a beta list now comes from the plug-in itself, not from its registration. A `PLUGIN_SERVICES_CONFIG` entry naming `operations_only` is refused: remove it before upgrading. In the API, a plug-in service reads `availability` and `beta_communities` in place of `operations_only`, and takes `beta_community_ids`.
-- **Suspend a plug-in everywhere.** On Plug-in services, a plug-in is suspended rather than switched off, which also hides it from every community until it is lifted; one switched off before is suspended. A `PLUGIN_SERVICES_CONFIG` entry naming `enabled` is refused. In the API, a plug-in service takes `suspended` and reads `suspended_at` in place of `enabled`.
 - **A half-written help request is marked on Help.** A dot on the Help button, or on your account menu, replaces the pill that sat over the corner of the page.
-
-### Fixed
-
 - **Major Security fixes** A number of flagged high severity issues for installed packages have been resolved.
 
 ## [0.79.0] - 2026-11-13
