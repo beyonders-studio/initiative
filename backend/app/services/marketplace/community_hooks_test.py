@@ -954,6 +954,32 @@ class TestPurging:
         assert await _purge(session, when) == 1
         assert await _standing(session, guild_id) is None
 
+    async def test_a_plugin_suspended_there_does_not_hold_the_purge(
+        self, session, monkeypatch, capfd
+    ):
+        """Nothing is sent to it: its erase is given up on at once, and its
+        names go as for a plug-in that never answered."""
+        user, guild, install = await _setup(session)
+        guild_id = guild.id
+        member = await plugin_refs.ensure_plugin_ref(
+            guild_id=guild_id, public_id=PUBLIC_ID, user_id=user.id
+        )
+        plugins = _answering(monkeypatch)
+        await set_install_state(session, guild_id, install.id, suspended=True)
+        when = await _deleted(session, guild_id)
+
+        # Its erase is queued and given up on in the same pass.
+        assert await _purge(session, when) == 1
+
+        assert plugins.calls == []
+        assert await _standing(session, guild_id) is None
+        assert (
+            await plugin_refs.resolve_plugin_ref(session, ref=member, guild_id=guild_id)
+            is None
+        )
+        (record,) = emitted(capfd, AuditEventType.PLUGIN_ERASE_ABANDONED)
+        assert record["detail"]["plugin"] == PUBLIC_ID
+
     async def test_an_answered_purge_erase_lets_the_purge_finish(
         self, session, monkeypatch
     ):

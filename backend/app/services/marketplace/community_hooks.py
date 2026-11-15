@@ -1146,7 +1146,44 @@ async def queue_purge_erases(session: AsyncSession, *, guild_id: int) -> int:
 
 async def hooks_unfinished(session: AsyncSession, *, guild_id: int) -> bool:
     """Whether the community has a hook neither answered nor given up on,
-    which keeps a purge from deleting it."""
+    which keeps a purge from deleting it.
+
+    A plug-in suspended in the community is sent nothing, so its hooks are
+    given up on here, in ``session``'s transaction: an ``erase`` among them
+    drops its references and goes on the audit stream, as for a plug-in that
+    never answered."""
+    held = await _suspended_here(guild_id)
+    if held:
+        from app.core.audit_events import AuditEventType
+        from app.services import audit as audit_service
+
+        given_up = (
+            await session.exec(
+                update(_TABLE)
+                .where(
+                    _TABLE.c.guild_id == guild_id,
+                    _TABLE.c.public_id.in_(sorted(held)),
+                    _TABLE.c.done_at.is_(None),
+                )
+                .values(
+                    done_at=datetime.now(UTC), outcome="gave_up", claimed_until=None
+                )
+                .returning(_TABLE.c.public_id, _TABLE.c.hook, _TABLE.c.install_id)
+            )
+        ).all()
+        for public_id, _hook, install_id in (r for r in given_up if r.hook == "erase"):
+            await identity_refs.drop_sector_refs(
+                session, sector_guild_id=guild_id, sector_plugin=public_id
+            )
+            await audit_service.record(
+                session,
+                event_type=AuditEventType.PLUGIN_ERASE_ABANDONED,
+                actor_user_id=None,
+                guild_id=guild_id,
+                target_type="plugin",
+                target_id=install_id,
+                detail={"plugin": public_id, "suspended": True},
+            )
     return bool(
         (
             await session.exec(
