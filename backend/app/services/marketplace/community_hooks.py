@@ -186,7 +186,7 @@ LATEST_WINS: frozenset[str] = frozenset(
 )
 
 #: Hooks a plug-in on hold or deleted in the community is still sent.
-LIFECYCLE_HOOKS: frozenset[str] = frozenset({"plugin_status", "uninstalled"})
+LIFECYCLE_HOOKS: frozenset[str] = frozenset({"plugin_status", "uninstalled", "erase"})
 
 #: The waits after each failed attempt, in seconds; the last repeats.
 BACKOFF_SECONDS: tuple[int, ...] = (30, 120, 600, 1800, 3600, 6 * 3600)
@@ -479,16 +479,6 @@ async def _parked(guild_id: int) -> Callable[[str, str], bool]:
         return state is PluginState.suspended or hook not in LIFECYCLE_HOOKS
 
     return parked
-
-
-async def _suspended_here(guild_id: int) -> frozenset[str]:
-    """The plug-ins suspended in the community. Their hooks wait, untouched,
-    until the suspension lifts."""
-    return frozenset(
-        snapshot.public_id
-        for snapshot in (await registration_lookup.load_registrations()).values()
-        if snapshot.state_in(guild_id) is PluginState.suspended
-    )
 
 
 async def _current_body(
@@ -1170,23 +1160,36 @@ async def hooks_unfinished(session: AsyncSession, *, guild_id: int) -> bool:
     """Whether the community has a hook neither answered nor given up on,
     which keeps a purge from deleting it.
 
-    A plug-in suspended in the community is sent nothing, so its hooks are
-    given up on here, in ``session``'s transaction: an ``erase`` among them
-    drops its references and goes on the audit stream, as for a plug-in that
-    never answered."""
-    held = await _suspended_here(guild_id)
-    if held:
+    A hook its plug-in's state there keeps waiting (:func:`_parked`: all of
+    them while it is suspended, all but its lifecycle while it is on hold or
+    deleted) is never sent, so it is given up on here, in ``session``'s
+    transaction: an ``erase`` among them drops its references and goes on the
+    audit stream, as for a plug-in that never answered."""
+    parked = await _parked(guild_id)
+    waiting = [
+        row.id
+        for row in (
+            await session.exec(
+                select(
+                    PluginCommunityHook.id,
+                    PluginCommunityHook.public_id,
+                    PluginCommunityHook.hook,
+                ).where(
+                    PluginCommunityHook.guild_id == guild_id,
+                    col(PluginCommunityHook.done_at).is_(None),
+                )
+            )
+        ).all()
+        if parked(row.public_id, row.hook)
+    ]
+    if waiting:
         from app.core.audit_events import AuditEventType
         from app.services import audit as audit_service
 
         given_up = (
             await session.exec(
                 update(_TABLE)
-                .where(
-                    _TABLE.c.guild_id == guild_id,
-                    _TABLE.c.public_id.in_(sorted(held)),
-                    _TABLE.c.done_at.is_(None),
-                )
+                .where(_TABLE.c.id.in_(waiting))
                 .values(
                     done_at=datetime.now(UTC), outcome="gave_up", claimed_until=None
                 )
@@ -1204,7 +1207,7 @@ async def hooks_unfinished(session: AsyncSession, *, guild_id: int) -> bool:
                 guild_id=guild_id,
                 target_type="plugin",
                 target_id=install_id,
-                detail={"plugin": public_id, "suspended": True},
+                detail={"plugin": public_id, "parked": True},
             )
     return bool(
         (

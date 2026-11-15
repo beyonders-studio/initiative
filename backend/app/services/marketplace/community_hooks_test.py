@@ -992,6 +992,30 @@ class TestPurging:
         (record,) = emitted(capfd, AuditEventType.PLUGIN_ERASE_ABANDONED)
         assert record["detail"]["plugin"] == PUBLIC_ID
 
+    async def test_a_plugin_on_hold_is_sent_its_erase_and_nothing_else_holds_it(
+        self, session, monkeypatch
+    ):
+        """On hold, the erase is a lifecycle hook and goes; a hook its state
+        keeps waiting is given up on rather than holding the purge."""
+        _user, guild, install = await _setup(session)
+        guild_id = guild.id
+        await plugin_refs.ensure_plugin_guild_ref(
+            guild_id=guild_id, public_id=PUBLIC_ID
+        )
+        plugins = _answering(monkeypatch)
+        await _deliver(guild_id, hook="installed")
+        await set_install_state(session, guild_id, install.id, status="on_hold")
+        when = await _deleted(session, guild_id)
+
+        assert await _purge(session, when) == 0
+        installed, erase = await _hooks(session, guild_id)
+        assert (installed.hook, installed.outcome) == ("installed", "gave_up")
+        assert (erase.hook, erase.done_at) == ("erase", None)
+
+        await _visit(guild_id)
+        assert [path for _, path, _, _ in plugins.calls] == ["/v1/hooks/erase"]
+        assert await _purge(session, when) == 1
+
     async def test_an_answered_purge_erase_lets_the_purge_finish(
         self, session, monkeypatch
     ):

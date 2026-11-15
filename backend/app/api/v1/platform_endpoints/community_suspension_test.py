@@ -543,3 +543,40 @@ async def test_a_deleted_plugin_comes_back_within_its_window_and_goes_after(
         )
     ).all()
     assert hooks == ["uninstalled"]
+
+
+async def test_a_deleted_plugin_suspended_there_goes_without_a_word(client, session):
+    """Uninstalled by the sweep while suspended, it is sent nothing: no
+    ``uninstalled``, no revocation, and what waited for it is discarded."""
+    from app.services.marketplace import community_hooks
+
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+    await community_hooks.deliver_community_hook(
+        guild_id=guild.id, public_id="t.board", hook="installed"
+    )
+    for method, what, body in (
+        ("POST", "suspension", {"suspended": True}),
+        ("PUT", "status", {"status": "deleted"}),
+    ):
+        response = await client.request(
+            method, _plugin_url(guild, install_id, what), json=body, headers=headers
+        )
+        assert response.status_code == 200, response.text
+
+    past = datetime.now(UTC) + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS + 1)
+    assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 1
+
+    await route_session_to_guild(session, guild.id)
+    assert await session.get(GuildPlugin, install_id) is None
+    await set_rls_context(session, Unattributed())
+    hooks = (
+        await session.exec(
+            select(PluginCommunityHook.hook).where(
+                PluginCommunityHook.guild_id == guild.id
+            )
+        )
+    ).all()
+    assert hooks == []
