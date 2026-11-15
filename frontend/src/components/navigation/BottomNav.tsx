@@ -22,11 +22,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { PopUpDock, pillClassName } from "@/ui/pop-up";
 
 import { usePrimaryCreateAction } from "./CreateActionContext";
-
-const pillClass =
-  "pointer-events-auto flex items-center gap-1 rounded-full border bg-card/90 p-1 shadow-lg backdrop-blur supports-backdrop-filter:bg-card/70";
 
 /**
  * App-wide floating bottom navigation. The hamburger/search/home pill is mobile
@@ -82,113 +80,117 @@ export function BottomNav() {
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40"
       style={{ paddingBottom: "var(--safe-area-inset-bottom)" }}
     >
-      <div className="flex w-full items-end justify-center gap-3 px-4 pb-4 sm:px-6 sm:pb-6 md:justify-end">
-        {isMobile && (
-          <nav className={pillClass} aria-label={t("bottomNav.label")}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-11 w-11 rounded-full"
-              onClick={() => setOpenMobile(true)}
-              aria-label={t("bottomNav.menu")}
-            >
-              <Menu className="h-5 w-5" />
-              {unreadCount > 0 ? (
-                <Badge className="absolute -top-0.5 -right-0.5 h-5 min-w-5 justify-center rounded-full px-1 py-0 text-2xs">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Badge>
-              ) : null}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 rounded-full"
-              onClick={() => void navigate({ to: "/" })}
-              aria-label={t("bottomNav.home")}
-            >
-              <Home className="h-5 w-5" />
-            </Button>
-            {dmEnabled && (
+      <div className="flex w-full flex-col items-end gap-3 px-4 pb-4 sm:px-6 sm:pb-6">
+        {/* Pop-ups sit above the buttons, so neither covers the other. */}
+        <PopUpDock />
+        <div className="flex w-full items-end justify-center gap-3 md:justify-end">
+          {isMobile && (
+            <nav className={pillClassName} aria-label={t("bottomNav.label")}>
               <Button
                 variant="ghost"
                 size="icon"
                 className="relative h-11 w-11 rounded-full"
-                onClick={() => void navigate({ to: "/messages" })}
-                aria-label={messagesLabel}
+                onClick={() => setOpenMobile(true)}
+                aria-label={t("bottomNav.menu")}
               >
-                <MessageSquare className="h-5 w-5" />
-                {waitingBadge}
+                <Menu className="h-5 w-5" />
+                {unreadCount > 0 ? (
+                  <Badge className="absolute -top-0.5 -right-0.5 h-5 min-w-5 justify-center rounded-full px-1 py-0 text-2xs">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Badge>
+                ) : null}
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 rounded-full"
-              onClick={() => getOpenCommandCenter()?.()}
-              aria-label={t("bottomNav.search")}
-            >
-              <Search className="h-5 w-5" />
-            </Button>
-          </nav>
-        )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 rounded-full"
+                onClick={() => void navigate({ to: "/" })}
+                aria-label={t("bottomNav.home")}
+              >
+                <Home className="h-5 w-5" />
+              </Button>
+              {dmEnabled && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-11 w-11 rounded-full"
+                  onClick={() => void navigate({ to: "/messages" })}
+                  aria-label={messagesLabel}
+                >
+                  <MessageSquare className="h-5 w-5" />
+                  {waitingBadge}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 rounded-full"
+                onClick={() => getOpenCommandCenter()?.()}
+                aria-label={t("bottomNav.search")}
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+            </nav>
+          )}
 
-        {/* Beside the create button rather than inside the mobile pill, which
+          {/* Beside the create button rather than inside the mobile pill, which
             is not drawn at this size: the two things somebody reaches for from
             anywhere are starting something and seeing who has written. The
             quieter of the two is on the left, so the primary action stays where
             it has always been. */}
-        {!isMobile && dmEnabled && (
-          <Button
-            variant="secondary"
-            size="icon"
-            className="pointer-events-auto relative h-12 w-12 rounded-full shadow-lg"
-            onClick={() => void navigate({ to: "/messages" })}
-            aria-label={messagesLabel}
-          >
-            <MessageSquare className="h-5 w-5" />
-            {waitingBadge}
-          </Button>
-        )}
-
-        {!hideAdd &&
-          (action ? (
+          {!isMobile && dmEnabled && (
             <Button
+              variant="secondary"
               size="icon"
-              className="pointer-events-auto h-12 w-12 rounded-full shadow-lg shadow-primary/40 md:w-auto md:px-5"
-              onClick={() => action.run()}
-              aria-label={action.label || t("bottomNav.add")}
+              className="pointer-events-auto relative h-12 w-12 rounded-full shadow-lg"
+              onClick={() => void navigate({ to: "/messages" })}
+              aria-label={messagesLabel}
             >
-              <Plus className="h-5 w-5" />
-              <span className="hidden md:inline">{action.label}</span>
+              <MessageSquare className="h-5 w-5" />
+              {waitingBadge}
             </Button>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon"
-                  className="pointer-events-auto h-12 w-12 rounded-full shadow-lg shadow-primary/40 md:w-auto md:px-5"
-                  aria-label={t("bottomNav.add")}
-                >
-                  <Plus className="h-5 w-5" />
-                  <span className="hidden md:inline">{t("bottomNav.add")}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="top" className="mb-2">
-                {globalCreate.task && (
-                  <DropdownMenuItem onSelect={() => getOpenCreateTaskWizard()?.()}>
-                    <SquareCheckBig className="h-4 w-4" />
-                    {t("bottomNav.addTask")}
-                  </DropdownMenuItem>
-                )}
-                {globalCreate.tool && (
-                  <DropdownMenuItem onSelect={() => getOpenCreateToolWizard(Tool.file)?.()}>
-                    <FilePlus className="h-4 w-4" />
-                    {t("bottomNav.addFile")}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ))}
+          )}
+
+          {!hideAdd &&
+            (action ? (
+              <Button
+                size="icon"
+                className="pointer-events-auto h-12 w-12 rounded-full shadow-lg shadow-primary/40 md:w-auto md:px-5"
+                onClick={() => action.run()}
+                aria-label={action.label || t("bottomNav.add")}
+              >
+                <Plus className="h-5 w-5" />
+                <span className="hidden md:inline">{action.label}</span>
+              </Button>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    className="pointer-events-auto h-12 w-12 rounded-full shadow-lg shadow-primary/40 md:w-auto md:px-5"
+                    aria-label={t("bottomNav.add")}
+                  >
+                    <Plus className="h-5 w-5" />
+                    <span className="hidden md:inline">{t("bottomNav.add")}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="top" className="mb-2">
+                  {globalCreate.task && (
+                    <DropdownMenuItem onSelect={() => getOpenCreateTaskWizard()?.()}>
+                      <SquareCheckBig className="h-4 w-4" />
+                      {t("bottomNav.addTask")}
+                    </DropdownMenuItem>
+                  )}
+                  {globalCreate.tool && (
+                    <DropdownMenuItem onSelect={() => getOpenCreateToolWizard(Tool.file)?.()}>
+                      <FilePlus className="h-4 w-4" />
+                      {t("bottomNav.addFile")}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ))}
+        </div>
       </div>
     </div>
   );

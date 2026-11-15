@@ -1,5 +1,5 @@
 /**
- * What feedback asks for, in the sheet and on Initiative Cloud's page: the
+ * What feedback asks for, in the dialog and on Initiative Cloud's page: the
  * kind first, an idea to start, which picks the question the box asks and
  * keeps what was written when it changes; the box, with pictures where they
  * are taken, and under an idea the published ideas like it; whether the team
@@ -145,7 +145,7 @@ const IdeasLikeThis = ({
 };
 
 interface FeedbackFormProps {
-  /** The heading's element: the sheet's title, or the page's. */
+  /** The heading's element: the dialog's title, or the page's. */
   Title: ElementType;
   draft: FeedbackDraft;
   onChange: (next: Partial<FeedbackDraft>) => void;

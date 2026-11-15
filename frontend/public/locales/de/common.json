@@ -3,6 +3,7 @@
   "aPlugin": "Ein Plug-in",
   "help": "Hilfe",
   "helpDraft": "Entwurf der Hilfeanfrage",
+  "reloadPage": "Seite neu laden",
   "deletedUserName": "Gelöschter Benutzer #{{id}}",
   "user": "Benutzer",
   "userWithId": "Benutzer #{{id}}",
