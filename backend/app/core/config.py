@@ -1108,8 +1108,7 @@ class Settings(BaseSettings):
     #     "jwks": {"keys": […]},
     #     "allowed_origins": ["https://shopify.example.com"],
     #     "vendor_env": {"client_secret": "SHOPIFY_CLIENT_SECRET"},
-    #     "mandatory": false,
-    #     "operations_only": false}]
+    #     "mandatory": false}]
     # ``base_url`` is where this server calls the plug-in, so it may be an address
     # only the container network resolves; ``page_origin`` is where a browser
     # loads its pages, omitted when the plug-in answers both at one address. Give
@@ -1117,11 +1116,10 @@ class Settings(BaseSettings):
     # them at ``base_url``'s origin (``/.well-known/jwks.json`` for a plug-in built
     # on the SDK). ``vendor_env`` maps a vendor value to the environment
     # variable holding it, so the file names no secret and can be a plain
-    # ConfigMap. ``operations_only`` offers the plug-in to the operations
-    # community alone. An entry waits until its plug-in's listing
+    # ConfigMap. Which communities a plug-in reaches is its manifest's
+    # ``availability``. An entry waits until its plug-in's listing
     # arrives. Unset (the default) ⇒ nothing is reconciled.
-    # Reconciliation never re-enables a registration an operator disabled, and
-    # never blocks boot.
+    # Reconciliation never lifts a suspension, and never blocks boot.
     PLUGIN_SERVICES_CONFIG: str | None = None
 
     # --- Billing (hosted deployments only; default OFF) -------------------

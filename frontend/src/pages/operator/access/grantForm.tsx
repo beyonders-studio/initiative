@@ -7,13 +7,12 @@ import type {
   CommunityNotice,
   GrantCaseRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import type { PickedCommunity } from "@/components/communities/CommunityPicker";
 import { useGrantCases } from "@/hooks/useAccessGrants";
 import type { AccessGrantsForm, AccessGrantsSearch } from "@/lib/accessGrantsSearch";
 import { CasePicker } from "@/pages/operator/CasePicker";
 import { Field } from "@/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-
-import type { PickedCommunity } from "./CommunityPicker";
 
 export const communityLabel = (grant: {
   community_name?: string | null;

@@ -45,7 +45,7 @@ from typing import Any
 from cryptography.fernet import InvalidToken
 from fastapi import HTTPException
 from fastapi import status as http_status
-from sqlalchemy import delete, text, tuple_
+from sqlalchemy import delete, text, tuple_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
@@ -385,63 +385,45 @@ async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:
 # --- an install's state ---------------------------------------------------------
 
 
-#: Stamp the installs of a listing that its registration suspended before,
-#: by the owner or by being out of reach, and no longer does, as back from a
-#: suspension.
-_RESUMED_SQL = text(
-    """
-UPDATE public.plugin_installs i
-   SET resumed_at = now()
-  FROM public.plugin_service_registrations r
- WHERE i.listing_uid = :uid
-   AND r.listing_uid = i.listing_uid
-   AND (CAST(:was_suspended AS boolean)
-     OR (CAST(:was_operations_only AS boolean)
-       AND i.guild_id IS DISTINCT FROM CAST(:was_operations_guild AS integer)))
-   AND r.suspended_at IS NULL
-   AND (NOT r.operations_only OR i.guild_id = (
-       SELECT s.operations_guild_id FROM public.app_settings s WHERE s.id = 1))
-"""
-)
-
-
 async def suspension_moved(
     session: AsyncSession,
     listing_uid: str,
+    guild_ids: Collection[int] | None = None,
     *,
-    was_suspended: bool = False,
-    was_operations_only: bool = False,
-    was_operations_guild: int | None = None,
+    resumed: Collection[int] = (),
 ) -> None:
     """The registration of ``listing_uid`` was suspended or lifted, or its
-    reach moved, on ``session``, the system engine's. ``was_*`` say what
-    suspended it before: its own suspension, and its limit to the operations
-    community then named.
-
-    Each install it no longer suspends is stamped as back from a suspension
-    (``resumed_at``), billing is told each of its installs as it now stands,
-    and each community's hooks are armed once it commits, so a plug-in lifted
-    hears its state and what waited for it."""
-    await session.exec(
-        _RESUMED_SQL,  # type: ignore[call-overload]
-        params={
-            "uid": listing_uid,
-            "was_suspended": was_suspended,
-            "was_operations_only": was_operations_only,
-            "was_operations_guild": was_operations_guild,
-        },
-    )
-    guild_ids = (
+    reach moved, on ``session``, the system engine's. Its installs in
+    ``resumed``'s communities, which it no longer suspends, are stamped as
+    back from a suspension (``resumed_at``); billing is told each of its
+    installs as it now stands, everywhere or in the communities ``guild_ids``
+    names; and each of those communities' hooks are armed once it commits, so
+    a plug-in lifted hears its state and what waited for it."""
+    if resumed:
+        await session.exec(
+            update(PluginInstall)
+            .where(
+                col(PluginInstall.listing_uid) == listing_uid,
+                col(PluginInstall.guild_id).in_(sorted(resumed)),
+            )
+            .values(resumed_at=utcnow())
+        )
+    told = (
         await session.exec(
             text(
                 "SELECT guild_id, public.billing_plugin_status(guild_id, install_id)"
                 " FROM public.plugin_installs WHERE listing_uid = :uid"
+                " AND (CAST(:guilds AS integer[]) IS NULL"
+                " OR guild_id = ANY(CAST(:guilds AS integer[])))"
             ),
-            params={"uid": listing_uid},
+            params={
+                "uid": listing_uid,
+                "guilds": None if guild_ids is None else sorted(guild_ids),
+            },
         )
     ).all()
     community_hooks.status_changed(
-        session, *sorted({int(row.guild_id) for row in guild_ids})
+        session, *sorted({int(row.guild_id) for row in told})
     )
 
 

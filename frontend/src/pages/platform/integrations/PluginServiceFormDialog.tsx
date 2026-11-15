@@ -1,10 +1,12 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  PluginServicePublishedKey,
-  PluginServiceRegistrationRead,
+import {
+  PluginAvailability,
+  type PluginServicePublishedKey,
+  type PluginServiceRegistrationRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { CommunityPicker, type PickedCommunity } from "@/components/communities/CommunityPicker";
 import {
   useConnectPluginService,
   usePluginServiceKeys,
@@ -14,6 +16,7 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { parseAllowedOrigins, postToVendor } from "@/lib/pluginServices";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { CopyButton } from "@/ui/copy-button";
 import {
@@ -42,9 +45,10 @@ export interface PluginServiceFormValues {
   /** Where the plug-in publishes its key set, or "" for none. */
   jwksUri: string;
   mandatory: boolean;
-  operationsOnly: boolean;
   /** One vendor installation may connect to several communities. */
   sharedRoutes: boolean;
+  /** The communities a beta plug-in reaches; sent only while it is beta. */
+  betaCommunities: PickedCommunity[];
   /** Vendor values that were typed, by key. "" clears one; a key left out is kept. */
   vendorValues: Record<string, string>;
 }
@@ -57,8 +61,8 @@ interface FormState {
   jwks: string;
   jwksUri: string;
   mandatory: boolean;
-  operationsOnly: boolean;
   sharedRoutes: boolean;
+  betaCommunities: PickedCommunity[];
   vendorValues: Record<string, string>;
 }
 
@@ -70,8 +74,8 @@ const EMPTY_FORM: FormState = {
   jwks: "",
   jwksUri: "",
   mandatory: false,
-  operationsOnly: false,
   sharedRoutes: false,
+  betaCommunities: [],
   vendorValues: {},
 };
 
@@ -138,8 +142,8 @@ export const PluginServiceFormDialog = ({
         jwks: editing.jwks ? JSON.stringify(editing.jwks, null, 2) : "",
         jwksUri: editing.jwks_uri ?? "",
         mandatory: editing.mandatory,
-        operationsOnly: editing.operations_only,
         sharedRoutes: editing.shared_routes,
+        betaCommunities: editing.beta_communities,
         vendorValues: {},
       });
     } else {
@@ -241,8 +245,8 @@ export const PluginServiceFormDialog = ({
       allowedOrigins: parseAllowedOrigins(form.allowedOrigins),
       jwksUri: form.jwksUri.trim(),
       mandatory: form.mandatory,
-      operationsOnly: form.operationsOnly,
       sharedRoutes: form.sharedRoutes,
+      betaCommunities: form.betaCommunities,
       vendorValues: Object.fromEntries(
         Object.entries(form.vendorValues).map(([key, value]) => [key, value.trim()])
       ),
@@ -627,26 +631,42 @@ export const PluginServiceFormDialog = ({
             </fieldset>
           )}
 
-          <div className="space-y-2 rounded-md border p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <Label htmlFor="plugin-service-operations-only" className="font-medium">
-                  {t("pluginServices.operationsOnlyLabel")}
-                </Label>
-                <p className="text-muted-foreground text-xs">
-                  {t("pluginServices.operationsOnlyHelp")}{" "}
-                  {t("pluginServices.operationsMandatoryHelp")}
-                </p>
+          {/* Who can use it is the plug-in's to say, in each release; the owner
+              picks the communities only of a beta. */}
+          {editing && (
+            <fieldset className="rounded-md border p-3">
+              <legend className="float-left w-full font-medium text-sm">
+                {t("pluginServices.reachTitle")}
+              </legend>
+              <div className="clear-both space-y-2">
+                <p className="text-muted-foreground text-xs">{t("pluginServices.reachHelp")}</p>
+                {editing.availability === PluginAvailability.beta ? (
+                  <>
+                    <Badge variant="secondary">{t("pluginServices.betaBadge")}</Badge>
+                    <CommunityPicker
+                      multiple
+                      aria-label={t("pluginServices.betaCommunitiesLabel")}
+                      value={form.betaCommunities}
+                      onChange={(betaCommunities) =>
+                        setForm((prev) => ({ ...prev, betaCommunities }))
+                      }
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {form.betaCommunities.length > 0
+                        ? t("pluginServices.betaPickedHelp")
+                        : t("pluginServices.betaNoneHelp")}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm">
+                    {editing.availability === PluginAvailability.operations
+                      ? t("pluginServices.reachOperations")
+                      : t("pluginServices.reachEveryCommunity")}
+                  </p>
+                )}
               </div>
-              <Switch
-                id="plugin-service-operations-only"
-                checked={form.operationsOnly}
-                onCheckedChange={(checked) =>
-                  setForm((prev) => ({ ...prev, operationsOnly: Boolean(checked) }))
-                }
-              />
-            </div>
-          </div>
+            </fieldset>
+          )}
 
           <div className="space-y-2 rounded-md border border-amber-500/50 p-3">
             <div className="flex items-start justify-between gap-3">

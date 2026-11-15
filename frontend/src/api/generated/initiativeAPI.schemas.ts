@@ -8520,6 +8520,7 @@ export interface MarketplaceListingDetail {
   latest_version: MarketplaceVersionRead | null;
   installable: boolean;
   unavailable: ListingUnavailable | null;
+  beta: boolean;
   updated_at: string;
   long_description: string | null;
   definition: MarketplaceListingDetailDefinition;
@@ -8551,6 +8552,7 @@ export interface MarketplaceListingSummary {
   latest_version: MarketplaceVersionRead | null;
   installable: boolean;
   unavailable: ListingUnavailable | null;
+  beta: boolean;
   updated_at: string;
 }
 
@@ -8623,6 +8625,7 @@ export interface MarketplaceSharedListingRead {
   latest_version: MarketplaceVersionRead | null;
   installable: boolean;
   unavailable: ListingUnavailable | null;
+  beta: boolean;
   updated_at: string;
   pending_versions: string[];
 }
@@ -9956,6 +9959,26 @@ export interface PluginActionRun {
 }
 
 /**
+ * Which communities a plug-in reaches, as its manifest declares it (the
+ * contract's ``availability``).
+ */
+export type PluginAvailability = (typeof PluginAvailability)[keyof typeof PluginAvailability];
+
+export const PluginAvailability = {
+  none: "none",
+  beta: "beta",
+  operations: "operations",
+} as const;
+
+/**
+ * A community on a beta plug-in's list.
+ */
+export interface PluginBetaCommunityRead {
+  id: number;
+  name: string;
+}
+
+/**
  * A plug-in asking one member to let it act as them, for one purpose.
  */
 export interface PluginConsentRequestCreate {
@@ -10168,7 +10191,6 @@ export interface PluginServiceRegistrationCreate {
   jwks?: PluginServiceRegistrationCreateJwks;
   jwks_uri?: string | null;
   mandatory?: boolean;
-  operations_only?: boolean;
   vendor_values?: PluginServiceRegistrationCreateVendorValues;
 }
 
@@ -10208,7 +10230,8 @@ export interface PluginServiceRegistrationRead {
   jwks_uri: string | null;
   scope_ceiling: string[];
   mandatory: boolean;
-  operations_only: boolean;
+  availability: PluginAvailability;
+  beta_communities: PluginBetaCommunityRead[];
   shared_routes: boolean;
   suspended_at: string | null;
   source: string;
@@ -10248,9 +10271,9 @@ export interface PluginServiceRegistrationUpdate {
   jwks?: PluginServiceRegistrationUpdateJwks;
   jwks_uri?: string | null;
   mandatory?: boolean | null;
-  operations_only?: boolean | null;
   shared_routes?: boolean | null;
   suspended?: boolean | null;
+  beta_community_ids?: number[] | null;
   vendor_values?: PluginServiceRegistrationUpdateVendorValues;
 }
 

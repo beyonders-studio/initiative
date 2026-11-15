@@ -17,8 +17,11 @@ from sqlalchemy import update
 
 from app.core.config import settings
 from app.models.platform.plugin_install import PluginInstallStatus, PluginState
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
-from app.services.marketplace import registration_lookup
+from app.models.platform.plugin_service_registration import (
+    PluginAvailability,
+    PluginServiceRegistration,
+)
+from app.services.marketplace import contract, registration_lookup
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.platform import notify_bus
 from app.testing import (
@@ -26,6 +29,7 @@ from app.testing import (
     create_guild_plugin,
     create_plugin_service_registration,
     create_user,
+    set_beta_communities,
     set_install_state,
 )
 from conftest import TEST_DATABASE_URL
@@ -36,7 +40,21 @@ LISTING = "STATESNAPSHOT1"
 PUBLIC_ID = "tests.states"
 
 
-def _snapshot(*, suspension: str, status: PluginInstallStatus) -> RegistrationSnapshot:
+#: Out of reach: limited to the operations community, or beta with the
+#: community off its list.
+_OUT_OF_REACH = {
+    "operations": PluginAvailability.operations,
+    "beta": PluginAvailability.beta,
+}
+
+
+def _snapshot(
+    *,
+    suspension: str,
+    status: PluginInstallStatus,
+    availability: PluginAvailability | None = None,
+    beta: frozenset[int] = frozenset({OPERATIONS}),
+) -> RegistrationSnapshot:
     held = (
         PluginState.suspended if suspension == "install" else PluginState(status.value)
     )
@@ -50,8 +68,11 @@ def _snapshot(*, suspension: str, status: PluginInstallStatus) -> RegistrationSn
         mandatory=False,
         suspended=suspension == "platform",
         live=suspension != "platform",
-        operations_only=suspension == "reach",
+        availability=(
+            availability or _OUT_OF_REACH.get(suspension, PluginAvailability.none)
+        ).value,
         operations_guild_id=OPERATIONS,
+        beta_communities=beta,
         install_states=MappingProxyType(
             {} if held is PluginState.active else {GUILD: held}
         ),
@@ -59,7 +80,9 @@ def _snapshot(*, suspension: str, status: PluginInstallStatus) -> RegistrationSn
 
 
 @pytest.mark.parametrize("status", list(PluginInstallStatus))
-@pytest.mark.parametrize("suspension", ["none", "platform", "install", "reach"])
+@pytest.mark.parametrize(
+    "suspension", ["none", "platform", "install", "operations", "beta"]
+)
 def test_a_suspension_wins_over_the_status(suspension, status):
     snapshot = _snapshot(suspension=suspension, status=status)
     expected = (
@@ -74,15 +97,38 @@ def test_a_suspension_wins_over_the_status(suspension, status):
     # suspended by the registration itself.
     assert snapshot.state_in(GUILD + 100) is (
         PluginState.suspended
-        if suspension in ("platform", "reach")
+        if suspension in ("platform", *_OUT_OF_REACH)
         else PluginState.active
     )
 
 
-def test_the_operations_community_is_in_reach():
-    snapshot = _snapshot(suspension="reach", status=PluginInstallStatus.active)
-    assert snapshot.state_in(OPERATIONS) is PluginState.active
-    assert snapshot.state_in(None) is PluginState.suspended
+@pytest.mark.parametrize(
+    ("availability", "beta", "in_reach"),
+    [
+        (PluginAvailability.none, frozenset(), {GUILD, OPERATIONS}),
+        (PluginAvailability.operations, frozenset({GUILD}), {OPERATIONS}),
+        (PluginAvailability.beta, frozenset({GUILD}), {GUILD}),
+        (PluginAvailability.beta, frozenset(), set()),
+    ],
+)
+def test_reach_follows_availability(availability, beta, in_reach):
+    """Every community; the operations community; the beta list, nobody
+    while it is empty."""
+    snapshot = _snapshot(
+        suspension="none",
+        status=PluginInstallStatus.active,
+        availability=availability,
+        beta=beta,
+    )
+    for guild_id in (GUILD, OPERATIONS):
+        assert snapshot.serves(guild_id) is (guild_id in in_reach)
+    assert snapshot.serves(None) is (availability is PluginAvailability.none)
+
+
+def test_the_contract_declares_each_availability():
+    assert contract.enum("availability") == {
+        value.value for value in PluginAvailability
+    }
 
 
 async def _installed(session, status: PluginInstallStatus):
@@ -129,29 +175,60 @@ async def test_the_snapshot_carries_each_install_that_is_not_plain_active(sessio
     assert (await registration_lookup.load_registrations())[PUBLIC_ID].serves(held.id)
 
 
-async def test_a_suspension_heard_on_the_bus_drops_the_snapshot(session, monkeypatch):
-    """A suspension written by any process is announced on the channel at
-    commit, and hearing it drops the snapshot this process holds."""
+async def test_the_snapshot_carries_a_beta_plugins_list(session):
+    await create_plugin_service_registration(
+        session, public_id=PUBLIC_ID, listing_uid=LISTING, availability="beta"
+    )
+    picked, _ = await _installed(session, PluginInstallStatus.active)
+    other, _ = await _installed(session, PluginInstallStatus.active)
+    await set_beta_communities(session, LISTING, picked.id)
+
+    snapshot = (await registration_lookup.load_registrations())[PUBLIC_ID]
+
+    assert snapshot.beta_communities == {picked.id}
+    assert snapshot.live_in(picked.id)
+    assert snapshot.state_in(other.id) is PluginState.suspended
+
+
+@pytest.mark.parametrize("moved", ["suspension", "availability", "beta_list"])
+async def test_a_suspension_heard_on_the_bus_drops_the_snapshot(
+    session, monkeypatch, moved
+):
+    """A suspension, a reach or a beta list written by any process is
+    announced on the channel at commit, and hearing it drops the snapshot
+    this process holds."""
     monkeypatch.setattr(settings, "DATABASE_URL_LISTEN", TEST_DATABASE_URL)
     await create_plugin_service_registration(
         session, public_id=PUBLIC_ID, listing_uid=LISTING
     )
+    guild, _ = await _installed(session, PluginInstallStatus.active)
     cached = (await registration_lookup.load_registrations())[PUBLIC_ID]
-    assert not cached.suspended
+    assert cached.live_in(guild.id)
     heard = asyncio.Event()
     listener = await asyncpg.connect(dsn=notify_bus._dsn())
     try:
         await listener.add_listener(registration_lookup.CHANNEL, lambda *_: heard.set())
-        await session.exec(
-            update(PluginServiceRegistration)
-            .where(PluginServiceRegistration.public_id == PUBLIC_ID)
-            .values(suspended_at=datetime.now(UTC))
-        )
-        await session.commit()
+        if moved == "beta_list":
+            await set_beta_communities(session, LISTING, guild.id)
+        else:
+            await session.exec(
+                update(PluginServiceRegistration)
+                .where(PluginServiceRegistration.public_id == PUBLIC_ID)
+                .values(
+                    suspended_at=datetime.now(UTC) if moved == "suspension" else None,
+                    availability=PluginAvailability.beta.value
+                    if moved == "availability"
+                    else PluginAvailability.none.value,
+                )
+            )
+            await session.commit()
         await asyncio.wait_for(heard.wait(), timeout=10)
     finally:
         await listener.close()
 
-    assert (await registration_lookup.load_registrations())[PUBLIC_ID] is cached
+    if moved != "beta_list":
+        assert (await registration_lookup.load_registrations())[PUBLIC_ID] is cached
     await registration_lookup.hint("")
-    assert (await registration_lookup.load_registrations())[PUBLIC_ID].suspended
+    assert (await registration_lookup.load_registrations())[PUBLIC_ID].live_in(
+        guild.id
+    ) is (moved == "beta_list")

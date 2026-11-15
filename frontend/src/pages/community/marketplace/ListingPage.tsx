@@ -195,6 +195,7 @@ export function ListingPage() {
                     {t("card.version", { version: listing.latest_version.version })}
                   </Badge>
                 )}
+                {listing.beta && <Badge variant="secondary">{t("card.beta")}</Badge>}
                 {minimumAge != null && (
                   <Badge variant="outline">{t("detail.minimumAge", { age: minimumAge })}</Badge>
                 )}

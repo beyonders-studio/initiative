@@ -76,6 +76,7 @@ def maximal_manifest() -> dict:
             }
         ],
         "min_plugin_api": "4.2",
+        "availability": "beta",
         "vendor": {
             "label": {"en": "Acme client"},
             "fields": [

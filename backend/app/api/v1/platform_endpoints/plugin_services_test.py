@@ -21,7 +21,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
-from app.core.messages import AuthMessages, PluginServiceMessages
+from app.core.messages import AuthMessages, GuildMessages, PluginServiceMessages
 from app.models.platform.plugin_install import PluginInstall
 from app.models.platform.plugin_service_registration import (
     LISTING_STATED_FIELDS,
@@ -40,6 +40,7 @@ from app.testing.factories import (
     create_plugin_service_registration,
     create_user,
     get_auth_headers,
+    set_beta_communities,
 )
 from app.testing.fake_vendor import declarative_github
 
@@ -310,13 +311,13 @@ async def test_patch_sets_the_operator_only_fields(
     response = await client.patch(
         f"{BASE}{row.id}",
         headers=headers,
-        json={"mandatory": True, "operations_only": True, "suspended": True},
+        json={"mandatory": True, "suspended": True},
     )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["mandatory"] is True
-    assert body["operations_only"] is True
+    assert (body["availability"], body["beta_communities"]) == ("none", [])
     assert body["suspended_at"] is not None
     assert body["live"] is False
 
@@ -325,6 +326,62 @@ async def test_patch_sets_the_operator_only_fields(
     )
     assert lifted.status_code == 200, lifted.text
     assert lifted.json()["suspended_at"] is None
+
+
+async def test_patch_replaces_a_beta_plugins_communities(
+    client: AsyncClient, session: AsyncSession, capfd
+):
+    """The whole list at once, recorded as who was added and who removed.
+    Refused for a plug-in that is not beta, and for a community that does not
+    exist."""
+    headers = await _owner_headers(session)
+    row = await _seed(session, availability="beta")
+    plain = await _seed(session, public_id="acme.plain", listing_uid=None)
+    owner = await create_user(session)
+    dropped, kept, added = [
+        await create_guild(session, creator=owner, name=name)
+        for name in ("Dropped", "Kept", "Added")
+    ]
+    await set_beta_communities(session, LISTING_UID, dropped.id, kept.id)
+    capfd.readouterr()
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"beta_community_ids": [kept.id, added.id]},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["availability"] == "beta"
+    assert body["beta_communities"] == [
+        {"id": added.id, "name": "Added"},
+        {"id": kept.id, "name": "Kept"},
+    ]
+    [record] = emitted(capfd, AuditEventType.PLUGIN_SERVICE_UPDATED)
+    assert record["detail"]["beta_communities"] == {
+        "listing_uid": LISTING_UID,
+        "added": [added.id],
+        "removed": [dropped.id],
+    }
+
+    unknown = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"beta_community_ids": [kept.id, added.id + 1000]},
+    )
+    assert unknown.status_code == 400
+    assert unknown.json()["detail"] == GuildMessages.COMMUNITY_NOT_FOUND
+    not_beta = await client.patch(
+        f"{BASE}{plain.id}", headers=headers, json={"beta_community_ids": []}
+    )
+    assert not_beta.status_code == 409
+    assert not_beta.json()["detail"] == PluginServiceMessages.NOT_BETA
+    listed = await _listed(client, headers, row.id)
+    assert [community["id"] for community in listed["beta_communities"]] == [
+        added.id,
+        kept.id,
+    ]
 
 
 async def test_sharing_is_turned_off_once_each_installation_has_one_community(

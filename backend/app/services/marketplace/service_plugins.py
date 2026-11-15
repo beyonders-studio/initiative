@@ -42,6 +42,7 @@ from typing import Any
 
 from app.core.currencies import CURRENCY_CODES
 from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
+from app.models.platform.plugin_service_registration import PluginAvailability
 from app.services.marketplace import contract, expressions, plugin_api
 from app.services.marketplace.manifest_values import (
     MAX_HINT_LENGTH,
@@ -150,6 +151,10 @@ WEBHOOK_SCHEMES: frozenset[str] = contract.enum("webhookScheme")
 WEBHOOK_ENCODINGS: frozenset[str] = contract.enum("webhookEncoding")
 HEADER_NAME_CHARS = contract.charset("headerName")
 FIELD_PATH_CHARS = contract.charset("fieldPath")
+
+#: Which communities a version reaches: every one (``none``, the default), the
+#: owner's beta list, or the operations community (``PluginAvailability``).
+AVAILABILITIES: frozenset[str] = contract.enum("availability")
 
 #: Field kinds a connection form can render. The same closed enum the automation
 #: service's node contract settled on, so one generic form renderer draws every
@@ -3753,6 +3758,15 @@ def normalize_service_plugin_definition(
     minimum_age = _minimum_age(body.get("minimum_age"))
     if minimum_age is not None:
         cleaned["minimum_age"] = minimum_age
+
+    availability = body.get("availability", PluginAvailability.none.value)
+    if not isinstance(availability, str) or availability not in AVAILABILITIES:
+        fail(
+            "service plug-in: availability must be one of "
+            f"{', '.join(sorted(AVAILABILITIES))}"
+        )
+    if availability != PluginAvailability.none.value:
+        cleaned["availability"] = availability
 
     # The oldest plug-in API contract the plug-in calls. The catalog decides from
     # it whether this deployment serves the version; kept here so the stored

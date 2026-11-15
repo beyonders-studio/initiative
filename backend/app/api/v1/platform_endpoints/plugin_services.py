@@ -4,8 +4,8 @@ and its publishers (``publishers``).
 A listing declares what a plug-in is, and gives its registration the plug-in facts:
 which listing it is, its image, its scope ceiling and its Compose service. The
 operator gives the deployment facts here: its addresses, its public keys, its
-vendor values and the reach (``mandatory``, ``operations_only``) it confers, and the owner
-suspends a plug-in everywhere and lifts it. Vendor
+vendor values and whether it is ``mandatory``, and the owner suspends a plug-in
+everywhere and lifts it, and picks the communities a beta plug-in reaches. Vendor
 values may also come from the vendor's own setup flow, run from here. A publisher is the prefix of
 a plug-in's ``public_id``, with a switch that stops every plug-in under it. The whole
 surface is gated on ``plugins.manage`` (owner tier).
@@ -24,9 +24,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.deps import SystemSessionDep, require_capability
 from app.core.capabilities import Capability
 from app.core.messages import PluginServiceMessages
+from app.models.platform.plugin_service_registration import PluginAvailability
 from app.models.platform.publisher import Publisher
 from app.models.platform.user import User
 from app.schemas.platform.plugin_service import (
+    PluginBetaCommunityRead,
     PluginPublisherCreate,
     PluginPublisherRead,
     PluginPublisherUpdate,
@@ -79,7 +81,11 @@ def _to_read(
         jwks_uri=row.jwks_uri,
         scope_ceiling=list(row.scope_ceiling or []),
         mandatory=row.mandatory,
-        operations_only=row.operations_only,
+        availability=PluginAvailability(row.availability),
+        beta_communities=[
+            PluginBetaCommunityRead(id=community_id, name=name)
+            for community_id, name in view.beta_communities
+        ],
         shared_routes=row.shared_routes,
         suspended_at=row.suspended_at,
         source=row.source,
@@ -155,7 +161,6 @@ async def create_plugin_service(
         jwks=payload.jwks,
         jwks_uri=payload.jwks_uri,
         mandatory=payload.mandatory,
-        operations_only=payload.operations_only,
         vendor_values=payload.vendor_values,
         actor_user_id=owner.id,
     )
@@ -170,9 +175,11 @@ async def update_plugin_service(
     owner: PluginsManageDep,
 ) -> PluginServiceRegistrationRead:
     """Suspend everywhere or lift, repoint either address, replace the keys,
-    change the reach conferred, let vendor installations be shared, or set
-    the vendor values. Turning sharing off while an installation is connected
-    to more than one community is refused (409)."""
+    make it mandatory or not, let vendor installations be shared, set the
+    vendor values, or replace a beta plug-in's communities. Turning sharing
+    off while an installation is connected to more than one community is
+    refused (409), and so is a list of communities for a plug-in that is not
+    beta; one naming a community that does not exist is refused (400)."""
     row = await registrations_service.update_registration(
         session,
         registration_id,
@@ -182,9 +189,9 @@ async def update_plugin_service(
         jwks=payload.jwks,
         jwks_uri=payload.jwks_uri,
         mandatory=payload.mandatory,
-        operations_only=payload.operations_only,
         shared_routes=payload.shared_routes,
         suspended=payload.suspended,
+        beta_community_ids=payload.beta_community_ids,
         vendor_values=payload.vendor_values,
         actor_user_id=owner.id,
     )
