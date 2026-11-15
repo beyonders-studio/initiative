@@ -25,7 +25,7 @@ import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schem
 import { openHelp } from "@/components/help/helpStore";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
-import { useFeedback } from "@/components/tickets/FeedbackSheet";
+import { useFeedback } from "@/components/tickets/FeedbackDialog";
 import { useSecurityReporting } from "@/components/tickets/ReportSecurityProblem";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
 import { MentionText } from "@/components/user/MentionText";
