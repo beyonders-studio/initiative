@@ -772,7 +772,7 @@ def custom_openapi() -> dict:
 # without the ``_inject_query_schemas`` upgrades, which then leaks into the frontend
 # type generation (conditions/sorting collapse back to ``string``). The SPA catch-all
 # registered later is ``include_in_schema=False``, so the spec is already complete here.
-app.openapi = custom_openapi  # ty: ignore[invalid-assignment]
+app.openapi = custom_openapi
 
 
 class McpBarePathMiddleware:
