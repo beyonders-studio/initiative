@@ -554,7 +554,7 @@ class TestKillSwitches:
     ):
         a, plugin, dashboard = await _workspace(session, acting_user)
         registration = (await session.exec(select(PluginServiceRegistration))).first()
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()
@@ -578,7 +578,7 @@ class TestKillSwitches:
         assert first.status_code == 200
 
         registration = (await session.exec(select(PluginServiceRegistration))).first()
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()

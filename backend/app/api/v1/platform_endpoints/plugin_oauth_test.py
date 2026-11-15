@@ -8,6 +8,7 @@ token. Every refusal is the OAuth error body RFC 6749 §5.2 defines.
 from __future__ import annotations
 
 import time
+from datetime import UTC, datetime
 
 import pytest
 from httpx2 import AsyncClient
@@ -705,11 +706,11 @@ async def test_an_assertion_is_used_once(
     assert _error(second) == "invalid_client"
 
 
-async def test_a_disabled_registration_is_an_invalid_client(
+async def test_a_suspended_registration_is_an_invalid_client(
     client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
     await install_plugin(
-        session, acting_user, role_session, granted=["files:read"], enabled=False
+        session, acting_user, role_session, granted=["files:read"], suspended=True
     )
 
     response = await _ask(client)
@@ -794,7 +795,15 @@ async def test_a_plugin_token_lists_the_installs_a_page_at_a_time(
 
 
 @pytest.mark.parametrize(
-    "paused_by", ["install_off", "guild_on_hold", "guild_deleted", "operations_only"]
+    "paused_by",
+    [
+        "install_off",
+        "guild_on_hold",
+        "guild_deleted",
+        "install_on_hold",
+        "operations_only",
+        "install_suspended",
+    ],
 )
 async def test_a_paused_install_is_listed_as_inactive(
     client: AsyncClient,
@@ -817,6 +826,18 @@ async def test_a_paused_install_is_listed_as_inactive(
         assert switched.status_code == 200, switched.text
     elif paused_by == "operations_only":
         await _limit_to_operations(session)
+    elif paused_by.startswith("install_"):
+        column, value = (
+            ("status", "on_hold")
+            if paused_by == "install_on_hold"
+            else ("suspended_at", datetime.now(UTC))
+        )
+        await session.exec(
+            text(
+                f"UPDATE public.plugin_installs SET {column} = :v WHERE guild_id = :g"
+            ).bindparams(v=value, g=installed.guild.id)
+        )
+        invalidate_registrations()
     else:
         status = "on_hold" if paused_by == "guild_on_hold" else "deleted"
         await session.exec(
@@ -834,6 +855,10 @@ async def test_a_paused_install_is_listed_as_inactive(
     )
 
     assert response.status_code == 200, response.text
+    if paused_by in ("operations_only", "install_suspended"):
+        # Suspended there: nothing about it goes out, its listing included.
+        assert response.json() == []
+        return
     [listed] = response.json()
     assert listed["installation"] == installation
     assert listed["active"] is False

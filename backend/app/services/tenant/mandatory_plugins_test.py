@@ -15,7 +15,7 @@ make it usable in production:
 * **The kill switch outranks the flag**, and clearing the flag deletes nothing.
 """
 
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pytest
@@ -109,10 +109,10 @@ class TestAtGuildCreation:
         assert plugins[0].name == "Provided plug-in"
         assert plugins[0].plugin_kind == "service"
 
-    async def test_a_registration_switched_off_installs_nowhere(
+    async def test_a_registration_suspended_installs_nowhere(
         self, client: AsyncClient, session: AsyncSession, mandatory_registration
     ):
-        mandatory_registration.enabled = False
+        mandatory_registration.suspended_at = datetime.now(UTC)
         session.add(mandatory_registration)
         await session.commit()
         invalidate_registrations()

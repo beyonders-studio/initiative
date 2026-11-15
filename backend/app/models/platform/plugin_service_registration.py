@@ -10,8 +10,8 @@ splits the same way, whatever published its listing:
   directory, the build).
 * **Deployment facts** come from the operator, through ``PLUGIN_SERVICES_CONFIG``
   or the settings form: where the plug-in runs, the public keys its container signs
-  with, its vendor values, the switch, the mandatory and operations-only flags
-  and the origins.
+  with, its vendor values, the mandatory and operations-only flags and the
+  origins. Suspending it everywhere is the owner's alone (``suspended_at``).
 
 A registration holds no secret beyond its vendor values. Every call the plug-in
 makes to Initiative is a JWT it signs with a key published here (``jwks``, or
@@ -30,8 +30,8 @@ Some columns exist only because of that split:
   the plug-in scope vocabulary (``app.core.plugin_scopes``). A community's seat grants
   within it; nothing outside it can be granted. Empty means nothing may be.
 * ``mandatory`` — the deployment asserts this plug-in is part of what it *is*, so
-  every guild has it and guild admins cannot remove it. The operator's kill
-  switch (``enabled``) still outranks it.
+  every guild has it and guild admins cannot remove it. A suspension
+  (``suspended_at``) still outranks it.
 * ``operations_only`` — the plug-in is for the deployment's operations community
   (``app_settings.operations_guild_id``) alone: it is offered nowhere else, the
   mandatory sweep installs it nowhere else, and an install anywhere else is not
@@ -50,10 +50,11 @@ Some columns exist only because of that split:
   plug-in's registration has no location and no keys.
 
 **Live** is one rule, stated once in :func:`registration_live_sql`: the
-registration is enabled, its publisher is enabled, its required vendor values
-are set and, for a container, it has a location and a key set to verify
+registration is not suspended, its publisher is enabled, its required vendor
+values are set and, for a container, it has a location and a key set to verify
 against; and, asked for one community, the registration is not limited to the
-operations community or that community is it.
+operations community or that community is it, and the community's install is
+neither suspended, on hold nor deleted (``plugin_installs``).
 The install standing, the registration snapshot and every channel that reads
 a single row ask it in that form.
 
@@ -85,6 +86,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel
 
 from app.core.encryption import FERNET_SALT, SALT_PLUGIN_VENDOR
+from app.models.platform.plugin_install import PluginInstallStatus
 
 __all__ = [
     "IMAGE_REFERENCE_MAX_LENGTH",
@@ -146,10 +148,12 @@ def registration_live_sql(
 
     Given ``community``, a SQL expression naming one community's id, it is live
     in that community: an ``operations_only`` registration is live only in the
-    community ``app_settings.operations_guild_id`` names. Without it, the
-    answer is the registration's own, wherever it is limited to.
+    community ``app_settings.operations_guild_id`` names, and none is live
+    where the community's install of its listing is suspended, on hold or
+    deleted. Without it, the answer is the registration's own, wherever it is
+    limited to.
 
-    Enabled, its publisher enabled, and every required vendor value set; and
+    Not suspended, its publisher enabled, and every required vendor value set; and
     for a container, a location and a key set to verify against (a pasted set
     with at least one key, or a key set address). ``-> 0`` reads the first key
     and is null for an empty or absent set.
@@ -164,10 +168,16 @@ def registration_live_sql(
         else (
             f" AND (NOT {registration}.operations_only OR {community} = ("
             "SELECT s.operations_guild_id FROM public.app_settings s WHERE s.id = 1))"
+            " AND NOT EXISTS (SELECT 1 FROM public.plugin_installs i"
+            f" WHERE i.guild_id = {community}"
+            f" AND i.listing_uid = {registration}.listing_uid"
+            " AND (i.suspended_at IS NOT NULL"
+            f" OR i.status IN ('{PluginInstallStatus.on_hold.value}',"
+            f" '{PluginInstallStatus.deleted.value}')))"
         )
     )
     return (
-        f"({registration}.enabled AND {publisher}.enabled"
+        f"({registration}.suspended_at IS NULL AND {publisher}.enabled"
         f" AND {registration}.vendor_ready"
         f" AND ({registration}.kind = '{RegistrationKind.DECLARATIVE}'"
         f" OR ({registration}.base_url IS NOT NULL"
@@ -258,10 +268,16 @@ class PluginServiceRegistration(SQLModel, table=True):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
-    # The operator's kill switch. False stops every channel this plug-in has.
-    enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
+    # The owner suspended it everywhere, and who did: nothing flows through it
+    # and no community sees it until the suspension is lifted.
+    suspended_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    suspended_by: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
     )
     # Which kind of plug-in it is for (``RegistrationKind``), from its listing.
     kind: str = Field(

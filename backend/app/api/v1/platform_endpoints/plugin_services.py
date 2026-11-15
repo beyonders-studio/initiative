@@ -4,7 +4,8 @@ and its publishers (``publishers``).
 A listing declares what a plug-in is, and gives its registration the plug-in facts:
 which listing it is, its image, its scope ceiling and its Compose service. The
 operator gives the deployment facts here: its addresses, its public keys, its
-vendor values, the switch and the reach (``mandatory``, ``operations_only``) it confers. Vendor
+vendor values and the reach (``mandatory``, ``operations_only``) it confers, and the owner
+suspends a plug-in everywhere and lifts it. Vendor
 values may also come from the vendor's own setup flow, run from here. A publisher is the prefix of
 a plug-in's ``public_id``, with a switch that stops every plug-in under it. The whole
 surface is gated on ``plugins.manage`` (owner tier).
@@ -80,7 +81,7 @@ def _to_read(
         mandatory=row.mandatory,
         operations_only=row.operations_only,
         shared_routes=row.shared_routes,
-        enabled=row.enabled,
+        suspended_at=row.suspended_at,
         source=row.source,
         image_digest=row.image_digest,
         compose_service=registrations_service.filled_compose(row),
@@ -155,7 +156,6 @@ async def create_plugin_service(
         jwks_uri=payload.jwks_uri,
         mandatory=payload.mandatory,
         operations_only=payload.operations_only,
-        enabled=payload.enabled,
         vendor_values=payload.vendor_values,
         actor_user_id=owner.id,
     )
@@ -169,10 +169,10 @@ async def update_plugin_service(
     session: SystemSessionDep,
     owner: PluginsManageDep,
 ) -> PluginServiceRegistrationRead:
-    """Enable/disable, repoint either address, replace the keys, change the
-    reach conferred, let vendor installations be shared, or set the vendor
-    values. Turning sharing off while an installation is connected to more
-    than one community is refused (409)."""
+    """Suspend everywhere or lift, repoint either address, replace the keys,
+    change the reach conferred, let vendor installations be shared, or set
+    the vendor values. Turning sharing off while an installation is connected
+    to more than one community is refused (409)."""
     row = await registrations_service.update_registration(
         session,
         registration_id,
@@ -184,7 +184,7 @@ async def update_plugin_service(
         mandatory=payload.mandatory,
         operations_only=payload.operations_only,
         shared_routes=payload.shared_routes,
-        enabled=payload.enabled,
+        suspended=payload.suspended,
         vendor_values=payload.vendor_values,
         actor_user_id=owner.id,
     )

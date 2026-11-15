@@ -16,7 +16,7 @@ Most plug-ins need nothing from you. The rest need an address, a key or a few va
 | The Initiative registry | A signed online catalog your server follows from its first start. See [below](#the-initiative-registry). |
 | Your own directory | Listing files you publish yourself. See [Publishing your own listings](publishing-listings.md). |
 
-Every plug-in from any of these gets a row under **Plug-in services**. Its listing says what the plug-in is and the most it may ever be granted. The row holds what only your server knows: where it runs, the keys it signs with, any values from its vendor, and whether it's switched on.
+Every plug-in from any of these gets a row under **Plug-in services**. Its listing says what the plug-in is and the most it may ever be granted. The row holds what only your server knows: where it runs, the keys it signs with, any values from its vendor, and whether you've suspended it.
 
 ## The Initiative registry
 
@@ -111,11 +111,11 @@ The **Base URL** and **Browser address** are `http` or `https` addresses with a 
 
 | Switch | What it does |
 |---|---|
-| **Enabled** | Off, every community that added the plug-in stops reaching it at once: its data, its settings, its events and its pages. Nothing is deleted, and turning it back on puts everything where it was. A restart never turns it back on for you. |
+| **Suspend everywhere** | Every community that added the plug-in stops reaching it at once, and stops seeing it: its data, its settings, its events and its pages. Nothing goes to the plug-in while it's suspended. Nothing is deleted, and **Lift** puts everything where it was. A restart never lifts it for you. |
 | **Install in every community** | Adds it to every community, new ones included, and community admins can't remove it or turn it off. Where it appears and what it may do stay each community's call. Shown as **In every community**. |
 | **Only the operations community** | Only the [operations community](operations-community.md) can find it, install it or use it. A copy added anywhere else stops working until you turn this off, and nothing is deleted. With **Install in every community** also on, it's added to that one community. Shown as **Operations community only**, or **In the operations community** with both on. |
 | **Share installations between communities** | Off, one installation at the vendor (one GitHub organization, say) connects to one community on this server, and the next community to try is told it's taken, never by whom. On, several communities can connect the same one, which suits a server where every community belongs to one company. It won't switch off while an installation is connected to more than one community. Only shown for a plug-in with vendor values. |
-| **Delete** | Removes the registration for good, after you type its identifier to confirm. Adding it back means registering it again. A plug-in from the registry can't be deleted, because the next update would bring it straight back, so switch it off instead. |
+| **Delete** | Removes the registration for good, after you type its identifier to confirm. Adding it back means registering it again. A plug-in from the registry can't be deleted, because the next update would bring it straight back, so suspend it instead. |
 
 A row marked **Publisher switched off** has stopped because every plug-in from that publisher has. Nothing is deleted there either.
 
@@ -177,7 +177,7 @@ Rather click nothing? `PLUGIN_SERVICES_CONFIG` names a JSON file Initiative read
 | `operations_only` | `true` offers it to the operations community alone. |
 | `vendor_env` | Each vendor value, as the name of the environment variable holding it. They're read and stored encrypted at every start, so a secret never sits in the file, and rotating one is changing the variable and restarting. |
 
-What the plug-in is comes from its listing, so an entry naming `listing_uid`, `kind`, `scope_ceiling`, `image`, `image_digest`, `registry` or `compose` is refused. So is a second entry for the same `public_id`. An entry for a plug-in whose listing hasn't arrived waits for it. A file that can't be read, or an entry that's refused, is logged and skipped, and the server starts anyway. A plug-in you switched off stays off, whatever the file says.
+What the plug-in is comes from its listing, so an entry naming `listing_uid`, `kind`, `scope_ceiling`, `image`, `image_digest`, `registry` or `compose` is refused. So is a second entry for the same `public_id`. An entry for a plug-in whose listing hasn't arrived waits for it. A file that can't be read, or an entry that's refused, is logged and skipped, and the server starts anyway. An entry naming `enabled` is refused too, since suspending a plug-in is done here, and a plug-in you suspended stays suspended, whatever the file says.
 
 ## Initiative's own signing key
 

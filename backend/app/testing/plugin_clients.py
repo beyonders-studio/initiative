@@ -140,7 +140,7 @@ async def install_plugin(
     client_id: str = CLIENT,
     listing_uid: str = LISTING,
     register: bool = True,
-    enabled: bool = True,
+    suspended: bool = False,
     requested: Sequence[str] | None = None,
     declares: Mapping[str, Any] | None = None,
 ) -> InstalledPlugin:
@@ -173,7 +173,7 @@ async def install_plugin(
             session,
             public_id=client_id,
             listing_uid=listing_uid,
-            enabled=enabled,
+            suspended=suspended,
             jwks=client_jwks(),
             scope_ceiling=list(ALL_SCOPES if requested is None else requested),
         )

@@ -77,6 +77,7 @@ from app.models.platform.identity_ref import (
     ref_prefix,
 )
 from app.models.platform.member_moderation import live_timeout_sql
+from app.models.platform.plugin_install import PluginInstallStatus
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
     registration_live_sql,
@@ -534,8 +535,13 @@ ISSUABLE_SCOPES_SQL = (
 )
 
 #: The install's content is held read-only, over the guild row ``g``: the
-#: community's is frozen, or the member a member token acts for is timed out.
+#: community's is frozen, the install's status is read-only, or the member a
+#: member token acts for is timed out.
 _INSTALL_HOLD = f"""(g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
+        SELECT 1 FROM public.plugin_installs pi
+        WHERE pi.guild_id = {gucs.GUILD_ID} AND pi.install_id = {gucs.INSTALL_ID}
+          AND pi.status = '{PluginInstallStatus.read_only.value}'
+      ) OR EXISTS (
         SELECT 1 FROM public.member_moderation mm
         JOIN public.guild_memberships m
           ON m.guild_id = mm.guild_id AND m.user_id = mm.user_id

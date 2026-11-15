@@ -261,7 +261,7 @@ async def test_a_known_prefix_keeps_its_publisher_as_it_is(session):
     publisher = await session.get(Publisher, row.publisher_id)
     assert publisher.enabled is False
     snapshot = (await load_registrations(force=True))["offpub.widgets"]
-    assert snapshot.enabled is True
+    assert snapshot.suspended is False
     assert snapshot.live is False
 
 
@@ -839,10 +839,11 @@ async def test_an_entry_waits_for_its_listing(session, tmp_path, monkeypatch):
     assert (await load_registrations(force=True))["acme.widgets"].live is True
 
 
-@pytest.mark.parametrize("stated", LISTING_STATED_FIELDS)
-async def test_an_entry_naming_what_the_listing_states_is_refused(
+@pytest.mark.parametrize("stated", [*LISTING_STATED_FIELDS, "enabled"])
+async def test_an_entry_naming_what_is_not_the_files_is_refused(
     session, tmp_path, monkeypatch, stated
 ):
+    """What the listing states, and the suspension, which is the owner's."""
     await _listed(session, "acme.widgets")
     entry = {"public_id": "acme.widgets", "base_url": BASE_URL, stated: True}
     monkeypatch.setattr(
@@ -929,18 +930,16 @@ async def test_reconcile_is_idempotent(session, tmp_path, monkeypatch):
     assert (second.updated, second.unchanged) == (0, 1)
 
 
-async def test_reconcile_never_re_enables_a_disabled_registration(
-    session, tmp_path, monkeypatch
-):
-    """Deactivating a plug-in is the operator's kill switch, so a restart must not
-    quietly reverse it — the file still governs everything else."""
+async def test_reconcile_never_lifts_a_suspension(session, tmp_path, monkeypatch):
+    """Suspending a plug-in is the owner's, so a restart must not quietly
+    reverse it — the file still governs everything else."""
     row = await _listed(session, "acme.killswitch")
     entry = {"public_id": "acme.killswitch", "base_url": BASE_URL, "mandatory": False}
     monkeypatch.setattr(
         settings, "PLUGIN_SERVICES_CONFIG", _write_config(tmp_path, [entry])
     )
     await service.reconcile_from_config(session)
-    await service.update_registration(session, row.id, enabled=False)
+    await service.update_registration(session, row.id, suspended=True)
 
     entry["mandatory"] = True
     monkeypatch.setattr(
@@ -950,7 +949,7 @@ async def test_reconcile_never_re_enables_a_disabled_registration(
 
     assert result.updated == 1
     stored = await _registration(session, "acme.killswitch")
-    assert stored.enabled is False
+    assert stored.suspended_at is not None
     assert stored.mandatory is True
 
 

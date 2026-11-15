@@ -275,12 +275,15 @@ class TestTheToken:
     async def test_a_switch_turned_off_stops_every_call(
         self, client: AsyncClient, session: AsyncSession, what: str
     ):
-        """The operator's switch, the publisher's and the guild's all end the
-        install's calls at the next request, with the same answer."""
+        """The owner's suspension, the publisher's switch and the guild's all
+        end the install's calls at the next request, with the same answer."""
         registration = await _register(session)
         guild, _, plugin = await _install(session, with_values=True)
         if what == "registration":
-            await _switch_off(session, registration)
+            registration.suspended_at = datetime.now(UTC)
+            session.add(registration)
+            await session.commit()
+            invalidate_registrations()
         elif what == "publisher":
             await _switch_off(
                 session, await session.get(Publisher, registration.publisher_id)

@@ -7,16 +7,20 @@ registration — is this plug-in wired up, is it live, where does it live, which
 origins may frame it, and which keys it signs with — is loaded once on the
 system engine and kept as an immutable snapshot the request path reads.
 
-**Freshness is bounded, and a write is immediate.** An operator's kill switch
-has to bite quickly, so the cache is short-lived *and* dropped in-process on
-any registration or publisher write. A replica that did not serve the write
-picks the change up within the TTL.
+**Freshness is bounded, and a suspension is immediate.** The cache is
+short-lived *and* dropped in-process on any registration or publisher write. A
+suspension or an install's status, written by any process, is announced on
+:data:`CHANNEL` by the database, and every process drops its snapshot on
+hearing it (:func:`hint`). Anything else a replica that did not serve the write
+picks up within the TTL.
 
 Whether a registration is live is computed by the database with the one rule
 in :func:`~app.models.platform.plugin_service_registration.registration_live_sql`,
 the same one the install standing asks, and carried on the snapshot. Whether
-it is live in one community also asks whether it is limited to the operations
-community, which the snapshot carries beside it (:meth:`RegistrationSnapshot.live_in`).
+it is live in one community also asks the plug-in's state there
+(:meth:`RegistrationSnapshot.state_in`): whether it is limited to the
+operations community, and the installs whose status or suspension the
+snapshot carries beside it.
 """
 
 from __future__ import annotations
@@ -29,12 +33,18 @@ from types import MappingProxyType
 from typing import Any
 
 from jwt import PyJWK
-from sqlalchemy import literal_column
-from sqlmodel import select
+from sqlalchemy import literal_column, or_
+from sqlmodel import col, select
 
 from app.db import session as db_session
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.marketplace import MarketplaceListing
+from app.models.platform.plugin_install import (
+    SERVING_STATES,
+    PluginInstall,
+    PluginInstallStatus,
+    PluginState,
+)
 from app.models.platform.plugin_service_registration import (
     PluginServiceRegistration,
     RegistrationKind,
@@ -47,11 +57,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "CACHE_TTL_SECONDS",
+    "CHANNEL",
     "InstallState",
     "RegistrationSnapshot",
     "declarative_registration",
     "enabled_service_ids",
     "frame_origins",
+    "hint",
     "install_state",
     "invalidate_registrations",
     "is_declarative",
@@ -67,6 +79,10 @@ __all__ = [
 #: registration takes effect promptly on every replica, long enough that a busy
 #: guild's plug-in reads do not each open a system-engine connection.
 CACHE_TTL_SECONDS = 60.0
+
+#: The channel a suspension or an install's status is announced on, at commit
+#: (the ``plugin_state_notify`` triggers).
+CHANNEL = "plugin_states"
 
 
 @dataclass(frozen=True)
@@ -92,10 +108,11 @@ class RegistrationSnapshot:
     #: registration says so, or the package serving its listing does. The
     #: package's word adds the flag and never clears it.
     mandatory: bool
-    #: The operator's kill switch on the registration itself.
-    enabled: bool
-    #: Whether anything may flow through this plug-in right now: enabled, its
-    #: publisher enabled, a location, and a key set to verify against.
+    #: The owner suspended it everywhere.
+    suspended: bool
+    #: Whether anything may flow through this plug-in right now: not
+    #: suspended, its publisher enabled, a location, and a key set to verify
+    #: against.
     #: Computed by the database from ``registration_live_sql`` when the
     #: snapshot is loaded.
     live: bool
@@ -112,19 +129,38 @@ class RegistrationSnapshot:
     operations_only: bool = False
     #: The deployment's operations community when the snapshot was loaded.
     operations_guild_id: int | None = None
+    #: The state of each install of its listing that is not plain active, by
+    #: community: its status, or ``suspended`` where staff suspended it.
+    install_states: Mapping[int, PluginState] = MappingProxyType({})
 
     @property
     def browser_base(self) -> str:
         """The base to build an address a browser will be sent to."""
         return browser_base(self)
 
-    def serves(self, guild_id: int | None) -> bool:
-        """Whether this plug-in is for community ``guild_id``: any community,
-        unless it is limited to the operations community and that is another
-        one, or none is named."""
-        return not self.operations_only or (
-            guild_id is not None and guild_id == self.operations_guild_id
+    def suspends(self, guild_id: int | None) -> bool:
+        """Whether the registration itself suspends the plug-in in community
+        ``guild_id``: the owner suspended it, or it is limited to the
+        operations community and that is another one (or none is named)."""
+        return self.suspended or (
+            self.operations_only
+            and (guild_id is None or guild_id != self.operations_guild_id)
         )
+
+    def state_in(self, guild_id: int | None) -> PluginState:
+        """The plug-in's state in community ``guild_id``: suspended where the
+        registration suspends it (:meth:`suspends`) or staff suspended the
+        install; otherwise the install's status."""
+        if self.suspends(guild_id):
+            return PluginState.suspended
+        if guild_id is None:
+            return PluginState.active
+        return self.install_states.get(guild_id, PluginState.active)
+
+    def serves(self, guild_id: int | None) -> bool:
+        """Whether this plug-in is there for community ``guild_id``: its state
+        there is active or read-only."""
+        return self.state_in(guild_id) in SERVING_STATES
 
     def live_in(self, guild_id: int | None) -> bool:
         """Whether anything may flow through this plug-in in community
@@ -166,6 +202,12 @@ def invalidate_registrations() -> None:
     _loaded_at = 0.0
 
 
+async def hint(_payload: str) -> None:
+    """A suspension or an install's status moved, in this process or another:
+    drop the snapshot. Registered on :data:`CHANNEL`."""
+    invalidate_registrations()
+
+
 def live_registration_clause() -> Any:
     """:func:`registration_live_sql` over ``plugin_service_registrations`` joined
     to ``publishers``, for a query that selects both by their table names."""
@@ -182,7 +224,8 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
     Runs on the system engine: the table carries no request-path grant beyond
     the install standing's few columns, so this is the reader everything else
     shares. One statement joins each registration to its publisher and its
-    listing, and reads the operations community beside it.
+    listing, and reads the operations community beside it; a second reads the
+    installs that are not plain active.
     """
     from app.services.marketplace.catalog import REGISTRY_SOURCE
     from app.services.marketplace.tuf_registry import configured_root_is_builtin
@@ -218,6 +261,26 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
                 .order_by(PluginServiceRegistration.public_id)
             )
         ).all()
+        held = (
+            await session.exec(
+                select(
+                    PluginInstall.listing_uid,
+                    PluginInstall.guild_id,
+                    PluginInstall.status,
+                    PluginInstall.suspended_at,
+                ).where(
+                    or_(
+                        PluginInstall.status != PluginInstallStatus.active.value,
+                        col(PluginInstall.suspended_at).is_not(None),
+                    )
+                )
+            )
+        ).all()
+    states: dict[str, dict[int, PluginState]] = {}
+    for listing_uid, guild_id, status, suspended_at in held:
+        states.setdefault(listing_uid, {})[guild_id] = (
+            PluginState.suspended if suspended_at is not None else PluginState(status)
+        )
     # The package's terms hold only under the shipped root.
     packaged = configured_root_is_builtin()
 
@@ -231,13 +294,14 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
             keys=_parse_keys(row),
             mandatory=bool(row.mandatory)
             or (packaged and bool(signed) and source == REGISTRY_SOURCE),
-            enabled=bool(row.enabled),
+            suspended=row.suspended_at is not None,
             live=bool(live),
             scope_ceiling=tuple(sorted(row.scope_ceiling or [])),
             jwks_uri=row.jwks_uri,
             declarative=row.kind == RegistrationKind.DECLARATIVE,
             operations_only=row.operations_only,
             operations_guild_id=operations_guild_id,
+            install_states=MappingProxyType(states.get(row.listing_uid or "", {})),
         )
         for row, live, operations_guild_id, signed, source in rows
     }
@@ -254,9 +318,9 @@ async def frame_origins() -> tuple[str, ...]:
     describes the services this deployment runs, and says nothing about any
     guild or reader.
 
-    Only live registrations count, which is how the operator's kill switch and
-    a publisher's reach the frame policy: within the cache TTL, a stopped plug-in's
-    origins are gone from it.
+    Only live registrations count, which is how a suspension and a publisher's
+    switch reach the frame policy: a suspended plug-in's origins are gone from
+    it as soon as the snapshot is dropped.
     """
     snapshots = await load_registrations()
     return tuple(
@@ -339,17 +403,24 @@ async def declarative_registration(
 class InstallState:
     """What an installed plug-in's registration says about it, for a client.
 
-    Both halves are derived rather than stored, which is what makes an
-    operator's edits take effect without touching a single install: clearing
-    ``mandatory`` turns every copy into an ordinary plug-in, and the kill switch
-    makes every copy unavailable, in the time it takes a cached snapshot to
-    expire.
+    Derived rather than stored, which is what makes an operator's edits take
+    effect without touching a single install: clearing ``mandatory`` turns
+    every copy into an ordinary plug-in, in the time it takes a cached
+    snapshot to expire.
     """
 
     mandatory: bool = False
     available: bool = True
     #: The most the operator allows any install of this plug-in to be granted.
     scope_ceiling: tuple[str, ...] = ()
+    #: Its state in the community. The community sees it only while it is
+    #: active or read-only (:attr:`hidden`).
+    state: PluginState = PluginState.active
+
+    @property
+    def hidden(self) -> bool:
+        """Suspended, on hold or deleted: the community sees nothing of it."""
+        return self.state not in SERVING_STATES
 
 
 def _has_registration(definition: Mapping[str, Any] | None) -> bool:
@@ -364,8 +435,8 @@ async def install_state(
 ) -> InstallState:
     """The registration-derived state of one install in community ``guild_id``.
 
-    One limited to the operations community is neither mandatory nor available
-    in any other.
+    One that is not there for the community (:meth:`RegistrationSnapshot.serves`)
+    is neither mandatory nor available in it.
 
     A plug-in with no service behind it — a tool instance — is always
     available and never mandatory: there is no registration for it to depend on.
@@ -381,6 +452,7 @@ async def install_state(
         mandatory=snapshot.mandatory and snapshot.serves(guild_id),
         available=snapshot.live_in(guild_id),
         scope_ceiling=snapshot.scope_ceiling,
+        state=snapshot.state_in(guild_id),
     )
 
 
@@ -393,9 +465,9 @@ async def enabled_service_ids(guild_id: int | None) -> frozenset[str]:
     that one. A listing naming a service that is not in here is not offered,
     because installing it would produce a plug-in with nothing behind it.
 
-    Only registrations live there: a plug-in switched off, or whose publisher
-    is, or that has no key set, is not offered, nor is one limited to the
-    operations community anywhere else.
+    Only registrations live there: a plug-in suspended, or whose publisher is
+    switched off, or that has no key set, is not offered, nor is one in a
+    community where it is out of reach or its install is held.
     """
     return frozenset(
         snapshot.public_id
@@ -429,8 +501,8 @@ async def plugin_is_offered(
 async def mandatory_registrations() -> list[RegistrationSnapshot]:
     """The plug-ins this deployment installs into every guild.
 
-    Only the live ones: a registration the operator switched off, or whose
-    publisher is off, installs nowhere new, because the kill switch outranks
+    Only the live ones: a registration the owner suspended, or whose
+    publisher is off, installs nowhere new, because a suspension outranks
     the flag (§7.7). Whether the plug-in's container is up is not asked: an
     install is a local row, and the plug-in finds the guild on its next
     installations pull.

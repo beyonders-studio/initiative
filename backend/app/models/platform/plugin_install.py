@@ -8,6 +8,12 @@ vendor webhook is routed to it by. It holds no content.
 It also holds the community status each install's plug-in was last told
 (``community_status_sent``), which is how a change of status reaches it.
 
+**The install's state.** Beside the index, each row holds what the platform
+decided about the install, never the community's content: its ``status``
+(:class:`PluginInstallStatus`, set by staff or by billing's sync), whether
+staff suspended it there (``suspended_at``), and the status its plug-in was
+last told (``plugin_status_sent``). The index sweep writes none of these.
+
 It answers two questions without visiting a guild schema: which installs an
 plug-in has (``GET /plugin-platform/installations``), and which installs a vendor
 delivery belongs to (``POST /plugin-hooks/{public_id}``). ``hook_route`` is the
@@ -24,18 +30,26 @@ the install when it is removed.
 
 Written by the ``plugin_index`` sweep from each community's installs, which
 their writes arm (:mod:`app.services.marketplace.plugin_installs`); a connect
-claims its route first. Reached only by the system engine.
+claims its route first. Reached by the system engine; besides it, an installed
+plug-in's standing reads its own install's row, and billing's sync writes the
+statuses of the community it is routed to.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
+from enum import Enum
+
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
     String,
+    Text,
     text,
 )
 from sqlmodel import Field, SQLModel
@@ -43,10 +57,13 @@ from sqlmodel import Field, SQLModel
 __all__ = [
     "EXCLUSIVE_ROUTE_INDEX",
     "HOOK_ROUTE_MAX_LENGTH",
+    "SERVING_STATES",
     "SETTING_KEY_LENGTH",
     "SETTING_VALUE_LENGTH",
     "PluginInstall",
     "PluginInstallClaim",
+    "PluginInstallStatus",
+    "PluginState",
 ]
 
 #: The widest route value kept.
@@ -61,9 +78,46 @@ SETTING_KEY_LENGTH = 64
 SETTING_VALUE_LENGTH = 16
 
 
+class PluginInstallStatus(str, Enum):
+    """An install's status, set by staff or, where billing sets plans, by
+    billing. Initiative keeps no plug-in data by it: the plug-in is told and
+    decides what each means to it."""
+
+    #: Everything flows.
+    active = "active"
+    #: The plug-in reads; its writes are refused by its standing.
+    read_only = "read_only"
+    #: Nothing flows, and the community sees nothing of it.
+    on_hold = "on_hold"
+    #: As on hold, and uninstalled once its window ends
+    #: (``retention.PLUGIN_INSTALL_DELETION``).
+    deleted = "deleted"
+
+
+class PluginState(str, Enum):
+    """A plug-in's state in one community: suspended when the platform, the
+    install or its reach suspends it, otherwise the install's status."""
+
+    active = "active"
+    read_only = "read_only"
+    on_hold = "on_hold"
+    deleted = "deleted"
+    suspended = "suspended"
+
+
+#: The states in which the plug-in is there for the community.
+SERVING_STATES: frozenset[PluginState] = frozenset(
+    {PluginState.active, PluginState.read_only}
+)
+
+
 class PluginInstall(SQLModel, table=True):
     __tablename__ = "plugin_installs"
     __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'read_only', 'on_hold', 'deleted')",
+            name="ck_plugin_installs_status",
+        ),
         Index("ix_plugin_installs_hook_route", "listing_uid", "hook_route"),
         Index("ix_plugin_installs_listing", "listing_uid", "guild_id", "install_id"),
         Index(
@@ -101,6 +155,31 @@ class PluginInstall(SQLModel, table=True):
     #: is told however it was changed.
     community_status_sent: str | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
+    )
+    #: The install's status (:class:`PluginInstallStatus`).
+    status: str = Field(
+        default=PluginInstallStatus.active.value,
+        sa_column=Column(Text, nullable=False, server_default="active"),
+    )
+    #: When ``status`` last moved: a deletion's window counts from it.
+    status_changed_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    #: Staff suspended the install here, and who did.
+    suspended_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    suspended_by: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
+    )
+    #: The status its plug-in was last told, by the ``plugin_status`` hook;
+    #: compared with ``status`` as ``community_status_sent`` is with the
+    #: community's. Unset reads as told ``active``, which an install starts as.
+    plugin_status_sent: str | None = Field(
+        default=None, sa_column=Column(Text, nullable=True)
     )
 
 

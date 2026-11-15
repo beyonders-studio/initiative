@@ -47,6 +47,7 @@ from app.testing import (
     create_plugin_service_registration,
     create_user,
     emitted,
+    set_install_state,
 )
 
 PUBLIC_ID = "tests.hooked"
@@ -560,6 +561,79 @@ class TestState:
         await session.commit()
         await post_commit.settle_all()
         assert await _timers(session, guild_id) == 1
+
+
+class TestPluginState:
+    """``plugin_status`` tells a plug-in its own status in the community, on
+    hold and deleted included, and a suspended plug-in is sent nothing."""
+
+    async def test_it_reaches_a_plugin_on_hold_and_deleted(self, session, monkeypatch):
+        _user, guild, install = await _setup(session)
+        plugins = _answering(monkeypatch)
+
+        for status in ("on_hold", "deleted", "active"):
+            await set_install_state(session, guild.id, install.id, status=status)
+            await _visit(guild.id)
+
+        assert [(path, body) for _, path, _, body in plugins.calls] == [
+            ("/v1/hooks/plugin_status", {"status": "on_hold"}),
+            ("/v1/hooks/plugin_status", {"status": "deleted"}),
+            ("/v1/hooks/plugin_status", {"status": "active"}),
+        ]
+        await set_rls_context(session, Unattributed())
+        told = await session.scalar(
+            select(PluginInstall.plugin_status_sent).where(
+                PluginInstall.guild_id == guild.id
+            )
+        )
+        await session.commit()
+        assert told == "active"
+        # Told: the next visit has nothing to say.
+        await _visit(guild.id)
+        assert len(plugins.calls) == 3
+
+    async def test_on_hold_it_is_sent_only_its_lifecycle(self, session, monkeypatch):
+        _user, guild, install = await _setup(session)
+        plugins = _answering(monkeypatch)
+        await set_install_state(session, guild.id, install.id, status="on_hold")
+        await _visit(guild.id)
+
+        await _deliver(guild.id, hook="installed")
+        await _visit(guild.id)
+
+        [(_, _, _, told)] = plugins.calls
+        assert told == {"status": "on_hold"}
+        *_, installed = await _hooks(session, guild.id)
+        assert installed.last_error == "the plug-in is not reachable here"
+
+    async def test_a_suspended_plugin_is_sent_nothing_and_its_hooks_wait(
+        self, session, monkeypatch
+    ):
+        """Its own status included. What the community queued waits, no
+        attempt spent, and goes once the suspension is lifted."""
+        _user, guild, install = await _setup(session)
+        await plugin_refs.ensure_plugin_guild_ref(
+            guild_id=guild.id, public_id=PUBLIC_ID
+        )
+        plugins = _answering(monkeypatch)
+        await set_install_state(
+            session, guild.id, install.id, status="read_only", suspended=True
+        )
+
+        await _deliver(guild.id, hook="erase")
+        assert await _visit(guild.id) is None
+        assert await community_hooks.due_outside(guild.id, datetime.now(UTC)) is None
+        assert plugins.calls == []
+        [erase] = await _hooks(session, guild.id)
+        assert (erase.hook, erase.attempts, erase.done_at) == ("erase", 0, None)
+
+        await set_install_state(session, guild.id, install.id, suspended=False)
+        await _visit(guild.id)
+
+        assert [(path, body) for _, path, _, body in plugins.calls] == [
+            ("/v1/hooks/erase", {}),
+            ("/v1/hooks/plugin_status", {"status": "read_only"}),
+        ]
 
 
 async def _sent(session: AsyncSession, guild_id: int):
