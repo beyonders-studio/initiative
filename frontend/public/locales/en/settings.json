@@ -1221,7 +1221,6 @@
     "allowedOriginsHelp": "One per line. Leave blank to allow only the browser address's own origin.",
     "allowedOriginsHelpEdit": "One per line. Leave blank to keep the current origins.",
     "mandatoryLabel": "Install in every community",
-    "operationsOnlyLabel": "Only the operations community",
     "sharedRoutesLabel": "Share installations between communities",
     "created": "Plug-in service registered.",
     "saved": "Plug-in service updated.",

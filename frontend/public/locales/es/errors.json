@@ -779,6 +779,7 @@
   "PLUGIN_SERVICE_SUSPENSION_IS_OWNERS": "Un plug-in se suspende en Servicios de plug-ins, no en el archivo de configuración. Quita enabled de su entrada.",
   "PLUGIN_SERVICE_STATUS_IS_BILLINGS": "El estado de los plug-ins de esta comunidad se establece en la facturación.",
   "PLUGIN_SERVICE_INSTALL_NOT_FOUND": "Ese plug-in ya no está instalado en esta comunidad.",
+  "PLUGIN_SERVICE_NOT_BETA": "Este plug-in no está en beta, así que no tiene una lista de comunidades.",
   "PLUGIN_SERVICE_INVALID_VENDOR_VALUE": "Ese valor no es válido. Revisa su longitud y que una dirección empiece por https:// o http://.",
   "PLUGIN_SERVICE_VENDOR_SETUP_UNAVAILABLE": "La ficha de este complemento no ofrece una configuración en su proveedor. Introduce sus valores a mano.",
   "PLUGIN_SERVICE_VENDOR_SETUP_INVALID_ORGANIZATION": "Ese no es un nombre de organización que use GitHub. Usa letras, números y guiones, hasta 39 caracteres.",

@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PluginServiceRegistrationRead } from "@/api/generated/initiativeAPI.schemas";
+import {
+  PluginAvailability,
+  type PluginServiceRegistrationRead,
+} from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -91,7 +94,6 @@ export const PluginServicesPage = () => {
           data: {
             ...placement,
             mandatory: values.mandatory,
-            operations_only: values.operationsOnly,
             shared_routes: values.sharedRoutes,
             // Only the values that were typed; a secret left alone is kept.
             ...(Object.keys(values.vendorValues).length > 0
@@ -120,7 +122,6 @@ export const PluginServicesPage = () => {
         jwks: values.jwks,
         jwks_uri: values.jwksUri || null,
         mandatory: values.mandatory,
-        operations_only: values.operationsOnly,
       },
       {
         onSuccess: () => {
@@ -216,7 +217,7 @@ export const PluginServicesPage = () => {
                       {registration.source === "registry" && (
                         <Badge variant="secondary">{t("pluginServices.registryBadge")}</Badge>
                       )}
-                      {registration.operations_only ? (
+                      {registration.availability === PluginAvailability.operations ? (
                         <Badge variant="secondary">
                           {t(
                             registration.mandatory
@@ -336,7 +337,7 @@ export const PluginServicesPage = () => {
                   )}
                   {keysMissing && <p>{t("pluginServices.noKeysHelp")}</p>}
                   {!registration.vendor_ready && <p>{t("pluginServices.vendorMissingHelp")}</p>}
-                  {registration.operations_only ? (
+                  {registration.availability === PluginAvailability.operations ? (
                     <p>
                       {t("pluginServices.operationsOnlyHelp")}
                       {registration.mandatory && ` ${t("pluginServices.operationsMandatoryHelp")}`}

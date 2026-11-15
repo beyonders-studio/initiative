@@ -24,7 +24,8 @@ const buildRegistration = (
   jwks_uri: null,
   scope_ceiling: [],
   mandatory: false,
-  operations_only: false,
+  availability: "none",
+  beta_communities: [],
   shared_routes: false,
   suspended_at: null,
   source: "operator",
@@ -169,7 +170,7 @@ describe("PluginServicesPage", () => {
       registrations = [
         buildRegistration({ id: 1, public_id: "core.automation", mandatory: true }),
         buildRegistration({ id: 2, public_id: "acme.shopify" }),
-        buildRegistration({ id: 3, public_id: "acme.sales", operations_only: true }),
+        buildRegistration({ id: 3, public_id: "acme.sales", availability: "operations" }),
       ];
       renderAsOperator();
 
@@ -185,7 +186,7 @@ describe("PluginServicesPage", () => {
     });
 
     it("says a mandatory operations-only plug-in is installed in the operations community alone", () => {
-      registrations = [buildRegistration({ mandatory: true, operations_only: true })];
+      registrations = [buildRegistration({ mandatory: true, availability: "operations" })];
       renderAsOperator();
 
       expect(screen.getByText("In the operations community")).toBeInTheDocument();
@@ -204,9 +205,8 @@ describe("PluginServicesPage", () => {
       await user.click(screen.getByRole("button", { name: "Add plug-in service" }));
       await screen.findByLabelText("Plug-in identifier");
 
-      // Two switches in the operator's box: whether only the operations
-      // community gets it, and whether every community does.
-      expect(within(screen.getByRole("dialog")).getAllByRole("switch")).toHaveLength(2);
+      // One switch in the operator's box: whether every community gets it.
+      expect(within(screen.getByRole("dialog")).getAllByRole("switch")).toHaveLength(1);
     });
   });
 
@@ -243,20 +243,7 @@ describe("PluginServicesPage", () => {
           jwks: null,
           jwks_uri: "https://shopify.example.com/.well-known/jwks.json",
           mandatory: false,
-          operations_only: false,
         },
-        expect.anything()
-      );
-    });
-
-    it("registers it for the operations community only", async () => {
-      const user = await fillNewService();
-
-      await user.click(screen.getByRole("switch", { name: "Only the operations community" }));
-      await user.click(screen.getByRole("button", { name: "Save" }));
-
-      expect(createMutate).toHaveBeenCalledWith(
-        expect.objectContaining({ operations_only: true, mandatory: false }),
         expect.anything()
       );
     });
@@ -312,40 +299,6 @@ describe("PluginServicesPage", () => {
       // The stored key set is shown in the box and sent back as it was.
       expect(data.jwks).toEqual(registrations[0].jwks);
       expect(data).not.toHaveProperty("secret");
-    });
-
-    it("keeps operations-only through an unrelated edit", async () => {
-      const user = userEvent.setup();
-      registrations = [buildRegistration({ operations_only: true })];
-      renderAsOperator();
-
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      await user.type(
-        await screen.findByLabelText("Key set address"),
-        "https://gh.example.com/jwks.json"
-      );
-      await user.click(screen.getByRole("button", { name: "Save" }));
-
-      expect(updateMutate.mock.calls[0][0].data).toMatchObject({
-        jwks_uri: "https://gh.example.com/jwks.json",
-        operations_only: true,
-      });
-    });
-
-    it("saves operations-only off once switched off", async () => {
-      const user = userEvent.setup();
-      registrations = [buildRegistration({ operations_only: true })];
-      renderAsOperator();
-
-      await user.click(screen.getByRole("button", { name: "Edit" }));
-      const operationsOnly = await screen.findByRole("switch", {
-        name: "Only the operations community",
-      });
-      expect(operationsOnly).toBeChecked();
-      await user.click(operationsOnly);
-      await user.click(screen.getByRole("button", { name: "Save" }));
-
-      expect(updateMutate.mock.calls[0][0].data).toMatchObject({ operations_only: false });
     });
 
     it("asks for the vendor values and sharing, keeping a secret left alone", async () => {
@@ -417,7 +370,6 @@ describe("PluginServicesPage", () => {
 
       expect(updateMutate.mock.calls[0][0].data).toEqual({
         mandatory: false,
-        operations_only: false,
         shared_routes: false,
         vendor_values: { client_id: "gh-app" },
       });

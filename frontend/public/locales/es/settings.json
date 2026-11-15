@@ -1221,7 +1221,6 @@
     "allowedOriginsHelp": "Uno por línea. Déjalo en blanco para permitir solo el origen de la dirección del navegador.",
     "allowedOriginsHelpEdit": "Uno por línea. Déjalo en blanco para mantener los orígenes actuales.",
     "mandatoryLabel": "Instalar en todas las comunidades",
-    "operationsOnlyLabel": "Solo la comunidad de operaciones",
     "sharedRoutesLabel": "Compartir instalaciones entre comunidades",
     "created": "Servicio de complemento registrado.",
     "saved": "Servicio de complemento actualizado.",

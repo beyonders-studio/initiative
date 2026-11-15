@@ -42,7 +42,6 @@ export interface PluginServiceFormValues {
   /** Where the plug-in publishes its key set, or "" for none. */
   jwksUri: string;
   mandatory: boolean;
-  operationsOnly: boolean;
   /** One vendor installation may connect to several communities. */
   sharedRoutes: boolean;
   /** Vendor values that were typed, by key. "" clears one; a key left out is kept. */
@@ -57,7 +56,6 @@ interface FormState {
   jwks: string;
   jwksUri: string;
   mandatory: boolean;
-  operationsOnly: boolean;
   sharedRoutes: boolean;
   vendorValues: Record<string, string>;
 }
@@ -70,7 +68,6 @@ const EMPTY_FORM: FormState = {
   jwks: "",
   jwksUri: "",
   mandatory: false,
-  operationsOnly: false,
   sharedRoutes: false,
   vendorValues: {},
 };
@@ -138,7 +135,6 @@ export const PluginServiceFormDialog = ({
         jwks: editing.jwks ? JSON.stringify(editing.jwks, null, 2) : "",
         jwksUri: editing.jwks_uri ?? "",
         mandatory: editing.mandatory,
-        operationsOnly: editing.operations_only,
         sharedRoutes: editing.shared_routes,
         vendorValues: {},
       });
@@ -241,7 +237,6 @@ export const PluginServiceFormDialog = ({
       allowedOrigins: parseAllowedOrigins(form.allowedOrigins),
       jwksUri: form.jwksUri.trim(),
       mandatory: form.mandatory,
-      operationsOnly: form.operationsOnly,
       sharedRoutes: form.sharedRoutes,
       vendorValues: Object.fromEntries(
         Object.entries(form.vendorValues).map(([key, value]) => [key, value.trim()])
@@ -626,27 +621,6 @@ export const PluginServiceFormDialog = ({
               </div>
             </fieldset>
           )}
-
-          <div className="space-y-2 rounded-md border p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <Label htmlFor="plugin-service-operations-only" className="font-medium">
-                  {t("pluginServices.operationsOnlyLabel")}
-                </Label>
-                <p className="text-muted-foreground text-xs">
-                  {t("pluginServices.operationsOnlyHelp")}{" "}
-                  {t("pluginServices.operationsMandatoryHelp")}
-                </p>
-              </div>
-              <Switch
-                id="plugin-service-operations-only"
-                checked={form.operationsOnly}
-                onCheckedChange={(checked) =>
-                  setForm((prev) => ({ ...prev, operationsOnly: Boolean(checked) }))
-                }
-              />
-            </div>
-          </div>
 
           <div className="space-y-2 rounded-md border border-amber-500/50 p-3">
             <div className="flex items-start justify-between gap-3">

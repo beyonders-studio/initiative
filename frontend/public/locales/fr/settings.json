@@ -1221,7 +1221,6 @@
     "allowedOriginsHelp": "Une par ligne. Laissez vide pour n'autoriser que l'origine de l'adresse du navigateur.",
     "allowedOriginsHelpEdit": "Une par ligne. Laissez vide pour conserver les origines actuelles.",
     "mandatoryLabel": "Installer dans toutes les communautés",
-    "operationsOnlyLabel": "Seulement la communauté d'exploitation",
     "sharedRoutesLabel": "Partager les installations entre communautés",
     "created": "Service de plug-in enregistré.",
     "saved": "Service de plug-in mis à jour.",

@@ -264,9 +264,11 @@ export const useCreatePluginService = <TError = ErrorType<HTTPValidationError>, 
 };
 /**
  * Suspend everywhere or lift, repoint either address, replace the keys,
- * change the reach conferred, let vendor installations be shared, or set
- * the vendor values. Turning sharing off while an installation is connected
- * to more than one community is refused (409).
+ * make it mandatory or not, let vendor installations be shared, set the
+ * vendor values, or replace a beta plug-in's communities. Turning sharing
+ * off while an installation is connected to more than one community is
+ * refused (409), and so is a list of communities for a plug-in that is not
+ * beta; one naming a community that does not exist is refused (400).
  * @summary Update Plugin Service
  */
 export const updatePluginService = (

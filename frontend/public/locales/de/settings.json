@@ -1221,7 +1221,6 @@
     "allowedOriginsHelp": "Eine pro Zeile. Leer lassen, um nur die Herkunft der Browser-Adresse zu erlauben.",
     "allowedOriginsHelpEdit": "Eine pro Zeile. Leer lassen, um die aktuellen Herkünfte beizubehalten.",
     "mandatoryLabel": "In jeder Community installieren",
-    "operationsOnlyLabel": "Nur die Betriebs-Community",
     "sharedRoutesLabel": "Installationen beim Anbieter teilen",
     "created": "Plug-in-Dienst registriert.",
     "saved": "Plug-in-Dienst aktualisiert.",
