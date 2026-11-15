@@ -21,7 +21,7 @@ import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { useTitleBarHeight } from "@/components/navigation/DesktopTitleBar";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/navigation/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { useFeedback } from "@/components/tickets/FeedbackSheet";
+import { useFeedback } from "@/components/tickets/FeedbackDialog";
 import { UpdateButton } from "@/components/updates/UpdateButton";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
