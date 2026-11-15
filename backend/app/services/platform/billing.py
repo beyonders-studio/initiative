@@ -9,13 +9,14 @@ under the ``initiative_billing`` role, scoped to the one community it names.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import insert, update
+from sqlalchemy import insert, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -29,7 +30,7 @@ from app.core.identify import bearer_token
 from app.core.messages import BillingMessages
 from app.core.rules import SYNCED_RULES, SetBy
 from app.core.security import PublicKeyBundleError, load_verification_keys
-from app.db import cohorts
+from app.db import cohorts, post_commit
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.billing import (
@@ -41,9 +42,10 @@ from app.models.platform.billing import (
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.rule import CommunityRule
-from app.schemas.platform.billing import CommunityFields
+from app.schemas.platform.billing import CommunityFields, SyncedPluginStatus
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks
+from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.platform import billing_envelope as envelope
 from app.services.platform import rules
 from app.services.tenant import custom_roles as custom_roles_service
@@ -284,6 +286,8 @@ async def apply_community_sync(
     lifts returns the community to it. A rule the deployment does not offer
     the means to meet refuses the item; ``system`` reads what it offers. The
     deployment's custom roles are written in the community's schema first.
+    Its plug-ins' statuses, when sent, are written whole
+    (:func:`_apply_plugin_statuses`).
     """
     # Locked, so two syncs for one community take turns: each reads the
     # version the other wrote, and an older one never lands after a newer.
@@ -354,6 +358,8 @@ async def apply_community_sync(
     )
     for key, value in synced.items():
         await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
+    if fields.plugins is not None:
+        await _apply_plugin_statuses(session, guild_id, fields.plugins)
     from app.services import ai_settings
 
     ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
@@ -369,6 +375,39 @@ async def apply_community_sync(
         session, guild_id=guild_id, reader=system
     )
     return Synced(version=version, went_on_hold=went_on_hold)
+
+
+#: Every installed plug-in's status as billing holds it, under the billing
+#: role routed to the community: the one ``:wanted`` names, or ``active``.
+_PLUGIN_STATUSES_SQL = text(
+    """
+UPDATE public.plugin_installs
+   SET status = COALESCE(CAST(:wanted AS jsonb) ->> listing_uid, 'active'),
+       status_changed_at = now()
+ WHERE guild_id = :guild
+   AND status <> COALESCE(CAST(:wanted AS jsonb) ->> listing_uid, 'active')
+RETURNING install_id
+"""
+)
+
+
+async def _apply_plugin_statuses(
+    session: AsyncSession, guild_id: int, plugins: list[SyncedPluginStatus]
+) -> None:
+    """Set each installed plug-in's status as billing holds it, whole: one it
+    leaves out is ``active``, and one it names that is not installed is
+    ignored. A suspension is left as it is. A status that moves is told to the
+    plug-in once the sync commits."""
+    wanted = {plugin.listing_uid: plugin.status.value for plugin in plugins}
+    moved = (
+        await session.exec(
+            _PLUGIN_STATUSES_SQL,  # type: ignore[call-overload]
+            params={"wanted": json.dumps(wanted), "guild": guild_id},
+        )
+    ).all()
+    if moved:
+        community_hooks.status_changed(session, guild_id)
+        post_commit.after_commit(session, invalidate_registrations)
 
 
 async def _apply_custom_roles(guild_id: int, fields: CommunityFields) -> None:

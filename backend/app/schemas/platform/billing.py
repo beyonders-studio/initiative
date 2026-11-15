@@ -44,6 +44,7 @@ from app.models.platform.guild import (
 )
 from app.models.platform.identity_ref import REF_MAX_LENGTH
 from app.models.platform.marketplace import UID_LENGTH
+from app.models.platform.plugin_install import PluginInstallStatus
 from app.models.tenant.custom_role import (
     CUSTOM_ROLE_NAME_MAX_LENGTH,
     CUSTOM_ROLE_RUNGS,
@@ -124,6 +125,20 @@ class SyncedCustomRole(SanitizedBaseModel):
         return self
 
 
+#: The most plug-in statuses one sync carries.
+MAX_SYNCED_PLUGINS = 200
+
+
+class SyncedPluginStatus(SanitizedBaseModel):
+    """The status billing holds one of the community's plug-ins to. Never
+    ``suspended``: suspending is Initiative's alone."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    listing_uid: str = Field(min_length=UID_LENGTH, max_length=UID_LENGTH, strict=True)
+    status: PluginInstallStatus
+
+
 class CommunityFields(SanitizedBaseModel):
     """What billing holds a community to, whole, at one version. Every field
     is sent every time: billing sends its desired state, never a patch, so a
@@ -149,6 +164,22 @@ class CommunityFields(SanitizedBaseModel):
     custom_roles: list[SyncedCustomRole] = Field(
         default_factory=list, max_length=MAX_DEPLOYMENT_CUSTOM_ROLES
     )
+    #: The status of each of the community's plug-ins, whole: an installed
+    #: plug-in left out is ``active``, and one not installed is ignored. A
+    #: sender that predates the field leaves it out, and every status stays
+    #: as it is.
+    plugins: list[SyncedPluginStatus] | None = Field(
+        default=None, max_length=MAX_SYNCED_PLUGINS
+    )
+
+    @field_validator("plugins")
+    @classmethod
+    def _each_listing_once(
+        cls, value: list[SyncedPluginStatus] | None
+    ) -> list[SyncedPluginStatus] | None:
+        if value is not None and len({p.listing_uid for p in value}) != len(value):
+            raise ValueError(BillingMessages.PLUGINS_NOT_SYNCED)
+        return value
 
     @field_validator("custom_roles")
     @classmethod

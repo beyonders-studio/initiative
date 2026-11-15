@@ -39,6 +39,7 @@ from app.testing import (
     create_plugin_service_registration,
     entitlement_statement,
     marketplace_uid,
+    set_install_state,
 )
 from app.testing.billing_boundary import configure_outbound, served_changes
 from app.testing.billing_managed import billing_manages_plans
@@ -316,8 +317,9 @@ class TestGating:
 
 
 class TestInstallChanges:
-    """Billing hears of installs and uninstalls from its change log, and only
-    of listings a package names terms for."""
+    """Billing hears of installs, statuses and uninstalls from its change log,
+    for every listing: it sets the status of every installed plug-in, paid or
+    free."""
 
     async def test_installing_and_removing_tell_billing(
         self, client: AsyncClient, session: AsyncSession, acting_user, entitled, hooks
@@ -347,7 +349,7 @@ class TestInstallChanges:
             ("plugin.uninstalled", ref, SERVICE_UID),
         ]
 
-    async def test_a_listing_without_terms_tells_nobody(
+    async def test_a_listing_without_terms_is_told_too(
         self,
         client: AsyncClient,
         acting_user,
@@ -362,18 +364,30 @@ class TestInstallChanges:
             definition=_definition(),
         )
         a = await _seat(acting_user)
+        ref = await billing_guild_ref(a.guild.id)
 
         async with billing_manages_plans(session):
             installed = await _install(client, a)
-            await client.delete(
-                a.g(f"/plugins/{installed.json()['id']}"), headers=a.headers
-            )
+            assert installed.status_code == 201, installed.text
+            install_id = installed.json()["id"]
+            await sweep_timers.process_due_timers()
+            await set_install_state(session, a.guild.id, install_id, status="on_hold")
+            await set_install_state(session, a.guild.id, install_id, status="active")
+            await client.delete(a.g(f"/plugins/{install_id}"), headers=a.headers)
             await _settle()
             await sweep_timers.process_due_timers()
             served, _cursor = await served_changes()
 
-        assert installed.status_code == 201, installed.text
-        assert [c for c in served if c["kind"].startswith("plugin.")] == []
+        assert [
+            (c["kind"], c["community_ref"], c["listing_uid"], c.get("status"))
+            for c in served
+            if c["kind"].startswith("plugin.")
+        ] == [
+            ("plugin.installed", ref, SERVICE_UID, None),
+            ("plugin.status", ref, SERVICE_UID, "on_hold"),
+            ("plugin.status", ref, SERVICE_UID, "active"),
+            ("plugin.uninstalled", ref, SERVICE_UID, None),
+        ]
 
 
 # --- the uninstall notice ----------------------------------------------------------
