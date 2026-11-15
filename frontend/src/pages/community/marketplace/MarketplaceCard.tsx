@@ -67,6 +67,11 @@ export function MarketplaceCard({ listing, installedCount = 0 }: MarketplaceCard
                   {t("card.version", { version: listing.latest_version.version })}
                 </span>
               )}
+              {listing.beta && (
+                <Badge variant="secondary" className="text-xs">
+                  {t("card.beta")}
+                </Badge>
+              )}
               {!listing.installable ? (
                 <Badge variant="outline" className="text-xs">
                   {t("card.needsUpdate")}

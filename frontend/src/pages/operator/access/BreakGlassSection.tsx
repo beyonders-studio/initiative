@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { BreakGlassCreate, CommunityNotice } from "@/api/generated/initiativeAPI.schemas";
+import { CommunityPicker, type PickedCommunity } from "@/components/communities/CommunityPicker";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useBreakGlass, useBreakGlassRequirements } from "@/hooks/useAccessGrants";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -15,7 +16,6 @@ import { Input } from "@/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
-import { CommunityPicker, type PickedCommunity } from "./CommunityPicker";
 import {
   CaseField,
   CommunityNoticeField,

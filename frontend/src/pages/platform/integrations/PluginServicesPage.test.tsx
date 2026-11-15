@@ -73,6 +73,20 @@ vi.mock("@/hooks/usePluginServices", () => ({
   useCompleteVendorSetup: () => ({ mutate: completeSetupMutate, isPending: false }),
 }));
 
+// The beta's community picker searches every community on the server.
+vi.mock(import("@/hooks/useSettings"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  usePlatformCommunities: (() => ({
+    data: {
+      items: [
+        { id: 7, name: "Riverside", status: "active" },
+        { id: 8, name: "Hilltop", status: "active" },
+      ],
+    },
+    isFetching: false,
+  })) as unknown as typeof import("@/hooks/useSettings").usePlatformCommunities,
+}));
+
 import { PluginServicesPage } from "./PluginServicesPage";
 
 const renderAsOperator = () =>
@@ -197,6 +211,63 @@ describe("PluginServicesPage", () => {
       expect(
         screen.getByText(/added to the operations community only, and its admins cannot remove it/)
       ).toBeInTheDocument();
+    });
+
+    it.each([
+      ["none", "Every community"],
+      ["operations", "The operations community"],
+    ] as const)(
+      "says a plug-in declaring %s reaches %s, with nothing to pick",
+      async (availability, reach) => {
+        const user = userEvent.setup();
+        registrations = [buildRegistration({ availability })];
+        renderAsOperator();
+
+        await user.click(screen.getByRole("button", { name: "Edit" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText(reach)).toBeInTheDocument();
+        expect(within(dialog).queryByText("Beta")).toBeNull();
+        expect(within(dialog).queryByRole("combobox")).toBeNull();
+        await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+        expect(updateMutate.mock.calls[0][0].data).not.toHaveProperty("beta_community_ids");
+      }
+    );
+
+    it("says nobody can use a beta plug-in until communities are picked", async () => {
+      const user = userEvent.setup();
+      registrations = [buildRegistration({ availability: "beta" })];
+      renderAsOperator();
+
+      expect(within(screen.getByRole("listitem")).getByText("Beta")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("Beta")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Nobody can use this plug-in until you pick communities.")
+      ).toBeInTheDocument();
+    });
+
+    it("replaces a beta plug-in's communities with those picked", async () => {
+      const user = userEvent.setup();
+      registrations = [
+        buildRegistration({
+          availability: "beta",
+          beta_communities: [{ id: 7, name: "Riverside" }],
+        }),
+      ];
+      renderAsOperator();
+
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("Riverside (#7)")).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("combobox", { name: "Communities in the beta" }));
+      await user.click(await screen.findByRole("option", { name: /Hilltop/ }));
+      await user.keyboard("{Escape}");
+      await user.click(within(dialog).getByRole("button", { name: "Remove Riverside (#7)" }));
+      await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+      expect(updateMutate.mock.calls[0][0].data).toMatchObject({ beta_community_ids: [8] });
     });
 
     it("confers no powers beyond the scope ceiling", async () => {

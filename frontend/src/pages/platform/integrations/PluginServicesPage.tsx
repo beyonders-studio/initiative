@@ -94,6 +94,10 @@ export const PluginServicesPage = () => {
             ...placement,
             mandatory: values.mandatory,
             shared_routes: values.sharedRoutes,
+            // The whole list, replacing the one stored; only a beta has one.
+            ...(editing.availability === PluginAvailability.beta
+              ? { beta_community_ids: values.betaCommunities.map((community) => community.id) }
+              : {}),
             // Only the values that were typed; a secret left alone is kept.
             ...(Object.keys(values.vendorValues).length > 0
               ? { vendor_values: values.vendorValues }
@@ -217,6 +221,9 @@ export const PluginServicesPage = () => {
                       )}
                       {registration.source === "registry" && (
                         <Badge variant="secondary">{t("pluginServices.registryBadge")}</Badge>
+                      )}
+                      {registration.availability === PluginAvailability.beta && (
+                        <Badge variant="secondary">{t("pluginServices.betaBadge")}</Badge>
                       )}
                       {registration.availability === PluginAvailability.operations ? (
                         <Badge variant="secondary">
