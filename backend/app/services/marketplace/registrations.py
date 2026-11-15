@@ -483,9 +483,16 @@ async def registration_views(
 
 
 async def get_registration(
-    session: AsyncSession, registration_id: int
+    session: AsyncSession, registration_id: int, *, lock: bool = False
 ) -> PluginServiceRegistration:
-    row = await session.get(PluginServiceRegistration, registration_id)
+    """The registration, or 404. ``lock`` holds its row until the transaction
+    ends, for a write that reads its reach and beta list first."""
+    query = select(PluginServiceRegistration).where(
+        PluginServiceRegistration.id == registration_id
+    )
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    row = (await session.exec(query)).first()
     if row is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
@@ -495,14 +502,14 @@ async def get_registration(
 
 
 async def _by_public_id(
-    session: AsyncSession, public_id: str
+    session: AsyncSession, public_id: str, *, lock: bool = False
 ) -> PluginServiceRegistration | None:
-    result = await session.exec(
-        select(PluginServiceRegistration).where(
-            PluginServiceRegistration.public_id == public_id
-        )
+    query = select(PluginServiceRegistration).where(
+        PluginServiceRegistration.public_id == public_id
     )
-    return result.first()
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return (await session.exec(query)).first()
 
 
 # --- writes ------------------------------------------------------------------
@@ -621,7 +628,9 @@ async def update_registration(
     for a plug-in that is not beta is refused (409), and so is one naming a
     community that does not exist (400).
     """
-    row = await get_registration(session, registration_id)
+    # Locked first: two saves reading the same list would otherwise each
+    # write their own difference from it.
+    row = await get_registration(session, registration_id, lock=True)
     beta: set[int] | None = None
     if beta_community_ids is not None:
         if row.availability != PluginAvailability.beta.value or row.listing_uid is None:
@@ -1167,7 +1176,7 @@ async def apply_listing_registration(
     ``availability`` off ``beta`` deletes its beta list, and each install its
     reach moves in or out of is told to billing. The caller commits.
     """
-    row = await _by_public_id(session, registration.public_id)
+    row = await _by_public_id(session, registration.public_id, lock=True)
     created = row is None
     was = None if row is None else await _reach(session, row)
     if row is None:

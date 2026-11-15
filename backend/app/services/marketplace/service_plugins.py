@@ -3760,7 +3760,7 @@ def normalize_service_plugin_definition(
         cleaned["minimum_age"] = minimum_age
 
     availability = body.get("availability", PluginAvailability.none.value)
-    if availability not in AVAILABILITIES:
+    if not isinstance(availability, str) or availability not in AVAILABILITIES:
         fail(
             "service plug-in: availability must be one of "
             f"{', '.join(sorted(AVAILABILITIES))}"

@@ -113,8 +113,10 @@ def _unforced_update(statement: str) -> None:
     """Run ``statement`` on the registrations with their row security lifted,
     and put it back: no policy admits the migration's own role."""
     op.execute(f"ALTER TABLE public.{REGISTRATIONS} NO FORCE ROW LEVEL SECURITY")
-    op.execute(statement)
-    op.execute(f"ALTER TABLE public.{REGISTRATIONS} FORCE ROW LEVEL SECURITY")
+    try:
+        op.execute(statement)
+    finally:
+        op.execute(f"ALTER TABLE public.{REGISTRATIONS} FORCE ROW LEVEL SECURITY")
 
 
 def upgrade() -> None:
