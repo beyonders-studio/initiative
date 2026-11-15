@@ -25,6 +25,7 @@
     "configInvalid": "Problème de configuration",
     "provided": "Fourni avec Initiative",
     "unavailable": "Non configuré sur ce serveur",
+    "readOnly": "Lecture seule",
     "configure": "Ouvrir les paramètres",
     "version": "Version {{version}}",
     "autoUpdate": "Mettre à jour automatiquement",

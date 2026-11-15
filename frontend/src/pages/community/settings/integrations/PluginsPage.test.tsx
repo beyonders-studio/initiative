@@ -20,6 +20,7 @@ import { PluginsPage } from "./PluginsPage";
 let notice: CommunityPluginUninstallNotice | undefined;
 let closedSurfaces: string[] | null = null;
 let pendingVersion: string | null = null;
+let readOnly = false;
 const openAddress = vi.fn();
 const uninstall = vi.hoisted(() => vi.fn());
 
@@ -54,6 +55,7 @@ vi.mock("@/hooks/useCommunityPlugins", async (importOriginal) => ({
           enabled: true,
           created_at: "2026-10-01T00:00:00Z",
           pending_version: pendingVersion,
+          read_only: readOnly,
         },
       ],
     },
@@ -70,6 +72,7 @@ beforeEach(() => {
   notice = undefined;
   closedSurfaces = null;
   pendingVersion = null;
+  readOnly = false;
   openAddress.mockReset();
   uninstall.mockReset();
   uninstall.mockResolvedValue(undefined);
@@ -159,5 +162,14 @@ describe("a version waiting for the seat", () => {
     // Followed while the page is already open.
     await router.navigate({ to: ".", search: { plugin: 4 } });
     await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "true"));
+  });
+});
+
+describe("a plug-in staff or billing made read-only", () => {
+  it("is marked read-only", async () => {
+    readOnly = true;
+    renderPage(PluginsPage);
+
+    expect(await screen.findByText("Read-only")).toBeInTheDocument();
   });
 });

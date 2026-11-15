@@ -25,6 +25,7 @@
     "configInvalid": "Problem bei der Einrichtung",
     "provided": "Gehört zu Initiative",
     "unavailable": "Auf diesem Server nicht eingerichtet",
+    "readOnly": "Schreibgeschützt",
     "configure": "Einstellungen öffnen",
     "version": "Version {{version}}",
     "autoUpdate": "Automatisch aktualisieren",

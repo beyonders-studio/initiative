@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildUser } from "@/__tests__/factories";
 import { renderPage, renderWithProviders } from "@/__tests__/helpers/render";
 import type { PluginServiceRegistrationRead } from "@/api/generated/initiativeAPI.schemas";
+import { formatDate } from "@/ui/lib/formatDate";
 
 const buildRegistration = (
   overrides: Partial<PluginServiceRegistrationRead> = {}
@@ -601,23 +602,25 @@ describe("PluginServicesPage", () => {
     });
   });
 
-  describe("the operator kill switch", () => {
-    it("confirms before stopping a plug-in, and says what stopping means", async () => {
+  describe("suspending everywhere", () => {
+    it("confirms before suspending a plug-in, and says what suspending means", async () => {
       const user = userEvent.setup();
       registrations = [buildRegistration()];
       renderAsOperator();
 
-      await user.click(screen.getByRole("switch"));
+      await user.click(screen.getByRole("button", { name: "Suspend everywhere" }));
 
       // Nothing has happened yet.
       expect(updateMutate).not.toHaveBeenCalled();
 
       const dialog = await screen.findByRole("alertdialog");
-      expect(within(dialog).getByText("Disable core.github?")).toBeInTheDocument();
-      expect(within(dialog).getByText(/stops reaching it immediately/)).toBeInTheDocument();
+      expect(within(dialog).getByText("Suspend core.github everywhere?")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(/in every community at once and hides it/)
+      ).toBeInTheDocument();
       expect(within(dialog).getByText(/Nothing is deleted/)).toBeInTheDocument();
 
-      await user.click(within(dialog).getByRole("button", { name: "Disable plug-in service" }));
+      await user.click(within(dialog).getByRole("button", { name: "Suspend everywhere" }));
 
       expect(updateMutate).toHaveBeenCalledWith(
         { registrationId: 1, data: { suspended: true } },
@@ -625,12 +628,16 @@ describe("PluginServicesPage", () => {
       );
     });
 
-    it("turns a plug-in back on without a confirmation", async () => {
+    it("says since when it is suspended, and lifts it without a confirmation", async () => {
       const user = userEvent.setup();
-      registrations = [buildRegistration({ suspended_at: "2026-11-15T00:00:00Z" })];
+      registrations = [buildRegistration({ suspended_at: "2026-11-15T12:00:00Z" })];
       renderAsOperator();
 
-      await user.click(screen.getByRole("switch"));
+      expect(
+        screen.getByText(`Suspended since ${formatDate("2026-11-15T12:00:00Z")}`)
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Suspend everywhere" })).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Lift suspension" }));
 
       expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(updateMutate).toHaveBeenCalledWith(

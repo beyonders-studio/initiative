@@ -29,10 +29,12 @@ import type { AppColumnDef } from "@/ui/lib/table";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { StatusMessage } from "@/ui/status-message";
 
 import { BillingConsoleButton } from "./BillingConsoleButton";
 import { CommunityOperatorSettingsSheet } from "./CommunityOperatorSettingsSheet";
+import { CommunityPluginsList } from "./CommunityPluginsList";
 
 // Storage caps are entered in binary GB (GiB) so a value round-trips cleanly
 // with `formatBytes` (which is also 1024-based). The editor for them, and for
@@ -244,6 +246,41 @@ const CommunitySuspensionButton = ({ community }: { community: PlatformCommunity
 };
 
 /**
+ * A community's plug-ins, for a reader the row says may suspend and lift them
+ * (`plugins`): a moderator under a live moderate grant on it. An operator
+ * reaches the same list in the Manage sheet.
+ */
+const CommunityPluginsButton = ({ community }: { community: PlatformCommunityStorageRead }) => {
+  const { t } = useTranslation("settings");
+  const [open, setOpen] = useState(false);
+  if (!community.allowed_actions.includes(CommunityAction.plugins)) return null;
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        aria-label={t("communities.plugins.openLabel", { name: community.name })}
+      >
+        {t("communities.plugins.title")}
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>{t("communities.plugins.sheetTitle", { name: community.name })}</SheetTitle>
+            <SheetDescription>{t("communities.plugins.help")}</SheetDescription>
+          </SheetHeader>
+          <div className="py-6">
+            <CommunityPluginsList communityId={community.id} />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+};
+
+/**
  * The ways into a community a reader may ask for, from its row: a request
  * for access, or breaking glass. Each opens that form on the Access tab with
  * the community already chosen.
@@ -372,6 +409,7 @@ export const CommunitiesPage = () => {
         <div className="flex flex-wrap items-center gap-2">
           <CommunityStatusCell community={row.original} />
           <CommunitySuspensionButton community={row.original} />
+          <CommunityPluginsButton community={row.original} />
         </div>
       ),
     },
