@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-11-13
+
 ### Added
 
 - **Ban and time out members.** Removing someone can ban them until you lift it under **Settings → Users → Banned**. **Time out…** on a member lets them read but not post, comment or react, for an hour, a day, a week or until a date you pick.
