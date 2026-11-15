@@ -82,7 +82,10 @@ from app.schemas.tenant.plugin_data import (
 from app.services import audit as audit_service
 from app.services.marketplace import plugin_actions
 from app.services.marketplace import plugin_data as plugin_data_service
-from app.services.marketplace.registration_lookup import registration_for_definition
+from app.services.marketplace.registration_lookup import (
+    install_state,
+    registration_for_definition,
+)
 from app.services.marketplace.service_plugins import plugin_widget_type
 from app.services.tenant import plugin_age, view_as
 
@@ -169,7 +172,8 @@ async def read_plugin_widget_catalog(
     is still listed, and still refused at fetch time to anyone else.
 
     Disabled installs are left out entirely: their widgets have nothing to draw,
-    so offering them would be offering a binding that cannot resolve.
+    so offering them would be offering a binding that cannot resolve. So are
+    those the platform suspended, held or deleted here.
     """
     plugins = (
         await session.exec(
@@ -180,7 +184,17 @@ async def read_plugin_widget_catalog(
     items: list[PluginWidgetCatalogEntry] = []
     for plugin in plugins:
         definition = plugin.definition or {}
-        if not plugin.enabled or definition.get("plugin_kind") != "service":
+        if (
+            not plugin.enabled
+            or definition.get("plugin_kind") != "service"
+            or (
+                await install_state(
+                    definition,
+                    guild_id=guild_context.guild_id,
+                    listing_uid=plugin.listing_uid,
+                )
+            ).hidden
+        ):
             continue
         declared = definition.get("widgets")
         widgets = [
