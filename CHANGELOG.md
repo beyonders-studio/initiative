@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Reload in the desktop app.** The title bar has a reload button beside Help, for a page that needs a fresh start.
 
+### Changed
+
+- **A half-written help request is marked on Help.** A dot on the Help button, or on your account menu, replaces the pill that sat over the corner of the page.
+
 ## [0.79.0] - 2026-11-13
 
 ### Added

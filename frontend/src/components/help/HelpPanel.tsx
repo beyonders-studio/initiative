@@ -9,8 +9,8 @@
  * takes help requests, "Ask the team" carries the search into a request; where
  * it gave an address instead, the panel shows the address.
  *
- * What somebody writes is kept until it is sent or discarded: closing Help
- * leaves a pill that opens it again.
+ * What somebody writes is kept until it is sent or discarded: opening Help
+ * again returns to it.
  */
 
 import { Link } from "@tanstack/react-router";
