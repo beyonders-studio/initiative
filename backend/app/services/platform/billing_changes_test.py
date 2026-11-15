@@ -36,6 +36,7 @@ from app.testing import (
     create_guild_plugin,
     create_plugin_service_registration,
     create_user,
+    set_beta_communities,
     set_install_state,
 )
 from app.testing.billing_boundary import change_kinds, change_rows, served_changes
@@ -216,6 +217,67 @@ async def test_a_plugin_suspended_everywhere_is_told_for_each_install(
         [("active", True), ("active", False)],
         [("active", True), ("active", True)],
     ]
+
+
+async def test_a_beta_list_that_moves_is_told_for_each_install_it_moves(
+    session: AsyncSession,
+):
+    """Replacing a beta plug-in's list, and its leaving beta, writes
+    ``plugin.status`` for each install whose reach moved, where nothing else
+    suspends it."""
+    from app.services.marketplace import registrations
+
+    listing_uid = "BETAMOVES00001"
+    registration = await create_plugin_service_registration(
+        session,
+        public_id="tests.beta-moves",
+        listing_uid=listing_uid,
+        availability="beta",
+    )
+    registration_id = registration.id
+    owner = await create_user(session)
+    guilds = [await create_guild(session, creator=owner) for _ in range(3)]
+    dropped, picked, staffed = guild_ids = [guild.id for guild in guilds]
+    plugins = [
+        await create_guild_plugin(
+            session,
+            guild,
+            owner,
+            definition={"plugin_kind": "service"},
+            listing_uid=listing_uid,
+        )
+        for guild in guilds
+    ]
+    await set_install_state(session, staffed, plugins[2].id, suspended=True)
+    await set_beta_communities(session, listing_uid, dropped)
+
+    async with billing_manages_plans(session):
+        await registrations.update_registration(
+            session, registration_id, beta_community_ids=[picked, staffed]
+        )
+        await registrations.apply_listing_registration(
+            session,
+            registrations.ListingRegistration(
+                public_id="tests.beta-moves",
+                listing_uid=listing_uid,
+                source="operator",
+                kind="container",
+                image=None,
+                scope_ceiling=[],
+            ),
+        )
+        await session.commit()
+        told = [
+            [
+                data["suspended"]
+                for _kind, data in await change_rows(
+                    session, guild_id, kinds=("plugin.status",)
+                )
+            ]
+            for guild_id in guild_ids
+        ]
+
+    assert told == [[True, False], [False], []]
 
 
 async def test_stored_bytes_are_reported_as_a_total(session: AsyncSession, monkeypatch):

@@ -61,7 +61,10 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCMappingTargetType,
 )
 from app.models.platform.plugin_install import PluginInstall
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.models.platform.plugin_service_registration import (
+    PluginBetaCommunity,
+    PluginServiceRegistration,
+)
 from app.models.platform.publisher import Publisher, publisher_prefix
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.tenant._mixins import ActorKind
@@ -1468,6 +1471,42 @@ async def set_install_state(
             col(PluginInstall.install_id) == install_id,
         )
         .values(**values)
+    )
+    await session.commit()
+    invalidate_registrations()
+
+
+async def set_beta_communities(
+    session: AsyncSession, listing_uid: str, *community_ids: int
+) -> None:
+    """Make ``community_ids`` the beta list of listing ``listing_uid``, as the
+    owner would, and drop the registration snapshot. A bare listing row is
+    made when the catalog has none, for the list's foreign key."""
+    if (
+        await session.exec(
+            select(MarketplaceListing).where(MarketplaceListing.uid == listing_uid)
+        )
+    ).first() is None:
+        session.add(
+            MarketplaceListing(
+                uid=listing_uid,
+                public_id=f"tests.{listing_uid.lower()}",
+                kind="plugin",
+                source="builtin",
+                name="Beta plug-in",
+                publisher="Tests",
+                description="A beta plug-in for tests.",
+                avatar_url="/marketplace/test.svg",
+            )
+        )
+    await session.exec(
+        sa_delete(PluginBetaCommunity).where(
+            col(PluginBetaCommunity.listing_uid) == listing_uid
+        )
+    )
+    session.add_all(
+        PluginBetaCommunity(listing_uid=listing_uid, community_id=community_id)
+        for community_id in community_ids
     )
     await session.commit()
     invalidate_registrations()

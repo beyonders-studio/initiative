@@ -18,8 +18,8 @@ Six properties, and each one is a deliberate choice:
   next boot tries again.
 * **The kill switch outranks the flag.** A registration the operator turned off
   installs nowhere new — deactivating a plug-in stops it exactly like any other.
-  One limited to the operations community (``operations_only``) is installed
-  there alone.
+  One with a reach (``availability``: a beta list, or the operations
+  community) is installed there alone.
 * **It is granted what it asks for, within the ceiling.** The manifest's
   requested scopes, capped by the registration's ``scope_ceiling``: the
   operator's registration is the consent a seat would otherwise give. Using
@@ -268,15 +268,15 @@ async def _missing(
     """The communities missing a mandatory install, read from the install
     index."""
     found = {
-        registration.operations_guild_id
+        community
         for registration in registrations
-        if registration.operations_only and registration.operations_guild_id is not None
+        for community in registration.reach or ()
     }
     everywhere = sorted(
         {
             registration.listing_uid
             for registration in registrations
-            if registration.listing_uid and not registration.operations_only
+            if registration.listing_uid and registration.reach is None
         }
     )
     if not everywhere:

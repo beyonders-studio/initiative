@@ -28,7 +28,13 @@ from app.services.marketplace.catalog import (
 from app.services.marketplace.plugin_keys import jwk_thumbprint
 from app.services.marketplace.registration_lookup import load_registrations
 from app.services.marketplace.vendor_values import load_vendor_values
-from app.testing import create_plugin_service_registration, sample_plugin_jwks
+from app.testing import (
+    create_guild,
+    create_plugin_service_registration,
+    create_user,
+    sample_plugin_jwks,
+    set_beta_communities,
+)
 from app.testing.fake_vendor import declarative_plugin
 from app.testing.tuf_repository import service_plugin_definition
 
@@ -632,6 +638,39 @@ async def test_a_listing_republished_without_a_scope_takes_it_away(session):
     assert (await _registration(session)).scope_ceiling == ["comments:read"]
 
 
+async def test_a_listing_writes_its_reach_and_leaving_beta_deletes_the_list(
+    session,
+):
+    """From its latest version's manifest. A release that stays beta keeps
+    the owner's list; one that leaves it deletes the list."""
+    beta = {**service_plugin_definition("acme.widgets"), "availability": "beta"}
+
+    async def publish(version: str, definition: dict) -> None:
+        await upsert_listing(
+            session,
+            {
+                **_plugin_listing(CONTAINER),
+                "version": version,
+                "definition": definition,
+            },
+            source="operator",
+        )
+        await session.commit()
+
+    await publish("1.0.0", beta)
+    assert (await _registration(session)).availability == "beta"
+    owner = await create_user(session)
+    picked = await create_guild(session, creator=owner)
+    await set_beta_communities(session, LISTING_UID, picked.id)
+
+    await publish("1.1.0", beta)
+    assert await service._beta_list(session, LISTING_UID) == {picked.id}
+
+    await publish("1.2.0", service_plugin_definition("acme.widgets"))
+    assert (await _registration(session)).availability == "none"
+    assert await service._beta_list(session, LISTING_UID) == set()
+
+
 @pytest.mark.parametrize(
     "block",
     [
@@ -788,7 +827,6 @@ async def test_reconcile_writes_the_deployment_facts_from_the_mounted_file(
                     "base_url": BASE_URL,
                     "allowed_origins": ["https://app.example.com"],
                     "mandatory": True,
-                    "operations_only": True,
                 }
             ],
         ),
@@ -801,7 +839,6 @@ async def test_reconcile_writes_the_deployment_facts_from_the_mounted_file(
     assert row.base_url == BASE_URL
     assert row.allowed_origins == ["https://app.example.com"]
     assert row.mandatory is True
-    assert row.operations_only is True
     assert row.listing_uid == LISTING_UID
 
 
@@ -839,13 +876,24 @@ async def test_an_entry_waits_for_its_listing(session, tmp_path, monkeypatch):
     assert (await load_registrations(force=True))["acme.widgets"].live is True
 
 
-@pytest.mark.parametrize("stated", [*LISTING_STATED_FIELDS, "enabled"])
+@pytest.mark.parametrize(
+    "stated", [*LISTING_STATED_FIELDS, "operations_only", "enabled"]
+)
 async def test_an_entry_naming_what_is_not_the_files_is_refused(
     session, tmp_path, monkeypatch, stated
 ):
-    """What the listing states, and the suspension, which is the owner's."""
+    """What the listing states (``operations_only`` among it, as its
+    ``availability`` was once named), and the suspension, which is the
+    owner's."""
     await _listed(session, "acme.widgets")
     entry = {"public_id": "acme.widgets", "base_url": BASE_URL, stated: True}
+    with pytest.raises(HTTPException) as refused:
+        service._deployment_facts(entry)
+    assert refused.value.detail == (
+        PluginServiceMessages.SUSPENSION_IS_OWNERS
+        if stated == "enabled"
+        else PluginServiceMessages.STATED_BY_LISTING
+    )
     monkeypatch.setattr(
         settings, "PLUGIN_SERVICES_CONFIG", _write_config(tmp_path, [entry])
     )

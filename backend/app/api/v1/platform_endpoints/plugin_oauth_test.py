@@ -70,7 +70,7 @@ async def _limit_to_operations(session: AsyncSession) -> None:
     test community is."""
     await session.exec(
         text(
-            "UPDATE public.plugin_service_registrations SET operations_only = true "
+            "UPDATE public.plugin_service_registrations SET availability = 'operations' "
             "WHERE public_id = :c"
         ).bindparams(c=CLIENT)
     )
@@ -617,7 +617,7 @@ async def test_another_clients_installation_is_refused(
     assert _error(response) == "invalid_grant"
 
 
-async def test_an_operations_only_plugin_gets_no_token_elsewhere(
+async def test_an_operations_plugin_gets_no_token_elsewhere(
     client: AsyncClient, session: AsyncSession, acting_user, role_session
 ):
     installed = await install_plugin(
@@ -801,7 +801,7 @@ async def test_a_plugin_token_lists_the_installs_a_page_at_a_time(
         "guild_on_hold",
         "guild_deleted",
         "install_on_hold",
-        "operations_only",
+        "out_of_reach",
         "install_suspended",
     ],
 )
@@ -824,7 +824,7 @@ async def test_a_paused_install_is_listed_as_inactive(
             headers=installed.seat.headers,
         )
         assert switched.status_code == 200, switched.text
-    elif paused_by == "operations_only":
+    elif paused_by == "out_of_reach":
         await _limit_to_operations(session)
     elif paused_by.startswith("install_"):
         column, value = (
@@ -855,7 +855,7 @@ async def test_a_paused_install_is_listed_as_inactive(
     )
 
     assert response.status_code == 200, response.text
-    if paused_by in ("operations_only", "install_suspended"):
+    if paused_by in ("out_of_reach", "install_suspended"):
         # Suspended there: nothing about it goes out, its listing included.
         assert response.json() == []
         return

@@ -2347,7 +2347,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     # Everything else is the system engine's. An installed plug-in's standing reads
     # the registration its token was issued to (its column grant is public_id,
     # listing_uid, suspended_at, publisher_id, jwks, jwks_uri, base_url,
-    # vendor_ready, kind and operations_only alone).
+    # vendor_ready, kind and availability alone).
     "plugin_service_registrations": SharedTable(
         rls=TableRls(
             policies=(
@@ -2359,7 +2359,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                 ),
                 # The change log's writer reads whether a plug-in is suspended
                 # (its column grant is listing_uid, suspended_at and
-                # operations_only; migration 20261115_0609).
+                # availability; migrations 20261115_0609 and 20261115_0610).
                 Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
             ),
         ),
@@ -2375,11 +2375,40 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             app_user=None,
             # No TABLE grant: a column-scoped SELECT on (public_id, listing_uid,
             # suspended_at, publisher_id, jwks, jwks_uri, base_url, vendor_ready,
-            # kind, operations_only), for the registration the install's token
+            # kind, availability), for the registration the install's token
             # names (install_reads_its_registration; migrations 20260924_0379,
             # 20260924_0387, 20260924_0388, 20260924_0390, 20260925_0393,
-            # 20261001_0437, 20261010_0482 and 20261115_0609). Asserted in
-            # install_standing_test beside the one on guilds.
+            # 20261001_0437, 20261010_0482, 20261115_0609 and 20261115_0610).
+            # Asserted in install_standing_test beside the one on guilds.
+            plugin_install_base=None,
+        ),
+    ),
+    # The communities the owner picked for a beta plug-in, by listing: an id pair.
+    # Read across communities by the owner's page and the registration snapshot,
+    # both on the system engine.
+    "plugin_beta_communities": SharedTable(
+        rls=TableRls(
+            policies=(
+                # An installed plug-in's standing asks whether its own community
+                # is on the list (its column grant is listing_uid and
+                # community_id; migration 20261115_0610).
+                Policy(
+                    "install_reads_its_community",
+                    SELECT,
+                    ("plugin_install_base",),
+                    using=f"community_id = {gucs.GUILD_ID}",
+                ),
+                # The change log's writer reads whether an install is in reach
+                # (its column grant is listing_uid and community_id).
+                Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
+            ),
+        ),
+        grants=Grants(
+            # The owner's list replaced, and deleted when the plug-in leaves
+            # beta; never updated.
+            app_admin=frozenset({SELECT, INSERT, DELETE}),
+            # No TABLE grant: the column-scoped SELECT above, for its own
+            # community's row. Asserted in install_standing_test.
             plugin_install_base=None,
         ),
     ),

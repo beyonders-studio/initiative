@@ -5,13 +5,15 @@ A marketplace **listing** says what a plug-in is and what it declares. A
 splits the same way, whatever published its listing:
 
 * **Plug-in facts** come from the plug-in's listing, and only a listing apply writes
-  them: ``listing_uid``, ``scope_ceiling``, ``image_digest`` and ``compose``. Every source reads the same
+  them: ``listing_uid``, ``scope_ceiling``, ``image_digest``, ``compose`` and,
+  from its latest version's manifest, ``availability``. Every source reads the same
   ``registration`` block (the registry, a local upload, the operator's catalog
   directory, the build).
 * **Deployment facts** come from the operator, through ``PLUGIN_SERVICES_CONFIG``
   or the settings form: where the plug-in runs, the public keys its container signs
-  with, its vendor values, the mandatory and operations-only flags and the
-  origins. Suspending it everywhere is the owner's alone (``suspended_at``).
+  with, its vendor values, the mandatory flag and the origins. Suspending it
+  everywhere is the owner's alone (``suspended_at``), and so is the list of
+  communities a beta plug-in reaches (``plugin_beta_communities``).
 
 A registration holds no secret beyond its vendor values. Every call the plug-in
 makes to Initiative is a JWT it signs with a key published here (``jwks``, or
@@ -32,10 +34,12 @@ Some columns exist only because of that split:
 * ``mandatory`` — the deployment asserts this plug-in is part of what it *is*, so
   every guild has it and guild admins cannot remove it. A suspension
   (``suspended_at``) still outranks it.
-* ``operations_only`` — the plug-in is for the deployment's operations community
-  (``app_settings.operations_guild_id``) alone: it is offered nowhere else, the
-  mandatory sweep installs it nowhere else, and an install anywhere else is not
-  live. With no operations community named, it is live nowhere.
+* ``availability`` — which communities the plug-in reaches, as its manifest
+  declares (:class:`PluginAvailability`): every one; for ``beta``, the communities
+  the owner picks (:class:`PluginBetaCommunity`); for ``operations``, the
+  deployment's operations community (``app_settings.operations_guild_id``),
+  and none while none is named. Out of reach, it is suspended: offered
+  nowhere, installed by the mandatory sweep nowhere, and live nowhere.
 * ``shared_routes`` — one vendor installation may route to several communities.
   Off, each route of its installs is held by one community
   (``plugin_installs.exclusive``).
@@ -52,9 +56,9 @@ Some columns exist only because of that split:
 **Live** is one rule, stated once in :func:`registration_live_sql`: the
 registration is not suspended, its publisher is enabled, its required vendor
 values are set and, for a container, it has a location and a key set to verify
-against; and, asked for one community, the registration is not limited to the
-operations community or that community is it, and the community's install is
-neither suspended, on hold nor deleted (``plugin_installs``).
+against; and, asked for one community, the community is in its reach
+(``availability``), and the community's install is neither suspended, on hold
+nor deleted (``plugin_installs``).
 The install standing, the registration snapshot and every channel that reads
 a single row ask it in that form.
 
@@ -67,12 +71,15 @@ It is written on the system engine by ``plugins.manage`` (owner) endpoints, by
 boot reconciliation from ``PLUGIN_SERVICES_CONFIG``, and by listing applies.
 """
 
+from collections.abc import Collection
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Protocol
 
 from pydantic import ConfigDict
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Computed,
     DateTime,
@@ -93,10 +100,13 @@ __all__ = [
     "LISTING_STATED_FIELDS",
     "MAX_PLUGIN_ID_LENGTH",
     "BrowserAddressed",
+    "PluginAvailability",
+    "PluginBetaCommunity",
     "PluginServiceRegistration",
     "RegistrationKind",
     "RegistrationSource",
     "browser_base",
+    "reach",
     "registration_live_sql",
 ]
 
@@ -117,7 +127,37 @@ LISTING_STATED_FIELDS: tuple[str, ...] = (
     "image_digest",
     "registry",
     "compose",
+    "availability",
 )
+
+
+class PluginAvailability(str, Enum):
+    """Which communities a plug-in reaches, as its manifest declares it (the
+    contract's ``availability``)."""
+
+    #: Every community.
+    none = "none"
+    #: The communities the owner picks, none until they do.
+    beta = "beta"
+    #: The deployment's operations community.
+    operations = "operations"
+
+
+def reach(
+    availability: str,
+    *,
+    operations_guild_id: int | None,
+    beta: Collection[int],
+) -> frozenset[int] | None:
+    """The communities a plug-in of ``availability`` reaches, ``None`` for
+    every one: the operations community ``operations_guild_id`` names, or the
+    owner's ``beta`` list. The Python spelling of the reach clause in
+    :func:`registration_live_sql`."""
+    if availability == PluginAvailability.operations.value:
+        return frozenset(() if operations_guild_id is None else (operations_guild_id,))
+    if availability == PluginAvailability.beta.value:
+        return frozenset(beta)
+    return None
 
 
 class RegistrationKind:
@@ -147,10 +187,10 @@ def registration_live_sql(
     row and its publisher's row, named by ``registration`` and ``publisher``.
 
     Given ``community``, a SQL expression naming one community's id, it is live
-    in that community: an ``operations_only`` registration is live only in the
-    community ``app_settings.operations_guild_id`` names, and none is live
-    where the community's install of its listing is suspended, on hold or
-    deleted. Without it, the answer is the registration's own, wherever it is
+    in that community: the community is in its reach (an ``operations``
+    registration's is the community ``app_settings.operations_guild_id``
+    names, a ``beta`` one's the communities on its list), and the community's
+    install of its listing is not suspended, on hold or deleted. Without it, the answer is the registration's own, wherever it is
     limited to.
 
     Not suspended, its publisher enabled, and every required vendor value set; and
@@ -166,8 +206,14 @@ def registration_live_sql(
         ""
         if community is None
         else (
-            f" AND (NOT {registration}.operations_only OR {community} = ("
-            "SELECT s.operations_guild_id FROM public.app_settings s WHERE s.id = 1))"
+            f" AND ({registration}.availability = '{PluginAvailability.none.value}'"
+            f" OR ({registration}.availability = '{PluginAvailability.operations.value}'"
+            f" AND {community} = (SELECT s.operations_guild_id"
+            " FROM public.app_settings s WHERE s.id = 1))"
+            f" OR ({registration}.availability = '{PluginAvailability.beta.value}'"
+            " AND EXISTS (SELECT 1 FROM public.plugin_beta_communities b"
+            f" WHERE b.listing_uid = {registration}.listing_uid"
+            f" AND b.community_id = {community})))"
             " AND NOT EXISTS (SELECT 1 FROM public.plugin_installs i"
             f" WHERE i.guild_id = {community}"
             f" AND i.listing_uid = {registration}.listing_uid"
@@ -190,6 +236,14 @@ class PluginServiceRegistration(SQLModel, table=True):
     """One plug-in service this deployment has wired up."""
 
     __tablename__ = "plugin_service_registrations"
+    __table_args__ = (
+        CheckConstraint(
+            "availability IN ("
+            + ", ".join(f"'{value.value}'" for value in PluginAvailability)
+            + ")",
+            name="ck_plugin_service_registrations_availability",
+        ),
+    )
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -258,10 +312,11 @@ class PluginServiceRegistration(SQLModel, table=True):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
-    # Offered to, installed in and live in the operations community alone.
-    operations_only: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    # Which communities it reaches (``PluginAvailability``), from its listing's
+    # latest version.
+    availability: str = Field(
+        default=PluginAvailability.none.value,
+        sa_column=Column(Text, nullable=False, server_default="none"),
     )
     # One vendor installation may route to several communities.
     shared_routes: bool = Field(
@@ -355,3 +410,40 @@ def browser_base(registration: BrowserAddressed) -> str:
     plug-in reachable at a single address needs no second field to say so.
     """
     return registration.page_origin or registration.base_url
+
+
+class PluginBetaCommunity(SQLModel, table=True):
+    """A community the owner picked for a beta plug-in, by its listing.
+
+    The list is the whole reach of a plug-in whose ``availability`` is
+    ``beta``, and goes when it stops being: the apply that moves it off
+    ``beta`` deletes its listing's rows.
+    """
+
+    __tablename__ = "plugin_beta_communities"
+
+    listing_uid: str = Field(
+        sa_column=Column(
+            String(14),
+            ForeignKey("marketplace_listings.uid", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    community_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("guilds.id", ondelete="CASCADE"),
+            primary_key=True,
+            index=True,
+        )
+    )
+    added_by: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )

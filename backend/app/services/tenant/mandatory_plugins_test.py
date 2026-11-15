@@ -260,10 +260,10 @@ class TestBackfill:
                 f"guild {guild.id} did not get its own install"
             )
 
-    async def test_an_operations_only_plugin_goes_to_the_operations_community(
+    async def test_an_operations_plugin_goes_to_the_operations_community(
         self, session: AsyncSession, mandatory_registration
     ):
-        mandatory_registration.operations_only = True
+        mandatory_registration.availability = "operations"
         session.add(mandatory_registration)
         await session.commit()
         guilds = []

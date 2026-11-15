@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict, Field
 
+from app.models.platform.plugin_service_registration import PluginAvailability
 from app.schemas.base import RawTextStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.services.import_engine.contract import EnvelopeImportResult
@@ -170,6 +171,9 @@ class MarketplaceListingSummary(SanitizedBaseModel):
     #: Set when the asking community cannot install it yet, and why. Absent on
     #: every surface that is not asked from a community.
     unavailable: ListingUnavailable | None = None
+    #: Its latest version declares itself beta: the owner picks the
+    #: communities that may use it.
+    beta: bool = False
     updated_at: datetime
 
 
@@ -394,6 +398,9 @@ def serialize_listing_summary(
         # Everything that has to be true for the install button to do anything:
         # still offered, has a version, and that version runs on this build.
         installable=bool(listing.available and version and version.compatible),
+        beta=latest is not None
+        and (latest.definition or {}).get("availability")
+        == PluginAvailability.beta.value,
         updated_at=listing.updated_at,
     )
 

@@ -1638,6 +1638,8 @@ class PluginServiceMessages:
     STATUS_IS_BILLINGS = "PLUGIN_SERVICE_STATUS_IS_BILLINGS"
     #: No install of that id in the community.
     INSTALL_NOT_FOUND = "PLUGIN_SERVICE_INSTALL_NOT_FOUND"
+    #: A list of communities for a plug-in that does not declare itself beta.
+    NOT_BETA = "PLUGIN_SERVICE_NOT_BETA"
     #: A vendor value that is too long, or not the address its field asks for.
     INVALID_VENDOR_VALUE = "PLUGIN_SERVICE_INVALID_VENDOR_VALUE"
     #: The plug-in's listing declares no vendor setup flow this build runs.

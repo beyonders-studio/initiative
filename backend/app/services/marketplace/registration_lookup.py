@@ -18,9 +18,9 @@ Whether a registration is live is computed by the database with the one rule
 in :func:`~app.models.platform.plugin_service_registration.registration_live_sql`,
 the same one the install standing asks, and carried on the snapshot. Whether
 it is live in one community also asks the plug-in's state there
-(:meth:`RegistrationSnapshot.state_in`): whether it is limited to the
-operations community, and the installs whose status or suspension the
-snapshot carries beside it.
+(:meth:`RegistrationSnapshot.state_in`): whether the community is in its
+reach, and the installs whose status or suspension the snapshot carries
+beside it.
 """
 
 from __future__ import annotations
@@ -46,9 +46,12 @@ from app.models.platform.plugin_install import (
     PluginState,
 )
 from app.models.platform.plugin_service_registration import (
+    PluginAvailability,
+    PluginBetaCommunity,
     PluginServiceRegistration,
     RegistrationKind,
     browser_base,
+    reach,
     registration_live_sql,
 )
 from app.models.platform.publisher import Publisher
@@ -125,10 +128,12 @@ class RegistrationSnapshot:
     #: Initiative makes this plug-in's calls itself, from its manifest; it has no
     #: location and no keys.
     declarative: bool = False
-    #: The plug-in is for the deployment's operations community alone.
-    operations_only: bool = False
+    #: Which communities it reaches (:class:`PluginAvailability`).
+    availability: str = PluginAvailability.none.value
     #: The deployment's operations community when the snapshot was loaded.
     operations_guild_id: int | None = None
+    #: The communities the owner picked, for a beta plug-in.
+    beta_communities: frozenset[int] = frozenset()
     #: The state of each install of its listing that is not plain active, by
     #: community: its status, or ``suspended`` where staff suspended it.
     install_states: Mapping[int, PluginState] = MappingProxyType({})
@@ -138,13 +143,23 @@ class RegistrationSnapshot:
         """The base to build an address a browser will be sent to."""
         return browser_base(self)
 
+    @property
+    def reach(self) -> frozenset[int] | None:
+        """The communities it reaches, ``None`` for every one."""
+        return reach(
+            self.availability,
+            operations_guild_id=self.operations_guild_id,
+            beta=self.beta_communities,
+        )
+
     def suspends(self, guild_id: int | None) -> bool:
         """Whether the registration itself suspends the plug-in in community
-        ``guild_id``: the owner suspended it, or it is limited to the
-        operations community and that is another one (or none is named)."""
+        ``guild_id``: the owner suspended it, or the community is out of its
+        reach (or none is named while it has one)."""
+        communities = self.reach
         return self.suspended or (
-            self.operations_only
-            and (guild_id is None or guild_id != self.operations_guild_id)
+            communities is not None
+            and (guild_id is None or guild_id not in communities)
         )
 
     def state_in(self, guild_id: int | None) -> PluginState:
@@ -225,7 +240,8 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
     the install standing's few columns, so this is the reader everything else
     shares. One statement joins each registration to its publisher and its
     listing, and reads the operations community beside it; a second reads the
-    installs that are not plain active.
+    installs that are not plain active, and a third each beta registration's
+    list.
     """
     from app.services.marketplace.catalog import REGISTRY_SOURCE
     from app.services.marketplace.tuf_registry import configured_root_is_builtin
@@ -276,6 +292,25 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
                 )
             )
         ).all()
+        picked = (
+            await session.exec(
+                select(
+                    PluginBetaCommunity.listing_uid, PluginBetaCommunity.community_id
+                )
+                .join(
+                    PluginServiceRegistration,
+                    PluginServiceRegistration.listing_uid
+                    == PluginBetaCommunity.listing_uid,
+                )
+                .where(
+                    PluginServiceRegistration.availability
+                    == PluginAvailability.beta.value
+                )
+            )
+        ).all()
+    beta: dict[str, set[int]] = {}
+    for listing_uid, community_id in picked:
+        beta.setdefault(listing_uid, set()).add(community_id)
     states: dict[str, dict[int, PluginState]] = {}
     for listing_uid, guild_id, status, suspended_at in held:
         states.setdefault(listing_uid, {})[guild_id] = (
@@ -299,8 +334,9 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
             scope_ceiling=tuple(sorted(row.scope_ceiling or [])),
             jwks_uri=row.jwks_uri,
             declarative=row.kind == RegistrationKind.DECLARATIVE,
-            operations_only=row.operations_only,
+            availability=row.availability,
             operations_guild_id=operations_guild_id,
+            beta_communities=frozenset(beta.get(row.listing_uid or "", ())),
             install_states=MappingProxyType(states.get(row.listing_uid or "", {})),
         )
         for row, live, operations_guild_id, signed, source in rows

@@ -126,6 +126,15 @@
       "pattern": "^[0-9]+\\.[0-9]+$",
       "description": "The oldest plug-in API contract this plug-in needs, as 'MAJOR.MINOR': '4.1'. The contract is the plug-in API published with initiative-plugin-sdk, versioned as that package is. A deployment serving contract S can run it when S has the same major version and a minor version at least this one's. Absent: any contract; the plug-in makes no claim. Beside a listing's min_app_version, the oldest Initiative release it runs on, this says what the plug-in calls rather than which release serves it."
     },
+    "availability": {
+      "enum": [
+        "beta",
+        "none",
+        "operations"
+      ],
+      "default": "none",
+      "description": "Which communities may use this version of the plug-in: 'none', every community; 'beta', only the communities the deployment's owner picks; 'operations', only the deployment's operations community. Absent: 'none'. Declared per version, as every field here is: a release that leaves it out declares 'none'."
+    },
     "hosts": {
       "type": "array",
       "minItems": 1,

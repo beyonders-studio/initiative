@@ -384,22 +384,33 @@ async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:
 # --- an install's state ---------------------------------------------------------
 
 
-async def suspension_moved(session: AsyncSession, listing_uid: str) -> None:
+async def suspension_moved(
+    session: AsyncSession,
+    listing_uid: str,
+    guild_ids: Collection[int] | None = None,
+) -> None:
     """The registration of ``listing_uid`` was suspended or lifted on
-    ``session``, the system engine's: billing is told each of its installs as
-    it now stands, and each community's hooks are armed once it commits, so a
-    plug-in lifted hears its state and what waited for it."""
-    guild_ids = (
+    ``session``, the system engine's, everywhere or in the communities
+    ``guild_ids`` names (its reach moved there): billing is told each of its
+    installs there as it now stands, and each community's hooks are armed
+    once it commits, so a plug-in lifted hears its state and what waited for
+    it."""
+    told = (
         await session.exec(
             text(
                 "SELECT guild_id, public.billing_plugin_status(guild_id, install_id)"
                 " FROM public.plugin_installs WHERE listing_uid = :uid"
+                " AND (CAST(:guilds AS integer[]) IS NULL"
+                " OR guild_id = ANY(CAST(:guilds AS integer[])))"
             ),
-            params={"uid": listing_uid},
+            params={
+                "uid": listing_uid,
+                "guilds": None if guild_ids is None else sorted(guild_ids),
+            },
         )
     ).all()
     community_hooks.status_changed(
-        session, *sorted({int(row.guild_id) for row in guild_ids})
+        session, *sorted({int(row.guild_id) for row in told})
     )
 
 
