@@ -1475,6 +1475,20 @@ async def _require_community(session: Any, guild_id: int) -> Guild:
     return guild
 
 
+async def _require_plugin(session: Any, guild_id: int, install_id: int) -> Guild:
+    """The community, which has the plug-in ``install_id`` names, or a 404:
+    a tool instance is not a plug-in with a state."""
+    guild = await _require_community(session, guild_id)
+    if not await plugin_installs_service.community_installs(
+        session, guild_id, install_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=PluginServiceMessages.INSTALL_NOT_FOUND,
+        )
+    return guild
+
+
 async def _one_plugin(
     session: Any, guild_id: int, install_id: int, actor: User
 ) -> CommunityPluginStateRead:
@@ -1534,7 +1548,7 @@ async def set_community_plugin_suspension(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_SUSPENSION_NEEDS_GRANT,
         )
-    guild = await _require_community(session, guild_id)
+    guild = await _require_plugin(session, guild_id, install_id)
     grant = await access_grants_service.get_live_grant(
         session, user_id=moderator.id, guild_id=guild_id
     )
@@ -1579,7 +1593,7 @@ async def set_community_plugin_status(
             status_code=status.HTTP_409_CONFLICT,
             detail=PluginServiceMessages.STATUS_IS_BILLINGS,
         )
-    await _require_community(session, guild_id)
+    await _require_plugin(session, guild_id, install_id)
     await plugin_installs_service.set_status(
         session,
         guild_id=guild_id,

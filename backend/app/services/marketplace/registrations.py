@@ -616,11 +616,9 @@ async def update_registration(
     ``base_url`` moves is checked against the new origin. ``shared_routes``
     is written to the registration's installs in the install index in the same
     transaction, and turning it off is refused (409) while a vendor
-    installation routes to more than one community. A suspension, or its
-    lift, is told to billing for each install
-    (:func:`~app.services.marketplace.plugin_installs.suspension_moved`), and
-    so is each install a new beta list moves in or out of reach. A list for a
-    plug-in that is not beta is refused (409), and so is one naming a
+    installation routes to more than one community. A suspension, its lift,
+    or a new beta list is told for each install (:func:`reach_moved`). A list
+    for a plug-in that is not beta is refused (409), and so is one naming a
     community that does not exist (400).
     """
     row = await get_registration(session, registration_id)
@@ -640,6 +638,7 @@ async def update_registration(
                 GuildMessages.COMMUNITY_NOT_FOUND, "no such community on the list"
             )
     before = audit_service.snapshot(row, AUDITED_FIELDS)
+    was_suspended, was_reach = row.suspended_at is not None, await _reach(session, row)
     placement = (base_url, page_origin, allowed_origins, jwks, jwks_uri)
     if row.kind == RegistrationKind.DECLARATIVE and any(
         value is not None for value in placement
@@ -660,10 +659,7 @@ async def update_registration(
         row.mandatory = mandatory
     if shared_routes is not None:
         row.shared_routes = shared_routes
-    suspension_moved = suspended is not None and suspended != (
-        row.suspended_at is not None
-    )
-    if suspension_moved:
+    if suspended is not None and suspended != was_suspended:
         row.suspended_at = utcnow() if suspended else None
         row.suspended_by = actor_user_id if suspended else None
     vendor_changed = await _apply_vendor(session, row, vendor_values)
@@ -673,9 +669,6 @@ async def update_registration(
     session.add(row)
     if shared_routes is not None and row.listing_uid:
         await _write_exclusive(session, row)
-    if suspension_moved and row.listing_uid:
-        await session.flush()
-        await plugin_installs.suspension_moved(session, row.listing_uid)
     changed = audit_service.changed_fields(
         before, audit_service.snapshot(row, AUDITED_FIELDS)
     )
@@ -710,7 +703,7 @@ async def update_registration(
                     "removed": removed,
                 },
             }
-            await _reach_moved(session, row, frozenset(was))
+    await reach_moved(session, row, was_suspended, was_reach)
     if changed["changed"] or vendor_changed or "beta_communities" in changed:
         await audit_service.record(
             session,
@@ -1224,7 +1217,7 @@ async def apply_listing_registration(
     session.add(row)
     await session.flush()
     if not created:
-        await _reach_moved(session, row, was)
+        await reach_moved(session, row, row.suspended_at is not None, was)
     await audit_service.record(
         session,
         event_type=(
@@ -1275,31 +1268,55 @@ async def _reach(
     )
 
 
-async def _reach_moved(
-    session: AsyncSession, row: PluginServiceRegistration, was: frozenset[int] | None
+async def reach_moved(
+    session: AsyncSession,
+    row: PluginServiceRegistration,
+    was_suspended: bool,
+    was_reach: frozenset[int] | None,
 ) -> None:
-    """Tell billing and the plug-in of each install of ``row`` whose
-    community its reach moved in or out of since it was ``was``, where nothing
-    else suspends it."""
+    """Tell each install of ``row`` where it now stands, when its suspension
+    or its reach moved since it was ``was_suspended`` and reached
+    ``was_reach`` (``None`` for every community).
+
+    Each install the registration no longer suspends is stamped as back from
+    a suspension. Billing is told every install when the suspension moved,
+    and, when only the reach did, each install whose state there flipped,
+    where staff have not suspended it.
+    """
     await session.flush()
-    now = await _reach(session, row)
-    if now == was or row.listing_uid is None or row.suspended_at is not None:
+    suspended, now = row.suspended_at is not None, await _reach(session, row)
+    if row.listing_uid is None or (suspended, now) == (was_suspended, was_reach):
         return
-    installed = (
+
+    def out(by_owner: bool, communities: frozenset[int] | None, guild_id: int) -> bool:
+        return by_owner or (communities is not None and guild_id not in communities)
+
+    installs = (
         await session.exec(
-            select(PluginInstall.guild_id).where(
-                PluginInstall.listing_uid == row.listing_uid,
-                col(PluginInstall.suspended_at).is_(None),
+            select(PluginInstall.guild_id, PluginInstall.suspended_at).where(
+                PluginInstall.listing_uid == row.listing_uid
             )
         )
     ).all()
-    moved = {
+    resumed = {
         guild_id
-        for guild_id in installed
-        if (was is None or guild_id in was) != (now is None or guild_id in now)
+        for guild_id, _ in installs
+        if out(was_suspended, was_reach, guild_id) and not out(suspended, now, guild_id)
     }
-    if moved:
-        await plugin_installs.suspension_moved(session, row.listing_uid, moved)
+    told = (
+        None
+        if suspended != was_suspended
+        else {
+            guild_id
+            for guild_id, by_staff in installs
+            if by_staff is None
+            and out(was_suspended, was_reach, guild_id) != out(suspended, now, guild_id)
+        }
+    )
+    if told is None or told or resumed:
+        await plugin_installs.suspension_moved(
+            session, row.listing_uid, told, resumed=resumed
+        )
 
 
 # --- boot reconciliation -----------------------------------------------------

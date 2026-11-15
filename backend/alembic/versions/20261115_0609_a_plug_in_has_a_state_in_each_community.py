@@ -6,8 +6,10 @@
   ``suspended_at`` where it read ``enabled``.
 - ``plugin_installs`` gains each install's ``status`` (``active``,
   ``read_only``, ``on_hold``, ``deleted``) and when it last moved, whether
-  staff suspended it there and who did, and the status its plug-in was last
-  told (``plugin_status_sent``). Every install starts ``active``.
+  staff suspended it there and who did, when it was last back from a
+  suspension (``resumed_at``: what happened before is never sent), and the
+  status its plug-in was last told (``plugin_status_sent``). Every install
+  starts ``active``.
 - The install floor reads its own install's row: a column grant here, and a
   policy rendered from the shared-table registry at boot. Billing's role reads
   and writes the statuses of the community it is routed to, the same way.
@@ -235,6 +237,7 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="SET NULL"),
             nullable=True,
         ),
+        sa.Column("resumed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("plugin_status_sent", sa.Text(), nullable=True),
     ):
         op.add_column(INSTALLS, column)
@@ -299,6 +302,7 @@ def downgrade() -> None:
     )
     for column in (
         "plugin_status_sent",
+        "resumed_at",
         "suspended_by",
         "suspended_at",
         "status_changed_at",

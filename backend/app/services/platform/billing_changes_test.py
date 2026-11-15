@@ -17,6 +17,7 @@ Pinned:
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from sqlalchemy import text
@@ -224,7 +225,7 @@ async def test_a_beta_list_that_moves_is_told_for_each_install_it_moves(
 ):
     """Replacing a beta plug-in's list, and its leaving beta, writes
     ``plugin.status`` for each install whose reach moved, where nothing else
-    suspends it."""
+    suspends it; each brought back in is stamped as back from a suspension."""
     from app.services.marketplace import registrations
 
     listing_uid = "BETAMOVES00001"
@@ -255,6 +256,7 @@ async def test_a_beta_list_that_moves_is_told_for_each_install_it_moves(
         await registrations.update_registration(
             session, registration_id, beta_community_ids=[picked, staffed]
         )
+        picked_resumed = await _resumed_at(session, listing_uid)
         await registrations.apply_listing_registration(
             session,
             registrations.ListingRegistration(
@@ -267,17 +269,78 @@ async def test_a_beta_list_that_moves_is_told_for_each_install_it_moves(
             ),
         )
         await session.commit()
-        told = [
-            [
-                data["suspended"]
-                for _kind, data in await change_rows(
-                    session, guild_id, kinds=("plugin.status",)
-                )
-            ]
-            for guild_id in guild_ids
-        ]
+        told = await _told(session, guild_ids)
 
     assert told == [[True, False], [False], []]
+    assert picked_resumed[picked] is not None and picked_resumed[dropped] is None
+    assert (await _resumed_at(session, listing_uid))[dropped] is not None
+
+
+async def test_the_operations_community_moving_is_told_for_each_install(
+    session: AsyncSession,
+):
+    """A plug-in for the operations community follows the choice: the install
+    brought into reach is told and stamped as back from a suspension; the one
+    still out of reach is not told again."""
+    from app.services.platform.intake_setup import set_operations_guild
+
+    listing_uid = "OPERATIONSONLY"
+    await create_plugin_service_registration(
+        session,
+        public_id="tests.reach",
+        listing_uid=listing_uid,
+        availability="operations",
+    )
+    owner = await create_user(session)
+    guilds = [await create_guild(session, creator=owner) for _ in range(2)]
+    guild_ids = [guild.id for guild in guilds]
+    for guild in guilds:
+        await create_guild_plugin(
+            session,
+            guild,
+            owner,
+            definition={"plugin_kind": "service"},
+            listing_uid=listing_uid,
+        )
+
+    async with billing_manages_plans(session):
+        await set_operations_guild(session, guild_ids[0])
+        told = await _told(session, guild_ids)
+    resumed = await _resumed_at(session, listing_uid)
+    await set_operations_guild(session, None)
+
+    assert told == [[False], []]
+    assert resumed[guild_ids[0]] is not None
+    assert resumed[guild_ids[1]] is None
+
+
+async def _told(session: AsyncSession, guild_ids: list[int]) -> list[list[bool]]:
+    """Whether each community's ``plugin.status`` rows said suspended."""
+    return [
+        [
+            data["suspended"]
+            for _kind, data in await change_rows(
+                session, guild_id, kinds=("plugin.status",)
+            )
+        ]
+        for guild_id in guild_ids
+    ]
+
+
+async def _resumed_at(session: AsyncSession, listing_uid: str) -> dict[int, Any]:
+    """When each install of ``listing_uid`` was last back from a suspension."""
+    from app.models.platform.plugin_install import PluginInstall
+
+    session.expire_all()
+    return dict(
+        (
+            await session.exec(
+                select(PluginInstall.guild_id, PluginInstall.resumed_at).where(
+                    PluginInstall.listing_uid == listing_uid
+                )
+            )
+        ).all()
+    )
 
 
 async def test_stored_bytes_are_reported_as_a_total(session: AsyncSession, monkeypatch):

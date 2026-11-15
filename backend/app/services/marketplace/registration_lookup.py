@@ -208,6 +208,9 @@ def _parse_keys(row: PluginServiceRegistration) -> Mapping[str, Any]:
 
 _cache: dict[str, RegistrationSnapshot] | None = None
 _loaded_at: float = 0.0
+#: The installs that are not plain active, by listing and community, loaded
+#: with the snapshot: an install keeps its state with no registration behind it.
+_install_states: Mapping[str, Mapping[int, PluginState]] = MappingProxyType({})
 
 
 def invalidate_registrations() -> None:
@@ -246,7 +249,7 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
     from app.services.marketplace.catalog import REGISTRY_SOURCE
     from app.services.marketplace.tuf_registry import configured_root_is_builtin
 
-    global _cache, _loaded_at
+    global _cache, _loaded_at, _install_states
     if (
         not force
         and _cache is not None
@@ -342,6 +345,7 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
         for row, live, operations_guild_id, signed, source in rows
     }
     _cache = snapshots
+    _install_states = MappingProxyType(states)
     _loaded_at = time.monotonic()
     return snapshots
 
@@ -475,15 +479,25 @@ async def install_state(
     is neither mandatory nor available in it.
 
     A plug-in with no service behind it — a tool instance — is always
-    available and never mandatory: there is no registration for it to depend on.
+    available and never mandatory, and has no state: there is no registration
+    for it to depend on. A service with no registration here keeps the state
+    staff gave its install.
     """
     if not _has_registration(definition):
         return InstallState()
     snapshot = await registration_for_definition(definition, listing_uid=listing_uid)
     if snapshot is None:
         # Installed here, but this deployment has not wired the service up (or
-        # no longer does). Nothing it offers can be reached.
-        return InstallState(mandatory=False, available=False)
+        # no longer does). Nothing it offers can be reached, and the state
+        # staff gave the install still holds.
+        held = (
+            _install_states.get(listing_uid or "", {}).get(guild_id)
+            if guild_id is not None
+            else None
+        )
+        return InstallState(
+            mandatory=False, available=False, state=held or PluginState.active
+        )
     return InstallState(
         mandatory=snapshot.mandatory and snapshot.serves(guild_id),
         available=snapshot.live_in(guild_id),

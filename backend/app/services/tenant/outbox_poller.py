@@ -83,10 +83,12 @@ from app.core.plugin_scopes import (
     expand,
     plugin_scope_target,
 )
+from app.db import session as db_session
 from app.db.request_context import SystemGuild, SystemMaintenance
 from app.db.session import (
     set_rls_context,
 )
+from app.models.platform.plugin_install import PluginInstall
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
@@ -142,6 +144,9 @@ class InstallReach:
     #: Whether the seat's grant holds the community-admin standing, which the
     #: demo's events need.
     administers: bool = False
+    #: When the install was last back from a suspension: nothing that
+    #: happened before it is heard.
+    resumed_at: datetime | None = None
 
     @classmethod
     def from_row(
@@ -150,6 +155,7 @@ class InstallReach:
         live: bool | None,
         placed: Iterable[int] | None,
         granted_scopes: Iterable[str] | None,
+        resumed_at: datetime | None = None,
     ) -> InstallReach:
         readable: set[str] = set()
         plugins: set[str] = set()
@@ -171,7 +177,14 @@ class InstallReach:
             plugins=frozenset(plugins),
             administers=LEVEL_SCOPES[InstallLevel.community_admin]
             in (granted_scopes or ()),
+            resumed_at=resumed_at,
         )
+
+    def heard(self, occurred_at: datetime) -> bool:
+        """Whether something that happened at ``occurred_at`` may be heard:
+        the install is live, and it happened since it was last back from a
+        suspension."""
+        return self.live and (self.resumed_at is None or occurred_at >= self.resumed_at)
 
     def hears_plugin(self, emitter: str, initiative_id: int | None) -> bool:
         """Whether it may hear an event ``emitter`` emitted about
@@ -187,8 +200,9 @@ class InstallReach:
 def _within_reach(row: EventOutbox, reach: InstallReach) -> bool:
     """Whether an installed plug-in may hear about this change now: it is live,
     placed in the change's initiative (or the change belongs to none), and
-    holds the read scope of what changed."""
-    if not reach.live:
+    holds the read scope of what changed. What happened while it was
+    suspended is never heard."""
+    if not reach.heard(row.occurred_at):
         return False
     if row.initiative_id is not None and row.initiative_id not in reach.placed:
         return False
@@ -257,7 +271,9 @@ def _matches_plugin_event(
         if lands_in != subscription.initiative_id:
             return False
     return subscription.plugin_install_id is None or (
-        reach is not None and reach.hears_plugin(emitter, lands_in)
+        reach is not None
+        and reach.hears_plugin(emitter, lands_in)
+        and reach.heard(event.occurred_at)
     )
 
 
@@ -273,7 +289,7 @@ def _matches_demo_event(
         event.event_type in subscription.event_types
         and subscription.plugin_install_id == event.install_id
         and reach is not None
-        and reach.live
+        and reach.heard(event.occurred_at)
         and reach.administers
     )
 
@@ -756,6 +772,18 @@ async def drain_guild(
     live_listings = [
         r.listing_uid for r in registrations if r.listing_uid and r.live_in(guild_id)
     ]
+    # When each install was last back from a suspension, from the install index.
+    async with db_session.SystemSessionLocal() as system_session:
+        resumed = dict(
+            (
+                await system_session.exec(
+                    select(PluginInstall.install_id, PluginInstall.resumed_at).where(
+                        PluginInstall.guild_id == guild_id,
+                        col(PluginInstall.resumed_at).is_not(None),
+                    )
+                )
+            ).all()
+        )
     await set_rls_context(session, SystemGuild(guild_id))
     # Ids, not instances: each pass ends by expunging the identity map (ids
     # repeat across guild schemas), and an instance held across that is detached.
@@ -765,7 +793,10 @@ async def drain_guild(
             None
             if row.plugin_install_id is None
             else InstallReach.from_row(
-                live=row.live, placed=row.placed, granted_scopes=row.granted_scopes
+                live=row.live,
+                placed=row.placed,
+                granted_scopes=row.granted_scopes,
+                resumed_at=resumed.get(row.plugin_install_id),
             ),
             None
             if row.plugin_install_id is None

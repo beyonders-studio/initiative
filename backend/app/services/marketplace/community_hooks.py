@@ -93,9 +93,9 @@ installed plug-in within a day.
 **A plug-in's state decides what it is sent.** Where it is suspended, by the
 owner, by staff or by being out of reach, nothing is sent and nothing is
 written for it: its queue waits untouched, no attempt spent, and goes once the
-suspension lifts. On hold or deleted, it is sent only :data:`LIFECYCLE_HOOKS`;
-anything else is not reachable, as for a plug-in that is not live. Only an
-active or read-only plug-in is told the community's status.
+suspension lifts. On hold or deleted, it is sent only :data:`LIFECYCLE_HOOKS`,
+and the rest wait the same way without holding those back (:func:`_parked`).
+Only an active or read-only plug-in is told the community's status.
 """
 
 from __future__ import annotations
@@ -103,7 +103,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -461,6 +461,26 @@ async def _tell_status(session: AsyncSession, guild_id: int, now: datetime) -> N
         await session.exec(insert(_TABLE).values(rows))
 
 
+async def _parked(guild_id: int) -> Callable[[str, str], bool]:
+    """Which hooks wait in the community, untouched and no attempt spent,
+    asked as ``parked(public_id, hook)``: every hook to a plug-in suspended
+    there, and all but :data:`LIFECYCLE_HOOKS` to one on hold or deleted
+    there. The hooks behind them go meanwhile; the parked ones go once the
+    state allows them."""
+    snapshots = await registration_lookup.load_registrations()
+
+    def parked(public_id: str, hook: str) -> bool:
+        snapshot = snapshots.get(public_id)
+        if snapshot is None:
+            return False
+        state = snapshot.state_in(guild_id)
+        if state in SERVING_STATES:
+            return False
+        return state is PluginState.suspended or hook not in LIFECYCLE_HOOKS
+
+    return parked
+
+
 async def _suspended_here(guild_id: int) -> frozenset[str]:
     """The plug-ins suspended in the community. Their hooks wait, untouched,
     until the suspension lifts."""
@@ -749,7 +769,9 @@ async def _claim_head(guild_id: int, public_id: str) -> PluginCommunityHook | No
 
     State hooks a newer one of their kind supersedes are settled first,
     whether or not they are due, so a send that failed never holds the current
-    state back. A hook sent at once whose sender died is settled ``lapsed``."""
+    state back. A hook sent at once whose sender died is settled ``lapsed``.
+    The next is the first one the plug-in's state there allows (:func:`_parked`)."""
+    parked = await _parked(guild_id)
     now = datetime.now(UTC)
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
@@ -783,7 +805,11 @@ async def _claim_head(guild_id: int, public_id: str) -> PluginCommunityHook | No
                 .where(_TABLE.c.id.in_(lapsed))
                 .values(done_at=now, outcome="lapsed", claimed_until=None)
             )
-        rest = [row for row in rest if row.id not in lapsed]
+        rest = [
+            row
+            for row in rest
+            if row.id not in lapsed and not parked(public_id, row.hook)
+        ]
         if not rest or rest[0].next_attempt_at > now:
             await session.commit()
             return None
@@ -1019,9 +1045,10 @@ async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
     """When the community next has hook work: each plug-in's first hook still
     to send (now, if one of its state hooks is waiting to be superseded), or an
     answered row coming past its keeping. A hook queued behind one waiting
-    out a retry is not counted: it goes once that one does, nor is one for a
-    plug-in suspended there: lifting the suspension arms the timer."""
-    held = await _suspended_here(guild_id)
+    out a retry is not counted: it goes once that one does, nor is one parked
+    by its plug-in's state there (:func:`_parked`): a change of state arms the
+    timer."""
+    parked = await _parked(guild_id)
     rows = (
         await session.exec(
             select(PluginCommunityHook)
@@ -1034,12 +1061,12 @@ async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
     ).all()
     by_plugin: dict[str, list[PluginCommunityHook]] = {}
     for row in rows:
-        if row.public_id not in held:
-            by_plugin.setdefault(row.public_id, []).append(row)
+        by_plugin.setdefault(row.public_id, []).append(row)
     due: list[datetime] = []
     now = datetime.now(UTC)
     for queue in by_plugin.values():
         stale, rest = _effective(queue)
+        rest = [row for row in rest if not parked(row.public_id, row.hook)]
         held = [row.claimed_until for row in queue if _live(row, now)]
         if held:
             # Its sender settles it; asked again if the claim lapses first.
@@ -1063,9 +1090,9 @@ async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
 
 async def visit(_routed: AsyncSession, guild_id: int) -> datetime | None:
     """The ``plugin_hooks`` sweep's visit: tell installed plug-ins a status they
-    have not been told, send the community's due hooks to every plug-in not
-    suspended there, delete answered ones past their keeping, and answer when
-    there is next work.
+    have not been told, send the community's due hooks their plug-ins' states
+    allow, delete answered ones past their keeping, and answer when there is
+    next work.
 
     The rows are ``public``'s and kept by the system engine, so they are read
     and written on short system sessions of the visit's own, and the
@@ -1097,14 +1124,9 @@ async def visit(_routed: AsyncSession, guild_id: int) -> datetime | None:
             )
         ).all()
         await session.commit()
-    held = await _suspended_here(guild_id)
     limit = asyncio.Semaphore(SENDS_AT_ONCE)
     await asyncio.gather(
-        *(
-            _deliver_plugin(guild_id, str(public_id), limit)
-            for public_id in plugins
-            if public_id not in held
-        )
+        *(_deliver_plugin(guild_id, str(public_id), limit) for public_id in plugins)
     )
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
