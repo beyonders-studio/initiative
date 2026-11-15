@@ -281,63 +281,33 @@
   "download": {
     "title": "Descarga",
     "titleHighlight": "Initiative",
-    "description": "Funciona en el navegador, y usarlo así para siempre es una decisión perfectamente respetable. Pero también puede tener su propio icono y su propia ventana.",
-    "detected": "Parece que usas {{platform}}",
-    "platformAndroid": "Android",
-    "platformIos": "un iPhone o iPad",
-    "platformDesktop": "un ordenador",
-    "androidTitle": "Initiative para Android",
-    "androidBody": "Se instala como cualquier otra cosa, sin tienda de apps.",
-    "iosTitle": "Initiative para iPhone y iPad",
-    "iosBody": "Toca Compartir y luego Añadir a la pantalla de inicio. Es el mismo Initiative, pero los iPhone todavía no reciben notificaciones push.",
-    "desktopTitle": "Initiative para tu ordenador",
-    "desktopBody": "Su propia ventana y su propio icono en el dock o la barra de tareas, con la sesión iniciada como uno de tus dispositivos.",
+    "description": "Lleva tus comunidades contigo. Disponible para Windows, Mac, Linux, Android, iPhone y iPad.",
     "androidButton": "Descargar para Android",
     "iosButton": "Añadir a tu iPhone",
     "windowsButton": "Descargar para Windows",
     "macButton": "Descargar para Mac",
     "linuxButton": "Descargar para Linux",
     "desktopButton": "Descargar para tu ordenador",
-    "version": "Versión {{version}}, la que usa este servidor",
     "releases": "Ver todas las versiones",
-    "desktopMeta": "Windows, Mac y Linux",
-    "browserInstall": "O instálalo desde el navegador",
-    "cardsAria": "Todas las formas de conseguir Initiative",
-    "android": {
-      "title": "Android",
-      "sub": "Móviles y tabletas",
-      "body": "Deja que <1>Obtainium</1> lo mantenga actualizado por ti.",
-      "button": "Descargar APK",
-      "bodyPush": "Con notificaciones push. O deja que <1>Obtainium</1> lo mantenga actualizado por ti."
+    "os": {
+      "windows": "Windows",
+      "mac": "Mac",
+      "linux": "Linux",
+      "android": "Android",
+      "ios": "iPhone y iPad"
     },
-    "ios": {
-      "title": "iPhone y iPad",
-      "sub": "Desde Safari",
-      "step1": "Abre esta página en Safari",
-      "step2": "Toca el botón Compartir",
-      "step3": "Toca Añadir a la pantalla de inicio",
-      "button": "Enséñamelo"
+    "screensAlt": "El tablero de tareas de un proyecto en Initiative en un ordenador, con el mismo tablero en un móvil delante",
+    "computer": {
+      "title": "Descárgalo para tu ordenador",
+      "body": "Entérate en cuanto algo te necesita, aunque Initiative esté escondido detrás de tus otras ventanas."
     },
-    "desktop": {
-      "title": "Ordenador",
-      "sub": "Windows, Mac, Linux",
-      "body": "Un instalador para Windows, Mac o Linux. Chrome y Edge también lo instalan directamente desde el navegador, y Safari desde Archivo y luego Añadir al Dock."
-    },
-    "browser": {
-      "title": "Navegador",
-      "sub": "Cualquier cosa con pantalla",
-      "body": "Nada que instalar, solo guárdalo en favoritos.",
-      "button": "Abrir en el navegador"
-    },
-    "factsAria": "Bueno saberlo",
-    "updatesTitle": "Las actualizaciones se instalan solas",
-    "updatesBody": "Initiative se mantiene al día solo, así que no tendrás que volver aquí.",
-    "accountTitle": "Una cuenta, todos los dispositivos",
-    "accountBody": "Inicia sesión en el móvil, el portátil o el ordenador de la biblioteca y todo está ahí.",
-    "passkeysTitle": "Llaves de acceso bienvenidas",
-    "passkeysBody": "Inicia sesión con una llave de acceso si prefieres no escribir una contraseña.",
-    "descriptionPush": "Funciona en el navegador, y usarlo así para siempre es una decisión perfectamente respetable. Pero también puede tener su propio icono, su propia ventana y, en Android, notificaciones que llegan aunque no estés mirando.",
-    "androidBodyPush": "Se instala como cualquier otra cosa, con notificaciones push y sin tienda de apps."
+    "phone": {
+      "title": "Descárgalo para tu móvil",
+      "body": "Echa un vistazo a tus comunidades desde el sofá o desde la última fila del ensayo.",
+      "bodyPush": "Echa un vistazo a tus comunidades desde el sofá o desde la última fila del ensayo, y en Android te avisa cuando algo te necesita.",
+      "obtainium": "O deja que <1>Obtainium</1> lo mantenga actualizado por ti.",
+      "iosHow": "En Safari, toca Compartir y luego Añadir a pantalla de inicio."
+    }
   },
   "pricing": {
     "sectionLabel": "Planes",
