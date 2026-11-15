@@ -99,6 +99,10 @@ RUN apt-get update \
          exit 1; \
        fi \
     && rm -rf /var/lib/apt/lists/*
+# The base image's pip goes for the same reason uv never arrives (below):
+# nothing here installs a package, and its vendored libraries would ship
+# with the application unused.
+RUN python -m pip uninstall --yes --disable-pip-version-check --root-user-action=ignore pip
 # uv is a build-time tool: it synced the venv in backend-deps and is never
 # invoked again — entrypoint.sh and start.sh run everything out of
 # /app/.venv/bin. Copying only /app keeps both binaries out of the image, and
