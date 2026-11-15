@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Screenshots for Help, feedback and reports.** The camera in the text box pictures the page and opens an editor to hide or number any part. Help and feedback hide people's names, avatars and contact details for you.
 - **Suggestions and a roadmap on Initiative Cloud.** The **Suggestions** page, in the site's header, lists what the team has written up from feedback, with a roadmap of what's coming. Sign in to vote, and hear each time one you voted for moves.
+- **Reload in the desktop app.** The title bar has a reload button beside Help, for a page that needs a fresh start.
 - **Drop a file on an import.** Importing a backup, another app's export, an .ics calendar or a registry bundle takes a file dropped on its box.
 - **The phone apps ask for a rating once.** After three days of use, the App Store or Google Play shows its prompt once, after you finish something; from Google Play, **Rate us on Google Play** is in your account menu. Needs the newest app.
 - **Plug-ins add community contacts.** With `contacts:write` on a token not limited to one initiative, a plug-in creates a contact with no `initiative_id`. It joins the community's contacts, held by the Community contacts plug-in and shared with every member.

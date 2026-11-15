@@ -3,6 +3,7 @@
   "aPlugin": "Un plug-in",
   "help": "Aide",
   "helpDraft": "Brouillon de la demande d'aide",
+  "reloadPage": "Recharger la page",
   "user": "Utilisateur",
   "userWithId": "Utilisateur n° {{id}}",
   "formerMember": "Ancien membre",

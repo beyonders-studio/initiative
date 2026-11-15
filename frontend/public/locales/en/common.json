@@ -3,6 +3,7 @@
   "aPlugin": "A plug-in",
   "help": "Help",
   "helpDraft": "Help request draft",
+  "reloadPage": "Reload page",
   "deletedUserName": "Deleted user #{{id}}",
   "user": "User",
   "userWithId": "User #{{id}}",
