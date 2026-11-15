@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A half-written help request is marked on Help.** A dot on the Help button, or on your account menu, replaces the pill that sat over the corner of the page.
 
+### Fixed
+
+- **Major Security fixes** A number of flagged high severity issues for installed packages have been resolved.
+
 ## [0.79.0] - 2026-11-13
 
 ### Added
