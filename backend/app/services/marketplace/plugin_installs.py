@@ -229,7 +229,8 @@ async def reindex_community(session: AsyncSession, guild_id: int) -> None:
 
     Each install is held while its row is written, as a connect holds it
     while it claims a route, so the row is written from the install as the
-    connect left it. The rows to drop are those the index held before the
+    connect left it: the install is locked first and its row after, the
+    order every path holding both takes them in. The rows to drop are those the index held before the
     installs were read and whose install is gone by then: an install made
     meanwhile is not among them.
     """
@@ -384,11 +385,52 @@ async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:
 # --- an install's state ---------------------------------------------------------
 
 
-async def suspension_moved(session: AsyncSession, listing_uid: str) -> None:
-    """The registration of ``listing_uid`` was suspended or lifted on
-    ``session``, the system engine's: billing is told each of its installs as
-    it now stands, and each community's hooks are armed once it commits, so a
-    plug-in lifted hears its state and what waited for it."""
+#: Stamp the installs of a listing that its registration suspended before,
+#: by the owner or by being out of reach, and no longer does, as back from a
+#: suspension.
+_RESUMED_SQL = text(
+    """
+UPDATE public.plugin_installs i
+   SET resumed_at = now()
+  FROM public.plugin_service_registrations r
+ WHERE i.listing_uid = :uid
+   AND r.listing_uid = i.listing_uid
+   AND (CAST(:was_suspended AS boolean)
+     OR (CAST(:was_operations_only AS boolean)
+       AND i.guild_id IS DISTINCT FROM CAST(:was_operations_guild AS integer)))
+   AND r.suspended_at IS NULL
+   AND (NOT r.operations_only OR i.guild_id = (
+       SELECT s.operations_guild_id FROM public.app_settings s WHERE s.id = 1))
+"""
+)
+
+
+async def suspension_moved(
+    session: AsyncSession,
+    listing_uid: str,
+    *,
+    was_suspended: bool = False,
+    was_operations_only: bool = False,
+    was_operations_guild: int | None = None,
+) -> None:
+    """The registration of ``listing_uid`` was suspended or lifted, or its
+    reach moved, on ``session``, the system engine's. ``was_*`` say what
+    suspended it before: its own suspension, and its limit to the operations
+    community then named.
+
+    Each install it no longer suspends is stamped as back from a suspension
+    (``resumed_at``), billing is told each of its installs as it now stands,
+    and each community's hooks are armed once it commits, so a plug-in lifted
+    hears its state and what waited for it."""
+    await session.exec(
+        _RESUMED_SQL,  # type: ignore[call-overload]
+        params={
+            "uid": listing_uid,
+            "was_suspended": was_suspended,
+            "was_operations_only": was_operations_only,
+            "was_operations_guild": was_operations_guild,
+        },
+    )
     guild_ids = (
         await session.exec(
             text(
@@ -416,10 +458,11 @@ class CommunityInstall:
 async def community_installs(
     session: AsyncSession, guild_id: int, install_id: int | None = None
 ) -> list[CommunityInstall]:
-    """The community's installs, or the one ``install_id`` names, with their
+    """The community's plug-ins, or the one ``install_id`` names, with their
     names and states, on the system engine's ``session``. The names are read
     in the community's own schema; the state from the row and the
-    registration's own suspension and reach."""
+    registration's own suspension and reach. A tool instance, one of this
+    build's tools mounted in the community, has no state and is left out."""
     query = select(PluginInstall).where(PluginInstall.guild_id == guild_id)
     if install_id is not None:
         query = query.where(PluginInstall.install_id == install_id)
@@ -428,9 +471,13 @@ async def community_installs(
         return []
     async with cohorts.system_session(guild_id) as system_session:
         await db_session.set_rls_context(system_session, SystemGuild(guild_id))
-        names = dict(
-            (await system_session.exec(select(GuildPlugin.id, GuildPlugin.name))).all()
-        )
+        installed = (
+            await system_session.exec(
+                select(GuildPlugin.id, GuildPlugin.name, GuildPlugin.plugin_kind)
+            )
+        ).all()
+    names = {row.id: row.name for row in installed}
+    tools = {row.id for row in installed if row.plugin_kind == "tool_instance"}
     registrations = {
         snapshot.listing_uid: snapshot
         for snapshot in (await load_registrations()).values()
@@ -451,6 +498,7 @@ async def community_installs(
             ),
         )
         for row in rows
+        if row.install_id not in tools
     ]
 
 
@@ -511,11 +559,13 @@ async def set_suspended(
 ) -> PluginInstall:
     """Suspend the community's install, or lift its suspension, on the system
     engine's ``session``. Its status is left as it is, and lifting returns the
-    install to it. The caller commits."""
+    install to it, stamped as back from a suspension. The caller commits."""
     row = await _locked(session, guild_id, install_id)
     if suspended != (row.suspended_at is not None):
         row.suspended_at = utcnow() if suspended else None
         row.suspended_by = actor_user_id if suspended else None
+        if not suspended:
+            row.resumed_at = utcnow()
         await _changed(
             session,
             row,

@@ -500,7 +500,7 @@ async def test_an_install_hears_nothing_once_its_reach_is_withdrawn(
 ):
     from app.db.install_standing_test import _install
     from app.services.tenant import outbox_poller as poller
-    from app.testing import create_file, set_install_state
+    from app.testing import create_file
 
     install = await _install(
         session, acting_user, role_session, granted=["files:read"], placed="a"
@@ -522,15 +522,37 @@ async def test_an_install_hears_nothing_once_its_reach_is_withdrawn(
     await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
     assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [before.id]
 
-    if what == "install_suspended":
-        # What changed while it was out is never sent, the lift included.
-        await set_install_state(
-            session, install.guild.id, install.plugin.id, suspended=False
-        )
-        session.expunge_all()
-        system.expunge_all()
-        await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
-        assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [before.id]
+
+async def test_what_changed_while_it_was_suspended_is_never_heard(
+    session: AsyncSession, role_session, acting_user, monkeypatch
+):
+    """Lifted before the poller came by, the change made while it was out is
+    still not sent; one made after the lift is."""
+    from app.db.install_standing_test import _install
+    from app.services.tenant import outbox_poller as poller
+    from app.testing import create_file, set_install_state
+
+    install = await _install(
+        session, acting_user, role_session, granted=["files:read"], placed="a"
+    )
+    await _install_subscribes(role_session, install, initiative_id=install.a.id)
+    sent = _collector(monkeypatch, poller)
+    system = await role_session("app_admin")
+
+    await set_install_state(
+        session, install.guild.id, install.plugin.id, suspended=True
+    )
+    session.expunge_all()
+    await create_file(session, install.a, install.seat.user)
+    await set_install_state(
+        session, install.guild.id, install.plugin.id, suspended=False
+    )
+    session.expunge_all()
+    after = await create_file(session, install.a, install.seat.user)
+    session.expunge_all()
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
+
+    assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [after.id]
 
 
 async def test_a_plugins_event_is_kept_until_the_subscriber_accepts_it(

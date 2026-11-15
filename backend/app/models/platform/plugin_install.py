@@ -175,6 +175,12 @@ class PluginInstall(SQLModel, table=True):
             Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
         ),
     )
+    #: When the plug-in was last back in the community from a suspension, by
+    #: staff, the owner or its reach: what happened there before is never
+    #: sent to it.
+    resumed_at: datetime | None = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
     #: The status its plug-in was last told, by the ``plugin_status`` hook;
     #: compared with ``status`` as ``community_status_sent`` is with the
     #: community's. Unset reads as told ``active``, which an install starts as.

@@ -218,6 +218,63 @@ async def test_a_plugin_suspended_everywhere_is_told_for_each_install(
     ]
 
 
+async def test_a_plugins_reach_moving_is_told_for_each_install(
+    session: AsyncSession,
+):
+    """Limited to the operations community, and that community named, each
+    install is told whether it is now out of reach; the one brought back in
+    is stamped as back from a suspension."""
+    from app.models.platform.plugin_install import PluginInstall
+    from app.services.marketplace import registrations
+    from app.services.platform.intake_setup import set_operations_guild
+
+    listing_uid = "OPERATIONSONLY"
+    registration = await create_plugin_service_registration(
+        session, public_id="tests.reach", listing_uid=listing_uid
+    )
+    registration_id = registration.id
+    owner = await create_user(session)
+    guilds = [await create_guild(session, creator=owner) for _ in range(2)]
+    guild_ids = [guild.id for guild in guilds]
+    for guild in guilds:
+        await create_guild_plugin(
+            session,
+            guild,
+            owner,
+            definition={"plugin_kind": "service"},
+            listing_uid=listing_uid,
+        )
+
+    async with billing_manages_plans(session):
+        await registrations.update_registration(
+            session, registration_id, operations_only=True
+        )
+        await set_operations_guild(session, guild_ids[0])
+        told = [
+            [
+                data["suspended"]
+                for _kind, data in await change_rows(
+                    session, guild_id, kinds=("plugin.status",)
+                )
+            ]
+            for guild_id in guild_ids
+        ]
+    resumed = dict(
+        (
+            await session.exec(
+                select(PluginInstall.guild_id, PluginInstall.resumed_at).where(
+                    PluginInstall.listing_uid == listing_uid
+                )
+            )
+        ).all()
+    )
+    await set_operations_guild(session, None)
+
+    assert told == [[True, False], [True, True]]
+    assert resumed[guild_ids[0]] is not None
+    assert resumed[guild_ids[1]] is None
+
+
 async def test_stored_bytes_are_reported_as_a_total(session: AsyncSession, monkeypatch):
     monkeypatch.setattr(billing_changes, "STORAGE_WINDOW_SECONDS", 0)
     guild = await create_guild(session)

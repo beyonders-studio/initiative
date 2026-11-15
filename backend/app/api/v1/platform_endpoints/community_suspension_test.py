@@ -12,6 +12,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import AuthMessages, GuildMessages, PluginServiceMessages
+from app.core.tools import Tool
 from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.access_grant import AccessGrant
@@ -463,6 +464,36 @@ async def test_a_plugins_status_is_billings_where_it_sets_plans(
         headers=headers,
     )
     assert suspended.status_code == 200, suspended.text
+
+
+async def test_a_mounted_tool_is_not_a_plugin_with_a_state(client, session):
+    """One of this build's tools mounted in the community is left out, and
+    neither suspended nor given a status."""
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    tool = await create_guild_plugin(
+        session,
+        guild,
+        operator,
+        definition={"plugin_kind": "tool_instance", "tool": Tool.contact.value},
+        listing_uid="TOOLAPP0000001",
+        name="Contacts",
+    )
+    tool_id = tool.id
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+
+    listed = await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    assert [plugin["install_id"] for plugin in listed.json()] == [install_id]
+    for method, what, body in (
+        ("POST", "suspension", {"suspended": True}),
+        ("PUT", "status", {"status": "on_hold"}),
+    ):
+        refused = await client.request(
+            method, _plugin_url(guild, tool_id, what), json=body, headers=headers
+        )
+        assert refused.status_code == 404, refused.text
+        assert refused.json()["detail"] == PluginServiceMessages.INSTALL_NOT_FOUND
 
 
 async def test_a_deleted_plugin_comes_back_within_its_window_and_goes_after(

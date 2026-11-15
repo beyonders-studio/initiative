@@ -50,7 +50,11 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.schema_provisioning import deprovision_guild
 from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.guild import CommunityStatus, Guild
-from app.models.platform.plugin_install import PluginInstall, PluginInstallClaim
+from app.models.platform.plugin_install import (
+    PluginInstall,
+    PluginInstallClaim,
+    PluginInstallStatus,
+)
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
 from app.services.platform import rules
@@ -125,14 +129,38 @@ async def _uninstall_deleted(
 ) -> None:
     """Uninstall one plug-in install whose deletion window has run out: in its
     community's own schema, on a system session from its cohort, without an
-    erase, then drop its index row in the transaction that claimed it. An
-    install already gone there leaves only the row to drop."""
+    erase, then drop its index row. An install already gone there leaves only
+    the row to drop.
+
+    Locks go install first, then its index row, the order the index sweep
+    takes them in (``plugin_installs.reindex_community``): the sweep's claim
+    on the row is let go, and the row is held again under the install's lock
+    and uninstalled only if it is still deleted from the same moment."""
     from app.services.tenant import guild_plugins as guild_plugins_service
 
     guild_id, install_id = install.guild_id, install.install_id
+    deleted_at = install.status_changed_at
+    await session.commit()
     async with cohorts.system_session(guild_id) as guild_session:
         await set_rls_context(guild_session, SystemGuild(guild_id))
         plugin = await guild_plugins_service.lock_install(guild_session, install_id)
+        still = (
+            await session.exec(
+                select(PluginInstall)
+                .where(
+                    col(PluginInstall.guild_id) == guild_id,
+                    col(PluginInstall.install_id) == install_id,
+                    col(PluginInstall.status) == PluginInstallStatus.deleted.value,
+                    col(PluginInstall.status_changed_at) == deleted_at,
+                )
+                .with_for_update()
+            )
+        ).one_or_none()
+        if still is None:
+            # Set back, or gone, since it was found due.
+            await guild_session.rollback()
+            await session.commit()
+            return
         if plugin is not None:
             await guild_plugins_service.uninstall_plugin(
                 guild_session, plugin, actor_user_id=None

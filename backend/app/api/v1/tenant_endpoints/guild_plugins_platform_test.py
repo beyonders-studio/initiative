@@ -296,12 +296,17 @@ class TestInstallState:
         self, client: AsyncClient, acting_user, session: AsyncSession
     ):
         """Installed here, wired up nowhere: nothing it offers can be reached,
-        and the read says so rather than showing a working plug-in."""
+        and the read says so rather than showing a working plug-in. A state
+        staff gave it holds all the same."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
-        await _installed(session, a)
+        plugin = await _installed(session, a)
 
         items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
         assert [item["available"] for item in items] == [False]
+
+        await set_install_state(session, a.guild.id, plugin.id, status="on_hold")
+        items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
+        assert items == []
 
     @pytest.mark.parametrize("how", NOT_LIVE)
     async def test_only_a_live_registration_is_available(

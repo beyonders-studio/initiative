@@ -1461,6 +1461,8 @@ async def set_install_state(
         values.update(status=status, status_changed_at=datetime.now(UTC))
     if suspended is not None:
         values["suspended_at"] = datetime.now(UTC) if suspended else None
+        if not suspended:
+            values["resumed_at"] = datetime.now(UTC)
     await session.exec(
         update(PluginInstall)
         .where(

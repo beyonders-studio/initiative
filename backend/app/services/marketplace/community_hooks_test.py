@@ -593,18 +593,30 @@ class TestPluginState:
         assert len(plugins.calls) == 3
 
     async def test_on_hold_it_is_sent_only_its_lifecycle(self, session, monkeypatch):
+        """A hook the state does not allow waits, untouched, without holding
+        back ``plugin_status`` behind it, and goes once it is active again."""
         _user, guild, install = await _setup(session)
         plugins = _answering(monkeypatch)
+        await _deliver(guild.id, hook="installed")
         await set_install_state(session, guild.id, install.id, status="on_hold")
         await _visit(guild.id)
 
-        await _deliver(guild.id, hook="installed")
-        await _visit(guild.id)
+        assert [(path, body) for _, path, _, body in plugins.calls] == [
+            ("/v1/hooks/plugin_status", {"status": "on_hold"})
+        ]
+        installed, _told = await _hooks(session, guild.id)
+        assert (installed.hook, installed.attempts, installed.done_at) == (
+            "installed",
+            0,
+            None,
+        )
 
-        [(_, _, _, told)] = plugins.calls
-        assert told == {"status": "on_hold"}
-        *_, installed = await _hooks(session, guild.id)
-        assert installed.last_error == "the plug-in is not reachable here"
+        await set_install_state(session, guild.id, install.id, status="active")
+        await _visit(guild.id)
+        assert [path for _, path, _, _ in plugins.calls][1:] == [
+            "/v1/hooks/installed",
+            "/v1/hooks/plugin_status",
+        ]
 
     async def test_a_suspended_plugin_is_sent_nothing_and_its_hooks_wait(
         self, session, monkeypatch

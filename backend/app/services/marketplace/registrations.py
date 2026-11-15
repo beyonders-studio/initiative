@@ -62,6 +62,7 @@ from app.core.messages import PluginServiceMessages
 from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
 from app.core.security import plugin_platform_signing_enabled
 from app.db.errors import dbapi_constraint
+from app.models.platform.app_setting import AppSetting
 from app.models.platform.plugin_install import EXCLUSIVE_ROUTE_INDEX, PluginInstall
 from app.models.platform.plugin_service_registration import (
     IMAGE_REFERENCE_MAX_LENGTH,
@@ -589,12 +590,16 @@ async def update_registration(
     ``base_url`` moves is checked against the new origin. ``shared_routes``
     is written to the registration's installs in the install index in the same
     transaction, and turning it off is refused (409) while a vendor
-    installation routes to more than one community. A suspension, or its
-    lift, is told to billing for each install
+    installation routes to more than one community. A suspension, its lift,
+    or a change of reach is told for each install
     (:func:`~app.services.marketplace.plugin_installs.suspension_moved`).
     """
     row = await get_registration(session, registration_id)
     before = audit_service.snapshot(row, AUDITED_FIELDS)
+    was_suspended, was_operations_only = (
+        row.suspended_at is not None,
+        row.operations_only,
+    )
     placement = (base_url, page_origin, allowed_origins, jwks, jwks_uri)
     if row.kind == RegistrationKind.DECLARATIVE and any(
         value is not None for value in placement
@@ -617,10 +622,7 @@ async def update_registration(
         row.operations_only = operations_only
     if shared_routes is not None:
         row.shared_routes = shared_routes
-    suspension_moved = suspended is not None and suspended != (
-        row.suspended_at is not None
-    )
-    if suspension_moved:
+    if suspended is not None and suspended != was_suspended:
         row.suspended_at = utcnow() if suspended else None
         row.suspended_by = actor_user_id if suspended else None
     vendor_changed = await _apply_vendor(session, row, vendor_values)
@@ -630,9 +632,7 @@ async def update_registration(
     session.add(row)
     if shared_routes is not None and row.listing_uid:
         await _write_exclusive(session, row)
-    if suspension_moved and row.listing_uid:
-        await session.flush()
-        await plugin_installs.suspension_moved(session, row.listing_uid)
+    await _reach_moved(session, row, was_suspended, was_operations_only)
     changed = audit_service.changed_fields(
         before, audit_service.snapshot(row, AUDITED_FIELDS)
     )
@@ -656,6 +656,31 @@ async def update_registration(
     # drops it rather than waiting out its TTL.
     invalidate_registrations()
     return row
+
+
+async def _reach_moved(
+    session: AsyncSession,
+    row: PluginServiceRegistration,
+    was_suspended: bool,
+    was_operations_only: bool,
+) -> None:
+    """Tell each of the registration's installs where it now stands, when its
+    suspension or its limit to the operations community moved."""
+    if not row.listing_uid or (
+        (row.suspended_at is not None, row.operations_only)
+        == (was_suspended, was_operations_only)
+    ):
+        return
+    await session.flush()
+    await plugin_installs.suspension_moved(
+        session,
+        row.listing_uid,
+        was_suspended=was_suspended,
+        was_operations_only=was_operations_only,
+        was_operations_guild=await session.scalar(
+            select(AppSetting.operations_guild_id).where(AppSetting.id == 1)
+        ),
+    )
 
 
 async def _write_exclusive(
@@ -1351,8 +1376,9 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
         return ReconcileResult()
 
     updated = unchanged = waiting = skipped = 0
-    # The rows this pass changed, with what they looked like before.
-    edited: list[tuple[PluginServiceRegistration, dict]] = []
+    # The rows this pass changed, with what they looked like before and
+    # whether they were limited to the operations community.
+    edited: list[tuple[PluginServiceRegistration, dict, bool]] = []
     seen: set[str] = set()
 
     for entry in entries:
@@ -1387,6 +1413,7 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
             waiting += 1
             continue
         before = audit_service.snapshot(row, AUDITED_FIELDS)
+        was_operations_only = row.operations_only
         required_before = list(row.vendor_required or [])
         moved = apply_deployment_facts(row, facts)
         await vendor_values_service.sync_required(session, row)
@@ -1395,11 +1422,14 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
             continue
         row.updated_at = utcnow()
         session.add(row)
-        edited.append((row, before))
+        edited.append((row, before, was_operations_only))
         updated += 1
 
     # The file is the author, so the records carry no actor.
-    for edit, was in edited:
+    for edit, was, was_operations_only in edited:
+        await _reach_moved(
+            session, edit, edit.suspended_at is not None, was_operations_only
+        )
         await audit_service.record(
             session,
             event_type=AuditEventType.PLUGIN_SERVICE_UPDATED,
