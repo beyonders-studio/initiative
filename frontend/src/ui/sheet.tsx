@@ -20,6 +20,8 @@ const Sheet = ({ modal = true, ...props }: React.ComponentProps<typeof SheetPrim
 
 const SheetPortal = SheetPrimitive.Portal;
 
+const SheetTrigger = SheetPrimitive.Trigger;
+
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
@@ -60,12 +62,15 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  /** Where the sheet is drawn; the document body when not given. */
+  container?: HTMLElement | null;
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => {
+>(({ side = "right", container, className, children, ...props }, ref) => {
   const { t } = useTranslation("ui");
   const modal = React.useContext(SheetModalContext);
   const content = (
@@ -86,7 +91,7 @@ const SheetContent = React.forwardRef<
     </SheetPrimitive.Content>
   );
   return (
-    <SheetPortal>
+    <SheetPortal container={container}>
       {/* Inside its overlay, so it always paints above it (see DialogContent).
           A non-modal sheet has no overlay, and draws its own backdrop if any. */}
       {modal ? <SheetOverlay>{content}</SheetOverlay> : content}
@@ -132,4 +137,5 @@ export {
   SheetOverlay,
   SheetPortal,
   SheetTitle,
+  SheetTrigger,
 };
