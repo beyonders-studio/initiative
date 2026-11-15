@@ -26,7 +26,7 @@ const buildRegistration = (
   mandatory: false,
   operations_only: false,
   shared_routes: false,
-  enabled: true,
+  suspended_at: null,
   source: "operator",
   image_digest: null,
   compose_service: null,
@@ -668,21 +668,21 @@ describe("PluginServicesPage", () => {
       await user.click(within(dialog).getByRole("button", { name: "Disable plug-in service" }));
 
       expect(updateMutate).toHaveBeenCalledWith(
-        { registrationId: 1, data: { enabled: false } },
+        { registrationId: 1, data: { suspended: true } },
         expect.anything()
       );
     });
 
     it("turns a plug-in back on without a confirmation", async () => {
       const user = userEvent.setup();
-      registrations = [buildRegistration({ enabled: false })];
+      registrations = [buildRegistration({ suspended_at: "2026-11-15T00:00:00Z" })];
       renderAsOperator();
 
       await user.click(screen.getByRole("switch"));
 
       expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(updateMutate).toHaveBeenCalledWith(
-        { registrationId: 1, data: { enabled: true } },
+        { registrationId: 1, data: { suspended: false } },
         expect.anything()
       );
     });

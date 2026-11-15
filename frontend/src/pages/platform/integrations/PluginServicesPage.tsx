@@ -133,7 +133,7 @@ export const PluginServicesPage = () => {
 
   const setEnabled = (registration: PluginServiceRegistrationRead, enabled: boolean) => {
     updateService.mutate(
-      { registrationId: registration.id, data: { enabled } },
+      { registrationId: registration.id, data: { suspended: !enabled } },
       {
         onSuccess: () => {
           setDisabling(null);
@@ -203,7 +203,7 @@ export const PluginServicesPage = () => {
                           {t("pluginServices.notLiveBadge")}
                         </Badge>
                       )}
-                      {!registration.enabled && (
+                      {registration.suspended_at != null && (
                         <Badge variant="outline" className="border-destructive text-destructive">
                           {t("pluginServices.disabledBadge")}
                         </Badge>
@@ -267,7 +267,7 @@ export const PluginServicesPage = () => {
                       </Label>
                       <Switch
                         id={`plugin-service-enabled-${registration.id}`}
-                        checked={registration.enabled}
+                        checked={registration.suspended_at == null}
                         disabled={updateService.isPending}
                         onCheckedChange={(checked) => {
                           // Turning it back on is safe; turning it off stops
@@ -324,7 +324,7 @@ export const PluginServicesPage = () => {
                       })}
                     </p>
                   )}
-                  {!registration.enabled && (
+                  {registration.suspended_at != null && (
                     <p className="text-destructive">{t("pluginServices.disabledHelp")}</p>
                   )}
                   {!registration.publisher_enabled && (
