@@ -221,6 +221,7 @@ async def _delete_rows(
     *,
     reason: str,
     installs: dict[int, tuple[str, dict[str, Any] | None]],
+    revoke: bool = True,
 ) -> int:
     """Delete stored credentials and record the matching revocations.
 
@@ -228,11 +229,15 @@ async def _delete_rows(
     each row's sealed tokens is queued before the row goes, so no caller can
     delete values without the grant being ended at the vendor. ``installs`` is
     as :func:`~app.services.tenant.plugin_revocation.queue_revocations_for_rows`
-    takes it.
+    takes it. Without ``revoke``, for a plug-in suspended in the community,
+    nothing is sent to it or to its vendor for it, and the values just go.
     """
     if not rows:
         return 0
-    await queue_revocations_for_rows(session, rows, reason=reason, installs=installs)
+    if revoke:
+        await queue_revocations_for_rows(
+            session, rows, reason=reason, installs=installs
+        )
     for row in rows:
         await session.delete(row)
     return len(rows)
@@ -367,7 +372,11 @@ async def revoke_all(
 
 
 async def delete_plugin_connections(
-    session: AsyncSession, *, plugin: GuildPlugin, reason: str = "uninstalled"
+    session: AsyncSession,
+    *,
+    plugin: GuildPlugin,
+    reason: str = "uninstalled",
+    revoke: bool = True,
 ) -> int:
     """Everything for one install, blocked tombstones included.
 
@@ -381,6 +390,7 @@ async def delete_plugin_connections(
         rows,
         reason=reason,
         installs={plugin.id: (plugin.listing_uid, plugin.definition)},
+        revoke=revoke,
     )
 
 

@@ -50,6 +50,7 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.schema_provisioning import deprovision_guild
 from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.guild import CommunityStatus, Guild
+from app.models.platform.plugin_community_hook import PluginCommunityHook
 from app.models.platform.plugin_install import (
     PluginInstall,
     PluginInstallClaim,
@@ -135,11 +136,17 @@ async def _uninstall_deleted(
     Locks go install first, then its index row, the order the index sweep
     takes them in (``plugin_installs.reindex_community``): the sweep's claim
     on the row is let go, and the row is held again under the install's lock
-    and uninstalled only if it is still deleted from the same moment."""
+    and uninstalled only if it is still deleted from the same moment.
+
+    One staff also suspended there is removed without a word to it: nothing is
+    queued for it, nothing is revoked at its vendor, and what waited in its
+    queue for the community is discarded with the row."""
     from app.services.tenant import guild_plugins as guild_plugins_service
 
     guild_id, install_id = install.guild_id, install.install_id
     deleted_at = install.status_changed_at
+    suspended = install.suspended_at is not None
+    public_id: str | None = None
     await session.commit()
     async with cohorts.system_session(guild_id) as guild_session:
         await set_rls_context(guild_session, SystemGuild(guild_id))
@@ -162,10 +169,19 @@ async def _uninstall_deleted(
             await session.commit()
             return
         if plugin is not None:
+            public_id = await guild_plugins_service.install_public_id(plugin)
             await guild_plugins_service.uninstall_plugin(
-                guild_session, plugin, actor_user_id=None
+                guild_session, plugin, actor_user_id=None, suspended=suspended
             )
         await guild_session.commit()
+    if suspended and public_id is not None:
+        await session.exec(
+            delete(PluginCommunityHook).where(
+                col(PluginCommunityHook.guild_id) == guild_id,
+                col(PluginCommunityHook.public_id) == public_id,
+                col(PluginCommunityHook.done_at).is_(None),
+            )
+        )
     for table in (PluginInstall, PluginInstallClaim):
         await session.exec(
             delete(table).where(
