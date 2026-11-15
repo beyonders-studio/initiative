@@ -21,7 +21,9 @@ dropping the schema, here or where a guild's creation was rolled back.
 Before any of that, each pass deletes the communities whose hold has run out:
 one left ``on_hold`` for longer than the deployment's hold window moves to
 ``deleted`` exactly as a deletion from its danger zone would, and the
-retention window then starts like any other.
+retention window then starts like any other. It also uninstalls each plug-in
+install left ``deleted`` for :data:`~app.services.platform.retention.PLUGIN_INSTALL_DELETION_DAYS`,
+in its community, as an admin's uninstall would and without an erase.
 
 Polled by ``background_tasks.Loop`` once an hour on ``SystemSessionLocal``
 (the ``app_admin`` login). It works on ``public.guilds``; the one thing it does
@@ -48,10 +50,20 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.schema_provisioning import deprovision_guild
 from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.guild import CommunityStatus, Guild
+from app.models.platform.plugin_community_hook import PluginCommunityHook
+from app.models.platform.plugin_install import (
+    PluginInstall,
+    PluginInstallClaim,
+    PluginInstallStatus,
+)
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
 from app.services.platform import rules
-from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
+from app.services.platform.retention import (
+    COMMUNITY_DELETION,
+    COMMUNITY_HOLD,
+    PLUGIN_INSTALL_DELETION,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +123,79 @@ async def delete_expired_holds(session: AsyncSession, *, now: datetime) -> int:
     does not restart the clock.
     """
     return await COMMUNITY_HOLD.sweep(session, now=now, act=_delete_expired_hold)
+
+
+async def _uninstall_deleted(
+    session: AsyncSession, install: PluginInstall, _days: int
+) -> None:
+    """Uninstall one plug-in install whose deletion window has run out: in its
+    community's own schema, on a system session from its cohort, without an
+    erase, then drop its index row. An install already gone there leaves only
+    the row to drop.
+
+    Locks go install first, then its index row, the order the index sweep
+    takes them in (``plugin_installs.reindex_community``): the sweep's claim
+    on the row is let go, and the row is held again under the install's lock
+    and uninstalled only if it is still deleted from the same moment.
+
+    One staff also suspended there is removed without a word to it: nothing is
+    queued for it, nothing is revoked at its vendor, and what waited in its
+    queue for the community is discarded with the row."""
+    from app.services.tenant import guild_plugins as guild_plugins_service
+
+    guild_id, install_id = install.guild_id, install.install_id
+    deleted_at = install.status_changed_at
+    suspended = install.suspended_at is not None
+    public_id: str | None = None
+    await session.commit()
+    async with cohorts.system_session(guild_id) as guild_session:
+        await set_rls_context(guild_session, SystemGuild(guild_id))
+        plugin = await guild_plugins_service.lock_install(guild_session, install_id)
+        still = (
+            await session.exec(
+                select(PluginInstall)
+                .where(
+                    col(PluginInstall.guild_id) == guild_id,
+                    col(PluginInstall.install_id) == install_id,
+                    col(PluginInstall.status) == PluginInstallStatus.deleted.value,
+                    col(PluginInstall.status_changed_at) == deleted_at,
+                )
+                .with_for_update()
+            )
+        ).one_or_none()
+        if still is None:
+            # Set back, or gone, since it was found due.
+            await guild_session.rollback()
+            await session.commit()
+            return
+        if plugin is not None:
+            public_id = await guild_plugins_service.install_public_id(plugin)
+            await guild_plugins_service.uninstall_plugin(
+                guild_session, plugin, actor_user_id=None, suspended=suspended
+            )
+        await guild_session.commit()
+    if suspended and public_id is not None:
+        await session.exec(
+            delete(PluginCommunityHook).where(
+                col(PluginCommunityHook.guild_id) == guild_id,
+                col(PluginCommunityHook.public_id) == public_id,
+                col(PluginCommunityHook.done_at).is_(None),
+            )
+        )
+    for table in (PluginInstall, PluginInstallClaim):
+        await session.exec(
+            delete(table).where(
+                col(table.guild_id) == guild_id, col(table.install_id) == install_id
+            )
+        )
+    await session.commit()
+    await post_commit.settle(guild_session)
+
+
+async def uninstall_deleted_plugins(session: AsyncSession, *, now: datetime) -> int:
+    """One pass of :data:`~app.services.platform.retention.PLUGIN_INSTALL_DELETION`.
+    Returns how many installs were uninstalled."""
+    return await PLUGIN_INSTALL_DELETION.sweep(session, now=now, act=_uninstall_deleted)
 
 
 async def _destroy(session: AsyncSession, guild: Guild, days: int) -> bool:
@@ -332,5 +417,6 @@ async def process_guild_purges() -> None:
     now = datetime.now(UTC)
     async with SystemSessionLocal() as session:
         await delete_expired_holds(session, now=now)
+        await uninstall_deleted_plugins(session, now=now)
         await purge_due_guilds(session, now=now)
         await reclaim_orphaned_guilds(session)

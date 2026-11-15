@@ -81,7 +81,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * is still listed, and still refused at fetch time to anyone else.
  *
  * Disabled installs are left out entirely: their widgets have nothing to draw,
- * so offering them would be offering a binding that cannot resolve.
+ * so offering them would be offering a binding that cannot resolve. So are
+ * those the platform suspended, held or deleted here.
  * @summary Read Plugin Widget Catalog
  */
 export const readPluginWidgetCatalog = (
@@ -974,10 +975,11 @@ export const useRunPluginAction = <TError = ErrorType<HTTPValidationError>, TCon
  * Every plug-in installed in this guild, enabled or not.
  *
  * Disabled ones are included so an admin can find and re-enable them; the
- * sidebar filters to enabled. A service plug-in whose registration is gone or
- * switched off comes back too, marked unavailable — an install that quietly
- * vanished would leave an admin with nothing to look at and nothing to
- * remove.
+ * sidebar filters to enabled. A service plug-in this deployment has not set
+ * up comes back too, marked unavailable — an install that quietly vanished
+ * would leave an admin with nothing to look at and nothing to remove. One
+ * the platform suspended, held or deleted here is left out: nothing in the
+ * community can act on it.
  * @summary List Community Plugins
  */
 export const listCommunityPlugins = (

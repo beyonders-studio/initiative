@@ -6,7 +6,7 @@ Pinned:
   where billing manages plans: a community made (with its name and its
   owner, who is the first superadmin even when staff made it), renamed,
   deleted, restored, suspended, unsuspended and purged; its member and guest
-  counts; its stored bytes;
+  counts; its stored bytes; a plug-in's status and suspension in it;
 * every row names the community by billing's reference, and a purge's
   reference is the one it had;
 * the cursor never skips a row that commits late, and an aborted
@@ -33,7 +33,10 @@ from app.testing import (
     create_guest,
     create_guild,
     create_guild_membership,
+    create_guild_plugin,
+    create_plugin_service_registration,
     create_user,
+    set_install_state,
 )
 from app.testing.billing_boundary import change_kinds, change_rows, served_changes
 from app.testing.billing_managed import billing_manages_plans
@@ -162,6 +165,114 @@ async def test_a_community_billing_never_knew_is_not_served_once_gone(
         served, _ = await served_changes()
 
     assert [c for c in served if c["kind"].startswith("community.")] == []
+
+
+async def test_a_plugin_suspended_everywhere_is_told_for_each_install(
+    session: AsyncSession,
+):
+    """Suspending a registration, and lifting it, writes ``plugin.status`` for
+    every install of it, saying whether it is suspended there by any means."""
+    from app.services.marketplace import registrations
+
+    listing_uid = "EVERYWHERE0001"
+    registration = await create_plugin_service_registration(
+        session, public_id="tests.everywhere", listing_uid=listing_uid
+    )
+    registration_id = registration.id
+    owner = await create_user(session)
+    guilds = [await create_guild(session, creator=owner) for _ in range(2)]
+    guild_ids = [guild.id for guild in guilds]
+    plugins = [
+        await create_guild_plugin(
+            session,
+            guild,
+            owner,
+            definition={"plugin_kind": "service"},
+            listing_uid=listing_uid,
+        )
+        for guild in guilds
+    ]
+    # The second is suspended there by staff too, so lifting leaves it so.
+    await set_install_state(session, guild_ids[1], plugins[1].id, suspended=True)
+
+    async with billing_manages_plans(session):
+        await registrations.update_registration(
+            session, registration_id, suspended=True
+        )
+        await registrations.update_registration(
+            session, registration_id, suspended=False
+        )
+        told = [
+            [
+                (data["status"], data["suspended"])
+                for _kind, data in await change_rows(
+                    session, guild_id, kinds=("plugin.status",)
+                )
+            ]
+            for guild_id in guild_ids
+        ]
+
+    assert told == [
+        [("active", True), ("active", False)],
+        [("active", True), ("active", True)],
+    ]
+
+
+async def test_a_plugins_reach_moving_is_told_for_each_install(
+    session: AsyncSession,
+):
+    """Limited to the operations community, and that community named, each
+    install is told whether it is now out of reach; the one brought back in
+    is stamped as back from a suspension."""
+    from app.models.platform.plugin_install import PluginInstall
+    from app.services.marketplace import registrations
+    from app.services.platform.intake_setup import set_operations_guild
+
+    listing_uid = "OPERATIONSONLY"
+    registration = await create_plugin_service_registration(
+        session, public_id="tests.reach", listing_uid=listing_uid
+    )
+    registration_id = registration.id
+    owner = await create_user(session)
+    guilds = [await create_guild(session, creator=owner) for _ in range(2)]
+    guild_ids = [guild.id for guild in guilds]
+    for guild in guilds:
+        await create_guild_plugin(
+            session,
+            guild,
+            owner,
+            definition={"plugin_kind": "service"},
+            listing_uid=listing_uid,
+        )
+
+    async with billing_manages_plans(session):
+        await registrations.update_registration(
+            session, registration_id, operations_only=True
+        )
+        await set_operations_guild(session, guild_ids[0])
+        told = [
+            [
+                data["suspended"]
+                for _kind, data in await change_rows(
+                    session, guild_id, kinds=("plugin.status",)
+                )
+            ]
+            for guild_id in guild_ids
+        ]
+    resumed = dict(
+        (
+            await session.exec(
+                select(PluginInstall.guild_id, PluginInstall.resumed_at).where(
+                    PluginInstall.listing_uid == listing_uid
+                )
+            )
+        ).all()
+    )
+    await set_operations_guild(session, None)
+
+    assert told == [[True, False], [True, True]]
+    assert resumed[guild_ids[0]] is not None
+    assert resumed[guild_ids[1]] is None
 
 
 async def test_stored_bytes_are_reported_as_a_total(session: AsyncSession, monkeypatch):

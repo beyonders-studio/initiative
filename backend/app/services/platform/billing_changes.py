@@ -14,7 +14,12 @@ definer function ``public.billing_change_row`` (migration ``20261021_0532``):
   counted when the change is served (:func:`page`) rather than written;
 * by the triggers on ``plugin_installs``: ``plugin.installed`` and
   ``plugin.uninstalled`` with ``listing_uid`` (an erase follows an uninstall,
-  so it's told by the uninstall);
+  so it's told by the uninstall), and ``plugin.status`` with ``listing_uid``,
+  ``status`` and ``suspended`` (by the owner, by staff, or out of reach)
+  when an install's status or suspension moves, through
+  ``public.billing_plugin_status`` (migration ``20261115_0609``), which the
+  system engine also calls for every install of a registration suspended or
+  lifted;
 * by the trigger on ``plugin_usage``: ``plugin.usage`` with ``listing_uid``,
   ``meter``, ``period`` (``YYYY-MM``, UTC) and ``quantity``, the meter's
   running total for the month;
@@ -38,8 +43,9 @@ Rows name the community by billing's reference: captured when the row was
 written if it had one (a purge's always does, since the references go after
 the row), or resolved here, minting on first use. A row for a community that
 no longer exists and never had a reference is skipped: billing never knew it.
-A plug-in row for a listing no package names terms for is skipped too: there
-is nothing for billing to bill.
+A usage row for a listing no package names terms for is skipped too: there
+is nothing for billing to bill. Every other plug-in row is served whatever
+the listing costs, since billing sets the status of every install.
 
 A committed row is announced on :data:`CHANNEL`, and each process that hears
 it sends billing one ping (:func:`hint`), collapsed over :data:`PING_DEBOUNCE_SECONDS`.
@@ -68,7 +74,8 @@ RETENTION = timedelta(days=30)
 STORAGE_WINDOW_SECONDS = 30.0
 PING_DEBOUNCE_SECONDS = 1.0
 
-_PLUGIN_KINDS = frozenset({"plugin.installed", "plugin.uninstalled", "plugin.usage"})
+#: The kinds served only for a listing a package names terms for.
+_BILLED_KINDS = frozenset({"plugin.usage"})
 
 
 class CursorInvalid(ValueError):
@@ -193,7 +200,7 @@ async def _served(
         data: dict[str, Any] = dict(row.data or {})
         if row.kind == "community.members":
             data = dict(members.get(row.guild_id, {"members": 0, "guests": 0}))
-        if row.kind in _PLUGIN_KINDS:
+        if row.kind in _BILLED_KINDS:
             uid = str(data.get("listing_uid") or "")
             if uid not in terms:
                 terms[uid] = await listing_terms(uid) is not None

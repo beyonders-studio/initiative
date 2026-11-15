@@ -83,7 +83,8 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     operations_only: bool = False
     #: One vendor installation may connect to several communities.
     shared_routes: bool = False
-    enabled: bool = True
+    #: When the owner suspended it everywhere; null while it is not.
+    suspended_at: datetime | None = None
     #: ``registry`` when its plug-in facts come from a listing the registry signed,
     #: ``operator`` otherwise.
     source: str = "operator"
@@ -113,7 +114,7 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     connection_setup_url: str
     #: The address to give the vendor for this plug-in's webhooks.
     webhook_url: str
-    #: Enabled, its publisher enabled, every required vendor value set and,
+    #: Not suspended, its publisher enabled, every required vendor value set and,
     #: for a container, an address and a key set to verify against.
     live: bool
     created_at: datetime
@@ -152,7 +153,6 @@ class PluginServiceRegistrationCreate(_DeploymentFacts):
     jwks_uri: str | None = Field(default=None, max_length=1000)
     mandatory: bool = False
     operations_only: bool = False
-    enabled: bool = True
     #: Values for the vendor fields the listing's manifest declares, by key.
     vendor_values: dict[str, RawTextStr | None] | None = None
 
@@ -178,7 +178,8 @@ class PluginServiceRegistrationUpdate(_DeploymentFacts):
     #: Let one vendor installation connect to several communities. Turning it
     #: off is refused while one is connected to more than one.
     shared_routes: bool | None = None
-    enabled: bool | None = None
+    #: Suspend it everywhere, or lift the suspension.
+    suspended: bool | None = None
     #: Set or clear vendor values, by key.
     vendor_values: dict[str, RawTextStr | None] | None = None
 

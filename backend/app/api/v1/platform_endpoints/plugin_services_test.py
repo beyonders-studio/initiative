@@ -103,7 +103,7 @@ async def test_non_owner_tiers_are_refused(
     assert create.status_code == 403
     assert create.json()["detail"] == AuthMessages.INSUFFICIENT_PRIVILEGES
     assert (
-        await client.patch(f"{BASE}{row.id}", headers=headers, json={"enabled": False})
+        await client.patch(f"{BASE}{row.id}", headers=headers, json={"suspended": True})
     ).status_code == 403
     assert (await client.delete(f"{BASE}{row.id}", headers=headers)).status_code == 403
     assert (
@@ -310,14 +310,21 @@ async def test_patch_sets_the_operator_only_fields(
     response = await client.patch(
         f"{BASE}{row.id}",
         headers=headers,
-        json={"mandatory": True, "operations_only": True, "enabled": False},
+        json={"mandatory": True, "operations_only": True, "suspended": True},
     )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["mandatory"] is True
     assert body["operations_only"] is True
-    assert body["enabled"] is False
+    assert body["suspended_at"] is not None
+    assert body["live"] is False
+
+    lifted = await client.patch(
+        f"{BASE}{row.id}", headers=headers, json={"suspended": False}
+    )
+    assert lifted.status_code == 200, lifted.text
+    assert lifted.json()["suspended_at"] is None
 
 
 async def test_sharing_is_turned_off_once_each_installation_has_one_community(
@@ -466,7 +473,7 @@ async def test_missing_registration_is_a_404(
     headers = await _owner_headers(session)
 
     response = await client.patch(
-        f"{BASE}999999", headers=headers, json={"enabled": False}
+        f"{BASE}999999", headers=headers, json={"suspended": True}
     )
 
     assert response.status_code == 404
@@ -536,7 +543,7 @@ async def test_switching_a_publisher_off_takes_its_plugins_out_of_service(
     assert off.json()["enabled"] is False
     assert off.json()["display_name"] == "Acme, paused"
     read = await _listed(client, headers, row.id)
-    assert read["enabled"] is True
+    assert read["suspended_at"] is None
     assert read["publisher_enabled"] is False
     assert read["live"] is False
 

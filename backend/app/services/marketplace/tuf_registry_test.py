@@ -437,13 +437,14 @@ class TestOtherSources:
             base_url="https://tracker.internal.test",
             jwks=sample_plugin_jwks(),
             mandatory=True,
-            enabled=False,
+            suspended=True,
         )
         repo.publish()
         await _refresh(session, repo, force=True)
         registration = await _registration(session, "acme.tracker")
         assert registration is not None
-        assert (registration.enabled, registration.mandatory) == (False, True)
+        assert registration.suspended_at is not None
+        assert registration.mandatory is True
         assert registration.base_url == "https://tracker.internal.test"
         assert registration.jwks == sample_plugin_jwks()
 
@@ -639,7 +640,7 @@ class TestWithdrawal:
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None and listing.available is False
         registration = await _registration(session, "acme.tracker")
-        assert registration is not None and registration.enabled is False
+        assert registration is not None and registration.suspended_at is not None
         board = await _listing(session, BOARD_UID)
         assert board is not None and board.available is True
 

@@ -12,6 +12,7 @@ a card that appears opens a page that offers it and an install that takes it —
 and one that does not appear is refused the same way at each step.
 """
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -496,7 +497,7 @@ class TestAPluginNeedsItsServiceRegistered:
         registration = await create_plugin_service_registration(
             session, public_id="tests.shop"
         )
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()

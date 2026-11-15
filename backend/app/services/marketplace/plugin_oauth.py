@@ -72,6 +72,7 @@ from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import GuildMembership
 from app.models.platform.plugin_assertion_jti import ASSERTION_JTI_MAX_LENGTH
+from app.models.platform.plugin_install import PluginState
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
     registration_live_sql,
@@ -776,8 +777,10 @@ async def issue_token(
 class InstallationListing:
     installation: str
     #: The install is switched on, its community is in use and its plug-in is
-    #: for that community, so a token can be issued for it. An install that is off, or whose community is on hold,
-    #: suspended or awaiting deletion, is still listed: it still exists.
+    #: there for that community, so a token can be issued for it. An install
+    #: that is off, on hold or deleted, or whose community is on hold,
+    #: suspended or awaiting deletion, is still listed: it still exists. One
+    #: where the plug-in is suspended is not listed at all.
     active: bool
 
 
@@ -798,6 +801,11 @@ async def list_installations(
     entries, next_cursor = await plugin_installs.page(
         client.listing_uid, cursor=cursor, limit=limit
     )
+    entries = [
+        entry
+        for entry in entries
+        if client.state_in(entry.guild_id) is not PluginState.suspended
+    ]
     refs = await plugin_refs.ensure_plugin_guild_refs(
         (entry.guild_id, client.public_id) for entry in entries
     )

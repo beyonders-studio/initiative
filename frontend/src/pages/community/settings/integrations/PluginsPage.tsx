@@ -153,6 +153,8 @@ export interface PluginListItem {
   mandatory?: boolean;
   /** False when the plug-in's service is not set up on this server. */
   available?: boolean;
+  /** Staff or billing let it read here but not write. */
+  read_only?: boolean;
   /** A version asking for more access, waiting for the seat's answer. */
   pending_version?: string | null;
 }
@@ -262,6 +264,7 @@ function PluginRow({
         {plugin.available === false && (
           <Badge variant="outline">{t("plugins:manage.unavailable")}</Badge>
         )}
+        {plugin.read_only && <Badge variant="outline">{t("plugins:manage.readOnly")}</Badge>}
         {!plugin.enabled && <Badge variant="outline">{t("plugins:manage.disabled")}</Badge>}
 
         <div className="flex shrink-0 items-center gap-2">

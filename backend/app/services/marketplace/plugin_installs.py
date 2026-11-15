@@ -23,6 +23,11 @@ hold the same one. A value is claimed (:func:`claim_value`,
 install's community, in the same transaction. Claims go with the install's
 row (:func:`forget`).
 
+Each row also holds what the platform decided about the install: its status
+and whether staff suspended it (:func:`set_suspended`, :func:`set_status`;
+billing's sync sets statuses too). The sweep writes neither, and every such
+change is told to billing and to the plug-in.
+
 The index is read and kept on the system engine; a claim is the one write a
 routed session makes here, for its own community.
 """
@@ -38,33 +43,45 @@ from dataclasses import dataclass
 from typing import Any
 
 from cryptography.fernet import InvalidToken
-from sqlalchemy import delete, tuple_
+from fastapi import HTTPException
+from fastapi import status as http_status
+from sqlalchemy import delete, text, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
+from app.core.clock import utcnow
 from app.core.encryption import (
     SALT_PLUGIN_INSTALLS_CURSOR,
     decrypt_field,
     encrypt_field,
 )
+from app.core.messages import PluginServiceMessages
+from app.db import cohorts
 from app.db import session as db_session
 from app.db.errors import dbapi_constraint
+from app.db.request_context import SystemGuild
 from app.models.platform.guild import LIVE_STATUS_VALUES, Guild
 from app.models.platform.plugin_install import (
     EXCLUSIVE_ROUTE_INDEX,
     HOOK_ROUTE_MAX_LENGTH,
     PluginInstall,
     PluginInstallClaim,
+    PluginInstallStatus,
+    PluginState,
 )
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.services import audit as audit_service
+from app.services.marketplace import community_hooks
 from app.services.marketplace.manifest_values import (
     MAX_UNIQUE_SETTING_VALUE_LENGTH,
     MIN_UNIQUE_SETTING_VALUE_LENGTH,
     UNIQUE_SETTING_VALUE_CHARS,
 )
+from app.services.marketplace.registration_lookup import load_registrations
 from app.services.tenant.plugin_config import REMOVED_AT, connection_by_id
 
 logger = logging.getLogger(__name__)
@@ -72,16 +89,21 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "INDEX_SWEEP",
     "PAGE_LIMIT",
+    "CommunityInstall",
     "IndexedInstall",
     "assigned_value",
     "claim",
     "claim_value",
+    "community_installs",
     "forget",
     "hook_route",
     "page",
     "record",
     "reindex_community",
     "routed",
+    "set_status",
+    "set_suspended",
+    "suspension_moved",
 ]
 
 #: The most installs one page lists.
@@ -207,7 +229,8 @@ async def reindex_community(session: AsyncSession, guild_id: int) -> None:
 
     Each install is held while its row is written, as a connect holds it
     while it claims a route, so the row is written from the install as the
-    connect left it. The rows to drop are those the index held before the
+    connect left it: the install is locked first and its row after, the
+    order every path holding both takes them in. The rows to drop are those the index held before the
     installs were read and whose install is gone by then: an install made
     meanwhile is not among them.
     """
@@ -357,6 +380,223 @@ async def routed(listing_uid: str, route_value: str) -> list[IndexedInstall]:
         )
         for row in rows
     ]
+
+
+# --- an install's state ---------------------------------------------------------
+
+
+#: Stamp the installs of a listing that its registration suspended before,
+#: by the owner or by being out of reach, and no longer does, as back from a
+#: suspension.
+_RESUMED_SQL = text(
+    """
+UPDATE public.plugin_installs i
+   SET resumed_at = now()
+  FROM public.plugin_service_registrations r
+ WHERE i.listing_uid = :uid
+   AND r.listing_uid = i.listing_uid
+   AND (CAST(:was_suspended AS boolean)
+     OR (CAST(:was_operations_only AS boolean)
+       AND i.guild_id IS DISTINCT FROM CAST(:was_operations_guild AS integer)))
+   AND r.suspended_at IS NULL
+   AND (NOT r.operations_only OR i.guild_id = (
+       SELECT s.operations_guild_id FROM public.app_settings s WHERE s.id = 1))
+"""
+)
+
+
+async def suspension_moved(
+    session: AsyncSession,
+    listing_uid: str,
+    *,
+    was_suspended: bool = False,
+    was_operations_only: bool = False,
+    was_operations_guild: int | None = None,
+) -> None:
+    """The registration of ``listing_uid`` was suspended or lifted, or its
+    reach moved, on ``session``, the system engine's. ``was_*`` say what
+    suspended it before: its own suspension, and its limit to the operations
+    community then named.
+
+    Each install it no longer suspends is stamped as back from a suspension
+    (``resumed_at``), billing is told each of its installs as it now stands,
+    and each community's hooks are armed once it commits, so a plug-in lifted
+    hears its state and what waited for it."""
+    await session.exec(
+        _RESUMED_SQL,  # type: ignore[call-overload]
+        params={
+            "uid": listing_uid,
+            "was_suspended": was_suspended,
+            "was_operations_only": was_operations_only,
+            "was_operations_guild": was_operations_guild,
+        },
+    )
+    guild_ids = (
+        await session.exec(
+            text(
+                "SELECT guild_id, public.billing_plugin_status(guild_id, install_id)"
+                " FROM public.plugin_installs WHERE listing_uid = :uid"
+            ),
+            params={"uid": listing_uid},
+        )
+    ).all()
+    community_hooks.status_changed(
+        session, *sorted({int(row.guild_id) for row in guild_ids})
+    )
+
+
+@dataclass(frozen=True)
+class CommunityInstall:
+    """One of a community's installs as staff see it."""
+
+    row: PluginInstall
+    #: The community's name for it, or ``None`` where its install is gone.
+    name: str | None
+    state: PluginState
+
+
+async def community_installs(
+    session: AsyncSession, guild_id: int, install_id: int | None = None
+) -> list[CommunityInstall]:
+    """The community's plug-ins, or the one ``install_id`` names, with their
+    names and states, on the system engine's ``session``. The names are read
+    in the community's own schema; the state from the row and the
+    registration's own suspension and reach. A tool instance, one of this
+    build's tools mounted in the community, has no state and is left out."""
+    query = select(PluginInstall).where(PluginInstall.guild_id == guild_id)
+    if install_id is not None:
+        query = query.where(PluginInstall.install_id == install_id)
+    rows = (await session.exec(query.order_by(col(PluginInstall.install_id)))).all()
+    if not rows:
+        return []
+    async with cohorts.system_session(guild_id) as system_session:
+        await db_session.set_rls_context(system_session, SystemGuild(guild_id))
+        installed = (
+            await system_session.exec(
+                select(GuildPlugin.id, GuildPlugin.name, GuildPlugin.plugin_kind)
+            )
+        ).all()
+    names = {row.id: row.name for row in installed}
+    tools = {row.id for row in installed if row.plugin_kind == "tool_instance"}
+    registrations = {
+        snapshot.listing_uid: snapshot
+        for snapshot in (await load_registrations()).values()
+        if snapshot.listing_uid
+    }
+    return [
+        CommunityInstall(
+            row=row,
+            name=names.get(row.install_id),
+            state=(
+                PluginState.suspended
+                if row.suspended_at is not None
+                or (
+                    (registration := registrations.get(row.listing_uid)) is not None
+                    and registration.suspends(guild_id)
+                )
+                else PluginState(row.status)
+            ),
+        )
+        for row in rows
+        if row.install_id not in tools
+    ]
+
+
+async def _locked(
+    session: AsyncSession, guild_id: int, install_id: int
+) -> PluginInstall:
+    """The community's install row, held for the rest of the transaction, or
+    a 404."""
+    row = (
+        await session.exec(
+            select(PluginInstall)
+            .where(
+                PluginInstall.guild_id == guild_id,
+                PluginInstall.install_id == install_id,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=PluginServiceMessages.INSTALL_NOT_FOUND,
+        )
+    return row
+
+
+async def _changed(
+    session: AsyncSession,
+    row: PluginInstall,
+    *,
+    actor_user_id: int,
+    detail: dict[str, Any],
+) -> None:
+    """Record a change to an install's state, and arm its community's hooks
+    to tell the plug-in once it commits."""
+    session.add(row)
+    await audit_service.record(
+        session,
+        event_type=AuditEventType.PLUGIN_STATE_CHANGED,
+        actor_user_id=actor_user_id,
+        guild_id=row.guild_id,
+        target_type="plugin",
+        target_id=row.install_id,
+        detail={"listing_uid": row.listing_uid, **detail},
+    )
+    community_hooks.status_changed(session, row.guild_id)
+
+
+async def set_suspended(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    install_id: int,
+    suspended: bool,
+    actor_user_id: int,
+    grant_id: int | None = None,
+) -> PluginInstall:
+    """Suspend the community's install, or lift its suspension, on the system
+    engine's ``session``. Its status is left as it is, and lifting returns the
+    install to it, stamped as back from a suspension. The caller commits."""
+    row = await _locked(session, guild_id, install_id)
+    if suspended != (row.suspended_at is not None):
+        row.suspended_at = utcnow() if suspended else None
+        row.suspended_by = actor_user_id if suspended else None
+        if not suspended:
+            row.resumed_at = utcnow()
+        await _changed(
+            session,
+            row,
+            actor_user_id=actor_user_id,
+            detail={"suspended": suspended, "grant_id": grant_id},
+        )
+    return row
+
+
+async def set_status(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    install_id: int,
+    status: PluginInstallStatus,
+    actor_user_id: int,
+) -> PluginInstall:
+    """Set the community's install's status, on the system engine's
+    ``session``, stamping when it moved. The caller commits."""
+    row = await _locked(session, guild_id, install_id)
+    if row.status != status.value:
+        before = row.status
+        row.status = status.value
+        row.status_changed_at = utcnow()
+        await _changed(
+            session,
+            row,
+            actor_user_id=actor_user_id,
+            detail={"from": before, "to": status.value},
+        )
+    return row
 
 
 # --- claims on unique settings -------------------------------------------------

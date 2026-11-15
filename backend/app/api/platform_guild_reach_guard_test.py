@@ -178,6 +178,10 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "the scheduled sweep that deletes a community whose hold ran out, "
         "letting go of its plug-in connections in its own schema"
     ),
+    (f"{_SERVICES}/guild_purge.py", "_uninstall_deleted"): (
+        "the scheduled sweep that uninstalls a plug-in left deleted past its "
+        "window, in its community's own schema"
+    ),
     (f"{_SERVICES}/guild_purge.py", "destroy_now"): (
         "destroys a community without a retention window, letting go of its "
         "plug-in connections in its own schema"

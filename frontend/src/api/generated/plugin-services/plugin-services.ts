@@ -263,10 +263,10 @@ export const useCreatePluginService = <TError = ErrorType<HTTPValidationError>, 
   return useMutation(getCreatePluginServiceMutationOptions(options), queryClient);
 };
 /**
- * Enable/disable, repoint either address, replace the keys, change the
- * reach conferred, let vendor installations be shared, or set the vendor
- * values. Turning sharing off while an installation is connected to more
- * than one community is refused (409).
+ * Suspend everywhere or lift, repoint either address, replace the keys,
+ * change the reach conferred, let vendor installations be shared, or set
+ * the vendor values. Turning sharing off while an installation is connected
+ * to more than one community is refused (409).
  * @summary Update Plugin Service
  */
 export const updatePluginService = (

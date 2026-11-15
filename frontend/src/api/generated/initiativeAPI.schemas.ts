@@ -3182,6 +3182,7 @@ export const CommunityAction = {
   billing_operator: "billing_operator",
   request_access: "request_access",
   break_glass: "break_glass",
+  plugins: "plugins",
 } as const;
 
 export type CommunityAuthOption = (typeof CommunityAuthOption)[keyof typeof CommunityAuthOption];
@@ -3942,6 +3943,19 @@ export interface CommunityPaymentIssueRead {
 }
 
 /**
+ * What the reader may do to one of a community's plug-ins. Worked out by
+ * the server per install.
+ */
+export type CommunityPluginAction =
+  (typeof CommunityPluginAction)[keyof typeof CommunityPluginAction];
+
+export const CommunityPluginAction = {
+  suspend: "suspend",
+  lift: "lift",
+  set_status: "set_status",
+} as const;
+
+/**
  * One thing an install produced.
  */
 export interface CommunityPluginArtifact {
@@ -4263,6 +4277,7 @@ export interface CommunityPluginDetail {
   granted_scopes: string[];
   mandatory: boolean;
   available: boolean;
+  read_only: boolean;
   created_by: number;
   created_at: string;
   updated_at: string;
@@ -4345,6 +4360,7 @@ export interface CommunityPluginRead {
   granted_scopes: string[];
   mandatory: boolean;
   available: boolean;
+  read_only: boolean;
   created_by: number;
   created_at: string;
   updated_at: string;
@@ -4429,6 +4445,56 @@ export interface CommunityPluginScopesUpdate {
  */
 export interface CommunityPluginSettingUpdate {
   value?: string | null;
+}
+
+/**
+ * An install's status, set by staff or, where billing sets plans, by
+ * billing. Initiative keeps no plug-in data by it: the plug-in is told and
+ * decides what each means to it.
+ */
+export type PluginInstallStatus = (typeof PluginInstallStatus)[keyof typeof PluginInstallStatus];
+
+export const PluginInstallStatus = {
+  active: "active",
+  read_only: "read_only",
+  on_hold: "on_hold",
+  deleted: "deleted",
+} as const;
+
+/**
+ * A plug-in's state in one community: suspended when the platform, the
+ * install or its reach suspends it, otherwise the install's status.
+ */
+export type PluginState = (typeof PluginState)[keyof typeof PluginState];
+
+export const PluginState = {
+  active: "active",
+  read_only: "read_only",
+  on_hold: "on_hold",
+  deleted: "deleted",
+  suspended: "suspended",
+} as const;
+
+/**
+ * One of a community's plug-ins as staff see it.
+ */
+export interface CommunityPluginStateRead {
+  install_id: number;
+  listing_uid: string;
+  name: string | null;
+  status: PluginInstallStatus;
+  state: PluginState;
+  status_changed_at: string | null;
+  suspended_at: string | null;
+  uninstall_at: string | null;
+  allowed_actions: CommunityPluginAction[];
+}
+
+/**
+ * Set the status of one of a community's plug-ins.
+ */
+export interface CommunityPluginStatusUpdate {
+  status: PluginInstallStatus;
 }
 
 /**
@@ -4684,7 +4750,7 @@ export interface CommunityStorageUsageRead {
 }
 
 /**
- * Suspend a community, or lift its suspension.
+ * Suspend a community, or one of its plug-ins, or lift the suspension.
  */
 export interface CommunitySuspensionUpdate {
   suspended: boolean;
@@ -10103,7 +10169,6 @@ export interface PluginServiceRegistrationCreate {
   jwks_uri?: string | null;
   mandatory?: boolean;
   operations_only?: boolean;
-  enabled?: boolean;
   vendor_values?: PluginServiceRegistrationCreateVendorValues;
 }
 
@@ -10145,7 +10210,7 @@ export interface PluginServiceRegistrationRead {
   mandatory: boolean;
   operations_only: boolean;
   shared_routes: boolean;
-  enabled: boolean;
+  suspended_at: string | null;
   source: string;
   image_digest: string | null;
   compose_service: string | null;
@@ -10185,7 +10250,7 @@ export interface PluginServiceRegistrationUpdate {
   mandatory?: boolean | null;
   operations_only?: boolean | null;
   shared_routes?: boolean | null;
-  enabled?: boolean | null;
+  suspended?: boolean | null;
   vendor_values?: PluginServiceRegistrationUpdateVendorValues;
 }
 

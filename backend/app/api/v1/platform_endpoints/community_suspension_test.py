@@ -1,5 +1,6 @@
 """Staff on the communities list: who reads it, what each row offers them,
-and a moderator suspending a community under a ``moderate`` grant."""
+and a moderator suspending a community, or one of its plug-ins, under a
+``moderate`` grant; an operator setting a plug-in's status."""
 
 from __future__ import annotations
 
@@ -10,11 +11,24 @@ from httpx2 import AsyncClient, Response
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import AuthMessages, GuildMessages
+from app.core.messages import AuthMessages, GuildMessages, PluginServiceMessages
+from app.core.tools import Tool
+from app.db.request_context import Unattributed
+from app.db.session import set_rls_context
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
+from app.models.platform.plugin_community_hook import PluginCommunityHook
 from app.models.platform.user import User, UserRole
-from app.testing import create_guild, create_user, get_auth_headers
+from app.models.tenant.guild_plugin import GuildPlugin
+from app.services.platform import guild_purge
+from app.services.platform.retention import PLUGIN_INSTALL_DELETION_DAYS
+from app.testing import (
+    create_guild,
+    create_guild_plugin,
+    create_user,
+    get_auth_headers,
+    route_session_to_guild,
+)
 
 COMMUNITIES = "/api/v1/settings/communities"
 
@@ -299,3 +313,270 @@ async def test_what_is_not_an_id_is_searched_as_a_name(
         COMMUNITIES, params={"search": term}, headers=get_auth_headers(support)
     )
     assert response.status_code == 200, response.text
+
+
+# ── A community's plug-ins ───────────────────────────────────────────────────
+
+PLUGIN_UID = "STAFFAPP000001"
+
+
+async def _plugin(session: AsyncSession, guild: Guild) -> int:
+    owner = await create_user(session)
+    plugin = await create_guild_plugin(
+        session,
+        guild,
+        owner,
+        definition={"plugin_kind": "service", "service": {"public_id": "t.board"}},
+        listing_uid=PLUGIN_UID,
+        name="Board",
+    )
+    assert plugin.id is not None
+    return plugin.id
+
+
+def _plugin_url(guild: Guild, install_id: int, what: str) -> str:
+    return f"{COMMUNITIES}/{guild.id}/plugins/{install_id}/{what}"
+
+
+async def test_a_moderator_suspends_and_lifts_a_plugin_only_under_a_grant(
+    client, session
+):
+    moderator = await create_user(session, role=UserRole.moderator)
+    guild = await create_guild(session)
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(moderator)
+
+    listed = await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    assert listed.status_code == 403, listed.text
+    assert listed.json()["detail"] == GuildMessages.COMMUNITY_SUSPENSION_NEEDS_GRANT
+    refused = await client.post(
+        _plugin_url(guild, install_id, "suspension"),
+        json={"suspended": True},
+        headers=headers,
+    )
+    assert refused.status_code == 403, refused.text
+    assert "plugins" not in (await _row(client, moderator, guild))["allowed_actions"]
+
+    await _moderate_grant(session, user=moderator, guild=guild)
+    assert "plugins" in (await _row(client, moderator, guild))["allowed_actions"]
+    listed = await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    assert listed.status_code == 200, listed.text
+    [plugin] = listed.json()
+    assert (plugin["install_id"], plugin["name"], plugin["state"]) == (
+        install_id,
+        "Board",
+        "active",
+    )
+    assert plugin["allowed_actions"] == ["suspend"]
+
+    suspended = await client.post(
+        _plugin_url(guild, install_id, "suspension"),
+        json={"suspended": True},
+        headers=headers,
+    )
+    assert suspended.status_code == 200, suspended.text
+    body = suspended.json()
+    assert (body["status"], body["state"]) == ("active", "suspended")
+    assert body["suspended_at"] is not None
+    assert body["allowed_actions"] == ["lift"]
+
+    # Never a status: that is the operator's, or billing's.
+    status_set = await client.put(
+        _plugin_url(guild, install_id, "status"),
+        json={"status": "on_hold"},
+        headers=headers,
+    )
+    assert status_set.status_code == 403, status_set.text
+
+    lifted = await client.post(
+        _plugin_url(guild, install_id, "suspension"),
+        json={"suspended": False},
+        headers=headers,
+    )
+    assert lifted.status_code == 200, lifted.text
+    assert (lifted.json()["state"], lifted.json()["suspended_at"]) == ("active", None)
+
+
+async def test_an_operator_sets_a_status_under_a_suspension(client, session):
+    """A suspension placed over a status leaves it as it was, and lifting
+    returns the install to it."""
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+
+    [plugin] = (
+        await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    ).json()
+    assert plugin["allowed_actions"] == ["suspend", "set_status"]
+
+    await client.post(
+        _plugin_url(guild, install_id, "suspension"),
+        json={"suspended": True},
+        headers=headers,
+    )
+    held = await client.put(
+        _plugin_url(guild, install_id, "status"),
+        json={"status": "read_only"},
+        headers=headers,
+    )
+    assert held.status_code == 200, held.text
+    assert (held.json()["status"], held.json()["state"]) == ("read_only", "suspended")
+
+    lifted = await client.post(
+        _plugin_url(guild, install_id, "suspension"),
+        json={"suspended": False},
+        headers=headers,
+    )
+    assert lifted.json()["state"] == "read_only"
+
+
+async def test_a_plugins_status_is_billings_where_it_sets_plans(
+    client, session, monkeypatch
+):
+    from app.core.config import settings
+
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+    monkeypatch.setattr(settings, "BILLING_URL", "https://billing.example.com")
+    monkeypatch.setattr(settings, "BILLING_PUBLIC_KEY_PEM", "test-public-key")
+    monkeypatch.setattr(
+        settings, "BILLING_STATEMENT_PUBLIC_KEY_PEM", "test-statement-key"
+    )
+
+    [plugin] = (
+        await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    ).json()
+    assert plugin["allowed_actions"] == ["suspend"]
+    refused = await client.put(
+        _plugin_url(guild, install_id, "status"),
+        json={"status": "on_hold"},
+        headers=headers,
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == PluginServiceMessages.STATUS_IS_BILLINGS
+    # Suspending stays Initiative's.
+    suspended = await client.post(
+        _plugin_url(guild, install_id, "suspension"),
+        json={"suspended": True},
+        headers=headers,
+    )
+    assert suspended.status_code == 200, suspended.text
+
+
+async def test_a_mounted_tool_is_not_a_plugin_with_a_state(client, session):
+    """One of this build's tools mounted in the community is left out, and
+    neither suspended nor given a status."""
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    tool = await create_guild_plugin(
+        session,
+        guild,
+        operator,
+        definition={"plugin_kind": "tool_instance", "tool": Tool.contact.value},
+        listing_uid="TOOLAPP0000001",
+        name="Contacts",
+    )
+    tool_id = tool.id
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+
+    listed = await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    assert [plugin["install_id"] for plugin in listed.json()] == [install_id]
+    for method, what, body in (
+        ("POST", "suspension", {"suspended": True}),
+        ("PUT", "status", {"status": "on_hold"}),
+    ):
+        refused = await client.request(
+            method, _plugin_url(guild, tool_id, what), json=body, headers=headers
+        )
+        assert refused.status_code == 404, refused.text
+        assert refused.json()["detail"] == PluginServiceMessages.INSTALL_NOT_FOUND
+
+
+async def test_a_deleted_plugin_comes_back_within_its_window_and_goes_after(
+    client, session
+):
+    """Set back within the window, it is as it was. Left deleted past it, the
+    hourly sweep uninstalls it in its community, telling the plug-in
+    ``uninstalled`` and never ``erase``."""
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+
+    async def set_status(status: str) -> dict:
+        response = await client.put(
+            _plugin_url(guild, install_id, "status"),
+            json={"status": status},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    deleted = await set_status("deleted")
+    changed = datetime.fromisoformat(deleted["status_changed_at"])
+    assert datetime.fromisoformat(deleted["uninstall_at"]) == changed + timedelta(
+        days=PLUGIN_INSTALL_DELETION_DAYS
+    )
+
+    within = changed + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS - 1)
+    assert await guild_purge.uninstall_deleted_plugins(session, now=within) == 0
+    assert (await set_status("active"))["uninstall_at"] is None
+
+    await set_status("deleted")
+    past = datetime.now(UTC) + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS + 1)
+    assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 1
+
+    listed = await client.get(f"{COMMUNITIES}/{guild.id}/plugins", headers=headers)
+    assert listed.json() == []
+    await route_session_to_guild(session, guild.id)
+    assert await session.get(GuildPlugin, install_id) is None
+    await set_rls_context(session, Unattributed())
+    hooks = (
+        await session.exec(
+            select(PluginCommunityHook.hook).where(
+                PluginCommunityHook.guild_id == guild.id
+            )
+        )
+    ).all()
+    assert hooks == ["uninstalled"]
+
+
+async def test_a_deleted_plugin_suspended_there_goes_without_a_word(client, session):
+    """Uninstalled by the sweep while suspended, it is sent nothing: no
+    ``uninstalled``, no revocation, and what waited for it is discarded."""
+    from app.services.marketplace import community_hooks
+
+    operator = await create_user(session, role=UserRole.operator)
+    guild = await create_guild(session)
+    install_id = await _plugin(session, guild)
+    headers = get_auth_headers(operator)
+    await community_hooks.deliver_community_hook(
+        guild_id=guild.id, public_id="t.board", hook="installed"
+    )
+    for method, what, body in (
+        ("POST", "suspension", {"suspended": True}),
+        ("PUT", "status", {"status": "deleted"}),
+    ):
+        response = await client.request(
+            method, _plugin_url(guild, install_id, what), json=body, headers=headers
+        )
+        assert response.status_code == 200, response.text
+
+    past = datetime.now(UTC) + timedelta(days=PLUGIN_INSTALL_DELETION_DAYS + 1)
+    assert await guild_purge.uninstall_deleted_plugins(session, now=past) == 1
+
+    await route_session_to_guild(session, guild.id)
+    assert await session.get(GuildPlugin, install_id) is None
+    await set_rls_context(session, Unattributed())
+    hooks = (
+        await session.exec(
+            select(PluginCommunityHook.hook).where(
+                PluginCommunityHook.guild_id == guild.id
+            )
+        )
+    ).all()
+    assert hooks == []

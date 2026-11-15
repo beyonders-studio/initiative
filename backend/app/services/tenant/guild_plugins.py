@@ -481,10 +481,15 @@ async def uninstall_plugin(
     session: AsyncSession,
     plugin: GuildPlugin,
     *,
-    actor_user_id: int,
+    actor_user_id: int | None,
     erase: bool = False,
+    suspended: bool = False,
 ) -> None:
     """Remove an install, ending its access and trashing what it created.
+    ``actor_user_id`` is ``None`` for the sweep removing a deleted install.
+    ``suspended``: the plug-in is suspended in the community, so nothing is
+    sent to it or to its vendor for it: its credentials go unrevoked and no
+    hook is queued.
 
     What the plug-in calls the community and its members is kept, so a later
     install brings the same names back. It is told ``uninstalled`` once the
@@ -505,7 +510,7 @@ async def uninstall_plugin(
     guild_id = routed_guild_id(session)
     retention_days = await guilds_service.get_guild_retention_days(session)
     connections = await connections_service.delete_plugin_connections(
-        session, plugin=plugin
+        session, plugin=plugin, revoke=not suspended
     )
     # Every member's answers to its requests go with it. The foreign key would
     # take them with the install row; removed here so the record counts them.
@@ -518,16 +523,17 @@ async def uninstall_plugin(
     await webhook_subscriptions_service.deactivate_for_install(
         session, guild_id=guild_id, plugin_install_id=plugin.id
     )
-    secrets = await load_secrets(session, plugin)
-    # The revocations to the plug-in itself are written to its hook queue
-    # here, ahead of the uninstalled and erase below.
-    await queue_install_revocations(
-        session,
-        plugin,
-        {*(plugin.config or {}), *secrets},
-        secrets=secrets,
-        reason="uninstalled",
-    )
+    if not suspended:
+        secrets = await load_secrets(session, plugin)
+        # The revocations to the plug-in itself are written to its hook queue
+        # here, ahead of the uninstalled and erase below.
+        await queue_install_revocations(
+            session,
+            plugin,
+            {*(plugin.config or {}), *secrets},
+            secrets=secrets,
+            reason="uninstalled",
+        )
     for artifact in await plugin_artifacts(session, plugin):
         await ARTIFACT_HANDLERS[artifact["type"]].remove(
             session,
@@ -549,7 +555,7 @@ async def uninstall_plugin(
 
     # Told with the removal, in its transaction, under the public id its
     # references key on, registration or not, so an erase still reaches them.
-    if public_id is not None:
+    if public_id is not None and not suspended:
         await community_hooks.queue_community_hooks(
             session,
             guild_id=guild_id,

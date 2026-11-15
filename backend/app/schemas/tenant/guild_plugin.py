@@ -22,6 +22,7 @@ from typing import (
 from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.identity_boundary import PersonId
+from app.models.platform.plugin_install import PluginState
 from app.models.tenant.plugin_member_consent import ConsentAccess, ConsentStatus
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.marketplace import ListingSource
@@ -330,9 +331,12 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: erroring, so the client is told which installs those are.
     mandatory: bool = False
     #: Whether what this plug-in offers can be reached right now. False for a
-    #: service plug-in whose registration is missing or switched off — the install
-    #: stays where it is and says why it is doing nothing.
+    #: service plug-in this deployment has not set up — the install stays
+    #: where it is and says why it is doing nothing.
     available: bool = True
+    #: The platform set this install read-only: its pages and data still
+    #: read, and nothing it would write is taken.
+    read_only: bool = False
     created_by: PersonId
     created_at: datetime
     updated_at: datetime
@@ -690,6 +694,7 @@ def serialize_guild_plugin(
         granted_scopes=sorted(plugin.granted_scopes or []),
         mandatory=service_state.mandatory,
         available=service_state.available,
+        read_only=service_state.state is PluginState.read_only,
         created_by=plugin.created_by,
         created_at=plugin.created_at,
         updated_at=plugin.updated_at,
