@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Reload in the desktop app.** The title bar has a reload button beside Help, for a page that needs a fresh start.
+
 ## [0.79.0] - 2026-11-13
 
 ### Added

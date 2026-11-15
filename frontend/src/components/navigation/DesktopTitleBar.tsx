@@ -1,3 +1,4 @@
+import { RotateCw } from "lucide-react";
 import { Suspense, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -6,6 +7,7 @@ import { HelpButton } from "@/components/support/HelpButton";
 import { UpdateButton } from "@/components/updates/UpdateButton";
 import { themeColor } from "@/lib/cssColor";
 import Desktop from "@/plugins/desktop";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** The part of the window controls overlay read here; TypeScript's DOM types lack it. */
 interface WindowControlsOverlay extends EventTarget {
@@ -64,9 +66,35 @@ const useWindowButtonColors = (shown: boolean) => {
   }, [shown]);
 };
 
+/** Reloads the page, which a browser's own toolbar offers and the desktop app's window does not. */
+const ReloadButton = () => {
+  const { t } = useTranslation("common");
+  const label = t("reloadPage");
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+            aria-label={label}
+            onClick={() => window.location.reload()}
+          >
+            <RotateCw className="size-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{label}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 /**
  * The desktop app's title bar, which the window leaves to the page: the app's
- * name, then the update it is waiting on and Help, with the computer's own
+ * name, then the update it is waiting on, Reload and Help, with the computer's own
  * window buttons drawn at its end. The bar drags the window and a double click
  * maximizes it. Everything under it is sized by `--title-bar-height` (`h-app`,
  * `min-h-app`, `max-h-app`).
@@ -105,6 +133,7 @@ export const DesktopTitleBar = () => {
         <Suspense fallback={null}>
           <div className="ml-auto flex items-center gap-3 [app-region:no-drag]">
             <UpdateButton />
+            <ReloadButton />
             <HelpButton />
           </div>
         </Suspense>
