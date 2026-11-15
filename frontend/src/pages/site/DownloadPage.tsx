@@ -3,25 +3,21 @@
  *
  * Android gets a real file: the APK attached to the release the server's
  * native floor names, which is the newest one that runs this server's web
- * bundle. A computer gets its installer from the release its own floor names,
- * or installs from the browser: in one click where the browser offers its own
- * install prompt and by the guide where it doesn't. An iPhone adds it to the
- * home screen from Safari.
+ * bundle. A computer gets its installer from the release its own floor names.
+ * An iPhone adds it to the home screen from Safari.
  */
 
-import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpRight,
   Download,
-  Globe,
   KeyRound,
   Monitor,
   RefreshCw,
   Smartphone,
   User,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { useGetFcmConfig } from "@/api/generated/settings/settings";
@@ -48,65 +44,11 @@ import { usePageMeta } from "./usePageMeta";
 const INSTALL_GUIDE = docsUrl("getting-started/install-the-app/");
 const BROWSER_INSTALL = `${INSTALL_GUIDE}#install-it-from-the-browser`;
 
-/** The browser's own install prompt, where it offers one (Chrome, Edge). */
-interface InstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-}
-
-const useInstallPrompt = () => {
-  const [event, setEvent] = useState<InstallPromptEvent | null>(null);
-  useEffect(() => {
-    const capture = (e: Event) => {
-      e.preventDefault();
-      setEvent(e as InstallPromptEvent);
-    };
-    const installed = () => setEvent(null);
-    window.addEventListener("beforeinstallprompt", capture);
-    window.addEventListener("appinstalled", installed);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", capture);
-      window.removeEventListener("appinstalled", installed);
-    };
-  }, []);
-  // A prompt can be shown once. After that, whatever the answer, it is spent,
-  // and the buttons go back to pointing at the guide.
-  const consume = () => {
-    if (!event) return;
-    void event.prompt().finally(() => setEvent(null));
-  };
-  return { available: event != null, consume };
-};
-
 const DESKTOP_BUTTON = {
   windows: "download.windowsButton",
   mac: "download.macButton",
   linux: "download.linuxButton",
 } as const;
-
-/** The button that gets Initiative onto this computer: the browser's prompt
- *  when it has one, the guide when it doesn't. */
-const InstallButton = ({
-  prompt,
-  className,
-  variant,
-  children,
-}: {
-  prompt: ReturnType<typeof useInstallPrompt>;
-  className?: string;
-  variant?: "default" | "outline";
-  children: ReactNode;
-}) =>
-  prompt.available ? (
-    <Button size="lg" variant={variant} className={className} onClick={prompt.consume}>
-      {children}
-    </Button>
-  ) : (
-    <Button size="lg" variant={variant} className={className} asChild>
-      <a href={BROWSER_INSTALL} target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
-    </Button>
-  );
 
 const ApkButton = ({
   minNativeVersion,
@@ -220,7 +162,6 @@ export const DownloadPage = () => {
   const minDesktopVersion = config?.min_desktop_version ?? null;
   const platform = useMemo(() => detectPlatform(), []);
   const desktopOs = useMemo<DesktopOs | null>(() => detectDesktopOs(), []);
-  const prompt = useInstallPrompt();
   const desktopLabel = t(desktopOs ? DESKTOP_BUTTON[desktopOs] : "download.desktopButton");
 
   return (
@@ -295,9 +236,6 @@ export const DownloadPage = () => {
                   <Download className="h-5 w-5" aria-hidden="true" />
                   {desktopLabel}
                 </DesktopButton>
-                <InstallButton prompt={prompt} variant="outline">
-                  {t("download.browserInstall")}
-                </InstallButton>
                 <p className="text-center text-muted-foreground text-sm">
                   {minDesktopVersion
                     ? t("download.version", { version: minDesktopVersion })
@@ -309,7 +247,7 @@ export const DownloadPage = () => {
         </section>
 
         <ul
-          className="mt-8 grid gap-3 sm:mt-10 sm:gap-4 md:grid-cols-2 lg:grid-cols-4"
+          className="mt-8 grid gap-3 sm:mt-10 sm:gap-4 md:grid-cols-3"
           aria-label={t("download.cardsAria")}
         >
           <PlatformCard
@@ -375,22 +313,6 @@ export const DownloadPage = () => {
                 ? desktopLabel
                 : t("download.releases")}
             </DesktopButton>
-            <InstallButton prompt={prompt} variant="outline" className="w-full">
-              {t("download.browserInstall")}
-            </InstallButton>
-          </PlatformCard>
-          <PlatformCard
-            icon={Globe}
-            title={t("download.browser.title")}
-            sub={t("download.browser.sub")}
-            platform="browser"
-          >
-            <p className="flex-1 text-muted-foreground text-sm">{t("download.browser.body")}</p>
-            <Button variant="outline" size="lg" className="w-full" asChild>
-              <Link to="/login" search={true}>
-                {t("download.browser.button")}
-              </Link>
-            </Button>
           </PlatformCard>
         </ul>
 

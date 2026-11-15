@@ -281,7 +281,7 @@
   "download": {
     "title": "Download",
     "titleHighlight": "Initiative",
-    "description": "It runs in a browser, and using it that way forever is a completely respectable life choice. But it can also have its own icon and its own window.",
+    "description": "Take your communities with you. Available on Windows, Mac, Linux, Android, iPhone and iPad.",
     "detected": "Looks like you're on {{platform}}",
     "platformAndroid": "Android",
     "platformIos": "an iPhone or iPad",
@@ -291,7 +291,7 @@
     "iosTitle": "Initiative for iPhone and iPad",
     "iosBody": "Tap Share, then Add to Home Screen. It's the same Initiative, but iPhones don't get push notifications yet.",
     "desktopTitle": "Initiative for your computer",
-    "desktopBody": "Its own window and its own icon in the dock or taskbar, signed in as one of your devices.",
+    "desktopBody": "Know the moment something needs you, even with Initiative tucked behind your other windows.",
     "androidButton": "Download for Android",
     "iosButton": "Add to your iPhone",
     "windowsButton": "Download for Windows",
@@ -301,7 +301,6 @@
     "version": "Version {{version}}, the one this server runs",
     "releases": "See every release",
     "desktopMeta": "Windows, Mac and Linux",
-    "browserInstall": "Or install it from the browser",
     "cardsAria": "Every way to get Initiative",
     "android": {
       "title": "Android",
@@ -321,22 +320,16 @@
     "desktop": {
       "title": "Computer",
       "sub": "Windows, Mac, Linux",
-      "body": "An installer for Windows, Mac or Linux. Chrome and Edge can also install it straight from the browser, and Safari from File, then Add to Dock."
-    },
-    "browser": {
-      "title": "Browser",
-      "sub": "Anything with a screen",
-      "body": "Nothing to install, just bookmark it.",
-      "button": "Open in your browser"
+      "body": "Lives in your dock or taskbar and pings you while you're busy in other apps."
     },
     "factsAria": "Good to know",
     "updatesTitle": "Updates install themselves",
     "updatesBody": "Initiative keeps itself up to date, so you won't need to come back here.",
     "accountTitle": "One account, every device",
-    "accountBody": "Sign in on your phone, laptop or the library computer and everything's there.",
+    "accountBody": "Sign in on your phone, tablet and computer, and everything's there.",
     "passkeysTitle": "Passkeys welcome",
     "passkeysBody": "Sign in with a passkey if you'd rather not type a password.",
-    "descriptionPush": "It runs in a browser, and using it that way forever is a completely respectable life choice. But it can also have its own icon, its own window and, on Android, notifications that turn up while you aren't looking.",
+    "descriptionPush": "Take your communities with you, and get a ping on Android when something needs you. Available on Windows, Mac, Linux, Android, iPhone and iPad.",
     "androidBodyPush": "Installs like anything else, push notifications included, no app store needed."
   },
   "pricing": {

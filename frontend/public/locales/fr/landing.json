@@ -281,7 +281,7 @@
   "download": {
     "title": "Télécharger",
     "titleHighlight": "Initiative",
-    "description": "Ça tourne dans un navigateur, et s'en tenir là pour toujours est un choix parfaitement respectable. Mais ça peut aussi avoir sa propre icône et sa propre fenêtre.",
+    "description": "Emportez vos communautés partout. Disponible sur Windows, Mac, Linux, Android, iPhone et iPad.",
     "detected": "On dirait que vous êtes sur {{platform}}",
     "platformAndroid": "Android",
     "platformIos": "un iPhone ou un iPad",
@@ -291,7 +291,7 @@
     "iosTitle": "Initiative pour iPhone et iPad",
     "iosBody": "Touchez Partager, puis Sur l'écran d'accueil. C'est le même Initiative, mais les iPhone ne reçoivent pas encore de notifications push.",
     "desktopTitle": "Initiative pour votre ordinateur",
-    "desktopBody": "Sa propre fenêtre et sa propre icône dans le Dock ou la barre des tâches, connecté comme l'un de vos appareils.",
+    "desktopBody": "Sachez tout de suite quand on a besoin de vous, même avec Initiative caché derrière vos autres fenêtres.",
     "androidButton": "Télécharger pour Android",
     "iosButton": "Ajouter à votre iPhone",
     "windowsButton": "Télécharger pour Windows",
@@ -301,7 +301,6 @@
     "version": "Version {{version}}, celle de ce serveur",
     "releases": "Voir toutes les versions",
     "desktopMeta": "Windows, Mac et Linux",
-    "browserInstall": "Ou installez-le depuis le navigateur",
     "cardsAria": "Toutes les façons d'obtenir Initiative",
     "android": {
       "title": "Android",
@@ -321,22 +320,16 @@
     "desktop": {
       "title": "Ordinateur",
       "sub": "Windows, Mac, Linux",
-      "body": "Un programme d'installation pour Windows, Mac ou Linux. Chrome et Edge l'installent aussi directement depuis le navigateur, et Safari via Fichier, puis Ajouter au Dock."
-    },
-    "browser": {
-      "title": "Navigateur",
-      "sub": "Tout ce qui a un écran",
-      "body": "Rien à installer, ajoutez-le simplement à vos favoris.",
-      "button": "Ouvrir dans le navigateur"
+      "body": "Reste dans votre Dock ou votre barre des tâches et vous prévient pendant que vous êtes occupé ailleurs."
     },
     "factsAria": "Bon à savoir",
     "updatesTitle": "Les mises à jour s'installent toutes seules",
     "updatesBody": "Initiative se tient à jour tout seul, vous n'aurez donc pas besoin de revenir ici.",
     "accountTitle": "Un compte, tous vos appareils",
-    "accountBody": "Connectez-vous sur votre téléphone, votre portable ou l'ordinateur de la bibliothèque, et tout est là.",
+    "accountBody": "Connectez-vous sur votre téléphone, votre tablette et votre ordinateur, et tout est là.",
     "passkeysTitle": "Les clés d'accès sont les bienvenues",
     "passkeysBody": "Connectez-vous avec une clé d'accès si vous préférez ne pas taper de mot de passe.",
-    "descriptionPush": "Ça tourne dans un navigateur, et s'en tenir là pour toujours est un choix parfaitement respectable. Mais ça peut aussi avoir sa propre icône, sa propre fenêtre et, sur Android, des notifications qui arrivent même quand vous ne regardez pas.",
+    "descriptionPush": "Emportez vos communautés partout, et sur Android, Initiative vous prévient quand on a besoin de vous. Disponible sur Windows, Mac, Linux, Android, iPhone et iPad.",
     "androidBodyPush": "S'installe comme n'importe quoi d'autre, notifications push comprises, sans passer par une boutique d'applications."
   },
   "pricing": {

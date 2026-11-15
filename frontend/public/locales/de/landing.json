@@ -281,7 +281,7 @@
   "download": {
     "title": "Hol dir",
     "titleHighlight": "Initiative",
-    "description": "Es läuft im Browser, und es für immer so zu nutzen, ist eine völlig respektable Entscheidung. Es kann aber auch ein eigenes Symbol und ein eigenes Fenster haben.",
+    "description": "Nimm deine Communitys überallhin mit. Für Windows, Mac, Linux, Android, iPhone und iPad.",
     "detected": "Sieht aus, als wärst du auf {{platform}}",
     "platformAndroid": "Android",
     "platformIos": "einem iPhone oder iPad",
@@ -291,7 +291,7 @@
     "iosTitle": "Initiative für iPhone und iPad",
     "iosBody": "Tippe auf Teilen und dann auf Zum Home-Bildschirm. Es ist dasselbe Initiative, nur bekommen iPhones noch keine Push-Benachrichtigungen.",
     "desktopTitle": "Initiative für deinen Computer",
-    "desktopBody": "Ein eigenes Fenster und ein eigenes Symbol im Dock oder in der Taskleiste, angemeldet als eines deiner Geräte.",
+    "desktopBody": "Erfahre sofort, wenn du gebraucht wirst, auch wenn Initiative hinter deinen anderen Fenstern steckt.",
     "androidButton": "Download für Android",
     "iosButton": "Aufs iPhone holen",
     "windowsButton": "Download für Windows",
@@ -301,7 +301,6 @@
     "version": "Version {{version}}, die dieser Server nutzt",
     "releases": "Alle Versionen ansehen",
     "desktopMeta": "Windows, Mac und Linux",
-    "browserInstall": "Oder direkt aus dem Browser installieren",
     "cardsAria": "Alle Wege zu Initiative",
     "android": {
       "title": "Android",
@@ -321,22 +320,16 @@
     "desktop": {
       "title": "Computer",
       "sub": "Windows, Mac, Linux",
-      "body": "Ein Installationsprogramm für Windows, Mac oder Linux. Chrome und Edge installieren es auch direkt aus dem Browser, Safari über Ablage und dann Zum Dock hinzufügen."
-    },
-    "browser": {
-      "title": "Browser",
-      "sub": "Alles mit Bildschirm",
-      "body": "Nichts zu installieren, einfach ein Lesezeichen setzen.",
-      "button": "Im Browser öffnen"
+      "body": "Wohnt in deinem Dock oder deiner Taskleiste und meldet sich, während du in anderen Apps beschäftigt bist."
     },
     "factsAria": "Gut zu wissen",
     "updatesTitle": "Updates installieren sich selbst",
     "updatesBody": "Initiative hält sich selbst aktuell, du musst also nicht hierher zurückkommen.",
     "accountTitle": "Ein Konto, jedes Gerät",
-    "accountBody": "Melde dich auf dem Handy, dem Laptop oder dem Computer in der Bibliothek an, und alles ist da.",
+    "accountBody": "Melde dich auf Handy, Tablet und Computer an, und alles ist da.",
     "passkeysTitle": "Passkeys willkommen",
     "passkeysBody": "Melde dich mit einem Passkey an, wenn du lieber kein Passwort eintippst.",
-    "descriptionPush": "Es läuft im Browser, und es für immer so zu nutzen, ist eine völlig respektable Entscheidung. Es kann aber auch ein eigenes Symbol haben, ein eigenes Fenster und, auf Android, Benachrichtigungen, die ankommen, während du gerade nicht hinschaust.",
+    "descriptionPush": "Nimm deine Communitys überallhin mit, und auf Android meldet sich Initiative, wenn du gebraucht wirst. Für Windows, Mac, Linux, Android, iPhone und iPad.",
     "androidBodyPush": "Installiert sich wie alles andere, mit Push-Benachrichtigungen, ganz ohne App Store."
   },
   "pricing": {

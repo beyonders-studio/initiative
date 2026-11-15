@@ -281,7 +281,7 @@
   "download": {
     "title": "Descarga",
     "titleHighlight": "Initiative",
-    "description": "Funciona en el navegador, y usarlo así para siempre es una decisión perfectamente respetable. Pero también puede tener su propio icono y su propia ventana.",
+    "description": "Lleva tus comunidades contigo. Disponible para Windows, Mac, Linux, Android, iPhone y iPad.",
     "detected": "Parece que usas {{platform}}",
     "platformAndroid": "Android",
     "platformIos": "un iPhone o iPad",
@@ -291,7 +291,7 @@
     "iosTitle": "Initiative para iPhone y iPad",
     "iosBody": "Toca Compartir y luego Añadir a la pantalla de inicio. Es el mismo Initiative, pero los iPhone todavía no reciben notificaciones push.",
     "desktopTitle": "Initiative para tu ordenador",
-    "desktopBody": "Su propia ventana y su propio icono en el dock o la barra de tareas, con la sesión iniciada como uno de tus dispositivos.",
+    "desktopBody": "Entérate en cuanto algo te necesita, aunque Initiative esté escondido detrás de tus otras ventanas.",
     "androidButton": "Descargar para Android",
     "iosButton": "Añadir a tu iPhone",
     "windowsButton": "Descargar para Windows",
@@ -301,7 +301,6 @@
     "version": "Versión {{version}}, la que usa este servidor",
     "releases": "Ver todas las versiones",
     "desktopMeta": "Windows, Mac y Linux",
-    "browserInstall": "O instálalo desde el navegador",
     "cardsAria": "Todas las formas de conseguir Initiative",
     "android": {
       "title": "Android",
@@ -321,22 +320,16 @@
     "desktop": {
       "title": "Ordenador",
       "sub": "Windows, Mac, Linux",
-      "body": "Un instalador para Windows, Mac o Linux. Chrome y Edge también lo instalan directamente desde el navegador, y Safari desde Archivo y luego Añadir al Dock."
-    },
-    "browser": {
-      "title": "Navegador",
-      "sub": "Cualquier cosa con pantalla",
-      "body": "Nada que instalar, solo guárdalo en favoritos.",
-      "button": "Abrir en el navegador"
+      "body": "Vive en tu Dock o barra de tareas y te avisa mientras estás liado con otras apps."
     },
     "factsAria": "Bueno saberlo",
     "updatesTitle": "Las actualizaciones se instalan solas",
     "updatesBody": "Initiative se mantiene al día solo, así que no tendrás que volver aquí.",
     "accountTitle": "Una cuenta, todos los dispositivos",
-    "accountBody": "Inicia sesión en el móvil, el portátil o el ordenador de la biblioteca y todo está ahí.",
+    "accountBody": "Inicia sesión en el móvil, la tableta y el ordenador, y todo está ahí.",
     "passkeysTitle": "Llaves de acceso bienvenidas",
     "passkeysBody": "Inicia sesión con una llave de acceso si prefieres no escribir una contraseña.",
-    "descriptionPush": "Funciona en el navegador, y usarlo así para siempre es una decisión perfectamente respetable. Pero también puede tener su propio icono, su propia ventana y, en Android, notificaciones que llegan aunque no estés mirando.",
+    "descriptionPush": "Lleva tus comunidades contigo, y en Android te avisa cuando algo te necesita. Disponible para Windows, Mac, Linux, Android, iPhone y iPad.",
     "androidBodyPush": "Se instala como cualquier otra cosa, con notificaciones push y sin tienda de apps."
   },
   "pricing": {

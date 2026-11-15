@@ -336,7 +336,7 @@ describe("DownloadPage", () => {
       await screen.findByRole("heading", { name: landing.download.desktopTitle })
     ).toBeInTheDocument();
     const cards = screen.getByRole("list", { name: landing.download.cardsAria });
-    expect(cards.querySelectorAll("[data-platform]")).toHaveLength(4);
+    expect(cards.querySelectorAll("[data-platform]")).toHaveLength(3);
   });
 
   it("promises push notifications only where the server sends them", async () => {
@@ -355,27 +355,6 @@ describe("DownloadPage", () => {
     const [installer] = await screen.findAllByTestId("desktop-installer");
     expect(installer).toHaveAttribute("href", desktopInstallerUrl(DESKTOP_FLOOR, "linux"));
     expect(installer).toHaveAttribute("download");
-  });
-
-  it("shows the browser's install prompt once, then points at the guide", async () => {
-    renderDownload();
-    const [install] = await screen.findAllByRole("link", {
-      name: landing.download.browserInstall,
-    });
-
-    const prompt = vi.fn().mockResolvedValue(undefined);
-    act(() => {
-      window.dispatchEvent(Object.assign(new Event("beforeinstallprompt"), { prompt }));
-    });
-    const [button] = await screen.findAllByRole("button", {
-      name: landing.download.browserInstall,
-    });
-    fireEvent.click(button);
-    expect(prompt).toHaveBeenCalledTimes(1);
-
-    // Spent after one use, whatever the answer: the guide again.
-    const [again] = await screen.findAllByRole("link", { name: landing.download.browserInstall });
-    expect(again).toHaveAttribute("href", install.getAttribute("href"));
   });
 
   it("mentions passkeys only where the server offers them", async () => {
