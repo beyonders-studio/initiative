@@ -282,55 +282,32 @@
     "title": "Télécharger",
     "titleHighlight": "Initiative",
     "description": "Emportez vos communautés partout. Disponible sur Windows, Mac, Linux, Android, iPhone et iPad.",
-    "detected": "On dirait que vous êtes sur {{platform}}",
-    "platformAndroid": "Android",
-    "platformIos": "un iPhone ou un iPad",
-    "platformDesktop": "un ordinateur",
-    "androidTitle": "Initiative pour Android",
-    "androidBody": "S'installe comme n'importe quoi d'autre, sans passer par une boutique d'applications.",
-    "iosTitle": "Initiative pour iPhone et iPad",
-    "iosBody": "Touchez Partager, puis Sur l'écran d'accueil. C'est le même Initiative, mais les iPhone ne reçoivent pas encore de notifications push.",
-    "desktopTitle": "Initiative pour votre ordinateur",
-    "desktopBody": "Sachez tout de suite quand on a besoin de vous, même avec Initiative caché derrière vos autres fenêtres.",
     "androidButton": "Télécharger pour Android",
     "iosButton": "Ajouter à votre iPhone",
     "windowsButton": "Télécharger pour Windows",
     "macButton": "Télécharger pour Mac",
     "linuxButton": "Télécharger pour Linux",
     "desktopButton": "Télécharger pour votre ordinateur",
-    "version": "Version {{version}}, celle de ce serveur",
     "releases": "Voir toutes les versions",
-    "desktopMeta": "Windows, Mac et Linux",
-    "cardsAria": "Toutes les façons d'obtenir Initiative",
-    "android": {
-      "title": "Android",
-      "sub": "Téléphones et tablettes",
-      "body": "Laissez <1>Obtainium</1> le tenir à jour pour vous.",
-      "button": "Télécharger l'APK",
-      "bodyPush": "Notifications push comprises. Ou laissez <1>Obtainium</1> le tenir à jour pour vous."
+    "os": {
+      "windows": "Windows",
+      "mac": "Mac",
+      "linux": "Linux",
+      "android": "Android",
+      "ios": "iPhone et iPad"
     },
-    "ios": {
-      "title": "iPhone et iPad",
-      "sub": "Depuis Safari",
-      "step1": "Ouvrez cette page dans Safari",
-      "step2": "Touchez le bouton Partager",
-      "step3": "Touchez Sur l'écran d'accueil",
-      "button": "Montrez-moi"
+    "screensAlt": "Le tableau des tâches d'un projet dans Initiative sur un ordinateur, avec le même tableau sur un téléphone devant",
+    "computer": {
+      "title": "Téléchargez-le pour votre ordinateur",
+      "body": "Sachez tout de suite quand on a besoin de vous, même avec Initiative caché derrière vos autres fenêtres."
     },
-    "desktop": {
-      "title": "Ordinateur",
-      "sub": "Windows, Mac, Linux",
-      "body": "Reste dans votre Dock ou votre barre des tâches et vous prévient pendant que vous êtes occupé ailleurs."
-    },
-    "factsAria": "Bon à savoir",
-    "updatesTitle": "Les mises à jour s'installent toutes seules",
-    "updatesBody": "Initiative se tient à jour tout seul, vous n'aurez donc pas besoin de revenir ici.",
-    "accountTitle": "Un compte, tous vos appareils",
-    "accountBody": "Connectez-vous sur votre téléphone, votre tablette et votre ordinateur, et tout est là.",
-    "passkeysTitle": "Les clés d'accès sont les bienvenues",
-    "passkeysBody": "Connectez-vous avec une clé d'accès si vous préférez ne pas taper de mot de passe.",
-    "descriptionPush": "Emportez vos communautés partout, et sur Android, Initiative vous prévient quand on a besoin de vous. Disponible sur Windows, Mac, Linux, Android, iPhone et iPad.",
-    "androidBodyPush": "S'installe comme n'importe quoi d'autre, notifications push comprises, sans passer par une boutique d'applications."
+    "phone": {
+      "title": "Téléchargez-le pour votre téléphone",
+      "body": "Passez voir vos communautés depuis le canapé ou le dernier rang de la répétition.",
+      "bodyPush": "Passez voir vos communautés depuis le canapé ou le dernier rang de la répétition, et sur Android, Initiative vous prévient quand on a besoin de vous.",
+      "obtainium": "Ou laissez <1>Obtainium</1> le tenir à jour pour vous.",
+      "iosHow": "Dans Safari, touchez Partager, puis Sur l'écran d'accueil."
+    }
   },
   "pricing": {
     "sectionLabel": "Formules",

@@ -1,5 +1,6 @@
 /**
- * Getting Initiative onto a device, the visitor's own device first.
+ * Getting Initiative onto a device: one big button for the visitor's own
+ * device, then every computer and phone below it.
  *
  * Android gets a real file: the APK attached to the release the server's
  * native floor names, which is the newest one that runs this server's web
@@ -8,15 +9,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import {
-  ArrowUpRight,
-  Download,
-  KeyRound,
-  Monitor,
-  RefreshCw,
-  Smartphone,
-  User,
-} from "lucide-react";
+import { ArrowUpRight, Download, Monitor, Smartphone } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -28,21 +21,18 @@ import {
   OBTAINIUM_URL,
   RELEASES_URL,
 } from "@/lib/links";
-import {
-  type DesktopOs,
-  detectDesktopOs,
-  detectPlatform,
-  type VisitorPlatform,
-} from "@/lib/platform";
+import { type DesktopOs, detectDesktopOs, detectPlatform } from "@/lib/platform";
 import { Button } from "@/ui/button";
+import { useResolvedTheme } from "@/ui/lib/useResolvedTheme";
 
 import { DarkBand } from "./DarkBand";
 import { SiteShell } from "./SiteShell";
 import { useFrontDoor } from "./useFrontDoor";
 import { usePageMeta } from "./usePageMeta";
 
-const INSTALL_GUIDE = docsUrl("getting-started/install-the-app/");
-const BROWSER_INSTALL = `${INSTALL_GUIDE}#install-it-from-the-browser`;
+const IOS_GUIDE = docsUrl("getting-started/install-the-app/#on-an-iphone-or-ipad");
+
+const DESKTOP_OSES: DesktopOs[] = ["windows", "mac", "linux"];
 
 const DESKTOP_BUTTON = {
   windows: "download.windowsButton",
@@ -50,17 +40,19 @@ const DESKTOP_BUTTON = {
   linux: "download.linuxButton",
 } as const;
 
+/** The hero's button, white on the dark band. */
+const HERO_BUTTON = "h-14 bg-white px-7 text-base text-slate-950 hover:bg-slate-100";
+
+type ButtonLook = { className?: string; variant?: "default" | "outline" };
+
+/** The APK from the release the server's native floor names; every release
+ *  when the floor is unknown. */
 const ApkButton = ({
   minNativeVersion,
   className,
   variant,
   children,
-}: {
-  minNativeVersion: string | null;
-  className?: string;
-  variant?: "default" | "outline";
-  children: ReactNode;
-}) => (
+}: ButtonLook & { minNativeVersion: string | null; children: ReactNode }) => (
   <Button size="lg" variant={variant} className={className} asChild>
     {minNativeVersion ? (
       <a href={androidApkUrl(minNativeVersion)} download data-testid="android-apk">
@@ -74,19 +66,17 @@ const ApkButton = ({
   </Button>
 );
 
-/** The installer for this computer, from the release the server's desktop
- *  floor names; every release when either is unknown. */
+/** One computer's installer, from the release the server's desktop floor
+ *  names; every release when the floor is unknown. */
 const DesktopButton = ({
   os,
   minDesktopVersion,
   className,
   variant,
   children,
-}: {
+}: ButtonLook & {
   os: DesktopOs | null;
   minDesktopVersion: string | null;
-  className?: string;
-  variant?: "default" | "outline";
   children: ReactNode;
 }) => (
   <Button size="lg" variant={variant} className={className} asChild>
@@ -102,58 +92,76 @@ const DesktopButton = ({
   </Button>
 );
 
-const PlatformCard = ({
-  icon: Icon,
-  title,
-  sub,
-  platform,
-  children,
-}: {
-  icon: LucideIcon;
-  title: string;
-  sub: string;
-  platform: string;
-  children: ReactNode;
-}) => (
-  <li
-    className="flex flex-col gap-3.5 rounded-2xl border bg-card p-5 sm:p-6"
-    data-platform={platform}
-  >
-    <div className="flex items-center gap-3">
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Icon className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <div>
-        <h3 className="font-bold text-lg">{title}</h3>
-        <p className="text-muted-foreground text-sm">{sub}</p>
+const IosButton = ({ className, variant, children }: ButtonLook & { children: ReactNode }) => (
+  <Button size="lg" variant={variant} className={className} asChild>
+    <a href={IOS_GUIDE} target="_blank" rel="noopener noreferrer">
+      {children}
+      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+    </a>
+  </Button>
+);
+
+/** The app on a computer, with the same screen on a phone in front of it. */
+const Screens = () => {
+  const { t } = useTranslation("landing");
+  const dark = useResolvedTheme() === "dark";
+  const src = (name: string) => `/site/${name}${dark ? ".dark" : ""}.webp`;
+  return (
+    <div className="relative mx-auto mt-12 max-w-5xl pr-[9%] sm:mt-16">
+      <div className="overflow-hidden rounded-lg border border-white/15 bg-slate-900 shadow-2xl shadow-black/60 sm:rounded-2xl">
+        <img
+          src={src("download-computer")}
+          alt={t("download.screensAlt")}
+          width={2560}
+          height={1600}
+          className="block h-auto w-full"
+        />
+      </div>
+      <div className="absolute right-0 bottom-[-6%] w-[26%] rounded-[1.1rem] border-4 border-slate-950 bg-slate-950 shadow-2xl shadow-black/70 ring-1 ring-white/20 sm:rounded-[2.2rem] sm:border-8">
+        <img
+          src={src("download-phone")}
+          alt=""
+          width={780}
+          height={1688}
+          className="block h-auto w-full rounded-[0.8rem] sm:rounded-[1.7rem]"
+        />
       </div>
     </div>
-    {children}
-  </li>
-);
-
-const Fact = ({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) => (
-  <li className="flex items-start gap-3.5 rounded-2xl bg-muted/60 p-5">
-    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-    <div>
-      <h3 className="font-bold">{title}</h3>
-      <p className="mt-0.5 text-muted-foreground text-sm">{body}</p>
-    </div>
-  </li>
-);
-
-const PLATFORM_NAME: Record<
-  VisitorPlatform,
-  "download.platformAndroid" | "download.platformIos" | "download.platformDesktop"
-> = {
-  android: "download.platformAndroid",
-  ios: "download.platformIos",
-  desktop: "download.platformDesktop",
+  );
 };
+
+/** One kind of device, with every way to get the app onto it. */
+const Device = ({
+  id,
+  icon: Icon,
+  title,
+  body,
+  children,
+}: {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  body: ReactNode;
+  children: ReactNode;
+}) => (
+  <section
+    className="flex flex-col rounded-3xl border bg-card p-6 sm:p-9"
+    aria-labelledby={`download-${id}`}
+  >
+    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+      <Icon className="h-6 w-6" aria-hidden="true" />
+    </span>
+    <h2 id={`download-${id}`} className="mt-5 font-extrabold text-2xl tracking-tight sm:text-3xl">
+      {title}
+    </h2>
+    <p className="mt-2 text-lg text-muted-foreground">{body}</p>
+    <div className="mt-7 flex flex-col gap-5">{children}</div>
+  </section>
+);
 
 export const DownloadPage = () => {
   const { t } = useTranslation("landing");
-  const { config, passkeyLoginEnabled } = useFrontDoor();
+  const { config } = useFrontDoor();
   usePageMeta(t("meta.downloadTitle"), t("meta.downloadDescription"));
   // The Android app only gets push where this server has it switched on.
   const fcm = useGetFcmConfig(undefined, { query: { staleTime: 300_000 } });
@@ -161,105 +169,98 @@ export const DownloadPage = () => {
   const minNativeVersion = config?.min_native_version ?? null;
   const minDesktopVersion = config?.min_desktop_version ?? null;
   const platform = useMemo(() => detectPlatform(), []);
-  const desktopOs = useMemo<DesktopOs | null>(() => detectDesktopOs(), []);
-  const desktopLabel = t(desktopOs ? DESKTOP_BUTTON[desktopOs] : "download.desktopButton");
+  // A phone's browser also says Linux; only a computer is offered a file.
+  const desktopOs = useMemo(() => (platform === "desktop" ? detectDesktopOs() : null), [platform]);
 
   return (
     <SiteShell current="download">
       <DarkBand stars aria-labelledby="landing-download-title">
-        <div className="relative mx-auto max-w-6xl px-4 pt-10 pb-20 sm:px-8 sm:pt-18 sm:pb-24">
-          <h1
-            id="landing-download-title"
-            className="font-extrabold text-[2.6rem] leading-tight tracking-tight sm:text-6xl"
-          >
-            {t("download.title")}{" "}
-            <span className="text-amber-400">{t("download.titleHighlight")}</span>
-          </h1>
-          <p className="mt-4 max-w-2xl text-lg text-slate-300">
-            {t(push ? "download.descriptionPush" : "download.description")}
-          </p>
-        </div>
-      </DarkBand>
-
-      <div className="mx-auto max-w-6xl px-4 sm:px-8">
-        <section
-          className="relative -mt-12 grid items-center gap-5 rounded-3xl border bg-card p-5 shadow-2xl sm:gap-8 sm:p-9 md:grid-cols-[1fr_auto]"
-          aria-labelledby="landing-download-feature"
-        >
-          <div>
-            <p className="font-semibold text-amber-700 text-sm dark:text-amber-400">
-              {t("download.detected", { platform: t(PLATFORM_NAME[platform]) })}
-            </p>
-            <h2
-              id="landing-download-feature"
-              className="mt-1 font-extrabold text-2xl tracking-tight sm:text-3xl"
+        <div className="relative mx-auto max-w-6xl px-4 pt-12 pb-16 sm:px-8 sm:pt-20 sm:pb-24">
+          <div className="mx-auto max-w-3xl text-center">
+            <h1
+              id="landing-download-title"
+              className="font-extrabold text-[2.6rem] leading-tight tracking-tight sm:text-6xl"
             >
-              {t(`download.${platform}Title`)}
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              {t(
-                platform === "android"
-                  ? push
-                    ? "download.androidBodyPush"
-                    : "download.androidBody"
-                  : `download.${platform}Body`
-              )}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2.5 md:min-w-72">
-            {platform === "android" ? (
-              <>
-                <ApkButton minNativeVersion={minNativeVersion} className="h-14 text-base">
+              {t("download.title")}{" "}
+              <span className="text-amber-400">{t("download.titleHighlight")}</span>
+            </h1>
+            <p className="mt-4 text-lg text-slate-300 sm:text-xl">{t("download.description")}</p>
+            <div className="mt-8 flex justify-center">
+              {platform === "android" ? (
+                <ApkButton minNativeVersion={minNativeVersion} className={HERO_BUTTON}>
                   <Download className="h-5 w-5" aria-hidden="true" />
                   {t("download.androidButton")}
                 </ApkButton>
-                {minNativeVersion ? (
-                  <p className="text-center text-muted-foreground text-sm">
-                    {t("download.version", { version: minNativeVersion })}
-                  </p>
-                ) : null}
-              </>
-            ) : platform === "ios" ? (
-              <Button size="lg" className="h-14 text-base" asChild>
-                <a href={BROWSER_INSTALL} target="_blank" rel="noopener noreferrer">
-                  {t("download.iosButton")}
-                  <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                </a>
-              </Button>
-            ) : (
-              <>
+              ) : platform === "ios" ? (
+                <IosButton className={HERO_BUTTON}>{t("download.iosButton")}</IosButton>
+              ) : (
                 <DesktopButton
                   os={desktopOs}
                   minDesktopVersion={minDesktopVersion}
-                  className="h-14 text-base"
+                  className={HERO_BUTTON}
                 >
                   <Download className="h-5 w-5" aria-hidden="true" />
-                  {desktopLabel}
+                  {t(desktopOs ? DESKTOP_BUTTON[desktopOs] : "download.desktopButton")}
                 </DesktopButton>
-                <p className="text-center text-muted-foreground text-sm">
-                  {minDesktopVersion
-                    ? t("download.version", { version: minDesktopVersion })
-                    : t("download.desktopMeta")}
-                </p>
-              </>
+              )}
+            </div>
+          </div>
+          <Screens />
+        </div>
+      </DarkBand>
+
+      <div className="mx-auto grid max-w-6xl grid-cols-fill-80/2 gap-4 px-4 py-14 sm:gap-6 sm:px-8 sm:py-20">
+        <Device
+          id="computer"
+          icon={Monitor}
+          title={t("download.computer.title")}
+          body={t("download.computer.body")}
+        >
+          <div className="flex flex-wrap gap-2.5">
+            {minDesktopVersion ? (
+              DESKTOP_OSES.map((os) => (
+                <DesktopButton
+                  key={os}
+                  os={os}
+                  minDesktopVersion={minDesktopVersion}
+                  variant={os === desktopOs ? "default" : "outline"}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  {t(`download.os.${os}`)}
+                </DesktopButton>
+              ))
+            ) : (
+              <DesktopButton os={null} minDesktopVersion={null} variant="outline">
+                {t("download.releases")}
+                <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+              </DesktopButton>
             )}
           </div>
-        </section>
+        </Device>
 
-        <ul
-          className="mt-8 grid gap-3 sm:mt-10 sm:gap-4 md:grid-cols-3"
-          aria-label={t("download.cardsAria")}
+        <Device
+          id="phone"
+          icon={Smartphone}
+          title={t("download.phone.title")}
+          body={t(push ? "download.phone.bodyPush" : "download.phone.body")}
         >
-          <PlatformCard
-            icon={Smartphone}
-            title={t("download.android.title")}
-            sub={t("download.android.sub")}
-            platform="android"
-          >
-            <p className="flex-1 text-muted-foreground text-sm">
+          <div className="flex flex-wrap gap-2.5">
+            <ApkButton
+              minNativeVersion={minNativeVersion}
+              variant={platform === "android" ? "default" : "outline"}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              {t("download.os.android")}
+            </ApkButton>
+            <IosButton variant={platform === "ios" ? "default" : "outline"}>
+              {t("download.os.ios")}
+            </IosButton>
+          </div>
+          <div className="space-y-1 text-muted-foreground text-sm">
+            <p>
               <Trans
                 t={t}
-                i18nKey={push ? "download.android.bodyPush" : "download.android.body"}
+                i18nKey="download.phone.obtainium"
                 components={{
                   1: (
                     // biome-ignore lint/a11y/useAnchorContent: Trans fills the link with the translated text
@@ -271,69 +272,9 @@ export const DownloadPage = () => {
                 }}
               />
             </p>
-            <ApkButton minNativeVersion={minNativeVersion} variant="outline" className="w-full">
-              <Download className="h-4 w-4" aria-hidden="true" />
-              {minNativeVersion ? t("download.android.button") : t("download.releases")}
-            </ApkButton>
-          </PlatformCard>
-          <PlatformCard
-            icon={Smartphone}
-            title={t("download.ios.title")}
-            sub={t("download.ios.sub")}
-            platform="ios"
-          >
-            <ol className="flex-1 list-decimal pl-5 text-sm">
-              <li>{t("download.ios.step1")}</li>
-              <li>{t("download.ios.step2")}</li>
-              <li>{t("download.ios.step3")}</li>
-            </ol>
-            <Button variant="outline" size="lg" className="w-full" asChild>
-              <a href={BROWSER_INSTALL} target="_blank" rel="noopener noreferrer">
-                {t("download.ios.button")}
-                <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-              </a>
-            </Button>
-          </PlatformCard>
-          <PlatformCard
-            icon={Monitor}
-            title={t("download.desktop.title")}
-            sub={t("download.desktop.sub")}
-            platform="desktop"
-          >
-            <p className="flex-1 text-muted-foreground text-sm">{t("download.desktop.body")}</p>
-            <DesktopButton
-              // A phone's browser also says Linux; only a computer is offered a file.
-              os={platform === "desktop" ? desktopOs : null}
-              minDesktopVersion={minDesktopVersion}
-              variant="outline"
-              className="w-full"
-            >
-              <Download className="h-4 w-4" aria-hidden="true" />
-              {platform === "desktop" && desktopOs && minDesktopVersion
-                ? desktopLabel
-                : t("download.releases")}
-            </DesktopButton>
-          </PlatformCard>
-        </ul>
-
-        <ul
-          className="mt-8 mb-20 grid gap-3 sm:mt-10 sm:mb-24 sm:gap-4 md:grid-cols-3"
-          aria-label={t("download.factsAria")}
-        >
-          <Fact
-            icon={RefreshCw}
-            title={t("download.updatesTitle")}
-            body={t("download.updatesBody")}
-          />
-          <Fact icon={User} title={t("download.accountTitle")} body={t("download.accountBody")} />
-          {passkeyLoginEnabled ? (
-            <Fact
-              icon={KeyRound}
-              title={t("download.passkeysTitle")}
-              body={t("download.passkeysBody")}
-            />
-          ) : null}
-        </ul>
+            <p>{t("download.phone.iosHow")}</p>
+          </div>
+        </Device>
       </div>
     </SiteShell>
   );

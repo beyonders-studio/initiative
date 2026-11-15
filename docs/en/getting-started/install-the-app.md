@@ -42,7 +42,7 @@ The [Android app](#install-the-android-app) does more, including push notificati
 
 ### On a computer
 
-- **Chrome or Edge:** select the install icon at the right-hand end of the address bar, or **Or install it from the browser** on the Download page.
+- **Chrome or Edge:** select the install icon at the right-hand end of the address bar.
 - **Safari on a Mac:** choose **File**, then **Add to Dock**.
 
 Other browsers keep Initiative in a tab, which works just as well and looks less like an app.

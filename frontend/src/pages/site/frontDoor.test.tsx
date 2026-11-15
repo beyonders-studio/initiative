@@ -328,39 +328,33 @@ describe("DownloadPage", () => {
     expect(apk).toHaveAttribute("download");
   });
 
-  it("features the visitor's own device and lists every way to get it", async () => {
+  it("leads with the visitor's own device, then every computer and phone", async () => {
     renderDownload();
 
-    // jsdom is not a phone.
-    expect(
-      await screen.findByRole("heading", { name: landing.download.desktopTitle })
-    ).toBeInTheDocument();
-    const cards = screen.getByRole("list", { name: landing.download.cardsAria });
-    expect(cards.querySelectorAll("[data-platform]")).toHaveLength(3);
+    // jsdom is a Linux computer: the hero offers its installer.
+    await screen.findAllByTestId("desktop-installer");
+    const hero = screen.getByRole("region", { name: /Download Initiative/ });
+    expect(within(hero).getByRole("link", { name: landing.download.linuxButton })).toHaveAttribute(
+      "href",
+      desktopInstallerUrl(DESKTOP_FLOOR, "linux")
+    );
+    const computer = screen.getByRole("region", { name: landing.download.computer.title });
+    for (const os of ["windows", "mac", "linux"] as const) {
+      expect(within(computer).getByRole("link", { name: landing.download.os[os] })).toHaveAttribute(
+        "href",
+        desktopInstallerUrl(DESKTOP_FLOOR, os)
+      );
+    }
+    expect(screen.getByRole("region", { name: landing.download.phone.title })).toBeInTheDocument();
   });
 
   it("promises push notifications only where the server sends them", async () => {
     renderDownload();
-    expect(await screen.findByText(landing.download.description)).toBeInTheDocument();
+    expect(await screen.findByText(landing.download.phone.body)).toBeInTheDocument();
 
     server.use(stubPush(true));
     renderDownload();
-    expect(await screen.findByText(landing.download.descriptionPush)).toBeInTheDocument();
-  });
-
-  it("offers this computer's installer from the release its own floor names", async () => {
-    renderDownload();
-
-    // jsdom says Linux.
-    const [installer] = await screen.findAllByTestId("desktop-installer");
-    expect(installer).toHaveAttribute("href", desktopInstallerUrl(DESKTOP_FLOOR, "linux"));
-    expect(installer).toHaveAttribute("download");
-  });
-
-  it("mentions passkeys only where the server offers them", async () => {
-    renderDownload();
-    await screen.findByTestId("android-apk");
-    expect(screen.queryByText(landing.download.passkeysTitle)).not.toBeInTheDocument();
+    expect(await screen.findByText(landing.download.phone.bodyPush)).toBeInTheDocument();
   });
 });
 

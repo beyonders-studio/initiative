@@ -282,55 +282,32 @@
     "title": "Hol dir",
     "titleHighlight": "Initiative",
     "description": "Nimm deine Communitys überallhin mit. Für Windows, Mac, Linux, Android, iPhone und iPad.",
-    "detected": "Sieht aus, als wärst du auf {{platform}}",
-    "platformAndroid": "Android",
-    "platformIos": "einem iPhone oder iPad",
-    "platformDesktop": "einem Computer",
-    "androidTitle": "Initiative für Android",
-    "androidBody": "Installiert sich wie alles andere, ganz ohne App Store.",
-    "iosTitle": "Initiative für iPhone und iPad",
-    "iosBody": "Tippe auf Teilen und dann auf Zum Home-Bildschirm. Es ist dasselbe Initiative, nur bekommen iPhones noch keine Push-Benachrichtigungen.",
-    "desktopTitle": "Initiative für deinen Computer",
-    "desktopBody": "Erfahre sofort, wenn du gebraucht wirst, auch wenn Initiative hinter deinen anderen Fenstern steckt.",
     "androidButton": "Download für Android",
     "iosButton": "Aufs iPhone holen",
     "windowsButton": "Download für Windows",
     "macButton": "Download für Mac",
     "linuxButton": "Download für Linux",
     "desktopButton": "Download für deinen Computer",
-    "version": "Version {{version}}, die dieser Server nutzt",
     "releases": "Alle Versionen ansehen",
-    "desktopMeta": "Windows, Mac und Linux",
-    "cardsAria": "Alle Wege zu Initiative",
-    "android": {
-      "title": "Android",
-      "sub": "Handys und Tablets",
-      "body": "Lass <1>Obtainium</1> es für dich aktuell halten.",
-      "button": "APK herunterladen",
-      "bodyPush": "Mit Push-Benachrichtigungen. Oder lass <1>Obtainium</1> es für dich aktuell halten."
+    "os": {
+      "windows": "Windows",
+      "mac": "Mac",
+      "linux": "Linux",
+      "android": "Android",
+      "ios": "iPhone und iPad"
     },
-    "ios": {
-      "title": "iPhone und iPad",
-      "sub": "Über Safari",
-      "step1": "Öffne diese Seite in Safari",
-      "step2": "Tippe auf Teilen",
-      "step3": "Tippe auf Zum Home-Bildschirm",
-      "button": "Zeig's mir"
+    "screensAlt": "Das Aufgabenboard eines Projekts in Initiative auf einem Computer, davor dasselbe Board auf einem Handy",
+    "computer": {
+      "title": "Für deinen Computer herunterladen",
+      "body": "Erfahre sofort, wenn du gebraucht wirst, auch wenn Initiative hinter deinen anderen Fenstern steckt."
     },
-    "desktop": {
-      "title": "Computer",
-      "sub": "Windows, Mac, Linux",
-      "body": "Wohnt in deinem Dock oder deiner Taskleiste und meldet sich, während du in anderen Apps beschäftigt bist."
-    },
-    "factsAria": "Gut zu wissen",
-    "updatesTitle": "Updates installieren sich selbst",
-    "updatesBody": "Initiative hält sich selbst aktuell, du musst also nicht hierher zurückkommen.",
-    "accountTitle": "Ein Konto, jedes Gerät",
-    "accountBody": "Melde dich auf Handy, Tablet und Computer an, und alles ist da.",
-    "passkeysTitle": "Passkeys willkommen",
-    "passkeysBody": "Melde dich mit einem Passkey an, wenn du lieber kein Passwort eintippst.",
-    "descriptionPush": "Nimm deine Communitys überallhin mit, und auf Android meldet sich Initiative, wenn du gebraucht wirst. Für Windows, Mac, Linux, Android, iPhone und iPad.",
-    "androidBodyPush": "Installiert sich wie alles andere, mit Push-Benachrichtigungen, ganz ohne App Store."
+    "phone": {
+      "title": "Für dein Handy herunterladen",
+      "body": "Schau bei deinen Communitys vorbei, vom Sofa aus oder aus der letzten Reihe bei der Probe.",
+      "bodyPush": "Schau bei deinen Communitys vorbei, vom Sofa aus oder aus der letzten Reihe bei der Probe, und auf Android meldet sich Initiative, wenn du gebraucht wirst.",
+      "obtainium": "Oder lass <1>Obtainium</1> es für dich aktuell halten.",
+      "iosHow": "Tippe in Safari auf Teilen und dann auf Zum Home-Bildschirm."
+    }
   },
   "pricing": {
     "sectionLabel": "Tarife",
