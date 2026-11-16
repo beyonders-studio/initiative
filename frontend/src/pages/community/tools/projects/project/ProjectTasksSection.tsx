@@ -306,8 +306,12 @@ export const ProjectTasksSection = ({
 
   const projectTasks = useMemo(() => tasksQuery.data?.items ?? [], [tasksQuery.data]);
   const collapsedStorageKey = useMemo(
-    () => (Number.isFinite(projectId) ? `project:${projectId}:kanban-collapsed` : null),
-    [projectId]
+    // A project's id is its community's own, so the key names both.
+    () =>
+      Number.isFinite(projectId)
+        ? `community:${communityId}:project:${projectId}:kanban-collapsed`
+        : null,
+    [communityId, projectId]
   );
   const [collapsedStatuses, setCollapsedStatuses] = useState<Set<number>>(new Set());
 
