@@ -79,7 +79,7 @@ export const ganttWindow = (
 /** One row of the Gantt: a group's heading, a task, or another project's
  *  task one of them is linked to. */
 export type GanttRow =
-  | { type: "group"; key: string; count: number; label?: string }
+  | { type: "group"; key: string; count: number; open: boolean; label?: string }
   | { type: "outside"; key: string; task: LinkedTaskRead }
   | {
       type: "task";
@@ -93,6 +93,9 @@ export type GanttRow =
       /** What its parts cover, together; null where none is dated. */
       parts: Pick<GanttSpan, "start" | "end"> | null;
     };
+
+/** The key a group's heading is folded by, apart from any task's row key. */
+export const groupFoldKey = (key: string) => `group:${key}`;
 
 /** The task each task is part of, among `tasks`: its first `part_of` edge to
  *  one of them that does not lead back to itself. */

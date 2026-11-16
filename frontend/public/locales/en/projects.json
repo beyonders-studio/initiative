@@ -243,6 +243,8 @@
     "ganttSchedule": "Drag across the days to give this task dates",
     "ganttFold": "Hide the parts of {{title}}",
     "ganttUnfold": "Show the parts of {{title}}",
+    "ganttFoldAll": "Collapse all",
+    "ganttUnfoldAll": "Expand all",
     "ganttLink": "Drag onto another task to link the two",
     "ganttOutside": "Linked from other projects",
     "ganttLinkQuestion": "How is “{{task}}” linked to “{{other}}”?",
