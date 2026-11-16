@@ -1445,7 +1445,7 @@ class TestUpgrade:
         # And the button goes away rather than offering the version just taken.
         assert response.json()["update_version"] is None
 
-    async def test_a_switched_off_service_still_upgrades_its_installs(
+    async def test_a_service_out_of_service_still_upgrades_its_installs(
         self,
         client: AsyncClient,
         acting_user,
@@ -1454,8 +1454,8 @@ class TestUpgrade:
     ):
         """Whether this deployment runs the service decides whether a guild may
         *take* the plug-in. The install this guild already has stays theirs, and
-        keeps following the versions its publisher ships, so switching the
-        service back on finds it current rather than a version behind."""
+        keeps following the versions its publisher ships, so putting the
+        service back in service finds it current rather than a version behind."""
         uid = marketplace_uid("offbutinstalled")
         await create_marketplace_listing(
             session,
@@ -1472,7 +1472,7 @@ class TestUpgrade:
         plugin_id = installed.json()["id"]
 
         shop, _ = wired_plugin_services
-        shop.enabled = False
+        shop.jwks = None
         session.add(shop)
         await session.commit()
         invalidate_registrations()

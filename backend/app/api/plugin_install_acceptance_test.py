@@ -460,7 +460,7 @@ async def test_switching_off_takes_effect_on_the_next_request(
     if switch == "registration":
         await session.exec(
             text(
-                "UPDATE public.plugin_service_registrations SET enabled = false "
+                "UPDATE public.plugin_service_registrations SET suspended_at = now() "
                 "WHERE public_id = :c"
             ),
             params={"c": CLIENT},

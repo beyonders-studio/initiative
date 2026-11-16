@@ -3,8 +3,9 @@
 The table holds each plug-in's shared-secret ciphertext and is written on the
 system engine alone: the schema's default privileges are wound back,
 ``app_admin`` carries every verb, and no person's request-path role holds a
-grant or a policy on it. The one other reader is the install floor, whose
-standing statement reads four columns of the registration its token names.
+grant or a policy on it. The other readers are the install floor, whose
+standing statement reads four columns of the registration its token names, and
+the billing change log's writer, which records a plug-in's status.
 
 Style mirrors ``auth_provider_secrets_rls_test``: ``SET ROLE platform_<tier>``
 drops to a non-superuser role so table GRANTs and policies are enforced exactly
@@ -41,9 +42,9 @@ async def _make_row(session, public_id: str = "acme.widgets") -> None:
         text(
             f"INSERT INTO {TABLE} "
             "(public_id, publisher_id, base_url, allowed_origins, jwks, "
-            " mandatory, enabled, created_at, updated_at) "
+            " mandatory, created_at, updated_at) "
             "SELECT :pid, p.id, 'http://127.0.0.1:9100', '[]'::jsonb, "
-            " '{\"keys\": []}'::jsonb, false, true, now(), now() "
+            " '{\"keys\": []}'::jsonb, false, now(), now() "
             "FROM public.publishers p WHERE p.prefix = 'acme'"
         ),
         params={"pid": public_id},
@@ -53,7 +54,7 @@ async def _make_row(session, public_id: str = "acme.widgets") -> None:
 def test_registry_records_the_grant_decision():
     """The registries name this table for the system engine alone: it holds
     every verb, the bare pre-routing role and every tier hold nothing, and the
-    one policy on the table is the install floor's read."""
+    policies on the table are the install floor's and the billing log's reads."""
     shared = SHARED_TABLE_REGISTRY[TABLE]
     assert shared.grants.app_admin == DML
     assert shared.grants.app_user is None
@@ -61,7 +62,8 @@ def test_registry_records_the_grant_decision():
     rls = PUBLIC_RLS[TABLE]
     assert rls.enabled and rls.forced
     assert [(p.command, p.roles) for p in rls.policies] == [
-        (SELECT, ("plugin_install_base",))
+        (SELECT, ("plugin_install_base",)),
+        (SELECT, ("app_billing_log",)),
     ]
 
 
@@ -73,7 +75,7 @@ async def test_no_platform_tier_reads_or_writes_registrations(session):
     for tier in UserRole:
         for statement in (
             f"SELECT jwks FROM {TABLE}",
-            f"UPDATE {TABLE} SET enabled = false",
+            f"UPDATE {TABLE} SET suspended_at = now()",
             f"DELETE FROM {TABLE}",
         ):
             async with as_role(session, role_name(platform_tier(tier)), user.id):
