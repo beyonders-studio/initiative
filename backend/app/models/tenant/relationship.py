@@ -130,6 +130,17 @@ class EntityRelationship(CreatedByMixin, table=True):
             "relationship_type",
             postgresql_where=text("removed_at IS NULL"),
         ),
+        # The forward read for a query that names its rows by an id column
+        # rather than by node ids it already holds: a list's tag sort and its
+        # untagged filter compare ``source_id`` with the row's own id, which
+        # this looks up and arithmetic on that id would not.
+        Index(
+            "ix_relationships_source",
+            "source_id",
+            "source_type",
+            "relationship_type",
+            postgresql_where=text("removed_at IS NULL"),
+        ),
     )
 
     id: int | None = Field(

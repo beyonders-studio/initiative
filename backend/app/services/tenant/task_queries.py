@@ -64,16 +64,6 @@ from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import task_hierarchy
 
 
-def _date_group_expression(tz: str | None = None):
-    """The date-group ordering expression, from the field registry.
-
-    Kept as a helper because two queries select it as a labelled column rather
-    than only ordering by it — the cross-guild merge sorts in Python and needs
-    the value carried out of SQL.
-    """
-    return fields_registry.sort_expression("tasks", "date_group", _sort_ctx(tz))
-
-
 def _sort_ctx(tz: str | None) -> SortContext:
     """Sorting needs only the timezone; identity is filter context."""
     return SortContext(tz=tz)
@@ -108,22 +98,29 @@ _GLOBAL_SORT_ATTRGETTERS = {
 _PRIORITY_SORT_ORDER = {p: i for i, p in enumerate(TaskPriority)}
 
 
-def _global_ordering_selectables(tz: str | None = None):
+#: The sort keys the task dataset computes rather than stores. Each is worked
+#: out for every task the filter matches, so the ordering pass selects one only
+#: when the caller sorts by it.
+_COMPUTED_SORT_KEYS = ("date_group", "status_position", "tag_name")
+
+
+def _global_ordering_selectables(tz: str | None, sort_fields: list | None):
     """The columns the cross-guild ordering pass selects.
 
     Every sort key the /me task views accept is a plain ``tasks`` column or an
-    expression the task dataset declares (``date_group``, ``status_position``,
-    ``tag_name``), so the whole matching set can be ordered from rows this
-    narrow — no relationships, no annotations. Labelled with the
-    sort field names so :func:`_sort_global_task_keys` reads a row by the name
-    the caller sorted on.
+    expression the task dataset declares (:data:`_COMPUTED_SORT_KEYS`), so the
+    whole matching set can be ordered from rows this narrow — no relationships,
+    no annotations. Labelled with the sort field names so
+    :func:`_sort_global_task_keys` reads a row by the name the caller sorted
+    on, which is the only name it reads beyond ``position`` and ``id``.
     """
+    sorted_by = {sf.field for sf in sort_fields or ()}
     return (
         Task.id.label("id"),
-        _date_group_expression(tz).label("date_group"),
         *(
             fields_registry.sort_expression("tasks", name, _sort_ctx(tz)).label(name)
-            for name in ("status_position", "tag_name")
+            for name in _COMPUTED_SORT_KEYS
+            if name in sorted_by
         ),
         Task.position.label("position"),
         Task.title.label("title"),
@@ -716,7 +713,7 @@ async def _gather_global_task_reads(
         else {}
     )
 
-    ordering = _global_ordering_selectables(tz)
+    ordering = _global_ordering_selectables(tz, sort_fields)
 
     async def _order_keys(
         guild_session: AsyncSession, _guild_id: int

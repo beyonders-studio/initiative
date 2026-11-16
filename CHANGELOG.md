@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **My Tasks and the calendar load quickly again.** On PostgreSQL 17.12, My Tasks, the calendar, a list sorted by tag and the untagged count beside a list could take from seconds to minutes in a community with many tags. Each now reads only the tags of the items it shows.
+
 ## [0.79.1] - 2026-11-16
 
 ### Added
