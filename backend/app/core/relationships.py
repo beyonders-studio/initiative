@@ -221,17 +221,7 @@ def node_id(kind: EndpointKind, entity_id: int) -> int:
     The database computes the same value in a generated column, so SQL and
     Python agree by construction rather than by convention.
     """
-    return node_base(kind) | entity_id
-
-
-def node_base(kind: EndpointKind) -> int:
-    """The high half of every node id of one kind.
-
-    What a SQL expression adds an id column to, so a query can ask the indexed
-    ``*_node`` column about a whole table's worth of rows without the database
-    having to see through a two-column encoding it has no index for.
-    """
-    return _CODES[kind.value] << NODE_ID_SHIFT
+    return _CODES[kind.value] << NODE_ID_SHIFT | entity_id
 
 
 def decode_node_id(value: int) -> tuple[EndpointKind, int]:
