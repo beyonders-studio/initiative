@@ -7,6 +7,38 @@ message the check printed, under a `## After <release>` heading naming the
 release it breaks from. Once the next release ships, its entries no longer
 matter and can be deleted.
 
+## After 0.79.0
+
+### A plug-in is suspended, not switched off
+
+The owner suspends a plug-in everywhere and lifts it: a plug-in service takes
+`suspended` and reads `suspended_at` in place of `enabled`. Staff act on each
+of a community's plug-ins from its row, which offers `plugins` among its
+actions.
+
+- GET /api/v1/plugin-services/ removed the required property `items/enabled` from the response with the `200` status
+- POST /api/v1/plugin-services/ removed the required property `enabled` from the response with the `201` status
+- PATCH /api/v1/plugin-services/{registration_id} removed the required property `enabled` from the response with the `200` status
+- POST /api/v1/plugin-services/{registration_id}/connect removed the required property `enabled` from the response with the `200` status
+- POST /api/v1/plugin-services/{registration_id}/vendor-setup/complete removed the required property `enabled` from the response with the `200` status
+- GET /api/v1/settings/communities added the new `plugins` enum value to the `items/items/allowed_actions/items/` response property for the response status `200`
+- PATCH /api/v1/settings/communities/{community_id} added the new `plugins` enum value to the `allowed_actions/items/` response property for the response status `200`
+- POST /api/v1/settings/communities/{community_id}/restore added the new `plugins` enum value to the `allowed_actions/items/` response property for the response status `200`
+- POST /api/v1/settings/communities/{community_id}/suspension added the new `plugins` enum value to the `allowed_actions/items/` response property for the response status `200`
+
+### A plug-in says who can use it
+
+Which communities a plug-in reaches comes from its manifest's
+`availability`: a plug-in service reads `availability` and
+`beta_communities` in place of `operations_only`, and takes
+`beta_community_ids` for a beta plug-in.
+
+- GET /api/v1/plugin-services/ removed the required property `items/operations_only` from the response with the `200` status
+- POST /api/v1/plugin-services/ removed the required property `operations_only` from the response with the `201` status
+- PATCH /api/v1/plugin-services/{registration_id} removed the required property `operations_only` from the response with the `200` status
+- POST /api/v1/plugin-services/{registration_id}/connect removed the required property `operations_only` from the response with the `200` status
+- POST /api/v1/plugin-services/{registration_id}/vendor-setup/complete removed the required property `operations_only` from the response with the `200` status
+
 ## After 0.78.0
 
 ### A plug-in answers to the community's roles

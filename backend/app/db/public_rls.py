@@ -2224,13 +2224,48 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
         grants=Grants(app_admin=frozenset({SELECT, INSERT, UPDATE})),
     ),
     # Which community holds which install, and the value a vendor webhook routes to it
-    # by. An index over the guild schemas, holding no content.
+    # by, with each install's status and suspension. An index over the guild schemas,
+    # holding no content.
     "plugin_installs": SharedTable(
-        rls=FORCED_NO_POLICY,
+        rls=TableRls(
+            policies=(
+                # An installed plug-in's standing reads its own install's status
+                # and suspension (its column grant is guild_id, install_id,
+                # listing_uid, status and suspended_at; migration 20261115_0609).
+                Policy(
+                    "install_reads_its_install",
+                    SELECT,
+                    ("plugin_install_base",),
+                    using=(
+                        f"guild_id = {gucs.GUILD_ID} AND install_id = {gucs.INSTALL_ID}"
+                    ),
+                ),
+                # Billing's sync sets the statuses of the community it is routed
+                # to (column grants: reads guild_id, install_id, listing_uid and
+                # status, writes status and status_changed_at).
+                Policy(
+                    "billing_plugin_installs_select",
+                    SELECT,
+                    ("initiative_billing",),
+                    using=billing_scoped("guild_id"),
+                ),
+                Policy(
+                    "billing_plugin_installs_update",
+                    UPDATE,
+                    ("initiative_billing",),
+                    using=billing_scoped("guild_id"),
+                ),
+                # The change log's writer reads an install's state to tell it.
+                Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
+            ),
+        ),
         grants=Grants(
             # The install index: kept in step with each community's installs, read to
-            # list a plug-in's installs and to route its vendor webhooks.
+            # list a plug-in's installs and to route its vendor webhooks, and its
+            # states set by staff.
             app_admin=DML,
+            # No TABLE grant: the column-scoped SELECT above, for its own row.
+            plugin_install_base=None,
         ),
     ),
     # The values each install holds for its plug-in's unique settings, current and
@@ -2311,8 +2346,8 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     # never per guild — and owner-managed.
     # Everything else is the system engine's. An installed plug-in's standing reads
     # the registration its token was issued to (its column grant is public_id,
-    # listing_uid, enabled, publisher_id, jwks, jwks_uri, base_url, vendor_ready,
-    # kind and operations_only alone).
+    # listing_uid, suspended_at, publisher_id, jwks, jwks_uri, base_url,
+    # vendor_ready, kind and availability alone).
     "plugin_service_registrations": SharedTable(
         rls=TableRls(
             policies=(
@@ -2322,6 +2357,10 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     ("plugin_install_base",),
                     using=f"public_id = {gucs.TOKEN_CLIENT_ID}",
                 ),
+                # The change log's writer reads whether a plug-in is suspended
+                # (its column grant is listing_uid, suspended_at and
+                # availability; migrations 20261115_0609 and 20261115_0610).
+                Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
             ),
         ),
         grants=Grants(
@@ -2335,12 +2374,41 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             # Deployment wiring: read and written on the system engine alone.
             app_user=None,
             # No TABLE grant: a column-scoped SELECT on (public_id, listing_uid,
-            # enabled, publisher_id, jwks, jwks_uri, base_url, vendor_ready, kind,
-            # operations_only), for the registration the install's token names
-            # (install_reads_its_registration; migrations 20260924_0379,
+            # suspended_at, publisher_id, jwks, jwks_uri, base_url, vendor_ready,
+            # kind, availability), for the registration the install's token
+            # names (install_reads_its_registration; migrations 20260924_0379,
             # 20260924_0387, 20260924_0388, 20260924_0390, 20260925_0393,
-            # 20261001_0437 and 20261010_0482). Asserted in install_standing_test
-            # beside the one on guilds.
+            # 20261001_0437, 20261010_0482, 20261115_0609 and 20261115_0610).
+            # Asserted in install_standing_test beside the one on guilds.
+            plugin_install_base=None,
+        ),
+    ),
+    # The communities the owner picked for a beta plug-in, by listing: an id pair.
+    # Read across communities by the owner's page and the registration snapshot,
+    # both on the system engine.
+    "plugin_beta_communities": SharedTable(
+        rls=TableRls(
+            policies=(
+                # An installed plug-in's standing asks whether its own community
+                # is on the list (its column grant is listing_uid and
+                # community_id; migration 20261115_0610).
+                Policy(
+                    "install_reads_its_community",
+                    SELECT,
+                    ("plugin_install_base",),
+                    using=f"community_id = {gucs.GUILD_ID}",
+                ),
+                # The change log's writer reads whether an install is in reach
+                # (its column grant is listing_uid and community_id).
+                Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
+            ),
+        ),
+        grants=Grants(
+            # The owner's list replaced, and deleted when the plug-in leaves
+            # beta; never updated.
+            app_admin=frozenset({SELECT, INSERT, DELETE}),
+            # No TABLE grant: the column-scoped SELECT above, for its own
+            # community's row. Asserted in install_standing_test.
             plugin_install_base=None,
         ),
     ),

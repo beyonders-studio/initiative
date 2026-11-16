@@ -13,10 +13,14 @@ from typing import Any
 from pydantic import ConfigDict, Field, model_validator
 
 from app.core.messages import PluginServiceMessages
-from app.models.platform.plugin_service_registration import LISTING_STATED_FIELDS
+from app.models.platform.plugin_service_registration import (
+    LISTING_STATED_FIELDS,
+    PluginAvailability,
+)
 from app.schemas.base import RawTextStr, SanitizedBaseModel
 
 __all__ = [
+    "PluginBetaCommunityRead",
     "PluginPublisherCreate",
     "PluginPublisherRead",
     "PluginPublisherUpdate",
@@ -43,6 +47,13 @@ class PluginVendorFieldRead(SanitizedBaseModel):
     type: str
     required: bool = False
     label: dict[str, str] = {}
+
+
+class PluginBetaCommunityRead(SanitizedBaseModel):
+    """A community on a beta plug-in's list."""
+
+    id: int
+    name: str
 
 
 class PluginServiceRegistrationRead(SanitizedBaseModel):
@@ -79,11 +90,16 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     scope_ceiling: list[str] = []
     #: Installed into every guild and not removable by guild admins.
     mandatory: bool = False
-    #: Offered to, installed in and live in the operations community alone.
-    operations_only: bool = False
+    #: Which communities it reaches, as its manifest declares: ``none`` for
+    #: every one, ``beta`` for those on ``beta_communities``, ``operations``
+    #: for the operations community.
+    availability: PluginAvailability = PluginAvailability.none
+    #: The communities the owner picked, while it is beta.
+    beta_communities: list[PluginBetaCommunityRead] = []
     #: One vendor installation may connect to several communities.
     shared_routes: bool = False
-    enabled: bool = True
+    #: When the owner suspended it everywhere; null while it is not.
+    suspended_at: datetime | None = None
     #: ``registry`` when its plug-in facts come from a listing the registry signed,
     #: ``operator`` otherwise.
     source: str = "operator"
@@ -113,7 +129,7 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     connection_setup_url: str
     #: The address to give the vendor for this plug-in's webhooks.
     webhook_url: str
-    #: Enabled, its publisher enabled, every required vendor value set and,
+    #: Not suspended, its publisher enabled, every required vendor value set and,
     #: for a container, an address and a key set to verify against.
     live: bool
     created_at: datetime
@@ -151,8 +167,6 @@ class PluginServiceRegistrationCreate(_DeploymentFacts):
     jwks: dict[str, Any] | None = None
     jwks_uri: str | None = Field(default=None, max_length=1000)
     mandatory: bool = False
-    operations_only: bool = False
-    enabled: bool = True
     #: Values for the vendor fields the listing's manifest declares, by key.
     vendor_values: dict[str, RawTextStr | None] | None = None
 
@@ -174,11 +188,13 @@ class PluginServiceRegistrationUpdate(_DeploymentFacts):
     jwks: dict[str, Any] | None = None
     jwks_uri: str | None = Field(default=None, max_length=1000)
     mandatory: bool | None = None
-    operations_only: bool | None = None
     #: Let one vendor installation connect to several communities. Turning it
     #: off is refused while one is connected to more than one.
     shared_routes: bool | None = None
-    enabled: bool | None = None
+    #: Suspend it everywhere, or lift the suspension.
+    suspended: bool | None = None
+    #: Replace a beta plug-in's list of communities.
+    beta_community_ids: list[int] | None = None
     #: Set or clear vendor values, by key.
     vendor_values: dict[str, RawTextStr | None] | None = None
 

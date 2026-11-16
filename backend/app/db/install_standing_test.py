@@ -31,7 +31,10 @@ from app.db.session import (
 )
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.identity_ref import IdentityEntity, IdentityPurpose
-from app.models.platform.plugin_service_registration import RegistrationKind
+from app.models.platform.plugin_service_registration import (
+    PluginAvailability,
+    RegistrationKind,
+)
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import Initiative, PermissionKey
@@ -47,6 +50,8 @@ from app.testing import (
     route_as,
     route_as_install,
     route_session_to_guild,
+    set_beta_communities,
+    set_install_state,
 )
 
 CLIENT = "tests.install-standing"
@@ -339,11 +344,16 @@ async def _set_guild_status(
     "reason",
     [
         "install_disabled",
-        "registration_disabled",
+        "registration_suspended",
+        "install_suspended",
+        "install_on_hold",
+        "install_deleted",
         "registration_keyless",
         "registration_declarative",
         "publisher_disabled",
-        "operations_only_elsewhere",
+        "operations_elsewhere",
+        "beta_off_the_list",
+        "beta_with_an_empty_list",
         "another_client",
         "guild_suspended",
         "guild_on_hold",
@@ -356,8 +366,19 @@ async def test_an_install_that_may_not_act_is_refused(
     client = CLIENT
     if reason == "install_disabled":
         await _disable_install(session, install)
-    elif reason == "registration_disabled":
-        await _set_registration(session, "enabled", False)
+    elif reason == "registration_suspended":
+        await _set_registration(session, "suspended_at", datetime.now(UTC))
+    elif reason == "install_suspended":
+        await set_install_state(
+            session, install.guild.id, install.plugin.id, suspended=True
+        )
+    elif reason in ("install_on_hold", "install_deleted"):
+        await set_install_state(
+            session,
+            install.guild.id,
+            install.plugin.id,
+            status=reason.removeprefix("install_"),
+        )
     elif reason == "registration_keyless":
         await _set_registration(session, "jwks", None)
     elif reason == "registration_declarative":
@@ -373,8 +394,17 @@ async def test_an_install_that_may_not_act_is_refused(
             ).bindparams(c=CLIENT)
         )
         await session.commit()
-    elif reason == "operations_only_elsewhere":
-        await _set_registration(session, "operations_only", True)
+    elif reason == "operations_elsewhere":
+        await _set_registration(
+            session, "availability", PluginAvailability.operations.value
+        )
+    elif reason.startswith("beta_"):
+        await _set_registration(session, "availability", PluginAvailability.beta.value)
+        if reason == "beta_off_the_list":
+            other = await acting_user(guild_role=CommunityRole.member)
+            await set_beta_communities(session, LISTING, other.guild.id)
+        else:
+            await set_beta_communities(session, LISTING)
     elif reason == "another_client":
         client = "tests.someone-else"
     elif reason == "guild_suspended":
@@ -406,28 +436,48 @@ async def test_an_install_that_may_not_act_is_refused(
     await s.rollback()
 
 
-async def test_an_operations_only_install_acts_in_the_operations_community(
-    session, acting_user, role_session
+@pytest.mark.parametrize(
+    "availability", [PluginAvailability.operations, PluginAvailability.beta]
+)
+async def test_an_install_acts_in_its_reach(
+    session, acting_user, role_session, availability
 ):
+    """The operations community, or a community on the beta list."""
     install = await _install(session, acting_user, role_session, granted=["files:read"])
-    await _set_registration(session, "operations_only", True)
-    await set_operations_guild(session, install.guild.id)
+    await _set_registration(session, "availability", availability.value)
+    if availability is PluginAvailability.operations:
+        await set_operations_guild(session, install.guild.id)
+    else:
+        await set_beta_communities(session, LISTING, install.guild.id)
 
     s, context = await _route(role_session, install, ["files:read"])
     assert context.live
     await s.rollback()
 
 
-async def test_a_read_only_community_writes_nothing(session, acting_user, role_session):
+@pytest.mark.parametrize("held", ["community", "install"])
+async def test_a_read_only_install_reads_and_writes_nothing(
+    session, acting_user, role_session, held
+):
+    """Read-only, the community's status or the install's own: the plug-in
+    reads what it may and writes nothing."""
     install = await _install(
         session, acting_user, role_session, granted=["files:write"]
     )
-    await _set_guild_status(session, install, CommunityStatus.read_only)
+    shared = await create_file(session, install.a, install.seat.user, name="Shared")
+    await create_resource_grant(session, shared, all_initiative_members=True)
+    if held == "community":
+        await _set_guild_status(session, install, CommunityStatus.read_only)
+    else:
+        await set_install_state(
+            session, install.guild.id, install.plugin.id, status="read_only"
+        )
     s, context = await _route(role_session, install, ["files:write"])
     assert context.live and context.content_hold
     assert set(context.install_read) == {"files"}
     assert context.install_write == ()
     assert not any(pair.endswith(":create_files") for pair in context.role_grants)
+    assert (await s.exec(select(File.name))).all() == ["Shared"]
     await s.rollback()
 
 
@@ -768,7 +818,7 @@ async def test_a_new_transaction_replays_the_install(
             {
                 "public_id",
                 "listing_uid",
-                "enabled",
+                "suspended_at",
                 "publisher_id",
                 "jwks",
                 "jwks_uri",
@@ -777,12 +827,19 @@ async def test_a_new_transaction_replays_the_install(
                 # Whether it is a declarative plug-in's, which needs no location
                 # or keys to be live.
                 "kind",
-                # Whether it is live outside the operations community.
-                "operations_only",
+                # Which communities it reaches.
+                "availability",
             },
         ),
         # Whether the registration's publisher is on.
         ("publishers", {"id", "enabled"}),
+        # Whether its community is on its beta list.
+        ("plugin_beta_communities", {"listing_uid", "community_id"}),
+        # Its own install's status and suspension.
+        (
+            "plugin_installs",
+            {"guild_id", "install_id", "listing_uid", "status", "suspended_at"},
+        ),
         # A member token's standing: the member's own membership row, whether
         # it is live (a guest's ends), the surfaces it holds, and whether their
         # account is active.

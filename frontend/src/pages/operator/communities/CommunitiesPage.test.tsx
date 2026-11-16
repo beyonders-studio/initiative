@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useReducer } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,9 +7,11 @@ import { buildPage, buildUser } from "@/__tests__/factories";
 import { renderPage as renderInRouter } from "@/__tests__/helpers/render";
 import type {
   CommunityAction,
+  CommunityPluginStateRead,
   PlatformCommunityStorageRead,
   UserRole,
 } from "@/api/generated/initiativeAPI.schemas";
+import { formatDate } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 
 const GIB = 1024 ** 3;
@@ -163,6 +165,26 @@ const agreeNarrowing = vi.fn();
 let pluginSummaries: Record<number, unknown[]> = {};
 let pluginSummariesFail = false;
 
+// Each community's plug-ins with their state, as the staff list serves them.
+let pluginStates: Record<number, CommunityPluginStateRead[]> = {};
+const setPluginSuspension = vi.fn();
+const setPluginStatus = vi.fn();
+
+const buildPluginState = (
+  overrides: Partial<CommunityPluginStateRead> = {}
+): CommunityPluginStateRead => ({
+  install_id: 1,
+  listing_uid: "core.github",
+  name: "GitHub",
+  status: "active",
+  state: "active",
+  status_changed_at: null,
+  suspended_at: null,
+  uninstall_at: null,
+  allowed_actions: ["suspend", "set_status"],
+  ...overrides,
+});
+
 vi.mock("@/api/generated/settings/settings", () => ({
   createPlatformCommunityBillingServiceHandoff: (communityId: number, answer: unknown) =>
     answer ? mintHandoff(communityId, answer) : mintHandoff(communityId),
@@ -174,6 +196,16 @@ vi.mock("@/api/generated/settings/settings", () => ({
     data: { values: { used: 250, allowed: 500 }, rows: [] },
     isError: false,
   }),
+  getListCommunityPluginStatesQueryKey: (communityId: number) => [
+    `/api/v1/settings/communities/${communityId}/plugins`,
+  ],
+  useListCommunityPluginStates: (communityId: number) => ({
+    data: pluginStates[communityId] ?? [],
+    isLoading: false,
+    isError: false,
+  }),
+  useSetCommunityPluginSuspension: () => ({ mutate: setPluginSuspension, isPending: false }),
+  useSetCommunityPluginStatus: () => ({ mutate: setPluginStatus, isPending: false }),
 }));
 
 // Every page drawing the list, so a test can draw them again with what the
@@ -265,6 +297,9 @@ describe("CommunitiesPage", () => {
     supportBound = true;
     pluginSummaries = {};
     pluginSummariesFail = false;
+    pluginStates = {};
+    setPluginSuspension.mockClear();
+    setPluginStatus.mockClear();
     narrowings = [];
   });
 
@@ -608,6 +643,110 @@ describe("CommunitiesPage", () => {
     });
   });
 
+  describe("plug-in states", () => {
+    /** The Manage sheet, which lists the community's plug-ins. */
+    const pluginList = () => screen.getByRole("dialog");
+
+    it("offers only the actions the server allows on each plug-in", async () => {
+      pluginStates = {
+        7: [
+          buildPluginState(),
+          buildPluginState({
+            install_id: 2,
+            listing_uid: "acme.notes",
+            name: "Notes",
+            state: "suspended",
+            suspended_at: "2026-11-10T12:00:00Z",
+            allowed_actions: ["lift"],
+          }),
+        ],
+      };
+      await openSheet("Capped Community");
+      const list = pluginList();
+
+      expect(within(list).getByLabelText("Status of GitHub")).toBeInTheDocument();
+      expect(within(list).getByRole("button", { name: "Suspend GitHub" })).toBeInTheDocument();
+      expect(
+        within(list).queryByRole("button", { name: "Lift the suspension on GitHub" })
+      ).toBeNull();
+
+      // Notes may only be lifted: its status is text, and it says since when.
+      expect(within(list).queryByLabelText("Status of Notes")).toBeNull();
+      expect(within(list).queryByRole("button", { name: "Suspend Notes" })).toBeNull();
+      const notes = within(list).getByText("Notes").closest("li") as HTMLElement;
+      expect(within(notes).getByText("Active")).toBeInTheDocument();
+      expect(
+        within(list).getByText(`Suspended here on ${formatDate("2026-11-10T12:00:00Z")}`)
+      ).toBeInTheDocument();
+      await userEvent.click(
+        within(list).getByRole("button", { name: "Lift the suspension on Notes" })
+      );
+      expect(setPluginSuspension).toHaveBeenCalledWith({
+        communityId: 7,
+        installId: 2,
+        data: { suspended: false },
+      });
+    });
+
+    it("suspends a plug-in once the operator confirms", async () => {
+      pluginStates = { 7: [buildPluginState()] };
+      const user = await openSheet("Capped Community");
+
+      await user.click(within(pluginList()).getByRole("button", { name: "Suspend GitHub" }));
+      expect(setPluginSuspension).not.toHaveBeenCalled();
+      const confirm = await screen.findByRole("alertdialog");
+      expect(within(confirm).getByText("Suspend GitHub in this community?")).toBeInTheDocument();
+
+      await user.click(within(confirm).getByRole("button", { name: "Suspend" }));
+      expect(setPluginSuspension).toHaveBeenCalledWith({
+        communityId: 7,
+        installId: 1,
+        data: { suspended: true },
+      });
+    });
+
+    it("says when a deleted plug-in is removed", async () => {
+      pluginStates = {
+        7: [
+          buildPluginState({
+            status: "deleted",
+            state: "deleted",
+            uninstall_at: "2026-12-15T12:00:00Z",
+          }),
+        ],
+      };
+      await openSheet("Capped Community");
+
+      expect(
+        within(pluginList()).getByText(`Removed on ${formatDate("2026-12-15T12:00:00Z")}`)
+      ).toBeInTheDocument();
+    });
+
+    it("lets a moderator open a community's plug-ins from its row", async () => {
+      served = communitiesData.map((community) => ({
+        ...community,
+        status_choices: [],
+        allowed_actions: ["suspend", "plugins"],
+      }));
+      pluginStates = { 7: [buildPluginState({ allowed_actions: ["suspend"] })] };
+      const user = mounted("moderator");
+
+      await user.click(await screen.findByRole("button", { name: "Plug-ins of Capped Community" }));
+
+      const sheet = await screen.findByRole("dialog");
+      expect(within(sheet).getByText("Plug-ins of Capped Community")).toBeInTheDocument();
+      expect(within(sheet).getByRole("button", { name: "Suspend GitHub" })).toBeInTheDocument();
+      expect(within(sheet).queryByLabelText("Status of GitHub")).toBeNull();
+    });
+
+    it("leaves the row's plug-ins out for a reader not moderating it", async () => {
+      renderPage();
+
+      expect(await screen.findByText("Capped Community")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Plug-ins of/ })).toBeNull();
+    });
+  });
+
   describe("billing column", () => {
     it("labels each button with the community's plan, verbatim", async () => {
       renderPage();
@@ -689,6 +828,15 @@ describe("CommunitiesPage", () => {
         screen.getByText("Billing sets this community's limits and features.")
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Change in billing" })).toBeInTheDocument();
+    });
+
+    it("shows each plug-in's status as text, and still suspends", async () => {
+      // The server offers no status control where billing sets the plan.
+      pluginStates = { 7: [buildPluginState({ allowed_actions: ["suspend"] })] };
+      await openSheet("Capped Community");
+
+      expect(screen.queryByLabelText("Status of GitHub")).toBeNull();
+      expect(screen.getByRole("button", { name: "Suspend GitHub" })).toBeInTheDocument();
     });
 
     it("opens the operator console to change it", async () => {

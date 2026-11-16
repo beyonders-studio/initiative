@@ -1,6 +1,6 @@
 """The hooks about a community's install, and how they reach its plug-in.
 
-Five hooks tell a plug-in what happened to the community it is installed in,
+Six hooks tell a plug-in what happened to the community it is installed in,
 rather than to one of its connections:
 
 * ``installed`` — the community installed it, for the first time or again.
@@ -11,6 +11,9 @@ rather than to one of its connections:
   dropped, and a later install starts afresh.
 * ``community_status`` — the community's status changed. The body is
   ``{"status": <CommunityStatus value>}``.
+* ``plugin_status`` — the plug-in's own status in the community changed. The
+  body is ``{"status": <PluginInstallStatus value>}``; what it means is the
+  plug-in's to decide.
 * ``entitlement`` — the statement this deployment's issuer signed of what the
   community holds of the plug-in, ``{"statement": "<jws>"}`` exactly as the
   issuer sent it, written by ``plugin_entitlements.deliver_entitlement``.
@@ -77,13 +80,22 @@ hook unfinished (:func:`hooks_unfinished`); its rows then go with its
 ``guilds`` row. An erase answered then is reported to the entitlement issuer
 like any other, while billing's name for the community still stands.
 
-**Statuses.** A change of a community's status arms its ``plugin_hooks`` timer
-(:func:`status_changed`). The visit compares each enabled install's
-``plugin_installs.community_status_sent`` with the community's status and
-writes ``community_status`` where they differ; an install counts as told
-only once its plug-in answers it (2xx or 404). The daily ``reconcile``
-asks the same question (:func:`due_outside`), so a status that changed by a
-path that armed nothing still reaches every installed plug-in within a day.
+**Statuses.** A change of a community's status, or of a plug-in's state in
+it, arms its ``plugin_hooks`` timer (:func:`status_changed`). The visit
+compares each enabled install's ``plugin_installs.community_status_sent`` with
+the community's status, and each install's ``plugin_status_sent`` with its own
+status, and writes ``community_status`` or ``plugin_status`` where they
+differ; an install counts as told only once its plug-in answers it (2xx or
+404). The daily ``reconcile`` asks the same question (:func:`due_outside`), so
+a status that changed by a path that armed nothing still reaches every
+installed plug-in within a day.
+
+**A plug-in's state decides what it is sent.** Where it is suspended, by the
+owner, by staff or by being out of reach, nothing is sent and nothing is
+written for it: its queue waits untouched, no attempt spent, and goes once the
+suspension lifts. On hold or deleted, it is sent only :data:`LIFECYCLE_HOOKS`,
+and the rest wait the same way without holding those back (:func:`_parked`).
+Only an active or read-only plug-in is told the community's status.
 """
 
 from __future__ import annotations
@@ -91,7 +103,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -108,7 +120,11 @@ from app.models.platform.plugin_community_hook import (
     HOOK_ERROR_MAX_LENGTH,
     PluginCommunityHook,
 )
-from app.models.platform.plugin_install import PluginInstall
+from app.models.platform.plugin_install import (
+    SERVING_STATES,
+    PluginInstall,
+    PluginState,
+)
 from app.services.marketplace import plugin_refs, registration_lookup
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.platform import identity_refs
@@ -122,6 +138,7 @@ __all__ = [
     "DONE_RETENTION",
     "KIND",
     "LATEST_WINS",
+    "LIFECYCLE_HOOKS",
     "MAX_ATTEMPTS",
     "call_now",
     "deliver_community_hook",
@@ -142,7 +159,14 @@ KIND = "plugin_hooks"
 #: ``plugin_connection_flows.HOOK_NAMES``, which is what lets ``call_hook``
 #: send it.
 COMMUNITY_HOOK_NAMES: frozenset[str] = frozenset(
-    {"installed", "uninstalled", "erase", "community_status", "entitlement"}
+    {
+        "installed",
+        "uninstalled",
+        "erase",
+        "community_status",
+        "plugin_status",
+        "entitlement",
+    }
     # A connection's grant, ended by the plug-in, queued by an uninstall ahead
     # of ``uninstalled`` and ``erase`` (``plugin_revocation``).
     | {"revoke"}
@@ -157,7 +181,12 @@ ANSWERED_HOOK_NAMES: frozenset[str] = frozenset(
 
 #: Hooks that state where something stands now, so a newer one replaces one
 #: still waiting rather than following it.
-LATEST_WINS: frozenset[str] = frozenset({"community_status", "entitlement"})
+LATEST_WINS: frozenset[str] = frozenset(
+    {"community_status", "plugin_status", "entitlement"}
+)
+
+#: Hooks a plug-in on hold or deleted in the community is still sent.
+LIFECYCLE_HOOKS: frozenset[str] = frozenset({"plugin_status", "uninstalled", "erase"})
 
 #: The waits after each failed attempt, in seconds; the last repeats.
 BACKOFF_SECONDS: tuple[int, ...] = (30, 120, 600, 1800, 3600, 6 * 3600)
@@ -323,13 +352,17 @@ async def deliver_community_hook(
     return written
 
 
-def status_changed(session: Any, guild_id: int) -> None:
-    """The community's status is changing in ``session``'s transaction: once
-    it commits, arm its ``plugin_hooks`` timer, whose visit tells each
-    installed plug-in. Nothing is armed if it rolls back."""
+def status_changed(session: Any, *guild_ids: int) -> None:
+    """The status of each community in ``guild_ids``, or a plug-in's state in
+    it, is changing in ``session``'s transaction: once it commits, arm their
+    ``plugin_hooks`` timers, whose visit tells each installed plug-in and sends
+    what waited for a suspension to lift. Nothing is armed if it rolls back."""
     from app.services import sweep_timers
 
-    post_commit.after_commit(session, lambda: sweep_timers.arm_in(KIND, [guild_id]))
+    if guild_ids:
+        post_commit.after_commit(
+            session, lambda: sweep_timers.arm_in(KIND, list(guild_ids))
+        )
 
 
 # --- the visit ---------------------------------------------------------------------
@@ -342,43 +375,71 @@ class _Outcome:
     error: str | None = None
 
 
-#: The community's enabled installs whose plug-in was last told a status other
-#: than the community's (or none), with no ``community_status`` hook already
-#: waiting for its plug-in.
+#: The community's installs not suspended there whose plug-in was last told a
+#: status other than the community's (or none), while enabled, or other than
+#: its own (unset reading as ``active``, which an install starts as).
 _STATUS_UNTOLD_SQL = text(
     """
-SELECT i.install_id, i.listing_uid
+SELECT i.install_id, i.listing_uid,
+       i.enabled AND i.community_status_sent IS DISTINCT FROM g.status
+         AS community_untold,
+       COALESCE(i.plugin_status_sent, 'active') IS DISTINCT FROM i.status
+         AS plugin_untold
 FROM public.plugin_installs i
 JOIN public.guilds g ON g.id = i.guild_id
 WHERE i.guild_id = :guild
-  AND i.enabled
-  AND i.community_status_sent IS DISTINCT FROM g.status
+  AND i.suspended_at IS NULL
   AND g.purge_started_at IS NULL
+  AND ((i.enabled AND i.community_status_sent IS DISTINCT FROM g.status)
+    OR COALESCE(i.plugin_status_sent, 'active') IS DISTINCT FROM i.status)
 """
 )
 
 
-async def _tell_status(session: AsyncSession, guild_id: int, now: datetime) -> None:
-    """Write ``community_status`` for each of the community's enabled installs
-    whose plug-in has not been told its status and has none waiting. The row
-    says only that the status moved: what is sent is the status when it is
-    sent, and the install counts as told once the plug-in answers."""
+async def _untold(session: AsyncSession, guild_id: int) -> list[tuple[str, int, str]]:
+    """The status hooks the community's installs are owed, as ``(public_id,
+    install_id, hook)``: ``community_status`` to a plug-in active or read-only
+    there, ``plugin_status`` to one not suspended there. A plug-in with no
+    registration here is owed nothing until it has one."""
     untold = (
         await session.exec(_STATUS_UNTOLD_SQL, params={"guild": guild_id})  # type: ignore[call-overload]
     ).all()
     if not untold:
-        return
+        return []
     by_listing = {
         snapshot.listing_uid: snapshot
         for snapshot in (await registration_lookup.load_registrations()).values()
         if snapshot.listing_uid and not snapshot.declarative
     }
+    owed: list[tuple[str, int, str]] = []
+    for row in untold:
+        snapshot = by_listing.get(row.listing_uid)
+        if snapshot is None:
+            continue
+        state = snapshot.state_in(guild_id)
+        if row.community_untold and state in SERVING_STATES:
+            owed.append((snapshot.public_id, int(row.install_id), "community_status"))
+        if row.plugin_untold and state is not PluginState.suspended:
+            owed.append((snapshot.public_id, int(row.install_id), "plugin_status"))
+    return owed
+
+
+async def _tell_status(session: AsyncSession, guild_id: int, now: datetime) -> None:
+    """Write each status hook the community's installs are owed (:func:`_untold`)
+    with none of its kind waiting for its plug-in. The row says only that a
+    status moved: what is sent is the status when it is sent, and the install
+    counts as told once the plug-in answers."""
+    owed = await _untold(session, guild_id)
+    if not owed:
+        return
     waiting = set(
         (
             await session.exec(
-                select(PluginCommunityHook.public_id).where(
+                select(PluginCommunityHook.public_id, PluginCommunityHook.hook).where(
                     PluginCommunityHook.guild_id == guild_id,
-                    PluginCommunityHook.hook == "community_status",
+                    col(PluginCommunityHook.hook).in_(
+                        ("community_status", "plugin_status")
+                    ),
                     col(PluginCommunityHook.done_at).is_(None),
                 )
             )
@@ -387,31 +448,66 @@ async def _tell_status(session: AsyncSession, guild_id: int, now: datetime) -> N
     rows = [
         _row(
             guild_id=guild_id,
-            public_id=by_listing[row.listing_uid].public_id,
-            hook="community_status",
+            public_id=public_id,
+            hook=hook,
             body={},
-            install_id=int(row.install_id),
+            install_id=install_id,
             now=now,
         )
-        for row in untold
-        if row.listing_uid in by_listing
-        and by_listing[row.listing_uid].public_id not in waiting
+        for public_id, install_id, hook in owed
+        if (public_id, hook) not in waiting
     ]
     if rows:
         await session.exec(insert(_TABLE).values(rows))
+
+
+async def _parked(guild_id: int) -> Callable[[str, str], bool]:
+    """Which hooks wait in the community, untouched and no attempt spent,
+    asked as ``parked(public_id, hook)``: every hook to a plug-in suspended
+    there, and all but :data:`LIFECYCLE_HOOKS` to one on hold or deleted
+    there. The hooks behind them go meanwhile; the parked ones go once the
+    state allows them."""
+    snapshots = await registration_lookup.load_registrations()
+
+    def parked(public_id: str, hook: str) -> bool:
+        snapshot = snapshots.get(public_id)
+        if snapshot is None:
+            return False
+        state = snapshot.state_in(guild_id)
+        if state in SERVING_STATES:
+            return False
+        return state is PluginState.suspended or hook not in LIFECYCLE_HOOKS
+
+    return parked
 
 
 async def _current_body(
     hook: str, guild_id: int, public_id: str, stored: Mapping[str, Any]
 ) -> dict[str, Any] | None:
     """What a hook says when it is sent. A state hook says the state now: the
-    community's status, or the newest signed entitlement statement as stored
-    (``None`` when there is none, and nothing to send). Every other hook says what it was
-    written with."""
+    community's status, the install's own, or the newest signed entitlement
+    statement as stored (``None`` when there is none, and nothing to send).
+    Every other hook says what it was written with."""
     if hook == "community_status":
         from app.services.marketplace.community_status import community_status
 
         return {"status": await community_status(guild_id)}
+    if hook == "plugin_status":
+        registration = (await registration_lookup.load_registrations()).get(public_id)
+        if registration is None or not registration.listing_uid:
+            return None
+        async with db_session.SystemSessionLocal() as session:
+            await db_session.set_rls_context(session, Unattributed())
+            status = (
+                await session.exec(
+                    select(PluginInstall.status).where(
+                        PluginInstall.guild_id == guild_id,
+                        PluginInstall.listing_uid == registration.listing_uid,
+                    )
+                )
+            ).first()
+        # Uninstalled meanwhile: its ``uninstalled`` says the rest.
+        return None if status is None else {"status": status}
     if hook == "revoke":
         from app.core.encryption import SALT_PLUGIN_CONFIG
 
@@ -455,10 +551,15 @@ async def _send(
     from app.services.tenant import plugin_connection_flows as flows
 
     registration = await _container(public_id)
+    state = None if registration is None else registration.state_in(guild_id)
     if (
         registration is None
         or not registration.base_url
-        or not registration.live_in(guild_id)
+        or not registration.live
+        or not (
+            state in SERVING_STATES
+            or (hook in LIFECYCLE_HOOKS and state is not PluginState.suspended)
+        )
     ):
         return _Outcome(None, "the plug-in is not reachable here")
 
@@ -528,10 +629,17 @@ async def _record_abandoned_erase(row: PluginCommunityHook, attempts: int) -> No
         await session.commit()
 
 
+#: What an answered status hook records as told, by hook.
+_TOLD_COLUMNS = {
+    "community_status": "community_status_sent",
+    "plugin_status": "plugin_status_sent",
+}
+
+
 async def _mark_status_told(
     session: AsyncSession, row: PluginCommunityHook, status: str
 ) -> None:
-    """The plug-in answered ``community_status``: its install counts as told
+    """The plug-in answered a status hook: its install counts as told
     ``status``."""
     registration = (await registration_lookup.load_registrations()).get(row.public_id)
     if registration is None or not registration.listing_uid:
@@ -542,7 +650,7 @@ async def _mark_status_told(
             PluginInstall.__table__.c.guild_id == row.guild_id,  # type: ignore[attr-defined]
             PluginInstall.__table__.c.listing_uid == registration.listing_uid,  # type: ignore[attr-defined]
         )
-        .values(community_status_sent=status)
+        .values(**{_TOLD_COLUMNS[row.hook]: status})
     )
 
 
@@ -614,11 +722,7 @@ async def _settle(
                 row.guild_id,
             )
             return False
-        if (
-            row.hook == "community_status"
-            and outcome.outcome is not None
-            and sent is not None
-        ):
+        if row.hook in _TOLD_COLUMNS and outcome.outcome is not None and sent:
             await _mark_status_told(session, row, str(sent["status"]))
         if erased:
             # Erasing is the community's request: a plug-in that never answers
@@ -655,7 +759,9 @@ async def _claim_head(guild_id: int, public_id: str) -> PluginCommunityHook | No
 
     State hooks a newer one of their kind supersedes are settled first,
     whether or not they are due, so a send that failed never holds the current
-    state back. A hook sent at once whose sender died is settled ``lapsed``."""
+    state back. A hook sent at once whose sender died is settled ``lapsed``.
+    The next is the first one the plug-in's state there allows (:func:`_parked`)."""
+    parked = await _parked(guild_id)
     now = datetime.now(UTC)
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
@@ -689,7 +795,11 @@ async def _claim_head(guild_id: int, public_id: str) -> PluginCommunityHook | No
                 .where(_TABLE.c.id.in_(lapsed))
                 .values(done_at=now, outcome="lapsed", claimed_until=None)
             )
-        rest = [row for row in rest if row.id not in lapsed]
+        rest = [
+            row
+            for row in rest
+            if row.id not in lapsed and not parked(public_id, row.hook)
+        ]
         if not rest or rest[0].next_attempt_at > now:
             await session.commit()
             return None
@@ -925,7 +1035,10 @@ async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
     """When the community next has hook work: each plug-in's first hook still
     to send (now, if one of its state hooks is waiting to be superseded), or an
     answered row coming past its keeping. A hook queued behind one waiting
-    out a retry is not counted: it goes once that one does."""
+    out a retry is not counted: it goes once that one does, nor is one parked
+    by its plug-in's state there (:func:`_parked`): a change of state arms the
+    timer."""
+    parked = await _parked(guild_id)
     rows = (
         await session.exec(
             select(PluginCommunityHook)
@@ -943,6 +1056,7 @@ async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
     now = datetime.now(UTC)
     for queue in by_plugin.values():
         stale, rest = _effective(queue)
+        rest = [row for row in rest if not parked(row.public_id, row.hook)]
         held = [row.claimed_until for row in queue if _live(row, now)]
         if held:
             # Its sender settles it; asked again if the claim lapses first.
@@ -966,8 +1080,9 @@ async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
 
 async def visit(_routed: AsyncSession, guild_id: int) -> datetime | None:
     """The ``plugin_hooks`` sweep's visit: tell installed plug-ins a status they
-    have not been told, send the community's due hooks, delete answered ones
-    past their keeping, and answer when there is next work.
+    have not been told, send the community's due hooks their plug-ins' states
+    allow, delete answered ones past their keeping, and answer when there is
+    next work.
 
     The rows are ``public``'s and kept by the system engine, so they are read
     and written on short system sessions of the visit's own, and the
@@ -1010,22 +1125,11 @@ async def visit(_routed: AsyncSession, guild_id: int) -> datetime | None:
 
 async def due_outside(guild_id: int, now: datetime) -> datetime | None:
     """What the daily reconcile asks of the ``plugin_hooks`` sweep, read on the
-    system engine since its rows are ``public``'s: ``now`` when an enabled
-    install has not been told the community's status, else the visit's own
-    next due time."""
+    system engine since its rows are ``public``'s: ``now`` when an install is
+    owed a status (:func:`_untold`), else the visit's own next due time."""
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
-        untold = (
-            await session.exec(_STATUS_UNTOLD_SQL, params={"guild": guild_id})  # type: ignore[call-overload]
-        ).all()
-        # An untold install of a plug-in with no registration here has nothing
-        # to be sent; it is told once there is one.
-        registered = {
-            snapshot.listing_uid
-            for snapshot in (await registration_lookup.load_registrations()).values()
-            if snapshot.listing_uid and not snapshot.declarative
-        }
-        if any(row.listing_uid in registered for row in untold):
+        if await _untold(session, guild_id):
             return now
         return await _next_due(session, guild_id)
 
@@ -1054,7 +1158,57 @@ async def queue_purge_erases(session: AsyncSession, *, guild_id: int) -> int:
 
 async def hooks_unfinished(session: AsyncSession, *, guild_id: int) -> bool:
     """Whether the community has a hook neither answered nor given up on,
-    which keeps a purge from deleting it."""
+    which keeps a purge from deleting it.
+
+    A hook its plug-in's state there keeps waiting (:func:`_parked`: all of
+    them while it is suspended, all but its lifecycle while it is on hold or
+    deleted) is never sent, so it is given up on here, in ``session``'s
+    transaction: an ``erase`` among them drops its references and goes on the
+    audit stream, as for a plug-in that never answered."""
+    parked = await _parked(guild_id)
+    waiting = [
+        row.id
+        for row in (
+            await session.exec(
+                select(
+                    PluginCommunityHook.id,
+                    PluginCommunityHook.public_id,
+                    PluginCommunityHook.hook,
+                ).where(
+                    PluginCommunityHook.guild_id == guild_id,
+                    col(PluginCommunityHook.done_at).is_(None),
+                )
+            )
+        ).all()
+        if parked(row.public_id, row.hook)
+    ]
+    if waiting:
+        from app.core.audit_events import AuditEventType
+        from app.services import audit as audit_service
+
+        given_up = (
+            await session.exec(
+                update(_TABLE)
+                .where(_TABLE.c.id.in_(waiting))
+                .values(
+                    done_at=datetime.now(UTC), outcome="gave_up", claimed_until=None
+                )
+                .returning(_TABLE.c.public_id, _TABLE.c.hook, _TABLE.c.install_id)
+            )
+        ).all()
+        for public_id, _hook, install_id in (r for r in given_up if r.hook == "erase"):
+            await identity_refs.drop_sector_refs(
+                session, sector_guild_id=guild_id, sector_plugin=public_id
+            )
+            await audit_service.record(
+                session,
+                event_type=AuditEventType.PLUGIN_ERASE_ABANDONED,
+                actor_user_id=None,
+                guild_id=guild_id,
+                target_type="plugin",
+                target_id=install_id,
+                detail={"plugin": public_id, "parked": True},
+            )
     return bool(
         (
             await session.exec(

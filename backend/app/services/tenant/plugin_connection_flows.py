@@ -193,7 +193,7 @@ HOOK_NAMES: frozenset[str] = frozenset(
     {"after_connect", "revoke", "webhook", "schedule", "entitlement"}
     # The hooks about the community's install, delivered by
     # ``app.services.marketplace.community_hooks``.
-    | {"installed", "uninstalled", "erase", "community_status"}
+    | {"installed", "uninstalled", "erase", "community_status", "plugin_status"}
 )
 #: The widest account label kept, matching what the members view shows.
 MAX_ACCOUNT_LABEL_LENGTH = 200

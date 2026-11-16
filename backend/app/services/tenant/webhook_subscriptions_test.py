@@ -392,6 +392,7 @@ async def _withdraw(session, role_session, install, what: str) -> None:
     from app.models.tenant.guild_plugin import GuildPlugin
     from app.models.tenant.plugin_placement import PluginPlacement
     from app.services.marketplace.registration_lookup import invalidate_registrations
+    from app.testing import set_install_state
 
     session.expunge_all()
     if what == "placement":
@@ -418,10 +419,18 @@ async def _withdraw(session, role_session, install, what: str) -> None:
                 )
             )
         ).one()
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()
+    elif what == "install_suspended":
+        await set_install_state(
+            session, install.guild.id, install.plugin.id, suspended=True
+        )
+    elif what == "install_on_hold":
+        await set_install_state(
+            session, install.guild.id, install.plugin.id, status="on_hold"
+        )
     else:
         raise AssertionError(what)
     session.expunge_all()
@@ -475,7 +484,17 @@ async def test_an_install_hears_what_it_writes_and_is_named_for_it(
     assert changes[in_a.id]["actor_plugin"] is None
 
 
-@pytest.mark.parametrize("what", ["placement", "scope", "install", "registration"])
+@pytest.mark.parametrize(
+    "what",
+    [
+        "placement",
+        "scope",
+        "install",
+        "registration",
+        "install_suspended",
+        "install_on_hold",
+    ],
+)
 async def test_an_install_hears_nothing_once_its_reach_is_withdrawn(
     session: AsyncSession, role_session, acting_user, monkeypatch, what
 ):
@@ -502,6 +521,38 @@ async def test_an_install_hears_nothing_once_its_reach_is_withdrawn(
     system.expunge_all()
     await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
     assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [before.id]
+
+
+async def test_what_changed_while_it_was_suspended_is_never_heard(
+    session: AsyncSession, role_session, acting_user, monkeypatch
+):
+    """Lifted before the poller came by, the change made while it was out is
+    still not sent; one made after the lift is."""
+    from app.db.install_standing_test import _install
+    from app.services.tenant import outbox_poller as poller
+    from app.testing import create_file, set_install_state
+
+    install = await _install(
+        session, acting_user, role_session, granted=["files:read"], placed="a"
+    )
+    await _install_subscribes(role_session, install, initiative_id=install.a.id)
+    sent = _collector(monkeypatch, poller)
+    system = await role_session("app_admin")
+
+    await set_install_state(
+        session, install.guild.id, install.plugin.id, suspended=True
+    )
+    session.expunge_all()
+    await create_file(session, install.a, install.seat.user)
+    await set_install_state(
+        session, install.guild.id, install.plugin.id, suspended=False
+    )
+    session.expunge_all()
+    after = await create_file(session, install.a, install.seat.user)
+    session.expunge_all()
+    await poller.drain_guild(system, install.guild.id, now=datetime.now(UTC))
+
+    assert [c["resource"]["id"] for e in sent for c in e["changes"]] == [after.id]
 
 
 async def test_a_plugins_event_is_kept_until_the_subscriber_accepts_it(

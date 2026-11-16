@@ -281,63 +281,33 @@
   "download": {
     "title": "Download",
     "titleHighlight": "Initiative",
-    "description": "It runs in a browser, and using it that way forever is a completely respectable life choice. But it can also have its own icon and its own window.",
-    "detected": "Looks like you're on {{platform}}",
-    "platformAndroid": "Android",
-    "platformIos": "an iPhone or iPad",
-    "platformDesktop": "a computer",
-    "androidTitle": "Initiative for Android",
-    "androidBody": "Installs like anything else, no app store needed.",
-    "iosTitle": "Initiative for iPhone and iPad",
-    "iosBody": "Tap Share, then Add to Home Screen. It's the same Initiative, but iPhones don't get push notifications yet.",
-    "desktopTitle": "Initiative for your computer",
-    "desktopBody": "Its own window and its own icon in the dock or taskbar, signed in as one of your devices.",
+    "description": "Take your communities with you. Available on Windows, Mac, Linux, Android, iPhone and iPad.",
     "androidButton": "Download for Android",
     "iosButton": "Add to your iPhone",
     "windowsButton": "Download for Windows",
     "macButton": "Download for Mac",
     "linuxButton": "Download for Linux",
     "desktopButton": "Download for your computer",
-    "version": "Version {{version}}, the one this server runs",
     "releases": "See every release",
-    "desktopMeta": "Windows, Mac and Linux",
-    "browserInstall": "Or install it from the browser",
-    "cardsAria": "Every way to get Initiative",
-    "android": {
-      "title": "Android",
-      "sub": "Phones and tablets",
-      "body": "Let <1>Obtainium</1> keep it updated for you.",
-      "button": "Download APK",
-      "bodyPush": "Push notifications included. Or let <1>Obtainium</1> keep it updated for you."
+    "os": {
+      "windows": "Windows",
+      "mac": "Mac",
+      "linux": "Linux",
+      "android": "Android",
+      "ios": "iPhone and iPad"
     },
-    "ios": {
-      "title": "iPhone and iPad",
-      "sub": "From Safari",
-      "step1": "Open this page in Safari",
-      "step2": "Tap the Share button",
-      "step3": "Tap Add to Home Screen",
-      "button": "Show me"
+    "screensAlt": "A project's task board in Initiative on a computer, with the same board on a phone in front of it",
+    "computer": {
+      "title": "Download for your computer",
+      "body": "Know the moment something needs you, even with Initiative tucked behind your other windows."
     },
-    "desktop": {
-      "title": "Computer",
-      "sub": "Windows, Mac, Linux",
-      "body": "An installer for Windows, Mac or Linux. Chrome and Edge can also install it straight from the browser, and Safari from File, then Add to Dock."
-    },
-    "browser": {
-      "title": "Browser",
-      "sub": "Anything with a screen",
-      "body": "Nothing to install, just bookmark it.",
-      "button": "Open in your browser"
-    },
-    "factsAria": "Good to know",
-    "updatesTitle": "Updates install themselves",
-    "updatesBody": "Initiative keeps itself up to date, so you won't need to come back here.",
-    "accountTitle": "One account, every device",
-    "accountBody": "Sign in on your phone, laptop or the library computer and everything's there.",
-    "passkeysTitle": "Passkeys welcome",
-    "passkeysBody": "Sign in with a passkey if you'd rather not type a password.",
-    "descriptionPush": "It runs in a browser, and using it that way forever is a completely respectable life choice. But it can also have its own icon, its own window and, on Android, notifications that turn up while you aren't looking.",
-    "androidBodyPush": "Installs like anything else, push notifications included, no app store needed."
+    "phone": {
+      "title": "Download for your phone",
+      "body": "Check in on your communities from the couch or the back row of rehearsal.",
+      "bodyPush": "Check in on your communities from the couch or the back row of rehearsal, and on Android, get a ping when something needs you.",
+      "obtainium": "Or let <1>Obtainium</1> keep it updated for you.",
+      "iosHow": "In Safari, tap Share, then Add to Home Screen."
+    }
   },
   "pricing": {
     "sectionLabel": "Plans",

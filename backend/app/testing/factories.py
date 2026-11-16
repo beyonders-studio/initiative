@@ -28,8 +28,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from jwt.algorithms import OKPAlgorithm
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import update
 from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import usernames
@@ -59,7 +60,11 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCClaimMapping,
     OIDCMappingTargetType,
 )
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.models.platform.plugin_install import PluginInstall
+from app.models.platform.plugin_service_registration import (
+    PluginBetaCommunity,
+    PluginServiceRegistration,
+)
 from app.models.platform.publisher import Publisher, publisher_prefix
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.tenant._mixins import ActorKind
@@ -1407,7 +1412,7 @@ async def create_plugin_service_registration(
     listing_uid: str | None = None,
     allowed_origins: list[str] | None = None,
     mandatory: bool = False,
-    enabled: bool = True,
+    suspended: bool = False,
     jwks: dict[str, Any] | None = None,
     **overrides: Any,
 ) -> PluginServiceRegistration:
@@ -1415,7 +1420,7 @@ async def create_plugin_service_registration(
 
     Its publisher is the row for its ``public_id`` prefix, made when there is
     none. It carries :func:`sample_plugin_jwks` unless ``jwks`` is given, so it is
-    live unless the test switches it or its publisher off; pass
+    live unless the test suspends it or switches its publisher off; pass
     ``jwks={}`` for one with no key set.
 
     The in-process snapshot is dropped afterwards, so the very next read sees
@@ -1433,7 +1438,7 @@ async def create_plugin_service_registration(
             else [base_url],
             "jwks": (jwks or None) if jwks is not None else sample_plugin_jwks(),
             "mandatory": mandatory,
-            "enabled": enabled,
+            "suspended_at": datetime.now(UTC) if suspended else None,
             **overrides,
         }
     )
@@ -1442,6 +1447,71 @@ async def create_plugin_service_registration(
     await session.refresh(row)
     invalidate_registrations()
     return row
+
+
+async def set_install_state(
+    session: AsyncSession,
+    guild_id: int,
+    install_id: int,
+    *,
+    status: str | None = None,
+    suspended: bool | None = None,
+) -> None:
+    """Write an install's status or suspension in the install index, as staff
+    would, and drop the registration snapshot."""
+    values: dict[str, Any] = {}
+    if status is not None:
+        values.update(status=status, status_changed_at=datetime.now(UTC))
+    if suspended is not None:
+        values["suspended_at"] = datetime.now(UTC) if suspended else None
+        if not suspended:
+            values["resumed_at"] = datetime.now(UTC)
+    await session.exec(
+        update(PluginInstall)
+        .where(
+            col(PluginInstall.guild_id) == guild_id,
+            col(PluginInstall.install_id) == install_id,
+        )
+        .values(**values)
+    )
+    await session.commit()
+    invalidate_registrations()
+
+
+async def set_beta_communities(
+    session: AsyncSession, listing_uid: str, *community_ids: int
+) -> None:
+    """Make ``community_ids`` the beta list of listing ``listing_uid``, as the
+    owner would, and drop the registration snapshot. A bare listing row is
+    made when the catalog has none, for the list's foreign key."""
+    if (
+        await session.exec(
+            select(MarketplaceListing).where(MarketplaceListing.uid == listing_uid)
+        )
+    ).first() is None:
+        session.add(
+            MarketplaceListing(
+                uid=listing_uid,
+                public_id=f"tests.{listing_uid.lower()}",
+                kind="plugin",
+                source="builtin",
+                name="Beta plug-in",
+                publisher="Tests",
+                description="A beta plug-in for tests.",
+                avatar_url="/marketplace/test.svg",
+            )
+        )
+    await session.exec(
+        sa_delete(PluginBetaCommunity).where(
+            col(PluginBetaCommunity.listing_uid) == listing_uid
+        )
+    )
+    session.add_all(
+        PluginBetaCommunity(listing_uid=listing_uid, community_id=community_id)
+        for community_id in community_ids
+    )
+    await session.commit()
+    invalidate_registrations()
 
 
 def marketplace_uid(label: str) -> str:

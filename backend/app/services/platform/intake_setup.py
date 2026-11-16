@@ -38,12 +38,17 @@ from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityStatus, Guild
+from app.models.platform.plugin_service_registration import (
+    PluginAvailability,
+    PluginServiceRegistration,
+)
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskType
+from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.platform.intake import operations_guild_id
 from app.services.tenant import task_types as task_types_service
@@ -124,10 +129,28 @@ async def set_operations_guild(
         if guild_id is not None:
             await operations_schema.provision_operations(guild_id)
         row = await _settings_row(session)
+        previous = row.operations_guild_id
         row.operations_guild_id = guild_id
         session.add(row)
+        await session.flush()
+        # A plug-in for the operations community follows the choice too: each
+        # of its installs is told where it now stands.
+        if previous != guild_id:
+            for registration in (
+                await session.exec(
+                    select(PluginServiceRegistration).where(
+                        PluginServiceRegistration.availability
+                        == PluginAvailability.operations.value
+                    )
+                )
+            ).all():
+                await registrations_service.reach_moved(
+                    session,
+                    registration,
+                    registration.suspended_at is not None,
+                    frozenset(() if previous is None else (previous,)),
+                )
         await session.commit()
-        # A plug-in limited to the operations community follows the choice too.
         invalidate_registrations()
         await operations_schema.follow_choice(guild_id)
     return guild_id

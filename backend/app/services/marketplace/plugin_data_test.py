@@ -379,7 +379,7 @@ class TestDefinitionReading:
             allowed_origins=(),
             keys={},
             mandatory=False,
-            enabled=True,
+            suspended=False,
             live=True,
         )
 

@@ -8,10 +8,11 @@ Every plug-in splits the same way, whatever published its listing
   carry a ``registration`` block, and ``upsert_listing`` hands it to
   :func:`read_listing_registration` and :func:`apply_listing_registration`,
   which write the listing, scope ceiling, image and Compose service onto the
-  registration for the service it names, creating the row when there is none.
+  registration for the service it names, creating the row when there is none,
+  and its reach (``availability``) from the version's manifest.
 * **The operator gives the deployment facts**: where the plug-in runs, the keys
-  its container signs with, its vendor values, the switch, the mandatory and
-  operations-only flags and the origins. Through the ``plugins.manage`` endpoints, or in
+  its container signs with, its vendor values, the mandatory flag and the
+  origins. Through the ``plugins.manage`` endpoints, or in
   ``PLUGIN_SERVICES_CONFIG``, a file a chart mounts, reconciled at boot. An
   entry's ``vendor_env`` names the environment variables holding its vendor
   values, which are sealed into the registration on each boot. An entry for a
@@ -50,32 +51,38 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from jwt import PyJWK
 from jwt.exceptions import InvalidKeyError, PyJWKError
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.clock import utcnow
 from app.core.config import settings
-from app.core.messages import PluginServiceMessages
+from app.core.messages import GuildMessages, PluginServiceMessages
 from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
 from app.core.security import plugin_platform_signing_enabled
 from app.db.errors import dbapi_constraint
+from app.models.platform.app_setting import AppSetting
+from app.models.platform.guild import Guild
 from app.models.platform.plugin_install import EXCLUSIVE_ROUTE_INDEX, PluginInstall
 from app.models.platform.plugin_service_registration import (
     IMAGE_REFERENCE_MAX_LENGTH,
     LISTING_STATED_FIELDS,
     MAX_PLUGIN_ID_LENGTH,
+    PluginAvailability,
+    PluginBetaCommunity,
     PluginServiceRegistration,
     RegistrationKind,
     RegistrationSource,
+    reach,
 )
 from app.models.platform.publisher import (
     Publisher,
     publisher_prefix,
 )
 from app.services import audit as audit_service
+from app.services.marketplace import plugin_installs
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace.plugin_keys import (
     PRIVATE_JWK_MEMBERS,
@@ -109,9 +116,9 @@ AUDITED_FIELDS: tuple[str, ...] = (
     "jwks_uri",
     "scope_ceiling",
     "mandatory",
-    "operations_only",
+    "availability",
     "shared_routes",
-    "enabled",
+    "suspended_at",
     "source",
     "image_digest",
     "compose",
@@ -427,18 +434,21 @@ async def list_registrations(
 
 @dataclass(frozen=True)
 class RegistrationView:
-    """A registration with its publisher, and whether it is live."""
+    """A registration with its publisher, whether it is live, and the
+    communities on its beta list, by id and name."""
 
     row: PluginServiceRegistration
     publisher: Publisher
     live: bool
+    beta_communities: tuple[tuple[int, str], ...] = ()
 
 
 async def registration_views(
     session: AsyncSession, registration_id: int | None = None
 ) -> list[RegistrationView]:
     """Every registration, or the one ``registration_id`` names, each with its
-    publisher and whether it is live, in one statement."""
+    publisher and whether it is live, in one statement, and their beta lists
+    in a second."""
     query = (
         select(PluginServiceRegistration, Publisher, live_registration_clause())
         .join(Publisher, Publisher.id == PluginServiceRegistration.publisher_id)
@@ -447,16 +457,42 @@ async def registration_views(
     if registration_id is not None:
         query = query.where(PluginServiceRegistration.id == registration_id)
     rows = (await session.exec(query)).all()
+    picked: dict[str, list[tuple[int, str]]] = {}
+    for listing_uid, guild_id, name in (
+        await session.exec(
+            select(PluginBetaCommunity.listing_uid, Guild.id, Guild.name)
+            .join(Guild, col(Guild.id) == PluginBetaCommunity.community_id)
+            .where(
+                col(PluginBetaCommunity.listing_uid).in_(
+                    [row.listing_uid for row, _, _ in rows if row.listing_uid]
+                )
+            )
+            .order_by(Guild.name, Guild.id)
+        )
+    ).all():
+        picked.setdefault(listing_uid, []).append((guild_id, name))
     return [
-        RegistrationView(row=row, publisher=publisher, live=bool(live))
+        RegistrationView(
+            row=row,
+            publisher=publisher,
+            live=bool(live),
+            beta_communities=tuple(picked.get(row.listing_uid or "", ())),
+        )
         for row, publisher, live in rows
     ]
 
 
 async def get_registration(
-    session: AsyncSession, registration_id: int
+    session: AsyncSession, registration_id: int, *, lock: bool = False
 ) -> PluginServiceRegistration:
-    row = await session.get(PluginServiceRegistration, registration_id)
+    """The registration, or 404. ``lock`` holds its row until the transaction
+    ends, for a write that reads its reach and beta list first."""
+    query = select(PluginServiceRegistration).where(
+        PluginServiceRegistration.id == registration_id
+    )
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    row = (await session.exec(query)).first()
     if row is None:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
@@ -466,14 +502,14 @@ async def get_registration(
 
 
 async def _by_public_id(
-    session: AsyncSession, public_id: str
+    session: AsyncSession, public_id: str, *, lock: bool = False
 ) -> PluginServiceRegistration | None:
-    result = await session.exec(
-        select(PluginServiceRegistration).where(
-            PluginServiceRegistration.public_id == public_id
-        )
+    query = select(PluginServiceRegistration).where(
+        PluginServiceRegistration.public_id == public_id
     )
-    return result.first()
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return (await session.exec(query)).first()
 
 
 # --- writes ------------------------------------------------------------------
@@ -489,8 +525,6 @@ async def create_registration(
     jwks: dict | None = None,
     jwks_uri: str | None = None,
     mandatory: bool = False,
-    operations_only: bool = False,
-    enabled: bool = True,
     vendor_values: dict[str, str | None] | None = None,
     actor_user_id: int | None = None,
 ) -> PluginServiceRegistration:
@@ -524,8 +558,6 @@ async def create_registration(
         jwks=key_set,
         jwks_uri=key_uri,
         mandatory=mandatory,
-        operations_only=operations_only,
-        enabled=enabled,
     )
     vendor_changed = await _apply_vendor(session, row, vendor_values)
     await vendor_values_service.sync_required(session, row)
@@ -577,23 +609,45 @@ async def update_registration(
     jwks: dict | None = None,
     jwks_uri: str | None = None,
     mandatory: bool | None = None,
-    operations_only: bool | None = None,
     shared_routes: bool | None = None,
-    enabled: bool | None = None,
+    suspended: bool | None = None,
+    beta_community_ids: Iterable[int] | None = None,
     vendor_values: dict[str, str | None] | None = None,
     actor_user_id: int | None = None,
 ) -> PluginServiceRegistration:
-    """Edit a registration's deployment facts.
+    """Edit a registration's deployment facts, suspend or lift it, or
+    replace a beta plug-in's list of communities.
 
     An empty ``page_origin`` clears it, putting both surfaces back on
     ``base_url``; an empty ``jwks_uri`` clears it. A ``jwks_uri`` kept while
     ``base_url`` moves is checked against the new origin. ``shared_routes``
     is written to the registration's installs in the install index in the same
     transaction, and turning it off is refused (409) while a vendor
-    installation routes to more than one community.
+    installation routes to more than one community. A suspension, its lift,
+    or a new beta list is told for each install (:func:`reach_moved`). A list
+    for a plug-in that is not beta is refused (409), and so is one naming a
+    community that does not exist (400).
     """
-    row = await get_registration(session, registration_id)
+    # Locked first: two saves reading the same list would otherwise each
+    # write their own difference from it.
+    row = await get_registration(session, registration_id, lock=True)
+    beta: set[int] | None = None
+    if beta_community_ids is not None:
+        if row.availability != PluginAvailability.beta.value or row.listing_uid is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_409_CONFLICT,
+                detail=PluginServiceMessages.NOT_BETA,
+            )
+        beta = set(beta_community_ids)
+        found = (
+            await session.exec(select(Guild.id).where(col(Guild.id).in_(beta)))
+        ).all()
+        if len(found) != len(beta):
+            raise _bad_request(
+                GuildMessages.COMMUNITY_NOT_FOUND, "no such community on the list"
+            )
     before = audit_service.snapshot(row, AUDITED_FIELDS)
+    was_suspended, was_reach = row.suspended_at is not None, await _reach(session, row)
     placement = (base_url, page_origin, allowed_origins, jwks, jwks_uri)
     if row.kind == RegistrationKind.DECLARATIVE and any(
         value is not None for value in placement
@@ -612,12 +666,11 @@ async def update_registration(
     )
     if mandatory is not None:
         row.mandatory = mandatory
-    if operations_only is not None:
-        row.operations_only = operations_only
     if shared_routes is not None:
         row.shared_routes = shared_routes
-    if enabled is not None:
-        row.enabled = enabled
+    if suspended is not None and suspended != was_suspended:
+        row.suspended_at = utcnow() if suspended else None
+        row.suspended_by = actor_user_id if suspended else None
     vendor_changed = await _apply_vendor(session, row, vendor_values)
     await vendor_values_service.sync_required(session, row)
 
@@ -632,7 +685,35 @@ async def update_registration(
         # Which values moved, by key. A value is the vendor client's
         # credential, so none of it reaches the record.
         changed = {**changed, "vendor_values": vendor_changed}
-    if changed["changed"] or vendor_changed:
+    if beta is not None and row.listing_uid is not None:
+        was = await _beta_list(session, row.listing_uid)
+        added, removed = sorted(beta - was), sorted(was - beta)
+        if removed:
+            await session.exec(
+                delete(PluginBetaCommunity).where(
+                    col(PluginBetaCommunity.listing_uid) == row.listing_uid,
+                    col(PluginBetaCommunity.community_id).in_(removed),
+                )
+            )
+        session.add_all(
+            PluginBetaCommunity(
+                listing_uid=row.listing_uid,
+                community_id=community,
+                added_by=actor_user_id,
+            )
+            for community in added
+        )
+        if added or removed:
+            changed = {
+                **changed,
+                "beta_communities": {
+                    "listing_uid": row.listing_uid,
+                    "added": added,
+                    "removed": removed,
+                },
+            }
+    await reach_moved(session, row, was_suspended, was_reach)
+    if changed["changed"] or vendor_changed or "beta_communities" in changed:
         await audit_service.record(
             session,
             event_type=AuditEventType.PLUGIN_SERVICE_UPDATED,
@@ -643,8 +724,8 @@ async def update_registration(
         )
     await session.commit()
     await session.refresh(row)
-    # The kill switch, the flags, the keys and the origin list are all
-    # read through a cached snapshot on the request path, so an operator's edit
+    # The suspension, the flags, the keys and the origin list are all read
+    # through a cached snapshot on the request path, so an operator's edit
     # drops it rather than waiting out its TTL.
     invalidate_registrations()
     return row
@@ -734,7 +815,7 @@ async def delete_registration(
     session: AsyncSession, registration_id: int, *, actor_user_id: int | None = None
 ) -> None:
     """Remove a registration. One whose plug-in facts come from the registry is
-    switched off instead (409): the next refresh would bring it back."""
+    suspended instead (409): the next refresh would bring it back."""
     row = await get_registration(session, registration_id)
     if row.source == RegistrationSource.REGISTRY:
         raise _registry_managed()
@@ -901,6 +982,8 @@ class ListingRegistration:
     scope_ceiling: list[str]
     #: The Compose service its publisher wrote, placeholders unfilled.
     compose: dict[str, str] | None = None
+    #: Which communities it reaches (``PluginAvailability``), from the manifest.
+    availability: str = PluginAvailability.none.value
 
 
 def _image_reference(value: Any) -> str:
@@ -1078,6 +1161,7 @@ async def read_listing_registration(
         image=image,
         scope_ceiling=ceiling,
         compose=compose,
+        availability=definition.get("availability", PluginAvailability.none.value),
     )
 
 
@@ -1088,11 +1172,13 @@ async def apply_listing_registration(
 
     The one writer of plug-in facts, for every source. A registration that is not
     there yet is created, with the deployment facts ``PLUGIN_SERVICES_CONFIG``
-    gives it, and is not live until it has a location and keys. The caller
-    commits.
+    gives it, and is not live until it has a location and keys. Moving its
+    ``availability`` off ``beta`` deletes its beta list, and each install its
+    reach moves in or out of is told to billing. The caller commits.
     """
-    row = await _by_public_id(session, registration.public_id)
+    row = await _by_public_id(session, registration.public_id, lock=True)
     created = row is None
+    was = None if row is None else await _reach(session, row)
     if row is None:
         publisher = await ensure_publisher(
             session, publisher_prefix(registration.public_id)
@@ -1111,6 +1197,16 @@ async def apply_listing_registration(
     row.scope_ceiling = registration.scope_ceiling
     row.image_digest = registration.image
     row.compose = registration.compose
+    if (
+        row.availability == PluginAvailability.beta.value
+        and registration.availability != PluginAvailability.beta.value
+    ):
+        await session.exec(
+            delete(PluginBetaCommunity).where(
+                col(PluginBetaCommunity.listing_uid) == registration.listing_uid
+            )
+        )
+    row.availability = registration.availability
     row.source = (
         RegistrationSource.REGISTRY
         if registration.source == RegistrationSource.REGISTRY
@@ -1129,6 +1225,8 @@ async def apply_listing_registration(
     row.updated_at = utcnow()
     session.add(row)
     await session.flush()
+    if not created:
+        await reach_moved(session, row, row.suspended_at is not None, was)
     await audit_service.record(
         session,
         event_type=(
@@ -1143,6 +1241,91 @@ async def apply_listing_registration(
     )
     invalidate_registrations()
     return row
+
+
+async def _beta_list(session: AsyncSession, listing_uid: str) -> set[int]:
+    """The communities on the beta list of ``listing_uid``."""
+    return set(
+        (
+            await session.exec(
+                select(PluginBetaCommunity.community_id).where(
+                    PluginBetaCommunity.listing_uid == listing_uid
+                )
+            )
+        ).all()
+    )
+
+
+async def _reach(
+    session: AsyncSession, row: PluginServiceRegistration
+) -> frozenset[int] | None:
+    """The communities ``row`` reaches as ``session`` reads them, ``None`` for
+    every one."""
+    operations = (
+        await session.get(AppSetting, 1)
+        if row.availability == PluginAvailability.operations.value
+        else None
+    )
+    return reach(
+        row.availability,
+        operations_guild_id=operations.operations_guild_id if operations else None,
+        beta=(
+            await _beta_list(session, row.listing_uid)
+            if row.availability == PluginAvailability.beta.value and row.listing_uid
+            else ()
+        ),
+    )
+
+
+async def reach_moved(
+    session: AsyncSession,
+    row: PluginServiceRegistration,
+    was_suspended: bool,
+    was_reach: frozenset[int] | None,
+) -> None:
+    """Tell each install of ``row`` where it now stands, when its suspension
+    or its reach moved since it was ``was_suspended`` and reached
+    ``was_reach`` (``None`` for every community).
+
+    Each install the registration no longer suspends is stamped as back from
+    a suspension. Billing is told every install when the suspension moved,
+    and, when only the reach did, each install whose state there flipped,
+    where staff have not suspended it.
+    """
+    await session.flush()
+    suspended, now = row.suspended_at is not None, await _reach(session, row)
+    if row.listing_uid is None or (suspended, now) == (was_suspended, was_reach):
+        return
+
+    def out(by_owner: bool, communities: frozenset[int] | None, guild_id: int) -> bool:
+        return by_owner or (communities is not None and guild_id not in communities)
+
+    installs = (
+        await session.exec(
+            select(PluginInstall.guild_id, PluginInstall.suspended_at).where(
+                PluginInstall.listing_uid == row.listing_uid
+            )
+        )
+    ).all()
+    resumed = {
+        guild_id
+        for guild_id, _ in installs
+        if out(was_suspended, was_reach, guild_id) and not out(suspended, now, guild_id)
+    }
+    told = (
+        None
+        if suspended != was_suspended
+        else {
+            guild_id
+            for guild_id, by_staff in installs
+            if by_staff is None
+            and out(was_suspended, was_reach, guild_id) != out(suspended, now, guild_id)
+        }
+    )
+    if told is None or told or resumed:
+        await plugin_installs.suspension_moved(
+            session, row.listing_uid, told, resumed=resumed
+        )
 
 
 # --- boot reconciliation -----------------------------------------------------
@@ -1188,7 +1371,6 @@ class DeploymentFacts:
     jwks_uri: str | None = None
     allowed_origins: list[str] | None = None
     mandatory: bool | None = None
-    operations_only: bool | None = None
     vendor_env: Any = None
 
     @property
@@ -1200,11 +1382,19 @@ class DeploymentFacts:
 def _deployment_facts(entry: dict[str, Any]) -> DeploymentFacts:
     """Read an entry, refusing one that names what only the plug-in's listing
     states, or a location and keys that do not fit together."""
-    stated = [key for key in LISTING_STATED_FIELDS if key in entry]
+    # ``operations_only`` is ``availability``'s earlier name.
+    stated = [
+        key for key in (*LISTING_STATED_FIELDS, "operations_only") if key in entry
+    ]
     if stated:
         raise _bad_request(
             PluginServiceMessages.STATED_BY_LISTING,
             f"the plug-in's listing states {', '.join(stated)}",
+        )
+    if "enabled" in entry:
+        raise _bad_request(
+            PluginServiceMessages.SUSPENSION_IS_OWNERS,
+            "suspending a plug-in is the owner's, on Plug-in services",
         )
     declared_base = entry.get("base_url")
     base_url = normalize_base_url(str(declared_base)) if declared_base else None
@@ -1237,9 +1427,6 @@ def _deployment_facts(entry: dict[str, Any]) -> DeploymentFacts:
         ),
         allowed_origins=origins or None,
         mandatory=bool(entry["mandatory"]) if "mandatory" in entry else None,
-        operations_only=(
-            bool(entry["operations_only"]) if "operations_only" in entry else None
-        ),
         vendor_env=entry.get("vendor_env"),
     )
 
@@ -1284,7 +1471,6 @@ def apply_deployment_facts(
             row.jwks,
             row.jwks_uri,
             row.mandatory,
-            row.operations_only,
         )
 
     was = state()
@@ -1301,8 +1487,6 @@ def apply_deployment_facts(
     )
     if facts.mandatory is not None:
         row.mandatory = facts.mandatory
-    if facts.operations_only is not None:
-        row.operations_only = facts.operations_only
     vendor_moved = vendor_values_service.apply_vendor_env(
         row, facts.vendor_env, public_id=row.public_id
     )
@@ -1314,15 +1498,15 @@ async def reconcile_from_config(session: AsyncSession) -> ReconcileResult:
     it names.
 
     Each entry is ``{public_id}`` with any of ``base_url``, ``page_origin``,
-    ``allowed_origins``, ``jwks``, ``jwks_uri``, ``mandatory``,
-    ``operations_only`` and ``vendor_env`` (vendor key → environment variable name, read and sealed on
+    ``allowed_origins``, ``jwks``, ``jwks_uri``, ``mandatory`` and
+    ``vendor_env`` (vendor key → environment variable name, read and sealed on
     every pass). An entry naming what only the plug-in's listing states is
-    refused. Database-only: this updates rows and stops. It creates none: an
-    entry for a plug-in whose listing has not arrived waits, and the listing
-    apply that creates its registration applies it.
-
-    ``enabled`` is not reconciled: turning a registration off is an operator
-    action, and a restart must not reverse it.
+    refused (``operations_only`` among them, as ``availability`` was once
+    named), and so is one naming ``enabled``: suspending a plug-in is the
+    owner's, and a restart must not reverse it. Database-only: this updates
+    rows and stops. It creates none: an entry for a plug-in whose listing has
+    not arrived waits, and the listing apply that creates its registration
+    applies it.
 
     A malformed file or an unreadable path costs that file, and a refused entry
     costs that entry, and nothing else — the caller keeps booting.

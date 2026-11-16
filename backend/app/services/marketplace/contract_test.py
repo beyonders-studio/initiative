@@ -1011,6 +1011,16 @@ def test_a_minimum_age_is_kept_as_declared(validator):
     assert stored["minimum_age"] == {"default": 16, "US": 13, "FR": 15}
 
 
+@pytest.mark.parametrize("availability", ["Beta", "suspended", "", [], {}, True])
+def test_an_availability_is_one_of_three(availability, validator):
+    """Who may use a plug-in is ``none``, ``beta`` or ``operations``; anything
+    else, of any type, is refused by the schema and the platform alike."""
+    manifest = _manifest(availability=availability)
+    assert list(validator.iter_errors(manifest)) != []
+    with pytest.raises(ValueError):
+        platform_accepts(manifest)
+
+
 @pytest.mark.parametrize("min_plugin_api", ["4", "4.2.0", "v4.2", "4.x", "", 4.2])
 def test_a_min_plugin_api_is_major_minor(min_plugin_api, validator):
     """The oldest contract a plug-in needs is ``MAJOR.MINOR``; anything else is

@@ -53,9 +53,9 @@ vi.mock("@/lib/cloud", async () => ({
 
 import { CLOUD_ORIGIN } from "@/lib/cloud";
 
-import { FeedbackHost, useFeedback } from "./FeedbackSheet";
+import { FeedbackHost, useFeedback } from "./FeedbackDialog";
 
-/** The account menu's item, and the sheet the app shell draws. */
+/** The account menu's item, and the dialog the app shell draws. */
 const Menu = () => {
   const feedback = useFeedback();
   return (
@@ -70,7 +70,7 @@ const Menu = () => {
   );
 };
 
-describe("FeedbackSheet", () => {
+describe("FeedbackDialog", () => {
   beforeEach(() => {
     fileMutate.mockClear();
     openExternal.mockClear();
@@ -81,7 +81,8 @@ describe("FeedbackSheet", () => {
   });
 
   const openAgain = async () => {
-    const button = await screen.findByRole("button", { name: "Open feedback" });
+    // An open dialog hides the page behind it, the menu's item included.
+    const button = await screen.findByRole("button", { name: "Open feedback", hidden: true });
     act(() => button.click());
   };
 

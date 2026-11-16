@@ -79,6 +79,22 @@ describe("BrowsePage", () => {
     expect(screen.getByText("by Initiative")).toBeInTheDocument();
   });
 
+  it("marks a plug-in in beta, and no other", async () => {
+    listingsFor.mockReturnValue({
+      data: {
+        items: [
+          listing({ beta: true }),
+          listing({ id: 2, uid: "STEADY00000001", name: "Steady", beta: false }),
+        ],
+        total: 2,
+      },
+      isLoading: false,
+    });
+    renderPage(BrowsePage, { routerSearch: { kind: "plugin" } });
+    await screen.findByText("Steady");
+    expect(screen.getAllByText("Beta")).toHaveLength(1);
+  });
+
   it("asks the catalog only for dashboards", async () => {
     // Defaulted by the page itself: `useSearch({ strict: false })` does not run
     // the route's validation, so a page that leaned on it would drop the filter

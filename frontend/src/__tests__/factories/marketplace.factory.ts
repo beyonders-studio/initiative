@@ -54,6 +54,7 @@ export function buildMarketplaceListing(
     latest_version: buildMarketplaceVersion(),
     installable: true,
     unavailable: null,
+    beta: false,
     updated_at: "2026-01-15T00:00:00.000Z",
     ...overrides,
   };

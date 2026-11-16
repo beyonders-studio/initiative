@@ -6,6 +6,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from "@pla
 
 const RELEASE_IMAGES = fileURLToPath(new URL("../../../docs/images/releases/", import.meta.url));
 const HELP_IMAGES = fileURLToPath(new URL("../../../docs/en/images/", import.meta.url));
+const SITE_IMAGES = fileURLToPath(new URL("../../public/site/", import.meta.url));
 
 /** Small enough to keep in the repository, sharp enough to read a label. */
 const QUALITY = 0.85;
@@ -37,6 +38,16 @@ export async function shoot(page: Page, name: string, target?: Locator) {
  */
 export async function shootHelp(page: Page, name: string, target?: Locator) {
   await capture(page, HELP_IMAGES, name, target);
+}
+
+/**
+ * Take a picture for the front door's own pages, saved as
+ * `frontend/public/site/<name>.webp` and `<name>.dark.webp`. Unlike the
+ * others, these ship with the app: a server's front door draws them from
+ * itself, not from the docs site.
+ */
+export async function shootSite(page: Page, name: string, target?: Locator) {
+  await capture(page, SITE_IMAGES, name, target);
 }
 
 async function capture(page: Page, folder: string, name: string, target?: Locator) {

@@ -25,9 +25,10 @@ and the permission the page names, which the community's roles hold.
 
 Two things a guild admin does not govern. A plug-in the deployment marks mandatory
 is installed everywhere and is neither removable nor disableable here — the
-operator's registration decides whether it exists. And the operator's kill
-switch outranks everything: a service whose registration is switched off reaches
-nothing, whether or not the guild wanted it.
+operator's registration decides whether it exists. And the plug-in's state in
+the community, which the platform sets: a plug-in suspended, on hold or deleted
+there is absent from every route here, settings included, and comes back as it
+was once it is active again.
 """
 
 import logging
@@ -285,7 +286,8 @@ async def _require_grantable(
 async def _load(
     session: RLSSessionDep, plugin_id: int, *, for_update: bool = False
 ) -> GuildPlugin:
-    """This guild's install, or a 404.
+    """This guild's install, or a 404: none by that id, or the plug-in is
+    suspended, on hold or deleted here.
 
     ``for_update`` holds the row for the rest of the transaction — see
     :func:`~app.services.tenant.guild_plugins.lock_install`. Anything that rewrites
@@ -300,7 +302,16 @@ async def _load(
             await session.exec(select(GuildPlugin).where(GuildPlugin.id == plugin_id))
         ).first()
     )
-    if plugin is None:
+    if (
+        plugin is None
+        or (
+            await registration_lookup.install_state(
+                plugin.definition,
+                guild_id=routed_guild_id(session),
+                listing_uid=plugin.listing_uid,
+            )
+        ).hidden
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=GuildPluginMessages.NOT_FOUND,
@@ -486,16 +497,26 @@ async def list_community_plugins(
     """Every plug-in installed in this guild, enabled or not.
 
     Disabled ones are included so an admin can find and re-enable them; the
-    sidebar filters to enabled. A service plug-in whose registration is gone or
-    switched off comes back too, marked unavailable — an install that quietly
-    vanished would leave an admin with nothing to look at and nothing to
-    remove.
+    sidebar filters to enabled. A service plug-in this deployment has not set
+    up comes back too, marked unavailable — an install that quietly vanished
+    would leave an admin with nothing to look at and nothing to remove. One
+    the platform suspended, held or deleted here is left out: nothing in the
+    community can act on it.
     """
-    plugins = (
+    installed = (
         await session.exec(
             select(GuildPlugin).order_by(GuildPlugin.name, GuildPlugin.id)
         )
     ).all()
+    states = {
+        plugin.id: await registration_lookup.install_state(
+            plugin.definition,
+            guild_id=guild_context.guild_id,
+            listing_uid=plugin.listing_uid,
+        )
+        for plugin in installed
+    }
+    plugins = [plugin for plugin in installed if not states[plugin.id].hidden]
     avatars = await catalog_service.listing_avatars(
         session, [plugin.listing_uid for plugin in plugins]
     )
@@ -510,11 +531,7 @@ async def list_community_plugins(
             serialize_guild_plugin(
                 plugin,
                 viewer=viewer,
-                install_state=await registration_lookup.install_state(
-                    plugin.definition,
-                    guild_id=guild_context.guild_id,
-                    listing_uid=plugin.listing_uid,
-                ),
+                install_state=states[plugin.id],
                 avatar_url=avatars.get(plugin.listing_uid),
                 context=guild_context,
                 placements=placements.get(plugin.id, []),

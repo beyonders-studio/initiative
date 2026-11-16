@@ -47,6 +47,7 @@ from app.testing import (
     create_plugin_service_registration,
     create_user,
     emitted,
+    set_install_state,
 )
 
 PUBLIC_ID = "tests.hooked"
@@ -562,6 +563,91 @@ class TestState:
         assert await _timers(session, guild_id) == 1
 
 
+class TestPluginState:
+    """``plugin_status`` tells a plug-in its own status in the community, on
+    hold and deleted included, and a suspended plug-in is sent nothing."""
+
+    async def test_it_reaches_a_plugin_on_hold_and_deleted(self, session, monkeypatch):
+        _user, guild, install = await _setup(session)
+        plugins = _answering(monkeypatch)
+
+        for status in ("on_hold", "deleted", "active"):
+            await set_install_state(session, guild.id, install.id, status=status)
+            await _visit(guild.id)
+
+        assert [(path, body) for _, path, _, body in plugins.calls] == [
+            ("/v1/hooks/plugin_status", {"status": "on_hold"}),
+            ("/v1/hooks/plugin_status", {"status": "deleted"}),
+            ("/v1/hooks/plugin_status", {"status": "active"}),
+        ]
+        await set_rls_context(session, Unattributed())
+        told = await session.scalar(
+            select(PluginInstall.plugin_status_sent).where(
+                PluginInstall.guild_id == guild.id
+            )
+        )
+        await session.commit()
+        assert told == "active"
+        # Told: the next visit has nothing to say.
+        await _visit(guild.id)
+        assert len(plugins.calls) == 3
+
+    async def test_on_hold_it_is_sent_only_its_lifecycle(self, session, monkeypatch):
+        """A hook the state does not allow waits, untouched, without holding
+        back ``plugin_status`` behind it, and goes once it is active again."""
+        _user, guild, install = await _setup(session)
+        plugins = _answering(monkeypatch)
+        await _deliver(guild.id, hook="installed")
+        await set_install_state(session, guild.id, install.id, status="on_hold")
+        await _visit(guild.id)
+
+        assert [(path, body) for _, path, _, body in plugins.calls] == [
+            ("/v1/hooks/plugin_status", {"status": "on_hold"})
+        ]
+        installed, _told = await _hooks(session, guild.id)
+        assert (installed.hook, installed.attempts, installed.done_at) == (
+            "installed",
+            0,
+            None,
+        )
+
+        await set_install_state(session, guild.id, install.id, status="active")
+        await _visit(guild.id)
+        assert [path for _, path, _, _ in plugins.calls][1:] == [
+            "/v1/hooks/installed",
+            "/v1/hooks/plugin_status",
+        ]
+
+    async def test_a_suspended_plugin_is_sent_nothing_and_its_hooks_wait(
+        self, session, monkeypatch
+    ):
+        """Its own status included. What the community queued waits, no
+        attempt spent, and goes once the suspension is lifted."""
+        _user, guild, install = await _setup(session)
+        await plugin_refs.ensure_plugin_guild_ref(
+            guild_id=guild.id, public_id=PUBLIC_ID
+        )
+        plugins = _answering(monkeypatch)
+        await set_install_state(
+            session, guild.id, install.id, status="read_only", suspended=True
+        )
+
+        await _deliver(guild.id, hook="erase")
+        assert await _visit(guild.id) is None
+        assert await community_hooks.due_outside(guild.id, datetime.now(UTC)) is None
+        assert plugins.calls == []
+        [erase] = await _hooks(session, guild.id)
+        assert (erase.hook, erase.attempts, erase.done_at) == ("erase", 0, None)
+
+        await set_install_state(session, guild.id, install.id, suspended=False)
+        await _visit(guild.id)
+
+        assert [(path, body) for _, path, _, body in plugins.calls] == [
+            ("/v1/hooks/erase", {}),
+            ("/v1/hooks/plugin_status", {"status": "read_only"}),
+        ]
+
+
 async def _sent(session: AsyncSession, guild_id: int):
     await set_rls_context(session, Unattributed())
     value = (
@@ -879,6 +965,56 @@ class TestPurging:
 
         assert await _purge(session, when) == 1
         assert await _standing(session, guild_id) is None
+
+    async def test_a_plugin_suspended_there_does_not_hold_the_purge(
+        self, session, monkeypatch, capfd
+    ):
+        """Nothing is sent to it: its erase is given up on at once, and its
+        names go as for a plug-in that never answered."""
+        user, guild, install = await _setup(session)
+        guild_id = guild.id
+        member = await plugin_refs.ensure_plugin_ref(
+            guild_id=guild_id, public_id=PUBLIC_ID, user_id=user.id
+        )
+        plugins = _answering(monkeypatch)
+        await set_install_state(session, guild_id, install.id, suspended=True)
+        when = await _deleted(session, guild_id)
+
+        # Its erase is queued and given up on in the same pass.
+        assert await _purge(session, when) == 1
+
+        assert plugins.calls == []
+        assert await _standing(session, guild_id) is None
+        assert (
+            await plugin_refs.resolve_plugin_ref(session, ref=member, guild_id=guild_id)
+            is None
+        )
+        (record,) = emitted(capfd, AuditEventType.PLUGIN_ERASE_ABANDONED)
+        assert record["detail"]["plugin"] == PUBLIC_ID
+
+    async def test_a_plugin_on_hold_is_sent_its_erase_and_nothing_else_holds_it(
+        self, session, monkeypatch
+    ):
+        """On hold, the erase is a lifecycle hook and goes; a hook its state
+        keeps waiting is given up on rather than holding the purge."""
+        _user, guild, install = await _setup(session)
+        guild_id = guild.id
+        await plugin_refs.ensure_plugin_guild_ref(
+            guild_id=guild_id, public_id=PUBLIC_ID
+        )
+        plugins = _answering(monkeypatch)
+        await _deliver(guild_id, hook="installed")
+        await set_install_state(session, guild_id, install.id, status="on_hold")
+        when = await _deleted(session, guild_id)
+
+        assert await _purge(session, when) == 0
+        installed, erase = await _hooks(session, guild_id)
+        assert (installed.hook, installed.outcome) == ("installed", "gave_up")
+        assert (erase.hook, erase.done_at) == ("erase", None)
+
+        await _visit(guild_id)
+        assert [path for _, path, _, _ in plugins.calls] == ["/v1/hooks/erase"]
+        assert await _purge(session, when) == 1
 
     async def test_an_answered_purge_erase_lets_the_purge_finish(
         self, session, monkeypatch

@@ -8,10 +8,12 @@ by the boot sweep, and a guild admin can neither remove nor disable it. The
 refusal is by name because the affordance is absent in the UI — a request that
 arrives anyway is answered, not accepted.
 
-**The kill switch.** Switching a registration off stops the plug-in in every guild:
-its surfaces refuse, its vendor flows refuse, and the install reports itself as
-unavailable rather than quietly looking fine. It outranks ``mandatory``, because
-mandatory constrains guild admins rather than the operator.
+**Its state.** Suspending a registration stops the plug-in in every guild, and
+staff suspend, hold or delete it in one: suspended, on hold or deleted, the
+community sees nothing of it, and it comes back as it was once it is active
+again. It outranks ``mandatory``, because mandatory constrains guild admins
+rather than the operator. A plug-in this server has not set up stays listed,
+unavailable, which a community admin can act on.
 
 **Clearing the flag.** Non-destructive by construction: whether an install is
 mandatory is read from the registration every time, so a plug-in that stops being
@@ -26,7 +28,7 @@ So are the seat's own routes for placement and scopes.
 """
 
 from collections.abc import Sequence
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlsplit
 
@@ -69,6 +71,7 @@ from app.testing import (
     marketplace_uid,
     route_session_to_guild,
     sealed_vendor_values,
+    set_install_state,
 )
 
 SERVICE_ID = "tests.widgetco"
@@ -204,12 +207,12 @@ async def _mark(session: AsyncSession, row, **fields):
     invalidate_registrations()
 
 
-#: Two ways a registration that is switched on is still not live.
+#: Two ways a registration that is not suspended is still not live.
 NOT_LIVE = ("no key set", "publisher off")
 
 
 async def _take_out_of_service(session: AsyncSession, registration, how: str):
-    """Leave ``registration`` switched on but not live, ``how`` names."""
+    """Leave ``registration`` not suspended but not live, ``how`` names."""
     if how == "no key set":
         await _mark(session, registration, jwks=None)
         return
@@ -233,28 +236,77 @@ class TestInstallState:
         assert [item["available"] for item in items] == [True]
         assert [item["mandatory"] for item in items] == [False]
 
-    async def test_the_kill_switch_makes_it_unavailable(
-        self, client: AsyncClient, acting_user, session: AsyncSession, registration
+    @pytest.mark.parametrize("how", ["everywhere", "suspended", "on_hold", "deleted"])
+    async def test_a_plugin_out_of_service_here_is_invisible_until_it_is_back(
+        self,
+        client: AsyncClient,
+        acting_user,
+        session: AsyncSession,
+        registration,
+        how: str,
     ):
-        """Deactivating stops the plug-in in every guild. The install stays — this
-        is a stop, not a teardown — and says it is doing nothing."""
+        """Its list, its read and its page, settings included. The install
+        stays — this is a stop, not a teardown — and comes back as it was."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
-        await _installed(session, a)
-        await _mark(session, registration, enabled=False)
+        plugin = await _installed(session, a)
+        if how == "everywhere":
+            await _mark(session, registration, suspended_at=datetime.now(UTC))
+        else:
+            await set_install_state(
+                session,
+                a.guild.id,
+                plugin.id,
+                **({"suspended": True} if how == "suspended" else {"status": how}),
+            )
 
         items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
-        assert [item["available"] for item in items] == [False]
+        assert items == []
+        read = await client.get(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
+        assert read.status_code == 404
+        assert read.json()["detail"] == GuildPluginMessages.NOT_FOUND
+        opened = await client.post(
+            a.g(f"/plugins/{plugin.id}/handoff/board"), headers=a.headers
+        )
+        assert opened.status_code == 404
+
+        if how == "everywhere":
+            await _mark(session, registration, suspended_at=None)
+        else:
+            await set_install_state(
+                session, a.guild.id, plugin.id, suspended=False, status="active"
+            )
+        items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
+        assert [(item["id"], item["name"], item["available"]) for item in items] == [
+            (plugin.id, "WidgetCo", True)
+        ]
+
+    async def test_a_read_only_plugin_is_shown_as_read_only(
+        self, client: AsyncClient, acting_user, session: AsyncSession, registration
+    ):
+        a = await acting_user(guild_role=CommunityRole.superadmin)
+        plugin = await _installed(session, a)
+        await set_install_state(session, a.guild.id, plugin.id, status="read_only")
+
+        items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
+        assert [(item["read_only"], item["available"]) for item in items] == [
+            (True, True)
+        ]
 
     async def test_an_unregistered_service_plugin_is_unavailable(
         self, client: AsyncClient, acting_user, session: AsyncSession
     ):
         """Installed here, wired up nowhere: nothing it offers can be reached,
-        and the read says so rather than showing a working plug-in."""
+        and the read says so rather than showing a working plug-in. A state
+        staff gave it holds all the same."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
-        await _installed(session, a)
+        plugin = await _installed(session, a)
 
         items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
         assert [item["available"] for item in items] == [False]
+
+        await set_install_state(session, a.guild.id, plugin.id, status="on_hold")
+        items = (await client.get(a.g("/plugins/"), headers=a.headers)).json()["items"]
+        assert items == []
 
     @pytest.mark.parametrize("how", NOT_LIVE)
     async def test_only_a_live_registration_is_available(
@@ -265,7 +317,7 @@ class TestInstallState:
         registration,
         how: str,
     ):
-        """Availability is the one definition of live: switched on, its
+        """Availability is the one definition of live: not suspended, its
         publisher switched on, and a key set to verify against."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         await _installed(session, a)
@@ -343,25 +395,24 @@ class TestMandatory:
         removed = await client.delete(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
         assert removed.status_code == 204
 
-    async def test_the_kill_switch_outranks_the_flag(
+    async def test_a_suspension_outranks_the_flag(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
-        """Mandatory constrains guild admins, not the operator: a deactivated
+        """Mandatory constrains guild admins, not the operator: a suspended
         registration stops a mandatory plug-in exactly like any other."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await _installed(session, a)
-        await _mark(session, registration, mandatory=True, enabled=False)
+        await _mark(
+            session, registration, mandatory=True, suspended_at=datetime.now(UTC)
+        )
 
-        read = (
-            await client.get(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
-        ).json()
-        assert read["available"] is False
+        read = await client.get(a.g(f"/plugins/{plugin.id}"), headers=a.headers)
+        assert read.status_code == 404
 
         opened = await client.post(
             a.g(f"/plugins/{plugin.id}/handoff/board"), headers=a.headers
         )
-        assert opened.status_code == 409
-        assert opened.json()["detail"] == GuildPluginMessages.SERVICE_NOT_REGISTERED
+        assert opened.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -1428,18 +1479,17 @@ class TestConnectLaunch:
         assert response.status_code == 409
         assert response.json()["detail"] == GuildPluginMessages.SERVICE_NOT_REGISTERED
 
-    async def test_a_deactivated_registration_sends_nobody_anywhere(
+    async def test_a_suspended_registration_sends_nobody_anywhere(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await self._install(session, a)
-        await _mark(session, registration, enabled=False)
+        await _mark(session, registration, suspended_at=datetime.now(UTC))
 
         response = await client.post(
             a.g(f"/plugins/{plugin.id}/connections/github/connect"), headers=a.headers
         )
-        assert response.status_code == 409
-        assert response.json()["detail"] == GuildPluginMessages.SERVICE_NOT_REGISTERED
+        assert response.status_code == 404
 
 
 class TestUninstallStopsDeliveries:

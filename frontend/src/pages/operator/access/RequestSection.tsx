@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { AccessGrantRead, CommunityNotice } from "@/api/generated/initiativeAPI.schemas";
 import { AccessGrantStatusBadge } from "@/components/access/AccessGrantStatusBadge";
+import { CommunityPicker, type PickedCommunity } from "@/components/communities/CommunityPicker";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   flattenGrants,
@@ -23,7 +24,6 @@ import { LoadMore } from "@/ui/load-more";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
-import { CommunityPicker, type PickedCommunity } from "./CommunityPicker";
 import {
   CaseField,
   CommunityNoticeField,

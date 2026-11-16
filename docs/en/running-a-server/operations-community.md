@@ -23,7 +23,7 @@ Each kind has its own **Receiving new cases** switch to pause it, and **Stop rou
 
 Setting the community back to none stops every kind at once and leaves everything where it is, so choosing the same community again restores the setup. Choosing a different community starts fresh there. The community you leave keeps its cases as ordinary tasks, but their attachments are deleted, and requesters stop seeing those cases under **My Tickets**.
 
-A plug-in set to **Only the operations community** under [plug-in services](plugins.md) follows whichever community you choose here.
+A plug-in for **The operations community** under [plug-in services](plugins.md) follows whichever community you choose here.
 
 ## The kinds of case
 

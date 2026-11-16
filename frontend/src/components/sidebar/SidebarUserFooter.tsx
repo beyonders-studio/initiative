@@ -16,12 +16,12 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { openHelp } from "@/components/help/helpStore";
+import { openHelp, useHelpDraftWaiting } from "@/components/help/helpStore";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { useTitleBarHeight } from "@/components/navigation/DesktopTitleBar";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/navigation/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { useFeedback } from "@/components/tickets/FeedbackSheet";
+import { useFeedback } from "@/components/tickets/FeedbackDialog";
 import { UpdateButton } from "@/components/updates/UpdateButton";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
@@ -70,6 +70,7 @@ export const SidebarUserFooter = ({
 }: SidebarUserFooterProps) => {
   const { t } = useTranslation(["nav", "profiles", "common"]);
   const feedback = useFeedback();
+  const helpDraft = useHelpDraftWaiting();
   const storeListing = useStoreListing();
   // The desktop app's title bar carries the update while it is drawn.
   const titleBarShown = useTitleBarHeight() > 0;
@@ -159,6 +160,13 @@ export const SidebarUserFooter = ({
                         </span>
                       ) : null}
                     </div>
+                    {/* The desktop app's title bar marks its own Help button. */}
+                    {helpDraft && !titleBarShown ? (
+                      <span className="flex shrink-0 items-center">
+                        <span className="sr-only">{t("common:helpDraft")}</span>
+                        <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
+                      </span>
+                    ) : null}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -311,6 +319,12 @@ export const SidebarUserFooter = ({
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => openHelp()}>
                         <CircleQuestionMark className="h-4 w-4" /> {t("common:help")}
+                        {helpDraft ? (
+                          <span className="ml-auto flex items-center">
+                            <span className="sr-only">{t("common:helpDraft")}</span>
+                            <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
+                          </span>
+                        ) : null}
                       </DropdownMenuItem>
                       {feedback.offered ? (
                         <DropdownMenuItem onSelect={feedback.open}>

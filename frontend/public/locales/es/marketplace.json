@@ -8,6 +8,7 @@
   "card": {
     "installed": "Instalado",
     "version": "v{{version}}",
+    "beta": "Beta",
     "needsUpdate": "Necesita una app más reciente",
     "unavailable": "Aún no disponible",
     "request": "Bajo solicitud"

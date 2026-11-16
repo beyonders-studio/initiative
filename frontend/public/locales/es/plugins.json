@@ -25,6 +25,7 @@
     "configInvalid": "Problema de configuración",
     "provided": "Viene con Initiative",
     "unavailable": "No está configurada en este servidor",
+    "readOnly": "Solo lectura",
     "configure": "Abrir los ajustes",
     "version": "Versión {{version}}",
     "autoUpdate": "Actualizar automáticamente",

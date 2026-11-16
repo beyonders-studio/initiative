@@ -7,6 +7,8 @@ operator's kill switch — on the registration or on its publisher — is the th
 that takes an origin back out of it.
 """
 
+from datetime import UTC, datetime
+
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.embed_csp import plugin_frame_policy
@@ -68,7 +70,7 @@ class TestTheRegisteredOrigins:
             allowed_origins=[FRAMED],
         )
 
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()
@@ -132,7 +134,7 @@ class TestThePolicy:
             base_url=FRAMED,
             allowed_origins=[FRAMED],
         )
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()

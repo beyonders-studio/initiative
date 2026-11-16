@@ -143,6 +143,13 @@ describe("ListingPage", () => {
     expect(backHref()).toContain("kind=plugin");
   });
 
+  it("says a plug-in is in beta", async () => {
+    listing = { ...pluginListing(), beta: true } as unknown as MarketplaceListingDetail;
+    renderPage(ListingPage, { routerSearch: { kind: "plugin" } });
+    await screen.findByRole("heading", { name: "Community calendar" });
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+  });
+
   it("answers who wrote it before the install button", async () => {
     // The same sentence the card showed, on the page where the decision is
     // actually made.

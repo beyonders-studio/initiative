@@ -48,6 +48,7 @@ import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 import { BillingConsoleButton, opensBillingHere } from "./BillingConsoleButton";
+import { CommunityPluginsList } from "./CommunityPluginsList";
 import { CommunityRestoreWizard } from "./CommunityRestoreWizard";
 
 const GIB = 1024 ** 3;
@@ -296,7 +297,20 @@ export const CommunityOperatorSettingsSheet = ({
             </SettingsRow>
           </SettingsSection>
 
-          {deleted ? null : <PluginSummarySections communityId={community.id} />}
+          {deleted ? null : (
+            <>
+              {/* Where billing sets the plan, the server offers no status
+                  control, and each status shows as text. */}
+              <SettingsSection
+                plain
+                title={t("communities.plugins.title")}
+                description={t("communities.plugins.help")}
+              >
+                <CommunityPluginsList communityId={community.id} />
+              </SettingsSection>
+              <PluginSummarySections communityId={community.id} />
+            </>
+          )}
 
           {/* Two separate grants. Either one can be given on its own. */}
           <SettingsSection plain title={t("communities.sheet.decidesForItself")}>

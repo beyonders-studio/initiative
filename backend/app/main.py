@@ -198,6 +198,11 @@ async def lifespan(app: FastAPI):
     notify_bus.register(email_outbox.CHANNEL, email_outbox.hint)
     # A committed change row: billing is pinged to read its change log.
     notify_bus.register(billing_changes.CHANNEL, billing_changes.hint)
+    # A plug-in suspended or lifted, or an install's status set, by any
+    # process: every process drops its registration snapshot.
+    from app.services.marketplace import registration_lookup
+
+    notify_bus.register(registration_lookup.CHANNEL, registration_lookup.hint)
     await notify_bus.start()
 
     # Write collaborative bodies that have changed on an interval, so what a
@@ -772,7 +777,7 @@ def custom_openapi() -> dict:
 # without the ``_inject_query_schemas`` upgrades, which then leaks into the frontend
 # type generation (conditions/sorting collapse back to ``string``). The SPA catch-all
 # registered later is ``include_in_schema=False``, so the spec is already complete here.
-app.openapi = custom_openapi  # ty: ignore[invalid-assignment]
+app.openapi = custom_openapi
 
 
 class McpBarePathMiddleware:

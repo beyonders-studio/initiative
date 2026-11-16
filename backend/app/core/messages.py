@@ -1631,6 +1631,15 @@ class PluginServiceMessages:
     DECLARATIVE_NOT_PLACED = "PLUGIN_SERVICE_DECLARATIVE_NOT_PLACED"
     #: A vendor value named a field the plug-in's manifest does not declare.
     UNKNOWN_VENDOR_FIELD = "PLUGIN_SERVICE_UNKNOWN_VENDOR_FIELD"
+    #: A ``PLUGIN_SERVICES_CONFIG`` entry named ``enabled``: suspending a
+    #: plug-in is the owner's, on Plug-in services.
+    SUSPENSION_IS_OWNERS = "PLUGIN_SERVICE_SUSPENSION_IS_OWNERS"
+    #: The community's plug-in statuses are set in billing, which sets its plan.
+    STATUS_IS_BILLINGS = "PLUGIN_SERVICE_STATUS_IS_BILLINGS"
+    #: No install of that id in the community.
+    INSTALL_NOT_FOUND = "PLUGIN_SERVICE_INSTALL_NOT_FOUND"
+    #: A list of communities for a plug-in that does not declare itself beta.
+    NOT_BETA = "PLUGIN_SERVICE_NOT_BETA"
     #: A vendor value that is too long, or not the address its field asks for.
     INVALID_VENDOR_VALUE = "PLUGIN_SERVICE_INVALID_VENDOR_VALUE"
     #: The plug-in's listing declares no vendor setup flow this build runs.
@@ -1914,6 +1923,8 @@ class BillingMessages:
     #: A sync's custom roles name one twice (capitals aside), or give a role
     #: on the member rung a surface that is for admins.
     CUSTOM_ROLES_NOT_SYNCED = "BILLING_CUSTOM_ROLES_NOT_SYNCED"
+    #: A sync's plug-ins name one listing twice.
+    PLUGINS_NOT_SYNCED = "BILLING_PLUGINS_NOT_SYNCED"
     #: The notice could not be written down. Nothing was recorded, so the same
     #: key may be sent again.
     NOTICE_NOT_DELIVERED = "BILLING_NOTICE_NOT_DELIVERED"

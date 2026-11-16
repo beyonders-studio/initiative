@@ -85,7 +85,6 @@ async def test_registering_a_plugin_service_names_what_it_confers(
         "publisher_id",
         "base_url",
         "mandatory",
-        "enabled",
     } <= set(detail["changed"])
     assert detail["values"]["mandatory"] == {"from": None, "to": True}
     # The address is a string: named, never copied.
@@ -110,7 +109,7 @@ async def test_editing_a_registration_records_what_moved(
     edited = await client.patch(
         f"{BASE}{registration_id}",
         headers=headers,
-        json={"enabled": False, "mandatory": True},
+        json={"suspended": True, "mandatory": True},
     )
     assert edited.status_code == 200, edited.text
 
@@ -119,8 +118,8 @@ async def test_editing_a_registration_records_what_moved(
         (owner_id, registration_id)
     ]
     detail = rows[0]["detail"]
-    assert {"enabled", "mandatory"} <= set(detail["changed"])
-    assert detail["values"]["enabled"] == {"from": True, "to": False}
+    assert {"suspended_at", "mandatory"} <= set(detail["changed"])
+    assert detail["values"]["mandatory"] == {"from": False, "to": True}
 
 
 async def test_an_edit_that_changes_nothing_records_nothing(
@@ -131,7 +130,9 @@ async def test_an_edit_that_changes_nothing_records_nothing(
     capfd.readouterr()
 
     same = await client.patch(
-        f"{BASE}{row.id}", headers=headers, json={"enabled": True, "mandatory": False}
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"suspended": False, "mandatory": False},
     )
     assert same.status_code == 200, same.text
 
@@ -146,7 +147,7 @@ async def test_a_refused_request_records_nothing(
     capfd.readouterr()
 
     refused = await client.patch(
-        f"{BASE}{row.id}", headers=get_auth_headers(member), json={"enabled": False}
+        f"{BASE}{row.id}", headers=get_auth_headers(member), json={"suspended": True}
     )
     assert refused.status_code == 403
 

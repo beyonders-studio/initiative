@@ -524,6 +524,9 @@ class AuditEventType(str, Enum):
     #: A plug-in never answered the community's request to erase its data;
     #: its references were dropped anyway. Carries the plug-in and the tries.
     PLUGIN_ERASE_ABANDONED = "plugin.erase_abandoned", AuditCategory.LIFECYCLE
+    #: Staff suspended a community's install of a plug-in, lifted it, or set
+    #: its status. Carries the listing and what moved.
+    PLUGIN_STATE_CHANGED = "plugin.state_changed", AuditCategory.LIFECYCLE
     WEBHOOK_CREATED = "webhook.created", AuditCategory.LIFECYCLE
     WEBHOOK_UPDATED = "webhook.updated", AuditCategory.LIFECYCLE
     WEBHOOK_DELETED = "webhook.deleted", AuditCategory.LIFECYCLE

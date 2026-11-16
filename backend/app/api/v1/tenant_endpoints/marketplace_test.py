@@ -12,6 +12,7 @@ a card that appears opens a page that offers it and an install that takes it —
 and one that does not appear is refused the same way at each step.
 """
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -27,6 +28,7 @@ from app.testing import (
     create_marketplace_listing,
     create_plugin_service_registration,
     marketplace_uid,
+    set_beta_communities,
 )
 from app.testing.fake_vendor import declarative_plugin
 
@@ -496,7 +498,7 @@ class TestAPluginNeedsItsServiceRegistered:
         registration = await create_plugin_service_registration(
             session, public_id="tests.shop"
         )
-        registration.enabled = False
+        registration.suspended_at = datetime.now(UTC)
         session.add(registration)
         await session.commit()
         invalidate_registrations()
@@ -544,20 +546,45 @@ class TestAPluginNeedsItsServiceRegistered:
         assert response.status_code == 200
         assert response.json()["installable"] is True
 
-    async def test_an_operations_only_plugin_is_offered_to_the_operations_community(
-        self, client, acting_user, session, service_plugin
+    @pytest.mark.parametrize("availability", ["operations", "beta"])
+    async def test_a_plugin_is_offered_only_in_its_reach(
+        self, client, acting_user, session, availability
     ):
-        """Off the shelf, its page not found and its install refused in every
-        other community."""
-        await create_plugin_service_registration(
-            session, public_id="tests.shop", operations_only=True
+        """The operations community, or the communities on its beta list. Off
+        the shelf, its page not found and its install refused in every other
+        community."""
+        await create_marketplace_listing(
+            session,
+            uid=self.SERVICE_UID,
+            public_id="tests.shop",
+            kind="plugin",
+            name="Shop",
+            definition={
+                "plugin_kind": "service",
+                "service": {"public_id": "tests.shop", "protocol": 1},
+                "features": [],
+                "availability": availability,
+            },
         )
-        operations = await acting_user(guild_role=CommunityRole.superadmin)
+        await create_plugin_service_registration(
+            session,
+            public_id="tests.shop",
+            listing_uid=self.SERVICE_UID,
+            availability=availability,
+        )
+        inside = await acting_user(guild_role=CommunityRole.superadmin)
         other = await acting_user(guild_role=CommunityRole.superadmin)
-        await set_operations_guild(session, operations.guild.id)
+        if availability == "operations":
+            await set_operations_guild(session, inside.guild.id)
+        else:
+            await set_beta_communities(session, self.SERVICE_UID, inside.guild.id)
 
-        assert "tests.shop" in await _shelf(client, operations, kind="plugin")
+        assert "tests.shop" in await _shelf(client, inside, kind="plugin")
         assert "tests.shop" not in await _shelf(client, other, kind="plugin")
+        opened = await client.get(
+            inside.g("/marketplace/listings/tests.shop"), headers=inside.headers
+        )
+        assert opened.json()["beta"] is (availability == "beta")
         page = await client.get(
             other.g("/marketplace/listings/tests.shop"), headers=other.headers
         )

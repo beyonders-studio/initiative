@@ -43,6 +43,7 @@ from app.core.messages import (
     AuthMessages,
     BillingMessages,
     GuildMessages,
+    PluginServiceMessages,
     SettingsMessages,
 )
 from app.core.rules import (
@@ -82,11 +83,15 @@ from app.models.platform.guild import (
 )
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.identity_ref import IdentityEntity
+from app.models.platform.plugin_install import PluginInstallStatus
 from app.models.platform.user import User
 from app.schemas.platform.access_grant import BreakGlassCreate, SecondFactorAnswer
 from app.schemas.platform.billing import BillingPortalHandoffResponse
 from app.schemas.platform.guild import (
     CommunityAction,
+    CommunityPluginAction,
+    CommunityPluginStateRead,
+    CommunityPluginStatusUpdate,
     CommunitySuspensionUpdate,
     PlatformCommunityRestore,
     PlatformCommunityStorageListResponse,
@@ -130,6 +135,8 @@ from app.services.auth import narrowing_review, provider_registry
 from app.services.auth import platform_provider as platform_provider_service
 from app.services.captcha_config import ResolvedCaptchaConfig
 from app.services.marketplace import plugin_data as plugin_data_service
+from app.services.marketplace import plugin_installs as plugin_installs_service
+from app.services.marketplace import registration_lookup
 from app.services.platform import access_grants as access_grants_service
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import (
@@ -148,6 +155,7 @@ from app.services.platform.retention import (
     ACCOUNT_DELETION,
     COMMUNITY_DELETION,
     COMMUNITY_HOLD,
+    PLUGIN_INSTALL_DELETION,
 )
 
 logger = logging.getLogger(__name__)
@@ -932,6 +940,7 @@ def _community_actions(
             actions.append(CommunityAction.lift)
         elif status_ in _SUSPENDABLE:
             actions.append(CommunityAction.suspend)
+        actions.append(CommunityAction.plugins)
     if user_has_capability(actor, Capability.BILLING_SUPPORT):
         actions.append(CommunityAction.billing_support)
     if manages:
@@ -1415,6 +1424,185 @@ async def set_platform_community_suspension(
         actor=moderator,
         moderating=True,
     )
+
+
+def _plugin_state_read(
+    install: plugin_installs_service.CommunityInstall, actor: User
+) -> CommunityPluginStateRead:
+    """One of a community's plug-ins, with what ``actor``, who may suspend
+    and lift it (:func:`_may_suspend_plugins`), may do to it: set its status
+    too where they manage communities and billing does not set the
+    community's plan."""
+    row = install.row
+    actions = [
+        CommunityPluginAction.lift
+        if row.suspended_at is not None
+        else CommunityPluginAction.suspend
+    ]
+    if (
+        user_has_capability(actor, Capability.COMMUNITIES_MANAGE)
+        and not billing_service.billing_managed()
+    ):
+        actions.append(CommunityPluginAction.set_status)
+    return CommunityPluginStateRead(
+        install_id=row.install_id,
+        listing_uid=row.listing_uid,
+        name=install.name,
+        status=PluginInstallStatus(row.status),
+        state=install.state,
+        status_changed_at=row.status_changed_at,
+        suspended_at=row.suspended_at,
+        uninstall_at=PLUGIN_INSTALL_DELETION.ends_at(row),
+        allowed_actions=actions,
+    )
+
+
+async def _may_suspend_plugins(session: Any, actor: User, guild_id: int) -> bool:
+    """Whether ``actor`` may suspend and lift the community's plug-ins: they
+    manage communities, or they hold a live ``moderate`` grant on it."""
+    return user_has_capability(
+        actor, Capability.COMMUNITIES_MANAGE
+    ) or guild_id in await _moderating(session, user_id=actor.id, guild_ids=[guild_id])
+
+
+async def _require_community(session: Any, guild_id: int) -> Guild:
+    guild = await session.get(Guild, guild_id)
+    if guild is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=GuildMessages.COMMUNITY_NOT_FOUND,
+        )
+    return guild
+
+
+async def _require_plugin(session: Any, guild_id: int, install_id: int) -> Guild:
+    """The community, which has the plug-in ``install_id`` names, or a 404:
+    a tool instance is not a plug-in with a state."""
+    guild = await _require_community(session, guild_id)
+    if not await plugin_installs_service.community_installs(
+        session, guild_id, install_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=PluginServiceMessages.INSTALL_NOT_FOUND,
+        )
+    return guild
+
+
+async def _one_plugin(
+    session: Any, guild_id: int, install_id: int, actor: User
+) -> CommunityPluginStateRead:
+    """The install as it now stands, read after a change committed: the
+    snapshot every process reads is dropped first."""
+    registration_lookup.invalidate_registrations()
+    installs = await plugin_installs_service.community_installs(
+        session, guild_id, install_id
+    )
+    return _plugin_state_read(installs[0], actor)
+
+
+@router.get(
+    "/communities/{community_id}/plugins",
+    response_model=list[CommunityPluginStateRead],
+)
+async def list_community_plugin_states(
+    guild_id: CommunityIdPath,
+    session: SystemSessionDep,
+    reader: CommunitiesSuspendDep,
+) -> list[CommunityPluginStateRead]:
+    """The community's plug-ins with each one's state, and what the reader
+    may do to each. Operators and up (``communities.manage``), or a moderator
+    under a live ``moderate`` grant on the community."""
+    if not await _may_suspend_plugins(session, reader, guild_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_SUSPENSION_NEEDS_GRANT,
+        )
+    await _require_community(session, guild_id)
+    return [
+        _plugin_state_read(install, reader)
+        for install in await plugin_installs_service.community_installs(
+            session, guild_id
+        )
+    ]
+
+
+@router.post(
+    "/communities/{community_id}/plugins/{install_id}/suspension",
+    response_model=CommunityPluginStateRead,
+)
+async def set_community_plugin_suspension(
+    guild_id: CommunityIdPath,
+    install_id: int,
+    payload: CommunitySuspensionUpdate,
+    session: SystemSessionDep,
+    moderator: CommunitiesSuspendDep,
+) -> CommunityPluginStateRead:
+    """Suspend one of the community's plug-ins there, or lift its suspension
+    (``communities.suspend`` under a live ``moderate`` grant on it, or
+    ``communities.manage``). Its status is left as it is; lifting returns it
+    there. Nothing goes in or out of a suspended plug-in, and the community
+    sees nothing of it."""
+    if not await _may_suspend_plugins(session, moderator, guild_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_SUSPENSION_NEEDS_GRANT,
+        )
+    guild = await _require_plugin(session, guild_id, install_id)
+    grant = await access_grants_service.get_live_grant(
+        session, user_id=moderator.id, guild_id=guild_id
+    )
+    row = await plugin_installs_service.set_suspended(
+        session,
+        guild_id=guild_id,
+        install_id=install_id,
+        suspended=payload.suspended,
+        actor_user_id=moderator.id,
+        grant_id=grant.id if grant is not None else None,
+    )
+    listing_uid = row.listing_uid
+    await session.commit()
+    if grant is not None:
+        await grant_cases.note(
+            (await grant_cases.cases_of([grant.id])).get(grant.id),
+            case_activity.ActivityKind.guild_act,
+            f"{handle_of(moderator)} "
+            + ("suspended" if payload.suspended else "lifted the suspension of")
+            + f" plug-in {listing_uid} in community {guild.name} (#{guild_id}).",
+        )
+    return await _one_plugin(session, guild_id, install_id, moderator)
+
+
+@router.put(
+    "/communities/{community_id}/plugins/{install_id}/status",
+    response_model=CommunityPluginStateRead,
+)
+async def set_community_plugin_status(
+    guild_id: CommunityIdPath,
+    install_id: int,
+    payload: CommunityPluginStatusUpdate,
+    session: SystemSessionDep,
+    operator: GuildsManageDep,
+) -> CommunityPluginStateRead:
+    """Set one of the community's plug-ins' status (``communities.manage``).
+    Refused (409) where billing sets the community's plan: the status is
+    billing's there. A deleted install may be set back to any other status
+    until it is uninstalled."""
+    if billing_service.billing_managed():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=PluginServiceMessages.STATUS_IS_BILLINGS,
+        )
+    await _require_plugin(session, guild_id, install_id)
+    await plugin_installs_service.set_status(
+        session,
+        guild_id=guild_id,
+        install_id=install_id,
+        status=payload.status,
+        actor_user_id=operator.id,
+    )
+    await session.commit()
+    return await _one_plugin(session, guild_id, install_id, operator)
 
 
 @router.get(

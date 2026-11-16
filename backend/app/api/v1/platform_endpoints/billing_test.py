@@ -10,7 +10,7 @@ Pinned:
   stands alone; a capability package replaces rather than merges; the
   deployment's custom roles are its own; the pushed storage cap is the one
   uploads are held to; a suspension is never lifted; a hold tells the seat
-  once;
+  once; the plug-ins' statuses are set whole, never their suspension;
 * ``communities/read``: status, usage, members, guests, name, the version
   held and each statement's version, and nothing for a community that isn't
   there.
@@ -30,6 +30,7 @@ from app.core.login_methods import LoginMethod
 from app.models.platform.billing import BillingJti
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.plugin_install import PluginInstall
 from app.services.marketplace import plugin_entitlements
 from app.services.platform import rules
 from app.services.tenant.attachments import (
@@ -43,9 +44,11 @@ from app.testing import (
     create_guest,
     create_guild,
     create_guild_membership,
+    create_guild_plugin,
     create_upload,
     create_user,
     drain_notices,
+    set_install_state,
 )
 from app.testing.schema_harness import route_session_to_guild
 from app.testing.sockets import settle
@@ -465,6 +468,71 @@ async def test_a_suspended_community_stays_suspended(
         {"community_refs": [await billing_guild_ref(guild_id)]},
     )
     assert read.json()["communities"][0]["status"] == "suspended"
+
+
+async def test_billing_sets_each_plugins_status_whole(
+    client: AsyncClient, session: AsyncSession
+):
+    """A list is the community's whole state: a plug-in left out is active,
+    one not installed is ignored, and a suspension is never billing's to set
+    or lift. Left out altogether, every status stays as it is."""
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    guild_id = guild.id
+    held_id, kept_id = [
+        (
+            await create_guild_plugin(
+                session,
+                guild,
+                user,
+                definition={"plugin_kind": "service", "service": {"public_id": n}},
+                listing_uid=uid,
+            )
+        ).id
+        for n, uid in (("t.held", "HELDAPP0000001"), ("t.kept", "KEPTAPP0000001"))
+    ]
+    await set_install_state(
+        session, guild_id, kept_id, status="read_only", suspended=True
+    )
+
+    async def statuses() -> dict[int, tuple[str, bool]]:
+        session.expire_all()
+        rows = await session.exec(
+            select(PluginInstall).where(PluginInstall.guild_id == guild_id)
+        )
+        return {r.install_id: (r.status, r.suspended_at is not None) for r in rows}
+
+    synced = await _sync(
+        client,
+        (
+            guild_id,
+            1,
+            _fields(
+                plugins=[
+                    {"listing_uid": "HELDAPP0000001", "status": "on_hold"},
+                    {"listing_uid": "NOTINSTALLED01", "status": "deleted"},
+                ]
+            ),
+        ),
+    )
+    assert synced.json()["results"] == [
+        {"community_ref": await billing_guild_ref(guild_id), "version": 1}
+    ]
+    assert await statuses() == {held_id: ("on_hold", False), kept_id: ("active", True)}
+
+    await _sync(client, (guild_id, 2, _fields()))
+    assert await statuses() == {held_id: ("on_hold", False), kept_id: ("active", True)}
+
+    refused = await _sync(
+        client,
+        (
+            guild_id,
+            3,
+            _fields(plugins=[{"listing_uid": "HELDAPP0000001", "status": "suspended"}]),
+        ),
+    )
+    assert "error" in refused.json()["results"][0]
+    assert await statuses() == {held_id: ("on_hold", False), kept_id: ("active", True)}
 
 
 async def _hold_notices(session: AsyncSession, user_id: int) -> int:

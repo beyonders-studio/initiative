@@ -25,7 +25,7 @@ The caller runs each entry in its own savepoint, so a refusal part-way leaves
 nothing of that entry behind.
 
 **Withdrawal** (:func:`withdraw_missing`): a listing the repository no longer
-carries is marked unavailable and its registration switched off. Nothing is
+carries is marked unavailable and its registration suspended. Nothing is
 deleted, so installs keep their data.
 """
 
@@ -42,7 +42,7 @@ from typing import Any, NamedTuple
 
 from fastapi import HTTPException
 from sqlalchemy import update as sa_update
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -64,7 +64,7 @@ from app.models.platform.publisher import (
     publisher_prefix,
 )
 from app.services import audit as audit_service
-from app.services.marketplace import media
+from app.services.marketplace import media, plugin_installs
 from app.services.marketplace import publishers as publishers_service
 from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace.catalog import (
@@ -601,7 +601,7 @@ async def withdraw_missing(
         await session.exec(
             select(PluginServiceRegistration).where(
                 PluginServiceRegistration.source == RegistrationSource.REGISTRY,
-                PluginServiceRegistration.enabled.is_(True),
+                col(PluginServiceRegistration.suspended_at).is_(None),
             )
         )
     ).all()
@@ -613,9 +613,12 @@ async def withdraw_missing(
         ):
             continue
         before = audit_service.snapshot(row, registrations_service.AUDITED_FIELDS)
-        row.enabled = False
+        row.suspended_at = now
         row.updated_at = now
         session.add(row)
+        if row.listing_uid is not None:
+            await session.flush()
+            await plugin_installs.suspension_moved(session, row.listing_uid)
         await audit_service.record(
             session,
             event_type=AuditEventType.PLUGIN_SERVICE_UPDATED,
