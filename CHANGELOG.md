@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.79.2] - 2026-11-16
+
+### Added
+
+- **Fold a whole Gantt at once.** **Collapse all** folds every task down to the top of its tree, and **Expand all** opens them again. A group's band folds too, so grouping by type and folding one type hides it. A task's row shows how many of its subtasks are done, the Gantt remembers what you folded in each project on that device, and subtasks sit further in, so three levels read as three (#3397).
+- **A social media campaign to start from.** The marketplace has a six-week campaign in three phases: each post sits under its phase, and each post's copy, visuals and channel versions sit under the post. It opens on the Gantt.
+
+### Fixed
+
+- **My Tasks and the calendar load quickly again.** On PostgreSQL 17.12, My Tasks, the calendar, a list sorted by tag and the untagged count beside a list could take from seconds to minutes in a community with many tags. Each now reads only the tags of the items it shows.
+
 ## [0.79.1] - 2026-11-16
 
 ### Added

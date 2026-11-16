@@ -21,13 +21,15 @@ from app.db.schema_provisioning import guild_role_name, guild_schema_name
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import Task
 from app.schemas.query import FilterOp
-from app.services.tenant import activity_feed
+from app.services.tenant import activity_feed, task_queries
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import tags as tags_service
 from app.testing import (
     create_guild,
     create_initiative,
     create_project,
     create_property_definition,
+    create_tag,
     create_task,
     create_user,
     route_session_to_guild,
@@ -240,6 +242,70 @@ async def test_a_property_filter_reads_only_the_listed_rows_values(
         plan = plan if isinstance(plan, list) else json.loads(plan)
         read = _rows_read(plan[0]["Plan"], "metadata_values")
         assert read <= 3, f"{op.value} on 3 tasks read {read} values"
+
+
+async def test_a_list_reads_only_its_own_rows_edges(
+    acting_user, session: AsyncSession, role_session
+):
+    """Sorting three tasks by tag, counting which carry none, or counting what
+    still blocks them reads those tasks' own edges, not every edge in the
+    community. Each edge read is one the edge table's policies pass on, so a
+    list that read them all would cost a small list as much as the busiest
+    community."""
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    small = await create_project(session, a.initiative, a.user)
+    tag = await create_tag(session, a.guild)
+    await route_session_to_guild(session, a.guild.id)
+    await _many_tasks(session, a.project, 2000)
+    await _many_tasks(session, small, 3)
+    await session.exec(
+        text(
+            "INSERT INTO relationships (source_type, source_id, relationship_type, "
+            "target_type, target_id, provenance, created_at) "
+            "SELECT 'task', id, 'tagged_with', 'tag', :tag, 'manual', now() FROM tasks"
+        ).bindparams(tag=tag.id)
+    )
+    await session.commit()
+    await route_session_to_guild(session, a.guild.id)
+    for table in ("tasks", "relationships"):
+        await session.exec(text(f"ANALYZE {table}"))
+    await session.commit()
+
+    member = await role_session("app_user")
+    await establish_guild_access(member, a.user, a.guild.id)
+    spec = tags_service.TAG_LINKS["task"]
+    on_small = Task.project_id == small.id
+    for name, query in (
+        (
+            "sorting by tag",
+            select(Task.id)
+            .where(on_small)
+            .order_by(tags_service.first_tag_name(spec, Task.id)),
+        ),
+        (
+            "counting the untagged",
+            select(func.count())
+            .select_from(Task)
+            .where(on_small, tags_service.untagged_clause(spec, Task.id)),
+        ),
+        (
+            "counting blockers",
+            select(task_queries._open_blocker_count_expression()).where(on_small),
+        ),
+    ):
+        sql = str(
+            query.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
+        )
+        (plan,) = (
+            await member.exec(text(f"EXPLAIN (ANALYZE, FORMAT JSON) {sql}"))
+        ).one()
+        plan = plan if isinstance(plan, list) else json.loads(plan)
+        read = _rows_read(plan[0]["Plan"], "relationships")
+        assert read <= 3, f"{name} on 3 tasks read {read} edges"
 
 
 async def _changes(session: AsyncSession, task, actor_id: int, count: int) -> None:

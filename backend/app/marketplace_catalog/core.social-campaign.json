@@ -1,0 +1,2907 @@
+{
+  "uid": "7C4MPS0C1AKQ2N",
+  "public_id": "core.social-campaign",
+  "kind": "project",
+  "name": "Social media campaign",
+  "publisher": "Initiative",
+  "description": "Phases, the posts in each, and every version of every post. Folded until you need it.",
+  "long_description": "Six weeks in three phases: tease, launch and keep it going. Each phase holds its posts, and each post holds the work behind it (the copy, then the visuals) and a task for every channel it goes out on. A post's due date is the day it goes out.\n\nIt opens on the Gantt with every phase showing what its posts cover. Collapse all to see only the phases, open one to see its posts, and open a post when you need to know who is making the story. Pick the day the campaign starts when you install it, and every task lands in the right week.",
+  "avatar_url": "/marketplace/core-social-campaign.svg",
+  "images": [],
+  "version": "1.0.0",
+  "release_notes": "First release.",
+  "definition": {
+    "schema_version": 1,
+    "type": "initiative-project",
+    "app_version": "0.79.0",
+    "exported_at": "2000-01-03T00:00:00",
+    "exported_by_handle": null,
+    "project": {
+      "name": "Social media campaign",
+      "icon": "📣",
+      "description": "Three phases, the posts in each, and what every post needs before it goes out. A post's due date is the day it goes out.",
+      "is_template": false,
+      "archived_at": null,
+      "start_date": "2000-01-03",
+      "end_date": "2000-02-12",
+      "properties": []
+    },
+    "tags": [],
+    "task_statuses": [
+      {
+        "name": "To do",
+        "category": "todo",
+        "position": 0,
+        "color": null,
+        "icon": null,
+        "is_default": true
+      },
+      {
+        "name": "In progress",
+        "category": "in_progress",
+        "position": 1,
+        "color": null,
+        "icon": "pen-line",
+        "is_default": false
+      },
+      {
+        "name": "Scheduled",
+        "category": "in_progress",
+        "position": 2,
+        "color": null,
+        "icon": "calendar-clock",
+        "is_default": false
+      },
+      {
+        "name": "Done",
+        "category": "done",
+        "position": 3,
+        "color": null,
+        "icon": null,
+        "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Task",
+        "position": 0,
+        "is_default": true,
+        "color": "#94A3B8",
+        "icon": "square-check",
+        "layout_preset": "plain",
+        "starting_values": null
+      },
+      {
+        "name": "Phase",
+        "position": 1,
+        "is_default": false,
+        "color": "#A78BFA",
+        "icon": "flag",
+        "layout_preset": "dates",
+        "starting_values": null
+      },
+      {
+        "name": "Post",
+        "position": 2,
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "megaphone",
+        "layout_preset": "plain",
+        "starting_values": null
+      }
+    ],
+    "property_definitions": [
+      {
+        "name": "Channel",
+        "type": "select",
+        "position": 0.0,
+        "color": null,
+        "options": [
+          {
+            "value": "feed",
+            "label": "Feed",
+            "color": "#3B82F6"
+          },
+          {
+            "value": "stories",
+            "label": "Stories",
+            "color": "#EC4899"
+          },
+          {
+            "value": "short_video",
+            "label": "Short video",
+            "color": "#F59E0B"
+          },
+          {
+            "value": "newsletter",
+            "label": "Newsletter",
+            "color": "#10B981"
+          }
+        ],
+        "currency": null,
+        "counter": null,
+        "project": true
+      }
+    ],
+    "tasks": [
+      {
+        "title": "Tease",
+        "description": "Two weeks of hinting. Hint harder than feels comfortable; nobody is paying as close attention as you are.",
+        "priority": "high",
+        "start_date": "2000-01-03T12:00:00Z",
+        "due_date": "2000-01-16T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 0.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Phase",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:1",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Something is coming",
+        "description": "No product shot yet. A shape, a date, a reason to follow.",
+        "priority": "medium",
+        "start_date": "2000-01-03T12:00:00Z",
+        "due_date": "2000-01-08T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 1.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:2",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:1"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-03T12:00:00Z",
+        "due_date": "2000-01-04T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 2.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:3",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:2"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-05T12:00:00Z",
+        "due_date": "2000-01-07T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 3.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:4",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:2"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:3"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-08T12:00:00Z",
+        "due_date": "2000-01-08T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 4.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:5",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:2"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-08T12:00:00Z",
+        "due_date": "2000-01-08T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 5.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:6",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:2"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Behind the scenes",
+        "description": "The team, the desk, the whiteboard with the good half of the plan on it.",
+        "priority": "medium",
+        "start_date": "2000-01-08T12:00:00Z",
+        "due_date": "2000-01-13T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 6.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:7",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:1"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-08T12:00:00Z",
+        "due_date": "2000-01-09T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 7.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:8",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:7"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-10T12:00:00Z",
+        "due_date": "2000-01-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 8.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:9",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:7"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:8"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-13T12:00:00Z",
+        "due_date": "2000-01-13T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 9.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:10",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:7"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-13T12:00:00Z",
+        "due_date": "2000-01-13T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 10.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:11",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:7"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Short video",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-13T12:00:00Z",
+        "due_date": "2000-01-13T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 11.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:12",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "short_video",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:7"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Three days to go",
+        "description": "The countdown post. Say the date twice.",
+        "priority": "medium",
+        "start_date": "2000-01-11T12:00:00Z",
+        "due_date": "2000-01-16T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 12.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:13",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:1"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-11T12:00:00Z",
+        "due_date": "2000-01-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 13.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:14",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:13"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-13T12:00:00Z",
+        "due_date": "2000-01-15T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 14.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:15",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:13"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:14"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-16T12:00:00Z",
+        "due_date": "2000-01-16T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 15.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:16",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:13"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-16T12:00:00Z",
+        "due_date": "2000-01-16T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 16.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:17",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:13"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Launch",
+        "description": "The two weeks that the other four are for.",
+        "priority": "high",
+        "start_date": "2000-01-14T12:00:00Z",
+        "due_date": "2000-01-27T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 17.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Phase",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:18",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "It's here",
+        "description": "What it is, who it is for, and where to get it, in that order.",
+        "priority": "medium",
+        "start_date": "2000-01-14T12:00:00Z",
+        "due_date": "2000-01-19T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 18.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:19",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:18"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-14T12:00:00Z",
+        "due_date": "2000-01-15T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 19.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:20",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:19"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-16T12:00:00Z",
+        "due_date": "2000-01-18T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 20.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:21",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:19"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:20"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-19T12:00:00Z",
+        "due_date": "2000-01-19T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 21.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:22",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:19"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-19T12:00:00Z",
+        "due_date": "2000-01-19T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 22.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:23",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:19"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Short video",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-19T12:00:00Z",
+        "due_date": "2000-01-19T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 23.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:24",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "short_video",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:19"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Newsletter",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-19T12:00:00Z",
+        "due_date": "2000-01-19T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 24.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:25",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "newsletter",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:19"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "How it works in a minute",
+        "description": "One minute. If it needs two, it needs editing.",
+        "priority": "medium",
+        "start_date": "2000-01-16T12:00:00Z",
+        "due_date": "2000-01-21T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 25.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:26",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:18"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-16T12:00:00Z",
+        "due_date": "2000-01-17T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 26.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:27",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:26"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-18T12:00:00Z",
+        "due_date": "2000-01-20T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 27.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:28",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:26"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:27"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-21T12:00:00Z",
+        "due_date": "2000-01-21T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 28.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:29",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:26"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Short video",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-21T12:00:00Z",
+        "due_date": "2000-01-21T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 29.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:30",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "short_video",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:26"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Questions, answered",
+        "description": "The five questions from launch day comments, answered properly.",
+        "priority": "medium",
+        "start_date": "2000-01-22T12:00:00Z",
+        "due_date": "2000-01-27T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 30.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:31",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:18"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-22T12:00:00Z",
+        "due_date": "2000-01-23T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 31.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:32",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:31"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-24T12:00:00Z",
+        "due_date": "2000-01-26T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 32.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:33",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:31"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:32"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-27T12:00:00Z",
+        "due_date": "2000-01-27T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 33.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:34",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:31"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-27T12:00:00Z",
+        "due_date": "2000-01-27T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 34.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:35",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:31"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Keep it going",
+        "description": "Most campaigns stop here. Yours posts three more times.",
+        "priority": "high",
+        "start_date": "2000-01-29T12:00:00Z",
+        "due_date": "2000-02-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 35.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Phase",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:36",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "What people made with it",
+        "description": "Ask first, credit always.",
+        "priority": "medium",
+        "start_date": "2000-01-29T12:00:00Z",
+        "due_date": "2000-02-03T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 36.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:37",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:36"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-29T12:00:00Z",
+        "due_date": "2000-01-30T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 37.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:38",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:37"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-01-31T12:00:00Z",
+        "due_date": "2000-02-02T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 38.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:39",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:37"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:38"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-03T12:00:00Z",
+        "due_date": "2000-02-03T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 39.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:40",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:37"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-03T12:00:00Z",
+        "due_date": "2000-02-03T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 40.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:41",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:37"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Five things you might have missed",
+        "description": "The features nobody found, one per slide.",
+        "priority": "medium",
+        "start_date": "2000-02-04T12:00:00Z",
+        "due_date": "2000-02-09T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 41.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:42",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:36"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-04T12:00:00Z",
+        "due_date": "2000-02-05T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 42.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:43",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:42"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-06T12:00:00Z",
+        "due_date": "2000-02-08T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 43.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:44",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:42"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:43"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-09T12:00:00Z",
+        "due_date": "2000-02-09T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 44.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:45",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:42"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Short video",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-09T12:00:00Z",
+        "due_date": "2000-02-09T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 45.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:46",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "short_video",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:42"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Thank you, and what's next",
+        "description": "Close the campaign. Leave a door open for the next one.",
+        "priority": "medium",
+        "start_date": "2000-02-07T12:00:00Z",
+        "due_date": "2000-02-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 46.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Post",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:47",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:36"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Write the copy",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-07T12:00:00Z",
+        "due_date": "2000-02-08T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 47.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:48",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A first line worth stopping for",
+            "done": false
+          },
+          {
+            "text": "One thing to do next, and the link to do it",
+            "done": false
+          },
+          {
+            "text": "Read it out loud",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:47"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Make the visuals",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-09T12:00:00Z",
+        "due_date": "2000-02-11T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 48.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:49",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Square and tall versions",
+            "done": false
+          },
+          {
+            "text": "Text readable on a phone",
+            "done": false
+          },
+          {
+            "text": "Alt text written",
+            "done": false
+          }
+        ],
+        "properties": [],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:47"
+          },
+          {
+            "type": "depends_on",
+            "target_external_ref": "task:48"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Feed post",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-12T12:00:00Z",
+        "due_date": "2000-02-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 49.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:50",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "feed",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:47"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Story",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-12T12:00:00Z",
+        "due_date": "2000-02-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 50.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:51",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "stories",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:47"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      },
+      {
+        "title": "Newsletter",
+        "description": null,
+        "priority": "medium",
+        "start_date": "2000-02-12T12:00:00Z",
+        "due_date": "2000-02-12T12:00:00Z",
+        "recurrence": null,
+        "recurrence_shift": 0,
+        "recurrence_anchor": null,
+        "recurrence_anchor_count": 0,
+        "recurrence_strategy": "fixed",
+        "recurrence_occurrence_count": 0,
+        "recurrence_limit": null,
+        "series": null,
+        "recurrence_carry": null,
+        "position": 51.0,
+        "archived_at": null,
+        "completed_at": null,
+        "status_name": "To do",
+        "type_name": "Task",
+        "created_at": null,
+        "updated_at": null,
+        "external_ref": "task:52",
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Channel",
+            "property_type": "select",
+            "value_text": "newsletter",
+            "value_number": null,
+            "value_boolean": null,
+            "value_json": null,
+            "value_handle": null,
+            "value_name": null,
+            "currency": null,
+            "project": true
+          }
+        ],
+        "links": [
+          {
+            "type": "part_of",
+            "target_external_ref": "task:47"
+          }
+        ],
+        "comments": [],
+        "assignee_names": [],
+        "mention_handles": []
+      }
+    ],
+    "layouts": [
+      {
+        "kind": "default",
+        "task_type": null,
+        "definition": {
+          "kind": "gantt"
+        }
+      },
+      {
+        "kind": "gantt",
+        "task_type": null,
+        "definition": {}
+      },
+      {
+        "kind": "board",
+        "task_type": null,
+        "definition": {
+          "card": {
+            "type": "card",
+            "children": [
+              {
+                "type": "stack",
+                "props": {
+                  "align": "start"
+                },
+                "children": [
+                  {
+                    "type": "stack",
+                    "props": {
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "stack",
+                    "props": {
+                      "tone": "muted"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "property:1"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "assignees"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "dueDate"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "checklist"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "stack",
+                "props": {
+                  "direction": "row",
+                  "gap": "sm",
+                  "wrap": true
+                },
+                "children": [
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "priority"
+                    }
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "comments"
+                    }
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "blockers"
+                    }
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "tags"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "kind": "table",
+        "task_type": null,
+        "definition": {
+          "columns": [
+            "title",
+            "property:1",
+            "assignees",
+            "startDate",
+            "dueDate",
+            "priority",
+            "comments"
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 1,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Task"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Phase"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Post"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "dates"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

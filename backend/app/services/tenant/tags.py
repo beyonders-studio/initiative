@@ -27,10 +27,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import (
-    BigInteger,
     and_,
     exists,
-    literal,
 )
 from sqlalchemy import (
     delete as sa_delete,
@@ -48,7 +46,6 @@ from app.core.messages import TagMessages
 from app.core.relationships import (
     Provenance,
     RelationshipType,
-    node_base,
     node_id,
 )
 from app.core.search import SearchEntityType
@@ -98,17 +95,6 @@ class TagLinkSpec:
 
     def node_of(self, entity_id: int) -> int:
         return node_id(self.kind, entity_id)
-
-    def node_of_column(self, entity_id: ColumnElement[int]) -> ColumnElement[int]:
-        """An id column as node ids, for the indexed edge column.
-
-        The edge table indexes the packed pair, not the two columns it is packed
-        from, so a query that wants the index has to ask in those terms. The
-        base is typed ``BigInteger`` explicitly: inferred from an ``int4`` id
-        column it would be sent as one, and every kind code but the first is
-        past the end of that range.
-        """
-        return literal(node_base(self.kind), BigInteger) + entity_id
 
 
 _MODELS = tool_models()
@@ -165,6 +151,18 @@ def _live_tag_edge(spec: TagLinkSpec) -> list[Any]:
     ]
 
 
+def _live_tag_edges_of(spec: TagLinkSpec, entity_id: ColumnElement[int]) -> list[Any]:
+    """The live tag assignments of the row ``entity_id`` names in an outer query.
+
+    Matched on ``source_id`` itself, a plain comparison of two ids that
+    Postgres looks up in ``ix_relationships_source``, so only this row's own
+    edges are read. A node id built from the outer column (``base + id``) is
+    arithmetic it cannot look up, and it then reads every tag edge in the
+    community for each outer row.
+    """
+    return [EntityRelationship.source_id == entity_id, *_live_tag_edge(spec)]
+
+
 def tagged_entity_ids(
     spec: TagLinkSpec, tag_ids: Sequence[int], *, guild_id: int | None = None
 ) -> Select:
@@ -202,10 +200,7 @@ def untagged_clause(
     return ~exists(
         select(EntityRelationship.id)
         .join(Tag, Tag.id == EntityRelationship.target_id)
-        .where(
-            EntityRelationship.source_node == spec.node_of_column(entity_id),
-            *_live_tag_edge(spec),
-        )
+        .where(*_live_tag_edges_of(spec, entity_id))
     )
 
 
@@ -337,10 +332,7 @@ def first_tag_name(spec: TagLinkSpec, entity_id: ColumnElement[int]) -> Any:
         select(func.min(func.lower(Tag.name)))
         .select_from(EntityRelationship)
         .join(Tag, Tag.id == EntityRelationship.target_id)
-        .where(
-            EntityRelationship.source_node == spec.node_of_column(entity_id),
-            *_live_tag_edge(spec),
-        )
+        .where(*_live_tag_edges_of(spec, entity_id))
         .scalar_subquery()
     )
 
