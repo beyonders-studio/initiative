@@ -2,9 +2,9 @@
  * A project's tasks on a time axis. What a drag writes, what a drag across an
  * empty track gives a task with no dates, which dependencies are drawn late,
  * the link a drag from one bar to another row makes, what the keyboard moves,
- * and that only the rows in view are drawn.
+ * what folds and how it is kept, and that only the rows in view are drawn.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
@@ -28,6 +28,15 @@ const at = (iso: string) => new Date(`${iso}T09:00:00`).toISOString();
 /** `source` waits on `target`. */
 const waits = (source_id: number, target_id: number, id = source_id * 1000 + target_id) =>
   ({ id, source_id, target_id, relationship_type: "depends_on" }) as TaskEdgeRead;
+
+/** `source` is part of `target`. */
+const partOf = (source_id: number, target_id: number) =>
+  ({
+    id: -(source_id * 1000 + target_id),
+    source_id,
+    target_id,
+    relationship_type: "part_of",
+  }) as TaskEdgeRead;
 
 const mount = (
   tasks: ReturnType<typeof buildTask>[],
@@ -352,6 +361,81 @@ describe("ProjectTasksGanttView", () => {
     const track = (title: RegExp) => screen.getByTitle(title).closest('[role="gridcell"]');
     await waitFor(() => expect(track(/^Side ·/)).toHaveClass("opacity-30"));
     expect(track(/^After ·/)).not.toHaveClass("opacity-30");
+  });
+
+  it("folds every task to the top of its tree and opens them again, as left last time", async () => {
+    const dated = { start_date: at("2026-03-02"), due_date: at("2026-03-04") };
+    const phase = buildTask({
+      title: "Launch",
+      ...dated,
+      subtask_progress: { completed: 1, total: 2 },
+    });
+    const post = buildTask({
+      title: "Out now",
+      ...dated,
+      subtask_progress: { completed: 0, total: 1 },
+    });
+    const answers = buildTask({ title: "Questions", ...dated });
+    const copy = buildTask({ title: "Write the copy", ...dated });
+    const tasks = [phase, post, answers, copy];
+    const edges = [
+      partOf(post.id, phase.id),
+      partOf(answers.id, phase.id),
+      partOf(copy.id, post.id),
+    ];
+    const titles = () =>
+      screen.getAllByRole("row").map((row) => row.getAttribute("aria-label")?.split(",")[0]);
+
+    const first = mount(tasks, edges);
+    await screen.findByText("Write the copy");
+    // How many of its parts are done, beside it and as far as its bracket fills.
+    expect(screen.getByRole("row", { name: /^Launch, .*, 1\/2 subtasks$/ })).toBeVisible();
+    expect((await screen.findAllByTestId("gantt-parts-done"))[0]).toHaveStyle({ width: "50%" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+    await waitFor(() => expect(titles()).toEqual(["Launch"]));
+    // Opening one shows its parts, themselves folded.
+    fireEvent.click(screen.getByRole("button", { name: "Show the parts of Launch" }));
+    await waitFor(() => expect(titles()).toEqual(["Launch", "Out now", "Questions"]));
+
+    first.unmount();
+    mount(tasks, edges);
+    await waitFor(() => expect(titles()).toEqual(["Launch", "Out now", "Questions"]));
+    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
+    await waitFor(() =>
+      expect(titles()).toEqual(["Launch", "Out now", "Write the copy", "Questions"])
+    );
+  });
+
+  it("folds a group's band, by its heading or the arrow keys", async () => {
+    const mine = buildTask({
+      title: "Mine",
+      start_date: at("2026-03-02"),
+      due_date: at("2026-03-04"),
+    });
+    const theirs: LinkedTaskRead = {
+      id: 99,
+      title: "Their task",
+      start_date: at("2026-03-01"),
+      due_date: at("2026-03-02"),
+      project_id: 2,
+      project_name: "Other project",
+      initiative_id: 1,
+      done: false,
+    };
+    mount([mine], [waits(mine.id, 99)], undefined, [theirs]);
+    const heading = await screen.findByRole("button", { name: "Linked from other projects" });
+
+    fireEvent.click(heading);
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /^Their task/ })).not.toBeInTheDocument()
+    );
+    const band = heading.closest('[role="row"]') as HTMLElement;
+    expect(band).toHaveAttribute("aria-expanded", "false");
+
+    act(() => band.focus());
+    fireEvent.keyDown(band, { key: "ArrowRight" });
+    expect(await screen.findByRole("row", { name: /^Their task/ })).toBeVisible();
   });
 
   it("draws a repeating task's coming occurrences on its row", async () => {

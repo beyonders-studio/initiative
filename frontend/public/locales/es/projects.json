@@ -243,6 +243,8 @@
     "ganttSchedule": "Arrastra sobre los días para dar fechas a esta tarea",
     "ganttFold": "Ocultar las partes de {{title}}",
     "ganttUnfold": "Mostrar las partes de {{title}}",
+    "ganttFoldAll": "Contraer todo",
+    "ganttUnfoldAll": "Expandir todo",
     "ganttLink": "Arrastra sobre otra tarea para enlazarlas",
     "ganttOutside": "Vinculadas desde otros proyectos",
     "ganttLinkQuestion": "¿Cómo se relaciona «{{task}}» con «{{other}}»?",

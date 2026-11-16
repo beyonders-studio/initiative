@@ -243,6 +243,8 @@
     "ganttSchedule": "Ziehe über die Tage, um der Aufgabe Daten zu geben",
     "ganttFold": "Teile von {{title}} ausblenden",
     "ganttUnfold": "Teile von {{title}} einblenden",
+    "ganttFoldAll": "Alle einklappen",
+    "ganttUnfoldAll": "Alle ausklappen",
     "ganttLink": "Auf eine andere Aufgabe ziehen, um beide zu verknüpfen",
     "ganttOutside": "Verknüpft aus anderen Projekten",
     "ganttLinkQuestion": "Wie hängt „{{task}}“ mit „{{other}}“ zusammen?",

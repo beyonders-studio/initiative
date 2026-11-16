@@ -243,6 +243,8 @@
     "ganttSchedule": "Faites glisser sur les jours pour donner des dates à cette tâche",
     "ganttFold": "Masquer les parties de {{title}}",
     "ganttUnfold": "Afficher les parties de {{title}}",
+    "ganttFoldAll": "Tout replier",
+    "ganttUnfoldAll": "Tout déplier",
     "ganttLink": "Faites glisser sur une autre tâche pour les lier",
     "ganttOutside": "Liées depuis d’autres projets",
     "ganttLinkQuestion": "Quel est le lien entre « {{task}} » et « {{other}} » ?",

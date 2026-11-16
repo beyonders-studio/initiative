@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { GroupingState } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -48,6 +48,7 @@ import {
   type GanttScale,
   type GanttSpan,
   ganttWindow,
+  groupFoldKey,
   heldDays,
   PX_PER_DAY,
   scheduledDates,
@@ -57,6 +58,7 @@ import {
   wholesOf,
 } from "@/lib/gantt";
 import { taskFields } from "@/lib/layouts/tasks";
+import { getItem, removeItem, setItem } from "@/lib/storage";
 import { taskRoute } from "@/lib/tools";
 import {
   type AxisTick,
@@ -87,7 +89,21 @@ import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 const LABEL_WIDTH = 260;
 const ROW_HEIGHT = 32;
 const HEADER_HEIGHT = 40;
-const INDENT = 14;
+/** How far a task sits in from the one it is part of: the fold control and
+ *  the gap after it, so its control is under its parent's mark. */
+const INDENT = 20;
+/** Nothing folded, for the rows as they would be with every fold open. */
+const NOTHING_FOLDED: ReadonlySet<string> = new Set();
+
+/** The rows folded in a project's Gantt, as kept on this device. */
+const readFolds = (key: string): ReadonlySet<string> => {
+  try {
+    const kept: unknown = JSON.parse(getItem(key) ?? "[]");
+    return new Set(Array.isArray(kept) ? kept.filter((each) => typeof each === "string") : []);
+  } catch {
+    return new Set();
+  }
+};
 /** How far a pointer moves before a press on a bar is a drag, not a click. */
 const DRAG_SLOP = 4;
 /** Where the arrow from a blocker turns before it reaches what waits on it. */
@@ -163,7 +179,9 @@ type ProjectTasksGanttViewProps = {
  * it by an arrow, red where it starts before the other ends, and one is drawn
  * from the dot at a bar's end to the row of the task that waits on it; and a
  * task's parts are listed under it, folded with it, the span they cover drawn
- * over its row. Grouped, each group is a band with its heading.
+ * over its row and filled as far as they are done. Grouped, each group is a
+ * band with its heading, which folds too. What is folded is kept per project
+ * on the device.
  *
  * The rows are a tree grid: the arrow keys move between them and fold them,
  * Enter opens a task, and Alt with an arrow moves it a day (with Shift, its
@@ -189,7 +207,7 @@ export const ProjectTasksGanttView = ({
   onReschedule,
   editing = false,
 }: ProjectTasksGanttViewProps) => {
-  const { t, i18n } = useTranslation(["projects", "common"]);
+  const { t, i18n } = useTranslation(["projects", "common", "tasks"]);
   const { t: layoutT } = useTranslation(LAYOUT_NAMESPACES);
   const locale = i18n.language;
   const navigate = useNavigate();
@@ -229,28 +247,51 @@ export const ProjectTasksGanttView = ({
     [tasks, pending]
   );
 
-  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
+  // What is folded is each person's, on this device, kept per project.
+  const foldsKey = `project:${projectId}:gantt-folded`;
+  const [folds, setFolds] = useState(() => ({ key: foldsKey, folded: readFolds(foldsKey) }));
+  if (folds.key !== foldsKey) setFolds({ key: foldsKey, folded: readFolds(foldsKey) });
+  const folded = folds.folded;
+  const fold = (next: ReadonlySet<string>) => {
+    setFolds({ key: foldsKey, folded: next });
+    if (next.size > 0) setItem(foldsKey, JSON.stringify([...next]));
+    else removeItem(foldsKey);
+  };
+
   const outsideLabel = t("tasks.ganttOutside");
-  const rows = useMemo<GanttRow[]>(() => {
+  // The rows, and the key of every task with parts, folded or not.
+  const [rows, parents] = useMemo(() => {
     const wholes = wholesOf(shown, edges ?? []);
     const byId = new Map(shown.map((task) => [task.id, task]));
+    const parents: string[] = [];
+    const tree = (held: TaskListRead[], prefix?: string) => {
+      for (const row of taskRows(held, wholes, NOTHING_FOLDED, prefix)) {
+        if (row.type === "task" && row.hasParts) parents.push(row.key);
+      }
+      return taskRows(held, wholes, folded, prefix);
+    };
+    const band = (key: string, count: number, inside: () => GanttRow[], label?: string) => {
+      const open = !folded.has(groupFoldKey(key));
+      const heading: GanttRow = { type: "group", key, count, open, label };
+      return open ? [heading, ...inside()] : [heading];
+    };
     const own = active
-      ? boardBands(active, tasks).flatMap((band): GanttRow[] => {
-          const held = band.items.map((task) => byId.get(task.id) ?? task);
-          return [
-            { type: "group", key: band.key, count: held.length },
-            ...taskRows(held, wholes, folded, `${band.key}:`),
-          ];
+      ? boardBands(active, tasks).flatMap((each) => {
+          const held = each.items.map((task) => byId.get(task.id) ?? task);
+          return band(each.key, held.length, () => tree(held, `${each.key}:`));
         })
-      : taskRows(shown, wholes, folded);
+      : tree(shown);
     const others = links?.others ?? [];
-    if (others.length === 0) return own;
-    return [
-      ...own,
-      { type: "group", key: "outside", count: others.length, label: outsideLabel },
-      ...others.map((task): GanttRow => ({ type: "outside", key: `outside:${task.id}`, task })),
-    ];
+    if (others.length === 0) return [own, parents] as const;
+    const outside = band(
+      "outside",
+      others.length,
+      () => others.map((task): GanttRow => ({ type: "outside", key: `outside:${task.id}`, task })),
+      outsideLabel
+    );
+    return [[...own, ...outside], parents] as const;
   }, [shown, tasks, edges, links, folded, active, outsideLabel]);
+  const allOpen = parents.every((key) => !folded.has(key));
 
   const now = useMemo(() => Date.now(), []);
   const pxPerDay = PX_PER_DAY[scale];
@@ -439,12 +480,21 @@ export const ProjectTasksGanttView = ({
     };
   };
 
-  const toggleFold = (key: string) =>
-    setFolded((all) => {
-      const next = new Set(all);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
+  const toggleFold = (key: string) => {
+    const next = new Set(folded);
+    if (!next.delete(key)) next.add(key);
+    fold(next);
+  };
+  // Every task folded down to the top of its tree, or every one opened; a
+  // group's band stays as it is.
+  const foldAll = () => {
+    const next = new Set(folded);
+    for (const key of parents) {
+      if (allOpen) next.add(key);
+      else next.delete(key);
+    }
+    fold(next);
+  };
 
   // Which rows are in view, from where the chart is scrolled to: only those,
   // and the one in the tab order, are drawn. The axis sits above them in the
@@ -536,12 +586,22 @@ export const ProjectTasksGanttView = ({
         focusRow(rows.length - 1);
         break;
       case "ArrowRight":
-        // Open a folded task, then step into its parts.
+        // Open a folded group or task, then step into it.
+        if (row.type === "group") {
+          if (row.open) focusRow(focused + 1);
+          else toggleFold(groupFoldKey(row.key));
+          break;
+        }
         if (row.type !== "task" || !row.hasParts) return;
         if (row.open) focusRow(focused + 1);
         else toggleFold(row.key);
         break;
       case "ArrowLeft": {
+        if (row.type === "group") {
+          if (!row.open) return;
+          toggleFold(groupFoldKey(row.key));
+          break;
+        }
         if (row.type !== "task") return;
         if (row.hasParts && row.open) {
           toggleFold(row.key);
@@ -694,6 +754,12 @@ export const ProjectTasksGanttView = ({
             value={active?.grouping.column ?? null}
             onChange={(id) => onGroupingChange(id === null ? [] : [id])}
           />
+        ) : null}
+        {parents.length > 0 ? (
+          <Button type="button" variant="outline" size="sm" onClick={foldAll}>
+            {allOpen ? <ChevronsDownUp aria-hidden /> : <ChevronsUpDown aria-hidden />}
+            {t(allOpen ? "tasks.ganttFoldAll" : "tasks.ganttUnfoldAll")}
+          </Button>
         ) : null}
         {(edges ?? []).some((edge) => edge.relationship_type === "depends_on") ? (
           <Toggle variant="outline" size="sm" pressed={critical} onPressedChange={setCritical}>
@@ -930,15 +996,32 @@ export const ProjectTasksGanttView = ({
                     tabIndex={index === focused ? 0 : -1}
                     {...rowProps}
                     aria-level={1}
+                    aria-expanded={row.open}
                   >
                     {/* biome-ignore lint/a11y/useSemanticElements: virtualized absolute layout doesn't fit a <table>; ARIA grid roles convey semantics */}
                     <div
                       role="gridcell"
                       tabIndex={-1}
-                      className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-muted px-3"
+                      className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r bg-muted px-2"
                       style={{ width: LABEL_WIDTH }}
                     >
-                      <span className="min-w-0 truncate">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => toggleFold(groupFoldKey(row.key))}
+                        className="-m-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-expanded={row.open}
+                        aria-labelledby={`${markerId}-group-${index}`}
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform",
+                            row.open && "rotate-90"
+                          )}
+                          aria-hidden
+                        />
+                      </button>
+                      <span id={`${markerId}-group-${index}`} className="min-w-0 truncate">
                         {row.label ?? active?.grouping.header(row.key)}
                       </span>
                       <span className="text-muted-foreground text-xs tabular-nums">
@@ -965,6 +1048,14 @@ export const ProjectTasksGanttView = ({
                 );
               }
               const span = spanOf(row.task);
+              const progress = row.task.subtask_progress?.total ? row.task.subtask_progress : null;
+              const progressLabel = progress
+                ? t("tasks:subtasks.progress", {
+                    completed: progress.completed,
+                    total: progress.total,
+                    count: progress.total,
+                  })
+                : null;
               return (
                 // biome-ignore lint/a11y/useSemanticElements: virtualized absolute layout doesn't fit a <table>; ARIA grid roles convey semantics
                 <div
@@ -974,11 +1065,15 @@ export const ProjectTasksGanttView = ({
                   {...rowProps}
                   aria-level={row.depth + (active ? 2 : 1)}
                   aria-expanded={row.hasParts ? row.open : undefined}
-                  aria-label={
+                  aria-label={[
+                    row.task.title,
                     span
-                      ? `${row.task.title}, ${dayLabel(span.start)} – ${dayLabel(addUnits(span.end, "day", -1))}`
-                      : row.task.title
-                  }
+                      ? `${dayLabel(span.start)} – ${dayLabel(addUnits(span.end, "day", -1))}`
+                      : null,
+                    progressLabel,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
                 >
                   {/* biome-ignore lint/a11y/useSemanticElements: virtualized absolute layout doesn't fit a <table>; ARIA grid roles convey semantics */}
                   <div
@@ -1026,6 +1121,14 @@ export const ProjectTasksGanttView = ({
                         {row.task.title}
                       </Link>
                     )}
+                    {progress ? (
+                      <span
+                        className="ml-auto shrink-0 text-2xs text-muted-foreground tabular-nums"
+                        title={progressLabel ?? undefined}
+                      >
+                        {progress.completed}/{progress.total}
+                      </span>
+                    ) : null}
                   </div>
                   <TaskTrack
                     row={row}
@@ -1215,15 +1318,26 @@ const TaskTrack = ({
         />
       ))}
       {row.parts ? (
-        // What its parts cover, as a bracket over the row.
+        // What its parts cover, as a bracket over the row, filled as far as
+        // its parts are done.
         <div
-          className="pointer-events-none absolute top-1 h-1 rounded-sm bg-foreground/40"
+          className="pointer-events-none absolute top-1 h-1 overflow-hidden rounded-sm bg-foreground/25"
           style={{
             left: x(row.parts.start),
             width: Math.max(2, x(row.parts.end) - x(row.parts.start)),
           }}
           aria-hidden
-        />
+        >
+          {row.task.subtask_progress?.total ? (
+            <div
+              className="h-full bg-foreground/60"
+              data-testid="gantt-parts-done"
+              style={{
+                width: `${(row.task.subtask_progress.completed / row.task.subtask_progress.total) * 100}%`,
+              }}
+            />
+          ) : null}
+        </div>
       ) : null}
       {span && span.kind !== "bar" ? (
         <div
