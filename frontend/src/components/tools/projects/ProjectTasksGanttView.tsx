@@ -247,8 +247,9 @@ export const ProjectTasksGanttView = ({
     [tasks, pending]
   );
 
-  // What is folded is each person's, on this device, kept per project.
-  const foldsKey = `project:${projectId}:gantt-folded`;
+  // What is folded is each person's, on this device, kept per project. A
+  // project's id is its community's own, so the key names both.
+  const foldsKey = `community:${communityId}:project:${projectId}:gantt-folded`;
   const [folds, setFolds] = useState(() => ({ key: foldsKey, folded: readFolds(foldsKey) }));
   if (folds.key !== foldsKey) setFolds({ key: foldsKey, folded: readFolds(foldsKey) });
   const folded = folds.folded;
@@ -270,15 +271,16 @@ export const ProjectTasksGanttView = ({
       }
       return taskRows(held, wholes, folded, prefix);
     };
-    const band = (key: string, count: number, inside: () => GanttRow[], label?: string) => {
+    // A folded band's rows are still worked out, so its tasks fold with the rest.
+    const band = (key: string, count: number, inside: GanttRow[], label?: string) => {
       const open = !folded.has(groupFoldKey(key));
       const heading: GanttRow = { type: "group", key, count, open, label };
-      return open ? [heading, ...inside()] : [heading];
+      return open ? [heading, ...inside] : [heading];
     };
     const own = active
       ? boardBands(active, tasks).flatMap((each) => {
           const held = each.items.map((task) => byId.get(task.id) ?? task);
-          return band(each.key, held.length, () => tree(held, `${each.key}:`));
+          return band(each.key, held.length, tree(held, `${each.key}:`));
         })
       : tree(shown);
     const others = links?.others ?? [];
@@ -286,7 +288,7 @@ export const ProjectTasksGanttView = ({
     const outside = band(
       "outside",
       others.length,
-      () => others.map((task): GanttRow => ({ type: "outside", key: `outside:${task.id}`, task })),
+      others.map((task): GanttRow => ({ type: "outside", key: `outside:${task.id}`, task })),
       outsideLabel
     );
     return [[...own, ...outside], parents] as const;
