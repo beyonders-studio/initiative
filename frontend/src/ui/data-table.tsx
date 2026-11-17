@@ -150,6 +150,11 @@ interface DataTableProps<TData extends RowData> {
   enableVirtualization?: boolean;
   virtualRowHeight?: number;
   virtualOverscan?: number;
+  /** Fills the box it is in, edge to edge, for a table that is the whole of a
+   *  framed panel (a home widget): its toolbar and pagination stay put while
+   *  the rows scroll under a head that stays at the top. Give the box a
+   *  height. Not with ``enableVirtualization``, whose head follows the page. */
+  fill?: boolean;
 }
 
 export interface DataTableRowWrapperProps<TData extends RowData> {
@@ -206,6 +211,7 @@ export function DataTable<TData extends RowData>({
   enableVirtualization = false,
   virtualRowHeight = 48,
   virtualOverscan = 5,
+  fill = false,
 }: DataTableProps<TData>) {
   const { t } = useTranslation("ui");
   const initialStateRef = useRef<Partial<TableState> | undefined>(initialState);
@@ -692,7 +698,14 @@ export function DataTable<TData extends RowData>({
     </colgroup>
   );
   const head = (
-    <TableHeader>
+    <TableHeader
+      // Its rule is drawn by the cells: a collapsed border stays behind
+      // when the head sticks.
+      className={cn(
+        fill &&
+          "sticky top-0 z-10 [&_th]:bg-card [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0"
+      )}
+    >
       {table.getHeaderGroups().map((headerGroup) => (
         <TableRow key={headerGroup.id}>
           {headerGroup.headers.map((header) => {
@@ -793,7 +806,7 @@ export function DataTable<TData extends RowData>({
   );
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", fill && "flex h-full min-h-0 flex-col")}>
       {helpText && typeof helpText === "function" ? helpText(table) : helpText}
       {enableRowSelection &&
         selectionModeActive &&
@@ -822,6 +835,8 @@ export function DataTable<TData extends RowData>({
           // scroller, which a virtualized table's head would stay at the top
           // of instead of the page's.
           "overflow-clip rounded-md border bg-card",
+          // The frame around it is the table's own.
+          fill && "flex min-h-0 flex-1 flex-col rounded-none border-0 bg-transparent",
           selectionModeActive && "border-primary ring-2 ring-primary/20"
         )}
       >
@@ -829,7 +844,12 @@ export function DataTable<TData extends RowData>({
         enableClearSorting ||
         enableColumnVisibilityDropdown ||
         enableRowSelection ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 p-4">
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-2 p-4",
+              fill && "shrink-0 border-b px-4 py-2"
+            )}
+          >
             <div className="flex flex-1 items-center gap-2">
               {enableRowSelection && (
                 <Button
@@ -1038,14 +1058,14 @@ export function DataTable<TData extends RowData>({
             </Table>
           </div>
         ) : (
-          <Table>
+          <Table scrollContainerClassName={cn(fill && "min-h-0 flex-1")}>
             {head}
             {body}
           </Table>
         )}
         {showPagination && (
           <PaginationBar
-            className="p-4"
+            className={cn("p-4", fill && "shrink-0 border-t px-4 py-2")}
             page={table.state.pagination.pageIndex + 1}
             pageSize={table.state.pagination.pageSize}
             totalCount={table.getRowCount()}
