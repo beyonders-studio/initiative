@@ -26,6 +26,7 @@ import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import { Field } from "@/ui/field";
 import type { LayoutEnv } from "@/ui/layouts/fields";
+import { cn } from "@/ui/lib/utils";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 
@@ -168,9 +169,16 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
           activeCount={table.activeFilterCount}
         />
       }
+      // The table runs to the card's edges and scrolls its own rows.
+      bodyClassName="flex flex-col p-0"
     >
-      <div className="space-y-4">
-        {addTo && !nothingYet ? <QuickAddTask list={addTo.list} name={addTo.name} /> : null}
+      {addTo && !nothingYet ? (
+        <div className="shrink-0 border-b p-4">
+          <QuickAddTask list={addTo.list} name={addTo.name} />
+        </div>
+      ) : null}
+      {/* Narrow, the fields open in a sheet and leave this empty. */}
+      <div className={cn("shrink-0 border-b p-4 empty:hidden", !table.filtersOpen && "hidden")}>
         <ToolFilterPanel
           open={table.filtersOpen}
           onOpenChange={table.setFiltersOpen}
@@ -183,36 +191,42 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
             onChange={table.setFilters}
           />
         </ToolFilterPanel>
+      </div>
 
-        <div className="relative">
-          {/* A refetch is a background event: a status change has already
-                been applied to the rows optimistically, and the reader can go
-                on sorting, paging and checking things off while the
-                cross-community aggregate catches up. So this says a refresh is
-                running and takes nothing away — no cover, no pointer events,
-                no dimming of rows that are already correct. */}
-          {table.isRefetching ? (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden rounded-full bg-primary/15"
-            >
-              <div className="h-full w-1/3 animate-indeterminate-sweep rounded-full bg-primary/60" />
-            </div>
-          ) : null}
-          <span aria-live="polite" className="sr-only">
-            {table.isRefetching ? t("updating") : ""}
-          </span>
-          {/* The saved sort has to be in hand before the table mounts: it
-                seeds its headers once, so a table built on the defaults would
-                keep claiming them while the rows came back in the saved order.
-                The filters resolve from the same request. */}
-          {table.isInitialLoad || !table.preferencesLoaded ? (
-            <SkeletonRegion>
-              <TableSkeleton rows={8} columns={6} pagination />
-            </SkeletonRegion>
-          ) : table.hasError ? (
+      {/* Tall enough for its toolbar, head and pager, with rows between,
+         however much the lines above it take. */}
+      <div className="relative flex min-h-64 flex-1 flex-col">
+        {/* A refetch is a background event: a status change has already
+           been applied to the rows optimistically, and the reader can go
+           on sorting, paging and checking things off while the
+           cross-community aggregate catches up. So this says a refresh is
+           running and takes nothing away — no cover, no pointer events,
+           no dimming of rows that are already correct. */}
+        {table.isRefetching ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden rounded-full bg-primary/15"
+          >
+            <div className="h-full w-1/3 animate-indeterminate-sweep rounded-full bg-primary/60" />
+          </div>
+        ) : null}
+        <span aria-live="polite" className="sr-only">
+          {table.isRefetching ? t("updating") : ""}
+        </span>
+        {/* The saved sort has to be in hand before the table mounts: it
+           seeds its headers once, so a table built on the defaults would
+           keep claiming them while the rows came back in the saved order.
+           The filters resolve from the same request. */}
+        {table.isInitialLoad || !table.preferencesLoaded ? (
+          <SkeletonRegion className="p-4">
+            <TableSkeleton rows={8} columns={6} pagination />
+          </SkeletonRegion>
+        ) : table.hasError ? (
+          <div className="p-4">
             <StatusMessage />
-          ) : nothingYet ? (
+          </div>
+        ) : nothingYet ? (
+          <div className="flex-1 p-4">
             <HomeWidgetNotice
               icon={Inbox}
               action={
@@ -229,43 +243,44 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
             >
               {t("home:widgets.tasks.empty")}
             </HomeWidgetNotice>
-          ) : (
-            <DataTable
-              columns={columns}
-              data={table.displayTasks}
-              groupingOptions={groupingOptions}
-              columnVisibility={effectiveColumnVisibility}
-              onColumnVisibilityChange={setColumnVisibility}
-              // Sort and grouping are shared by every tasks widget on the
-              // page, so each table follows them rather than its own copy.
-              grouping={view.grouping}
-              onGroupingChange={setGrouping}
-              initialState={{ expanded: true }}
-              sorting={table.initialSorting}
-              enableFilterInput
-              filterInputColumnKey="title"
-              filterInputPlaceholder={t("filters.filterPlaceholder")}
-              enablePagination
-              manualPagination
-              pageCount={table.totalPages}
-              rowCount={table.totalCount}
-              pageIndex={table.page - 1}
-              onPaginationChange={(pag) => {
-                if (pag.pageSize !== table.pageSize) {
-                  table.setPageSize(pag.pageSize);
-                  table.setPage(1);
-                } else {
-                  table.setPage(pag.pageIndex + 1);
-                }
-              }}
-              onPrefetchPage={table.prefetchPage}
-              manualSorting
-              onSortingChange={table.handleSortingChange}
-              enableResetSorting
-              enableColumnVisibilityDropdown
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={table.displayTasks}
+            groupingOptions={groupingOptions}
+            columnVisibility={effectiveColumnVisibility}
+            onColumnVisibilityChange={setColumnVisibility}
+            // Sort and grouping are shared by every tasks widget on the
+            // page, so each table follows them rather than its own copy.
+            grouping={view.grouping}
+            onGroupingChange={setGrouping}
+            initialState={{ expanded: true }}
+            sorting={table.initialSorting}
+            enableFilterInput
+            filterInputColumnKey="title"
+            filterInputPlaceholder={t("filters.filterPlaceholder")}
+            enablePagination
+            manualPagination
+            pageCount={table.totalPages}
+            rowCount={table.totalCount}
+            pageIndex={table.page - 1}
+            onPaginationChange={(pag) => {
+              if (pag.pageSize !== table.pageSize) {
+                table.setPageSize(pag.pageSize);
+                table.setPage(1);
+              } else {
+                table.setPage(pag.pageIndex + 1);
+              }
+            }}
+            onPrefetchPage={table.prefetchPage}
+            manualSorting
+            onSortingChange={table.handleSortingChange}
+            enableResetSorting
+            enableColumnVisibilityDropdown
+            fill
+          />
+        )}
       </div>
     </HomeWidgetCard>
   );
