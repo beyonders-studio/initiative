@@ -206,6 +206,14 @@ describe("PropertyInput", () => {
       });
       fireEvent.blur(screen.getByRole("spinbutton", { name: "Seats" }));
       expect(onChange).toHaveBeenLastCalledWith(4);
+      // Escape drops what was typed and not yet sent.
+      onChange.mockClear();
+      const typed = screen.getByRole("spinbutton", { name: "Seats" });
+      fireEvent.change(typed, { target: { value: "2" } });
+      fireEvent.keyDown(typed, { key: "Escape" });
+      fireEvent.blur(typed);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(typed).toHaveValue(4);
 
       await userEvent.click(screen.getByRole("button", { name: "Open Seats full screen" }));
       const focus = await screen.findByRole("dialog", { name: "Seats" });

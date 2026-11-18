@@ -71,6 +71,12 @@ export const CounterValueInput = ({
       event.preventDefault();
       commit(draft);
       (event.target as HTMLInputElement).blur();
+    } else if (event.key === "Escape") {
+      // What was typed and not yet sent is dropped; a field around it puts
+      // back what was sent.
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      setDraft(lastCommittedRef.current);
     }
   };
 
