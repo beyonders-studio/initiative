@@ -1678,6 +1678,9 @@ class PluginServiceMessages:
     #: The vendor value the check signs with is not a key that can sign.
     #: Raised with ``params`` ``fields``: that value's key.
     VENDOR_KEY_UNUSABLE = "PLUGIN_SERVICE_VENDOR_KEY_UNUSABLE"
+    #: The vendor values changed while the vendor check ran on them, so what
+    #: was checked is not what would be written. Saving again checks again.
+    VENDOR_VALUES_CHANGED = "PLUGIN_SERVICE_VENDOR_VALUES_CHANGED"
     #: Sharing is turned off while a vendor installation is connected to more
     #: than one community.
     SHARED_ROUTES_IN_USE = "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE"

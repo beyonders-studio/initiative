@@ -44,6 +44,7 @@ __all__ = [
     "evaluate",
     "holds",
     "parse",
+    "root_reads",
     "shutdown",
     "step_reads",
 ]
@@ -142,6 +143,49 @@ def step_reads(tree: Any) -> set[str]:
 
     walk(tree)
     return names
+
+
+def root_reads(tree: Any, root: str) -> set[str] | None:
+    """The fields a syntax tree reads of one name at its root, as
+    ``<root>.<field>`` or ``$$.<root>.<field>``. ``None`` when it reads
+    ``root`` any other way (whole, by a computed key, filtered), so a caller
+    must assume it reads every field."""
+    names: set[str] = set()
+    dynamic = False
+    seen: set[int] = set()
+
+    def walk(node: Any) -> None:
+        nonlocal dynamic
+        if isinstance(node, list):
+            for child in node:
+                walk(child)
+            return
+        if not isinstance(node, Parser.Symbol) or id(node) in seen:
+            return
+        seen.add(id(node))
+        steps = getattr(node, "steps", None) if node.type == "path" else None
+        if isinstance(steps, list) and steps:
+            first = steps[0]
+            start = 1 if (first.type, first.value) == ("variable", "$") else 0
+            head = steps[start] if len(steps) > start else None
+            if head is not None and (head.type, head.value) == ("name", root):
+                field = steps[start + 1] if len(steps) > start + 1 else None
+                plain = not any(
+                    getattr(step, attr, None)
+                    for step in (head, field)
+                    if step is not None
+                    for attr in ("stages", "predicate", "group", "focus", "tuple")
+                )
+                if field is not None and field.type == "name" and plain:
+                    names.add(str(field.value))
+                else:
+                    dynamic = True
+        for key, child in vars(node).items():
+            if key != "_outer_instance":
+                walk(child)
+
+    walk(tree)
+    return None if dynamic else names
 
 
 # --- evaluating, in the pool ------------------------------------------------

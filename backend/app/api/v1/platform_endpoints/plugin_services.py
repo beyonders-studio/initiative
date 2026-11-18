@@ -217,9 +217,12 @@ async def update_plugin_service(
     vendor before anything is written (:mod:`~app.services.marketplace.vendor_check`):
     a refusal is a 400 naming the fields, and a check the vendor could not
     answer saves the values and says so in ``vendor_check``."""
-    checked = None
+    checked = held = None
     if payload.vendor_values:
         current = await registrations_service.get_registration(session, registration_id)
+        # What the check runs against, as stored: the write is refused if it
+        # moves before the row is locked.
+        held = dict(current.vendor_values or {})
         definition = (
             await vendor_values_service.listing_definitions(
                 session, [current.listing_uid]
@@ -243,6 +246,7 @@ async def update_plugin_service(
         suspended=payload.suspended,
         beta_community_ids=payload.beta_community_ids,
         vendor_values=payload.vendor_values,
+        vendor_values_checked=held if checked is not None else None,
         actor_user_id=owner.id,
     )
     read = await _read_one(session, row.id)
@@ -321,14 +325,15 @@ async def complete_plugin_service_vendor_setup(
 ) -> PluginServiceRegistrationRead:
     """Finish the setup the vendor sent the operator back from, writing the
     new client's values into the registration's vendor values."""
-    row = await vendor_setup_service.complete(
+    row, checked = await vendor_setup_service.complete(
         session,
         registration_id,
         code=payload.code,
         state=payload.state,
         actor_user_id=owner.id,
     )
-    return await _read_one(session, row.id)
+    read = await _read_one(session, row.id)
+    return read.model_copy(update={"vendor_check": checked})
 
 
 @router.delete("/{registration_id}", status_code=status.HTTP_204_NO_CONTENT)

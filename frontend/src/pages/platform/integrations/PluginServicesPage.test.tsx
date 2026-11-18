@@ -727,9 +727,14 @@ describe("PluginServicePage", () => {
       );
       await renderPluginPage();
 
+      await user.type(screen.getByLabelText(/App id/), "4735814");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       await waitFor(() => expect(toast.warning).toHaveBeenCalled());
+      // Kept, so saving again sends it again and the vendor is asked again.
+      expect(screen.getByLabelText(/App id/)).toHaveValue("4735814");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(updateMutate.mock.calls[1][0].data.vendor_values).toEqual({ app_id: "4735814" });
     });
 
     it("connects: shows the fingerprints the plug-in serves and pins them once confirmed", async () => {

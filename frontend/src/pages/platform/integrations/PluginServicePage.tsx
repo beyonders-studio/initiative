@@ -126,7 +126,10 @@ export const PluginServicePage = () => {
           setRefusal(null);
           toast.success(t("pluginServices.saved"));
           if (saved.vendor_check === "not_run") {
+            // The form keeps what was typed, so saving again sends it again
+            // and the vendor is asked again.
             toast.warning(t("pluginServices.vendorCheckNotRun"));
+            return;
           }
           setSaves((count) => count + 1);
         },

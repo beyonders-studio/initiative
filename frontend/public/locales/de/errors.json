@@ -789,6 +789,7 @@
   "PLUGIN_SERVICE_VENDOR_SETUP_FAILED": "GitHub hat die Werte der neuen App nicht übergeben. Starte die Einrichtung neu.",
   "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED": "Laut Anbieter gehören diese Werte nicht zusammen. Prüfe die markierten Felder.",
   "PLUGIN_SERVICE_VENDOR_KEY_UNUSABLE": "Das ist kein Schlüssel, der signieren kann. Füge den ganzen privaten Schlüssel des Anbieters ein, mit den Zeilen BEGIN und END.",
+  "PLUGIN_SERVICE_VENDOR_VALUES_CHANGED": "Diese Werte haben sich geändert, während der Anbieter dazu gefragt wurde. Speichere erneut, um sie zu prüfen.",
   "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE": "Das Teilen lässt sich nicht ausschalten, solange eine Installation beim Anbieter mit mehr als einer Community verbunden ist.",
   "PLUGIN_CHANNEL_CONNECTION_EXPIRED": "Diese Verbindung ist abgelaufen, und das Mitglied muss sich erneut verbinden.",
   "PLUGIN_CHANNEL_CONNECTION_NO_TOKEN": "Diese Verbindung hält kein Token, das ausgegeben werden kann.",

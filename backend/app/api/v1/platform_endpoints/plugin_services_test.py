@@ -1401,3 +1401,83 @@ async def test_a_signing_value_that_is_not_a_key_is_refused(
     assert response.json()["detail"] == PluginServiceMessages.VENDOR_KEY_UNUSABLE
     assert response.json()["params"]["fields"] == "private_key"
     assert sent == []
+
+
+async def test_values_that_change_while_the_vendor_is_asked_are_not_written(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    from sqlmodel import update
+
+    from app.services.marketplace import declarative
+
+    pem, _public = _rsa_pem()
+    _vendor_answers(monkeypatch, body={"name": "widgets"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+    asked = declarative.vendor_check
+
+    async def while_another_save_lands(*args, **kwargs):
+        await session.exec(
+            update(PluginServiceRegistration)
+            .where(PluginServiceRegistration.id == row.id)
+            .values(vendor_values={"hook_secret": "written by another save"})
+        )
+        await session.commit()
+        return await asked(*args, **kwargs)
+
+    monkeypatch.setattr(declarative, "vendor_check", while_another_save_lands)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {"app_id": "7", "app_name": "widgets", "private_key": pem}
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == PluginServiceMessages.VENDOR_VALUES_CHANGED
+    await session.refresh(row)
+    assert row.vendor_values == {"hook_secret": "written by another save"}
+
+
+async def test_a_setup_the_vendor_could_not_check_says_so(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    from app.services.tenant import plugin_connection_flows
+
+    _github(monkeypatch)
+
+    def unreachable(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("unreachable", request=request)
+
+    monkeypatch.setattr(
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(unreachable)
+    )
+    definition = copy.deepcopy(GITHUB_DEFINITION)
+    definition["vendor"]["check"] = {
+        "request": {"method": "GET", "url": "'https://api.vendor.example/app'"},
+        "expect": [
+            {
+                "holds": "response.body.id = vendor.app_id",
+                "fields": ["app_id"],
+                "message": {"en": "Another app."},
+            }
+        ],
+    }
+    await create_marketplace_listing(
+        session,
+        uid=LISTING_UID,
+        public_id="acme.widgets",
+        kind="plugin",
+        definition=definition,
+    )
+    row = await _seed(session)
+    a = await acting_user()
+    started = await _start(client, a.headers, row.id)
+
+    response = await _complete(client, a.headers, row.id, started["state"])
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "not_run"
+    assert (await load_vendor_values("acme.widgets"))["app_id"] == "4242"

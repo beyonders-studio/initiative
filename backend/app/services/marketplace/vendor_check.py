@@ -32,7 +32,7 @@ import jwt
 
 from app.core.errors import CodedError
 from app.core.messages import PluginServiceMessages
-from app.services.marketplace import declarative
+from app.services.marketplace import declarative, expressions
 from app.services.marketplace.vendor_values import vendor_fields
 from app.services.tenant import plugin_connection_flows as flows
 
@@ -40,8 +40,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["CheckResult", "reads", "run"]
 
-#: A vendor value an expression names.
-_VENDOR_NAME = r"\bvendor\.([A-Za-z_][A-Za-z0-9_]*)"
 #: A vendor value a template names.
 _TEMPLATE_NAME = r"\{vendor\.([^{}]+)\}"
 
@@ -66,10 +64,16 @@ def _texts(check: Mapping[str, Any]) -> Iterator[str]:
             yield row["shows"]
 
 
-def reads(check: Mapping[str, Any]) -> set[str]:
+def reads(check: Mapping[str, Any], *, every: set[str]) -> set[str]:
     """The vendor values a check reads: those its JWT is signed and issued
-    with, and those its expressions name."""
-    names = {name for text in _texts(check) for name in re.findall(_VENDOR_NAME, text)}
+    with, and those its expressions read as ``vendor.<key>``. An expression
+    that reads ``vendor`` any other way may read any of them: ``every``."""
+    names: set[str] = set()
+    for text in _texts(check):
+        read = expressions.root_reads(expressions.parse(text), "vendor")
+        if read is None:
+            return set(every)
+        names |= read
     sign = check.get("sign") or {}
     for template in (sign.get("iss"), sign.get("key")):
         if template:
@@ -112,7 +116,10 @@ async def run(
     check, or the save sets nothing it reads; raises :class:`CodedError` when
     it refuses the values."""
     check = ((definition or {}).get("vendor") or {}).get("check")
-    if not check or not reads(check) & set(submitted):
+    if not check:
+        return None
+    fields = vendor_fields(definition)
+    if not reads(check, every={field["key"] for field in fields}) & set(submitted):
         return None
     values = dict(held)
     for key, value in submitted.items():
@@ -131,11 +138,7 @@ async def run(
             )
             return CheckResult.not_run
 
-    secret = {
-        field["key"]
-        for field in vendor_fields(definition)
-        if field.get("type") == "secret"
-    }
+    secret = {field["key"] for field in fields if field.get("type") == "secret"}
     try:
         refusal = await declarative.vendor_check(
             definition or {},
