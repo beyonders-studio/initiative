@@ -454,11 +454,9 @@ async def test_a_thread_pages_by_conversation(client, session, acting_user):
     )
 
     pages = []
-    params = {"limit": 2}
+    params = {"subject_type": "task", "subject_id": task.id, "limit": 2}
     while True:
-        listed = await client.get(
-            a.g(thread_path("task", task.id)), headers=a.headers, params=params
-        )
+        listed = await client.get(a.g("/comments/"), headers=a.headers, params=params)
         assert listed.status_code == 200, listed.text
         body = listed.json()
         pages.append([c["id"] for c in body["comments"]])

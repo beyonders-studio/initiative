@@ -318,7 +318,7 @@ async def test_a_moderate_grantee_reads_what_is_held_and_others_dont(
     ).status_code == 201
     guild = scene["guild"]
     path = f"/api/v1/c/{guild.id}/comments/"
-    params = {"task_id": scene["task"].id}
+    params = {"subject_type": "task", "subject_id": scene["task"].id}
 
     moderator = await _moderator(session, guild)
     seen = await client.get(path, params=params, headers=get_auth_headers(moderator))
