@@ -22,15 +22,14 @@ Every plug-in from any of these gets a row under **Plug-in services**. Its listi
 
 The registry is a catalog of plug-ins and content from BeyondersStudio and the publishers it signs for. Anyone can [propose a listing](publishing-listings.md#publishing-to-the-initiative-registry). It's a [TUF](https://theupdateframework.io/) repository: every file it brings is checked against a signing key built into Initiative before anything is used, so a listing arrives exactly as it was published or not at all.
 
-Its panel is **Marketplace registry**, under **Integrations**.
+Its panel is **Plug-in registry**, under **Integrations**.
 
 | Control | What it does |
 |---|---|
-| **Follow the registry** | On by default. Off, the server stops asking for updates, and whatever the registry already brought stays. |
-| **Refresh now** | Checks straight away rather than at the next scheduled check. |
-| **Upload a registry bundle** | For a server with no internet access: a `.tar.gz` of the registry's `metadata` and `targets` folders, carried in by hand. It's checked against the same key, so a bundle that spent a week in somebody's coat pocket is exactly as trustworthy as one that didn't. |
+| **Get updates from the registry** | On by default, with **Refresh now** beside it to check straight away rather than at the next scheduled check. Off, the server stops asking for updates, and whatever the registry already brought stays. |
+| **Drop a registry bundle** | Shown while updates are off, for a server with no internet access: a `.tar.gz` of the registry's `metadata` and `targets` folders, carried in by hand. It applies as soon as you drop it, and it's checked against the same key, so a bundle that spent a week in somebody's coat pocket is exactly as trustworthy as one that didn't. |
 
-The panel also shows the registry's address, when it last updated, how many listings came from it, and why the last attempt stopped, if it did. A listing it skipped is named with its reason.
+The panel also says when the registry last updated and how many listings came from it, and why the last attempt stopped, if it did. A listing it skipped is named with its reason.
 
 Registry signatures expire on purpose: the newest one lasts a day. A server that hasn't reached the registry in a while says when the signatures it holds ran out, and that its listings may be out of date. Nothing the registry already brought stops working, and the next successful update brings it current. An update that fails for any reason changes nothing: the last verified catalog stays exactly as it was.
 
@@ -41,7 +40,7 @@ Registry signatures expire on purpose: the newest one lasts a day. A server that
 | A bundle | 32 MiB compressed, 64 MiB and 5,000 files unpacked |
 
 ??? techspec "Registry settings"
-    These are environment variables, read at startup, so a change needs a restart. Whether the server follows the registry at all is the **Follow the registry** switch, not a variable.
+    These are environment variables, read at startup, so a change needs a restart. Whether the server gets updates from the registry at all is the **Get updates from the registry** switch, not a variable.
 
     | Variable | What it does | Default |
     |---|---|---|
