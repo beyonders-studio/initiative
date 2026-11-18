@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.
 - **Fewer unexpected sign-outs on a laptop or phone that sleeps.** A tab or app nobody is looking at no longer renews its sign-in in the background; it waits until you come back to it, so a renewal can no longer be cut off by the device going to sleep.
 - **A device that missed its own sign-in renewal no longer looks like a stolen session.** When a laptop sleeps or an app closes just as a renewal's answer comes back, the device sends its old token next time; that now files a low case of its own instead of a high one. A session that was signed out, or ended from another device, no longer files a case at all when its device next tries it.
 
