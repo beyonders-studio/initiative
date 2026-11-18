@@ -364,8 +364,7 @@ async def resolve_references(
             if kind == SearchEntityType.comment
             else Endpoint(kind, entity_id)
         )
-        if owner is not None:
-            owners[owner.node] = owner
+        owners[owner.node] = owner
     await session.flush()
 
     # An import writes a body without the edges a save derives from it, and

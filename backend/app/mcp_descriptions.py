@@ -194,12 +194,12 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     # --- Comments -----------------------------------------------------------
     "list_comments": (
-        "The comment thread on one thing — name it with exactly one of the "
-        "`*_id` arguments. Newest conversations first, each with its replies; "
-        "follow `next_cursor` for older ones."
+        "The comment thread on one thing, named by `subject_type` (`task`, "
+        "`project`, `wiki_page`, …) and `subject_id`. Newest conversations "
+        "first, each with its replies; follow `next_cursor` for older ones."
     ),
     "create_comment": (
-        "Comment on one thing, named with exactly one of the `*_id` arguments. "
+        "Comment on one thing, named by `subject_type` and `subject_id`. "
         "`content` is markdown; `parent_comment_id` makes it a reply."
     ),
     "read_comment": "Read one comment by id.",

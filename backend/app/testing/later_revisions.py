@@ -48,6 +48,12 @@ NEWEST: tuple[str, ...] = (
 )
 
 
+#: A comment names its subject as a pair, where every older revision wrote the
+#: column for its kind: a test running an older revision on comments takes
+#: this off around it too (:func:`step_comment_subjects`).
+COMMENT_SUBJECTS = "20261118_0614_comments_name_their_subject_as_a_pair.py"
+
+
 def _load(name: str) -> ModuleType:
     path = _VERSIONS / name
     spec = importlib.util.spec_from_file_location(path.stem, path)
@@ -72,9 +78,11 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             contacts._apply_upgrade,
             pair._upgrade,
             lambda: step_newest(forward=True),
+            lambda: step_comment_subjects(forward=True),
             lambda: restate_kind_code(bind),
         ]
     return [
+        lambda: step_comment_subjects(forward=False),
         lambda: step_newest(forward=False),
         pair._downgrade,
         contacts._apply_downgrade,
@@ -98,6 +106,14 @@ def step_newest(*, forward: bool) -> None:
     else:
         for revision in reversed(revisions):
             revision._downgrade()
+
+
+def step_comment_subjects(*, forward: bool) -> None:
+    """Take :data:`COMMENT_SUBJECTS` off the schema the search path leads with
+    (``forward=False``), or put it back. Run inside an alembic ``Operations``
+    context."""
+    subjects = _load(COMMENT_SUBJECTS)
+    (subjects._apply_upgrade if forward else subjects._apply_downgrade)()
 
 
 def restate_kind_code(bind: Any) -> None:

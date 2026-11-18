@@ -36,7 +36,7 @@ from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.schemas.ai_generation import (
@@ -1076,7 +1076,7 @@ async def move_task(
     )
     # The files the task and its conversation show are kept for the
     # destination's initiative.
-    comments = await session.exec(select(Comment).where(Comment.task_id == task.id))
+    comments = await session.exec(select(Comment).where(said_on("task", task.id)))
     await attachments_service.claim_uploads(
         session, task, *comments.all(), carried=True
     )

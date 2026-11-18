@@ -164,17 +164,16 @@ def test_an_initiative_starts_with_projects_and_files_on():
 
 def test_every_tool_is_commentable():
     # Comments span EVERY tool plus the content-level extras: the service
-    # registry, the comments table's parent FKs, the RLS parent declaration,
-    # and the create schema's target fields all agree. A new tool that forgets
-    # its CommentTarget — or an extra that forgets its column — fails here.
+    # registry, the RLS subject declaration, the CHECK on ``subject_type`` and
+    # the routes' ``CommentSubject`` all agree. A new tool that forgets its
+    # CommentTarget — or an extra that forgets its entry — fails here.
     from sqlalchemy import inspect as sa_inspect
 
     from app.core.tools import CHILD_KINDS, COMMENT_TARGETS, KINDS
-    from app.db.initiative_rls import _COMMENT_PARENTS
+    from app.db.initiative_rls import COMMENT_PARENTS
     from app.models.tenant.comment import Comment
-    from app.schemas.tenant.comment import COMMENT_TARGET_FIELDS
+    from app.schemas.tenant.comment import CommentSubject
     from app.services.tenant.comments import (
-        COMMENT_PARENT_COLUMNS,
         EXTRA_COMMENT_TARGETS,
         TOOL_COMMENT_TARGETS,
     )
@@ -183,29 +182,31 @@ def test_every_tool_is_commentable():
     # The extras are the kinds inside a tool that say they take comments.
     extras = {k for k in CHILD_KINDS if KINDS[k].commentable}
     assert set(COMMENT_TARGETS) == extras | {t.value for t in Tool}
-    assert set(COMMENT_PARENT_COLUMNS) == {f"{target}_id" for target in COMMENT_TARGETS}
-    assert set(EXTRA_COMMENT_TARGETS) == {f"{extra}_id" for extra in extras}
+    assert set(EXTRA_COMMENT_TARGETS) == extras
+    assert tuple(COMMENT_PARENTS) == COMMENT_TARGETS
 
-    model_columns = {c.name for c in sa_inspect(Comment).persist_selectable.columns}
-    assert set(COMMENT_PARENT_COLUMNS) <= model_columns
+    [check] = [
+        c for c in Comment.__table__.constraints if c.name == "ck_comments_subject_type"
+    ]
+    assert all(f"'{target}'" in str(check.sqltext) for target in COMMENT_TARGETS)
 
-    assert {p.column for p in _COMMENT_PARENTS} == set(COMMENT_PARENT_COLUMNS)
-    assert set(COMMENT_TARGET_FIELDS) == set(COMMENT_PARENT_COLUMNS)
+    # Every kind is one the comment routes take.
+    assert {s.value for s in CommentSubject} == set(COMMENT_TARGETS)
 
     # Every extra names a tool to answer for it, and a real column to reach it
     # by — that is what makes a thread on something that is not a tool gated
     # like one — or answers for itself, as a kind no sharing governs does.
-    for column, extra in EXTRA_COMMENT_TARGETS.items():
-        parent = next(p for p in _COMMENT_PARENTS if p.column == column)
+    for kind, extra in EXTRA_COMMENT_TARGETS.items():
+        parent = COMMENT_PARENTS[kind]
         if parent.governed_by is None:
-            assert KINDS[extra.kind].standalone, column
+            assert KINDS[extra.kind].standalone, kind
             continue
-        assert parent.tool_fk is not None, column
+        assert parent.tool_fk is not None, kind
         extra_columns = {
             c.name for c in sa_inspect(extra.model).persist_selectable.columns
         }
-        assert parent.tool_fk in extra_columns, column
-        assert extra.title_field in extra_columns, column
+        assert parent.tool_fk in extra_columns, kind
+        assert extra.title_field in extra_columns, kind
 
 
 def test_every_tool_row_is_written_without_returning():

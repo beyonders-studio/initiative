@@ -973,7 +973,7 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             lambda s: (
                 "GET",
                 s.reader.g("/comments/"),
-                {"params": {"post_id": s.draft.id}},
+                {"params": {"subject_type": "post", "subject_id": s.draft.id}},
             ),
         ),
         (
@@ -981,7 +981,13 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             lambda s: (
                 "POST",
                 s.reader.g("/comments/"),
-                {"json": {"content": "Seen it", "post_id": s.draft.id}},
+                {
+                    "json": {
+                        "content": "Seen it",
+                        "subject_type": "post",
+                        "subject_id": s.draft.id,
+                    }
+                },
             ),
         ),
         (

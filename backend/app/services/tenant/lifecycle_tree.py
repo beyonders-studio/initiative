@@ -4,7 +4,9 @@ Trashing, restoring, purging and archiving all act on a row *and everything
 filed under it*. The tree they walk is not written down anywhere: it is read off
 the foreign keys between the soft-deletable tables, so a table that joins the
 trash can with a key to its parent joins the cascade in the same change, and the
-four lifecycles cannot disagree about it.
+four lifecycles cannot disagree about it. A comment names what it is said on as
+a pair rather than a key, so it is filed under every kind that takes comments
+(``COMMENT_TARGETS``).
 
 A key that lets go on delete (``SET NULL``) is a pointer rather than ownership —
 a collection's cover file, a wiki's home page — so it is not an edge: the thing
@@ -20,18 +22,45 @@ trashed or archived row freezes everything under it at the database (see
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import delete, update
+from sqlalchemy import and_, delete, update
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import COMMENT_TARGETS, KINDS
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import ids_in
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
+from app.models.tenant.comment import Comment
 
-#: parent model -> [(child model, fk column on the child)]
-Tree = Mapping[type, Sequence[tuple[type, str]]]
+
+@dataclass(frozen=True)
+class Edge:
+    """One way a row is filed under another: a foreign key on ``model``, or,
+    for a comment, the ``(subject_type, subject_id)`` pair it names its subject
+    by, where ``kind`` is the parent's kind and ``column`` the id."""
+
+    #: The model at the other end: the child, read downwards; the parent, read
+    #: upwards.
+    model: type
+    column: str
+    kind: str | None = None
+
+    def under(self, child: Any, parent_ids: Sequence[int]) -> Any:
+        """``child`` rows filed under any of these parents."""
+        tie = ids_in(getattr(child, self.column), parent_ids)
+        return tie if self.kind is None else and_(child.subject_type == self.kind, tie)
+
+    def ties(self, child: Any, parent: Any) -> Any:
+        """``child`` filed under ``parent``, as a join condition."""
+        tie = parent.id == getattr(child, self.column)
+        return tie if self.kind is None else and_(child.subject_type == self.kind, tie)
+
+
+#: parent model -> [edge to a child]
+Tree = Mapping[type, Sequence[Edge]]
 
 #: model -> ids, for one level of a walk.
 Level = dict[type, list[int]]
@@ -40,8 +69,8 @@ Level = dict[type, list[int]]
 _MAX_DEPTH = 256
 
 
-def _derive_children() -> dict[type, list[tuple[type, str]]]:
-    tree: dict[type, list[tuple[type, str]]] = {}
+def _derive_children() -> dict[type, list[Edge]]:
+    tree: dict[type, list[Edge]] = {}
     for child in SOFT_DELETE_MODELS:
         for column in child.__table__.columns:
             for fk in column.foreign_keys:
@@ -51,18 +80,25 @@ def _derive_children() -> dict[type, list[tuple[type, str]]]:
                     or (fk.ondelete or "").upper() == "SET NULL"
                 ):
                     continue
-                tree.setdefault(parent, []).append((child, column.name))
+                tree.setdefault(parent, []).append(Edge(child, column.name))
+    # A comment names what it is said on by kind, not by a key, so it is filed
+    # under every kind that takes comments.
+    for kind in COMMENT_TARGETS:
+        parent = MODELS_BY_TABLE[KINDS[kind].table]
+        tree.setdefault(parent, []).append(Edge(Comment, "subject_id", kind))
     return tree
 
 
-#: parent model -> [(child model, fk column)]: what a trashed row takes with it.
-CASCADE_CHILDREN: dict[type, list[tuple[type, str]]] = _derive_children()
+#: parent model -> [edge to a child]: what a trashed row takes with it.
+CASCADE_CHILDREN: dict[type, list[Edge]] = _derive_children()
 
-#: child model -> [(parent model, fk column)]: the same edges read upwards.
-CASCADE_PARENTS: dict[type, list[tuple[type, str]]] = {}
+#: child model -> [edge to a parent]: the same edges read upwards.
+CASCADE_PARENTS: dict[type, list[Edge]] = {}
 for _parent, _children in CASCADE_CHILDREN.items():
-    for _child, _fk in _children:
-        CASCADE_PARENTS.setdefault(_child, []).append((_parent, _fk))
+    for _edge in _children:
+        CASCADE_PARENTS.setdefault(_edge.model, []).append(
+            Edge(_parent, _edge.column, _edge.kind)
+        )
 
 
 def parents_first(models: Iterable[type]) -> tuple[type, ...]:
@@ -75,7 +111,11 @@ def parents_first(models: Iterable[type]) -> tuple[type, ...]:
     placed: list[type] = []
     while pending:
         for model in pending:
-            parents = {p for p, _ in CASCADE_PARENTS.get(model, ()) if p is not model}
+            parents = {
+                edge.model
+                for edge in CASCADE_PARENTS.get(model, ())
+                if edge.model is not model
+            }
             if not parents & set(pending):
                 placed.append(model)
                 pending.remove(model)
@@ -134,9 +174,10 @@ async def subtree_levels(
         levels.append(frontier)
         found: dict[type, dict[int, None]] = {}
         for parent_model, parent_ids in frontier.items():
-            for child_model, fk_col in tree.get(parent_model, ()):
+            for edge in tree.get(parent_model, ()):
+                child_model = edge.model
                 stmt = select_including_deleted(child_model.id).where(  # type: ignore[attr-defined]
-                    ids_in(getattr(child_model, fk_col), parent_ids)
+                    edge.under(child_model, parent_ids)
                 )
                 if where is not None:
                     stmt = stmt.where(where(child_model))

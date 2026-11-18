@@ -86,9 +86,7 @@ async def get_wiki_hydrated(
     if wiki is not None:
         await tags_service.annotate_tags(session, [wiki])
         await metadata_service.annotate_properties(session, [wiki])
-        await comments_service.annotate_comment_counts(
-            session, [wiki], column="wiki_id"
-        )
+        await comments_service.annotate_comment_counts(session, [wiki], kind="wiki")
     return wiki
 
 

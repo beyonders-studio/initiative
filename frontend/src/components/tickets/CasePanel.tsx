@@ -17,6 +17,7 @@ import {
   type CaseEvidenceRead,
   type CaseMessageRead,
   CommentAudience,
+  CommentSubject,
   Conversation,
   type TaskCaseRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -361,7 +362,8 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
     if (!content) return;
     await createComment.mutateAsync({
       content,
-      task_id: taskId,
+      subject_type: CommentSubject.task,
+      subject_id: taskId,
       audience: CommentAudience.filer,
     });
     setReply("");

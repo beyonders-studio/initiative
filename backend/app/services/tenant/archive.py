@@ -31,29 +31,26 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.tenant._mixins import ArchiveMixin
 from app.services.tenant.lifecycle_tree import (
     CASCADE_CHILDREN,
+    Edge,
     Level,
     set_columns,
     subtree_levels,
 )
 
 
-def _archivable_tree() -> dict[
-    type[ArchiveMixin], list[tuple[type[ArchiveMixin], str]]
-]:
+def _archivable_tree() -> dict[type[ArchiveMixin], list[Edge]]:
     """The trash can's tree, narrowed to what can be archived."""
-    tree: dict[type[ArchiveMixin], list[tuple[type[ArchiveMixin], str]]] = {}
+    tree: dict[type[ArchiveMixin], list[Edge]] = {}
     for parent, children in CASCADE_CHILDREN.items():
         if not issubclass(parent, ArchiveMixin):
             continue
-        archivable = [
-            (child, fk) for child, fk in children if issubclass(child, ArchiveMixin)
-        ]
+        archivable = [edge for edge in children if issubclass(edge.model, ArchiveMixin)]
         if archivable:
             tree[parent] = archivable
     return tree
 
 
-#: parent model -> [(child model, fk column)], for the archivable tree only.
+#: parent model -> [edge to a child], for the archivable tree only.
 ARCHIVE_CHILDREN = _archivable_tree()
 
 

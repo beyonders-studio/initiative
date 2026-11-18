@@ -10,7 +10,7 @@ from sqlmodel import select
 from app.core.intake import CaseField, IntakeStream
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition
 from app.models.tenant.project import Project
@@ -325,7 +325,7 @@ async def _notes_on(session, guild_id: int, task_id: int) -> list[Comment]:
         (
             await session.exec(
                 select(Comment)
-                .where(Comment.task_id == task_id)
+                .where(said_on("task", task_id))
                 .where(Comment.system_kind.is_not(None))
                 .order_by(Comment.id)
             )

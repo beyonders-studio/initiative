@@ -251,7 +251,7 @@ async def serialize_file_page(
     """
     await tags_service.annotate_tags(session, files)
     await metadata_service.annotate_properties(session, files)
-    await comments_service.annotate_comment_counts(session, files, column="file_id")
+    await comments_service.annotate_comment_counts(session, files, kind="file")
     await ownership_service.annotate_owner_plugins(session, files)
     context = require_actor_context(session)
     return [

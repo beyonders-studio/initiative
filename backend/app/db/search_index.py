@@ -70,6 +70,13 @@ class SearchDependency:
     column: str
     #: How the dependent source's rows tie back to it.
     local_column: str
+    #: Where the source names what it is on as a pair, the kind that pair
+    #: holds for this table's rows.
+    local_kind: str | None = None
+
+    def rows_under(self, row: str) -> str:
+        """The source rows under the ``$2`` this trigger fired for."""
+        return _tied(row, self.local_column, self.local_kind, "= $2")
 
 
 @dataclass(frozen=True)
@@ -89,25 +96,46 @@ class ArchiveParent:
     column: str
     #: ``(table, column)`` between the two, where the row names the step.
     through: tuple[str, str] | None = None
+    #: Where the source names what it is on as a pair, the kind that pair
+    #: holds for this parent (or for the step to it); ``column`` is its id.
+    kind: str | None = None
+
+    @property
+    def label(self) -> str:
+        """What its trigger is named by: the column, or ``<kind>_id`` for a
+        pair, which is the name a comment's column for the kind had."""
+        return self.column if self.kind is None else f"{self.kind}_id"
 
     def archived(self, row: str) -> str:
         if self.through is None:
-            return (
+            exists = (
                 f"EXISTS (SELECT 1 FROM {self.table} a WHERE a.id = {row}.{self.column}"
                 " AND a.archived_at IS NOT NULL)"
             )
-        step, fk = self.through
-        return (
-            f"EXISTS (SELECT 1 FROM {step} s JOIN {self.table} a ON a.id = s.{fk}"
-            f" WHERE s.id = {row}.{self.column} AND a.archived_at IS NOT NULL)"
-        )
+        else:
+            step, fk = self.through
+            exists = (
+                f"EXISTS (SELECT 1 FROM {step} s JOIN {self.table} a ON a.id = s.{fk}"
+                f" WHERE s.id = {row}.{self.column} AND a.archived_at IS NOT NULL)"
+            )
+        if self.kind is None:
+            return exists
+        return f"({row}.subject_type = '{self.kind}' AND {exists})"
 
     def rows_under(self, row: str) -> str:
         """The source rows under the ``$2`` this trigger fired for."""
         if self.through is None:
-            return f"{row}.{self.column} = $2"
+            return _tied(row, self.column, self.kind, "= $2")
         step, fk = self.through
-        return f"{row}.{self.column} IN (SELECT id FROM {step} WHERE {fk} = $2)"
+        return _tied(
+            row, self.column, self.kind, f"IN (SELECT id FROM {step} WHERE {fk} = $2)"
+        )
+
+
+def _tied(row: str, column: str, kind: str | None, match: str) -> str:
+    """``row.column`` matching, and, for a pair, of ``kind``."""
+    tie = f"{row}.{column} {match}"
+    return tie if kind is None else f"{row}.subject_type = '{kind}' AND {tie}"
 
 
 @dataclass(frozen=True)
@@ -284,15 +312,16 @@ def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
     cannot be archived itself, the tool it is part of (a wiki page's wiki)."""
     parents: list[ArchiveParent] = []
     tables = SQLModel.metadata.tables
-    for column, parent in COMMENT_PARENTS.items():
+    for kind, parent in COMMENT_PARENTS.items():
         if "archived_at" in tables[parent.table].columns:
-            parents.append(ArchiveParent(parent.table, column))
+            parents.append(ArchiveParent(parent.table, "subject_id", kind=kind))
         elif parent.tool_fk is not None and parent.governed_by is not None:
             parents.append(
                 ArchiveParent(
                     parent.governed_by.plural,
-                    column,
+                    "subject_id",
                     through=(parent.table, parent.tool_fk),
+                    kind=kind,
                 )
             )
     return tuple(parents)
@@ -301,28 +330,29 @@ def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
 def _comment_dac(row: str) -> tuple[str, str]:
     """Which tool's sharing governs a comment, and which of its entities.
 
-    A comment hangs off exactly one parent, and the parents are declared once
-    for the RLS policies — so the legs are derived from that same list rather
-    than restated here. A parent that is not itself a tool row names the tool
-    it is shared as part of: a task by its project, a wiki page by its wiki.
+    A comment is said on one subject, and the subjects are declared once for
+    the RLS policies — so the legs are derived from that same list rather than
+    restated here. A subject that is not itself a tool row names the tool it is
+    shared as part of: a task by its project, a wiki page by its wiki.
     """
     tools: list[str] = []
     ids: list[str] = []
-    for column, parent in COMMENT_PARENTS.items():
+    for kind, parent in COMMENT_PARENTS.items():
         if parent.governed_by is None:
             # No sharing to stamp: the entry is reached as the comment is.
             continue
         ident = (
-            f"{row}.{column}"
+            f"{row}.subject_id"
             if parent.tool_fk is None
             else f"(SELECT {parent.tool_fk} FROM {parent.table} "
-            f"WHERE id = {row}.{column})"
+            f"WHERE id = {row}.subject_id)"
         )
-        tools.append(
-            f"WHEN {row}.{column} IS NOT NULL THEN '{parent.governed_by.value}'"
-        )
-        ids.append(f"WHEN {row}.{column} IS NOT NULL THEN {ident}")
-    return f"(CASE {' '.join(tools)} END)", f"(CASE {' '.join(ids)} END)"
+        tools.append(f"WHEN '{kind}' THEN '{parent.governed_by.value}'")
+        ids.append(f"WHEN '{kind}' THEN {ident}")
+    return (
+        f"(CASE {row}.subject_type {' '.join(tools)} END)",
+        f"(CASE {row}.subject_type {' '.join(ids)} END)",
+    )
 
 
 def _title_expr(source: SearchSource, row: str = ROW) -> str:
@@ -531,7 +561,9 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
         # move between projects. Nothing about the comment changes when it does,
         # so the entry is rewritten from the table that moved. Every other
         # parent names its own initiative and cannot move between them.
-        depends_on=(SearchDependency("tasks", "project_id", "task_id"),),
+        depends_on=(
+            SearchDependency("tasks", "project_id", "subject_id", local_kind="task"),
+        ),
         archive_parents=_comment_archive_parents,
     ),
 }
@@ -922,7 +954,7 @@ def _dependency_block(
         source,
         dependency.table,
         dependency.column,
-        f"{{row}}.{dependency.local_column} = $2",
+        dependency.rows_under("{row}"),
     )
 
 
@@ -930,7 +962,7 @@ def _archive_block(table: str, source: SearchSource, parent: ArchiveParent) -> s
     """The trigger that rewrites entries when what they sit under is archived
     or brought back."""
     return _rewrite_trigger(
-        f"{source.trigger_name}_archived_by_{parent.column}",
+        f"{source.trigger_name}_archived_by_{parent.label}",
         table,
         source,
         parent.table,

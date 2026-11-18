@@ -699,13 +699,13 @@ async def test_soft_delete_tables_keep_the_trash_out_of_reader_written_sql(engin
 
 
 def test_every_comment_parent_is_a_kind_the_entity_function_answers_for():
-    """A comment's policy names its parent as a ``(kind, id)`` pair and asks
-    ``entity_access`` about it, so every parent column has to resolve to one of
-    the function's arms — at the table the parent actually lives in."""
+    """A comment's policy names its subject as a ``(kind, id)`` pair and asks
+    ``entity_access`` about it, so every subject kind has to resolve to one of
+    the function's arms — at the table the subject actually lives in."""
     tables = entity_tables()
     for parent in COMMENT_PARENTS.values():
-        assert parent.kind in tables, parent.column
-        assert tables[parent.kind] == parent.table, parent.column
+        assert parent.kind in tables, parent.kind
+        assert tables[parent.kind] == parent.table, parent.kind
 
 
 def test_initiative_of_reads_its_own_column_or_walks_to_it():

@@ -314,9 +314,7 @@ async def annotate(
         )
     await tags_service.annotate_tags(session, rows)
     await metadata_service.annotate_properties(session, rows)
-    await comments_service.annotate_comment_counts(
-        session, rows, column="collection_id"
-    )
+    await comments_service.annotate_comment_counts(session, rows, kind="collection")
     return await cards(session, rows)
 
 

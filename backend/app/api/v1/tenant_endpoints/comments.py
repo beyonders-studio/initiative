@@ -1,4 +1,3 @@
-import inspect
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -16,10 +15,10 @@ from app.api.deps import (
 )
 from app.models.platform.user import User
 from app.schemas.tenant.comment import (
-    COMMENT_TARGET_FIELDS,
     CommentCreate,
     CommentListResponse,
     CommentRead,
+    CommentSubject,
     CommentUpdate,
     RecentActivityEntry,
 )
@@ -31,24 +30,6 @@ router = APIRouter(route_class=ActorRoute)
 #: The routes an installed plug-in may call, under the comments scopes.
 CommentsRead = Annotated[ActorContext, Depends(plugin_scope("comments:read"))]
 CommentsWrite = Annotated[ActorContext, Depends(plugin_scope("comments:write"))]
-
-
-def comment_targets(**ids: int | None) -> dict[str, int | None]:
-    """The thread a request names: one optional query id per comment parent."""
-    return ids
-
-
-comment_targets.__signature__ = inspect.Signature(
-    [
-        inspect.Parameter(
-            field,
-            inspect.Parameter.KEYWORD_ONLY,
-            annotation=int | None,
-            default=Query(default=None, gt=0),
-        )
-        for field in COMMENT_TARGET_FIELDS
-    ]
-)
 
 
 @router.post("/", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
@@ -68,7 +49,7 @@ async def create_comment(
         content=comment_in.content,
         parent_comment_id=comment_in.parent_comment_id,
         audience=comment_in.audience,
-        targets=comment_in.target_ids(),
+        subject=(comment_in.subject_type.value, comment_in.subject_id),
     )
 
     await session.commit()
@@ -101,17 +82,19 @@ async def list_comments(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: CommentsRead,
-    targets: Annotated[dict[str, int | None], Depends(comment_targets)],
+    subject_type: CommentSubject,
+    subject_id: Annotated[int, Query(gt=0)],
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
 ) -> CommentListResponse:
-    """One page of a thread: ``limit`` conversations, newest first, each with
-    every reply under it. Follow ``next_cursor`` for older conversations."""
+    """One page of the thread on one subject: ``limit`` conversations, newest
+    first, each with every reply under it. Follow ``next_cursor`` for older
+    conversations."""
     page = await comments_service.list_comments(
         session,
         user=current_user,
         guild_id=guild_context.guild_id,
-        targets=targets,
+        subject=(subject_type.value, subject_id),
         limit=limit,
         cursor=cursor,
     )
