@@ -4843,9 +4843,7 @@ async def test_a_jira_sprint_becomes_an_event_its_tasks_are_related_to(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    setattr(a.initiative, Tool.calendar.view_permission, True)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
@@ -4920,9 +4918,7 @@ async def test_sprints_are_left_behind_and_said_so_when_calendars_are_off(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    setattr(a.initiative, Tool.calendar.view_permission, False)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: False})
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)

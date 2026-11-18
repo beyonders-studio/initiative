@@ -463,9 +463,7 @@ async def test_recent_drops_comments_of_a_disabled_tool(client, session, acting_
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert any(e["entity_type"] == "counter_group" for e in recent.json())
 
-    setattr(a.initiative, Tool.counter_group.view_permission, False)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
 
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert recent.status_code == 200

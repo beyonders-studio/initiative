@@ -52,7 +52,7 @@ async def _enable_tools(client, actor):
     response = await client.patch(
         actor.g(f"/initiatives/{actor.initiative.id}"),
         headers=actor.headers,
-        json={tool.view_permission: True for tool in Tool},
+        json={"tools": {tool.value: True for tool in Tool}},
     )
     assert response.status_code == 200, response.text
 
