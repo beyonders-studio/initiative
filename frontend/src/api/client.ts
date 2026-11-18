@@ -264,7 +264,10 @@ const sessionClock = (): SessionClock | null => {
 const idleSinceRenewal = (): boolean => {
   const input = lastInput();
   const clock = sessionClock();
-  return input === null || (clock !== null && input <= clock.issuedAt);
+  // A token's issue time is whole seconds, rounded down, so it may read as
+  // earlier than the input that asked for it: the whole of its second counts
+  // as before the renewal.
+  return input === null || (clock !== null && input < clock.issuedAt + 1000);
 };
 
 /** Renew if the person has done something since the last renewal and the token is near its end. */
@@ -495,10 +498,8 @@ let inView: Promise<void> | null = null;
  *
  * A request that finds the access token run out then is the app's own — a
  * socket catching up, a poll — and a renewal sent for it may go out as the
- * device goes to sleep or the app closes. A renewal spends the token it sends,
- * so one whose answer never arrives leaves the device holding a spent token,
- * and the next renewal it sends ends the session. The request waits instead,
- * and renews when somebody looks.
+ * device goes to sleep or the app closes, its answer never arriving. The
+ * request waits instead, and renews when somebody looks.
  */
 const untilSomebodyIsHere = (): Promise<void> | null => {
   if (typeof document === "undefined" || document.visibilityState !== "hidden") return null;
