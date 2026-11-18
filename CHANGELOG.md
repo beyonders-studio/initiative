@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Security cases say what to check, at the priority they deserve.** Each case opens with what its rule usually means and what to look at, and its task takes the rule's priority: a high rule files a high-priority task, a low one a low-priority task.
 - **The My Tasks widget keeps its controls in view.** Its table reaches the card's edges, and while its rows scroll, the filter box, the column names and the page controls stay where they are, whatever size the widget is.
+
+### Fixed
+
+- **A device that missed its own sign-in renewal no longer looks like a stolen session.** When a laptop sleeps or an app closes just as a renewal's answer comes back, the device sends its old token next time; that now files a low case of its own instead of a high one. A session that was signed out, or ended from another device, no longer files a case at all when its device next tries it.
 
 ## [0.79.2] - 2026-11-16
 
