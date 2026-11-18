@@ -153,7 +153,9 @@ class Kind:
 #: unused code, and no existing code ever moves. 7 and 8 were the libraries',
 #: 11 and 12 were the queues', and all four stay retired. 18 is the person's
 #: (``app.core.relationships.PERSON``), an edge end that is not a kind, and is
-#: never reused. The initial set was assigned in alphabetical order, which is
+#: never reused. Boot writes the codes into ``public.relationship_kind_code``
+#: (``app.db.kind_codes``), so a new kind needs no migration to restate that
+#: function. The initial set was assigned in alphabetical order, which is
 #: where the resemblance ends — a derived ordinal changes under you the first
 #: time a member is added in the middle. Declared
 #: tools first, then what lives inside them, then the guild's vocabulary; the
