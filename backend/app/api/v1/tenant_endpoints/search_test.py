@@ -521,9 +521,9 @@ async def test_what_cannot_be_archived_goes_with_what_it_is_under(
 
     assert await found() == everything
     for verb, expected in (("archive", set()), ("unarchive", everything)):
-        for kind, row in (("project", a.project), ("wiki", wiki)):
+        for segment, row in (("projects", a.project), ("wikis", wiki)):
             moved = await client.post(
-                a.g(f"/{verb}/{kind}/{row.id}"), headers=a.headers
+                a.g(f"/{segment}/{row.id}/{verb}"), headers=a.headers
             )
             assert moved.status_code == 200, moved.text
         assert await found() == expected
