@@ -276,9 +276,6 @@ async def update_dashboard(
     if "description" in update_data:
         dashboard.description = update_data["description"]
         updated = True
-    if "comments_enabled" in update_data:
-        dashboard.comments_enabled = update_data["comments_enabled"]
-        updated = True
 
     # Definition and config are validated as a pair even when only one is sent,
     # so config can never outlive the widgets it configures.

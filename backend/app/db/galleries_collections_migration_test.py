@@ -385,10 +385,11 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     )
     assert await _rows(
         session,
-        f"SELECT collection_id, content FROM {s}.comments WHERE id = :c",
+        f"SELECT subject_type, subject_id, content FROM {s}.comments WHERE id = :c",
         c=comment,
     ) == [
         (
+            "collection",
             gallery,
             f"Lovely, as #file[Spec]({spec.id}) says of #file[it]({sunset_file})",
         )

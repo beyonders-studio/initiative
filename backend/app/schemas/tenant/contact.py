@@ -14,7 +14,7 @@ from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
-from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate
+from app.schemas.tenant.tool import ToolSummaryBase
 
 #: The longest label a detail takes: "Office", "Mobile", "Billing".
 LABEL_MAX_LENGTH = 40
@@ -101,7 +101,7 @@ class ContactCreate(PropertiesOnCreate):
     grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
-class ContactUpdate(ToolUpdate):
+class ContactUpdate(SanitizedBaseModel):
     """A change to a contact. Only what is sent is written; a list sent
     replaces the one there."""
 

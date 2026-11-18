@@ -361,8 +361,10 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
     const content = reply.trim();
     if (!content) return;
     await createComment.mutateAsync({
-      subject: { subject_type: CommentSubject.task, subject_id: taskId },
-      body: { content, audience: CommentAudience.filer },
+      content,
+      subject_type: CommentSubject.task,
+      subject_id: taskId,
+      audience: CommentAudience.filer,
     });
     setReply("");
     void refreshTaskCase(taskId);

@@ -106,8 +106,13 @@ async def _file(
 async def _say(client, desk, task_id: int, content: str, audience="filer"):
     staff = desk["staff"]
     return await client.post(
-        staff.g(thread_path("task", task_id)),
-        json={"content": content, "audience": audience},
+        staff.g("/comments/"),
+        json={
+            "subject_type": "task",
+            "subject_id": task_id,
+            "content": content,
+            "audience": audience,
+        },
         headers=staff.headers,
     )
 
@@ -915,8 +920,10 @@ async def test_a_reply_keeps_the_audience_of_what_it_answers(client, acting_user
     staff = desk["staff"]
 
     response = await client.post(
-        staff.g(thread_path("task", task_id)),
+        staff.g("/comments/"),
         json={
+            "subject_type": "task",
+            "subject_id": task_id,
             "content": "Internal aside.",
             "parent_comment_id": said.json()["id"],
         },

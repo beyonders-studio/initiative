@@ -8,7 +8,7 @@ from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
-from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate
+from app.schemas.tenant.tool import ToolSummaryBase
 
 
 class CalendarBase(SanitizedBaseModel):
@@ -33,7 +33,7 @@ class CalendarCreate(CalendarBase, PropertiesOnCreate):
     grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
-class CalendarUpdate(ToolUpdate):
+class CalendarUpdate(SanitizedBaseModel):
     name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
     description: MentionStr | None = None
     color: str | None = Field(default=None, min_length=1, max_length=32)

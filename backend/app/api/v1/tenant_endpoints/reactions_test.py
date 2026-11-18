@@ -58,9 +58,9 @@ async def _strip_grants(session, tool: Tool, entity):
 
 async def _comment_on_task(client, actor, task_id: int, content: str = "Hello") -> int:
     created = await client.post(
-        actor.g(thread_path("task", task_id)),
+        actor.g("/comments/"),
         headers=actor.headers,
-        json={"content": content},
+        json={"subject_type": "task", "subject_id": task_id, "content": content},
     )
     assert created.status_code == 201, created.text
     return created.json()["id"]
@@ -478,9 +478,13 @@ class TestReactionAccess:
         a = await acting_user(guild_role=CommunityRole.member, initiative=True)
         project = await create_project(session, a.initiative, a.user)
         created = await client.post(
-            a.g(thread_path("project", project.id)),
+            a.g("/comments/"),
             headers=a.headers,
-            json={"content": "before"},
+            json={
+                "subject_type": "project",
+                "subject_id": project.id,
+                "content": "before",
+            },
         )
         assert created.status_code == 201
         comment_id = created.json()["id"]

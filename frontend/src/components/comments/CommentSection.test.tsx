@@ -14,19 +14,16 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 
 import { CommentSection } from "./CommentSection";
 
-/** Registers the create handler and resolves the body it received, and the
- *  thread it was posted to. */
-const captureCreate = (): { body: () => CommentCreate | null; thread: () => string | null } => {
+/** Registers the create handler and resolves the body it received. */
+const captureCreate = (): { body: () => CommentCreate | null } => {
   let received: CommentCreate | null = null;
-  let thread: string | null = null;
   server.use(
-    communityHttp.post("/:segment/:id/comments", async ({ request, params }) => {
+    communityHttp.post("/comments/", async ({ request }) => {
       received = (await request.json()) as CommentCreate;
-      thread = `${params.segment}/${params.id}`;
       return HttpResponse.json(buildComment({ content: received.content }), { status: 201 });
     })
   );
-  return { body: () => received, thread: () => thread };
+  return { body: () => received };
 };
 
 const postComment = async (text: string) => {
@@ -64,7 +61,7 @@ describe("CommentSection", () => {
     await waitFor(() => expect(deleted).toBe(String(mine.id)));
   });
 
-  it("posts a counter-group comment under counter_group_id", async () => {
+  it("posts a counter-group comment on the counter group", async () => {
     const created = captureCreate();
 
     renderPage(() => (
@@ -76,11 +73,12 @@ describe("CommentSection", () => {
     await waitFor(() => expect(created.body()).not.toBeNull());
     expect(created.body()).toEqual({
       content: "Reset these before the next session.",
-      counter_group_id: 9,
+      subject_type: "counter_group",
+      subject_id: 9,
     });
   });
 
-  it("posts a task comment to the task's thread", async () => {
+  it("posts a task comment on the task", async () => {
     const created = captureCreate();
 
     renderPage(() => (
@@ -90,8 +88,11 @@ describe("CommentSection", () => {
     await postComment("Picking this up.");
 
     await waitFor(() => expect(created.body()).not.toBeNull());
-    expect(created.body()).toEqual({ content: "Picking this up." });
-    expect(created.thread()).toBe("tasks/3");
+    expect(created.body()).toEqual({
+      content: "Picking this up.",
+      subject_type: "task",
+      subject_id: 3,
+    });
   });
 
   it("carries the parent id when replying", async () => {
@@ -115,9 +116,10 @@ describe("CommentSection", () => {
     await waitFor(() => expect(created.body()).not.toBeNull());
     expect(created.body()).toEqual({
       content: "Sounds right.",
+      subject_type: "calendar",
+      subject_id: 5,
       parent_comment_id: parent.id,
     });
-    expect(created.thread()).toBe("calendars/5");
   });
 
   it("reads the thread on opening and marks what was unread", async () => {

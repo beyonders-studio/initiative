@@ -340,7 +340,9 @@ async def test_a_list_and_a_thread_read_only_their_own_comments(
     for table in ("tasks", "comments"):
         await session.exec(text(f"ANALYZE {table}"))
     small_ids = list(
-        (await session.exec(select(Task.id).where(Task.project_id == small.id))).all()
+        (await session.exec(select(Task.id).where(Task.project_id == small.id)))
+        .scalars()
+        .all()
     )
     await session.commit()
 

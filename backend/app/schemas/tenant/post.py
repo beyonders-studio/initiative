@@ -16,7 +16,7 @@ from app.schemas.tenant.post_poll import PollRead, PollWrite, serialize_poll
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.reaction import ReactionGroup
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
-from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate
+from app.schemas.tenant.tool import ToolSummaryBase
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -66,7 +66,7 @@ class PostCreate(PostBase, PropertiesOnCreate):
     poll: PollWrite | None = None
 
 
-class PostUpdate(ToolUpdate):
+class PostUpdate(SanitizedBaseModel):
     name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
     body: LexicalState | None = None
     #: Move or clear a *pending* schedule. ``null`` publishes the draft now; a

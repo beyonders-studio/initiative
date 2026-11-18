@@ -21,7 +21,6 @@ from app.testing import (
     create_resource_grant,
     create_tag,
     route_session_to_guild,
-    thread_path,
 )
 from app.testing.factories import grant_role_permission
 
@@ -173,9 +172,13 @@ async def test_changing_a_collection_takes_the_role_that_makes_files(
     assert await tag_it() == 403
     # Seeing it is enough to talk about it.
     comment = await client.post(
-        maker.g(thread_path("collection", collection.id)),
+        maker.g("/comments/"),
         headers=maker.headers,
-        json={"content": "Nice set"},
+        json={
+            "subject_type": "collection",
+            "subject_id": collection.id,
+            "content": "Nice set",
+        },
     )
     assert comment.status_code == 201, comment.text
 

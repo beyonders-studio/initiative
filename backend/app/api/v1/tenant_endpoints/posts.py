@@ -469,9 +469,6 @@ async def update_post(
     if "name" in update_data and update_data["name"] is not None:
         post.name = update_data["name"].strip()
         updated = True
-    if "comments_enabled" in update_data:
-        post.comments_enabled = update_data["comments_enabled"]
-        updated = True
     body_changed = False
     if "body" in update_data and update_data["body"] is not None:
         post.body = _validated_body(update_data["body"])

@@ -3,18 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CommentCreate,
   type CommentRead,
   type CommentSubject,
   ModerationAct,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  type NewComment,
-  useCreateComment,
-  useDeleteComment,
-  useUpdateComment,
-} from "@/hooks/useComments";
+import { useCreateComment, useDeleteComment, useUpdateComment } from "@/hooks/useComments";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useModerate } from "@/hooks/useModeration";
 import { useReadOnOpen } from "@/hooks/useNotifications";
@@ -264,11 +260,11 @@ export const CommentSection = ({
     return map;
   }, [comments]);
 
-  const buildPayload = (commentBody: string, parentCommentId?: number): NewComment => ({
-    subject: { subject_type: entityType, subject_id: entityId },
-    body: parentCommentId
-      ? { content: commentBody, parent_comment_id: parentCommentId }
-      : { content: commentBody },
+  const buildPayload = (commentBody: string, parentCommentId?: number): CommentCreate => ({
+    content: commentBody,
+    subject_type: entityType,
+    subject_id: entityId,
+    ...(parentCommentId ? { parent_comment_id: parentCommentId } : {}),
   });
 
   const handleSubmit = (commentContent: string) => {

@@ -43,22 +43,25 @@ async function primaryCommunity(page: Page) {
   return primary.id;
 }
 
-/** Where the comment's target is, as the path its thread is under, looked up by name. */
+/** The comment's subject as the API takes it, looked up by name. */
 async function resolve(api: APIRequestContext, base: string, target: Target) {
   if ("task" in target) {
     const conditions = JSON.stringify([{ field: "title", op: "eq", value: target.task }]);
     const { items } = await (await api.get(`${base}/tasks/`, { params: { conditions } })).json();
-    return `tasks/${items[0].id}`;
+    return { subject_type: "task", subject_id: items[0].id as number };
   }
   if ("post" in target) {
     const { items } = await (await api.get(`${base}/posts/`)).json();
-    return `posts/${items.find((post: { name: string }) => post.name === target.post).id}`;
+    return {
+      subject_type: "post",
+      subject_id: items.find((post: { name: string }) => post.name === target.post).id,
+    };
   }
   const { items: wikis } = await (await api.get(`${base}/wikis/`)).json();
   for (const wiki of wikis) {
     const { items } = await (await api.get(`${base}/wikis/${wiki.id}/pages`)).json();
     const page = items.find((item: { title: string }) => item.title === target.wikiPage);
-    if (page) return `wiki-pages/${page.id}`;
+    if (page) return { subject_type: "wiki_page", subject_id: page.id as number };
   }
   throw new Error(`No wiki page named ${target.wikiPage}`);
 }
@@ -80,10 +83,12 @@ async function leaveComments(communityId: number) {
       extraHTTPHeaders: { Authorization: `Bearer ${access_token}` },
     });
     try {
-      const thread = `${base}/${await resolve(api, base, target)}/comments`;
-      const { comments } = await (await api.get(thread, { params: { limit: 100 } })).json();
+      const on = await resolve(api, base, target);
+      const { comments } = await (
+        await api.get(`${base}/comments/`, { params: { ...on, limit: 100 } })
+      ).json();
       if (comments.some((comment: { content: string }) => comment.content === content)) continue;
-      const made = await api.post(thread, { data: { content } });
+      const made = await api.post(`${base}/comments/`, { data: { ...on, content } });
       expect(made.ok(), await made.text()).toBe(true);
     } finally {
       await api.dispose();

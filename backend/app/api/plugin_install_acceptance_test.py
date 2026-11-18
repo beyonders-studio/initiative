@@ -985,9 +985,13 @@ async def test_a_mention_it_writes_is_stored_by_row_id(
     ]
 
     posted = await client.post(
-        guild_url(guild_id, thread_path("file", file.id)),
+        guild_url(guild_id, "/comments/"),
         headers=headers,
-        json={"content": f"Over to @[]({ref})"},
+        json={
+            "subject_type": "file",
+            "subject_id": file.id,
+            "content": f"Over to @[]({ref})",
+        },
     )
     assert posted.status_code == 201, posted.text
     assert posted.json()["content"] == f"Over to @[]({ref})"
@@ -1025,9 +1029,9 @@ async def test_a_mention_it_writes_is_stored_by_row_id(
 
     for content in (f"@[Sam]({member.user.id})", "@[Sam](uplu_nobody-at-all)"):
         refused = await client.post(
-            guild_url(guild_id, thread_path("file", file.id)),
+            guild_url(guild_id, "/comments/"),
             headers=headers,
-            json={"content": content},
+            json={"subject_type": "file", "subject_id": file.id, "content": content},
         )
         assert refused.status_code == 422, refused.text
         assert PluginMessages.REFERENCE_UNKNOWN in refused.text

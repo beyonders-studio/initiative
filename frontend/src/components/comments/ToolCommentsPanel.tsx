@@ -19,7 +19,7 @@ import { useMemo } from "react";
 import type { CommentSubject, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
 import {
-  type ThreadSubject,
+  type CommentThreadParams,
   useComments,
   useCommentsCache,
   useCommentThreadState,
@@ -54,7 +54,7 @@ export const ToolCommentsPanel = ({
   // 0 is what the mention lookups read as "no initiative to search".
   const initiativeId = entity.initiative_id ?? 0;
 
-  const subject = useMemo<ThreadSubject>(
+  const subject = useMemo<CommentThreadParams>(
     () => ({ subject_type: targetType, subject_id: entityId }),
     [targetType, entityId]
   );

@@ -132,9 +132,9 @@ async def test_a_read_only_grant_cannot_post(session: AsyncSession, reading_as):
     task = await create_task(session, project)
 
     insert = text(
-        "INSERT INTO comments (task_id, content, created_by, created_by_kind,"
-        " created_at, updated_at)"
-        " VALUES (:t, 'let me in', :u, 'member', now(), now())"
+        "INSERT INTO comments (subject_type, subject_id, content, created_by,"
+        " created_by_kind, created_at, updated_at)"
+        " VALUES ('task', :t, 'let me in', :u, 'member', now(), now())"
     ).bindparams(t=task.id, u=support.id)
 
     # A grantee reaches the community through the row, and the row says at

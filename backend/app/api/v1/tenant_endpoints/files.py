@@ -848,10 +848,6 @@ async def update_file(
         file.is_template = bool(update_data["is_template"])
         updated = True
 
-    if "comments_enabled" in update_data:
-        file.comments_enabled = update_data["comments_enabled"]
-        updated = True
-
     if updated:
         file.updated_at = datetime.now(UTC)
         session.add(file)

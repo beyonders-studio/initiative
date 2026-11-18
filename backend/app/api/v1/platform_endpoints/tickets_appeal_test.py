@@ -24,7 +24,6 @@ from app.testing import (
     create_user,
     get_auth_headers,
     make_operations_community,
-    thread_path,
 )
 
 TICKETS = "/api/v1/me/tickets"
@@ -238,8 +237,10 @@ async def test_the_team_answers_an_appeal(client, session, appeals_desk):
 
     staff = appeals_desk["staff"]
     response = await client.post(
-        staff.g(thread_path("task", case.task_id)),
+        staff.g("/comments/"),
         json={
+            "subject_type": "task",
+            "subject_id": case.task_id,
             "content": "We have lifted it.",
             "audience": "filer",
         },

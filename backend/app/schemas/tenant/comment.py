@@ -78,12 +78,25 @@ CommentSubject = Enum(
 
 
 class CommentCreate(CommentBase):
-    """A comment, posted on the subject its route names."""
+    """A comment, and what it is said on."""
 
+    subject_type: CommentSubject
+    subject_id: int = Field(gt=0)
     parent_comment_id: int | None = Field(default=None, gt=0)
     #: Who it is said to. ``filer`` only on an operations case somebody filed,
     #: where it is the reply they are shown; ``members`` everywhere else.
     audience: CommentAudience = CommentAudience.members
+
+
+class ToolCommentSettings(SanitizedBaseModel):
+    """The comment switch on one tool entity — the body and the reply of the
+    generic ``PUT /tools/{tool}/{tool_id}/comments`` route."""
+
+    model_config = ConfigDict(
+        from_attributes=True, json_schema_serialization_defaults_required=True
+    )
+
+    comments_enabled: bool
 
 
 class CommentUpdate(CommentBase):

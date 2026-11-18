@@ -127,9 +127,9 @@ async def test_posting_a_comment_needs_the_write_scope(
     in_a, _in_b = await _open_files(session, installed)
 
     posted = await client.post(
-        guild_url(installed.guild.id, thread_path("file", in_a.id)),
+        guild_url(installed.guild.id, "/comments/"),
         headers=install_headers(installed, scopes),
-        json={"content": "Hello"},
+        json={"subject_type": "file", "subject_id": in_a.id, "content": "Hello"},
     )
     assert posted.status_code == 403, posted.text
     assert posted.json()["detail"] == PluginMessages.SCOPE_REQUIRED
@@ -153,9 +153,11 @@ async def test_posts_as_itself_and_the_notices_name_the_plugin(
     guild_id = installed.guild.id
 
     posted = await client.post(
-        guild_url(guild_id, thread_path("file", in_a.id)),
+        guild_url(guild_id, "/comments/"),
         headers=headers,
         json={
+            "subject_type": "file",
+            "subject_id": in_a.id,
             "content": "An answer",
             "parent_comment_id": theirs.id,
         },
@@ -193,9 +195,9 @@ async def test_posts_as_itself_and_the_notices_name_the_plugin(
     ]
 
     elsewhere = await client.post(
-        guild_url(guild_id, thread_path("file", in_b.id)),
+        guild_url(guild_id, "/comments/"),
         headers=headers,
-        json={"content": "Not here"},
+        json={"subject_type": "file", "subject_id": in_b.id, "content": "Not here"},
     )
     assert elsewhere.status_code == 404, elsewhere.text
 

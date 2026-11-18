@@ -55,11 +55,9 @@ def guild_url(guild_id: int, path: str = "/") -> str:
 
 
 def thread_path(kind: str, subject_id: int) -> str:
-    """The guild-relative path of the thread on one subject:
-    ``thread_path("task", 4)`` → ``/tasks/4/comments``."""
-    from app.api.v1.tenant_endpoints.comments import subject_segment
-
-    return f"/{subject_segment(kind)}/{subject_id}/comments"
+    """The guild-relative path that reads the thread on one subject:
+    ``thread_path("task", 4)`` → ``/comments/?subject_type=task&subject_id=4``."""
+    return f"/comments/?subject_type={kind}&subject_id={subject_id}"
 
 
 @dataclass

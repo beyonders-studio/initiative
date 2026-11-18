@@ -182,8 +182,10 @@ async def test_a_tombstone_is_not_edited_reacted_to_or_deleted(client, session, 
 
     # Replying under it is still fine: the conversation goes on.
     replied = await client.post(
-        member.g(thread_path("task", scene["task"].id)),
+        member.g("/comments/"),
         json={
+            "subject_type": "task",
+            "subject_id": scene["task"].id,
             "content": "Fair enough",
             "parent_comment_id": comment.id,
         },
@@ -345,11 +347,11 @@ async def test_a_locked_thread_reads_and_nobody_adds_to_it(client, session, scen
     assert page["locked"] is True and page["can_moderate"] is False
     assert len(page["comments"]) == 1
 
-    body = {"content": "One more thing"}
+    body = {"content": "One more thing", "subject_type": "task", "subject_id": task_id}
     # Nobody, the moderators included: reopening it is how anyone adds to it.
     for actor in (scene["member"], scene["mod"]):
         refused = await client.post(
-            actor.g(thread_path("task", task_id)), json=body, headers=actor.headers
+            actor.g("/comments/"), json=body, headers=actor.headers
         )
         assert refused.status_code == 403
         assert refused.json()["detail"] == CommentMessages.LOCKED
@@ -357,7 +359,7 @@ async def test_a_locked_thread_reads_and_nobody_adds_to_it(client, session, scen
     unlocked = await _act(client, scene["mod"], "unlock_comments", "task", task_id)
     assert unlocked.status_code == 201, unlocked.text
     reopened = await client.post(
-        scene["member"].g(thread_path("task", task_id)),
+        scene["member"].g("/comments/"),
         json=body,
         headers=scene["member"].headers,
     )
@@ -375,8 +377,12 @@ async def test_a_locked_thread_keeps_its_comments_as_they_were(client, session, 
     taking one's own comment back is still a delete."""
     task_id = scene["task"].id
     said = await client.post(
-        scene["mod"].g(thread_path("task", task_id)),
-        json={"content": "Please keep it civil."},
+        scene["mod"].g("/comments/"),
+        json={
+            "subject_type": "task",
+            "subject_id": task_id,
+            "content": "Please keep it civil.",
+        },
         headers=scene["mod"].headers,
     )
     assert said.status_code == 201, said.text

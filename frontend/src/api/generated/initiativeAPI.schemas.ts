@@ -2338,7 +2338,6 @@ export interface CalendarRead {
 }
 
 export interface CalendarUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
   color?: string | null;
@@ -3060,15 +3059,6 @@ export const CommentAudience = {
   filer: "filer",
 } as const;
 
-/**
- * A comment, posted on the subject its route names.
- */
-export interface CommentCreate {
-  content: string;
-  parent_comment_id?: number | null;
-  audience?: CommentAudience;
-}
-
 export type CommentSubject = (typeof CommentSubject)[keyof typeof CommentSubject];
 
 export const CommentSubject = {
@@ -3084,6 +3074,18 @@ export const CommentSubject = {
   wiki: "wiki",
   contact: "contact",
 } as const;
+
+/**
+ * A comment, and what it is said on.
+ */
+export interface CommentCreate {
+  content: string;
+  subject_type: CommentSubject;
+  /** @exclusiveMinimum 0 */
+  subject_id: number;
+  parent_comment_id?: number | null;
+  audience?: CommentAudience;
+}
 
 /**
  * Who took a comment out of the conversation.
@@ -5040,7 +5042,6 @@ export interface ContactRead {
  * replaces the one there.
  */
 export interface ContactUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   is_organization?: boolean | null;
   emails?: ContactEmail[] | null;
@@ -5353,7 +5354,6 @@ export interface CounterGroupRead {
 }
 
 export interface CounterGroupUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
 }
@@ -5736,7 +5736,6 @@ export type DashboardUpdateDefinition = { [key: string]: unknown } | null;
 export type DashboardUpdateConfig = { [key: string]: unknown } | null;
 
 export interface DashboardUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
   definition?: DashboardUpdateDefinition;
@@ -7027,7 +7026,6 @@ export interface FileRead {
 export type FileUpdateContent = { [key: string]: unknown } | null;
 
 export interface FileUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   content?: FileUpdateContent;
   content_version?: string | null;
@@ -10596,7 +10594,6 @@ export interface PostReaders {
 export type PostUpdateBody = { [key: string]: unknown } | null;
 
 export interface PostUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   body?: PostUpdateBody;
   scheduled_for?: string | null;
@@ -10652,7 +10649,6 @@ export interface ProjectReorderRequest {
 }
 
 export interface ProjectUpdate {
-  comments_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
   icon?: string | null;
@@ -12299,6 +12295,14 @@ export interface Token {
   refresh_token?: string | null;
 }
 
+/**
+ * The comment switch on one tool entity — the body and the reply of the
+ * generic ``PUT /tools/{tool}/{tool_id}/comments`` route.
+ */
+export interface ToolCommentSettings {
+  comments_enabled: boolean;
+}
+
 export type ToolCountsByInitiativeResponseCounts = Partial<Record<Tool, { [key: string]: number }>>;
 
 /**
@@ -13113,7 +13117,6 @@ export interface WikiRead {
 }
 
 export interface WikiUpdate {
-  comments_enabled?: boolean | null;
   page_order?: WikiPageOrder | null;
   contents_depth?: number | null;
   show_connections?: boolean | null;
@@ -14135,6 +14138,18 @@ export type ListHoldsParams = {
   open_only?: boolean;
 };
 
+export type ListCommentsParams = {
+  subject_type: CommentSubject;
+  /** @exclusiveMinimum 0 */
+  subject_id: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  cursor?: string | null;
+};
+
 export type RecentCommentsParams = {
   /**
    * @minimum 1
@@ -14146,105 +14161,6 @@ export type RecentCommentsParams = {
 export type ReadCommentParams = {
   /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
-};
-
-export type ListTaskCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListWikiPageCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListCollectionCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListProjectCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListFileCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListCounterGroupCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListCalendarCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListDashboardCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListPostCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListWikiCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
-};
-
-export type ListContactCommentsParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  cursor?: string | null;
 };
 
 export type ReadActivityParams = {

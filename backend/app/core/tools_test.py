@@ -168,15 +168,14 @@ def test_an_initiative_starts_with_projects_and_files_on():
 def test_every_tool_is_commentable():
     # Comments span EVERY tool plus the content-level extras: the service
     # registry, the RLS subject declaration, the CHECK on ``subject_type`` and
-    # the thread routes all agree. A new tool that forgets its CommentTarget —
-    # or an extra that forgets its entry — fails here.
+    # the routes' ``CommentSubject`` all agree. A new tool that forgets its
+    # CommentTarget — or an extra that forgets its entry — fails here.
     from sqlalchemy import inspect as sa_inspect
 
-    from app.api.v1.tenant_endpoints.comments import subject_segment
     from app.core.tools import CHILD_KINDS, COMMENT_TARGETS, KINDS
     from app.db.initiative_rls import COMMENT_PARENTS
-    from app.main import app
     from app.models.tenant.comment import Comment
+    from app.schemas.tenant.comment import CommentSubject
     from app.services.tenant.comments import (
         EXTRA_COMMENT_TARGETS,
         TOOL_COMMENT_TARGETS,
@@ -194,16 +193,8 @@ def test_every_tool_is_commentable():
     ]
     assert all(f"'{target}'" in str(check.sqltext) for target in COMMENT_TARGETS)
 
-    # Every kind's thread is served at the kind's own path, read and posted.
-    routes = {
-        (method, getattr(route, "path", ""))
-        for route in iter_route_contexts(app.routes)
-        for method in getattr(route, "methods", ())
-    }
-    for target in COMMENT_TARGETS:
-        path = f"/{subject_segment(target)}/{{{target}_id}}/comments"
-        assert any(m == "GET" and p.endswith(path) for m, p in routes), target
-        assert any(m == "POST" and p.endswith(path) for m, p in routes), target
+    # Every kind is one the comment routes take.
+    assert {s.value for s in CommentSubject} == set(COMMENT_TARGETS)
 
     # Every extra names a tool to answer for it, and a real column to reach it
     # by — that is what makes a thread on something that is not a tool gated
@@ -255,11 +246,10 @@ def test_every_tool_records_where_it_came_from():
 
 
 def test_every_tool_carries_the_comment_switch():
-    import re
-
     # Every tool can turn its own thread off: the column on the content table
-    # and the field on its update are spelled the same on all of them. A new
-    # tool that forgets the mixin — or an update that never takes the switch —
+    # and the flag on the read schema are spelled the same on all six, and the
+    # generic route that sets it takes the Tool enum as its path param. A new
+    # tool that forgets the mixin — or a read schema that never exposes it —
     # fails here.
     from sqlalchemy import inspect as sa_inspect
 
@@ -272,21 +262,8 @@ def test_every_tool_carries_the_comment_switch():
         columns = {c.name for c in sa_inspect(target.model).persist_selectable.columns}
         assert "comments_enabled" in columns, tool
 
-    schema = app.openapi()
-    for tool in Tool:
-        pattern = re.compile(
-            r"^/api/v1/c/\{community_id\}/"
-            + re.escape(tool.route_segment)
-            + r"/\{\w+\}$"
-        )
-        [patch] = [
-            ops["patch"]
-            for path, ops in schema["paths"].items()
-            if pattern.match(path) and "patch" in ops
-        ]
-        body = patch["requestBody"]["content"]["application/json"]["schema"]["$ref"]
-        update = schema["components"]["schemas"][body.rsplit("/", 1)[-1]]
-        assert "comments_enabled" in update["properties"], tool
+    routes = {getattr(route, "path", "") for route in iter_route_contexts(app.routes)}
+    assert any(path.endswith("/tools/{tool}/{tool_id}/comments") for path in routes)
 
 
 def test_every_tool_read_schema_reports_the_comment_switch():

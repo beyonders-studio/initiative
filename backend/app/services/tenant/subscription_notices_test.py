@@ -24,7 +24,6 @@ from app.testing import (
     create_resource_grant,
     create_task,
     drain_notices,
-    thread_path,
 )
 
 SUBSCRIBED = NotificationType.subscription_activity
@@ -108,7 +107,9 @@ async def test_subscribers_hear_of_what_others_change(
     # A comment joins the line it is told on: the assignee's one line for the
     # task, beside its changes.
     commented = await client.post(
-        a.g(thread_path("task", task_id)), headers=a.headers, json={"content": "Ok"}
+        a.g("/comments/"),
+        headers=a.headers,
+        json={"subject_type": "task", "subject_id": task_id, "content": "Ok"},
     )
     assert commented.status_code == 201, commented.text
     await drain_notices()

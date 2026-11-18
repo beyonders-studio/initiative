@@ -22,7 +22,7 @@ from app.schemas.tenant.property import (
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.tag import TagSummary, annotated_tags
-from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate, from_row
+from app.schemas.tenant.tool import ToolSummaryBase, from_row
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -66,7 +66,7 @@ class WikiSettings(SanitizedBaseModel):
     template_page_id: int | None = None
 
 
-class WikiUpdate(WikiSettings, ToolUpdate):
+class WikiUpdate(WikiSettings):
     name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
     description: MentionStr | None = Field(default=None, max_length=2000)
     #: The page the wiki opens on. ``null`` clears the choice and it opens on
