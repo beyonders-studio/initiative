@@ -70,8 +70,11 @@ export function ListView({
 
       while (cursor <= last) {
         if (cursor >= monthStart && cursor <= monthEnd) {
+          // A later day is "All day" when the event runs to that day's end,
+          // midnight included, and says when it stops otherwise.
+          const runsToDayEnd = end >= startOfDay(addDays(cursor, 1));
           const when =
-            entry.allDay || (cursor > firstDay && cursor < lastDay)
+            entry.allDay || (cursor > firstDay && runsToDayEnd)
               ? "allDay"
               : cursor > firstDay
                 ? "until"

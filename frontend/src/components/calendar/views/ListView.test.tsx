@@ -72,4 +72,22 @@ describe("the calendar's list", () => {
     expect(await screen.findAllByRole("button")).toHaveLength(1);
     expect(screen.queryByText(/^Until /)).toBeNull();
   });
+
+  it("calls a day the event runs to its midnight 'All day'", async () => {
+    const weekend: CalendarEntry = {
+      id: "event-4",
+      title: "Weekend retreat",
+      startAt: "2026-10-23T18:00:00",
+      endAt: "2026-10-25T00:00:00",
+      allDay: false,
+      meta: { type: "event", eventId: 4 },
+    };
+    renderWithProviders(
+      <ListView entries={[weekend]} focusDate={new Date("2026-10-15T12:00:00")} />
+    );
+
+    expect(await screen.findAllByRole("button")).toHaveLength(2);
+    expect(screen.getByText("All day")).toBeInTheDocument();
+    expect(screen.queryByText(/^Until /)).toBeNull();
+  });
 });
