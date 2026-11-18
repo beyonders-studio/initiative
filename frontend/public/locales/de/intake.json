@@ -1,30 +1,27 @@
 {
   "ownerOnly": "Nur Plattform-Inhaber können festlegen, wo Betriebsvorgänge landen.",
   "contacts": {
-    "title": "Ansprechpartner",
-    "description": "Die Adresse, die ein Hinweis nennt, wenn er jemanden bittet, sich zu melden – zum Beispiel jemanden, dessen Konto oder Community gesperrt ist. Eine Art von Arbeit ohne eigene Adresse nutzt den allgemeinen Kontakt; ist keiner gesetzt, verweist der Hinweis auf die Betreiber dieses Servers.",
     "generalLabel": "Allgemeiner Kontakt",
     "generalPlaceholder": "name@example.com",
     "streamPlaceholder": "Nutzt den allgemeinen Kontakt",
     "save": "Kontakte speichern",
     "saving": "Wird gespeichert…",
     "saved": "Kontakte gespeichert.",
-    "saveError": "Die Kontakte konnten nicht gespeichert werden."
+    "saveError": "Die Kontakte konnten nicht gespeichert werden.",
+    "generalHelp": "Für jede Art von Fall ohne eigenen Kontakt. Ist keiner gesetzt, verweist eine Benachrichtigung an die Betreiber dieses Servers."
   },
   "community": {
     "title": "Betriebs-Community",
-    "description": "Die Community, die Sicherheits-, Moderations-, Support- und Feedback-Vorgänge dieser Installation erhält.",
+    "description": "Wo Sicherheits-, Moderations-, Support- und Feedback-Fälle landen, in Projekten, die du unten auswählst.",
     "label": "Community",
     "placeholder": "Community auswählen",
     "none": "Keine — nichts weiterleiten",
-    "helpText": "In jeder Hinsicht eine gewöhnliche Community. In welchem Projekt ein Kanal landet, wird unten darin festgelegt.",
     "saveError": "Die Betriebs-Community konnte nicht gespeichert werden.",
     "clearTitle": "Weiterleitung von Betriebsvorgängen beenden?",
     "clearBody": "Alle Kanäle hören auf zu empfangen. Die Projekte und alles darin bleiben unverändert, und wenn du diese Community erneut auswählst, ist alles wieder eingerichtet.",
     "clearConfirm": "Weiterleitung beenden"
   },
   "streams": {
-    "chooseCommunityFirst": "Wähle oben eine Community und lege dann fest, wo jeder Kanal landet.",
     "security": {
       "title": "Sicherheit",
       "description": "Vorgänge aus Regeln, die diese Installation überwachen."
@@ -48,8 +45,6 @@
   },
   "stream": {
     "notSetUp": "Nicht eingerichtet",
-    "receiving": "Empfängt",
-    "paused": "Pausiert",
     "setUpHelp": "Beim Einrichten erhältst du ein fertiges Projekt mit eigenen Status und Feldern, das du danach beliebig umbauen kannst. Oder richte den Kanal auf ein Projekt, das du schon hast.",
     "initiativeLabel": "Initiative",
     "initiativePlaceholder": "Initiative auswählen",
@@ -64,7 +59,6 @@
     "caseTypeDefault": "Standardtyp des Projekts",
     "ideaTypeLabel": "Der Typ, der eine Aufgabe auf die Seite „Vorschläge“ bringt",
     "ideaTypeNone": "Keiner: Es wird nichts veröffentlicht",
-    "enabledLabel": "Empfängt neue Vorgänge",
     "lastCase": "Letzter Vorgang {{when}} geöffnet.",
     "noCasesYet": "Noch keine Vorgänge.",
     "unbind": "Diesen Kanal nicht mehr weiterleiten",
@@ -83,7 +77,12 @@
     "statusRolesHelp": "Ein Fall im ersten Status zeigt der anfragenden Person „Wartet auf dich“. Sobald sie antwortet, wechselt er in den zweiten.",
     "noAwaitingHelp": "Ohne gewählten Status sehen anfragende Personen Eingegangen, In Bearbeitung und Geschlossen, aber nie „Wartet auf dich“.",
     "sharesIsolated": "Ein anderer Kanal landet ebenfalls in dieser Initiative. Sicherheits- und Moderationsfälle sollten eine eigene Initiative haben, damit nur die Bearbeitenden sie lesen können.",
-    "sharesWithIsolated": "Diese Initiative enthält auch Sicherheits- oder Moderationsfälle, die eine eigene Initiative haben sollten. Leite einen der Kanäle woandershin."
+    "sharesWithIsolated": "Diese Initiative enthält auch Sicherheits- oder Moderationsfälle, die eine eigene Initiative haben sollten. Leite einen der Kanäle woandershin.",
+    "contactLabel": "Kontakt",
+    "contactHelp": "Die Adresse, die eine Benachrichtigung nennt, wenn sie jemanden bittet, sich wegen dieser Art von Fall zu melden. Leer gelassen gilt der allgemeine Kontakt.",
+    "save": "Speichern",
+    "saving": "Wird gespeichert…",
+    "saved": "Gespeichert."
   },
   "help": {
     "action": "Hilfe anfordern",
@@ -332,7 +331,7 @@
     "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
   },
   "feedbackSwitch": {
-    "title": "Feedback",
+    "title": "Feedback an das Initiative-Team",
     "description": "Ideen, Probleme und Lob gehen an das Team, das Initiative macht. Ausgeschaltet sieht hier niemand „Feedback senden“, und nichts wird gesendet.",
     "label": "Feedback an das Initiative-Team erlauben",
     "error": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
@@ -425,5 +424,17 @@
       "card": "Karte",
       "text": "Text"
     }
+  },
+  "rows": {
+    "landsIn": "Landet in",
+    "contact": "Kontakt",
+    "usesGeneral": "Allgemeiner Kontakt",
+    "chooseCommunity": "Wähle eine Community, um Fälle weiterzuleiten. Kontakte funktionieren auch ohne.",
+    "sharesInitiative": "Teilt seine Initiative mit einer anderen Art von Fall",
+    "receivingLabel": "Neue Fälle für {{stream}} annehmen",
+    "edit": "Bearbeiten",
+    "setUp": "Einrichten",
+    "editLabel": "{{stream}} bearbeiten",
+    "setUpLabel": "{{stream}} einrichten"
   }
 }

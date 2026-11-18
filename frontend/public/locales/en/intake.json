@@ -1,30 +1,27 @@
 {
   "ownerOnly": "Only platform owners can configure where operations work lands.",
   "contacts": {
-    "title": "Who to contact",
-    "description": "The address a notice gives when it tells somebody to get in touch — for example, somebody whose account or community is suspended. A kind of work left blank uses the general contact; with neither set, the notice says to contact whoever runs this server.",
     "generalLabel": "General contact",
     "generalPlaceholder": "name@example.com",
     "streamPlaceholder": "Uses the general contact",
     "save": "Save contacts",
     "saving": "Saving…",
     "saved": "Contacts saved.",
-    "saveError": "Could not save the contacts."
+    "saveError": "Could not save the contacts.",
+    "generalHelp": "For any kind of case without its own contact. With none set, a notice says to contact whoever runs this server."
   },
   "community": {
     "title": "Operations community",
-    "description": "The community that receives this deployment's security, moderation, support and feedback work.",
+    "description": "Where security, moderation, support and feedback cases land, in projects you pick below.",
     "label": "Community",
     "placeholder": "Choose a community",
     "none": "None — route nothing",
-    "helpText": "An ordinary community in every respect. Which project each stream lands in is set below, inside it.",
     "saveError": "Could not save the operations community.",
     "clearTitle": "Stop routing operations work?",
     "clearBody": "Every stream stops receiving. The projects and everything in them stay exactly as they are, and choosing this community again restores what was set up.",
     "clearConfirm": "Stop routing"
   },
   "streams": {
-    "chooseCommunityFirst": "Choose a community above, then say where each stream lands.",
     "security": {
       "title": "Security",
       "description": "Cases raised by rules watching this deployment."
@@ -48,8 +45,6 @@
   },
   "stream": {
     "notSetUp": "Not set up",
-    "receiving": "Receiving",
-    "paused": "Paused",
     "setUpHelp": "Set this up and you get a ready-made project with its own statuses and fields, which you can restructure however you like afterwards. Or point the stream at a project you already have.",
     "initiativeLabel": "Initiative",
     "initiativePlaceholder": "Choose an initiative",
@@ -64,7 +59,6 @@
     "caseTypeDefault": "The project's default type",
     "ideaTypeLabel": "The type that puts a task on the Suggestions page",
     "ideaTypeNone": "Not chosen: nothing is published",
-    "enabledLabel": "Receiving new cases",
     "lastCase": "Last case opened {{when}}.",
     "noCasesYet": "No cases yet.",
     "unbind": "Stop routing this stream",
@@ -83,7 +77,12 @@
     "statusRolesHelp": "A case in the first status shows its requester “Waiting on you”. When they answer, it moves to the second.",
     "noAwaitingHelp": "With no status picked, requesters see Received, In progress and Closed, never “Waiting on you”.",
     "sharesIsolated": "Another stream lands in this initiative too. Security and moderation cases should have an initiative of their own, so only the people working them can read them.",
-    "sharesWithIsolated": "This initiative also holds security or moderation cases, which should have an initiative of their own. Point one of them somewhere else."
+    "sharesWithIsolated": "This initiative also holds security or moderation cases, which should have an initiative of their own. Point one of them somewhere else.",
+    "contactLabel": "Contact",
+    "contactHelp": "The address a notice gives when it tells somebody to get in touch about this kind of case. Left blank, it uses the general contact.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved."
   },
   "help": {
     "action": "Ask for help",
@@ -332,7 +331,7 @@
     "error": "Could not send that. Try again in a moment."
   },
   "feedbackSwitch": {
-    "title": "Feedback",
+    "title": "Feedback to the Initiative team",
     "description": "Ideas, problems and compliments go to the team that makes Initiative. Off, nobody here is offered Send feedback and nothing is sent.",
     "label": "Let people send feedback to the Initiative team",
     "error": "Could not change that. Try again in a moment."
@@ -425,5 +424,17 @@
       "card": "card",
       "text": "text"
     }
+  },
+  "rows": {
+    "landsIn": "Lands in",
+    "contact": "Contact",
+    "usesGeneral": "General contact",
+    "chooseCommunity": "Choose a community to route cases. Contacts work without one.",
+    "sharesInitiative": "Shares its initiative with another kind of case",
+    "receivingLabel": "Receive new {{stream}} cases",
+    "edit": "Edit",
+    "setUp": "Set up",
+    "editLabel": "Edit {{stream}}",
+    "setUpLabel": "Set up {{stream}}"
   }
 }
