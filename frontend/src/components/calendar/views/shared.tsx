@@ -69,6 +69,16 @@ export function parseEntry(entry: CalendarEntry): { start: Date; end: Date } {
   return { start: parseISO(entry.startAt), end: parseISO(entry.endAt) };
 }
 
+/**
+ * The first moment of the last day an entry is on. A timed entry's end is the
+ * moment it stops, so one ending at midnight is not on the day that midnight
+ * begins; an all-day entry's end is a moment on its own last day.
+ */
+export function lastDayOf(entry: CalendarEntry, start: Date, end: Date): Date {
+  if (Number.isNaN(end.getTime()) || end <= start) return startOfDay(start);
+  return startOfDay(entry.allDay ? end : new Date(end.getTime() - 1));
+}
+
 /** i18n key for a task entry's start/due marker label. */
 export function kindLabelKey(kind: CalendarEntryKind): "calendar.start" | "calendar.due" {
   return kind === "start" ? "calendar.start" : "calendar.due";
@@ -125,7 +135,7 @@ function assignLanes<T extends { lane: number }>(
   return laneEnds.length;
 }
 
-/** Every entry, placed on each day it spans (start through end inclusive). */
+/** Every entry, placed on each day it is on (see `lastDayOf`). */
 export function buildEntriesByDate(
   entries: CalendarEntry[],
   visible: { start: Date; end: Date }
@@ -135,12 +145,11 @@ export function buildEntriesByDate(
     const { start, end } = parseEntry(entry);
     if (Number.isNaN(start.getTime())) continue;
 
-    const endDay = Number.isNaN(end.getTime()) ? start : end;
     const cursor = new Date(
       Math.max(startOfDay(start).getTime(), startOfDay(visible.start).getTime())
     );
     const last = new Date(
-      Math.min(startOfDay(endDay).getTime(), startOfDay(visible.end).getTime())
+      Math.min(lastDayOf(entry, start, end).getTime(), startOfDay(visible.end).getTime())
     );
     while (cursor <= last) {
       const key = dateKey(cursor);
@@ -189,7 +198,7 @@ export function computeSpanPlacements(
     const { start, end } = parseEntry(entry);
     if (Number.isNaN(start.getTime())) continue;
     const entryStart = startOfDay(start);
-    const entryEnd = startOfDay(Number.isNaN(end.getTime()) ? start : end);
+    const entryEnd = lastDayOf(entry, start, end);
 
     if (entryEnd <= entryStart) {
       // Single-day entry — collect for per-cell rendering

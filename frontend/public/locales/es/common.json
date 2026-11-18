@@ -75,6 +75,7 @@
     "viewMode": "Modo de vista",
     "noEntries": "Sin eventos",
     "allDay": "Todo el día",
+    "until": "Hasta {{time}}",
     "more": "+{{count}} más",
     "start": "Inicio",
     "due": "Vence"

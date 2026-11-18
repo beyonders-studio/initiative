@@ -75,6 +75,7 @@
     "viewMode": "Mode d'affichage",
     "noEntries": "Aucun événement",
     "allDay": "Toute la journée",
+    "until": "Jusqu’à {{time}}",
     "more": "+{{count}} de plus",
     "start": "Début",
     "due": "Échéance"

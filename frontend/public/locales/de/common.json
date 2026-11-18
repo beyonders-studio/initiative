@@ -76,6 +76,7 @@
     "viewMode": "Ansichtsmodus",
     "noEntries": "Keine Termine",
     "allDay": "Ganztägig",
+    "until": "Bis {{time}}",
     "more": "+{{count}} weitere",
     "start": "Start",
     "due": "Fällig"
