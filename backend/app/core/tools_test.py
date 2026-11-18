@@ -58,6 +58,55 @@ def test_every_tool_has_one_record():
         assert kind.parent is not None or not (kind.commentable or kind.archivable)
 
 
+#: Every code ever given out, by the kind it was given to. A stored node id keeps
+#: the code it was written with, so none of these may move or be handed to
+#: another kind, even once its kind is gone. A new kind adds its line here.
+_ASSIGNED_CODES = {
+    "calendar": 1,
+    "calendar_event": 2,
+    "counter": 3,
+    "counter_group": 4,
+    "dashboard": 5,
+    "file": 6,
+    "post": 9,
+    "project": 10,
+    "tag": 13,
+    "task": 14,
+    "wiki": 15,
+    "wiki_page": 16,
+    "collection": 17,
+    "user": 18,
+    "contact": 19,
+}
+
+#: Codes whose kinds were removed: 7 and 8 the libraries', 11 and 12 the queues'.
+_RETIRED_CODES = frozenset({7, 8, 11, 12})
+
+
+def test_no_kind_code_ever_moves_or_is_reused():
+    """A kind keeps the code it was first given, and a code once given out, to
+    a kind that still exists or one that is gone, is never given to another.
+    Boot writes the database's codes from ``KINDS``, so only this ledger holds
+    the codes rows were already written with."""
+    from app.core.relationships import PERSON
+    from app.core.tools import KINDS
+
+    ledger = list(_ASSIGNED_CODES.values())
+    assert len(ledger) == len(set(ledger))
+    assert not _RETIRED_CODES & set(ledger)
+
+    current = {kind.value: kind.code for kind in (*KINDS.values(), PERSON)}
+    for name in current:
+        assert name in _ASSIGNED_CODES, f"record {name}'s code in _ASSIGNED_CODES"
+    in_use = set(current.values())
+    for name, code in _ASSIGNED_CODES.items():
+        if name in current:
+            assert current[name] == code, f"{name} moved from code {code}"
+        else:
+            assert code not in in_use, f"{name}'s code {code} was reused"
+    assert not _RETIRED_CODES & in_use
+
+
 def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
     """Codes are the high bits of every stored node id.
 
