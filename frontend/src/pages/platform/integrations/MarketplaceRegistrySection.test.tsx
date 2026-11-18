@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,6 +42,7 @@ const skip = (overrides: Partial<RegistrySkippedListing>): RegistrySkippedListin
 // Flipped per test before rendering; read lazily inside the mocked hooks.
 let status: RegistryStatusRead = buildStatus();
 let refreshResult: RegistryRefreshRead;
+const uploadMutate = vi.fn();
 
 vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
@@ -53,7 +54,7 @@ vi.mock("@/api/generated/marketplace/marketplace", () => ({
 
 vi.mock("@/hooks/useMarketplaceRegistry", () => ({
   useUpdateRegistrySettings: () => ({ mutate: vi.fn(), isPending: false }),
-  useUploadRegistryBundle: () => ({ mutate: vi.fn(), isPending: false }),
+  useUploadRegistryBundle: () => ({ mutate: uploadMutate, isPending: false }),
   useRefreshRegistry: (options?: { onSuccess?: (result: RegistryRefreshRead) => void }) => ({
     mutate: () => options?.onSuccess?.(refreshResult),
     isPending: false,
@@ -79,6 +80,35 @@ describe("MarketplaceRegistrySection", () => {
   beforeEach(() => {
     status = buildStatus();
     vi.mocked(toast.warning).mockReset();
+    uploadMutate.mockReset();
+  });
+
+  it("keeps a server getting updates to one row, with Refresh now beside the switch", () => {
+    render();
+
+    expect(screen.getByText("Plug-in registry")).toBeInTheDocument();
+    expect(screen.getByText(/3 listings/)).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Get updates from the registry" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Refresh now" })).toBeInTheDocument();
+    // Nothing to upload while the registry itself is followed, and no address.
+    expect(screen.queryByText(/registry bundle/)).toBeNull();
+    expect(screen.queryByText(/packages\.example\.com/)).toBeNull();
+  });
+
+  it("offers a bundle in place of Refresh once updates are off, and applies it on drop", () => {
+    status = buildStatus({ enabled: false, last_source: "bundle" });
+    render();
+
+    expect(screen.queryByRole("button", { name: "Refresh now" })).toBeNull();
+    expect(screen.getByText(/To update a server without internet access/)).toBeInTheDocument();
+    expect(screen.getByText(/from a bundle · 3 listings/)).toBeInTheDocument();
+
+    // Dropped, it applies at once: there is no second button to press.
+    const bundle = new File(["x"], "registry.tar.gz", { type: "application/gzip" });
+    const area = screen.getByText("Drop a registry bundle (.tar.gz)").parentElement as HTMLElement;
+    fireEvent.drop(area, { dataTransfer: { types: ["Files"], files: [bundle] } });
+    expect(uploadMutate).toHaveBeenCalledWith(bundle);
+    expect(screen.queryByRole("button", { name: "Upload bundle" })).toBeNull();
   });
 
   it("names one skipped listing in the toast, with why", async () => {
