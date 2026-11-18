@@ -86,10 +86,7 @@ export const StreamDialog = ({
           <DialogTitle>{t(`streams.${stream}.title`)}</DialogTitle>
           <DialogDescription>{t(`streams.${stream}.description`)}</DialogDescription>
         </DialogHeader>
-        {/* Remounted once the stream lands somewhere new, so the form starts
-            from what that project offers. */}
-        <StreamForm
-          key={binding.project_id ?? NONE}
+        <StreamBody
           binding={binding}
           contact={contact}
           routable={routable}
@@ -101,13 +98,37 @@ export const StreamDialog = ({
   );
 };
 
+type StreamBodyProps = Omit<StreamDialogProps, "open" | "onOpenChange"> & {
+  onDone: () => void;
+};
+
+/**
+ * The contact being typed, held above the routing form: setting the stream up
+ * remounts the form on its new project, and what was typed here stays.
+ */
+const StreamBody = (props: StreamBodyProps) => {
+  const [email, setEmail] = useState(props.contact);
+  return (
+    // Remounted once the stream lands somewhere new, so the form starts from
+    // what that project offers.
+    <StreamForm
+      key={props.binding.project_id ?? NONE}
+      {...props}
+      email={email}
+      onEmailChange={setEmail}
+    />
+  );
+};
+
 const StreamForm = ({
   binding,
   contact,
   routable,
   initiatives,
   onDone,
-}: Omit<StreamDialogProps, "open" | "onOpenChange"> & { onDone: () => void }) => {
+  email,
+  onEmailChange: setEmail,
+}: StreamBodyProps & { email: string; onEmailChange: (email: string) => void }) => {
   const { t } = useTranslation("intake");
   const stream = binding.stream as IntakeStream;
   const ideas = stream === "ideas";
@@ -116,7 +137,6 @@ const StreamForm = ({
 
   const [initiativeId, setInitiativeId] = useState("");
   const [unbinding, setUnbinding] = useState(false);
-  const [email, setEmail] = useState(contact);
   const [projectId, setProjectId] = useState(binding.project_id);
   const [defaultStatusId, setDefaultStatusId] = useState(binding.default_status_id ?? null);
   const [taskTypeId, setTaskTypeId] = useState(binding.task_type_id ?? null);
@@ -166,6 +186,9 @@ const StreamForm = ({
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    // Nothing is sent over work still running, a Stop routing above all:
+    // a binding written after it would route the stream again.
+    if (busy) return;
     if (contactChanged) {
       try {
         await updateContact.mutateAsync({ stream, body: { email: email.trim() || null } });
@@ -410,7 +433,7 @@ const StreamForm = ({
         submitLabel={t("stream.save")}
         pendingLabel={t("stream.saving")}
         pending={updateContact.isPending || upsert.isPending}
-        disabled={!contactChanged && !routingChanged}
+        disabled={busy || (!contactChanged && !routingChanged)}
       />
 
       <ConfirmDialog

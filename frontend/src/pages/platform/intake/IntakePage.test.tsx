@@ -27,6 +27,7 @@ const state = vi.hoisted(() => ({
   optionsError: false,
   isFetching: false,
   generalContact: null as string | null,
+  deletePending: false,
   contactEmails: {} as Record<string, string>,
 }));
 
@@ -96,7 +97,7 @@ vi.mock("@/hooks/useIntakeSettings", () => ({
     isPending: false,
   }),
   useImportIntakeBlueprint: () => ({ mutate: importMutate, isPending: false }),
-  useDeleteIntakeBinding: () => ({ mutate: deleteMutate, isPending: false }),
+  useDeleteIntakeBinding: () => ({ mutate: deleteMutate, isPending: state.deletePending }),
   useUpdateIntakeGeneralContact: () => ({ mutateAsync: generalContactMutate, isPending: false }),
   useUpdateIntakeStreamContact: () => ({ mutateAsync: streamContactMutate, isPending: false }),
   useUpdateFeedbackSwitch: () => ({ mutate: vi.fn(), isPending: false }),
@@ -126,6 +127,7 @@ describe("IntakePage", () => {
     state.isError = false;
     state.optionsError = false;
     state.isFetching = false;
+    state.deletePending = false;
   });
 
   const boundSecurity = (overrides: Record<string, unknown> = {}) => [
@@ -219,6 +221,44 @@ describe("IntakePage", () => {
       stream: "security",
       body: expect.objectContaining({ project_id: 21, task_type_id: 42 }),
     });
+  });
+
+  it("sends nothing over a Stop routing still under way", async () => {
+    state.operationsCommunityId = 3;
+    state.bindings = boundSecurity();
+    const { rerender } = renderPage();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit Security" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("combobox", { name: "New cases are" }));
+    await user.click(await screen.findByRole("option", { name: "Bug" }));
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeEnabled();
+
+    // A binding written after the delete would route the stream again.
+    state.deletePending = true;
+    rerender(<IntakePage />);
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(upsertMutate).not.toHaveBeenCalled();
+  });
+
+  it("keeps a contact typed before the stream is set up", async () => {
+    state.operationsCommunityId = 3;
+    const { rerender } = renderPage();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Set up Security" }));
+    await user.type(
+      within(await screen.findByRole("dialog")).getByLabelText("Contact"),
+      "sec@example.com"
+    );
+
+    // Setting it up lands it on a project, which remounts the routing form.
+    state.bindings = boundSecurity();
+    rerender(<IntakePage />);
+    expect(within(screen.getByRole("dialog")).getByLabelText("Contact")).toHaveValue(
+      "sec@example.com"
+    );
   });
 
   it("tells a non-owner this is not theirs to configure", () => {
