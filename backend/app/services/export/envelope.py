@@ -10,8 +10,9 @@ reading that same model field by field, off the tool's row:
 * ``external_ref`` is the row's ``<kind>:<id>``, what a reference to it is
   pointed at across one import;
 * a column of the row's table is its value, as JSON holds it;
-* a list of envelopes the row holds as a relationship is its child rows, each
-  written the same way.
+* a list of envelopes the row holds as a relationship to one of its tool's
+  item tables (``ToolSpec.item_tables``) is its child rows, each written the
+  same way.
 
 Whatever else a model declares is either the tool's to say (``fields``: a
 value its row does not hold as it is, such as a wiki page's parent by slug) or
@@ -61,6 +62,8 @@ def record(model: type[BaseModel], row: Any, /, **fields: Any) -> dict[str, Any]
         raise ValueError(f"{model.__name__} has no fields {sorted(unknown)}")
     columns = {column.key for column in row.__table__.columns}
     relationships = inspect(type(row)).relationships
+    kind = KIND_BY_TABLE.get(row.__tablename__)
+    items = kind.tool.spec.item_tables if kind is not None else ()
     written: dict[str, Any] = {}
     for name, info in model.model_fields.items():
         if name in _EnvelopeBase.model_fields:
@@ -79,7 +82,11 @@ def record(model: type[BaseModel], row: Any, /, **fields: Any) -> dict[str, Any]
                 # The model's default stands in for a value the row has none of.
                 value = deepcopy(info.default)
             written[name] = _json(value)
-        elif name in relationships and (child := _child_model(info.annotation)):
+        elif (
+            name in relationships
+            and relationships[name].mapper.local_table.name in items
+            and (child := _child_model(info.annotation))
+        ):
             written[name] = [record(child, each) for each in getattr(row, name)]
     return written
 
