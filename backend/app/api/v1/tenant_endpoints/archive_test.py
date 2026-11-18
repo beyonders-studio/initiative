@@ -23,7 +23,7 @@ async def test_a_tool_that_could_not_be_archived_before_can_be_now(
     group = await create_counter_group(session, a.initiative, a.user)
 
     response = await client.post(
-        a.g(f"/archive/counter_group/{group.id}"), headers=a.headers
+        a.g(f"/counter-groups/{group.id}/archive"), headers=a.headers
     )
 
     assert response.status_code == 200
@@ -38,10 +38,10 @@ async def test_archiving_twice_answers_with_the_stamp_it_has(
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     file = await create_file(session, a.initiative, a.user)
 
-    first = await client.post(a.g(f"/archive/file/{file.id}"), headers=a.headers)
+    first = await client.post(a.g(f"/files/{file.id}/archive"), headers=a.headers)
     assert first.status_code == 200
 
-    again = await client.post(a.g(f"/archive/file/{file.id}"), headers=a.headers)
+    again = await client.post(a.g(f"/files/{file.id}/archive"), headers=a.headers)
     assert again.status_code == 200
     assert again.json()["archived_at"] == first.json()["archived_at"]
 
@@ -52,7 +52,7 @@ async def test_unarchiving_something_live_is_a_repeat_too(
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     file = await create_file(session, a.initiative, a.user)
 
-    response = await client.post(a.g(f"/unarchive/file/{file.id}"), headers=a.headers)
+    response = await client.post(a.g(f"/files/{file.id}/unarchive"), headers=a.headers)
 
     assert response.status_code == 200
     assert response.json()["archived_at"] is None
@@ -64,9 +64,9 @@ async def test_an_archived_tool_goes_back(
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
 
-    await client.post(a.g(f"/archive/counter_group/{group.id}"), headers=a.headers)
+    await client.post(a.g(f"/counter-groups/{group.id}/archive"), headers=a.headers)
     back = await client.post(
-        a.g(f"/unarchive/counter_group/{group.id}"), headers=a.headers
+        a.g(f"/counter-groups/{group.id}/unarchive"), headers=a.headers
     )
 
     assert back.status_code == 200
@@ -83,7 +83,7 @@ async def test_archiving_an_initiative_archives_what_is_inside_it(
     task = await create_task(session, a.project)
 
     response = await client.post(
-        a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers
+        a.g(f"/initiatives/{a.initiative.id}/archive"), headers=a.headers
     )
     assert response.status_code == 200
     stamp = response.json()["archived_at"]
@@ -107,10 +107,10 @@ async def test_unarchiving_leaves_what_was_archived_on_its_own(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     group = await create_counter_group(session, a.initiative, a.user)
 
-    await client.post(a.g(f"/archive/counter_group/{group.id}"), headers=a.headers)
-    await client.post(a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers)
+    await client.post(a.g(f"/counter-groups/{group.id}/archive"), headers=a.headers)
+    await client.post(a.g(f"/initiatives/{a.initiative.id}/archive"), headers=a.headers)
     await client.post(
-        a.g(f"/unarchive/initiative/{a.initiative.id}"), headers=a.headers
+        a.g(f"/initiatives/{a.initiative.id}/unarchive"), headers=a.headers
     )
 
     await session.refresh(a.initiative)
@@ -131,8 +131,8 @@ async def test_a_task_cannot_be_taken_out_from_under_an_archived_project(
     )
     task = await create_task(session, a.project)
 
-    await client.post(a.g(f"/archive/project/{a.project.id}"), headers=a.headers)
-    response = await client.post(a.g(f"/unarchive/task/{task.id}"), headers=a.headers)
+    await client.post(a.g(f"/projects/{a.project.id}/archive"), headers=a.headers)
+    response = await client.post(a.g(f"/tasks/{task.id}/unarchive"), headers=a.headers)
 
     assert response.status_code == 409
     assert response.json()["detail"] == "PARENT_IS_FROZEN"
@@ -141,7 +141,7 @@ async def test_a_task_cannot_be_taken_out_from_under_an_archived_project(
 
     # One that is not there is refused as a task, not as its project.
     missing = await client.post(
-        a.g(f"/unarchive/task/{task.id + 1000}"), headers=a.headers
+        a.g(f"/tasks/{task.id + 1000}/unarchive"), headers=a.headers
     )
     assert missing.status_code == 404
     assert missing.json() == KINDS["task"].not_found().body
@@ -157,9 +157,9 @@ async def test_the_project_going_back_takes_its_tasks_with_it(
     )
     task = await create_task(session, a.project)
 
-    await client.post(a.g(f"/archive/project/{a.project.id}"), headers=a.headers)
+    await client.post(a.g(f"/projects/{a.project.id}/archive"), headers=a.headers)
     back = await client.post(
-        a.g(f"/unarchive/project/{a.project.id}"), headers=a.headers
+        a.g(f"/projects/{a.project.id}/unarchive"), headers=a.headers
     )
 
     assert back.status_code == 200
@@ -196,7 +196,7 @@ async def test_archiving_a_projects_done_tasks_archives_each_as_archiving_it_wou
     assert first.archived_at == second.archived_at
     assert live.archived_at is None
 
-    back = await client.post(a.g(f"/unarchive/task/{first.id}"), headers=a.headers)
+    back = await client.post(a.g(f"/tasks/{first.id}/unarchive"), headers=a.headers)
     assert back.status_code == 200
     await session.refresh(first)
     await session.refresh(second)

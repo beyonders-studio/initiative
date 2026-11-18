@@ -5,8 +5,9 @@ can reach that point, and so can a task and an initiative itself, so the set of
 things this serves is derived (``ARCHIVE_TARGETS``) rather than listed — a new
 tool becomes archivable by joining the ``Tool`` enum.
 
-Which is why this is one polymorphic pair and not ten near-identical routes on
-ten routers, the same shape the trash can already uses for restore and purge.
+Which is why the pair is written once and mounted for every archivable kind at
+that kind's own path, ``POST /{kind}/{id}/archive`` and ``…/unarchive``, the
+same shape the trash can uses for restore and purge.
 
 What archiving *does* is one column, ``archived_at``, on the thing named and on
 everything inside it — see ``services.tenant.archive`` for the cascade. The
@@ -31,11 +32,12 @@ from app.api.deps import (
     GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    plugin_scope_by,
+    plugin_scope,
 )
+from app.api.resource_access import id_path, path_param_of
 from app.core.messages import GuildMessages, InitiativeMessages
 from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
-from app.core.tools import ARCHIVE_TARGETS, KINDS, Tool, plural_of
+from app.core.tools import ARCHIVE_TARGETS, KINDS, Tool, plural_of, route_segment_of
 from app.db.base import MODELS_BY_TABLE
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
@@ -63,9 +65,7 @@ _ARCHIVE_SCOPES: dict[str, str] = {
     for target in ARCHIVE_TARGETS
     if target != "initiative"
 }
-ArchiveWrite = Annotated[
-    ActorContext, Depends(plugin_scope_by("entity_type", _ARCHIVE_SCOPES))
-]
+CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
 #: Wire name -> the model it addresses. Derived from the mixin: the archivable
 #: models are the ones carrying ``ArchiveMixin``, and a target's table is its
@@ -171,17 +171,14 @@ async def _authorize(
     )
 
 
-@router.post("/archive/{entity_type}/{entity_id}", response_model=ArchiveResponse)
-async def archive_entity(
+async def _archive(
     entity_type: ArchivableType,
     entity_id: int,
-    session: ActorSessionDep,
-    current_user: ActorUserDep,
-    guild_context: ArchiveWrite,
+    session: AsyncSession,
+    current_user: User | None,
+    guild_context: ActorContext,
 ) -> ArchiveResponse:
-    """Mark a thing finished with, and everything inside it. Idempotent: an
-    already-archived row keeps the stamp it has, so the date means when it was
-    archived, not when it was last asked about."""
+    """Mark a thing finished with, and everything inside it."""
     row = await _load(session, entity_type.value, entity_id)
     await _authorize(session, entity_type.value, row, current_user, guild_context)
     # Read the stamp back from the service, not off the row: committing expires
@@ -194,17 +191,14 @@ async def archive_entity(
     )
 
 
-@router.post("/unarchive/{entity_type}/{entity_id}", response_model=ArchiveResponse)
-async def unarchive_entity(
+async def _unarchive(
     entity_type: ArchivableType,
     entity_id: int,
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: AsyncSession,
+    current_user: User,
+    guild_context: ActorContext,
 ) -> ArchiveResponse:
-    """Take it back out, and with it everything that archiving took. Anything
-    inside that was archived on its own occasion stays archived. Idempotent on a
-    live row."""
+    """Take it back out, and with it everything that archiving took."""
     row = await _load(session, entity_type.value, entity_id)
     await _authorize(session, entity_type.value, row, current_user, guild_context)
     was_archived = getattr(row, "archived_at", None) is not None
@@ -218,3 +212,80 @@ async def unarchive_entity(
     return ArchiveResponse(
         entity_type=entity_type, entity_id=entity_id, archived_at=None
     )
+
+
+_ARCHIVE_DOC = (
+    "Mark it finished with, and everything inside it. Idempotent: an "
+    "already-archived row keeps the stamp it has, so the date means when it was "
+    "archived, not when it was last asked about."
+)
+_UNARCHIVE_DOC = (
+    "Take it back out, and with it everything that archiving took. Anything "
+    "inside that was archived on its own occasion stays archived. Idempotent on "
+    "a live row."
+)
+
+
+def _mount(entity_type: ArchivableType) -> None:
+    """Mount ``POST`` ``/{id}/archive`` and ``/{id}/unarchive`` for one kind."""
+    entity_id_param = Annotated[int, id_path(entity_type.value)]
+    item = (
+        f"/{route_segment_of(entity_type.value)}/{{{path_param_of(entity_type.value)}}}"
+    )
+    scope = _ARCHIVE_SCOPES.get(entity_type.value)
+
+    if scope is not None:
+        ArchiveWrite = Annotated[ActorContext, Depends(plugin_scope(scope))]
+
+        async def archive(
+            entity_id: entity_id_param,
+            session: ActorSessionDep,
+            current_user: ActorUserDep,
+            guild_context: ArchiveWrite,
+        ) -> ArchiveResponse:
+            return await _archive(
+                entity_type, entity_id, session, current_user, guild_context
+            )
+
+    else:
+
+        async def archive(
+            entity_id: entity_id_param,
+            session: RLSSessionDep,
+            current_user: CurrentUserDep,
+            guild_context: GuildContextDep,
+        ) -> ArchiveResponse:
+            return await _archive(
+                entity_type, entity_id, session, current_user, guild_context
+            )
+
+    async def unarchive(
+        entity_id: entity_id_param,
+        session: RLSSessionDep,
+        current_user: CurrentUserDep,
+        guild_context: GuildContextDep,
+    ) -> ArchiveResponse:
+        return await _unarchive(
+            entity_type, entity_id, session, current_user, guild_context
+        )
+
+    router.add_api_route(
+        f"{item}/archive",
+        archive,
+        methods=["POST"],
+        response_model=ArchiveResponse,
+        name=f"archive_{entity_type.value}",
+        description=_ARCHIVE_DOC,
+    )
+    router.add_api_route(
+        f"{item}/unarchive",
+        unarchive,
+        methods=["POST"],
+        response_model=ArchiveResponse,
+        name=f"unarchive_{entity_type.value}",
+        description=_UNARCHIVE_DOC,
+    )
+
+
+for _entity_type in ArchivableType:
+    _mount(_entity_type)

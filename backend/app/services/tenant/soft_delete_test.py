@@ -878,7 +878,7 @@ async def test_trash_listing_shows_a_trashed_wiki_alone(session: AsyncSession, c
     assert listed == {("wiki", wiki.id)}
 
     response = await client.post(
-        f"/api/v1/c/{guild.id}/trash/wiki/{wiki.id}/restore", headers=headers
+        f"/api/v1/c/{guild.id}/wikis/{wiki.id}/restore", headers=headers
     )
     assert response.status_code == 200, response.text
 
@@ -1012,10 +1012,14 @@ async def _build(
     return built[model]
 
 
-def _trash_kind(model: type) -> str:
+def _trash_segment(model: type) -> str:
+    """The path segment a trashed row of ``model`` is restored under."""
     from app.api.v1.tenant_endpoints.trash import ENTITY_REGISTRY
+    from app.core.tools import route_segment_of
 
-    return next(kind for kind, (m, _) in ENTITY_REGISTRY.items() if m is model)
+    return route_segment_of(
+        next(kind for kind, (m, _) in ENTITY_REGISTRY.items() if m is model)
+    )
 
 
 def _trash_edges() -> list:
@@ -1066,8 +1070,8 @@ async def test_nothing_comes_back_under_something_still_in_the_trash(
         await session.commit()
 
     headers = get_auth_headers(user)
-    trash = f"/api/v1/c/{guild.id}/trash"
-    restore_child = f"{trash}/{_trash_kind(child_model)}/{child.id}/restore"
+    base = f"/api/v1/c/{guild.id}"
+    restore_child = f"{base}/{_trash_segment(child_model)}/{child.id}/restore"
     response = await client.post(restore_child, headers=headers)
     assert response.status_code == 409, response.text
     assert response.json()["detail"] == "PARENT_IS_FROZEN"
@@ -1076,7 +1080,7 @@ async def test_nothing_comes_back_under_something_still_in_the_trash(
         await session.commit()
 
     response = await client.post(
-        f"{trash}/{_trash_kind(parent_model)}/{parent.id}/restore", headers=headers
+        f"{base}/{_trash_segment(parent_model)}/{parent.id}/restore", headers=headers
     )
     assert response.status_code == 200, response.text
     response = await client.post(restore_child, headers=headers)
@@ -1119,7 +1123,7 @@ async def test_the_trash_works_inside_an_archive(session: AsyncSession, client, 
     await session.commit()
 
     response = await client.post(
-        f"/api/v1/c/{guild.id}/trash/{_trash_kind(model)}/{row.id}/restore",
+        f"/api/v1/c/{guild.id}/{_trash_segment(model)}/{row.id}/restore",
         headers=get_auth_headers(user),
     )
     assert response.status_code == 200, response.text
@@ -1187,7 +1191,7 @@ async def test_every_tool_takes_its_thread_to_the_trash_and_back(
 
     for tool, (entity_id, _) in threads.items():
         response = await client.post(
-            f"/api/v1/c/{guild.id}/trash/{tool.value}/{entity_id}/restore",
+            f"/api/v1/c/{guild.id}/{tool.route_segment}/{entity_id}/restore",
             headers=headers,
         )
         assert response.status_code == 200, (tool, response.text)

@@ -1147,8 +1147,8 @@ class TestMetadata:
         trashed = await client.delete(seat.g(f"/tasks/{task_id}"), headers=seat.headers)
         assert trashed.status_code == 204, trashed.text
         assert len(await _stored(session, installed.guild.id)) == 1
-        purged = await client.delete(
-            seat.g(f"/trash/task/{task_id}/purge"), headers=seat.headers
+        purged = await client.post(
+            seat.g(f"/tasks/{task_id}/purge"), headers=seat.headers
         )
         assert purged.status_code == 204, purged.text
         assert await _stored(session, installed.guild.id) == []

@@ -397,7 +397,7 @@ async def test_a_write_grant_writes_a_guild_calendar_s_events(
     assert renamed.json() == Tool.calendar.write_required().body
 
     archived = await client.post(
-        member.g(f"/archive/calendar/{calendar.id}"), headers=member.headers
+        member.g(f"/calendars/{calendar.id}/archive"), headers=member.headers
     )
     assert archived.status_code == 403
 

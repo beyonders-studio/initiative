@@ -36,6 +36,9 @@ _WRITE_PREFIXES = (
     "move_",
     "delete_",
     "archive_",
+    "unarchive_",
+    "restore_",
+    "purge_",
     "duplicate_",
     "reorder_",
     "set_",
@@ -263,8 +266,14 @@ async def test_the_tool_writes_stop_short_of_these():
     writes = {n for n in names if n.startswith(_WRITE_PREFIXES)}
 
     # Nothing that removes or empties: delete, trash, archive, reset a counter,
-    # discard the done column.
-    assert not [w for w in writes if w.startswith(("delete_", "archive_", "reset_"))]
+    # discard the done column — nor what takes them back.
+    assert not [
+        w
+        for w in writes
+        if w.startswith(
+            ("delete_", "archive_", "unarchive_", "restore_", "purge_", "reset_")
+        )
+    ]
     # Nothing that acts on a whole collection at once.
     assert not [
         w for w in writes if w.startswith(("reorder_", "batch_", "sort_", "duplicate_"))

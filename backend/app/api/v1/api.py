@@ -116,6 +116,7 @@ from app.api.v1.tenant_endpoints import (
     tool_layouts,
     tool_lifecycle,
     tool_lists,
+    tool_tags,
     tools,
     trash,
     view_preferences,
@@ -405,6 +406,8 @@ guild_router.include_router(tools.router, prefix="/tools", tags=["tools"])
 guild_router.include_router(tool_grants.router)
 # Deleting: DELETE /{tool}/{id}, the same way (tenant_endpoints/tool_lifecycle.py).
 guild_router.include_router(tool_lifecycle.router)
+# Tagging: PUT /{tool}/{id}/tags, the same way (tenant_endpoints/tool_tags.py).
+guild_router.include_router(tool_tags.router, tags=["tools"])
 guild_router.include_router(guild_search.router, prefix="/search", tags=["search"])
 guild_router.include_router(
     smart_chips.router, prefix="/smart-chips", tags=["smart-chips"]
@@ -417,9 +420,11 @@ guild_router.include_router(
 guild_router.include_router(
     property_values.router, prefix="/properties", tags=["properties"]
 )
-guild_router.include_router(trash.router, prefix="/trash", tags=["trash"])
-# No prefix: the two routes are /archive/{kind}/{id} and /unarchive/{kind}/{id},
-# one pair for every archivable kind (see tenant_endpoints/archive.py).
+# No prefix: the listing is /trash/, and restore and purge are
+# /{kind}/{id}/restore and /{kind}/{id}/purge, mounted per trashable kind.
+guild_router.include_router(trash.router, tags=["trash"])
+# No prefix: /{kind}/{id}/archive and /{kind}/{id}/unarchive, mounted per
+# archivable kind (see tenant_endpoints/archive.py).
 guild_router.include_router(archive.router, tags=["archive"])
 # Guild member management (guild-admin). The signed-in account's own routes are
 # under /me below; users.router keeps the routes about other people.

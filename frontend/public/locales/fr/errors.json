@@ -268,7 +268,6 @@
   "unableToSaveCommunityOrder": "Impossible d'enregistrer l'ordre des communautés. Actualisation…",
   "TRASH_ITEM_NOT_FOUND": "Cet élément de la corbeille n'est plus disponible.",
   "TRASH_PURGE_REQUIRES_ADMIN": "Seuls les administrateurs de la communauté peuvent supprimer définitivement.",
-  "TRASH_UNKNOWN_ENTITY_TYPE": "Type d'élément de la corbeille inconnu.",
   "PROJECT_EXPORT_NO_TASK_STATUSES": "L'exportation du projet ne contient aucun statut de tâche, qui est obligatoire pour l'importer.",
   "EXPORT_UNKNOWN_SOURCE": "Ces données ne peuvent pas être exportées.",
   "EXPORT_INVALID_FORMAT": "Ce format d’export n’est pas pris en charge pour ces données.",

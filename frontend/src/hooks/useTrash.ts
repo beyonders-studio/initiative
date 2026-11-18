@@ -10,8 +10,38 @@ import type {
 import {
   getListCommunityTrashQueryKey,
   getListMyTrashQueryKey,
-  purgeTrashEntity,
-  restoreTrashEntity,
+  purgeCalendar,
+  purgeCalendarEvent,
+  purgeCollection,
+  purgeComment,
+  purgeContact,
+  purgeCounter,
+  purgeCounterGroup,
+  purgeDashboard,
+  purgeFile,
+  purgeInitiative,
+  purgePost,
+  purgeProject,
+  purgeTag,
+  purgeTask,
+  purgeWiki,
+  purgeWikiPage,
+  restoreCalendar,
+  restoreCalendarEvent,
+  restoreCollection,
+  restoreComment,
+  restoreContact,
+  restoreCounter,
+  restoreCounterGroup,
+  restoreDashboard,
+  restoreFile,
+  restoreInitiative,
+  restorePost,
+  restoreProject,
+  restoreTag,
+  restoreTask,
+  restoreWiki,
+  restoreWikiPage,
   useListCommunityTrash,
   useListMyTrash,
 } from "@/api/generated/trash/trash";
@@ -72,6 +102,46 @@ const RESTORED: Record<EntityType, () => Spec> = {
   contact: q.allContacts,
 };
 
+/** Each kind's `POST /{kind}/{id}/restore`. */
+const RESTORE: Record<EntityType, (communityId: number, id: number) => Promise<RestoreResponse>> = {
+  project: restoreProject,
+  file: restoreFile,
+  counter_group: restoreCounterGroup,
+  calendar: restoreCalendar,
+  dashboard: restoreDashboard,
+  post: restorePost,
+  wiki: restoreWiki,
+  contact: restoreContact,
+  task: restoreTask,
+  calendar_event: restoreCalendarEvent,
+  counter: restoreCounter,
+  wiki_page: restoreWikiPage,
+  collection: restoreCollection,
+  comment: restoreComment,
+  initiative: restoreInitiative,
+  tag: restoreTag,
+};
+
+/** Each kind's `POST /{kind}/{id}/purge`. */
+const PURGE: Record<EntityType, (communityId: number, id: number) => Promise<void>> = {
+  project: purgeProject,
+  file: purgeFile,
+  counter_group: purgeCounterGroup,
+  calendar: purgeCalendar,
+  dashboard: purgeDashboard,
+  post: purgePost,
+  wiki: purgeWiki,
+  contact: purgeContact,
+  task: purgeTask,
+  calendar_event: purgeCalendarEvent,
+  counter: purgeCounter,
+  wiki_page: purgeWikiPage,
+  collection: purgeCollection,
+  comment: purgeComment,
+  initiative: purgeInitiative,
+  tag: purgeTag,
+};
+
 export type RestoreTrashVars = {
   // The item's community — restore is community-scoped, and the cross-community /me view
   // surfaces items from several communities, so it travels with each row.
@@ -91,7 +161,7 @@ export const useRestoreTrashEntity = (options?: MutationOpts<RestoreResponse, Re
   useApiMutation<RestoreResponse, RestoreTrashVars>(
     {
       mutationFn: ({ communityId, entityType, entityId }) =>
-        restoreTrashEntity(communityId, entityType, entityId),
+        RESTORE[entityType](communityId, entityId),
       invalidate: (_restored, { communityId, entityType }) => {
         invalidateTrash(communityId);
         const restored = RESTORED[entityType];
@@ -114,7 +184,7 @@ export const usePurgeTrashEntity = (options?: MutationOpts<void, PurgeTrashVars>
   useApiMutation<void, PurgeTrashVars>(
     {
       mutationFn: async ({ communityId, entityType, entityId }) => {
-        await purgeTrashEntity(communityId, entityType, entityId);
+        await PURGE[entityType](communityId, entityId);
       },
       invalidate: (_none, { communityId }) => invalidateTrash(communityId),
       errorKey: "trash:purgeError",

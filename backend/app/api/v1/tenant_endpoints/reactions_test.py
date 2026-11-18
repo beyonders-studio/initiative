@@ -985,9 +985,7 @@ class TestReactionLifecycle:
 
         trashed = await client.delete(a.g(f"/posts/{post.id}"), headers=a.headers)
         assert trashed.status_code in (200, 204), trashed.text
-        purged = await client.delete(
-            a.g(f"/trash/post/{post.id}/purge"), headers=a.headers
-        )
+        purged = await client.post(a.g(f"/posts/{post.id}/purge"), headers=a.headers)
         assert purged.status_code == 204, purged.text
 
         await route_session_to_guild(session, a.guild.id)

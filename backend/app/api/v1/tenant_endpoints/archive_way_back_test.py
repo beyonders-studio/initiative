@@ -58,7 +58,7 @@ async def test_an_archived_tool_is_off_the_list_and_on_the_archived_one(
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
 
-    await client.post(a.g(f"/archive/counter_group/{group.id}"), headers=a.headers)
+    await client.post(a.g(f"/counter-groups/{group.id}/archive"), headers=a.headers)
 
     live = await client.get(a.g("/counter-groups/"), headers=a.headers)
     assert [g["id"] for g in live.json()["items"]] == []
@@ -77,7 +77,7 @@ async def test_an_archived_tool_says_it_can_be_taken_back(
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     file = await create_file(session, a.initiative, a.user)
 
-    await client.post(a.g(f"/archive/file/{file.id}"), headers=a.headers)
+    await client.post(a.g(f"/files/{file.id}/archive"), headers=a.headers)
     read = await client.get(a.g(f"/files/{file.id}"), headers=a.headers)
 
     body = read.json()
@@ -123,7 +123,7 @@ async def test_a_reader_is_not_offered_the_way_back(
         },
     )
     file_id = created.json()["id"]
-    await client.post(a.g(f"/archive/file/{file_id}"), headers=a.headers)
+    await client.post(a.g(f"/files/{file_id}/archive"), headers=a.headers)
 
     read = await client.get(a.g(f"/files/{file_id}"), headers=b.headers)
 
@@ -139,7 +139,7 @@ async def test_something_archived_with_its_initiative_comes_back_with_it(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
 
-    await client.post(a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers)
+    await client.post(a.g(f"/initiatives/{a.initiative.id}/archive"), headers=a.headers)
     read = await client.get(a.g(f"/counter-groups/{group.id}"), headers=a.headers)
 
     body = read.json()
@@ -154,7 +154,7 @@ async def test_the_archived_list_agrees_with_the_detail_about_the_way_back(
     offered in one place and refused from the other."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
-    await client.post(a.g(f"/archive/initiative/{a.initiative.id}"), headers=a.headers)
+    await client.post(a.g(f"/initiatives/{a.initiative.id}/archive"), headers=a.headers)
 
     listed = await client.get(a.g("/counter-groups/?archived=true"), headers=a.headers)
     row = next(g for g in listed.json()["items"] if g["id"] == group.id)

@@ -266,7 +266,7 @@ async def test_a_restored_page_takes_its_name_back(
     await client.delete(a.g(f"/wiki-pages/{page_id}"), headers=a.headers)
 
     restored = await client.post(
-        a.g(f"/trash/wiki_page/{page_id}/restore"), headers=a.headers
+        a.g(f"/wiki-pages/{page_id}/restore"), headers=a.headers
     )
 
     assert restored.status_code == 200, restored.text
@@ -296,7 +296,7 @@ async def test_a_restored_page_comes_back_beside_the_one_that_took_its_name(
     assert replacement.json()["slug"] == "step-1"
 
     restored = await client.post(
-        a.g(f"/trash/wiki_page/{page_id}/restore"), headers=a.headers
+        a.g(f"/wiki-pages/{page_id}/restore"), headers=a.headers
     )
 
     assert restored.status_code == 200, restored.text
@@ -325,9 +325,7 @@ async def test_a_wiki_restored_whole_keeps_its_pages_addresses(
         assert response.status_code == 201, response.text
 
     await client.delete(a.g(f"/wikis/{wiki.id}"), headers=a.headers)
-    restored = await client.post(
-        a.g(f"/trash/wiki/{wiki.id}/restore"), headers=a.headers
-    )
+    restored = await client.post(a.g(f"/wikis/{wiki.id}/restore"), headers=a.headers)
     assert restored.status_code == 200, restored.text
 
     pages = await client.get(a.g(f"/wikis/{wiki.id}/pages"), headers=a.headers)
@@ -576,7 +574,7 @@ async def test_trashing_a_page_takes_what_is_filed_under_it(
     assert listed.json()["items"] == []
 
     restored = await client.post(
-        a.g(f"/trash/wiki_page/{parent.id}/restore"), headers=a.headers
+        a.g(f"/wiki-pages/{parent.id}/restore"), headers=a.headers
     )
     assert restored.status_code == 200, restored.text
     back = await client.get(a.g(f"/wikis/{wiki.id}/pages"), headers=a.headers)
@@ -716,7 +714,7 @@ async def test_a_file_under_a_trashed_page_is_drawn_at_the_top(
     (row,) = listed.json()["items"]
     assert row["title"] == "Borrowed" and row["parent_page_id"] is None
 
-    await client.post(a.g(f"/trash/wiki_page/{rules.id}/restore"), headers=a.headers)
+    await client.post(a.g(f"/wiki-pages/{rules.id}/restore"), headers=a.headers)
     back = await client.get(a.g(f"/wikis/{wiki.id}/pages"), headers=a.headers)
     rows = back.json()["items"]
     assert [row["title"] for row in rows] == ["Rules", "Borrowed"]

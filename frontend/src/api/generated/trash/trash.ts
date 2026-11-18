@@ -21,7 +21,6 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  EntityType,
   HTTPValidationError,
   ListCommunityTrashParams,
   ListMyTrashParams,
@@ -188,19 +187,1513 @@ export function useListCommunityTrash<
 }
 
 /**
- * Restore a trashed entity.
- * @summary Restore Trash Entity
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Project
  */
-export const restoreTrashEntity = (
+export const restoreProject = (
   communityId: number,
-  entityType: EntityType,
-  entityId: number,
+  projectId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/projects/${projectId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreProjectMutationKey = () => ["restoreProject"] as const;
+
+export const getRestoreProjectMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreProject>>,
+    TError,
+    RestoreProjectMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreProject>>,
+  TError,
+  RestoreProjectMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreProjectMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreProject>>,
+    RestoreProjectMutationVariables
+  > = (props) => {
+    const { communityId, projectId } = props ?? {};
+
+    return restoreProject(communityId, projectId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreProjectMutationResult = NonNullable<Awaited<ReturnType<typeof restoreProject>>>;
+
+export type RestoreProjectMutationError = ErrorType<HTTPValidationError>;
+export type RestoreProjectMutationVariables = { communityId: number; projectId: number };
+
+/**
+ * @summary Restore Project
+ */
+export const useRestoreProject = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreProject>>,
+      TError,
+      RestoreProjectMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreProject>>,
+  TError,
+  RestoreProjectMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreProjectMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Project
+ */
+export const purgeProject = (
+  communityId: number,
+  projectId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/projects/${projectId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeProjectMutationKey = () => ["purgeProject"] as const;
+
+export const getPurgeProjectMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeProject>>,
+    TError,
+    PurgeProjectMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeProject>>,
+  TError,
+  PurgeProjectMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeProjectMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeProject>>,
+    PurgeProjectMutationVariables
+  > = (props) => {
+    const { communityId, projectId } = props ?? {};
+
+    return purgeProject(communityId, projectId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeProjectMutationResult = NonNullable<Awaited<ReturnType<typeof purgeProject>>>;
+
+export type PurgeProjectMutationError = ErrorType<HTTPValidationError>;
+export type PurgeProjectMutationVariables = { communityId: number; projectId: number };
+
+/**
+ * @summary Purge Project
+ */
+export const usePurgeProject = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeProject>>,
+      TError,
+      PurgeProjectMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeProject>>,
+  TError,
+  PurgeProjectMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeProjectMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore File
+ */
+export const restoreFile = (
+  communityId: number,
+  fileId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/files/${fileId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreFileMutationKey = () => ["restoreFile"] as const;
+
+export const getRestoreFileMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreFile>>,
+    TError,
+    RestoreFileMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreFile>>,
+  TError,
+  RestoreFileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreFileMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreFile>>,
+    RestoreFileMutationVariables
+  > = (props) => {
+    const { communityId, fileId } = props ?? {};
+
+    return restoreFile(communityId, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreFileMutationResult = NonNullable<Awaited<ReturnType<typeof restoreFile>>>;
+
+export type RestoreFileMutationError = ErrorType<HTTPValidationError>;
+export type RestoreFileMutationVariables = { communityId: number; fileId: number };
+
+/**
+ * @summary Restore File
+ */
+export const useRestoreFile = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreFile>>,
+      TError,
+      RestoreFileMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreFile>>,
+  TError,
+  RestoreFileMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreFileMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge File
+ */
+export const purgeFile = (
+  communityId: number,
+  fileId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/files/${fileId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeFileMutationKey = () => ["purgeFile"] as const;
+
+export const getPurgeFileMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeFile>>,
+    TError,
+    PurgeFileMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeFile>>,
+  TError,
+  PurgeFileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeFileMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeFile>>,
+    PurgeFileMutationVariables
+  > = (props) => {
+    const { communityId, fileId } = props ?? {};
+
+    return purgeFile(communityId, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeFileMutationResult = NonNullable<Awaited<ReturnType<typeof purgeFile>>>;
+
+export type PurgeFileMutationError = ErrorType<HTTPValidationError>;
+export type PurgeFileMutationVariables = { communityId: number; fileId: number };
+
+/**
+ * @summary Purge File
+ */
+export const usePurgeFile = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeFile>>,
+      TError,
+      PurgeFileMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeFile>>,
+  TError,
+  PurgeFileMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeFileMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Counter Group
+ */
+export const restoreCounterGroup = (
+  communityId: number,
+  groupId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/counter-groups/${groupId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreCounterGroupMutationKey = () => ["restoreCounterGroup"] as const;
+
+export const getRestoreCounterGroupMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCounterGroup>>,
+    TError,
+    RestoreCounterGroupMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreCounterGroup>>,
+  TError,
+  RestoreCounterGroupMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreCounterGroupMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreCounterGroup>>,
+    RestoreCounterGroupMutationVariables
+  > = (props) => {
+    const { communityId, groupId } = props ?? {};
+
+    return restoreCounterGroup(communityId, groupId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCounterGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreCounterGroup>>
+>;
+
+export type RestoreCounterGroupMutationError = ErrorType<HTTPValidationError>;
+export type RestoreCounterGroupMutationVariables = { communityId: number; groupId: number };
+
+/**
+ * @summary Restore Counter Group
+ */
+export const useRestoreCounterGroup = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreCounterGroup>>,
+      TError,
+      RestoreCounterGroupMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreCounterGroup>>,
+  TError,
+  RestoreCounterGroupMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreCounterGroupMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Counter Group
+ */
+export const purgeCounterGroup = (
+  communityId: number,
+  groupId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/counter-groups/${groupId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeCounterGroupMutationKey = () => ["purgeCounterGroup"] as const;
+
+export const getPurgeCounterGroupMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeCounterGroup>>,
+    TError,
+    PurgeCounterGroupMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeCounterGroup>>,
+  TError,
+  PurgeCounterGroupMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeCounterGroupMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeCounterGroup>>,
+    PurgeCounterGroupMutationVariables
+  > = (props) => {
+    const { communityId, groupId } = props ?? {};
+
+    return purgeCounterGroup(communityId, groupId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeCounterGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof purgeCounterGroup>>
+>;
+
+export type PurgeCounterGroupMutationError = ErrorType<HTTPValidationError>;
+export type PurgeCounterGroupMutationVariables = { communityId: number; groupId: number };
+
+/**
+ * @summary Purge Counter Group
+ */
+export const usePurgeCounterGroup = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeCounterGroup>>,
+      TError,
+      PurgeCounterGroupMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeCounterGroup>>,
+  TError,
+  PurgeCounterGroupMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeCounterGroupMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Calendar
+ */
+export const restoreCalendar = (
+  communityId: number,
+  calendarId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/calendars/${calendarId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreCalendarMutationKey = () => ["restoreCalendar"] as const;
+
+export const getRestoreCalendarMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCalendar>>,
+    TError,
+    RestoreCalendarMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreCalendar>>,
+  TError,
+  RestoreCalendarMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreCalendarMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreCalendar>>,
+    RestoreCalendarMutationVariables
+  > = (props) => {
+    const { communityId, calendarId } = props ?? {};
+
+    return restoreCalendar(communityId, calendarId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCalendarMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreCalendar>>
+>;
+
+export type RestoreCalendarMutationError = ErrorType<HTTPValidationError>;
+export type RestoreCalendarMutationVariables = { communityId: number; calendarId: number };
+
+/**
+ * @summary Restore Calendar
+ */
+export const useRestoreCalendar = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreCalendar>>,
+      TError,
+      RestoreCalendarMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreCalendar>>,
+  TError,
+  RestoreCalendarMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreCalendarMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Calendar
+ */
+export const purgeCalendar = (
+  communityId: number,
+  calendarId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/calendars/${calendarId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeCalendarMutationKey = () => ["purgeCalendar"] as const;
+
+export const getPurgeCalendarMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeCalendar>>,
+    TError,
+    PurgeCalendarMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeCalendar>>,
+  TError,
+  PurgeCalendarMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeCalendarMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeCalendar>>,
+    PurgeCalendarMutationVariables
+  > = (props) => {
+    const { communityId, calendarId } = props ?? {};
+
+    return purgeCalendar(communityId, calendarId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeCalendarMutationResult = NonNullable<Awaited<ReturnType<typeof purgeCalendar>>>;
+
+export type PurgeCalendarMutationError = ErrorType<HTTPValidationError>;
+export type PurgeCalendarMutationVariables = { communityId: number; calendarId: number };
+
+/**
+ * @summary Purge Calendar
+ */
+export const usePurgeCalendar = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeCalendar>>,
+      TError,
+      PurgeCalendarMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeCalendar>>,
+  TError,
+  PurgeCalendarMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeCalendarMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Dashboard
+ */
+export const restoreDashboard = (
+  communityId: number,
+  dashboardId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreDashboardMutationKey = () => ["restoreDashboard"] as const;
+
+export const getRestoreDashboardMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreDashboard>>,
+    TError,
+    RestoreDashboardMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreDashboard>>,
+  TError,
+  RestoreDashboardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreDashboardMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreDashboard>>,
+    RestoreDashboardMutationVariables
+  > = (props) => {
+    const { communityId, dashboardId } = props ?? {};
+
+    return restoreDashboard(communityId, dashboardId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreDashboardMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreDashboard>>
+>;
+
+export type RestoreDashboardMutationError = ErrorType<HTTPValidationError>;
+export type RestoreDashboardMutationVariables = { communityId: number; dashboardId: number };
+
+/**
+ * @summary Restore Dashboard
+ */
+export const useRestoreDashboard = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreDashboard>>,
+      TError,
+      RestoreDashboardMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreDashboard>>,
+  TError,
+  RestoreDashboardMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreDashboardMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Dashboard
+ */
+export const purgeDashboard = (
+  communityId: number,
+  dashboardId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeDashboardMutationKey = () => ["purgeDashboard"] as const;
+
+export const getPurgeDashboardMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeDashboard>>,
+    TError,
+    PurgeDashboardMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeDashboard>>,
+  TError,
+  PurgeDashboardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeDashboardMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeDashboard>>,
+    PurgeDashboardMutationVariables
+  > = (props) => {
+    const { communityId, dashboardId } = props ?? {};
+
+    return purgeDashboard(communityId, dashboardId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeDashboardMutationResult = NonNullable<Awaited<ReturnType<typeof purgeDashboard>>>;
+
+export type PurgeDashboardMutationError = ErrorType<HTTPValidationError>;
+export type PurgeDashboardMutationVariables = { communityId: number; dashboardId: number };
+
+/**
+ * @summary Purge Dashboard
+ */
+export const usePurgeDashboard = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeDashboard>>,
+      TError,
+      PurgeDashboardMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeDashboard>>,
+  TError,
+  PurgeDashboardMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeDashboardMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Post
+ */
+export const restorePost = (
+  communityId: number,
+  postId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/posts/${postId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestorePostMutationKey = () => ["restorePost"] as const;
+
+export const getRestorePostMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restorePost>>,
+    TError,
+    RestorePostMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restorePost>>,
+  TError,
+  RestorePostMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestorePostMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restorePost>>,
+    RestorePostMutationVariables
+  > = (props) => {
+    const { communityId, postId } = props ?? {};
+
+    return restorePost(communityId, postId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestorePostMutationResult = NonNullable<Awaited<ReturnType<typeof restorePost>>>;
+
+export type RestorePostMutationError = ErrorType<HTTPValidationError>;
+export type RestorePostMutationVariables = { communityId: number; postId: number };
+
+/**
+ * @summary Restore Post
+ */
+export const useRestorePost = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restorePost>>,
+      TError,
+      RestorePostMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restorePost>>,
+  TError,
+  RestorePostMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestorePostMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Post
+ */
+export const purgePost = (
+  communityId: number,
+  postId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/posts/${postId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgePostMutationKey = () => ["purgePost"] as const;
+
+export const getPurgePostMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgePost>>,
+    TError,
+    PurgePostMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgePost>>,
+  TError,
+  PurgePostMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgePostMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgePost>>,
+    PurgePostMutationVariables
+  > = (props) => {
+    const { communityId, postId } = props ?? {};
+
+    return purgePost(communityId, postId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgePostMutationResult = NonNullable<Awaited<ReturnType<typeof purgePost>>>;
+
+export type PurgePostMutationError = ErrorType<HTTPValidationError>;
+export type PurgePostMutationVariables = { communityId: number; postId: number };
+
+/**
+ * @summary Purge Post
+ */
+export const usePurgePost = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgePost>>,
+      TError,
+      PurgePostMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgePost>>,
+  TError,
+  PurgePostMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgePostMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Wiki
+ */
+export const restoreWiki = (
+  communityId: number,
+  wikiId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/wikis/${wikiId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreWikiMutationKey = () => ["restoreWiki"] as const;
+
+export const getRestoreWikiMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreWiki>>,
+    TError,
+    RestoreWikiMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreWiki>>,
+  TError,
+  RestoreWikiMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreWikiMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreWiki>>,
+    RestoreWikiMutationVariables
+  > = (props) => {
+    const { communityId, wikiId } = props ?? {};
+
+    return restoreWiki(communityId, wikiId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreWikiMutationResult = NonNullable<Awaited<ReturnType<typeof restoreWiki>>>;
+
+export type RestoreWikiMutationError = ErrorType<HTTPValidationError>;
+export type RestoreWikiMutationVariables = { communityId: number; wikiId: number };
+
+/**
+ * @summary Restore Wiki
+ */
+export const useRestoreWiki = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreWiki>>,
+      TError,
+      RestoreWikiMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreWiki>>,
+  TError,
+  RestoreWikiMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreWikiMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Wiki
+ */
+export const purgeWiki = (
+  communityId: number,
+  wikiId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/wikis/${wikiId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeWikiMutationKey = () => ["purgeWiki"] as const;
+
+export const getPurgeWikiMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeWiki>>,
+    TError,
+    PurgeWikiMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeWiki>>,
+  TError,
+  PurgeWikiMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeWikiMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeWiki>>,
+    PurgeWikiMutationVariables
+  > = (props) => {
+    const { communityId, wikiId } = props ?? {};
+
+    return purgeWiki(communityId, wikiId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeWikiMutationResult = NonNullable<Awaited<ReturnType<typeof purgeWiki>>>;
+
+export type PurgeWikiMutationError = ErrorType<HTTPValidationError>;
+export type PurgeWikiMutationVariables = { communityId: number; wikiId: number };
+
+/**
+ * @summary Purge Wiki
+ */
+export const usePurgeWiki = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeWiki>>,
+      TError,
+      PurgeWikiMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeWiki>>,
+  TError,
+  PurgeWikiMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeWikiMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Contact
+ */
+export const restoreContact = (
+  communityId: number,
+  contactId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/contacts/${contactId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreContactMutationKey = () => ["restoreContact"] as const;
+
+export const getRestoreContactMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreContact>>,
+    TError,
+    RestoreContactMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreContact>>,
+  TError,
+  RestoreContactMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreContactMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreContact>>,
+    RestoreContactMutationVariables
+  > = (props) => {
+    const { communityId, contactId } = props ?? {};
+
+    return restoreContact(communityId, contactId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreContactMutationResult = NonNullable<Awaited<ReturnType<typeof restoreContact>>>;
+
+export type RestoreContactMutationError = ErrorType<HTTPValidationError>;
+export type RestoreContactMutationVariables = { communityId: number; contactId: number };
+
+/**
+ * @summary Restore Contact
+ */
+export const useRestoreContact = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreContact>>,
+      TError,
+      RestoreContactMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreContact>>,
+  TError,
+  RestoreContactMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreContactMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Contact
+ */
+export const purgeContact = (
+  communityId: number,
+  contactId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/contacts/${contactId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeContactMutationKey = () => ["purgeContact"] as const;
+
+export const getPurgeContactMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeContact>>,
+    TError,
+    PurgeContactMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeContact>>,
+  TError,
+  PurgeContactMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeContactMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeContact>>,
+    PurgeContactMutationVariables
+  > = (props) => {
+    const { communityId, contactId } = props ?? {};
+
+    return purgeContact(communityId, contactId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeContactMutationResult = NonNullable<Awaited<ReturnType<typeof purgeContact>>>;
+
+export type PurgeContactMutationError = ErrorType<HTTPValidationError>;
+export type PurgeContactMutationVariables = { communityId: number; contactId: number };
+
+/**
+ * @summary Purge Contact
+ */
+export const usePurgeContact = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeContact>>,
+      TError,
+      PurgeContactMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeContact>>,
+  TError,
+  PurgeContactMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeContactMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Task
+ */
+export const restoreTask = (
+  communityId: number,
+  taskId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/tasks/${taskId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreTaskMutationKey = () => ["restoreTask"] as const;
+
+export const getRestoreTaskMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreTask>>,
+    TError,
+    RestoreTaskMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreTask>>,
+  TError,
+  RestoreTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreTaskMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreTask>>,
+    RestoreTaskMutationVariables
+  > = (props) => {
+    const { communityId, taskId } = props ?? {};
+
+    return restoreTask(communityId, taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreTaskMutationResult = NonNullable<Awaited<ReturnType<typeof restoreTask>>>;
+
+export type RestoreTaskMutationError = ErrorType<HTTPValidationError>;
+export type RestoreTaskMutationVariables = { communityId: number; taskId: number };
+
+/**
+ * @summary Restore Task
+ */
+export const useRestoreTask = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreTask>>,
+      TError,
+      RestoreTaskMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreTask>>,
+  TError,
+  RestoreTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreTaskMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Task
+ */
+export const purgeTask = (
+  communityId: number,
+  taskId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/tasks/${taskId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeTaskMutationKey = () => ["purgeTask"] as const;
+
+export const getPurgeTaskMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeTask>>,
+    TError,
+    PurgeTaskMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeTask>>,
+  TError,
+  PurgeTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeTaskMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeTask>>,
+    PurgeTaskMutationVariables
+  > = (props) => {
+    const { communityId, taskId } = props ?? {};
+
+    return purgeTask(communityId, taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeTaskMutationResult = NonNullable<Awaited<ReturnType<typeof purgeTask>>>;
+
+export type PurgeTaskMutationError = ErrorType<HTTPValidationError>;
+export type PurgeTaskMutationVariables = { communityId: number; taskId: number };
+
+/**
+ * @summary Purge Task
+ */
+export const usePurgeTask = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeTask>>,
+      TError,
+      PurgeTaskMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeTask>>,
+  TError,
+  PurgeTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeTaskMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Calendar Event
+ */
+export const restoreCalendarEvent = (
+  communityId: number,
+  calendarEventId: number,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
   return apiMutator<RestoreResponse>(
     {
-      url: `/api/v1/c/${communityId}/trash/${entityType}/${entityId}/restore`,
+      url: `/api/v1/c/${communityId}/calendar-events/${calendarEventId}/restore`,
       method: "POST",
       signal,
     },
@@ -208,26 +1701,26 @@ export const restoreTrashEntity = (
   );
 };
 
-export const getRestoreTrashEntityMutationKey = () => ["restoreTrashEntity"] as const;
+export const getRestoreCalendarEventMutationKey = () => ["restoreCalendarEvent"] as const;
 
-export const getRestoreTrashEntityMutationOptions = <
+export const getRestoreCalendarEventMutationOptions = <
   TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof restoreTrashEntity>>,
+    Awaited<ReturnType<typeof restoreCalendarEvent>>,
     TError,
-    RestoreTrashEntityMutationVariables,
+    RestoreCalendarEventMutationVariables,
     TContext
   >;
   request?: SecondParameter<typeof apiMutator>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof restoreTrashEntity>>,
+  Awaited<ReturnType<typeof restoreCalendarEvent>>,
   TError,
-  RestoreTrashEntityMutationVariables,
+  RestoreCalendarEventMutationVariables,
   TContext
 > => {
-  const mutationKey = getRestoreTrashEntityMutationKey();
+  const mutationKey = getRestoreCalendarEventMutationKey();
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
       ? options
@@ -235,103 +1728,93 @@ export const getRestoreTrashEntityMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof restoreTrashEntity>>,
-    RestoreTrashEntityMutationVariables
+    Awaited<ReturnType<typeof restoreCalendarEvent>>,
+    RestoreCalendarEventMutationVariables
   > = (props) => {
-    const { communityId, entityType, entityId } = props ?? {};
+    const { communityId, calendarEventId } = props ?? {};
 
-    return restoreTrashEntity(communityId, entityType, entityId, requestOptions);
+    return restoreCalendarEvent(communityId, calendarEventId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type RestoreTrashEntityMutationResult = NonNullable<
-  Awaited<ReturnType<typeof restoreTrashEntity>>
+export type RestoreCalendarEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreCalendarEvent>>
 >;
 
-export type RestoreTrashEntityMutationError = ErrorType<HTTPValidationError>;
-export type RestoreTrashEntityMutationVariables = {
+export type RestoreCalendarEventMutationError = ErrorType<HTTPValidationError>;
+export type RestoreCalendarEventMutationVariables = {
   communityId: number;
-  entityType: EntityType;
-  entityId: number;
+  calendarEventId: number;
 };
 
 /**
- * @summary Restore Trash Entity
+ * @summary Restore Calendar Event
  */
-export const useRestoreTrashEntity = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+export const useRestoreCalendarEvent = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof restoreTrashEntity>>,
+      Awaited<ReturnType<typeof restoreCalendarEvent>>,
       TError,
-      RestoreTrashEntityMutationVariables,
+      RestoreCalendarEventMutationVariables,
       TContext
     >;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof restoreTrashEntity>>,
+  Awaited<ReturnType<typeof restoreCalendarEvent>>,
   TError,
-  RestoreTrashEntityMutationVariables,
+  RestoreCalendarEventMutationVariables,
   TContext
 > => {
-  return useMutation(getRestoreTrashEntityMutationOptions(options), queryClient);
+  return useMutation(getRestoreCalendarEventMutationOptions(options), queryClient);
 };
 /**
- * Hard-purge a trashed entity. Guild-admin only, fully guild-scoped.
- *
- * Runs entirely on the routed guild-admin RLS session — no standing-BYPASSRLS
- * ``app_admin`` connection. The guild-schema content tables carry PERMISSIVE
- * ``initiative_member_delete`` policies that defer to ``initiative_access``,
- * whose community-admin leg (``app.guild_admin = 'true'``) admits the routed
- * admin for the hard delete, beside the RESTRICTIVE purge guard, which asks
- * for the community's trash, so the guild role itself does it.
- * ``_load_trash_entity`` 404s unless the entity is in THIS guild's trash (and
- * still soft-deleted) — that is the authorization boundary — and
- * ``for_update=True`` locks the row so a concurrent restore can't slip in
- * between the ``deleted_at`` check and the delete (which would otherwise
- * permanently remove a just-restored live row).
- * @summary Purge Trash Entity
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Calendar Event
  */
-export const purgeTrashEntity = (
+export const purgeCalendarEvent = (
   communityId: number,
-  entityType: EntityType,
-  entityId: number,
+  calendarEventId: number,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
   return apiMutator<void>(
     {
-      url: `/api/v1/c/${communityId}/trash/${entityType}/${entityId}/purge`,
-      method: "DELETE",
+      url: `/api/v1/c/${communityId}/calendar-events/${calendarEventId}/purge`,
+      method: "POST",
       signal,
     },
     options
   );
 };
 
-export const getPurgeTrashEntityMutationKey = () => ["purgeTrashEntity"] as const;
+export const getPurgeCalendarEventMutationKey = () => ["purgeCalendarEvent"] as const;
 
-export const getPurgeTrashEntityMutationOptions = <
+export const getPurgeCalendarEventMutationOptions = <
   TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof purgeTrashEntity>>,
+    Awaited<ReturnType<typeof purgeCalendarEvent>>,
     TError,
-    PurgeTrashEntityMutationVariables,
+    PurgeCalendarEventMutationVariables,
     TContext
   >;
   request?: SecondParameter<typeof apiMutator>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof purgeTrashEntity>>,
+  Awaited<ReturnType<typeof purgeCalendarEvent>>,
   TError,
-  PurgeTrashEntityMutationVariables,
+  PurgeCalendarEventMutationVariables,
   TContext
 > => {
-  const mutationKey = getPurgeTrashEntityMutationKey();
+  const mutationKey = getPurgeCalendarEventMutationKey();
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
       ? options
@@ -339,49 +1822,1045 @@ export const getPurgeTrashEntityMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof purgeTrashEntity>>,
-    PurgeTrashEntityMutationVariables
+    Awaited<ReturnType<typeof purgeCalendarEvent>>,
+    PurgeCalendarEventMutationVariables
   > = (props) => {
-    const { communityId, entityType, entityId } = props ?? {};
+    const { communityId, calendarEventId } = props ?? {};
 
-    return purgeTrashEntity(communityId, entityType, entityId, requestOptions);
+    return purgeCalendarEvent(communityId, calendarEventId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type PurgeTrashEntityMutationResult = NonNullable<
-  Awaited<ReturnType<typeof purgeTrashEntity>>
+export type PurgeCalendarEventMutationResult = NonNullable<
+  Awaited<ReturnType<typeof purgeCalendarEvent>>
 >;
 
-export type PurgeTrashEntityMutationError = ErrorType<HTTPValidationError>;
-export type PurgeTrashEntityMutationVariables = {
-  communityId: number;
-  entityType: EntityType;
-  entityId: number;
-};
+export type PurgeCalendarEventMutationError = ErrorType<HTTPValidationError>;
+export type PurgeCalendarEventMutationVariables = { communityId: number; calendarEventId: number };
 
 /**
- * @summary Purge Trash Entity
+ * @summary Purge Calendar Event
  */
-export const usePurgeTrashEntity = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+export const usePurgeCalendarEvent = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof purgeTrashEntity>>,
+      Awaited<ReturnType<typeof purgeCalendarEvent>>,
       TError,
-      PurgeTrashEntityMutationVariables,
+      PurgeCalendarEventMutationVariables,
       TContext
     >;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof purgeTrashEntity>>,
+  Awaited<ReturnType<typeof purgeCalendarEvent>>,
   TError,
-  PurgeTrashEntityMutationVariables,
+  PurgeCalendarEventMutationVariables,
   TContext
 > => {
-  return useMutation(getPurgeTrashEntityMutationOptions(options), queryClient);
+  return useMutation(getPurgeCalendarEventMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Counter
+ */
+export const restoreCounter = (
+  communityId: number,
+  counterId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/counters/${counterId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreCounterMutationKey = () => ["restoreCounter"] as const;
+
+export const getRestoreCounterMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCounter>>,
+    TError,
+    RestoreCounterMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreCounter>>,
+  TError,
+  RestoreCounterMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreCounterMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreCounter>>,
+    RestoreCounterMutationVariables
+  > = (props) => {
+    const { communityId, counterId } = props ?? {};
+
+    return restoreCounter(communityId, counterId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCounterMutationResult = NonNullable<Awaited<ReturnType<typeof restoreCounter>>>;
+
+export type RestoreCounterMutationError = ErrorType<HTTPValidationError>;
+export type RestoreCounterMutationVariables = { communityId: number; counterId: number };
+
+/**
+ * @summary Restore Counter
+ */
+export const useRestoreCounter = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreCounter>>,
+      TError,
+      RestoreCounterMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreCounter>>,
+  TError,
+  RestoreCounterMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreCounterMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Counter
+ */
+export const purgeCounter = (
+  communityId: number,
+  counterId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/counters/${counterId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeCounterMutationKey = () => ["purgeCounter"] as const;
+
+export const getPurgeCounterMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeCounter>>,
+    TError,
+    PurgeCounterMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeCounter>>,
+  TError,
+  PurgeCounterMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeCounterMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeCounter>>,
+    PurgeCounterMutationVariables
+  > = (props) => {
+    const { communityId, counterId } = props ?? {};
+
+    return purgeCounter(communityId, counterId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeCounterMutationResult = NonNullable<Awaited<ReturnType<typeof purgeCounter>>>;
+
+export type PurgeCounterMutationError = ErrorType<HTTPValidationError>;
+export type PurgeCounterMutationVariables = { communityId: number; counterId: number };
+
+/**
+ * @summary Purge Counter
+ */
+export const usePurgeCounter = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeCounter>>,
+      TError,
+      PurgeCounterMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeCounter>>,
+  TError,
+  PurgeCounterMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeCounterMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Wiki Page
+ */
+export const restoreWikiPage = (
+  communityId: number,
+  wikiPageId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/wiki-pages/${wikiPageId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreWikiPageMutationKey = () => ["restoreWikiPage"] as const;
+
+export const getRestoreWikiPageMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreWikiPage>>,
+    TError,
+    RestoreWikiPageMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreWikiPage>>,
+  TError,
+  RestoreWikiPageMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreWikiPageMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreWikiPage>>,
+    RestoreWikiPageMutationVariables
+  > = (props) => {
+    const { communityId, wikiPageId } = props ?? {};
+
+    return restoreWikiPage(communityId, wikiPageId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreWikiPageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreWikiPage>>
+>;
+
+export type RestoreWikiPageMutationError = ErrorType<HTTPValidationError>;
+export type RestoreWikiPageMutationVariables = { communityId: number; wikiPageId: number };
+
+/**
+ * @summary Restore Wiki Page
+ */
+export const useRestoreWikiPage = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreWikiPage>>,
+      TError,
+      RestoreWikiPageMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreWikiPage>>,
+  TError,
+  RestoreWikiPageMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreWikiPageMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Wiki Page
+ */
+export const purgeWikiPage = (
+  communityId: number,
+  wikiPageId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/wiki-pages/${wikiPageId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeWikiPageMutationKey = () => ["purgeWikiPage"] as const;
+
+export const getPurgeWikiPageMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeWikiPage>>,
+    TError,
+    PurgeWikiPageMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeWikiPage>>,
+  TError,
+  PurgeWikiPageMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeWikiPageMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeWikiPage>>,
+    PurgeWikiPageMutationVariables
+  > = (props) => {
+    const { communityId, wikiPageId } = props ?? {};
+
+    return purgeWikiPage(communityId, wikiPageId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeWikiPageMutationResult = NonNullable<Awaited<ReturnType<typeof purgeWikiPage>>>;
+
+export type PurgeWikiPageMutationError = ErrorType<HTTPValidationError>;
+export type PurgeWikiPageMutationVariables = { communityId: number; wikiPageId: number };
+
+/**
+ * @summary Purge Wiki Page
+ */
+export const usePurgeWikiPage = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeWikiPage>>,
+      TError,
+      PurgeWikiPageMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeWikiPage>>,
+  TError,
+  PurgeWikiPageMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeWikiPageMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Collection
+ */
+export const restoreCollection = (
+  communityId: number,
+  collectionId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/collections/${collectionId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreCollectionMutationKey = () => ["restoreCollection"] as const;
+
+export const getRestoreCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCollection>>,
+    TError,
+    RestoreCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreCollection>>,
+  TError,
+  RestoreCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreCollection>>,
+    RestoreCollectionMutationVariables
+  > = (props) => {
+    const { communityId, collectionId } = props ?? {};
+
+    return restoreCollection(communityId, collectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreCollection>>
+>;
+
+export type RestoreCollectionMutationError = ErrorType<HTTPValidationError>;
+export type RestoreCollectionMutationVariables = { communityId: number; collectionId: number };
+
+/**
+ * @summary Restore Collection
+ */
+export const useRestoreCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreCollection>>,
+      TError,
+      RestoreCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreCollection>>,
+  TError,
+  RestoreCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreCollectionMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Collection
+ */
+export const purgeCollection = (
+  communityId: number,
+  collectionId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/collections/${collectionId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeCollectionMutationKey = () => ["purgeCollection"] as const;
+
+export const getPurgeCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeCollection>>,
+    TError,
+    PurgeCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeCollection>>,
+  TError,
+  PurgeCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeCollection>>,
+    PurgeCollectionMutationVariables
+  > = (props) => {
+    const { communityId, collectionId } = props ?? {};
+
+    return purgeCollection(communityId, collectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof purgeCollection>>
+>;
+
+export type PurgeCollectionMutationError = ErrorType<HTTPValidationError>;
+export type PurgeCollectionMutationVariables = { communityId: number; collectionId: number };
+
+/**
+ * @summary Purge Collection
+ */
+export const usePurgeCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeCollection>>,
+      TError,
+      PurgeCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeCollection>>,
+  TError,
+  PurgeCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeCollectionMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Comment
+ */
+export const restoreComment = (
+  communityId: number,
+  commentId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/comments/${commentId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreCommentMutationKey = () => ["restoreComment"] as const;
+
+export const getRestoreCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreComment>>,
+    TError,
+    RestoreCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreComment>>,
+  TError,
+  RestoreCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreComment>>,
+    RestoreCommentMutationVariables
+  > = (props) => {
+    const { communityId, commentId } = props ?? {};
+
+    return restoreComment(communityId, commentId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCommentMutationResult = NonNullable<Awaited<ReturnType<typeof restoreComment>>>;
+
+export type RestoreCommentMutationError = ErrorType<HTTPValidationError>;
+export type RestoreCommentMutationVariables = { communityId: number; commentId: number };
+
+/**
+ * @summary Restore Comment
+ */
+export const useRestoreComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreComment>>,
+      TError,
+      RestoreCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreComment>>,
+  TError,
+  RestoreCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreCommentMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Comment
+ */
+export const purgeComment = (
+  communityId: number,
+  commentId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/comments/${commentId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeCommentMutationKey = () => ["purgeComment"] as const;
+
+export const getPurgeCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeComment>>,
+    TError,
+    PurgeCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeComment>>,
+  TError,
+  PurgeCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeComment>>,
+    PurgeCommentMutationVariables
+  > = (props) => {
+    const { communityId, commentId } = props ?? {};
+
+    return purgeComment(communityId, commentId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeCommentMutationResult = NonNullable<Awaited<ReturnType<typeof purgeComment>>>;
+
+export type PurgeCommentMutationError = ErrorType<HTTPValidationError>;
+export type PurgeCommentMutationVariables = { communityId: number; commentId: number };
+
+/**
+ * @summary Purge Comment
+ */
+export const usePurgeComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeComment>>,
+      TError,
+      PurgeCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeComment>>,
+  TError,
+  PurgeCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeCommentMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Initiative
+ */
+export const restoreInitiative = (
+  communityId: number,
+  initiativeId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/initiatives/${initiativeId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreInitiativeMutationKey = () => ["restoreInitiative"] as const;
+
+export const getRestoreInitiativeMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreInitiative>>,
+    TError,
+    RestoreInitiativeMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreInitiative>>,
+  TError,
+  RestoreInitiativeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreInitiativeMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreInitiative>>,
+    RestoreInitiativeMutationVariables
+  > = (props) => {
+    const { communityId, initiativeId } = props ?? {};
+
+    return restoreInitiative(communityId, initiativeId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreInitiativeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreInitiative>>
+>;
+
+export type RestoreInitiativeMutationError = ErrorType<HTTPValidationError>;
+export type RestoreInitiativeMutationVariables = { communityId: number; initiativeId: number };
+
+/**
+ * @summary Restore Initiative
+ */
+export const useRestoreInitiative = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreInitiative>>,
+      TError,
+      RestoreInitiativeMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreInitiative>>,
+  TError,
+  RestoreInitiativeMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreInitiativeMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Initiative
+ */
+export const purgeInitiative = (
+  communityId: number,
+  initiativeId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/initiatives/${initiativeId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeInitiativeMutationKey = () => ["purgeInitiative"] as const;
+
+export const getPurgeInitiativeMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeInitiative>>,
+    TError,
+    PurgeInitiativeMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeInitiative>>,
+  TError,
+  PurgeInitiativeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeInitiativeMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeInitiative>>,
+    PurgeInitiativeMutationVariables
+  > = (props) => {
+    const { communityId, initiativeId } = props ?? {};
+
+    return purgeInitiative(communityId, initiativeId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeInitiativeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof purgeInitiative>>
+>;
+
+export type PurgeInitiativeMutationError = ErrorType<HTTPValidationError>;
+export type PurgeInitiativeMutationVariables = { communityId: number; initiativeId: number };
+
+/**
+ * @summary Purge Initiative
+ */
+export const usePurgeInitiative = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeInitiative>>,
+      TError,
+      PurgeInitiativeMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeInitiative>>,
+  TError,
+  PurgeInitiativeMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeInitiativeMutationOptions(options), queryClient);
+};
+/**
+ * Take it out of the trash, with everything that went in with it. A
+ * member restores what they deleted; whoever holds the community's trash
+ * restores anything in it.
+ * @summary Restore Tag
+ */
+export const restoreTag = (
+  communityId: number,
+  tagId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<RestoreResponse>(
+    { url: `/api/v1/c/${communityId}/tags/${tagId}/restore`, method: "POST", signal },
+    options
+  );
+};
+
+export const getRestoreTagMutationKey = () => ["restoreTag"] as const;
+
+export const getRestoreTagMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreTag>>,
+    TError,
+    RestoreTagMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreTag>>,
+  TError,
+  RestoreTagMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreTagMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreTag>>,
+    RestoreTagMutationVariables
+  > = (props) => {
+    const { communityId, tagId } = props ?? {};
+
+    return restoreTag(communityId, tagId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreTagMutationResult = NonNullable<Awaited<ReturnType<typeof restoreTag>>>;
+
+export type RestoreTagMutationError = ErrorType<HTTPValidationError>;
+export type RestoreTagMutationVariables = { communityId: number; tagId: number };
+
+/**
+ * @summary Restore Tag
+ */
+export const useRestoreTag = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreTag>>,
+      TError,
+      RestoreTagMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof restoreTag>>,
+  TError,
+  RestoreTagMutationVariables,
+  TContext
+> => {
+  return useMutation(getRestoreTagMutationOptions(options), queryClient);
+};
+/**
+ * Delete it from the trash for good, with everything that went in with
+ * it. Only whoever holds the community's trash may.
+ * @summary Purge Tag
+ */
+export const purgeTag = (
+  communityId: number,
+  tagId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/tags/${tagId}/purge`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPurgeTagMutationKey = () => ["purgeTag"] as const;
+
+export const getPurgeTagMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeTag>>,
+    TError,
+    PurgeTagMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeTag>>,
+  TError,
+  PurgeTagMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeTagMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeTag>>,
+    PurgeTagMutationVariables
+  > = (props) => {
+    const { communityId, tagId } = props ?? {};
+
+    return purgeTag(communityId, tagId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeTagMutationResult = NonNullable<Awaited<ReturnType<typeof purgeTag>>>;
+
+export type PurgeTagMutationError = ErrorType<HTTPValidationError>;
+export type PurgeTagMutationVariables = { communityId: number; tagId: number };
+
+/**
+ * @summary Purge Tag
+ */
+export const usePurgeTag = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeTag>>,
+      TError,
+      PurgeTagMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof purgeTag>>,
+  TError,
+  PurgeTagMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeTagMutationOptions(options), queryClient);
 };
 /**
  * The current user's trashed entities across every guild they belong to,

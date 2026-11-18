@@ -9,6 +9,20 @@ matter and can be deleted.
 
 ## After 0.79.2
 
+### One route shape for every universal operation
+
+Tagging, archiving and taking out of the trash are mounted for every kind
+that has them at that kind's own path, `/{kind}/{id}/{operation}`, as trash,
+duplicate and sharing already were: `PUT /{tool}/{id}/tags`,
+`POST /{kind}/{id}/archive` and `…/unarchive`, `POST /{kind}/{id}/restore` and
+`…/purge`. Purging is a `POST` now, like restoring.
+
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags api path removed without deprecation
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore api path removed without deprecation
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge api path removed without deprecation
+
 ### Sending somebody something
 
 `NotificationType` takes `item_sent`: somebody pointed the reader at a thing,

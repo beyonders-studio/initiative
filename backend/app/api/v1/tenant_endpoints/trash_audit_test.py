@@ -26,8 +26,8 @@ async def test_purging_an_entity_records_what_was_destroyed(
     assert trashed.status_code in (200, 204), trashed.text
     capfd.readouterr()
 
-    purged = await client.delete(
-        admin.g(f"/trash/project/{project.id}/purge"), headers=admin.headers
+    purged = await client.post(
+        admin.g(f"/projects/{project.id}/purge"), headers=admin.headers
     )
     assert purged.status_code == 204, purged.text
 
@@ -58,8 +58,8 @@ async def test_a_refused_purge_records_nothing(
     assert trashed.status_code in (200, 204), trashed.text
     capfd.readouterr()
 
-    refused = await client.delete(
-        member.g(f"/trash/project/{project.id}/purge"), headers=member.headers
+    refused = await client.post(
+        member.g(f"/projects/{project.id}/purge"), headers=member.headers
     )
     assert refused.status_code == 403
 

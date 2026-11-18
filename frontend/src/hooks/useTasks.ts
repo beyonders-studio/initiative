@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
-import { archiveEntity } from "@/api/generated/archive/archive";
+import { archiveTask } from "@/api/generated/archive/archive";
 import type {
   ArchiveDoneResponse,
   ArchiveResponse,
@@ -539,7 +539,7 @@ export const useBulkArchiveTasks = (options?: MutationOpts<ArchiveResponse[], nu
   useCommunityMutation<ArchiveResponse[], number[]>(
     {
       mutationFn: (communityId, taskIds) =>
-        Promise.all(taskIds.map((taskId) => archiveEntity(communityId, "task", taskId))),
+        Promise.all(taskIds.map((taskId) => archiveTask(communityId, taskId))),
       invalidate: () => invalidate(q.allTasks()),
       errorKey: "projects:tasks.archiveError",
     },

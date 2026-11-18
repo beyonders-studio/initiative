@@ -29,13 +29,13 @@ on the resource, with the tool's write scope beside the sharing scope
 """
 
 # NOT ``from __future__ import annotations``: the handlers are built per tool
-# with ``Annotated[int, Path(alias=cfg.path_param)]`` closing over a local, and
+# with ``resource_access.id_path`` closing over a local, and
 # stringized annotations re-evaluate it where that local is out of scope.
 
 from enum import Enum
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
@@ -72,18 +72,11 @@ GrantNote = Annotated[
 ]
 
 
-def _title(path_param: str) -> str:
-    """The schema title a parameter of this name would be given."""
-    return path_param.replace("_", " ").title()
-
-
 def _mount(
     tool: Tool, cfg: resource_access.ResourceAccessConfig, spec: ToolListSpec
 ) -> None:
     """Mount ``PUT`` ``/{id}/grants`` for one tool."""
-    entity_id_param = Annotated[
-        int, Path(alias=cfg.path_param, title=_title(cfg.path_param))
-    ]
+    entity_id_param = Annotated[int, resource_access.id_path(tool.value)]
 
     async def replace(
         session: Any,

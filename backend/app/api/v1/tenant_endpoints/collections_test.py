@@ -186,8 +186,8 @@ async def test_archiving_a_collection_takes_the_role_that_makes_files(
     collection = await create_collection(
         session, owner.initiative, owner.user, files=[shared]
     )
-    archive = f"/archive/collection/{collection.id}"
-    unarchive = f"/unarchive/collection/{collection.id}"
+    archive = f"/collections/{collection.id}/archive"
+    unarchive = f"/collections/{collection.id}/unarchive"
 
     read = f"/collections/{collection.id}"
 
@@ -279,7 +279,7 @@ async def test_an_emptied_collection_goes_to_the_trash_and_comes_back(
     assert await deleted_at() is not None
 
     restored = await client.post(
-        owner.g(f"/trash/file/{private.id}/restore"), headers=owner.headers
+        owner.g(f"/files/{private.id}/restore"), headers=owner.headers
     )
     assert restored.status_code == 200, restored.text
     await post_commit.settle_all()

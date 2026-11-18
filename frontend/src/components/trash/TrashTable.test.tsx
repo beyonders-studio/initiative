@@ -24,8 +24,9 @@ const myTrashEndpoint = "/api/v1/me/trash";
 // variant="community" -> GET /api/v1/c/:communityId/trash/ (community-admin view).
 const communityTrashEndpoint = "/trash/";
 // restore/purge stay community-scoped, addressed by each item's community_id.
-const restoreEndpoint = "/trash/:type/:id/restore";
-const purgeEndpoint = "/trash/:type/:id/purge";
+// Each kind's own path: /{kind}/{id}/restore and /{kind}/{id}/purge.
+const restoreEndpoint = "/:segment/:id/restore";
+const purgeEndpoint = "/:segment/:id/purge";
 
 describe("TrashTable", () => {
   it("renders the empty state when the trash list is empty", async () => {
@@ -119,7 +120,7 @@ describe("TrashTable", () => {
         )
       ),
       communityHttp.post(restoreEndpoint, ({ params }) => {
-        restoreCalls.push(`${params.type}/${params.id}`);
+        restoreCalls.push(`${params.segment}/${params.id}`);
         return HttpResponse.json({ restored: true });
       })
     );
@@ -129,11 +130,11 @@ describe("TrashTable", () => {
     await screen.findByText("Test task");
     await userEvent.click(screen.getByRole("button", { name: /Restore/i }));
 
-    await waitFor(() => expect(restoreCalls).toEqual(["task/42"]));
+    await waitFor(() => expect(restoreCalls).toEqual(["tasks/42"]));
     await waitFor(() => expect(toast.success as ReturnType<typeof vi.fn>).toHaveBeenCalled());
   });
 
-  it("clicking Delete now opens a destructive confirmation and DELETEs on confirm", async () => {
+  it("clicking Delete now opens a destructive confirmation and purges on confirm", async () => {
     const { toast } = await import("@/lib/mascotToast");
     const purgeCalls: string[] = [];
 
@@ -145,8 +146,8 @@ describe("TrashTable", () => {
           ])
         )
       ),
-      communityHttp.delete(purgeEndpoint, ({ params }) => {
-        purgeCalls.push(`${params.type}/${params.id}`);
+      communityHttp.post(purgeEndpoint, ({ params }) => {
+        purgeCalls.push(`${params.segment}/${params.id}`);
         return new HttpResponse(null, { status: 204 });
       })
     );
@@ -162,7 +163,7 @@ describe("TrashTable", () => {
 
     await userEvent.click(within(confirm).getByRole("button", { name: /Delete forever/i }));
 
-    await waitFor(() => expect(purgeCalls).toEqual(["tag/9"]));
+    await waitFor(() => expect(purgeCalls).toEqual(["tags/9"]));
     await waitFor(() => expect(toast.success as ReturnType<typeof vi.fn>).toHaveBeenCalled());
   });
 });

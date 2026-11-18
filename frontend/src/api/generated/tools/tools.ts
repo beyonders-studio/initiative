@@ -340,101 +340,6 @@ export function useGetToolCounts<
 }
 
 /**
- * Set tags on any tool entity. Replaces all existing tags with the
- * provided list and returns the entity's new tags. Requires write access.
- * @summary Set Tool Tags
- */
-export const setToolTags = (
-  communityId: number,
-  tool: Tool,
-  toolId: number,
-  tagSetRequest: BodyType<TagSetRequest>,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<TagSummary[]>(
-    {
-      url: `/api/v1/c/${communityId}/tools/${tool}/${toolId}/tags`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: tagSetRequest,
-      signal,
-    },
-    options
-  );
-};
-
-export const getSetToolTagsMutationKey = () => ["setToolTags"] as const;
-
-export const getSetToolTagsMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof setToolTags>>,
-    TError,
-    SetToolTagsMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof apiMutator>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof setToolTags>>,
-  TError,
-  SetToolTagsMutationVariables,
-  TContext
-> => {
-  const mutationKey = getSetToolTagsMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof setToolTags>>,
-    SetToolTagsMutationVariables
-  > = (props) => {
-    const { communityId, tool, toolId, data } = props ?? {};
-
-    return setToolTags(communityId, tool, toolId, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type SetToolTagsMutationResult = NonNullable<Awaited<ReturnType<typeof setToolTags>>>;
-export type SetToolTagsMutationBody = BodyType<TagSetRequest>;
-export type SetToolTagsMutationError = ErrorType<HTTPValidationError>;
-export type SetToolTagsMutationVariables = {
-  communityId: number;
-  tool: Tool;
-  toolId: number;
-  data: BodyType<TagSetRequest>;
-};
-
-/**
- * @summary Set Tool Tags
- */
-export const useSetToolTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof setToolTags>>,
-      TError,
-      SetToolTagsMutationVariables,
-      TContext
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseMutationResult<
-  Awaited<ReturnType<typeof setToolTags>>,
-  TError,
-  SetToolTagsMutationVariables,
-  TContext
-> => {
-  return useMutation(getSetToolTagsMutationOptions(options), queryClient);
-};
-/**
  * Turn the comment thread on any tool entity on or off. Requires write
  * access, the same level that posting to the thread takes.
  *
@@ -538,4 +443,754 @@ export const useSetToolCommentSettings = <
   TContext
 > => {
   return useMutation(getSetToolCommentSettingsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Project Tags
+ */
+export const setProjectTags = (
+  communityId: number,
+  projectId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/projects/${projectId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetProjectTagsMutationKey = () => ["setProjectTags"] as const;
+
+export const getSetProjectTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setProjectTags>>,
+    TError,
+    SetProjectTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setProjectTags>>,
+  TError,
+  SetProjectTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetProjectTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setProjectTags>>,
+    SetProjectTagsMutationVariables
+  > = (props) => {
+    const { communityId, projectId, data } = props ?? {};
+
+    return setProjectTags(communityId, projectId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetProjectTagsMutationResult = NonNullable<Awaited<ReturnType<typeof setProjectTags>>>;
+export type SetProjectTagsMutationBody = BodyType<TagSetRequest>;
+export type SetProjectTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetProjectTagsMutationVariables = {
+  communityId: number;
+  projectId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Project Tags
+ */
+export const useSetProjectTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setProjectTags>>,
+      TError,
+      SetProjectTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setProjectTags>>,
+  TError,
+  SetProjectTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetProjectTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set File Tags
+ */
+export const setFileTags = (
+  communityId: number,
+  fileId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/files/${fileId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetFileTagsMutationKey = () => ["setFileTags"] as const;
+
+export const getSetFileTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setFileTags>>,
+    TError,
+    SetFileTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setFileTags>>,
+  TError,
+  SetFileTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetFileTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setFileTags>>,
+    SetFileTagsMutationVariables
+  > = (props) => {
+    const { communityId, fileId, data } = props ?? {};
+
+    return setFileTags(communityId, fileId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetFileTagsMutationResult = NonNullable<Awaited<ReturnType<typeof setFileTags>>>;
+export type SetFileTagsMutationBody = BodyType<TagSetRequest>;
+export type SetFileTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetFileTagsMutationVariables = {
+  communityId: number;
+  fileId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set File Tags
+ */
+export const useSetFileTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setFileTags>>,
+      TError,
+      SetFileTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setFileTags>>,
+  TError,
+  SetFileTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetFileTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Counter Group Tags
+ */
+export const setCounterGroupTags = (
+  communityId: number,
+  groupId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/counter-groups/${groupId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetCounterGroupTagsMutationKey = () => ["setCounterGroupTags"] as const;
+
+export const getSetCounterGroupTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setCounterGroupTags>>,
+    TError,
+    SetCounterGroupTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setCounterGroupTags>>,
+  TError,
+  SetCounterGroupTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetCounterGroupTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setCounterGroupTags>>,
+    SetCounterGroupTagsMutationVariables
+  > = (props) => {
+    const { communityId, groupId, data } = props ?? {};
+
+    return setCounterGroupTags(communityId, groupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetCounterGroupTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setCounterGroupTags>>
+>;
+export type SetCounterGroupTagsMutationBody = BodyType<TagSetRequest>;
+export type SetCounterGroupTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetCounterGroupTagsMutationVariables = {
+  communityId: number;
+  groupId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Counter Group Tags
+ */
+export const useSetCounterGroupTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setCounterGroupTags>>,
+      TError,
+      SetCounterGroupTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setCounterGroupTags>>,
+  TError,
+  SetCounterGroupTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetCounterGroupTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Calendar Tags
+ */
+export const setCalendarTags = (
+  communityId: number,
+  calendarId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/calendars/${calendarId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetCalendarTagsMutationKey = () => ["setCalendarTags"] as const;
+
+export const getSetCalendarTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setCalendarTags>>,
+    TError,
+    SetCalendarTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setCalendarTags>>,
+  TError,
+  SetCalendarTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetCalendarTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setCalendarTags>>,
+    SetCalendarTagsMutationVariables
+  > = (props) => {
+    const { communityId, calendarId, data } = props ?? {};
+
+    return setCalendarTags(communityId, calendarId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetCalendarTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setCalendarTags>>
+>;
+export type SetCalendarTagsMutationBody = BodyType<TagSetRequest>;
+export type SetCalendarTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetCalendarTagsMutationVariables = {
+  communityId: number;
+  calendarId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Calendar Tags
+ */
+export const useSetCalendarTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setCalendarTags>>,
+      TError,
+      SetCalendarTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setCalendarTags>>,
+  TError,
+  SetCalendarTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetCalendarTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Dashboard Tags
+ */
+export const setDashboardTags = (
+  communityId: number,
+  dashboardId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetDashboardTagsMutationKey = () => ["setDashboardTags"] as const;
+
+export const getSetDashboardTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setDashboardTags>>,
+    TError,
+    SetDashboardTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setDashboardTags>>,
+  TError,
+  SetDashboardTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetDashboardTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setDashboardTags>>,
+    SetDashboardTagsMutationVariables
+  > = (props) => {
+    const { communityId, dashboardId, data } = props ?? {};
+
+    return setDashboardTags(communityId, dashboardId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetDashboardTagsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setDashboardTags>>
+>;
+export type SetDashboardTagsMutationBody = BodyType<TagSetRequest>;
+export type SetDashboardTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetDashboardTagsMutationVariables = {
+  communityId: number;
+  dashboardId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Dashboard Tags
+ */
+export const useSetDashboardTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setDashboardTags>>,
+      TError,
+      SetDashboardTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setDashboardTags>>,
+  TError,
+  SetDashboardTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetDashboardTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Post Tags
+ */
+export const setPostTags = (
+  communityId: number,
+  postId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/posts/${postId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetPostTagsMutationKey = () => ["setPostTags"] as const;
+
+export const getSetPostTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setPostTags>>,
+    TError,
+    SetPostTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setPostTags>>,
+  TError,
+  SetPostTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetPostTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setPostTags>>,
+    SetPostTagsMutationVariables
+  > = (props) => {
+    const { communityId, postId, data } = props ?? {};
+
+    return setPostTags(communityId, postId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetPostTagsMutationResult = NonNullable<Awaited<ReturnType<typeof setPostTags>>>;
+export type SetPostTagsMutationBody = BodyType<TagSetRequest>;
+export type SetPostTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetPostTagsMutationVariables = {
+  communityId: number;
+  postId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Post Tags
+ */
+export const useSetPostTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setPostTags>>,
+      TError,
+      SetPostTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setPostTags>>,
+  TError,
+  SetPostTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetPostTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Wiki Tags
+ */
+export const setWikiTags = (
+  communityId: number,
+  wikiId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/wikis/${wikiId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetWikiTagsMutationKey = () => ["setWikiTags"] as const;
+
+export const getSetWikiTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setWikiTags>>,
+    TError,
+    SetWikiTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setWikiTags>>,
+  TError,
+  SetWikiTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetWikiTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setWikiTags>>,
+    SetWikiTagsMutationVariables
+  > = (props) => {
+    const { communityId, wikiId, data } = props ?? {};
+
+    return setWikiTags(communityId, wikiId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetWikiTagsMutationResult = NonNullable<Awaited<ReturnType<typeof setWikiTags>>>;
+export type SetWikiTagsMutationBody = BodyType<TagSetRequest>;
+export type SetWikiTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetWikiTagsMutationVariables = {
+  communityId: number;
+  wikiId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Wiki Tags
+ */
+export const useSetWikiTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setWikiTags>>,
+      TError,
+      SetWikiTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setWikiTags>>,
+  TError,
+  SetWikiTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetWikiTagsMutationOptions(options), queryClient);
+};
+/**
+ * Replace its tags with the ones listed and answer with its new tags.
+ * Requires write access.
+ * @summary Set Contact Tags
+ */
+export const setContactTags = (
+  communityId: number,
+  contactId: number,
+  tagSetRequest: BodyType<TagSetRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TagSummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/contacts/${contactId}/tags`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: tagSetRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetContactTagsMutationKey = () => ["setContactTags"] as const;
+
+export const getSetContactTagsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setContactTags>>,
+    TError,
+    SetContactTagsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setContactTags>>,
+  TError,
+  SetContactTagsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetContactTagsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setContactTags>>,
+    SetContactTagsMutationVariables
+  > = (props) => {
+    const { communityId, contactId, data } = props ?? {};
+
+    return setContactTags(communityId, contactId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetContactTagsMutationResult = NonNullable<Awaited<ReturnType<typeof setContactTags>>>;
+export type SetContactTagsMutationBody = BodyType<TagSetRequest>;
+export type SetContactTagsMutationError = ErrorType<HTTPValidationError>;
+export type SetContactTagsMutationVariables = {
+  communityId: number;
+  contactId: number;
+  data: BodyType<TagSetRequest>;
+};
+
+/**
+ * @summary Set Contact Tags
+ */
+export const useSetContactTags = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setContactTags>>,
+      TError,
+      SetContactTagsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setContactTags>>,
+  TError,
+  SetContactTagsMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetContactTagsMutationOptions(options), queryClient);
 };

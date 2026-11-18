@@ -74,7 +74,7 @@ async def test_archived_work_is_left_out_included_or_all_there_is(
 ):
     actor, _, _, shelved = await an_initiative(session, acting_user)
     archived = await client.post(
-        actor.g(f"/archive/project/{shelved.id}"), headers=actor.headers
+        actor.g(f"/projects/{shelved.id}/archive"), headers=actor.headers
     )
     assert archived.status_code == 200, archived.text
 

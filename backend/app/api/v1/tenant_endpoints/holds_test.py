@@ -290,8 +290,8 @@ async def test_trashing_what_holds_it_leaves_it_and_purging_waits(
     assert task.deleted_at is None and task.held_at is not None
     await set_rls_context(session, Unattributed())
 
-    purged = await client.delete(
-        owner.g(f"/trash/project/{project_id}/purge"), headers=owner.headers
+    purged = await client.post(
+        owner.g(f"/projects/{project_id}/purge"), headers=owner.headers
     )
     assert purged.status_code == 409
 

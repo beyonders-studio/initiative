@@ -850,8 +850,8 @@ async def test_purging_a_project_takes_its_layouts(
 
     trashed = await client.delete(a.g(f"/projects/{a.project.id}"), headers=a.headers)
     assert trashed.status_code == 204, trashed.text
-    purged = await client.delete(
-        a.g(f"/trash/project/{a.project.id}/purge"), headers=a.headers
+    purged = await client.post(
+        a.g(f"/projects/{a.project.id}/purge"), headers=a.headers
     )
 
     assert purged.status_code == 204, purged.text

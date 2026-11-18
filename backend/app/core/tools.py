@@ -36,6 +36,13 @@ def plural_of(stem: str) -> str:
     return stem + "s"
 
 
+def route_segment_of(kind: str) -> str:
+    """The kebab plural the routes for a kind are served under
+    (``calendar_event`` → ``calendar-events``). The frontend's
+    ``toolRouteSegment`` applies the same rule."""
+    return plural_of(kind).replace("_", "-")
+
+
 class Tool(str, Enum):
     project = "project"
     file = "file"
@@ -64,9 +71,8 @@ class Tool(str, Enum):
     @property
     def route_segment(self) -> str:
         """The kebab plural every route for this tool is served under
-        (``counter_group`` → ``counter-groups``). The frontend's
-        ``toolRouteSegment`` applies the same rule."""
-        return self.plural.replace("_", "-")
+        (``counter_group`` → ``counter-groups``)."""
+        return route_segment_of(self.value)
 
     @property
     def view_permission(self) -> str:

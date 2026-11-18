@@ -20,7 +20,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Path, status
 from sqlalchemy import inspect
 
 from app.api.deps import (
@@ -145,6 +145,21 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         hydrated_loader=contacts_service.get_contact_hydrated,
     ),
 }
+
+
+def path_param_of(kind: str) -> str:
+    """The path parameter a route mounted per kind addresses its row by: a
+    tool's own (a counter group's ``group_id``), ``<kind>_id`` for the rest."""
+    if kind in Tool._value2member_map_:
+        return RESOURCE_ACCESS[Tool(kind)].path_param
+    return f"{kind}_id"
+
+
+def id_path(kind: str) -> Any:
+    """That path parameter, for a handler built per kind to annotate its id
+    with: ``Annotated[int, id_path(kind)]``."""
+    param = path_param_of(kind)
+    return Path(alias=param, title=param.replace("_", " ").title())
 
 
 def governing_tool(table: str) -> Tool:

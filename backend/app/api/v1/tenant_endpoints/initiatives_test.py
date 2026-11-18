@@ -390,7 +390,7 @@ async def test_initiative_crud_answers_each_caller(
         )
     elif verb == "archive":
         response = await client.post(
-            actor.g(f"/archive/initiative/{initiative.id}"), headers=actor.headers
+            actor.g(f"/initiatives/{initiative.id}/archive"), headers=actor.headers
         )
     else:
         response = await client.delete(
@@ -541,7 +541,7 @@ async def test_archiving_an_initiative_round_trips_and_keeps_it_listed(
     assert fresh.json()["archived_at"] is None
 
     archive = await client.post(
-        admin.g(f"/archive/initiative/{initiative.id}"), headers=admin.headers
+        admin.g(f"/initiatives/{initiative.id}/archive"), headers=admin.headers
     )
     assert archive.status_code == 200
     assert archive.json()["archived_at"] is not None
@@ -554,7 +554,7 @@ async def test_archiving_an_initiative_round_trips_and_keeps_it_listed(
     assert archived["archived_at"] is not None
 
     unarchive = await client.post(
-        admin.g(f"/unarchive/initiative/{initiative.id}"), headers=admin.headers
+        admin.g(f"/initiatives/{initiative.id}/unarchive"), headers=admin.headers
     )
     assert unarchive.status_code == 200
     assert unarchive.json()["archived_at"] is None

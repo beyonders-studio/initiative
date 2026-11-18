@@ -91,7 +91,7 @@ describe("DetailsPage tags", () => {
   it("keeps the new selection when the write succeeds", async () => {
     resetFactories();
     server.use(
-      communityHttp.put("/tools/:tool/:toolId/tags", () => HttpResponse.json([ADDED_TAG]))
+      communityHttp.put("/counter-groups/:groupId/tags", () => HttpResponse.json([ADDED_TAG]))
     );
     renderSection(DetailsPage, buildEntity());
 
@@ -104,7 +104,7 @@ describe("DetailsPage tags", () => {
     resetFactories();
     const existing = buildTagSummary({ id: 1, name: "Existing tag" });
     server.use(
-      communityHttp.put("/tools/:tool/:toolId/tags", () =>
+      communityHttp.put("/counter-groups/:groupId/tags", () =>
         HttpResponse.json({ detail: "NOPE" }, { status: 500 })
       )
     );

@@ -351,10 +351,10 @@ async def test_an_archived_project_still_lists_its_tasks(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     earlier = await create_task(session, a.project, title="Archived earlier")
-    await client.post(a.g(f"/archive/task/{earlier.id}"), headers=a.headers)
+    await client.post(a.g(f"/tasks/{earlier.id}/archive"), headers=a.headers)
     task = await create_task(session, a.project, title="Archived with project")
     archived = await client.post(
-        a.g(f"/archive/project/{a.project.id}"), headers=a.headers
+        a.g(f"/projects/{a.project.id}/archive"), headers=a.headers
     )
     assert archived.status_code == 200
 

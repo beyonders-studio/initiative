@@ -1,5 +1,9 @@
 """Trash-can endpoints: list / restore / immediate-purge.
 
+``GET /trash/`` lists every kind at once. Restoring and purging are
+``POST /{kind}/{id}/restore`` and ``POST /{kind}/{id}/purge``, mounted for every
+trashable kind (``TRASH_TARGETS``) at that kind's own path.
+
 Guild routes operate on the guild in the ``/c/{community_id}`` path; the
 cross-guild ``/me/trash`` view (see ``me_trash.py``) spans the user's guilds.
 A guild's listing is one statement: a UNION ALL over the trashable models,
@@ -12,7 +16,9 @@ under a deleted project — just the project. Restoring the parent
 resurfaces the children automatically (see ``soft_delete.py``).
 """
 
-from __future__ import annotations
+# NOT ``from __future__ import annotations``: the restore and purge handlers are
+# built per kind with ``id_path`` closing over a local, and stringized
+# annotations re-evaluate it where that local is out of scope.
 
 from typing import Annotated
 
@@ -29,9 +35,10 @@ from app.api.deps import (
     get_current_active_user,
     require_surface,
 )
+from app.api.resource_access import id_path, path_param_of
 from app.core.audit_events import AuditEventType
 from app.core.messages import TrashMessages
-from app.core.tools import TRASH_TARGETS, plural_of
+from app.core.tools import TRASH_TARGETS, plural_of, route_segment_of
 from app.core.user_display import display_name
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import build_paginated_response
@@ -44,7 +51,6 @@ from app.models.tenant.comment import Comment
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import Task
 from app.schemas.tenant.trash import (
-    EntityType,
     RestoreResponse,
     TrashItem,
     TrashListResponse,
@@ -61,6 +67,8 @@ from app.services.tenant.soft_delete import (
 )
 
 router = APIRouter()
+
+CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
 
 def _entry(target: str) -> tuple[type[SQLModel], str]:
@@ -230,7 +238,7 @@ async def trash_page(
     return items, count.one()
 
 
-@router.get("/", response_model=TrashListResponse)
+@router.get("/trash/", response_model=TrashListResponse)
 async def list_community_trash(
     session: RLSSessionDep,
     guild_context: Annotated[
@@ -262,7 +270,7 @@ async def list_community_trash(
 async def _load_trash_entity(
     session: AsyncSession,
     *,
-    entity_type: EntityType,
+    entity_type: str,
     entity_id: int,
     for_update: bool = False,
 ) -> SQLModel:
@@ -277,13 +285,7 @@ async def _load_trash_entity(
     404 (deleted_at is NULL), or it blocks on the lock until the purge commits and
     the row is gone.
     """
-    spec = ENTITY_REGISTRY.get(entity_type)
-    if spec is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=TrashMessages.UNKNOWN_ENTITY_TYPE,
-        )
-    model, _ = spec
+    model, _ = ENTITY_REGISTRY[entity_type]
     stmt = select_including_deleted(model).where(model.id == entity_id)
     if for_update:
         stmt = stmt.with_for_update()
@@ -296,18 +298,13 @@ async def _load_trash_entity(
     return entity
 
 
-@router.post(
-    "/{entity_type}/{entity_id}/restore",
-    status_code=status.HTTP_200_OK,
-    response_model=RestoreResponse,
-)
-async def restore_trash_entity(
-    entity_type: EntityType,
+async def _restore(
+    entity_type: str,
     entity_id: int,
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
-):
+    session: AsyncSession,
+    current_user: User,
+    guild_context: GuildContext,
+) -> RestoreResponse:
     """Restore a trashed entity."""
     entity = await _load_trash_entity(
         session,
@@ -349,17 +346,12 @@ async def restore_trash_entity(
     return RestoreResponse(restored=True)
 
 
-@router.delete(
-    "/{entity_type}/{entity_id}/purge",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-)
-async def purge_trash_entity(
-    entity_type: EntityType,
+async def _purge(
+    entity_type: str,
     entity_id: int,
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: AsyncSession,
+    current_user: User,
+    guild_context: GuildContext,
 ) -> Response:
     """Hard-purge a trashed entity. Guild-admin only, fully guild-scoped.
 
@@ -393,10 +385,61 @@ async def purge_trash_entity(
         event_type=AuditEventType.TRASH_PURGED,
         actor_user_id=current_user.id,
         guild_id=guild_context.guild_id,
-        target_type=entity_type.value,
+        target_type=entity_type,
         target_id=entity_id,
         detail={"via": "admin"},
     )
     await session.commit()
     attachments_service.delete_blobs(guild_context.guild_id, released)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _mount(entity_type: str) -> None:
+    """Mount ``POST`` ``/{id}/restore`` and ``/{id}/purge`` for one kind."""
+    entity_id_param = Annotated[int, id_path(entity_type)]
+    item = f"/{route_segment_of(entity_type)}/{{{path_param_of(entity_type)}}}"
+
+    async def restore(
+        entity_id: entity_id_param,
+        session: RLSSessionDep,
+        current_user: CurrentUserDep,
+        guild_context: GuildContextDep,
+    ) -> RestoreResponse:
+        """Take it out of the trash, with everything that went in with it. A
+        member restores what they deleted; whoever holds the community's trash
+        restores anything in it."""
+        return await _restore(
+            entity_type, entity_id, session, current_user, guild_context
+        )
+
+    async def purge(
+        entity_id: entity_id_param,
+        session: RLSSessionDep,
+        current_user: CurrentUserDep,
+        guild_context: GuildContextDep,
+    ) -> Response:
+        """Delete it from the trash for good, with everything that went in with
+        it. Only whoever holds the community's trash may."""
+        return await _purge(
+            entity_type, entity_id, session, current_user, guild_context
+        )
+
+    router.add_api_route(
+        f"{item}/restore",
+        restore,
+        methods=["POST"],
+        response_model=RestoreResponse,
+        name=f"restore_{entity_type}",
+    )
+    router.add_api_route(
+        f"{item}/purge",
+        purge,
+        methods=["POST"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        response_class=Response,
+        name=f"purge_{entity_type}",
+    )
+
+
+for _entity_type in TRASH_TARGETS:
+    _mount(_entity_type)

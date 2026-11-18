@@ -23,13 +23,13 @@ write scope, as it reaches the tool's create.
 """
 
 # NOT ``from __future__ import annotations``: the handlers are built per tool
-# with ``Annotated[int, Path(alias=cfg.path_param)]`` closing over a local, and
+# with ``resource_access.id_path`` closing over a local, and
 # stringized annotations re-evaluate it where that local is out of scope.
 
 from enum import Enum
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, status
+from fastapi import APIRouter, Depends, status
 
 from app.api import resource_access, tool_copy
 from app.api.actor_route import ActorRoute
@@ -58,16 +58,9 @@ GuildContextDep = Annotated[GuildContext, Depends(get_guild_membership)]
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
 
-def _title(path_param: str) -> str:
-    """The schema title a parameter of this name would be given."""
-    return path_param.replace("_", " ").title()
-
-
 def _mount(tool: Tool, cfg: resource_access.ResourceAccessConfig) -> None:
     """Mount ``DELETE`` ``/{id}`` for one tool."""
-    entity_id_param = Annotated[
-        int, Path(alias=cfg.path_param, title=_title(cfg.path_param))
-    ]
+    entity_id_param = Annotated[int, resource_access.id_path(tool.value)]
 
     async def delete(
         entity_id: entity_id_param,
@@ -109,9 +102,7 @@ def _mount_duplicate(
     tool: Tool, cfg: resource_access.ResourceAccessConfig, spec: ToolListSpec
 ) -> None:
     """Mount ``POST`` ``/{id}/duplicate`` for one tool."""
-    entity_id_param = Annotated[
-        int, Path(alias=cfg.path_param, title=_title(cfg.path_param))
-    ]
+    entity_id_param = Annotated[int, resource_access.id_path(tool.value)]
     copier = tool_copy.TOOL_COPIERS[tool]
 
     async def copy(

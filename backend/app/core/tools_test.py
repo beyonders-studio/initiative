@@ -284,30 +284,46 @@ def test_a_tag_assignment_is_an_edge_like_any_other():
     assert not spec.transitive, "a tag of a tag is not a tag of the thing"
 
 
-def test_the_generic_tool_tags_route_is_the_only_tool_set_tags_surface():
-    # ONE generic route serves every tool — its {tool} path param is the Tool
-    # enum itself, so a new member is covered with no new endpoint. The
-    # content-level extras (tasks, events) take ``tag_ids`` on
-    # their own PATCH; the exact equality means a re-added set-tags route
-    # fails here.
+def test_every_kind_mounts_its_universal_operations():
+    # Tagging, archiving and the trash's restore and purge are each one route
+    # mounted for every kind that has the operation, at that kind's own path,
+    # ``/{segment}/{id}/{operation}``. The exact equality means a kind that
+    # loses one, or a hand-written copy added somewhere else, fails here. The
+    # operation id is the generated frontend client's function name. What
+    # lives inside a tool takes ``tag_ids`` on its own update, so tags are the
+    # tools' alone.
+    from app.api.resource_access import path_param_of
+    from app.core.tools import ARCHIVE_TARGETS, TRASH_TARGETS, route_segment_of
     from app.main import app
 
     spec = app.openapi()
-    put_tag_paths = {
-        path
-        for path, item in spec["paths"].items()
-        if "put" in item and path.endswith("/tags")
-    }
-    generic = "/api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags"
-    assert put_tag_paths == {generic}
 
-    tool_param = next(
-        p for p in spec["paths"][generic]["put"]["parameters"] if p["name"] == "tool"
-    )
-    schema = tool_param["schema"]
-    ref = schema.get("$ref") or schema["allOf"][0]["$ref"]
-    enum_values = spec["components"]["schemas"][ref.rsplit("/", 1)[-1]]["enum"]
-    assert set(enum_values) == {t.value for t in Tool}
+    def item(kind: str) -> str:
+        return (
+            f"/api/v1/c/{{community_id}}/{route_segment_of(kind)}"
+            f"/{{{path_param_of(kind)}}}"
+        )
+
+    operations = {
+        ("put", "tags", "set_{}_tags"): [t.value for t in Tool],
+        ("post", "archive", "archive_{}"): ARCHIVE_TARGETS,
+        ("post", "unarchive", "unarchive_{}"): ARCHIVE_TARGETS,
+        ("post", "restore", "restore_{}"): TRASH_TARGETS,
+        ("post", "purge", "purge_{}"): TRASH_TARGETS,
+    }
+    for (method, operation, operation_id), kinds in operations.items():
+        mounted = {
+            path
+            for path, methods in spec["paths"].items()
+            if method in methods
+            and path.startswith("/api/v1/c/")
+            and path.endswith(f"/{operation}")
+            and path.count("/") == 7
+        }
+        assert mounted == {f"{item(kind)}/{operation}" for kind in kinds}, operation
+        for kind in kinds:
+            route = spec["paths"][f"{item(kind)}/{operation}"][method]
+            assert route["operationId"] == operation_id.format(kind), kind
 
 
 def test_every_tool_mounts_its_list_route():

@@ -610,9 +610,7 @@ async def test_a_file_field_holds_one_file_of_its_initiative_until_it_is_purged(
     read = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
     assert _values(read.json()["properties"])[defn.id] == {"id": design.id}
 
-    purged = await client.delete(
-        a.g(f"/trash/file/{design.id}/purge"), headers=a.headers
-    )
+    purged = await client.post(a.g(f"/files/{design.id}/purge"), headers=a.headers)
     assert purged.status_code == 204, purged.text
     [held] = await _stored(session, TASKS, task)
     await session.refresh(held)
@@ -1289,8 +1287,8 @@ async def test_purging_an_initiative_takes_every_value_in_it_with_it(
     assert deleted.status_code in (200, 204)
     assert len(await _stored(session, EVENTS, event)) == 1
 
-    purged = await client.delete(
-        a.g(f"/trash/initiative/{a.initiative.id}/purge"), headers=a.headers
+    purged = await client.post(
+        a.g(f"/initiatives/{a.initiative.id}/purge"), headers=a.headers
     )
     assert purged.status_code == 204
     assert (await session.exec(select(MetadataValue))).all() == []

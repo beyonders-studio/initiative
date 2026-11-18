@@ -719,7 +719,7 @@ async def test_a_post_is_added_with_the_tags_its_page_requires(
     assert added.status_code == 201, added.text
 
     untagged = await client.put(
-        a.g(f"/tools/post/{added.json()['id']}/tags"),
+        a.g(f"/posts/{added.json()['id']}/tags"),
         json={"tag_ids": []},
         headers=a.headers,
     )
@@ -727,7 +727,7 @@ async def test_a_post_is_added_with_the_tags_its_page_requires(
     # One made before it was required is tagged and untagged as before.
     older = await create_post(session, a.initiative, a.user)
     untouched = await client.put(
-        a.g(f"/tools/post/{older.id}/tags"), json={"tag_ids": []}, headers=a.headers
+        a.g(f"/posts/{older.id}/tags"), json={"tag_ids": []}, headers=a.headers
     )
     assert untouched.status_code == 200, untouched.text
 

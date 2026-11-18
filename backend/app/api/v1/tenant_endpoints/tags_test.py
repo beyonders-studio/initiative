@@ -132,10 +132,10 @@ async def test_set_tags_rejects_other_guilds_tag(
     assert response.json()["detail"] == "INVALID_TAG_IDS"
 
 
-async def test_generic_tool_tags_route_covers_every_tool(
+async def test_tool_tags_route_covers_every_tool(
     client: AsyncClient, acting_user, session
 ):
-    """PUT /tools/{tool}/{tool_id}/tags works for EVERY Tool member.
+    """PUT /{tool}/{id}/tags works for EVERY Tool member.
 
     Both halves derive from the enum — the feature toggles from ``Tool`` and
     the entities from ``TOOL_FACTORIES`` — so a new
@@ -157,7 +157,7 @@ async def test_generic_tool_tags_route_covers_every_tool(
 
     for tool, entity in entities.items():
         response = await client.put(
-            a.g(f"/tools/{tool.value}/{entity.id}/tags"),
+            a.g(f"/{tool.route_segment}/{entity.id}/tags"),
             headers=a.headers,
             json={"tag_ids": [tag.id]},
         )
@@ -175,16 +175,6 @@ async def test_generic_tool_tags_route_covers_every_tool(
         rows = body["items"] if isinstance(body, dict) else body
         (row,) = [r for r in rows if r["id"] == entity.id]
         assert [t["id"] for t in row["tags"]] == [tag.id], tool
-
-
-async def test_generic_tool_tags_route_rejects_unknown_tool(
-    client: AsyncClient, acting_user
-):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    response = await client.put(
-        a.g("/tools/task/1/tags"), headers=a.headers, json={"tag_ids": []}
-    )
-    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -472,7 +462,7 @@ async def test_cross_initiative_member_cannot_touch_tags(
 
     # Same gate on the generic tool route: a's project is invisible to b.
     response = await client.put(
-        b.g(f"/tools/project/{a.project.id}/tags"),
+        b.g(f"/projects/{a.project.id}/tags"),
         headers=b.headers,
         json={"tag_ids": [tag.id]},
     )

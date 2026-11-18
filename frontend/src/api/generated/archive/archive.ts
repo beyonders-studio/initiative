@@ -12,11 +12,7 @@ import type {
   UseMutationResult,
 } from "@tanstack/react-query";
 
-import type {
-  ArchivableType,
-  ArchiveResponse,
-  HTTPValidationError,
-} from "../initiativeAPI.schemas";
+import type { ArchiveResponse, HTTPValidationError } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
 import type { ErrorType } from "../../mutator";
@@ -24,44 +20,41 @@ import type { ErrorType } from "../../mutator";
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Mark a thing finished with, and everything inside it. Idempotent: an
- * already-archived row keeps the stamp it has, so the date means when it was
- * archived, not when it was last asked about.
- * @summary Archive Entity
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Project
  */
-export const archiveEntity = (
+export const archiveProject = (
   communityId: number,
-  entityType: ArchivableType,
-  entityId: number,
+  projectId: number,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
   return apiMutator<ArchiveResponse>(
-    { url: `/api/v1/c/${communityId}/archive/${entityType}/${entityId}`, method: "POST", signal },
+    { url: `/api/v1/c/${communityId}/projects/${projectId}/archive`, method: "POST", signal },
     options
   );
 };
 
-export const getArchiveEntityMutationKey = () => ["archiveEntity"] as const;
+export const getArchiveProjectMutationKey = () => ["archiveProject"] as const;
 
-export const getArchiveEntityMutationOptions = <
+export const getArchiveProjectMutationOptions = <
   TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof archiveEntity>>,
+    Awaited<ReturnType<typeof archiveProject>>,
     TError,
-    ArchiveEntityMutationVariables,
+    ArchiveProjectMutationVariables,
     TContext
   >;
   request?: SecondParameter<typeof apiMutator>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof archiveEntity>>,
+  Awaited<ReturnType<typeof archiveProject>>,
   TError,
-  ArchiveEntityMutationVariables,
+  ArchiveProjectMutationVariables,
   TContext
 > => {
-  const mutationKey = getArchiveEntityMutationKey();
+  const mutationKey = getArchiveProjectMutationKey();
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
       ? options
@@ -69,87 +62,80 @@ export const getArchiveEntityMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof archiveEntity>>,
-    ArchiveEntityMutationVariables
+    Awaited<ReturnType<typeof archiveProject>>,
+    ArchiveProjectMutationVariables
   > = (props) => {
-    const { communityId, entityType, entityId } = props ?? {};
+    const { communityId, projectId } = props ?? {};
 
-    return archiveEntity(communityId, entityType, entityId, requestOptions);
+    return archiveProject(communityId, projectId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type ArchiveEntityMutationResult = NonNullable<Awaited<ReturnType<typeof archiveEntity>>>;
+export type ArchiveProjectMutationResult = NonNullable<Awaited<ReturnType<typeof archiveProject>>>;
 
-export type ArchiveEntityMutationError = ErrorType<HTTPValidationError>;
-export type ArchiveEntityMutationVariables = {
-  communityId: number;
-  entityType: ArchivableType;
-  entityId: number;
-};
+export type ArchiveProjectMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveProjectMutationVariables = { communityId: number; projectId: number };
 
 /**
- * @summary Archive Entity
+ * @summary Archive Project
  */
-export const useArchiveEntity = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+export const useArchiveProject = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof archiveEntity>>,
+      Awaited<ReturnType<typeof archiveProject>>,
       TError,
-      ArchiveEntityMutationVariables,
+      ArchiveProjectMutationVariables,
       TContext
     >;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof archiveEntity>>,
+  Awaited<ReturnType<typeof archiveProject>>,
   TError,
-  ArchiveEntityMutationVariables,
+  ArchiveProjectMutationVariables,
   TContext
 > => {
-  return useMutation(getArchiveEntityMutationOptions(options), queryClient);
+  return useMutation(getArchiveProjectMutationOptions(options), queryClient);
 };
 /**
- * Take it back out, and with it everything that archiving took. Anything
- * inside that was archived on its own occasion stays archived. Idempotent on a
- * live row.
- * @summary Unarchive Entity
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Project
  */
-export const unarchiveEntity = (
+export const unarchiveProject = (
   communityId: number,
-  entityType: ArchivableType,
-  entityId: number,
+  projectId: number,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
   return apiMutator<ArchiveResponse>(
-    { url: `/api/v1/c/${communityId}/unarchive/${entityType}/${entityId}`, method: "POST", signal },
+    { url: `/api/v1/c/${communityId}/projects/${projectId}/unarchive`, method: "POST", signal },
     options
   );
 };
 
-export const getUnarchiveEntityMutationKey = () => ["unarchiveEntity"] as const;
+export const getUnarchiveProjectMutationKey = () => ["unarchiveProject"] as const;
 
-export const getUnarchiveEntityMutationOptions = <
+export const getUnarchiveProjectMutationOptions = <
   TError = ErrorType<HTTPValidationError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof unarchiveEntity>>,
+    Awaited<ReturnType<typeof unarchiveProject>>,
     TError,
-    UnarchiveEntityMutationVariables,
+    UnarchiveProjectMutationVariables,
     TContext
   >;
   request?: SecondParameter<typeof apiMutator>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof unarchiveEntity>>,
+  Awaited<ReturnType<typeof unarchiveProject>>,
   TError,
-  UnarchiveEntityMutationVariables,
+  UnarchiveProjectMutationVariables,
   TContext
 > => {
-  const mutationKey = getUnarchiveEntityMutationKey();
+  const mutationKey = getUnarchiveProjectMutationKey();
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
       ? options
@@ -157,47 +143,1696 @@ export const getUnarchiveEntityMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof unarchiveEntity>>,
-    UnarchiveEntityMutationVariables
+    Awaited<ReturnType<typeof unarchiveProject>>,
+    UnarchiveProjectMutationVariables
   > = (props) => {
-    const { communityId, entityType, entityId } = props ?? {};
+    const { communityId, projectId } = props ?? {};
 
-    return unarchiveEntity(communityId, entityType, entityId, requestOptions);
+    return unarchiveProject(communityId, projectId, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type UnarchiveEntityMutationResult = NonNullable<
-  Awaited<ReturnType<typeof unarchiveEntity>>
+export type UnarchiveProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveProject>>
 >;
 
-export type UnarchiveEntityMutationError = ErrorType<HTTPValidationError>;
-export type UnarchiveEntityMutationVariables = {
-  communityId: number;
-  entityType: ArchivableType;
-  entityId: number;
-};
+export type UnarchiveProjectMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveProjectMutationVariables = { communityId: number; projectId: number };
 
 /**
- * @summary Unarchive Entity
+ * @summary Unarchive Project
  */
-export const useUnarchiveEntity = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+export const useUnarchiveProject = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof unarchiveEntity>>,
+      Awaited<ReturnType<typeof unarchiveProject>>,
       TError,
-      UnarchiveEntityMutationVariables,
+      UnarchiveProjectMutationVariables,
       TContext
     >;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseMutationResult<
-  Awaited<ReturnType<typeof unarchiveEntity>>,
+  Awaited<ReturnType<typeof unarchiveProject>>,
   TError,
-  UnarchiveEntityMutationVariables,
+  UnarchiveProjectMutationVariables,
   TContext
 > => {
-  return useMutation(getUnarchiveEntityMutationOptions(options), queryClient);
+  return useMutation(getUnarchiveProjectMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive File
+ */
+export const archiveFile = (
+  communityId: number,
+  fileId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/files/${fileId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveFileMutationKey = () => ["archiveFile"] as const;
+
+export const getArchiveFileMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveFile>>,
+    TError,
+    ArchiveFileMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveFile>>,
+  TError,
+  ArchiveFileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveFileMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveFile>>,
+    ArchiveFileMutationVariables
+  > = (props) => {
+    const { communityId, fileId } = props ?? {};
+
+    return archiveFile(communityId, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveFileMutationResult = NonNullable<Awaited<ReturnType<typeof archiveFile>>>;
+
+export type ArchiveFileMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveFileMutationVariables = { communityId: number; fileId: number };
+
+/**
+ * @summary Archive File
+ */
+export const useArchiveFile = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveFile>>,
+      TError,
+      ArchiveFileMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveFile>>,
+  TError,
+  ArchiveFileMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveFileMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive File
+ */
+export const unarchiveFile = (
+  communityId: number,
+  fileId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/files/${fileId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveFileMutationKey = () => ["unarchiveFile"] as const;
+
+export const getUnarchiveFileMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveFile>>,
+    TError,
+    UnarchiveFileMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveFile>>,
+  TError,
+  UnarchiveFileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveFileMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveFile>>,
+    UnarchiveFileMutationVariables
+  > = (props) => {
+    const { communityId, fileId } = props ?? {};
+
+    return unarchiveFile(communityId, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveFileMutationResult = NonNullable<Awaited<ReturnType<typeof unarchiveFile>>>;
+
+export type UnarchiveFileMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveFileMutationVariables = { communityId: number; fileId: number };
+
+/**
+ * @summary Unarchive File
+ */
+export const useUnarchiveFile = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveFile>>,
+      TError,
+      UnarchiveFileMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveFile>>,
+  TError,
+  UnarchiveFileMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveFileMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Counter Group
+ */
+export const archiveCounterGroup = (
+  communityId: number,
+  groupId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/counter-groups/${groupId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveCounterGroupMutationKey = () => ["archiveCounterGroup"] as const;
+
+export const getArchiveCounterGroupMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveCounterGroup>>,
+    TError,
+    ArchiveCounterGroupMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveCounterGroup>>,
+  TError,
+  ArchiveCounterGroupMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveCounterGroupMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveCounterGroup>>,
+    ArchiveCounterGroupMutationVariables
+  > = (props) => {
+    const { communityId, groupId } = props ?? {};
+
+    return archiveCounterGroup(communityId, groupId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveCounterGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof archiveCounterGroup>>
+>;
+
+export type ArchiveCounterGroupMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveCounterGroupMutationVariables = { communityId: number; groupId: number };
+
+/**
+ * @summary Archive Counter Group
+ */
+export const useArchiveCounterGroup = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveCounterGroup>>,
+      TError,
+      ArchiveCounterGroupMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveCounterGroup>>,
+  TError,
+  ArchiveCounterGroupMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveCounterGroupMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Counter Group
+ */
+export const unarchiveCounterGroup = (
+  communityId: number,
+  groupId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/counter-groups/${groupId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveCounterGroupMutationKey = () => ["unarchiveCounterGroup"] as const;
+
+export const getUnarchiveCounterGroupMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveCounterGroup>>,
+    TError,
+    UnarchiveCounterGroupMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveCounterGroup>>,
+  TError,
+  UnarchiveCounterGroupMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveCounterGroupMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveCounterGroup>>,
+    UnarchiveCounterGroupMutationVariables
+  > = (props) => {
+    const { communityId, groupId } = props ?? {};
+
+    return unarchiveCounterGroup(communityId, groupId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveCounterGroupMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveCounterGroup>>
+>;
+
+export type UnarchiveCounterGroupMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveCounterGroupMutationVariables = { communityId: number; groupId: number };
+
+/**
+ * @summary Unarchive Counter Group
+ */
+export const useUnarchiveCounterGroup = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveCounterGroup>>,
+      TError,
+      UnarchiveCounterGroupMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveCounterGroup>>,
+  TError,
+  UnarchiveCounterGroupMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveCounterGroupMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Calendar
+ */
+export const archiveCalendar = (
+  communityId: number,
+  calendarId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/calendars/${calendarId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveCalendarMutationKey = () => ["archiveCalendar"] as const;
+
+export const getArchiveCalendarMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveCalendar>>,
+    TError,
+    ArchiveCalendarMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveCalendar>>,
+  TError,
+  ArchiveCalendarMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveCalendarMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveCalendar>>,
+    ArchiveCalendarMutationVariables
+  > = (props) => {
+    const { communityId, calendarId } = props ?? {};
+
+    return archiveCalendar(communityId, calendarId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveCalendarMutationResult = NonNullable<
+  Awaited<ReturnType<typeof archiveCalendar>>
+>;
+
+export type ArchiveCalendarMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveCalendarMutationVariables = { communityId: number; calendarId: number };
+
+/**
+ * @summary Archive Calendar
+ */
+export const useArchiveCalendar = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveCalendar>>,
+      TError,
+      ArchiveCalendarMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveCalendar>>,
+  TError,
+  ArchiveCalendarMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveCalendarMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Calendar
+ */
+export const unarchiveCalendar = (
+  communityId: number,
+  calendarId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/calendars/${calendarId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveCalendarMutationKey = () => ["unarchiveCalendar"] as const;
+
+export const getUnarchiveCalendarMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveCalendar>>,
+    TError,
+    UnarchiveCalendarMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveCalendar>>,
+  TError,
+  UnarchiveCalendarMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveCalendarMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveCalendar>>,
+    UnarchiveCalendarMutationVariables
+  > = (props) => {
+    const { communityId, calendarId } = props ?? {};
+
+    return unarchiveCalendar(communityId, calendarId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveCalendarMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveCalendar>>
+>;
+
+export type UnarchiveCalendarMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveCalendarMutationVariables = { communityId: number; calendarId: number };
+
+/**
+ * @summary Unarchive Calendar
+ */
+export const useUnarchiveCalendar = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveCalendar>>,
+      TError,
+      UnarchiveCalendarMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveCalendar>>,
+  TError,
+  UnarchiveCalendarMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveCalendarMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Dashboard
+ */
+export const archiveDashboard = (
+  communityId: number,
+  dashboardId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveDashboardMutationKey = () => ["archiveDashboard"] as const;
+
+export const getArchiveDashboardMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveDashboard>>,
+    TError,
+    ArchiveDashboardMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveDashboard>>,
+  TError,
+  ArchiveDashboardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveDashboardMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveDashboard>>,
+    ArchiveDashboardMutationVariables
+  > = (props) => {
+    const { communityId, dashboardId } = props ?? {};
+
+    return archiveDashboard(communityId, dashboardId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveDashboardMutationResult = NonNullable<
+  Awaited<ReturnType<typeof archiveDashboard>>
+>;
+
+export type ArchiveDashboardMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveDashboardMutationVariables = { communityId: number; dashboardId: number };
+
+/**
+ * @summary Archive Dashboard
+ */
+export const useArchiveDashboard = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveDashboard>>,
+      TError,
+      ArchiveDashboardMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveDashboard>>,
+  TError,
+  ArchiveDashboardMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveDashboardMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Dashboard
+ */
+export const unarchiveDashboard = (
+  communityId: number,
+  dashboardId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveDashboardMutationKey = () => ["unarchiveDashboard"] as const;
+
+export const getUnarchiveDashboardMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveDashboard>>,
+    TError,
+    UnarchiveDashboardMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveDashboard>>,
+  TError,
+  UnarchiveDashboardMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveDashboardMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveDashboard>>,
+    UnarchiveDashboardMutationVariables
+  > = (props) => {
+    const { communityId, dashboardId } = props ?? {};
+
+    return unarchiveDashboard(communityId, dashboardId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveDashboardMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveDashboard>>
+>;
+
+export type UnarchiveDashboardMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveDashboardMutationVariables = { communityId: number; dashboardId: number };
+
+/**
+ * @summary Unarchive Dashboard
+ */
+export const useUnarchiveDashboard = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveDashboard>>,
+      TError,
+      UnarchiveDashboardMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveDashboard>>,
+  TError,
+  UnarchiveDashboardMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveDashboardMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Post
+ */
+export const archivePost = (
+  communityId: number,
+  postId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/posts/${postId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchivePostMutationKey = () => ["archivePost"] as const;
+
+export const getArchivePostMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archivePost>>,
+    TError,
+    ArchivePostMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archivePost>>,
+  TError,
+  ArchivePostMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchivePostMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archivePost>>,
+    ArchivePostMutationVariables
+  > = (props) => {
+    const { communityId, postId } = props ?? {};
+
+    return archivePost(communityId, postId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchivePostMutationResult = NonNullable<Awaited<ReturnType<typeof archivePost>>>;
+
+export type ArchivePostMutationError = ErrorType<HTTPValidationError>;
+export type ArchivePostMutationVariables = { communityId: number; postId: number };
+
+/**
+ * @summary Archive Post
+ */
+export const useArchivePost = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archivePost>>,
+      TError,
+      ArchivePostMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archivePost>>,
+  TError,
+  ArchivePostMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchivePostMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Post
+ */
+export const unarchivePost = (
+  communityId: number,
+  postId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/posts/${postId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchivePostMutationKey = () => ["unarchivePost"] as const;
+
+export const getUnarchivePostMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchivePost>>,
+    TError,
+    UnarchivePostMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchivePost>>,
+  TError,
+  UnarchivePostMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchivePostMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchivePost>>,
+    UnarchivePostMutationVariables
+  > = (props) => {
+    const { communityId, postId } = props ?? {};
+
+    return unarchivePost(communityId, postId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchivePostMutationResult = NonNullable<Awaited<ReturnType<typeof unarchivePost>>>;
+
+export type UnarchivePostMutationError = ErrorType<HTTPValidationError>;
+export type UnarchivePostMutationVariables = { communityId: number; postId: number };
+
+/**
+ * @summary Unarchive Post
+ */
+export const useUnarchivePost = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchivePost>>,
+      TError,
+      UnarchivePostMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchivePost>>,
+  TError,
+  UnarchivePostMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchivePostMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Wiki
+ */
+export const archiveWiki = (
+  communityId: number,
+  wikiId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/wikis/${wikiId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveWikiMutationKey = () => ["archiveWiki"] as const;
+
+export const getArchiveWikiMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveWiki>>,
+    TError,
+    ArchiveWikiMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveWiki>>,
+  TError,
+  ArchiveWikiMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveWikiMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveWiki>>,
+    ArchiveWikiMutationVariables
+  > = (props) => {
+    const { communityId, wikiId } = props ?? {};
+
+    return archiveWiki(communityId, wikiId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveWikiMutationResult = NonNullable<Awaited<ReturnType<typeof archiveWiki>>>;
+
+export type ArchiveWikiMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveWikiMutationVariables = { communityId: number; wikiId: number };
+
+/**
+ * @summary Archive Wiki
+ */
+export const useArchiveWiki = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveWiki>>,
+      TError,
+      ArchiveWikiMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveWiki>>,
+  TError,
+  ArchiveWikiMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveWikiMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Wiki
+ */
+export const unarchiveWiki = (
+  communityId: number,
+  wikiId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/wikis/${wikiId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveWikiMutationKey = () => ["unarchiveWiki"] as const;
+
+export const getUnarchiveWikiMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveWiki>>,
+    TError,
+    UnarchiveWikiMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveWiki>>,
+  TError,
+  UnarchiveWikiMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveWikiMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveWiki>>,
+    UnarchiveWikiMutationVariables
+  > = (props) => {
+    const { communityId, wikiId } = props ?? {};
+
+    return unarchiveWiki(communityId, wikiId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveWikiMutationResult = NonNullable<Awaited<ReturnType<typeof unarchiveWiki>>>;
+
+export type UnarchiveWikiMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveWikiMutationVariables = { communityId: number; wikiId: number };
+
+/**
+ * @summary Unarchive Wiki
+ */
+export const useUnarchiveWiki = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveWiki>>,
+      TError,
+      UnarchiveWikiMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveWiki>>,
+  TError,
+  UnarchiveWikiMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveWikiMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Contact
+ */
+export const archiveContact = (
+  communityId: number,
+  contactId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/contacts/${contactId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveContactMutationKey = () => ["archiveContact"] as const;
+
+export const getArchiveContactMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveContact>>,
+    TError,
+    ArchiveContactMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveContact>>,
+  TError,
+  ArchiveContactMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveContactMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveContact>>,
+    ArchiveContactMutationVariables
+  > = (props) => {
+    const { communityId, contactId } = props ?? {};
+
+    return archiveContact(communityId, contactId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveContactMutationResult = NonNullable<Awaited<ReturnType<typeof archiveContact>>>;
+
+export type ArchiveContactMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveContactMutationVariables = { communityId: number; contactId: number };
+
+/**
+ * @summary Archive Contact
+ */
+export const useArchiveContact = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveContact>>,
+      TError,
+      ArchiveContactMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveContact>>,
+  TError,
+  ArchiveContactMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveContactMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Contact
+ */
+export const unarchiveContact = (
+  communityId: number,
+  contactId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/contacts/${contactId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveContactMutationKey = () => ["unarchiveContact"] as const;
+
+export const getUnarchiveContactMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveContact>>,
+    TError,
+    UnarchiveContactMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveContact>>,
+  TError,
+  UnarchiveContactMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveContactMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveContact>>,
+    UnarchiveContactMutationVariables
+  > = (props) => {
+    const { communityId, contactId } = props ?? {};
+
+    return unarchiveContact(communityId, contactId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveContactMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveContact>>
+>;
+
+export type UnarchiveContactMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveContactMutationVariables = { communityId: number; contactId: number };
+
+/**
+ * @summary Unarchive Contact
+ */
+export const useUnarchiveContact = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveContact>>,
+      TError,
+      UnarchiveContactMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveContact>>,
+  TError,
+  UnarchiveContactMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveContactMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Task
+ */
+export const archiveTask = (
+  communityId: number,
+  taskId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/tasks/${taskId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveTaskMutationKey = () => ["archiveTask"] as const;
+
+export const getArchiveTaskMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveTask>>,
+    TError,
+    ArchiveTaskMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveTask>>,
+  TError,
+  ArchiveTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveTaskMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveTask>>,
+    ArchiveTaskMutationVariables
+  > = (props) => {
+    const { communityId, taskId } = props ?? {};
+
+    return archiveTask(communityId, taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveTaskMutationResult = NonNullable<Awaited<ReturnType<typeof archiveTask>>>;
+
+export type ArchiveTaskMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveTaskMutationVariables = { communityId: number; taskId: number };
+
+/**
+ * @summary Archive Task
+ */
+export const useArchiveTask = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveTask>>,
+      TError,
+      ArchiveTaskMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveTask>>,
+  TError,
+  ArchiveTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveTaskMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Task
+ */
+export const unarchiveTask = (
+  communityId: number,
+  taskId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/tasks/${taskId}/unarchive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getUnarchiveTaskMutationKey = () => ["unarchiveTask"] as const;
+
+export const getUnarchiveTaskMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveTask>>,
+    TError,
+    UnarchiveTaskMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveTask>>,
+  TError,
+  UnarchiveTaskMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveTaskMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveTask>>,
+    UnarchiveTaskMutationVariables
+  > = (props) => {
+    const { communityId, taskId } = props ?? {};
+
+    return unarchiveTask(communityId, taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveTaskMutationResult = NonNullable<Awaited<ReturnType<typeof unarchiveTask>>>;
+
+export type UnarchiveTaskMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveTaskMutationVariables = { communityId: number; taskId: number };
+
+/**
+ * @summary Unarchive Task
+ */
+export const useUnarchiveTask = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveTask>>,
+      TError,
+      UnarchiveTaskMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveTask>>,
+  TError,
+  UnarchiveTaskMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveTaskMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Collection
+ */
+export const archiveCollection = (
+  communityId: number,
+  collectionId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/collections/${collectionId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveCollectionMutationKey = () => ["archiveCollection"] as const;
+
+export const getArchiveCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveCollection>>,
+    TError,
+    ArchiveCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveCollection>>,
+  TError,
+  ArchiveCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveCollection>>,
+    ArchiveCollectionMutationVariables
+  > = (props) => {
+    const { communityId, collectionId } = props ?? {};
+
+    return archiveCollection(communityId, collectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof archiveCollection>>
+>;
+
+export type ArchiveCollectionMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveCollectionMutationVariables = { communityId: number; collectionId: number };
+
+/**
+ * @summary Archive Collection
+ */
+export const useArchiveCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveCollection>>,
+      TError,
+      ArchiveCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveCollection>>,
+  TError,
+  ArchiveCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveCollectionMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Collection
+ */
+export const unarchiveCollection = (
+  communityId: number,
+  collectionId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/unarchive`,
+      method: "POST",
+      signal,
+    },
+    options
+  );
+};
+
+export const getUnarchiveCollectionMutationKey = () => ["unarchiveCollection"] as const;
+
+export const getUnarchiveCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveCollection>>,
+    TError,
+    UnarchiveCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveCollection>>,
+  TError,
+  UnarchiveCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveCollection>>,
+    UnarchiveCollectionMutationVariables
+  > = (props) => {
+    const { communityId, collectionId } = props ?? {};
+
+    return unarchiveCollection(communityId, collectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveCollection>>
+>;
+
+export type UnarchiveCollectionMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveCollectionMutationVariables = { communityId: number; collectionId: number };
+
+/**
+ * @summary Unarchive Collection
+ */
+export const useUnarchiveCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveCollection>>,
+      TError,
+      UnarchiveCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveCollection>>,
+  TError,
+  UnarchiveCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveCollectionMutationOptions(options), queryClient);
+};
+/**
+ * Mark it finished with, and everything inside it. Idempotent: an already-archived row keeps the stamp it has, so the date means when it was archived, not when it was last asked about.
+ * @summary Archive Initiative
+ */
+export const archiveInitiative = (
+  communityId: number,
+  initiativeId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    { url: `/api/v1/c/${communityId}/initiatives/${initiativeId}/archive`, method: "POST", signal },
+    options
+  );
+};
+
+export const getArchiveInitiativeMutationKey = () => ["archiveInitiative"] as const;
+
+export const getArchiveInitiativeMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof archiveInitiative>>,
+    TError,
+    ArchiveInitiativeMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof archiveInitiative>>,
+  TError,
+  ArchiveInitiativeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getArchiveInitiativeMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof archiveInitiative>>,
+    ArchiveInitiativeMutationVariables
+  > = (props) => {
+    const { communityId, initiativeId } = props ?? {};
+
+    return archiveInitiative(communityId, initiativeId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ArchiveInitiativeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof archiveInitiative>>
+>;
+
+export type ArchiveInitiativeMutationError = ErrorType<HTTPValidationError>;
+export type ArchiveInitiativeMutationVariables = { communityId: number; initiativeId: number };
+
+/**
+ * @summary Archive Initiative
+ */
+export const useArchiveInitiative = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof archiveInitiative>>,
+      TError,
+      ArchiveInitiativeMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof archiveInitiative>>,
+  TError,
+  ArchiveInitiativeMutationVariables,
+  TContext
+> => {
+  return useMutation(getArchiveInitiativeMutationOptions(options), queryClient);
+};
+/**
+ * Take it back out, and with it everything that archiving took. Anything inside that was archived on its own occasion stays archived. Idempotent on a live row.
+ * @summary Unarchive Initiative
+ */
+export const unarchiveInitiative = (
+  communityId: number,
+  initiativeId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ArchiveResponse>(
+    {
+      url: `/api/v1/c/${communityId}/initiatives/${initiativeId}/unarchive`,
+      method: "POST",
+      signal,
+    },
+    options
+  );
+};
+
+export const getUnarchiveInitiativeMutationKey = () => ["unarchiveInitiative"] as const;
+
+export const getUnarchiveInitiativeMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unarchiveInitiative>>,
+    TError,
+    UnarchiveInitiativeMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unarchiveInitiative>>,
+  TError,
+  UnarchiveInitiativeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnarchiveInitiativeMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unarchiveInitiative>>,
+    UnarchiveInitiativeMutationVariables
+  > = (props) => {
+    const { communityId, initiativeId } = props ?? {};
+
+    return unarchiveInitiative(communityId, initiativeId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnarchiveInitiativeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unarchiveInitiative>>
+>;
+
+export type UnarchiveInitiativeMutationError = ErrorType<HTTPValidationError>;
+export type UnarchiveInitiativeMutationVariables = { communityId: number; initiativeId: number };
+
+/**
+ * @summary Unarchive Initiative
+ */
+export const useUnarchiveInitiative = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unarchiveInitiative>>,
+      TError,
+      UnarchiveInitiativeMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unarchiveInitiative>>,
+  TError,
+  UnarchiveInitiativeMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnarchiveInitiativeMutationOptions(options), queryClient);
 };

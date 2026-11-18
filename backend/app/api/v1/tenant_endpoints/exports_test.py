@@ -902,7 +902,7 @@ async def test_an_archived_projects_report_carries_the_tasks_archived_with_it(
         session, a.project, title="Old news", archived_at=datetime.now(UTC)
     )
     archived = await client.post(
-        a.g(f"/archive/project/{a.project.id}"), headers=a.headers
+        a.g(f"/projects/{a.project.id}/archive"), headers=a.headers
     )
     assert archived.status_code == 200
 
