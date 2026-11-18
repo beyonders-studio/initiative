@@ -83,12 +83,15 @@ from tuf.ngclient import FetcherInterface, Updater, UpdaterConfig
 from app.core.config import settings
 from app.core.messages import MarketplaceRegistryMessages as Codes
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.models.platform.marketplace import MarketplaceListing
 from app.models.platform.marketplace_registry import (
+    MAX_SKIPPED_KEPT,
     STATUS_ROW_ID,
     MarketplaceRegistryStatus,
     MarketplaceTufMetadata,
 )
 from app.services.marketplace import package_terms, registry_entries
+from app.services.marketplace import publishers as publishers_service
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.marketplace.registry_entries import RegistryError
 from app.services.platform import app_settings as app_settings_service
@@ -794,10 +797,53 @@ async def _claim_refresh(session: AsyncSession) -> bool:
 
 @dataclass(frozen=True)
 class SkippedEntry:
-    """A listing (or a delegated role) the repository carried that did not land."""
+    """What the repository carried that did not land, and why.
 
-    name: str
+    Named for the operator by display name, never by a target path or a uid:
+    the listing's when one was skipped, the publisher's when none of its
+    listings could be read. Neither, for the package's own role or a listing
+    this deployment has never held under a name.
+    """
+
     code: str
+    listing_name: str | None = None
+    publisher_name: str | None = None
+
+    def to_json(self) -> dict[str, str]:
+        kept = {"code": self.code}
+        if self.listing_name:
+            kept["listing_name"] = self.listing_name
+        if self.publisher_name:
+            kept["publisher_name"] = self.publisher_name
+        return kept
+
+    @classmethod
+    def from_json(cls, value: object) -> SkippedEntry | None:
+        if not isinstance(value, dict) or not isinstance(value.get("code"), str):
+            return None
+        listing_name = value.get("listing_name")
+        publisher_name = value.get("publisher_name")
+        return cls(
+            code=value["code"],
+            listing_name=listing_name if isinstance(listing_name, str) else None,
+            publisher_name=publisher_name if isinstance(publisher_name, str) else None,
+        )
+
+
+async def _stored_listing_name(session: AsyncSession, uid: str) -> str | None:
+    """The name this deployment holds a listing under, if it holds it."""
+    name = (
+        await session.exec(
+            select(MarketplaceListing.name).where(MarketplaceListing.uid == uid)
+        )
+    ).first()
+    return name[: registry_entries.MAX_LISTING_NAME] if name else None
+
+
+async def _publisher_name(session: AsyncSession, prefix: str) -> str | None:
+    """The display name of the publisher a delegated role is named after."""
+    publisher = await publishers_service.publisher_by_prefix(session, prefix)
+    return publisher.display_name if publisher is not None else None
 
 
 @dataclass
@@ -873,7 +919,12 @@ async def _apply(
 
         paths = await asyncio.to_thread(repo.listing_paths)
         for failed, code in repo.failed:
-            result.skipped.append(SkippedEntry(name=failed.name, code=code))
+            result.skipped.append(
+                SkippedEntry(
+                    code=code,
+                    publisher_name=await _publisher_name(session, failed.name),
+                )
+            )
 
         async def fetch(path: str, max_bytes: int) -> bytes:
             return await asyncio.to_thread(repo.fetch_target, path, max_bytes)
@@ -915,13 +966,19 @@ async def _apply(
                     exc.code,
                     exc.detail,
                 )
-                result.skipped.append(SkippedEntry(name=path, code=exc.code))
+                result.skipped.append(
+                    SkippedEntry(
+                        code=exc.code,
+                        listing_name=exc.listing_name
+                        or await _stored_listing_name(session, parsed.uid),
+                    )
+                )
 
         result.withdrawn = await registry_entries.withdraw_missing(
             session, present=present, uncertain=repo.uncertain, now=now
         )
         if anchor.builtin:
-            terms, keep = await _read_terms(repo, present, result)
+            terms, keep = await _read_terms(session, repo, present, result)
         else:
             terms, keep = {}, set()
         await package_terms.apply_terms(
@@ -935,6 +992,9 @@ async def _apply(
     # A skipped listing leaves the run incomplete, which is also what makes the
     # next refresh read the same snapshot again rather than treat it as done.
     status.last_error = result.skipped[0].code if result.skipped else None
+    status.last_skipped = [
+        entry.to_json() for entry in result.skipped[:MAX_SKIPPED_KEPT]
+    ] or None
     if not result.skipped:
         status.last_success_at = now
     session.add(status)
@@ -942,7 +1002,10 @@ async def _apply(
 
 
 async def _read_terms(
-    repo: VerifiedRepository, present: set[str], result: RefreshResult
+    session: AsyncSession,
+    repo: VerifiedRepository,
+    present: set[str],
+    result: RefreshResult,
 ) -> tuple[dict[str, package_terms.ListingTerms], set[str] | None]:
     """The package's terms for each listing present, and the uids whose
     terms could not be read and so stay as they are (``None`` for every one,
@@ -955,9 +1018,7 @@ async def _read_terms(
             exc.code,
             exc.detail,
         )
-        result.skipped.append(
-            SkippedEntry(name=package_terms.PACKAGE_ROLE, code=exc.code)
-        )
+        result.skipped.append(SkippedEntry(code=exc.code))
         return {}, None
     if package is None:
         return {}, set()
@@ -977,7 +1038,10 @@ async def _read_terms(
                 exc.detail,
             )
             result.skipped.append(
-                SkippedEntry(name=package_terms.terms_path(uid), code=exc.code)
+                SkippedEntry(
+                    code=exc.code,
+                    listing_name=await _stored_listing_name(session, uid),
+                )
             )
             keep.add(uid)
     return terms, keep
@@ -999,6 +1063,7 @@ def _record_attempt(
     status.source = source[:2000]
     status.last_attempt_at = now
     status.last_error = None
+    status.last_skipped = None
     status.updated_at = now
 
 
@@ -1013,6 +1078,9 @@ async def _record_failure(
         status = await _status_row(session)
         status.last_attempt_at = now
         status.last_error = code
+        # The refusal stopped the run before anything was read, so what an
+        # earlier run skipped is no longer this attempt's to report.
+        status.last_skipped = None
         status.source = source[:2000]
         status.updated_at = now
         session.add(status)
@@ -1130,6 +1198,8 @@ class RegistryStatus:
     last_success_at: datetime | None
     last_error: str | None
     listing_count: int
+    #: What the last refresh skipped and why, by display name.
+    skipped: list[SkippedEntry] = field(default_factory=list)
 
 
 async def read_status(session: AsyncSession, *, enabled: bool) -> RegistryStatus:
@@ -1156,7 +1226,15 @@ async def read_status(session: AsyncSession, *, enabled: bool) -> RegistryStatus
         last_success_at=row.last_success_at if row is not None and current else None,
         last_error=root_error or (row.last_error if row is not None else None),
         listing_count=row.listing_count if row is not None else 0,
+        skipped=_kept_skips(row),
     )
+
+
+def _kept_skips(row: MarketplaceRegistryStatus | None) -> list[SkippedEntry]:
+    if row is None or not isinstance(row.last_skipped, list):
+        return []
+    kept = (SkippedEntry.from_json(value) for value in row.last_skipped)
+    return [entry for entry in kept if entry is not None]
 
 
 async def process_registry_refresh() -> None:

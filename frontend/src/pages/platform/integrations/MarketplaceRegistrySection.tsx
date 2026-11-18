@@ -10,7 +10,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { RegistryRefreshRead } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  RegistryRefreshRead,
+  RegistrySkippedListing,
+} from "@/api/generated/initiativeAPI.schemas";
 import { useReadRegistryStatus } from "@/api/generated/marketplace/marketplace";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import {
@@ -28,6 +31,14 @@ import { Switch } from "@/ui/switch";
 /** What the status row records for an uploaded bundle. */
 const BUNDLE_SOURCE = "bundle";
 
+/** Why one thing was skipped, in the operator's words. */
+const skipReason = (item: RegistrySkippedListing): string =>
+  messageForCode(item.code, "settings:marketplaceRegistry.skippedReasonFallback");
+
+/** The name a skipped thing is shown under: never a path, a uid or a code. */
+const skipName = (item: RegistrySkippedListing): string | null =>
+  item.listing_name ?? item.publisher_name ?? null;
+
 export const MarketplaceRegistrySection = () => {
   const { t } = useTranslation("settings");
   const status = useReadRegistryStatus();
@@ -35,9 +46,38 @@ export const MarketplaceRegistrySection = () => {
 
   const reportApplied = (result: RegistryRefreshRead, key: "refreshed" | "bundleApplied") => {
     toast.success(t(`marketplaceRegistry.${key}`, { count: result.upserted }));
-    if (result.skipped.length > 0) {
+    const [only] = result.skipped;
+    if (result.skipped.length === 1 && only.listing_name) {
+      toast.warning(
+        t("marketplaceRegistry.skippedListingToast", {
+          listing: only.listing_name,
+          reason: skipReason(only),
+        })
+      );
+      return;
+    }
+    const names = [
+      ...new Set(result.skipped.map(skipName).filter((name): name is string => !!name)),
+    ];
+    if (names.length > 0) {
+      toast.warning(t("marketplaceRegistry.skippedNamed", { names: names.join(", ") }));
+    } else if (result.skipped.length > 0) {
       toast.warning(t("marketplaceRegistry.skipped", { count: result.skipped.length }));
     }
+  };
+
+  const skipLine = (item: RegistrySkippedListing): string => {
+    const reason = skipReason(item);
+    if (item.listing_name) {
+      return t("marketplaceRegistry.skippedListing", { listing: item.listing_name, reason });
+    }
+    if (item.publisher_name) {
+      return t("marketplaceRegistry.skippedPublisher", {
+        publisher: item.publisher_name,
+        reason,
+      });
+    }
+    return t("marketplaceRegistry.skippedUnnamed", { reason });
   };
 
   const update = useUpdateRegistrySettings({
@@ -107,7 +147,17 @@ export const MarketplaceRegistrySection = () => {
                 {t("marketplaceRegistry.stale", { when: formatDateTime(state.expires_at) })}
               </p>
             ) : null}
-            {state.last_error ? (
+            {state.skipped.length > 0 ? (
+              <div className="text-destructive">
+                <p>{t("marketplaceRegistry.skippedHeading")}</p>
+                <ul className="list-disc space-y-1 ps-5">
+                  {state.skipped.map((item, index) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a skip has no id, and the list is replaced whole
+                    <li key={index}>{skipLine(item)}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : state.last_error ? (
               <p className="text-destructive">
                 {t("marketplaceRegistry.lastError", {
                   reason: messageForCode(

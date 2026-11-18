@@ -178,16 +178,26 @@ _REFUSAL_STATUS: dict[str, int] = {
 _MAX_BUNDLE_BYTES = registry_service.MAX_BUNDLE_BYTES
 
 
+def _skipped_read(
+    skipped: list[registry_service.SkippedEntry],
+) -> list[RegistrySkippedListing]:
+    return [
+        RegistrySkippedListing(
+            code=item.code,
+            listing_name=item.listing_name,
+            publisher_name=item.publisher_name,
+        )
+        for item in skipped
+    ]
+
+
 def _refresh_read(result: registry_service.RefreshResult) -> RegistryRefreshRead:
     return RegistryRefreshRead(
         root_version=result.root_version,
         upserted=result.upserted,
         withdrawn=result.withdrawn,
         unchanged=result.unchanged,
-        skipped=[
-            RegistrySkippedListing(name=item.name, code=item.code)
-            for item in result.skipped
-        ],
+        skipped=_skipped_read(result.skipped),
     )
 
 
@@ -248,6 +258,7 @@ async def read_registry_status(
         last_success_at=state.last_success_at,
         last_error=state.last_error,
         listing_count=state.listing_count,
+        skipped=_skipped_read(state.skipped),
     )
 
 

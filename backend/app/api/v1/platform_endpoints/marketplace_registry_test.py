@@ -65,6 +65,7 @@ async def test_refresh_applies_and_the_status_follows(client, acting_user, repo)
     assert status["root_version"] == 1
     assert status["listing_count"] == 1
     assert status["last_error"] is None
+    assert status["skipped"] == []
     assert status["last_success_at"] is not None
 
 

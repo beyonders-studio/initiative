@@ -71,7 +71,10 @@ from app.services.marketplace.catalog import (
     DEFAULT_AVATAR_URL,
     REGISTRY_SOURCE,
     CatalogError,
+    CatalogIdentityConflict,
+    CatalogReservedName,
     CatalogSourceConflict,
+    CatalogVersionReused,
     upsert_listing,
     withdraw_listing,
 )
@@ -118,12 +121,37 @@ _PATH_CHARS = frozenset(
 
 
 class RegistryError(Exception):
-    """A refusal, carrying the message code that names it."""
+    """A refusal, carrying the message code that names it.
 
-    def __init__(self, code: str, detail: str = "") -> None:
+    ``listing_name`` is the display name of the listing it refused, when the
+    refusal came after the entry naming it was read: what the operator is
+    shown, rather than a target path or a uid."""
+
+    def __init__(
+        self, code: str, detail: str = "", *, listing_name: str | None = None
+    ) -> None:
         super().__init__(detail or code)
         self.code = code
         self.detail = detail
+        self.listing_name = listing_name
+
+
+#: The code a catalog refusal is reported under, most specific first. A
+#: refusal not listed is the listing's contents being invalid.
+_CATALOG_CODES: tuple[tuple[type[CatalogError], str], ...] = (
+    (CatalogSourceConflict, Codes.SOURCE_CONFLICT),
+    (CatalogIdentityConflict, Codes.IDENTITY_CONFLICT),
+    (CatalogReservedName, Codes.RESERVED_NAMESPACE),
+    (CatalogVersionReused, Codes.VERSION_REUSED),
+)
+
+
+def catalog_code(exc: CatalogError) -> str:
+    """The registry message code for a catalog refusal."""
+    for error, code in _CATALOG_CODES:
+        if isinstance(exc, error):
+            return code
+    return Codes.LISTING_REJECTED
 
 
 class UnsupportedEntry(Exception):
@@ -446,9 +474,43 @@ async def apply_entry(session: AsyncSession, path: str, context: EntryContext) -
     if parsed is None:
         raise _invalid(f"{path} is not a listing path")
     prefix, uid = parsed
-    directory = f"publishers/{prefix}/{uid}/"
 
     entry = _json_object(await context.fetch(path, MAX_ENTRY_BYTES), what=path)
+    try:
+        await _apply_read_entry(
+            session, entry, path=path, prefix=prefix, uid=uid, context=context
+        )
+    except RegistryError as exc:
+        # Named for the operator by what the listing calls itself, once the
+        # entry that says so has been read.
+        if exc.listing_name is None:
+            exc.listing_name = entry_display_name(entry)
+        raise
+
+
+#: The longest listing name a refusal carries to the status panel.
+MAX_LISTING_NAME = 200
+
+
+def entry_display_name(entry: dict[str, Any]) -> str | None:
+    """The name an entry gives its listing, or ``None`` when it gives none."""
+    name = entry.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return name.strip()[:MAX_LISTING_NAME]
+
+
+async def _apply_read_entry(
+    session: AsyncSession,
+    entry: dict[str, Any],
+    *,
+    path: str,
+    prefix: str,
+    uid: str,
+    context: EntryContext,
+) -> None:
+    """Apply an entry already read from ``path``."""
+    directory = f"publishers/{prefix}/{uid}/"
     if entry.get("schema") != ENTRY_SCHEMA:
         raise _invalid(f"{path} is not entry schema {ENTRY_SCHEMA}")
     if entry.get("uid") != uid:
@@ -540,10 +602,8 @@ async def apply_entry(session: AsyncSession, path: str, context: EntryContext) -
                 published,
                 source=REGISTRY_SOURCE,
             )
-        except CatalogSourceConflict as exc:
-            raise RegistryError(Codes.SOURCE_CONFLICT, str(exc)) from exc
         except CatalogError as exc:
-            raise RegistryError(Codes.LISTING_REJECTED, str(exc)) from exc
+            raise RegistryError(catalog_code(exc), str(exc)) from exc
 
     assert listing is not None  # the latest version is always published
     listing.publisher_id = publisher.id
