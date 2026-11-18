@@ -186,6 +186,12 @@ class ToolSpec:
     community_rows: CommunityRows | None = None
     #: How it lays out what it holds, if it does.
     layouts: Layouts | None = None
+    #: The tables inside it whose rows are read and written exactly as their
+    #: parent in the tool is: a project's tasks, a task's assignees. Naming one
+    #: here is what makes it the tool's; its row security then follows its
+    #: foreign key to the tool's table, or to one of these that has one
+    #: (``app.db.initiative_rls.item_path``).
+    item_tables: tuple[str, ...] = ()
 
 
 #: Every tool's record, in enum order.
@@ -201,6 +207,7 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
             detail="task",
             typed=True,
         ),
+        item_tables=("tasks", "task_statuses", "task_types", "task_assignees"),
     ),
     Tool.file: ToolSpec(
         code=6,
@@ -210,12 +217,14 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
             "lexical": ("pdf", "md", "docx"),
             "sheet": ("csv", "xlsx"),
         },
+        item_tables=("file_versions",),
     ),
     Tool.counter_group: ToolSpec(
         code=4,
         export_formats=("pdf", "csv", "xlsx", "md", "json"),
         report_formats=("pdf", "csv", "xlsx", "md"),
         layouts=Layouts(per_instance=True, detail="counter"),
+        item_tables=("counters",),
     ),
     Tool.calendar: ToolSpec(
         code=1,
@@ -226,10 +235,24 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
         layouts=Layouts(
             per_instance=False, lists=("calendar",), detail="calendar_event"
         ),
+        item_tables=(
+            "calendar_events",
+            "calendar_event_attendees",
+            "calendar_event_answers",
+            "event_reminder_dispatches",
+        ),
     ),
     Tool.dashboard: ToolSpec(code=5),
-    Tool.post: ToolSpec(code=9, layouts=Layouts(per_instance=False, detail="post")),
-    Tool.wiki: ToolSpec(code=15, export_formats=("pdf", "md", "docx", "json")),
+    Tool.post: ToolSpec(
+        code=9,
+        layouts=Layouts(per_instance=False, detail="post"),
+        item_tables=("post_reads", "post_polls", "post_poll_options"),
+    ),
+    Tool.wiki: ToolSpec(
+        code=15,
+        export_formats=("pdf", "md", "docx", "json"),
+        item_tables=("wiki_pages",),
+    ),
     Tool.contact: ToolSpec(
         code=19,
         export_formats=("json", "csv"),
@@ -295,7 +318,9 @@ class Kind:
 #: unused code, and no existing code ever moves. 7 and 8 were the libraries',
 #: 11 and 12 were the queues', and all four stay retired. 18 is the person's
 #: (``app.core.relationships.PERSON``), an edge end that is not a kind, and is
-#: never reused. The initial set was assigned in alphabetical order, which is
+#: never reused. Boot writes the codes into ``public.relationship_kind_code``
+#: (``app.db.kind_codes``), so a new kind needs no migration to restate that
+#: function. The initial set was assigned in alphabetical order, which is
 #: where the resemblance ends — a derived ordinal changes under you the first
 #: time a member is added in the middle. The tools first, with the codes their
 #: records hold, then what lives inside them, then the guild's vocabulary; the

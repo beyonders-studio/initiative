@@ -19,9 +19,10 @@ Three joins, one per way a tool reaches the schema:
 import pytest
 from sqlalchemy import text
 
-from app.core.relationships import ENDPOINT_KINDS, PERSON, EndpointKind, node_id
-from app.core.tools import Tool
+from app.core.relationships import PERSON, EndpointKind, node_id
+from app.core.tools import KINDS, Tool
 from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
+from app.db.kind_codes import apply_kind_codes_if_changed
 from app.db.schema_provisioning import (
     drop_guild_schema,
     guild_schema_name,
@@ -79,29 +80,60 @@ async def test_every_comment_parent_column_exists_on_comments(engine):
     )
 
 
-async def test_every_endpoint_kind_is_known_to_the_database(engine):
+async def test_every_kind_is_known_to_the_database(engine):
     """``relationships`` packs ``(kind, id)`` into one integer using a Postgres
-    function, and the generated node columns are persisted. A kind the function
-    has no arm for makes every write naming it fail; a kind whose code differs
-    between Python and SQL makes the two disagree about what a row points at,
-    which nothing would report. The person, an end that is no kind, too."""
+    function, and the generated node columns are persisted. Boot renders the
+    function from ``KINDS`` and the person (``app.db.kind_codes``), as the
+    suite's setup does. A kind the function has no arm for makes every write
+    naming it fail; a kind whose code differs between Python and SQL makes the
+    two disagree about what a row points at, which nothing would report."""
     async with engine.connect() as conn:
-        for endpoint in (*ENDPOINT_KINDS.values(), PERSON):
+        assert not await apply_kind_codes_if_changed(conn), (
+            "public.relationship_kind_code differs from what boot renders from "
+            "KINDS: the suite's setup did not render it."
+        )
+        for endpoint in (*KINDS.values(), PERSON):
             code = (
                 await conn.execute(
                     text("SELECT public.relationship_kind_code(:kind)"),
                     {"kind": endpoint.value},
                 )
             ).scalar()
-            assert code is not None, (
-                f"public.relationship_kind_code has no arm for '{endpoint.value}' — "
-                "the kind was added to app.core.relationships without the "
-                "migration that replaces the function."
-            )
             assert code == endpoint.code, (
                 f"'{endpoint.value}' is code {endpoint.code} in Python and {code} "
                 "in Postgres. A kind's code is permanent; one of them moved."
             )
+        retired = (
+            await conn.execute(text("SELECT public.relationship_kind_code('gallery')"))
+        ).scalar()
+        assert retired is None, "a retired kind still has a code"
+
+
+async def test_boot_writes_the_kind_codes_only_when_they_differ(engine):
+    """A database whose function an older revision wrote is brought to the
+    render once; the next boot leaves it alone."""
+    async with engine.connect() as conn:
+        await conn.execute(
+            text(
+                "CREATE OR REPLACE FUNCTION public.relationship_kind_code(kind text)"
+                " RETURNS bigint LANGUAGE sql IMMUTABLE STRICT"
+                " AS $$ SELECT (CASE kind WHEN 'calendar' THEN 1 END)::bigint $$"
+            )
+        )
+        assert await apply_kind_codes_if_changed(conn)
+        assert not await apply_kind_codes_if_changed(conn)
+        assert (
+            await conn.execute(
+                text(
+                    "SELECT provolatile::text, proisstrict FROM pg_proc WHERE oid = "
+                    "'public.relationship_kind_code(text)'::regprocedure"
+                )
+            )
+        ).one() == ("i", True)
+        assert (
+            await conn.execute(text("SELECT public.relationship_kind_code('contact')"))
+        ).scalar() == KINDS["contact"].code
+        await conn.rollback()
 
 
 async def test_the_database_packs_node_ids_the_way_python_does(engine):

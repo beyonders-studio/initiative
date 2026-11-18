@@ -6,9 +6,9 @@ them back last, oldest first. A new revision that reshapes a table an older
 revision's test reaches is added to ``LATER`` here, once, rather than to every
 such test.
 
-Putting them back ends with ``public.relationship_kind_code`` as the newest
-revision left it: an older revision's conversion restates it as that revision
-left it, and it is one function for the whole database.
+Putting them back ends with ``public.relationship_kind_code`` as boot renders
+it (``app.db.kind_codes``): an older revision's conversion restates it as that
+revision left it, and it is one function for the whole database.
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from types import ModuleType
 from typing import Any
 
 from sqlalchemy import text
+
+from app.db.kind_codes import kind_code_sql
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 
@@ -98,10 +100,9 @@ def step_authorship(*, forward: bool) -> None:
 
 
 def restate_kind_code(bind: Any) -> None:
-    """Restate ``public.relationship_kind_code`` as the newest revision left
-    it, after a test has run a revision that restates it as that one left it."""
-    contacts = _load("20261105_0582_contacts.py")
-    bind.exec_driver_sql(contacts._kind_code_fn(contacts._KIND_CODES_AFTER))
+    """Restate ``public.relationship_kind_code`` as boot renders it, after a
+    test has run a revision that restates it as that one left it."""
+    bind.exec_driver_sql(kind_code_sql())
 
 
 def step_later_revisions(bind: Any, schema: str, *, forward: bool) -> None:
