@@ -73,6 +73,15 @@ field per tool: an initiative reads `tools`, and creating or changing one takes
 - POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `projects_enabled` from the response with the `200` status
 - POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `wikis_enabled` from the response with the `200` status
 
+### The plug-in services list is paged
+
+A deployment may run any number of plug-ins, so the owner's list of plug-in
+services is searched and paged on the server: it answers one page, with its
+total, and each plug-in is read on its own at
+`GET /api/v1/plugin-services/{registration_id}`.
+
+- GET /api/v1/plugin-services/ the response's body `type` changed from `array<object>` to `object` for status `200`
+
 ### Sending somebody something
 
 `NotificationType` takes `item_sent`: somebody pointed the reader at a thing,

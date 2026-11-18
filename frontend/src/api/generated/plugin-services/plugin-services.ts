@@ -22,12 +22,14 @@ import type {
 
 import type {
   HTTPValidationError,
+  ListPluginServicesParams,
   PluginPublisherCreate,
   PluginPublisherRead,
   PluginPublisherUpdate,
   PluginServiceConnect,
   PluginServicePublishedKey,
   PluginServiceRegistrationCreate,
+  PluginServiceRegistrationListResponse,
   PluginServiceRegistrationRead,
   PluginServiceRegistrationUpdate,
   PluginServiceVendorSetup,
@@ -56,36 +58,41 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * Every plug-in service this deployment has wired up (``plugins.manage``).
+ * One page of the plug-in services this deployment has wired up
+ * (``plugins.manage``), by id.
  * @summary List Plugin Services
  */
 export const listPluginServices = (
+  params?: ListPluginServicesParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<PluginServiceRegistrationRead[]>(
-    { url: `/api/v1/plugin-services/`, method: "GET", signal },
+  return apiMutator<PluginServiceRegistrationListResponse>(
+    { url: `/api/v1/plugin-services/`, method: "GET", params, signal },
     options
   );
 };
 
-export const getListPluginServicesQueryKey = () => {
-  return [`/api/v1/plugin-services/`] as const;
+export const getListPluginServicesQueryKey = (params?: ListPluginServicesParams) => {
+  return [`/api/v1/plugin-services/`, ...(params ? [params] : [])] as const;
 };
 
 export const getListPluginServicesQueryOptions = <
   TData = Awaited<ReturnType<typeof listPluginServices>>,
   TError = ErrorType<HTTPValidationError>,
->(options?: {
-  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPluginServices>>, TError, TData>>;
-  request?: SecondParameter<typeof apiMutator>;
-}) => {
+>(
+  params?: ListPluginServicesParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPluginServices>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListPluginServicesQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListPluginServicesQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listPluginServices>>> = ({ signal }) =>
-    listPluginServices(requestOptions, signal);
+    listPluginServices(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof listPluginServices>>,
@@ -103,6 +110,7 @@ export function useListPluginServices<
   TData = Awaited<ReturnType<typeof listPluginServices>>,
   TError = ErrorType<HTTPValidationError>,
 >(
+  params: undefined | ListPluginServicesParams,
   options: {
     query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPluginServices>>, TError, TData>> &
       Pick<
@@ -121,6 +129,7 @@ export function useListPluginServices<
   TData = Awaited<ReturnType<typeof listPluginServices>>,
   TError = ErrorType<HTTPValidationError>,
 >(
+  params?: ListPluginServicesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof listPluginServices>>, TError, TData>
@@ -141,6 +150,7 @@ export function useListPluginServices<
   TData = Awaited<ReturnType<typeof listPluginServices>>,
   TError = ErrorType<HTTPValidationError>,
 >(
+  params?: ListPluginServicesParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPluginServices>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
@@ -155,13 +165,14 @@ export function useListPluginServices<
   TData = Awaited<ReturnType<typeof listPluginServices>>,
   TError = ErrorType<HTTPValidationError>,
 >(
+  params?: ListPluginServicesParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPluginServices>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListPluginServicesQueryOptions(options);
+  const queryOptions = getListPluginServicesQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>;
@@ -262,6 +273,130 @@ export const useCreatePluginService = <TError = ErrorType<HTTPValidationError>, 
 > => {
   return useMutation(getCreatePluginServiceMutationOptions(options), queryClient);
 };
+/**
+ * One plug-in service (``plugins.manage``).
+ * @summary Read Plugin Service
+ */
+export const readPluginService = (
+  registrationId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PluginServiceRegistrationRead>(
+    { url: `/api/v1/plugin-services/${registrationId}`, method: "GET", signal },
+    options
+  );
+};
+
+export const getReadPluginServiceQueryKey = (registrationId: number) => {
+  return [`/api/v1/plugin-services/${registrationId}`] as const;
+};
+
+export const getReadPluginServiceQueryOptions = <
+  TData = Awaited<ReturnType<typeof readPluginService>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  registrationId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginService>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadPluginServiceQueryKey(registrationId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readPluginService>>> = ({ signal }) =>
+    readPluginService(registrationId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: registrationId !== null && registrationId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof readPluginService>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ReadPluginServiceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof readPluginService>>
+>;
+export type ReadPluginServiceQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadPluginService<
+  TData = Awaited<ReturnType<typeof readPluginService>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  registrationId: number,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginService>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readPluginService>>,
+          TError,
+          Awaited<ReturnType<typeof readPluginService>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadPluginService<
+  TData = Awaited<ReturnType<typeof readPluginService>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  registrationId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginService>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readPluginService>>,
+          TError,
+          Awaited<ReturnType<typeof readPluginService>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadPluginService<
+  TData = Awaited<ReturnType<typeof readPluginService>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  registrationId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginService>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Plugin Service
+ */
+
+export function useReadPluginService<
+  TData = Awaited<ReturnType<typeof readPluginService>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  registrationId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readPluginService>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadPluginServiceQueryOptions(registrationId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 /**
  * Suspend everywhere or lift, repoint either address, replace the keys,
  * make it mandatory or not, let vendor installations be shared, set the

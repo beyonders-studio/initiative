@@ -94,12 +94,12 @@ describe("PageBanner", () => {
       <PageBanner banner={banner({ color: "#101010" })} title="Ravenloft" />
     );
     expect(screen.getByRole("heading", { name: "Ravenloft" }).style.textShadow).toContain(
-      "rgba(0,0,0"
+      "rgba(0, 0, 0"
     );
 
     rerender(<PageBanner banner={banner({ color: "#f5f0e8" })} title="Ravenloft" />);
     expect(screen.getByRole("heading", { name: "Ravenloft" }).style.textShadow).toContain(
-      "rgba(255,255,255"
+      "rgba(255, 255, 255"
     );
   });
 

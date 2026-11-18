@@ -77,11 +77,10 @@ async def _seed(session: AsyncSession, **overrides) -> PluginServiceRegistration
 
 
 async def _listed(client: AsyncClient, headers: dict[str, str], row_id: int) -> dict:
-    """One registration as the operator's list shows it."""
-    response = await client.get(BASE, headers=headers)
+    """One registration as the operator reads it."""
+    response = await client.get(f"{BASE}{row_id}", headers=headers)
     assert response.status_code == 200, response.text
-    (entry,) = [entry for entry in response.json() if entry["id"] == row_id]
-    return entry
+    return response.json()
 
 
 # --- capability gating -------------------------------------------------------
@@ -100,6 +99,7 @@ async def test_non_owner_tiers_are_refused(
     row = await _seed(session)
 
     assert (await client.get(BASE, headers=headers)).status_code == 403
+    assert (await client.get(f"{BASE}{row.id}", headers=headers)).status_code == 403
     create = await client.post(BASE, headers=headers, json=NEW)
     assert create.status_code == 403
     assert create.json()["detail"] == AuthMessages.INSUFFICIENT_PRIVILEGES
@@ -178,8 +178,8 @@ async def test_owner_lists_registrations_with_their_publisher(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert len(body) == 1
-    entry = body[0]
+    assert body["total_count"] == 1
+    (entry,) = body["items"]
     assert entry["public_id"] == "acme.widgets"
     assert "grants" not in entry
     assert entry["mandatory"] is True
@@ -513,6 +513,66 @@ async def test_create_fails_closed_without_a_signing_key(
     assert response.json()["detail"] == PluginServiceMessages.SIGNING_NOT_CONFIGURED
 
 
+async def test_the_list_is_searched_and_paged(
+    client: AsyncClient, session: AsyncSession
+):
+    headers = await _owner_headers(session)
+    for public_id in ("acme.alpha", "acme.beta", "acme.gamma"):
+        await _seed(session, public_id=public_id, listing_uid=None)
+
+    first = (await client.get(BASE, headers=headers, params={"page_size": 2})).json()
+    second = (
+        await client.get(BASE, headers=headers, params={"page_size": 2, "page": 2})
+    ).json()
+    found = (await client.get(BASE, headers=headers, params={"search": "BET"})).json()
+
+    assert [entry["public_id"] for entry in first["items"]] == [
+        "acme.alpha",
+        "acme.beta",
+    ]
+    assert first["total_count"] == 3
+    assert first["has_next"] is True
+    assert [entry["public_id"] for entry in second["items"]] == ["acme.gamma"]
+    assert [entry["public_id"] for entry in found["items"]] == ["acme.beta"]
+    assert found["total_count"] == 1
+
+
+async def test_a_plug_in_reads_its_listings_name_art_and_publisher(
+    client: AsyncClient, session: AsyncSession
+):
+    """Name, art and version come from the listing; only this project's own
+    publisher, under a registry signature, is built by Initiative."""
+    headers = await _owner_headers(session)
+    rows = {}
+    for uid, public_id in (
+        ("FRSTPARTY00001", "beyonders-studio.github"),
+        ("THRDPARTY00001", "acme.widgets"),
+    ):
+        listing = await create_marketplace_listing(
+            session,
+            uid=uid,
+            public_id=public_id,
+            version="2.1.0",
+            name=f"{public_id} board",
+            avatar_url=f"/marketplace/{uid}.svg",
+            commit=False,
+        )
+        listing.source = "registry"
+        session.add(listing)
+        await session.commit()
+        rows[public_id] = await _seed(session, public_id=public_id, listing_uid=uid)
+
+    ours = await _listed(client, headers, rows["beyonders-studio.github"].id)
+    theirs = await _listed(client, headers, rows["acme.widgets"].id)
+
+    assert ours["name"] == "beyonders-studio.github board"
+    assert ours["avatar_url"] == "/marketplace/FRSTPARTY00001.svg"
+    assert ours["version"] == "2.1.0"
+    assert ours["first_party"] is True
+    assert theirs["name"] == "acme.widgets board"
+    assert theirs["first_party"] is False
+
+
 # --- delete -------------------------------------------------------------------
 
 
@@ -521,7 +581,8 @@ async def test_owner_deletes_a_registration(client: AsyncClient, session: AsyncS
     row = await _seed(session)
 
     assert (await client.delete(f"{BASE}{row.id}", headers=headers)).status_code == 204
-    assert (await client.get(BASE, headers=headers)).json() == []
+    assert (await client.get(BASE, headers=headers)).json()["items"] == []
+    assert (await client.get(f"{BASE}{row.id}", headers=headers)).status_code == 404
 
 
 async def test_missing_registration_is_a_404(
