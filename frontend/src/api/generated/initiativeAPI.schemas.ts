@@ -11213,6 +11213,8 @@ export interface RefreshRequest {
 export interface RegistrySkippedListing {
   name: string;
   code: string;
+  listing_name: string | null;
+  publisher_name: string | null;
 }
 
 /**
@@ -11248,6 +11250,7 @@ export interface RegistryStatusRead {
   last_success_at: string | null;
   last_error: string | null;
   listing_count: number;
+  skipped: RegistrySkippedListing[];
 }
 
 /**

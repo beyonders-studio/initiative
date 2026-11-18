@@ -17,10 +17,16 @@ class RegistrySkippedListing(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    #: The listing's target path, or the publisher's role name.
+    #: The listing's target path, or the publisher's role name. Not for
+    #: showing: the operator is shown the display names below.
     name: str
     #: A ``MarketplaceRegistryMessages`` code naming why.
     code: str
+    #: The listing's display name, when a listing was skipped and its name is
+    #: known.
+    listing_name: str | None = None
+    #: The publisher's display name, when none of its listings could be read.
+    publisher_name: str | None = None
 
 
 class RegistryRefreshRead(SanitizedBaseModel):
@@ -61,6 +67,8 @@ class RegistryStatusRead(SanitizedBaseModel):
     #: A ``MarketplaceRegistryMessages`` code, or null after a clean refresh.
     last_error: str | None = None
     listing_count: int = 0
+    #: What the last refresh or bundle skipped, and why.
+    skipped: list[RegistrySkippedListing] = []
 
 
 class RegistrySettings(SanitizedBaseModel):

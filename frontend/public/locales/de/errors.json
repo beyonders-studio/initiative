@@ -465,6 +465,8 @@
   "MARKETPLACE_REGISTRY_ENTRY_INVALID": "Ein Eintrag lag nicht im Format vor, das dieser Server liest, daher wurde er übersprungen.",
   "MARKETPLACE_REGISTRY_SOURCE_CONFLICT": "Ein Eintrag mit demselben Code ist auf diesem Server bereits aus einer anderen Quelle vorhanden, daher wurde die Kopie der Registry übersprungen.",
   "MARKETPLACE_REGISTRY_PUBLISHER_CONFLICT": "Du hast hier einen Herausgeber mit demselben Namen angelegt, daher wurden die Einträge der Registry unter diesem Namen übersprungen.",
+  "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT": "Sein Code oder Name gehört bereits zu einem anderen Eintrag aus der Registry, daher wurde er übersprungen.",
+  "MARKETPLACE_REGISTRY_VERSION_REUSED": "Diese Version ist auf diesem Server bereits mit anderem Inhalt vorhanden. Eine veröffentlichte Version kann sich nicht ändern, daher muss ihr Herausgeber die Änderung als neue Version veröffentlichen.",
   "MARKETPLACE_REGISTRY_RESERVED_NAMESPACE": "Dieser Eintrag verwendet einen Anbieternamen, der für mitgelieferte Einträge reserviert ist, und wurde übersprungen.",
   "MARKETPLACE_REGISTRY_LISTING_REJECTED": "Dieser Eintrag wurde abgelehnt, weil sein Inhalt ungültig ist.",
   "MARKETPLACE_REGISTRY_TERMS_INVALID": "Die Bedingungen eines Pakets für diesen Eintrag wurden abgelehnt, weil sie ungültig sind.",
