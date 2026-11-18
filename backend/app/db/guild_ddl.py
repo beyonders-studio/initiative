@@ -1886,7 +1886,8 @@ def _departure_policies() -> str:
         )
         write = (
             f"departure_update ON {t} AS PERMISSIVE FOR UPDATE"
-            f"  USING ({departed}) WITH CHECK ({col} IS NULL);"
+            f"  USING ({departed})"
+            f" WITH CHECK (pg_trigger_depth() > 0 AND {col} IS NULL);"
             if named.clear
             else f"departure_delete ON {t} AS PERMISSIVE FOR DELETE"
             f"  USING ({departed});"

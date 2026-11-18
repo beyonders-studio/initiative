@@ -17,15 +17,19 @@ the classification, the generated policies, and its event stream all follow.
 ``tenancy_test.py``, ``guild_rls_test.py`` and ``event_readback_test.py``
 enforce that nothing drifts.
 
-This module is intentionally dependency-free (no models, no SQLAlchemy) so it can
-be imported by ``tenancy`` and by the build-time generator alike.
+A tool's item tables are named in its record (``ToolSpec.item_tables``), and
+their paths come from that name and the table's foreign key to its parent in
+the tool (:func:`item_paths`), read off the model metadata.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
+
+from sqlalchemy import ForeignKey, Table
+from sqlmodel import SQLModel
 
 from app.core.plugin_scopes import tool_resource
 from app.core.reactions import ReactionTarget
@@ -612,6 +616,75 @@ def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
         ),
         dac=_dac_two_hop("calendar_events", "calendar_id", "calendars", fk),
     )
+
+
+#: The two-hop paths, by the item table the walk goes through.
+_TWO_HOP: dict[str, Callable[[str], InitiativePath]] = {
+    "tasks": via_task_project,
+    "post_polls": via_post_poll,
+    "calendar_events": via_event_calendar,
+}
+
+
+def _keys_to(table: Table, parents: Iterable[str]) -> list[ForeignKey]:
+    """The keys of ``table`` to the id of one of ``parents``, a key to itself
+    left out (a page's parent page, an event's series)."""
+    names = set(parents) - {table.name}
+    keys = [fk for fk in table.foreign_keys if fk.column.table.name in names]
+    for fk in keys:
+        if fk.column.name != "id":
+            raise ValueError(
+                f"{table.name}.{fk.parent.name} keys {fk.column.table.name}."
+                f"{fk.column.name}, not its id"
+            )
+    return keys
+
+
+def item_path(
+    parent: str, items: Iterable[str], table: str, tables: Mapping[str, Table]
+) -> InitiativePath:
+    """The path of ``table``, one of the ``items`` of the tool whose table is
+    ``parent`` (``ToolSpec.item_tables``): whatever its parent in the tool says.
+
+    Its foreign key to the tool's table is one hop. Without one, its key to
+    another of the tool's items that has one is two, by that item's path in
+    :data:`_TWO_HOP`. Which tables are items is the record's to say; only the
+    column and the path come from the schema. No key, or more than one,
+    raises rather than choosing.
+    """
+    own = _keys_to(tables[table], (parent,))
+    if len(own) == 1:
+        return via(parent, own[0].parent.name)
+    if own:
+        raise ValueError(f"{table} has {len(own)} keys to {parent}")
+    one_hop = [item for item in items if len(_keys_to(tables[item], (parent,))) == 1]
+    through = _keys_to(tables[table], one_hop)
+    if len(through) != 1:
+        raise ValueError(
+            f"{table} has {len(through)} keys to {parent}'s items, needs one"
+        )
+    fk = through[0].parent.name
+    mid = through[0].column.table.name
+    if mid not in _TWO_HOP:
+        raise ValueError(f"{table} walks through {mid}, which has no two-hop path")
+    path = _TWO_HOP[mid](fk)
+    mid_fk = _keys_to(tables[mid], (parent,))[0].parent.name
+    if path.dac is None or path.dac.via != ((fk, mid), (mid_fk, parent)):
+        raise ValueError(f"{table}: the {mid} path does not walk {mid}.{mid_fk}")
+    return path
+
+
+def item_paths() -> dict[str, InitiativePath]:
+    """Every tool's item tables, each by :func:`item_path`."""
+    import app.db.base  # noqa: F401  # every model on the metadata
+
+    return {
+        table: item_path(
+            tool.plural, tool.spec.item_tables, table, SQLModel.metadata.tables
+        )
+        for tool in Tool
+        for table in tool.spec.item_tables
+    }
 
 
 @dataclass(frozen=True)
@@ -1688,32 +1761,19 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     "moderation_reports": direct_full_access(),
     "moderation_report_reporters": via_full_access("moderation_reports", "report_id"),
     "moderation_actions": direct_full_access(),
-    # Where a stream of operations work lands. Reached by whoever can reach the
-    # project it names, which is the initiative that does the work.
-    "intake_bindings": via("projects", "project_id"),
-    # One hop -> projects
-    "tasks": via("projects", "project_id"),
-    "task_statuses": via("projects", "project_id"),
-    "task_types": via("projects", "project_id"),
-    # One hop -> files
-    "file_versions": via("files", "file_id"),
-    # One hop -> counter_groups
-    "counters": via("counter_groups", "counter_group_id"),
-    # One hop -> wikis. The page tree is a column on this table, not a
-    # second path: every page of a wiki is reached exactly as hard as the
-    # wiki, however deep it sits.
-    "wiki_pages": via("wikis", "wiki_id"),
-    # One hop -> calendars
-    "calendar_events": via("calendars", "calendar_id"),
-    # One hop -> dashboards
-    # One hop -> posts
-    "post_reads": via("posts", "post_id"),
+    # Every tool's item tables, each read and written as its parent in the tool
+    # is: one hop to the tool's table, or two through the item that keys it.
+    # A wiki's page tree is a column on its pages, not a second path: every page
+    # is reached exactly as hard as the wiki, however deep it sits.
+    **item_paths(),
     # Seen through their files, changed by the initiative's file makers.
     "collections": collections_path(),
     "collection_files": collection_files_path(),
-    "post_polls": via("posts", "post_id"),
-    # Two hops -> tasks -> projects
-    "task_assignees": via_task_project("task_id"),
+    # The operations community's own tables, kept out of the Projects record:
+    # they point at a project or a task for the work they route, not as part of
+    # it. Where a stream of operations work lands is reached by whoever can
+    # reach the project it names, which is the initiative that does the work.
+    "intake_bindings": via("projects", "project_id"),
     # A case is read exactly as hard as the task it describes, so it hangs off
     # the task rather than off the project column it is keyed by.
     "intake_cases": via_task_project("task_id"),
@@ -1721,12 +1781,9 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     "idea_votes": via_task_project("task_id"),
     # What a person attached: reached as its report or its case is.
     "evidence": evidence_path(),
-    # Two hops -> post_polls -> posts
-    "post_poll_options": via_post_poll("poll_id"),
+    # A vote's poll_id is keyed with its option to the option, not to the poll,
+    # so no key leads to the poll: the vote walks to its post by the id alone.
     "post_poll_votes": via_post_poll("poll_id"),
-    # Two hops -> calendar_events -> calendars
-    "calendar_event_attendees": via_event_calendar("calendar_event_id"),
-    "calendar_event_answers": via_event_calendar("calendar_event_id"),
     # Every metadata value, properties included, on any tool and sub-tool and
     # on an install, by (entity_type, entity_id).
     "metadata_values": metadata_values_path(),
@@ -1739,7 +1796,6 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # Per-user state, scoped via the entity it points at: a queued line is
     # gated like the task or the reacted-to thing it describes.
     "batched_notices": batched_notices_path(),
-    "event_reminder_dispatches": via_event_calendar("event_id"),
     "personal_items": content_kind_path(),
     "engagement_levels": content_kind_path(),
 }

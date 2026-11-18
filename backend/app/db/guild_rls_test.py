@@ -572,6 +572,62 @@ def test_every_declared_hop_walks_a_real_column_to_a_real_table():
     assert problems == [], problems
 
 
+def test_every_item_table_is_read_as_its_record_says():
+    """A tool's item tables take the path derived from their keys, and nothing
+    written by hand replaces it."""
+    from sqlmodel import SQLModel
+
+    from app.core.tools import Tool
+    from app.db.initiative_rls import INITIATIVE_PATHS, item_path
+
+    for tool in Tool:
+        for table in tool.spec.item_tables:
+            derived = item_path(
+                tool.plural, tool.spec.item_tables, table, SQLModel.metadata.tables
+            )
+            for write in (False, True):
+                assert INITIATIVE_PATHS[table].predicate(
+                    table, write
+                ) == derived.predicate(table, write), table
+
+
+def test_an_item_table_names_exactly_one_parent_in_its_tool():
+    """An item follows its one key into its tool, or its one key to an item
+    that has one; two keys, or none, stop the derivation rather than choosing."""
+    from sqlalchemy import Column, ForeignKey, Integer, MetaData, Table
+
+    from app.db.initiative_rls import item_path
+
+    md = MetaData()
+
+    def table(name: str, **keys: str) -> None:
+        Table(
+            name,
+            md,
+            Column("id", Integer, primary_key=True),
+            *(Column(column, ForeignKey(f"{to}.id")) for column, to in keys.items()),
+        )
+
+    table("projects")
+    table("tasks", project_id="projects")
+    table("task_assignees", task_id="tasks")
+    table("twice", project_id="projects", moved_from_id="projects")
+    table("loose")
+    table("through_two", task_id="tasks", blocked_by_id="tasks")
+    items = ("tasks", "task_assignees", "twice", "loose", "through_two")
+
+    one_hop = item_path("projects", items, "tasks", md.tables).dac
+    assert one_hop is not None and one_hop.via == (("project_id", "projects"),)
+    two_hop = item_path("projects", items, "task_assignees", md.tables).dac
+    assert two_hop is not None and two_hop.via == (
+        ("task_id", "tasks"),
+        ("project_id", "projects"),
+    )
+    for name in ("twice", "loose", "through_two"):
+        with pytest.raises(ValueError):
+            item_path("projects", items, name, md.tables)
+
+
 _GID_QUERY_TRASH = 990_412
 
 #: What ``query_excludes_trash`` has to say, as Postgres normalises it.
