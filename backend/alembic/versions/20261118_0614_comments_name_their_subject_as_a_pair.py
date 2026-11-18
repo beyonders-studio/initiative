@@ -20,8 +20,8 @@ The downgrade puts the eleven columns back with their keys and indexes,
 filled from the pair, after deleting any comment whose subject is gone, and
 drops the pair.
 
-Revision ID: 20261118_0613
-Revises: 20261117_0612
+Revision ID: 20261118_0614
+Revises: 20261118_0613
 Create Date: 2026-11-18
 """
 
@@ -30,8 +30,8 @@ from alembic import op
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261118_0613"
-down_revision = "20261117_0612"
+revision = "20261118_0614"
+down_revision = "20261118_0613"
 branch_labels = None
 depends_on = None
 
