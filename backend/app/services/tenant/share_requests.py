@@ -588,12 +588,15 @@ async def settle_reached(
     sharing: dict[tuple[str, int | None], str],
     answerer: User,
     note: str | None,
+    before: dict[tuple[str, int | None], str] | None = None,
     tell: bool = True,
 ) -> set[int]:
     """Answer the pending requests on one thing that its new ``sharing``
     reaches, however it reaches them: by name, by a role they hold, or by every
-    member. A request reached at the rung it asked for is approved; one asking
-    to edit that is now let view stays open for the rest. Each requester the
+    member. A request reached at the rung it asked for is approved, recording
+    who answered and when; one asking to edit that is now let view stays open
+    for the rest, and is told only when ``before`` (the sharing it replaced)
+    gave them less. Each requester the
     new sharing lets in is told, as a yes is, unless ``tell`` is off for a
     caller that tells them itself. Returns who was let in. Rides the caller's
     transaction, after the sharing is written."""
@@ -623,11 +626,13 @@ async def settle_reached(
             )
         ).all()
     )
+    now = datetime.now(UTC)
     let_in: dict[int, ResourceAccessLevel] = {}
     for request in pending:
         if request.user_id not in subject.readers:
             continue
-        reach = _reached(sharing, request.user_id, roles.get(request.user_id))
+        role_id = roles.get(request.user_id)
+        reach = _reached(sharing, request.user_id, role_id)
         if reach is None:
             continue
         level, scope = reach
@@ -635,7 +640,13 @@ async def settle_reached(
             request.status = ShareRequestStatus.approved.value
             request.granted_level = level.value
             request.scope = scope.value
+            request.resolved_at = now
+            request.resolved_by = answerer.id
             session.add(request)
+        else:
+            had = _reached(before or {}, request.user_id, role_id)
+            if had is not None and had[0].reaches(level):
+                continue
         let_in[request.user_id] = level
     await session.flush()
     if not let_in or not tell:

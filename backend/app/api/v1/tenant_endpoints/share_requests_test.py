@@ -137,25 +137,44 @@ async def test_sharing_with_their_role_answers_what_they_asked(client, session, 
         )
     ).one()
 
-    shared = await client.put(
-        owner.g(f"/files/{file_id}/grants"),
-        json=[{"role_id": role_id, "level": "write"}],
-        headers=owner.headers,
-    )
-
-    assert shared.status_code == 200, shared.text
-    (request,) = (
-        await session.exec(
-            select(ShareRequest).where(ShareRequest.resource_id == file_id)
+    async def share(level: str, note: str | None = None):
+        shared = await client.put(
+            owner.g(f"/files/{file_id}/grants"),
+            params={"note": note} if note else {},
+            json=[{"role_id": role_id, "level": level}],
+            headers=owner.headers,
         )
-    ).all()
-    assert (request.status, request.granted_level, request.scope) == (
+        assert shared.status_code == 200, shared.text
+
+    async def request() -> ShareRequest:
+        (row,) = (
+            await session.exec(
+                select(ShareRequest)
+                .where(ShareRequest.resource_id == file_id)
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        return row
+
+    # View is less than they asked for: told once, and the request stays open
+    # however often the sharing is saved again.
+    await share("read")
+    await share("read", note="Still only view")
+    assert (await request()).status == "pending"
+    told = await _told(session, reader.user.id, NotificationType.share_granted)
+    assert [n.data["level"] for n in told] == ["read"]
+
+    await share("write")
+
+    answered = await request()
+    assert (answered.status, answered.granted_level, answered.scope) == (
         "approved",
         "write",
         "role",
     )
+    assert answered.resolved_by == owner.user.id and answered.resolved_at is not None
     told = await _told(session, reader.user.id, NotificationType.share_granted)
-    assert [n.data["level"] for n in told] == ["write"]
+    assert sorted(n.data["level"] for n in told) == ["read", "write"]
 
 
 async def test_nothing_outside_the_readers_initiatives_can_be_asked_about(

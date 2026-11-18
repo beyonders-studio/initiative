@@ -735,6 +735,7 @@ async def _tell_let_in(
         sharing=after,
         answerer=giver,
         note=note,
+        before=before,
     )
     let_in: dict[ResourceAccessLevel, list[int]] = {}
     for (grantee, user_id), level in after.items():

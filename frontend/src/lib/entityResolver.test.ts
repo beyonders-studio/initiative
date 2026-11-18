@@ -124,6 +124,27 @@ describe("resolveEntityPath", () => {
     await expect(resolveEntityPath(queryClient, COMMUNITY, "file", 99)).resolves.toBeNull();
   });
 
+  it("opens what the reader can't open but may know is there, to ask for it", async () => {
+    server.use(
+      communityHttp.get("/files/:id", () => new HttpResponse(null, { status: 404 })),
+      communityHttp.get("/tasks/:id", () => new HttpResponse(null, { status: 404 })),
+      communityHttp.get("/share-requests/standing", ({ request }) => {
+        const kind = new URL(request.url).searchParams.get("kind");
+        return HttpResponse.json(
+          kind === "task"
+            ? { resource_type: "project", resource_id: 4, initiative_id: 2, level: null }
+            : { resource_type: "file", resource_id: 99, initiative_id: 3, level: null }
+        );
+      })
+    );
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "file", 99)).resolves.toBe(
+      "/i/3/files/99"
+    );
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "task", 9)).resolves.toBe(
+      "/i/2/projects/4/tasks/9"
+    );
+  });
+
   it("returns null for an unknown ref type or a non-numeric id", async () => {
     await expect(resolveEntityPath(queryClient, COMMUNITY, "widget", 1)).resolves.toBeNull();
     await expect(

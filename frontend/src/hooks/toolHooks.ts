@@ -363,7 +363,9 @@ const grantsHook = <TRead>(
       {
         mutationFn: (communityId, { grants, note }) =>
           endpoints.setGrants(communityId, id, grants, note ? { note } : undefined),
-        invalidate: () => invalidate(q.tool(endpoints.tool, id)),
+        // A change of sharing answers the requests it reaches, so the queue
+        // above the sharing is read again too.
+        invalidate: () => invalidate(q.tool(endpoints.tool, id), q.shareRequests()),
         errorKey,
       },
       options
