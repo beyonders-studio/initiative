@@ -174,7 +174,11 @@ async def test_changing_a_collection_takes_the_role_that_makes_files(
     comment = await client.post(
         maker.g("/comments/"),
         headers=maker.headers,
-        json={"content": "Nice set", "collection_id": collection.id},
+        json={
+            "subject_type": "collection",
+            "subject_id": collection.id,
+            "content": "Nice set",
+        },
     )
     assert comment.status_code == 201, comment.text
 

@@ -3059,19 +3059,30 @@ export const CommentAudience = {
   filer: "filer",
 } as const;
 
+export type CommentSubject = (typeof CommentSubject)[keyof typeof CommentSubject];
+
+export const CommentSubject = {
+  task: "task",
+  wiki_page: "wiki_page",
+  collection: "collection",
+  project: "project",
+  file: "file",
+  counter_group: "counter_group",
+  calendar: "calendar",
+  dashboard: "dashboard",
+  post: "post",
+  wiki: "wiki",
+  contact: "contact",
+} as const;
+
+/**
+ * A comment, and what it is said on.
+ */
 export interface CommentCreate {
   content: string;
-  task_id?: number | null;
-  wiki_page_id?: number | null;
-  collection_id?: number | null;
-  project_id?: number | null;
-  file_id?: number | null;
-  counter_group_id?: number | null;
-  calendar_id?: number | null;
-  dashboard_id?: number | null;
-  post_id?: number | null;
-  wiki_id?: number | null;
-  contact_id?: number | null;
+  subject_type: CommentSubject;
+  /** @exclusiveMinimum 0 */
+  subject_id: number;
   parent_comment_id?: number | null;
   audience?: CommentAudience;
 }
@@ -3116,26 +3127,16 @@ export interface CommentRemoval {
 }
 
 /**
- * One comment. ``project_id`` is its own for a comment on a project and
- * the task's for a task comment (filled by the service's serializer).
+ * One comment, and what it is said on.
  */
 export interface CommentRead {
   created_by: number | null;
   created_by_kind: ActorKind;
   created_by_install: number | null;
   content: string;
-  task_id: number | null;
-  wiki_page_id: number | null;
-  collection_id: number | null;
-  project_id: number | null;
-  file_id: number | null;
-  counter_group_id: number | null;
-  calendar_id: number | null;
-  dashboard_id: number | null;
-  post_id: number | null;
-  wiki_id: number | null;
-  contact_id: number | null;
   id: number;
+  subject_type: CommentSubject;
+  subject_id: number;
   parent_comment_id: number | null;
   created_at: string;
   updated_at: string | null;
@@ -14117,23 +14118,15 @@ export type ListHoldsParams = {
 };
 
 export type ListCommentsParams = {
+  subject_type: CommentSubject;
+  /** @exclusiveMinimum 0 */
+  subject_id: number;
   /**
    * @minimum 1
    * @maximum 100
    */
   limit?: number;
   cursor?: string | null;
-  task_id?: number | null;
-  wiki_page_id?: number | null;
-  collection_id?: number | null;
-  project_id?: number | null;
-  file_id?: number | null;
-  counter_group_id?: number | null;
-  calendar_id?: number | null;
-  dashboard_id?: number | null;
-  post_id?: number | null;
-  wiki_id?: number | null;
-  contact_id?: number | null;
 };
 
 export type RecentCommentsParams = {

@@ -21,7 +21,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import Conversation, IntakeStream, conversation_for
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
@@ -117,7 +117,7 @@ async def read_case(session: AsyncSession, task_id: int) -> CaseView | None:
             (
                 await session.exec(
                     select(Comment)
-                    .where(Comment.task_id == task_id)
+                    .where(said_on("task", task_id))
                     .where(Comment.audience == CommentAudience.filer)
                     .options(selectinload(Comment.author))
                     .order_by(Comment.created_at, Comment.id)

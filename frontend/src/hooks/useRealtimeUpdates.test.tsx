@@ -18,8 +18,7 @@ import { latestSocket, MockWebSocket } from "@/__tests__/helpers/mockWebSocket";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { setAuthToken } from "@/api/client";
-import { getListCommentsQueryKey } from "@/api/generated/comments/comments";
-import type { CommentRead } from "@/api/generated/initiativeAPI.schemas";
+import type { CommentRead, CommentSubject } from "@/api/generated/initiativeAPI.schemas";
 import { setInvalidationCommunity } from "@/api/query-keys";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
 import { applyChanges, useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
@@ -49,18 +48,19 @@ const seed = (key: readonly unknown[]) => {
 /** A comment thread on one parent, as `useComments` keys and holds it; open
  *  (something on screen watching it) unless `open` is false. */
 const seedThread = (
-  param: string,
+  kind: CommentSubject,
   id: number,
   { comments = [], open = true }: { comments?: CommentRead[]; open?: boolean } = {}
 ) => {
-  const key = getListCommentsQueryKey(COMMUNITY, { [param]: id });
+  const subject = { subject_type: kind, subject_id: id };
+  const key = commentThreadQueryOptions(COMMUNITY, subject).queryKey;
   queryClient.setQueryData(key, {
-    pages: [{ comments, next_cursor: null }],
+    pages: [{ comments, next_cursor: null, locked: false, can_moderate: false }],
     pageParams: [undefined],
   });
   if (open) {
     new InfiniteQueryObserver(queryClient, {
-      ...commentThreadQueryOptions(COMMUNITY, { [param]: id }),
+      ...commentThreadQueryOptions(COMMUNITY, subject),
       enabled: false,
     }).subscribe(() => {});
   }
@@ -111,9 +111,9 @@ describe("realtime comment frames", () => {
   });
 
   it.each(TOOLS)("puts a new comment into a %s's thread and refreshes the entity", async (tool) => {
-    const thread = seedThread(`${tool}_id`, ENTITY_ID);
+    const thread = seedThread(tool, ENTITY_ID);
     const entity = seed([`/api/v1/c/${COMMUNITY}/${toolRouteSegment(tool)}/${ENTITY_ID}`]);
-    serveComments({ 1: buildComment({ id: 1, [`${tool}_id`]: ENTITY_ID }) });
+    serveComments({ 1: buildComment({ id: 1, subject_type: tool, subject_id: ENTITY_ID }) });
 
     applyChanges([comment(1, [{ type: toolPlural(tool), id: ENTITY_ID }])], COMMUNITY);
 
@@ -123,7 +123,7 @@ describe("realtime comment frames", () => {
   });
 
   it("updates the thread, refreshes the task and its project, and nothing further out", async () => {
-    const thread = seedThread("task_id", ENTITY_ID);
+    const thread = seedThread("task", ENTITY_ID);
     const task = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
     // A task list row carries its comment count.
     const taskList = seed([`/api/v1/c/${COMMUNITY}/tasks/`, { project_id: 7 }]);
@@ -134,7 +134,7 @@ describe("realtime comment frames", () => {
     const counts = seed([`/api/v1/c/${COMMUNITY}/tools/counts/by-initiative`]);
     const initiative = seed([`/api/v1/c/${COMMUNITY}/initiatives/3`]);
     const members = seed([`/api/v1/c/${COMMUNITY}/initiatives/3/members`]);
-    serveComments({ 1: buildComment({ id: 1, task_id: ENTITY_ID }) });
+    serveComments({ 1: buildComment({ id: 1, subject_type: "task", subject_id: ENTITY_ID }) });
 
     applyChanges(
       [
@@ -168,9 +168,11 @@ describe("realtime comment frames", () => {
   });
 
   it("leaves another entity's thread alone, and reads nothing for a thread not open", async () => {
-    const other = seedThread("post_id", 99);
-    const closed = seedThread("post_id", ENTITY_ID, { open: false });
-    const asked = serveComments({ 1: buildComment({ id: 1, post_id: ENTITY_ID }) });
+    const other = seedThread("post", 99);
+    const closed = seedThread("post", ENTITY_ID, { open: false });
+    const asked = serveComments({
+      1: buildComment({ id: 1, subject_type: "post", subject_id: ENTITY_ID }),
+    });
 
     applyChanges([comment(1, [{ type: "posts", id: ENTITY_ID }])], COMMUNITY);
 
@@ -183,9 +185,11 @@ describe("realtime comment frames", () => {
   });
 
   it("puts a wiki page's comment into that page's thread, which it names before its wiki", async () => {
-    const page = seedThread("wiki_page_id", 7);
-    const siblingPage = seedThread("wiki_page_id", 8);
-    const asked = serveComments({ 1: buildComment({ id: 1, wiki_page_id: 7 }) });
+    const page = seedThread("wiki_page", 7);
+    const siblingPage = seedThread("wiki_page", 8);
+    const asked = serveComments({
+      1: buildComment({ id: 1, subject_type: "wiki_page", subject_id: 7 }),
+    });
 
     applyChanges(
       [
@@ -204,11 +208,11 @@ describe("realtime comment frames", () => {
   });
 
   it("reads back each comment a batch names and brings the open pages up to date", async () => {
-    const onTask = { task_id: ENTITY_ID };
+    const onTask = { subject_type: "task", subject_id: ENTITY_ID } as const;
     const root = buildComment({ id: 1, ...onTask });
     const reply = buildComment({ id: 2, parent_comment_id: 1, ...onTask });
     const edited = buildComment({ id: 4, content: "Before", ...onTask });
-    const thread = seedThread("task_id", ENTITY_ID, { comments: [root, reply, edited] });
+    const thread = seedThread("task", ENTITY_ID, { comments: [root, reply, edited] });
     const parents = [{ type: "tasks", id: ENTITY_ID }];
     const asked = serveComments({
       // 1 was deleted; its reply stays, as somebody else's words.
@@ -243,8 +247,8 @@ describe("realtime frames for a case's conversation", () => {
   });
 
   it("keeps what is said with the requester out of the task's thread and reads the case again", async () => {
-    const onTask = { task_id: ENTITY_ID };
-    const thread = seedThread("task_id", ENTITY_ID);
+    const onTask = { subject_type: "task", subject_id: ENTITY_ID } as const;
+    const thread = seedThread("task", ENTITY_ID);
     const caseRead = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}/case`]);
     serveComments({
       1: buildComment({ id: 1, audience: "filer", ...onTask }),

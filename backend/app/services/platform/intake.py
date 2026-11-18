@@ -718,7 +718,8 @@ async def open_case(
             # Named explicitly: the routing carries no user, so the trigger
             # would otherwise leave the author empty.
             opening = Comment(
-                task_id=task.id,
+                subject_type="task",
+                subject_id=task.id,
                 content=filer.words,
                 created_by=filer.user_id,
                 created_by_kind=ActorKind.member,
@@ -808,7 +809,8 @@ async def add_filer_reply(
         if state is FilerState.closed:
             return False
         comment = Comment(
-            task_id=task_id,
+            subject_type="task",
+            subject_id=task_id,
             content=words,
             created_by=filer.id,
             created_by_kind=ActorKind.member,

@@ -43,7 +43,7 @@ from app.db.session import routed_guild_id
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -366,7 +366,7 @@ def latest_reply():
     """The newest comment said to a case's filer by anybody but the filer."""
     return (
         select(func.max(Comment.id))
-        .where(Comment.task_id == IntakeCase.task_id)
+        .where(said_on("task", IntakeCase.task_id))
         .where(Comment.audience == CommentAudience.filer)
         .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
         .where(
@@ -445,7 +445,7 @@ async def read_filed(user: User, task_id: int) -> FiledTicketDetail:
                 select(
                     Comment.id, Comment.created_by, Comment.content, Comment.created_at
                 )
-                .where(Comment.task_id == task_id)
+                .where(said_on("task", task_id))
                 .order_by(Comment.created_at, Comment.id)
             )
         ).all()

@@ -13,7 +13,7 @@ from app.core.intake import IntakeStream
 from app.core.messages import SecurityMessages
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task
 
@@ -66,7 +66,7 @@ async def test_anyone_signed_in_can_report_and_is_its_filer(
     task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
     assert task.title == "Session cookie set without Secure"
     opening = (
-        await session.exec(select(Comment).where(Comment.task_id == task.id))
+        await session.exec(select(Comment).where(said_on("task", task.id)))
     ).one()
     assert opening.audience == CommentAudience.filer
     assert opening.content == "On the sign-in response, over https."

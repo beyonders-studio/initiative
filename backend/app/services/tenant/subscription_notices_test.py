@@ -109,7 +109,9 @@ async def test_subscribers_hear_of_what_others_change(
     # A comment joins the line it is told on: the assignee's one line for the
     # task, beside its changes.
     commented = await client.post(
-        a.g("/comments/"), headers=a.headers, json={"task_id": task_id, "content": "Ok"}
+        a.g("/comments/"),
+        headers=a.headers,
+        json={"subject_type": "task", "subject_id": task_id, "content": "Ok"},
     )
     assert commented.status_code == 201, commented.text
     await drain_notices()

@@ -1,26 +1,28 @@
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import (
     CheckConstraint,
     Column,
+    ColumnElement,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    and_,
 )
 from sqlmodel import Field, Relationship
 
 from app.core.tools import COMMENT_TARGETS
+from app.db.registry_checks import FROM_REGISTRY
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant._mixins import CreatedByMixin, HoldMixin, SoftDeleteMixin
 
-#: The comment columns naming a parent — one per tool plus the content-level
-#: extras — as the single-parent CHECK spells them. Derived from the registry
-#: so the constraint and the columns below cannot name different sets.
-COMMENT_PARENT_COLUMN_SQL = ", ".join(f"{target}_id" for target in COMMENT_TARGETS)
+#: The kinds a comment may be said on, as the CHECK spells them.
+_SUBJECT_VALUES = ", ".join(f"'{target}'" for target in COMMENT_TARGETS)
 
 
 class CommentAudience(str, Enum):
@@ -49,14 +51,14 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     __tablename__ = "comments"
     _display_field = "content"
     __table_args__ = (
-        # A comment hangs off exactly ONE parent: one tool entity, or one of
-        # the content-level extras. The column list is derived from
-        # ``COMMENT_TARGETS``, so a new parent's column joins the rule by
-        # existing rather than by being remembered here.
         CheckConstraint(
-            f"num_nonnulls({COMMENT_PARENT_COLUMN_SQL}) = 1",
-            name="ck_comments_single_parent",
+            f"subject_type IN ({_SUBJECT_VALUES})",
+            name="ck_comments_subject_type",
+            info={FROM_REGISTRY: True},
         ),
+        # Every read of a thread, a count or a lifecycle walk names one kind
+        # and the ids of that kind, so the id leads.
+        Index("ix_comments_subject", "subject_id", "subject_type"),
         CheckConstraint(f"audience IN ({_AUDIENCE_SQL})", name="ck_comments_audience"),
     )
     # An import may attribute a comment to the account its author was matched
@@ -71,79 +73,13 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     content: str = Field(sa_column=Column(Text, nullable=False))
-    task_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    file_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("files.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    # Tool-entity parents: every Tool is commentable (drift-tested against the
-    # enum in comments_test), one nullable FK per tool alongside the original
-    # task/file pair. ``project_id`` means a comment ON the project itself;
-    # a task comment reports its task's project through the read schema only.
-    project_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    counter_group_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("counter_groups.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    calendar_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("calendars.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    dashboard_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("dashboards.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    post_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    wiki_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("wikis.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    contact_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    # A wiki's conversation happens on its pages: a note about the rota belongs
-    # on the rota. The wiki's own column above stays a parent so the tool is
-    # commentable like every other, but the thread people use is this one.
-    wiki_page_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("wiki_pages.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
-    collection_id: int | None = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
+    #: What the comment is said on, as the pair a reaction or an edge names
+    #: its end by: a kind from ``COMMENT_TARGETS`` and that row's id. No
+    #: foreign key holds the id; the comment's row policy asks the kind's own
+    #: table about it, and purging the subject deletes its comments
+    #: (``soft_delete``).
+    subject_type: str = Field(sa_column=Column(String(32), nullable=False))
+    subject_id: int = Field(sa_column=Column(Integer, nullable=False))
     #: Who said this where it came from, when an import could not match them
     #: to an account here. Display text and nothing more: it names a person
     #: without claiming they have an account, so the comment carries no avatar
@@ -229,3 +165,15 @@ def in_thread():
     the conversation with whoever filed an operations case, which the case
     shows on its own."""
     return Comment.audience == CommentAudience.members
+
+
+def said_on(kind: str, ids: Any) -> ColumnElement[bool]:
+    """The comments said on one subject, or on any of several of one kind: a
+    fixed kind and the ids, which is what the subject index is read by.
+
+    ``ids`` is one id (a value or a column to correlate on), or a collection
+    of them.
+    """
+    if isinstance(ids, (list, tuple, set, frozenset)):
+        return and_(Comment.subject_type == kind, Comment.subject_id.in_(tuple(ids)))
+    return and_(Comment.subject_type == kind, Comment.subject_id == ids)

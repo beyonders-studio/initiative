@@ -17,6 +17,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.user_display import handle_of
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.comment import said_on
 from app.models.tenant.metadata import (
     MetadataDefinition,
     MetadataType,
@@ -968,7 +969,7 @@ async def test_a_thread_survives_the_round_trip(session: AsyncSession):
     restored = {
         c.content: c
         for c in (
-            await session.exec(select(Comment).where(Comment.task_id == new_task.id))
+            await session.exec(select(Comment).where(said_on("task", new_task.id)))
         ).all()
     }
     assert restored["Question"].parent_comment_id is None

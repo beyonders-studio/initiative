@@ -54,6 +54,12 @@ def guild_url(guild_id: int, path: str = "/") -> str:
     return f"{API}/c/{guild_id}{path}"
 
 
+def thread_path(kind: str, subject_id: int) -> str:
+    """The guild-relative path that reads the thread on one subject:
+    ``thread_path("task", 4)`` → ``/comments/?subject_type=task&subject_id=4``."""
+    return f"/comments/?subject_type={kind}&subject_id={subject_id}"
+
+
 @dataclass
 class Actor:
     """An authenticated test identity and the workspace it acts in."""

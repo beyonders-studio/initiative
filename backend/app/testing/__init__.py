@@ -10,7 +10,7 @@ guild's ``guild_<id>`` schema before touching the database (see
 ``route_session_to_guild``.
 """
 
-from app.testing.actor import Actor, guild_url, make_actor
+from app.testing.actor import Actor, guild_url, make_actor, thread_path
 from app.testing.audit import emitted
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
@@ -204,4 +204,5 @@ __all__ = [
     "stub_assertion",
     "stub_registration",
     "switch_tools",
+    "thread_path",
 ]

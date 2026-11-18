@@ -47,7 +47,7 @@ from app.db.session import raise_flag
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant._mixins import ActorKind, SoftDeleteMixin
 from app.models.tenant.batched_notice import BatchedNotice
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.task import Task
@@ -273,17 +273,19 @@ async def restore_entity(
 async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     """Drop every row that names one of these by ``(kind, id)``: edges,
     reactions, recent views, engagement levels, batched notices, metadata
-    values (plug-ins' among them) and a tool's views.
+    values (plug-ins' among them), a tool's views and the comments said on
+    them.
 
     Nothing carries those out with the row they name, and once it is gone
     their policies have nothing to ask, so they go first. Each kind is read
     from the registry that lets the table name it, and the model already
-    knows its table.
+    knows its table. The comments go last, once the reactions on them have
+    gone with the rest.
     """
     from app.core.reactions import ReactionTarget
     from app.core.relationships import ENDPOINT_KINDS
-    from app.core.tools import LAYOUT_INSTANCE_TABLES
-    from app.db.initiative_rls import CONTENT_KIND_TABLES
+    from app.core.tools import KIND_BY_TABLE, LAYOUT_INSTANCE_TABLES
+    from app.db.initiative_rls import COMMENT_PARENTS, CONTENT_KIND_TABLES
     from app.services.tenant import (
         engagement_levels,
         metadata,
@@ -319,6 +321,14 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
             await metadata.drop_values(session, spec.target, ids)
         if (tool := layout_tools.get(table)) is not None:
             await tool_layouts.drop_for_instances(session, tool, ids)
+    for model, ids in doomed.items():
+        kind = KIND_BY_TABLE.get(getattr(model, "__tablename__", ""))
+        if ids and kind is not None and kind.value in COMMENT_PARENTS:
+            await session.exec(
+                delete(Comment)
+                .where(said_on(kind.value, ids))
+                .execution_options(synchronize_session=False)
+            )
 
 
 #: The tables whose rows the purge hooks read, not just their ids, with the

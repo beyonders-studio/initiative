@@ -27,6 +27,7 @@ from app.testing import (
     drain_notices,
     guild_of,
     switch_tools,
+    thread_path,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -57,7 +58,7 @@ async def _comment_on_task(client, actor, task_id: int, content: str = "Hello") 
     created = await client.post(
         actor.g("/comments/"),
         headers=actor.headers,
-        json={"content": content, "task_id": task_id},
+        json={"subject_type": "task", "subject_id": task_id, "content": content},
     )
     assert created.status_code == 201, created.text
     return created.json()["id"]
@@ -122,9 +123,7 @@ class TestReactionToggle:
             )
             assert resp.status_code == 200, resp.text
 
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=a.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         group = comment["reactions"][0]
@@ -162,9 +161,7 @@ class TestReactionToggle:
             json={"emoji": THUMBS},
         )
 
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=a.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         assert [g["emoji"] for g in comment["reactions"]] == [THUMBS]
@@ -396,9 +393,7 @@ class TestReactionAccess:
             json={"emoji": THUMBS},
         )
 
-        listed = await client.get(
-            a.g("/comments/"), headers=b.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=b.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         assert comment["reactions"][0]["count"] == 1
@@ -483,7 +478,11 @@ class TestReactionAccess:
         created = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "before", "project_id": project.id},
+            json={
+                "subject_type": "project",
+                "subject_id": project.id,
+                "content": "before",
+            },
         )
         assert created.status_code == 201
         comment_id = created.json()["id"]

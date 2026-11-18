@@ -45,7 +45,7 @@ from app.db.session import require_guild_context, routed_guild_id
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
-from app.models.tenant.comment import Comment, in_thread
+from app.models.tenant.comment import Comment, in_thread, said_on
 from app.models.tenant.metadata import PERSON_TYPES, MetadataDefinition
 from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
@@ -223,7 +223,7 @@ def _comment_count_expression():
     """
     return (
         select(func.count(Comment.id))
-        .where(Comment.task_id == Task.id)
+        .where(said_on("task", Task.id))
         .where(in_thread())
         .correlate(Task)
         .scalar_subquery()
@@ -298,10 +298,10 @@ async def _annotate_tasks(
 
     if comment_counts is None:
         stmt = (
-            select(Comment.task_id, func.count(Comment.id))
-            .where(Comment.task_id.in_(tuple(task_ids)))
+            select(Comment.subject_id, func.count(Comment.id))
+            .where(said_on("task", task_ids))
             .where(in_thread())
-            .group_by(Comment.task_id)
+            .group_by(Comment.subject_id)
         )
         comment_counts = dict((await session.exec(stmt)).all())
 
@@ -1260,7 +1260,7 @@ async def _load_comments_for_tasks(
     statement = (
         select(Comment)
         .where(
-            Comment.task_id.in_(task_ids),
+            said_on("task", task_ids),
             Comment.deleted_at.is_(None),
             in_thread(),
         )
@@ -1269,7 +1269,7 @@ async def _load_comments_for_tasks(
     )
     grouped: dict[int, list[Comment]] = {}
     for comment in await session.exec(statement):
-        grouped.setdefault(comment.task_id, []).append(comment)
+        grouped.setdefault(comment.subject_id, []).append(comment)
     return grouped
 
 

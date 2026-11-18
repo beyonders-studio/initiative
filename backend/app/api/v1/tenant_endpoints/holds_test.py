@@ -21,7 +21,7 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.collection import Collection
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.content_hold import ContentHold
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
@@ -31,6 +31,7 @@ from app.testing import (
     create_comment,
     create_file,
     create_user,
+    thread_path,
 )
 from app.testing.factories import create_access_grant, get_auth_headers
 
@@ -54,7 +55,7 @@ async def _hold(client, actor, target_type: str, target_id: int, **extra):
 
 async def _thread(client, actor, task_id: int) -> list[dict]:
     response = await client.get(
-        actor.g("/comments/"), params={"task_id": task_id}, headers=actor.headers
+        actor.g(thread_path("task", task_id)), headers=actor.headers
     )
     assert response.status_code == 200, response.text
     return response.json()["comments"]
@@ -317,7 +318,7 @@ async def test_a_moderate_grantee_reads_what_is_held_and_others_dont(
     ).status_code == 201
     guild = scene["guild"]
     path = f"/api/v1/c/{guild.id}/comments/"
-    params = {"task_id": scene["task"].id}
+    params = {"subject_type": "task", "subject_id": scene["task"].id}
 
     moderator = await _moderator(session, guild)
     seen = await client.get(path, params=params, headers=get_auth_headers(moderator))
@@ -597,7 +598,7 @@ async def test_a_hold_standing_30_days_is_noted_on_its_case(
     await _system(session, operations["guild"].id)
     notes = (
         await session.exec(
-            select(Comment.system_kind).where(Comment.task_id == hold.case_task_id)
+            select(Comment.system_kind).where(said_on("task", hold.case_task_id))
         )
     ).all()
     assert "hold_reminder" in notes

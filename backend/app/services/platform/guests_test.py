@@ -358,7 +358,8 @@ async def test_a_guest_given_an_item_hears_of_it_and_is_heard_there(
         a.g("/comments/"),
         headers=get_auth_headers(guest),
         json={
-            "task_id": assigned.json()["id"],
+            "subject_type": "task",
+            "subject_id": assigned.json()["id"],
             "content": f"Done @[{username}]({member_id})",
         },
     )

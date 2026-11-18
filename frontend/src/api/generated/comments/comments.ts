@@ -139,13 +139,14 @@ export const useCreateComment = <TError = ErrorType<HTTPValidationError>, TConte
   return useMutation(getCreateCommentMutationOptions(options), queryClient);
 };
 /**
- * One page of a thread: ``limit`` conversations, newest first, each with
- * every reply under it. Follow ``next_cursor`` for older conversations.
+ * One page of the thread on one subject: ``limit`` conversations, newest
+ * first, each with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
  * @summary List Comments
  */
 export const listComments = (
   communityId: number,
-  params?: ListCommentsParams,
+  params: ListCommentsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -164,7 +165,7 @@ export const getListCommentsQueryOptions = <
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  params?: ListCommentsParams,
+  params: ListCommentsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
@@ -195,7 +196,7 @@ export function useListComments<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  params: undefined | ListCommentsParams,
+  params: ListCommentsParams,
   options: {
     query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>> &
       Pick<
@@ -215,7 +216,7 @@ export function useListComments<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  params?: ListCommentsParams,
+  params: ListCommentsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>> &
       Pick<
@@ -235,7 +236,7 @@ export function useListComments<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  params?: ListCommentsParams,
+  params: ListCommentsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
@@ -251,7 +252,7 @@ export function useListComments<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  params?: ListCommentsParams,
+  params: ListCommentsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
