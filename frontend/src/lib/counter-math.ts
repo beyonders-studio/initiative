@@ -7,7 +7,28 @@
  * still the source of truth and refetch on settled fixes any drift.
  */
 
-import type { CounterRead } from "@/api/generated/initiativeAPI.schemas";
+import {
+  CounterLook,
+  type CounterRead,
+  CounterViewMode,
+} from "@/api/generated/initiativeAPI.schemas";
+import type { CounterShown } from "@/ui/properties/CounterView";
+
+/** The look a counter's view mode draws it in. */
+const LOOKS: Record<CounterViewMode, CounterLook> = {
+  [CounterViewMode.number]: CounterLook.number,
+  [CounterViewMode.progress_bar]: CounterLook.bar,
+  [CounterViewMode.segmented_clock]: CounterLook.clock,
+};
+
+/** A counter as the kit draws it. */
+export const counterShown = (counter: CounterRead): CounterShown => ({
+  count: counter.count,
+  step: counter.step,
+  min: counter.min,
+  max: counter.max,
+  look: LOOKS[counter.view_mode],
+});
 
 const toNum = (value: string | null | undefined): number => {
   if (value == null || value === "") return Number.NaN;

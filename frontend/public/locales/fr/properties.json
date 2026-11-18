@@ -162,6 +162,21 @@
     "maxPlaceholder": "Aucun",
     "initialPlaceholder": "0",
     "stepPositive": "Le pas doit être supérieur à zéro",
-    "minAboveMax": "Le minimum ne peut pas dépasser le maximum"
+    "minAboveMax": "Le minimum ne peut pas dépasser le maximum",
+    "look": "Afficher comme",
+    "looks": {
+      "number": "Nombre",
+      "bar": "Barre de progression",
+      "clock": "Horloge segmentée"
+    },
+    "lookNeedsBounds": "Une barre de progression ou une horloge segmentée a besoin d’un minimum et d’un maximum. Sans les deux, elle s’affiche comme un nombre.",
+    "focus": {
+      "open": "Ouvrir {{name}} en plein écran",
+      "exit": "Quitter le plein écran",
+      "more": "Plus d’actions",
+      "previous": "Compteur précédent",
+      "next": "Compteur suivant",
+      "position": "{{current}} / {{total}}"
+    }
   }
 }

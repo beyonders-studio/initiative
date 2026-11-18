@@ -1,4 +1,5 @@
 import {
+  CounterLook,
   type CounterSettingsInput,
   type CounterSettingsOutput,
   type CurrencyCode,
@@ -73,6 +74,7 @@ export const counterSettings = (settings: CounterSettingsInput | null | undefine
   min: settings?.min ?? null,
   max: settings?.max ?? null,
   initial: settings?.initial ?? 0,
+  look: settings?.look ?? (CounterLook.number as CounterLook),
 });
 
 /** `count` held to a counter's bounds. */

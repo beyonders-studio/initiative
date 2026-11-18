@@ -164,7 +164,7 @@ describe("PropertyInput", () => {
       def({
         type: MetadataType.counter,
         name: "Seats",
-        counter: { step: 2, min: 0, max: 5, initial: 1 },
+        counter: { step: 2, min: 0, max: 5, initial: 1, look: "number" },
       });
 
     it("steps from its initial value within its bounds, takes a count as typed, and resets", async () => {
@@ -187,6 +187,32 @@ describe("PropertyInput", () => {
       expect(onChange).toHaveBeenLastCalledWith(9);
       await userEvent.click(screen.getByRole("button", { name: "Reset Seats" }));
       expect(onChange).toHaveBeenLastCalledWith(1);
+    });
+
+    it("draws its look, and opens full screen stepping the same field", async () => {
+      const onChange = vi.fn();
+      const onStep = vi.fn();
+      const barred = def({
+        type: MetadataType.counter,
+        name: "Seats",
+        counter: { step: 2, min: 0, max: 5, initial: 1, look: "bar" },
+      });
+      renderWithProviders(
+        <PropertyInput definition={barred} value={3} onChange={onChange} onStep={onStep} />
+      );
+      expect(screen.getByText("/ 5")).toBeInTheDocument();
+      fireEvent.change(screen.getByRole("spinbutton", { name: "Seats" }), {
+        target: { value: "4" },
+      });
+      fireEvent.blur(screen.getByRole("spinbutton", { name: "Seats" }));
+      expect(onChange).toHaveBeenLastCalledWith(4);
+
+      await userEvent.click(screen.getByRole("button", { name: "Open Seats full screen" }));
+      const focus = await screen.findByRole("dialog", { name: "Seats" });
+      await userEvent.click(within(focus).getByRole("button", { name: "Step Seats up" }));
+      expect(onStep).toHaveBeenLastCalledWith(true);
+      await userEvent.click(within(focus).getByRole("button", { name: "Exit full screen" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     it("leaves a step to onStep where it is given", async () => {

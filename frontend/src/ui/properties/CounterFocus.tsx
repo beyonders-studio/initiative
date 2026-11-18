@@ -16,7 +16,8 @@ import { type CounterShown, CounterView } from "./CounterView";
 const SWIPE_THRESHOLD_PX = 60;
 
 /** A header button drawn on the counter's colours. */
-const CHROME_BUTTON = "h-10 w-10 hover:bg-current/10 focus-visible:bg-current/10";
+const CHROME_BUTTON =
+  "h-10 w-10 text-current hover:bg-current/10 hover:text-current focus-visible:bg-current/10";
 
 /** Where a counter sits among others the focus view moves between. */
 export interface CounterFocusNavigation {
@@ -101,8 +102,7 @@ export const CounterFocus = ({
       onClick={() => onStep(up)}
       disabled={disabled || (up ? atMax : atMin)}
       aria-label={t(up ? "input.stepUp" : "input.stepDown", { name })}
-      className="h-24 touch-manipulation rounded-2xl bg-current/15 text-current shadow-sm hover:bg-current/25 active:bg-current/35 sm:h-28"
-      style={{ color: fg }}
+      className="h-24 touch-manipulation rounded-2xl bg-current/15 text-current shadow-sm hover:bg-current/25 hover:text-current active:bg-current/35 sm:h-28"
     >
       {up ? <Plus className="h-10 w-10" /> : <Minus className="h-10 w-10" />}
     </Button>
@@ -119,7 +119,6 @@ export const CounterFocus = ({
           size="icon"
           aria-label={t("counter.focus.exit")}
           className={CHROME_BUTTON}
-          style={{ color: fg }}
           onClick={onExit}
         >
           <X className="h-5 w-5" />
@@ -136,7 +135,6 @@ export const CounterFocus = ({
                 size="icon"
                 aria-label={t("counter.focus.more")}
                 className={CHROME_BUTTON}
-                style={{ color: fg }}
               >
                 <MoreVertical className="h-5 w-5" />
               </Button>
@@ -162,7 +160,6 @@ export const CounterFocus = ({
             onClick={() => moving.onMove(-1)}
             aria-label={t("counter.focus.previous")}
             className={CHROME_BUTTON}
-            style={{ color: fg }}
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
@@ -175,7 +172,6 @@ export const CounterFocus = ({
             onClick={() => moving.onMove(1)}
             aria-label={t("counter.focus.next")}
             className={CHROME_BUTTON}
-            style={{ color: fg }}
           >
             <ChevronRight className="h-5 w-5" />
           </Button>

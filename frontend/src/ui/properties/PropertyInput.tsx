@@ -1,8 +1,9 @@
-import { ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
+import { ChevronDown, Maximize2, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  CounterLook,
   MetadataType,
   type PropertyOption,
   type PropertySummary,
@@ -17,6 +18,8 @@ import { cn } from "@/ui/lib/utils";
 import { type Member, type MemberId, MemberPicker, type SearchMembers } from "@/ui/member-picker";
 import { Slider } from "@/ui/slider";
 
+import { CounterFocusDialog } from "./CounterFocus";
+import { type CounterShown, CounterView } from "./CounterView";
 import { type FileFieldFiles, FileFieldInput } from "./FileFieldInput";
 import { extractUser } from "./PropertyValueCell";
 import {
@@ -200,7 +203,8 @@ const ScaleInput = ({
 };
 
 /** A counter: stepped down and up by its step, typed, or reset to its
- *  initial value, never past its bounds. */
+ *  initial value, never past its bounds, and drawn in its look. It opens
+ *  full screen, where it steps the same way. */
 const CounterInput = ({
   definition,
   value,
@@ -217,9 +221,21 @@ const CounterInput = ({
   className?: string;
 }) => {
   const { t } = useTranslation("properties");
+  const [focused, setFocused] = useState(false);
   const settings = counterSettings(definition.counter);
   const count = counterCount(settings, value);
   const step = (up: boolean) => (onStep ? onStep(up) : onChange(steppedCount(settings, value, up)));
+  const reset = () => onChange(withinBounds(settings, settings.initial));
+  // As typed: the bounds hold it once it is saved, not a digit at a time.
+  const type = (typed: string) => onChange(numericValue(typed));
+  const shown: CounterShown = {
+    count: String(count),
+    step: String(settings.step),
+    min: settings.min === null ? null : String(settings.min),
+    max: settings.max === null ? null : String(settings.max),
+    look: settings.look,
+  };
+  const drawn = settings.look !== CounterLook.number && shown.min !== null && shown.max !== null;
   return (
     <div className={cn("flex items-center gap-1", className)}>
       <Button
@@ -232,18 +248,30 @@ const CounterInput = ({
       >
         <Minus className="h-4 w-4" />
       </Button>
-      <Input
-        type="number"
-        inputMode="decimal"
-        step="any"
-        aria-label={definition.name}
-        value={coerceNumber(value)}
-        // As typed: the bounds hold it once it is saved, not a digit at a time.
-        onChange={(e) => onChange(numericValue(e.target.value))}
-        placeholder={String(settings.initial)}
-        disabled={disabled}
-        className="w-24 bg-transparent text-center tabular-nums"
-      />
+      {drawn ? (
+        <div className="flex min-w-0 flex-1 justify-center px-2">
+          <CounterView
+            counter={shown}
+            name={definition.name}
+            disabled={disabled}
+            textColor="currentColor"
+            onCommit={type}
+            size="lg"
+          />
+        </div>
+      ) : (
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="any"
+          aria-label={definition.name}
+          value={coerceNumber(value)}
+          onChange={(e) => type(e.target.value)}
+          placeholder={String(settings.initial)}
+          disabled={disabled}
+          className="w-24 bg-transparent text-center tabular-nums"
+        />
+      )}
       <Button
         type="button"
         variant="outline"
@@ -261,10 +289,30 @@ const CounterInput = ({
         className="text-muted-foreground"
         aria-label={t("input.reset", { name: definition.name })}
         disabled={disabled || count === withinBounds(settings, settings.initial)}
-        onClick={() => onChange(withinBounds(settings, settings.initial))}
+        onClick={reset}
       >
         <RotateCcw className="h-4 w-4" />
       </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground"
+        aria-label={t("counter.focus.open", { name: definition.name })}
+        onClick={() => setFocused(true)}
+      >
+        <Maximize2 className="h-4 w-4" />
+      </Button>
+      <CounterFocusDialog
+        open={focused}
+        onOpenChange={setFocused}
+        counter={shown}
+        name={definition.name}
+        disabled={disabled}
+        onStep={step}
+        onCommit={type}
+        onReset={reset}
+      />
     </div>
   );
 };

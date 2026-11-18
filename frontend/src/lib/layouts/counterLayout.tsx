@@ -10,16 +10,16 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SendButton } from "@/components/access/SendTo";
-import { CounterView } from "@/components/tools/counterGroups/views/CounterView";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
 import { itemSaves, useItemFieldSave } from "@/hooks/useFieldSave";
-import { isAtMax, isAtMin } from "@/lib/counter-math";
+import { counterShown, isAtMax, isAtMin } from "@/lib/counter-math";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { useItemContext } from "@/ui/layouts/DetailLayoutView";
 import { FieldFrame, type ItemFieldSave, ReadField, useFieldDraft } from "@/ui/layouts/editing";
 import { ColorField, TitleField } from "@/ui/layouts/fieldEditors";
+import { CounterView } from "@/ui/properties/CounterView";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { type COUNTER_FIELDS, COUNTER_LAYOUT, counterFields } from "./counters";
@@ -204,7 +204,8 @@ const Count = ({ counter }: { counter: CounterRead }) => {
         <Minus className="h-4 w-4" />
       </Button>
       <CounterView
-        counter={live}
+        counter={counterShown(live)}
+        name={live.name}
         disabled={locked}
         textColor="currentColor"
         onCommit={(value) => {
