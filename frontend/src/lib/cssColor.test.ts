@@ -8,8 +8,8 @@ describe("normalizeColor", () => {
   });
 
   it("says nothing about a colour it cannot read", () => {
-    // jsdom's canvas is a stub, so what matters is that nonsense never comes
-    // back as a colour — a wrong colour is harder to spot than none.
+    // Nonsense never comes back as a colour — a wrong colour is harder to
+    // spot than none.
     expect(normalizeColor("not-a-colour")).toBeNull();
     expect(normalizeColor("   ")).toBeNull();
   });
