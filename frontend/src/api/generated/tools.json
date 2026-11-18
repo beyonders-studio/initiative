@@ -144,5 +144,301 @@
       "commentable": true,
       "archivable": true
     }
+  },
+  "file_types": {
+    "lexical": {
+      "export_formats": ["pdf", "md", "docx", "json"]
+    },
+    "excalidraw": {
+      "export_formats": ["json"]
+    },
+    "sheet": {
+      "export_formats": ["csv", "xlsx", "json"]
+    },
+    "url": {
+      "export_formats": ["md", "json"]
+    },
+    "pdf": {
+      "export_formats": ["file"]
+    },
+    "doc": {
+      "export_formats": ["file"]
+    },
+    "docx": {
+      "export_formats": ["file"]
+    },
+    "odt": {
+      "export_formats": ["file"]
+    },
+    "rtf": {
+      "export_formats": ["file"]
+    },
+    "md": {
+      "export_formats": ["file"]
+    },
+    "xls": {
+      "export_formats": ["file"]
+    },
+    "xlsx": {
+      "export_formats": ["file"]
+    },
+    "ods": {
+      "export_formats": ["file"]
+    },
+    "csv": {
+      "export_formats": ["file"]
+    },
+    "tsv": {
+      "export_formats": ["file"]
+    },
+    "ppt": {
+      "export_formats": ["file"]
+    },
+    "pptx": {
+      "export_formats": ["file"]
+    },
+    "odp": {
+      "export_formats": ["file"]
+    },
+    "png": {
+      "export_formats": ["file"]
+    },
+    "jpeg": {
+      "export_formats": ["file"]
+    },
+    "gif": {
+      "export_formats": ["file"]
+    },
+    "webp": {
+      "export_formats": ["file"]
+    },
+    "svg": {
+      "export_formats": ["file"]
+    },
+    "heic": {
+      "export_formats": ["file"]
+    },
+    "tiff": {
+      "export_formats": ["file"]
+    },
+    "mp4": {
+      "export_formats": ["file"]
+    },
+    "webm": {
+      "export_formats": ["file"]
+    },
+    "mov": {
+      "export_formats": ["file"]
+    },
+    "mp3": {
+      "export_formats": ["file"]
+    },
+    "m4a": {
+      "export_formats": ["file"]
+    },
+    "wav": {
+      "export_formats": ["file"]
+    },
+    "ogg": {
+      "export_formats": ["file"]
+    },
+    "flac": {
+      "export_formats": ["file"]
+    },
+    "txt": {
+      "export_formats": ["file"]
+    },
+    "json": {
+      "export_formats": ["file"]
+    },
+    "html": {
+      "export_formats": ["file"]
+    },
+    "zip": {
+      "export_formats": ["file"]
+    },
+    "tar": {
+      "export_formats": ["file"]
+    },
+    "gz": {
+      "export_formats": ["file"]
+    },
+    "7z": {
+      "export_formats": ["file"]
+    },
+    "rar": {
+      "export_formats": ["file"]
+    },
+    "ai": {
+      "export_formats": ["file"]
+    },
+    "psd": {
+      "export_formats": ["file"]
+    },
+    "eps": {
+      "export_formats": ["file"]
+    },
+    "indd": {
+      "export_formats": ["file"]
+    },
+    "xcf": {
+      "export_formats": ["file"]
+    },
+    "kra": {
+      "export_formats": ["file"]
+    },
+    "procreate": {
+      "export_formats": ["file"]
+    },
+    "clip": {
+      "export_formats": ["file"]
+    },
+    "sketch": {
+      "export_formats": ["file"]
+    },
+    "fig": {
+      "export_formats": ["file"]
+    },
+    "afdesign": {
+      "export_formats": ["file"]
+    },
+    "afphoto": {
+      "export_formats": ["file"]
+    },
+    "afpub": {
+      "export_formats": ["file"]
+    },
+    "cdr": {
+      "export_formats": ["file"]
+    },
+    "blend": {
+      "export_formats": ["file"]
+    },
+    "fbx": {
+      "export_formats": ["file"]
+    },
+    "obj": {
+      "export_formats": ["file"]
+    },
+    "stl": {
+      "export_formats": ["file"]
+    },
+    "glb": {
+      "export_formats": ["file"]
+    },
+    "gltf": {
+      "export_formats": ["file"]
+    },
+    "3mf": {
+      "export_formats": ["file"]
+    },
+    "usdz": {
+      "export_formats": ["file"]
+    },
+    "ttf": {
+      "export_formats": ["file"]
+    },
+    "otf": {
+      "export_formats": ["file"]
+    },
+    "woff": {
+      "export_formats": ["file"]
+    },
+    "woff2": {
+      "export_formats": ["file"]
+    },
+    "dng": {
+      "export_formats": ["file"]
+    },
+    "cr2": {
+      "export_formats": ["file"]
+    },
+    "cr3": {
+      "export_formats": ["file"]
+    },
+    "nef": {
+      "export_formats": ["file"]
+    },
+    "arw": {
+      "export_formats": ["file"]
+    },
+    "raf": {
+      "export_formats": ["file"]
+    },
+    "orf": {
+      "export_formats": ["file"]
+    },
+    "py": {
+      "export_formats": ["file"]
+    },
+    "js": {
+      "export_formats": ["file"]
+    },
+    "ts": {
+      "export_formats": ["file"]
+    },
+    "css": {
+      "export_formats": ["file"]
+    },
+    "sql": {
+      "export_formats": ["file"]
+    },
+    "yaml": {
+      "export_formats": ["file"]
+    },
+    "xml": {
+      "export_formats": ["file"]
+    },
+    "toml": {
+      "export_formats": ["file"]
+    },
+    "c": {
+      "export_formats": ["file"]
+    },
+    "cpp": {
+      "export_formats": ["file"]
+    },
+    "cs": {
+      "export_formats": ["file"]
+    },
+    "java": {
+      "export_formats": ["file"]
+    },
+    "go": {
+      "export_formats": ["file"]
+    },
+    "rs": {
+      "export_formats": ["file"]
+    },
+    "rb": {
+      "export_formats": ["file"]
+    },
+    "php": {
+      "export_formats": ["file"]
+    },
+    "swift": {
+      "export_formats": ["file"]
+    },
+    "kt": {
+      "export_formats": ["file"]
+    },
+    "epub": {
+      "export_formats": ["file"]
+    },
+    "mobi": {
+      "export_formats": ["file"]
+    },
+    "dwg": {
+      "export_formats": ["file"]
+    },
+    "dxf": {
+      "export_formats": ["file"]
+    },
+    "step": {
+      "export_formats": ["file"]
+    },
+    "other": {
+      "export_formats": ["file"]
+    }
   }
 }

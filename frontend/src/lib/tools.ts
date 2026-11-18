@@ -47,7 +47,11 @@ import {
   Megaphone,
 } from "lucide-react";
 
-import type { InitiativeRead, PermissionKey } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  FileType,
+  InitiativeRead,
+  PermissionKey,
+} from "@/api/generated/initiativeAPI.schemas";
 import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import records from "@/api/generated/tools.json";
 
@@ -106,6 +110,11 @@ export const toolExportFormats = (tool: Tool): readonly string[] | null =>
 /** What a report may write a tool's rows in, in the order offered. */
 export const toolReportFormats = (tool: Tool): readonly string[] =>
   TOOL_RECORDS[tool].report_formats;
+
+/** What a file of this type exports as, in the order offered: the editor's
+ *  formats for its own types, the stored file itself (`file`) for the rest. */
+export const fileTypeExportFormats = (type: FileType): readonly string[] =>
+  records.file_types[type].export_formats;
 
 /** What a report may write each type of file in, in the order offered. */
 export const FILE_TYPE_REPORT_FORMATS = records.tools.file.type_report_formats;

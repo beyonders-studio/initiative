@@ -3,44 +3,13 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { ExportFormatOption } from "@/components/exports/ExportButton";
 import {
   FILE_TYPE_REPORT_FORMATS,
+  fileTypeExportFormats,
   NON_EXPORTABLE_TOOLS,
   SIDEBAR_TOOLS,
   TOOLS,
   toolExportFormats,
   toolReportFormats,
 } from "@/lib/tools";
-import { type EditorFileType, isStoredFileType } from "@/ui/lib/fileTypes";
-
-// Engine formats per editor file type — mirrors the backend adapter's rules.
-const EDITOR_FILE_FORMATS: Record<EditorFileType, ExportFormatOption[]> = {
-  lexical: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "docx", labelKey: "export.formatDocx" },
-    // The lossless one: the file envelope, round-trippable through the
-    // editor toolbar's import.
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  excalidraw: [{ format: "json", labelKey: "export.formatJson" }],
-  sheet: [
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  url: [
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-};
-
-const STORED_FILE_FORMATS: ExportFormatOption[] = [
-  { format: "file", labelKey: "export.formatOriginal" },
-];
-
-/** What a file of this type exports as: the editor's formats for its own
- *  types, the stored file itself for the rest. */
-export const fileTypeFormats = (type: FileType): ExportFormatOption[] =>
-  isStoredFileType(type) ? STORED_FILE_FORMATS : EDITOR_FILE_FORMATS[type];
 
 // Type-neutral labels for mixed-type selections, where a per-type label
 // ("Lexical file (.lexical)") would misdescribe the other entries in the zip.
@@ -69,6 +38,16 @@ export function fileSelectionFormats(types: FileType[]): ExportFormatOption[] {
   return shared.map((format) => ({
     format,
     labelKey: GENERIC_FORMAT_LABELS[format] ?? "export.formatJson",
+  }));
+}
+
+/** What a file of this type exports as: the editor's formats for its own
+ *  types, the stored file itself for the rest (the backend's rule, from the
+ *  records). */
+export function fileTypeFormats(type: FileType): ExportFormatOption[] {
+  return fileTypeExportFormats(type).map((format) => ({
+    format,
+    labelKey: GENERIC_FORMAT_LABELS[format],
   }));
 }
 
