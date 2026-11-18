@@ -8,7 +8,7 @@ comes from its listing.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -132,6 +132,10 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     #: The flow at the vendor that can create its client and fill in the
     #: vendor values (``github_app_manifest``), when the listing declares one.
     vendor_setup: str | None = None
+    #: What the listing's vendor check said about the values this save set:
+    #: ``passed``, or ``not_run`` when the vendor could not be asked and the
+    #: values were saved unchecked. Absent when no check ran.
+    vendor_check: Literal["passed", "not_run"] | None = None
     #: The two addresses to register with the vendor's client: where it
     #: returns a person with a code, and where its install page returns them.
     connection_callback_url: str

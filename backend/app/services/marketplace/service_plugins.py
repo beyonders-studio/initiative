@@ -376,6 +376,7 @@ BUTTON_VARIANTS: frozenset[str] = frozenset(
 MAX_CONNECTIONS = contract.cap("connections")
 MAX_FIELDS_PER_CONNECTION = contract.cap("fieldsPerConnection")
 MAX_VENDOR_FIELDS = contract.cap("vendorFields")
+MAX_VENDOR_CHECKS = contract.cap("vendorChecks")
 MAX_GITHUB_APP_PERMISSIONS = contract.cap("githubAppPermissions")
 MAX_GITHUB_APP_EVENTS = contract.cap("githubAppEvents")
 MAX_FLOW_SCOPES = contract.cap("flowScopes")
@@ -795,6 +796,8 @@ def _vendor(raw: Any) -> dict[str, Any] | None:
         cleaned["label"] = label
     if vendor.get("setup") is not None:
         cleaned["setup"] = _vendor_setup(vendor["setup"], fields=fields)
+    if vendor.get("check") is not None:
+        cleaned["check"] = _vendor_check(vendor["check"], fields=fields)
     return cleaned
 
 
@@ -873,6 +876,117 @@ def _vendor_setup(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
         "default_events": events,
     }
     return {"kind": setup["kind"], "app": cleaned_app, "values": dict(values)}
+
+
+#: What a vendor check's request may carry: a request with no connection,
+#: no GraphQL and no paging.
+_CHECK_REQUEST_TERMS = frozenset({"method", "url", "query", "headers", "body"})
+
+
+def _vendor_check(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
+    """The call made to the vendor when the vendor values are saved, and the
+    rows its answer is held to. Its JWT is signed with one secret vendor value
+    and issued by vendor values; its rows name declared vendor fields."""
+    what = "service plug-in: vendor.check"
+    check = require_mapping(raw, what)
+    vendor_keys = {field["key"] for field in fields}
+    secret_keys = {field["key"] for field in fields if field["type"] == "secret"}
+    cleaned: dict[str, Any] = {}
+
+    if check.get("sign") is not None:
+        sign = require_mapping(check["sign"], f"{what}.sign")
+        key = sign.get("key")
+        named = (
+            key[len("{vendor.") : -1]
+            if isinstance(key, str) and key.startswith("{vendor.") and key.endswith("}")
+            else None
+        )
+        if named is None or "{" in named or "}" in named:
+            fail(f"{what}.sign.key is one vendor value, '{{vendor.<key>}}'")
+        if named not in vendor_keys:
+            fail(
+                f"{what}.sign.key names {{vendor.{named}}}, which the vendor block does not declare"
+            )
+        if named not in secret_keys:
+            fail(f"{what}.sign.key: {named!r} signs, so it is a secret field")
+        alg = sign.get("alg", "RS256")
+        if alg not in JWT_ALGORITHMS:
+            fail(f"{what}.sign: unknown alg {alg!r}")
+        lifetime = sign.get("lifetime", 60)
+        if (
+            isinstance(lifetime, bool)
+            or not isinstance(lifetime, int)
+            or not 1 <= lifetime <= MAX_TOKEN_LIFETIME_SECONDS
+        ):
+            fail(
+                f"{what}.sign.lifetime must be 1..{MAX_TOKEN_LIFETIME_SECONDS} seconds"
+            )
+        cleaned["sign"] = {
+            "iss": _template(
+                sign.get("iss"),
+                what=f"{what}.sign.iss",
+                vendor_keys=vendor_keys,
+                field_keys=set(),
+            ),
+            "key": key,
+            "alg": alg,
+            "lifetime": lifetime,
+        }
+    if check.get("auth") is not None:
+        if "sign" not in cleaned:
+            fail(
+                f"{what}.auth puts the signed JWT on the request, and there is none without 'sign'"
+            )
+        cleaned["auth"] = _auth(check["auth"])
+    auth_header = (cleaned.get("auth") or {}).get("header", DEFAULT_AUTH_HEADER)
+
+    request = require_mapping(check.get("request"), f"{what}.request")
+    extra = sorted(set(request) - _CHECK_REQUEST_TERMS)
+    if extra:
+        fail(f"{what}.request carries no {', '.join(extra)}")
+    cleaned["request"] = _vendor_request(
+        request,
+        what=f"{what}.request",
+        # Without a signed JWT the request carries no credential, so no
+        # header is Initiative's to set.
+        auth_header=auth_header if "sign" in cleaned else "",
+        connection_ids=None,
+    )
+
+    rows = require_list(check.get("expect"), f"{what}.expect", MAX_VENDOR_CHECKS)
+    if not rows:
+        fail(f"{what}.expect names at least one row")
+    expect: list[dict[str, Any]] = []
+    for index, entry in enumerate(rows):
+        where = f"{what}.expect.{index}"
+        row = require_mapping(entry, where)
+        named_fields = require_list(
+            row.get("fields"), f"{where}.fields", MAX_VENDOR_FIELDS
+        )
+        if not named_fields:
+            fail(f"{where}.fields names at least one vendor field")
+        for field in named_fields:
+            if field not in vendor_keys:
+                fail(
+                    f"{where}.fields names {field!r}, which the vendor block does not declare"
+                )
+        if len(set(named_fields)) != len(named_fields):
+            fail(f"{where}.fields names a field twice")
+        message = localized_text(row.get("message"), MAX_TEXT_LENGTH)
+        if message is None:
+            fail(f"{where}.message is required")
+        cleaned_row: dict[str, Any] = {
+            "holds": _checked(row.get("holds"), what=f"{where}.holds"),
+            "fields": list(named_fields),
+            "message": message,
+        }
+        if row.get("status") is not None:
+            cleaned_row["status"] = _status_match(row["status"], what=f"{where}.status")
+        if row.get("shows") is not None:
+            cleaned_row["shows"] = _checked(row["shows"], what=f"{where}.shows")
+        expect.append(cleaned_row)
+    cleaned["expect"] = expect
+    return cleaned
 
 
 def _template(

@@ -35,8 +35,11 @@ export const VendorSetupPage = () => {
     complete.mutate(
       { registrationId: id, code, state },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           toast.success(t("pluginServices.vendorSetupDone"));
+          if (saved.vendor_check === "not_run") {
+            toast.warning(t("pluginServices.vendorCheckNotRunSetup"));
+          }
           void navigate({
             to: "/settings/platform/integrations/plugins/$registrationId",
             params: { registrationId: String(id) },

@@ -1176,3 +1176,308 @@ async def test_a_conversion_github_refuses_writes_nothing(
     assert response.status_code == 502
     assert response.json()["detail"] == PluginServiceMessages.VENDOR_SETUP_FAILED
     assert await load_vendor_values("acme.widgets") == {}
+
+
+# --- the plug-in's vendor check ----------------------------------------------
+
+
+def _rsa_pem() -> tuple[str, Any]:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    return pem, key.public_key()
+
+
+CHECKED_DEFINITION: dict[str, Any] = {
+    **VENDOR_DEFINITION,
+    "vendor": {
+        "fields": [
+            {"key": key, "type": kind, "required": True, "label": {"en": key}}
+            for key, kind in (
+                ("app_id", "string"),
+                ("app_name", "string"),
+                ("private_key", "secret"),
+                ("hook_secret", "secret"),
+            )
+        ],
+        "check": {
+            "sign": {"iss": "{vendor.app_id}", "key": "{vendor.private_key}"},
+            "request": {"method": "GET", "url": "'https://api.vendor.example/app'"},
+            "expect": [
+                {
+                    "status": "4xx",
+                    "holds": "false",
+                    "fields": ["app_id", "private_key"],
+                    "message": {"en": "No client by this id and key."},
+                },
+                {
+                    "holds": "response.body.name = vendor.app_name",
+                    "fields": ["app_name"],
+                    "message": {"en": "The id and key belong to another name."},
+                    "shows": "response.body.name",
+                },
+            ],
+        },
+    },
+}
+
+
+def _vendor_answers(
+    monkeypatch, *, status: int = 200, body: dict | None = None, fail: bool = False
+) -> list[httpx2.Request]:
+    """The vendor answering the check; the requests it was sent."""
+    from app.services.tenant import plugin_connection_flows
+
+    sent: list[httpx2.Request] = []
+
+    async def resolve(url: str, *, allow_private: bool = False) -> ValidatedTarget:
+        return ValidatedTarget(
+            hostname=httpx2.URL(url).host,
+            addresses=(ipaddress.ip_address("203.0.113.7"),),
+        )
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        if fail:
+            raise httpx2.ConnectError("unreachable", request=request)
+        return httpx2.Response(status, json=body or {})
+
+    monkeypatch.setattr(safe_http, "resolve_validated_target_async", resolve)
+    monkeypatch.setattr(
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(handle)
+    )
+    return sent
+
+
+async def _checked_registration(session: AsyncSession) -> PluginServiceRegistration:
+    await create_marketplace_listing(
+        session,
+        uid=LISTING_UID,
+        public_id="acme.widgets",
+        kind="plugin",
+        definition=CHECKED_DEFINITION,
+    )
+    return await _seed(session)
+
+
+async def test_values_the_vendor_does_not_know_together_are_not_saved(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    pem, _public = _rsa_pem()
+    sent = _vendor_answers(monkeypatch, body={"id": 7, "name": "widgets-for-acme"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {
+                "app_id": "7",
+                "app_name": "widgets",
+                "private_key": pem,
+            }
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    body = response.json()
+    assert body["detail"] == PluginServiceMessages.VENDOR_CHECK_REFUSED
+    assert body["params"]["fields"] == "app_name"
+    assert json.loads(body["params"]["message"]) == {
+        "en": "The id and key belong to another name."
+    }
+    assert body["params"]["shows"] == "widgets-for-acme"
+    assert len(sent) == 1
+    assert await load_vendor_values("acme.widgets") == {}
+
+
+async def test_values_the_vendor_knows_are_saved_and_say_so(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    import jwt as pyjwt
+
+    pem, public = _rsa_pem()
+    sent = _vendor_answers(monkeypatch, body={"id": 7, "name": "widgets"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {"app_id": "7", "app_name": "widgets", "private_key": pem}
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "passed"
+    (request,) = sent
+    assert (request.method, request.headers["host"], request.url.path) == (
+        "GET",
+        "api.vendor.example",
+        "/app",
+    )
+    scheme, token = request.headers["authorization"].split(" ", 1)
+    assert scheme == "Bearer"
+    assert pyjwt.decode(token, public, algorithms=["RS256"])["iss"] == "7"
+    assert (await load_vendor_values("acme.widgets"))["app_name"] == "widgets"
+
+    # A save that sets nothing the check reads does not ask the vendor.
+    again = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"vendor_values": {"hook_secret": "s3cr3t"}},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["vendor_check"] is None
+    assert len(sent) == 1
+
+
+async def test_a_vendor_refusing_the_signed_jwt_blames_the_id_and_key(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    pem, _public = _rsa_pem()
+    _vendor_answers(monkeypatch, status=401, body={"message": "bad credentials"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"vendor_values": {"app_id": "8", "app_name": "x", "private_key": pem}},
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["params"]["fields"] == "app_id\nprivate_key"
+
+
+async def test_a_vendor_that_cannot_be_asked_does_not_stop_a_save(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    pem, _public = _rsa_pem()
+    sent = _vendor_answers(monkeypatch, fail=True)
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={"vendor_values": {"app_id": "7", "app_name": "x", "private_key": pem}},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "not_run"
+    assert len(sent) == 1
+    assert (await load_vendor_values("acme.widgets"))["app_id"] == "7"
+
+
+async def test_a_signing_value_that_is_not_a_key_is_refused(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    sent = _vendor_answers(monkeypatch, body={"name": "x"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {
+                "app_id": "7",
+                "app_name": "x",
+                "private_key": "not a key",
+            }
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == PluginServiceMessages.VENDOR_KEY_UNUSABLE
+    assert response.json()["params"]["fields"] == "private_key"
+    assert sent == []
+
+
+async def test_values_that_change_while_the_vendor_is_asked_are_not_written(
+    client: AsyncClient, session: AsyncSession, monkeypatch
+):
+    from sqlmodel import update
+
+    from app.services.marketplace import declarative
+
+    pem, _public = _rsa_pem()
+    _vendor_answers(monkeypatch, body={"name": "widgets"})
+    headers = await _owner_headers(session)
+    row = await _checked_registration(session)
+    asked = declarative.vendor_check
+
+    async def while_another_save_lands(*args, **kwargs):
+        await session.exec(
+            update(PluginServiceRegistration)
+            .where(PluginServiceRegistration.id == row.id)
+            .values(vendor_values={"hook_secret": "written by another save"})
+        )
+        await session.commit()
+        return await asked(*args, **kwargs)
+
+    monkeypatch.setattr(declarative, "vendor_check", while_another_save_lands)
+
+    response = await client.patch(
+        f"{BASE}{row.id}",
+        headers=headers,
+        json={
+            "vendor_values": {"app_id": "7", "app_name": "widgets", "private_key": pem}
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == PluginServiceMessages.VENDOR_VALUES_CHANGED
+    await session.refresh(row)
+    assert row.vendor_values == {"hook_secret": "written by another save"}
+
+
+async def test_a_setup_the_vendor_could_not_check_says_so(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    from app.services.tenant import plugin_connection_flows
+
+    _github(monkeypatch)
+
+    def unreachable(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("unreachable", request=request)
+
+    monkeypatch.setattr(
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(unreachable)
+    )
+    definition = copy.deepcopy(GITHUB_DEFINITION)
+    definition["vendor"]["check"] = {
+        "request": {"method": "GET", "url": "'https://api.vendor.example/app'"},
+        "expect": [
+            {
+                "holds": "response.body.id = vendor.app_id",
+                "fields": ["app_id"],
+                "message": {"en": "Another app."},
+            }
+        ],
+    }
+    await create_marketplace_listing(
+        session,
+        uid=LISTING_UID,
+        public_id="acme.widgets",
+        kind="plugin",
+        definition=definition,
+    )
+    row = await _seed(session)
+    a = await acting_user()
+    started = await _start(client, a.headers, row.id)
+
+    response = await _complete(client, a.headers, row.id, started["state"])
+
+    assert response.status_code == 200, response.text
+    assert response.json()["vendor_check"] == "not_run"
+    assert (await load_vendor_values("acme.widgets"))["app_id"] == "4242"

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A plug-in can check the values you give its vendor before they are saved.** A plug-in that declares a vendor check (plug-in kit 11) has its values asked about at the vendor when you save them on its settings page. Values the vendor doesn't know together, such as an app name that isn't the app the ID and key belong to, are not saved: the fields to fix are marked, with what the vendor has instead. When the vendor can't be reached, the values save and the page says they weren't checked.
 - **Send something to someone, in the app.** **Send to…** beside the bell on a project, file, task, event or page puts it in their notifications, with a note if you add one, and tapping it opens it on whichever device they are using. Somebody who can't open it yet is let in if you can share it, or can ask for access.
 - **Giving someone access tells them.** Adding a person in a thing's Access settings sends them a notification, with an optional note, and answers any request for access the new sharing covers, including sharing with their role or the whole initiative.
 - **See Community calendar and Community contacts before you install them.** Their marketplace pages picture what each adds to a community, in your light or dark theme.
@@ -16,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A plug-in whose vendor app is already set shows its values first.** Making a new app at the vendor, which would replace them, folds away under them instead of leading the page.
 - **Plug-in services are a list you can search.** Platform → Integrations shows each plug-in on one line, with its art, name, version and state, a page at a time, and searches by identifier or publisher. Beta and operations-only plug-ins are tagged in colour, a plug-in whose listing the registry signed is tagged **Verified**, and one Initiative publishes is tagged **Built by Initiative**. Each plug-in opens on a page of its own, wide enough to read, where creating the GitHub App comes first and typing the values in yourself is the other way, in the order it happens at the vendor.
 - **The plug-in registry panel is one row.** Under Platform → Integrations, **Plug-in registry** shows **Get updates from the registry** with when it last updated, how many listings it holds and **Refresh now** beside the switch. A registry bundle is offered only once updates are off, and applies as soon as you drop it.
 - **Security cases say what to check, at the priority they deserve.** Each case opens with what its rule usually means and what to look at, and its task takes the rule's priority: a high rule files a high-priority task, a low one a low-priority task.

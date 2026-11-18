@@ -16,6 +16,8 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { vendorCheckRefusalIn } from "@/lib/pluginServices";
+import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { SettingsPaneSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -24,6 +26,7 @@ import { StatusMessage } from "@/ui/status-message";
 import { PluginServiceAvatar } from "./PluginServiceAvatar";
 import { PluginServiceBadges } from "./PluginServiceBadges";
 import { PluginServiceForm, type PluginServiceFormValues } from "./PluginServiceForm";
+import type { VendorRefusal } from "./VendorClientSection";
 
 /** Whether a registration carries a key set, pasted or by address. */
 const hasKeys = (registration: PluginServiceRegistrationRead): boolean =>
@@ -36,7 +39,7 @@ const hasKeys = (registration: PluginServiceRegistrationRead): boolean =>
  * Suspending it and deleting it are here too, each confirmed.
  */
 export const PluginServicePage = () => {
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
   const { user } = useAuth();
   const navigate = useNavigate();
   const canManagePlugins = hasCapability(user, Capability.pluginsManage);
@@ -50,6 +53,12 @@ export const PluginServicePage = () => {
   // Bumped by each save, so the form remounts on the values just saved.
   const [saves, setSaves] = useState(0);
   const [confirming, setConfirming] = useState<"suspend" | "delete" | null>(null);
+  // What the plug-in's vendor check refused the last save for, shown on the
+  // fields it blames until a save goes through.
+  const [refusal, setRefusal] = useState<VendorRefusal | null>(null);
+  // Vendor values a save wrote without the vendor being asked about them:
+  // the next form starts with them typed, so saving again asks again.
+  const [unchecked, setUnchecked] = useState<Record<string, string>>({});
 
   const back = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
@@ -116,12 +125,22 @@ export const PluginServicePage = () => {
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
+          setRefusal(null);
           toast.success(t("pluginServices.saved"));
+          const notRun = saved.vendor_check === "not_run";
+          if (notRun) toast.warning(t("pluginServices.vendorCheckNotRun"));
+          setUnchecked(notRun ? values.vendorValues : {});
           setSaves((count) => count + 1);
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:pluginServices.saveError")),
+        onError: (error) => {
+          const refused = vendorCheckRefusalIn(error);
+          const text =
+            (refused && localized(refused.message, i18n.language)) ||
+            getErrorMessage(error, "settings:pluginServices.saveError");
+          setRefusal(refused ? { fields: refused.fields, text, shows: refused.shows } : null);
+          toast.error(text);
+        },
       }
     );
   };
@@ -276,6 +295,8 @@ export const PluginServicePage = () => {
         key={saves}
         editing={registration}
         onSubmit={handleSubmit}
+        vendorRefusal={refusal}
+        initialVendorValues={unchecked}
         footer={
           <div className="flex justify-end">
             <Button type="submit" disabled={updateService.isPending}>

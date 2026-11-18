@@ -1,5 +1,47 @@
 /** Helpers for the deployment-level plug-in service registration form. */
 
+import { isAxiosError } from "axios";
+
+import { getErrorCode } from "@/lib/errorMessage";
+
+/**
+ * What a plug-in's vendor check refused a save for: the vendor fields it
+ * blames, the plug-in's own message by language, and what the vendor holds
+ * instead when the check says.
+ */
+export interface VendorCheckRefusal {
+  fields: string[];
+  message: Record<string, string>;
+  shows: string | null;
+}
+
+/** The codes a vendor check refuses a save with. */
+const VENDOR_CHECK_CODES = new Set([
+  "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED",
+  "PLUGIN_SERVICE_VENDOR_KEY_UNUSABLE",
+]);
+
+/** A save's vendor check refusal, or null for any other failure. */
+export const vendorCheckRefusalIn = (error: unknown): VendorCheckRefusal | null => {
+  if (!VENDOR_CHECK_CODES.has(getErrorCode(error) ?? "") || !isAxiosError(error)) return null;
+  const params =
+    (error.response?.data as { params?: Record<string, string> } | undefined)?.params ?? {};
+  let message: Record<string, string> = {};
+  if (params.message) {
+    try {
+      const parsed: unknown = JSON.parse(params.message);
+      if (parsed && typeof parsed === "object") message = parsed as Record<string, string>;
+    } catch {
+      // A message that is not JSON is shown as the code's own wording.
+    }
+  }
+  return {
+    fields: params.fields ? params.fields.split("\n") : [],
+    message,
+    shows: params.shows ?? null,
+  };
+};
+
 /** Split a textarea of origins into the list the API expects. */
 export const parseAllowedOrigins = (value: string): string[] =>
   value

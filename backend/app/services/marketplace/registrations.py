@@ -690,10 +690,15 @@ async def update_registration(
     suspended: bool | None = None,
     beta_community_ids: Iterable[int] | None = None,
     vendor_values: dict[str, str | None] | None = None,
+    vendor_values_checked: Mapping[str, Any] | None = None,
     actor_user_id: int | None = None,
 ) -> PluginServiceRegistration:
     """Edit a registration's deployment facts, suspend or lift it, or
     replace a beta plug-in's list of communities.
+
+    ``vendor_values_checked`` is the stored vendor values a vendor check ran
+    against, unlocked; when the row no longer holds them, the write is refused
+    (409) rather than writing values over ones nobody checked them with.
 
     An empty ``page_origin`` clears it, putting both surfaces back on
     ``base_url``; an empty ``jwks_uri`` clears it. A ``jwks_uri`` kept while
@@ -708,6 +713,13 @@ async def update_registration(
     # Locked first: two saves reading the same list would otherwise each
     # write their own difference from it.
     row = await get_registration(session, registration_id, lock=True)
+    if vendor_values_checked is not None and dict(row.vendor_values or {}) != dict(
+        vendor_values_checked
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=PluginServiceMessages.VENDOR_VALUES_CHANGED,
+        )
     beta: set[int] | None = None
     if beta_community_ids is not None:
         if row.availability != PluginAvailability.beta.value or row.listing_uid is None:
