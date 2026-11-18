@@ -14,16 +14,19 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 
 import { CommentSection } from "./CommentSection";
 
-/** Registers the create handler and resolves the body it received. */
-const captureCreate = (): { body: () => CommentCreate | null } => {
+/** Registers the create handler and resolves the body it received, and the
+ *  thread it was posted to. */
+const captureCreate = (): { body: () => CommentCreate | null; thread: () => string | null } => {
   let received: CommentCreate | null = null;
+  let thread: string | null = null;
   server.use(
-    communityHttp.post("/comments/", async ({ request }) => {
+    communityHttp.post("/:segment/:id/comments", async ({ request, params }) => {
       received = (await request.json()) as CommentCreate;
+      thread = `${params.segment}/${params.id}`;
       return HttpResponse.json(buildComment({ content: received.content }), { status: 201 });
     })
   );
-  return { body: () => received };
+  return { body: () => received, thread: () => thread };
 };
 
 const postComment = async (text: string) => {
@@ -41,8 +44,8 @@ describe("CommentSection", () => {
         return new HttpResponse(null, { status: 204 });
       })
     );
-    const mine = buildComment({ content: "Removable", task_id: 3, can_remove: true });
-    const theirs = buildComment({ content: "Not removable", task_id: 3, can_remove: false });
+    const mine = buildComment({ content: "Removable", subject_id: 3, can_remove: true });
+    const theirs = buildComment({ content: "Not removable", subject_id: 3, can_remove: false });
 
     renderPage(() => (
       <CommentSection entityType="task" entityId={3} comments={[mine, theirs]} initiativeId={7} />
@@ -77,7 +80,7 @@ describe("CommentSection", () => {
     });
   });
 
-  it("posts a task comment under task_id", async () => {
+  it("posts a task comment to the task's thread", async () => {
     const created = captureCreate();
 
     renderPage(() => (
@@ -87,12 +90,13 @@ describe("CommentSection", () => {
     await postComment("Picking this up.");
 
     await waitFor(() => expect(created.body()).not.toBeNull());
-    expect(created.body()).toEqual({ content: "Picking this up.", task_id: 3 });
+    expect(created.body()).toEqual({ content: "Picking this up." });
+    expect(created.thread()).toBe("tasks/3");
   });
 
   it("carries the parent id when replying", async () => {
     const created = captureCreate();
-    const parent = buildComment({ content: "Original", calendar_id: 5 });
+    const parent = buildComment({ content: "Original", subject_type: "calendar", subject_id: 5 });
 
     renderPage(() => (
       <CommentSection
@@ -111,9 +115,9 @@ describe("CommentSection", () => {
     await waitFor(() => expect(created.body()).not.toBeNull());
     expect(created.body()).toEqual({
       content: "Sounds right.",
-      calendar_id: 5,
       parent_comment_id: parent.id,
     });
+    expect(created.thread()).toBe("calendars/5");
   });
 
   it("reads the thread on opening and marks what was unread", async () => {
@@ -255,7 +259,7 @@ describe("CommentSection", () => {
   it("shows a tombstone where a comment was, saying who took it out and never what it said", async () => {
     const removed = buildComment({
       id: 1,
-      task_id: 3,
+      subject_id: 3,
       content: "",
       author: null,
       created_by: null,
@@ -263,7 +267,7 @@ describe("CommentSection", () => {
     });
     const legal = buildComment({
       id: 2,
-      task_id: 3,
+      subject_id: 3,
       content: "",
       author: null,
       created_by: null,
@@ -271,7 +275,7 @@ describe("CommentSection", () => {
     });
     const deleted = buildComment({
       id: 3,
-      task_id: 3,
+      subject_id: 3,
       content: "",
       author: null,
       created_by: null,
@@ -279,7 +283,7 @@ describe("CommentSection", () => {
     });
     const reply = buildComment({
       id: 4,
-      task_id: 3,
+      subject_id: 3,
       parent_comment_id: 3,
       content: "Still answering it",
       created_by: 99,
@@ -325,7 +329,7 @@ describe("CommentSection", () => {
     const author = buildUser({ id: 40 });
     const mine = buildComment({
       id: 8,
-      task_id: 3,
+      subject_id: 3,
       content: "What I said",
       created_by: author.id,
       can_remove: true,
@@ -344,7 +348,12 @@ describe("CommentSection", () => {
 
   it("closes an edit left open when the thread is locked, keeping what was typed", async () => {
     const author = buildUser({ id: 40 });
-    const mine = buildComment({ id: 8, task_id: 3, content: "What I said", created_by: author.id });
+    const mine = buildComment({
+      id: 8,
+      subject_id: 3,
+      content: "What I said",
+      created_by: author.id,
+    });
     const Toggled = () => {
       const [locked, setLocked] = useState(false);
       return (
@@ -377,7 +386,12 @@ describe("CommentSection", () => {
 
   it("offers an author the edit on their comment while the thread is open", async () => {
     const author = buildUser({ id: 40 });
-    const mine = buildComment({ id: 8, task_id: 3, content: "What I said", created_by: author.id });
+    const mine = buildComment({
+      id: 8,
+      subject_id: 3,
+      content: "What I said",
+      created_by: author.id,
+    });
     renderPage(
       () => <CommentSection entityType="task" entityId={3} comments={[mine]} initiativeId={7} />,
       { auth: { user: author } }
@@ -387,7 +401,7 @@ describe("CommentSection", () => {
   });
 
   it("hides the composer from a moderator too, who still acts on comments", async () => {
-    const theirs = buildComment({ id: 7, task_id: 3, content: "Out of line" });
+    const theirs = buildComment({ id: 7, subject_id: 3, content: "Out of line" });
     renderPage(() => (
       <CommentSection
         entityType="task"
@@ -465,8 +479,8 @@ describe("CommentSection", () => {
 
     it("marks out the comment it names", async () => {
       window.location.hash = "#comment-7";
-      const named = buildComment({ id: 7, task_id: 3, content: "This one" });
-      const other = buildComment({ id: 8, task_id: 3, content: "Not this one" });
+      const named = buildComment({ id: 7, subject_id: 3, content: "This one" });
+      const other = buildComment({ id: 8, subject_id: 3, content: "Not this one" });
       const { container } = renderPage(() => (
         <CommentSection entityType="task" entityId={3} comments={[named, other]} initiativeId={7} />
       ));
@@ -483,7 +497,7 @@ describe("CommentSection", () => {
         <CommentSection
           entityType="task"
           entityId={3}
-          comments={[buildComment({ id: 7, task_id: 3, content: "Newer" })]}
+          comments={[buildComment({ id: 7, subject_id: 3, content: "Newer" })]}
           initiativeId={7}
           hasOlder
           onLoadOlder={onLoadOlder}
@@ -497,7 +511,7 @@ describe("CommentSection", () => {
     it("starts the search afresh for another comment on another thread", async () => {
       window.location.hash = "#comment-99";
       const onLoadOlder = vi.fn();
-      const one = [buildComment({ id: 7, task_id: 3, content: "Here" })];
+      const one = [buildComment({ id: 7, subject_id: 3, content: "Here" })];
       const Switching = () => {
         const [entityId, setEntityId] = useState(3);
         return (
@@ -534,7 +548,7 @@ describe("CommentSection", () => {
     it("stops reading older conversations when a read brings nothing", async () => {
       window.location.hash = "#comment-99";
       const onLoadOlder = vi.fn();
-      const comments = [buildComment({ id: 7, task_id: 3, content: "Newer" })];
+      const comments = [buildComment({ id: 7, subject_id: 3, content: "Newer" })];
       const Thread = ({ loading }: { loading: boolean }) => (
         <CommentSection
           entityType="task"
@@ -570,7 +584,7 @@ describe("CommentSection", () => {
   });
 
   it("offers members no moderation", async () => {
-    const theirs = buildComment({ id: 7, task_id: 3, content: "Out of line" });
+    const theirs = buildComment({ id: 7, subject_id: 3, content: "Out of line" });
     renderPage(() => (
       <CommentSection entityType="task" entityId={3} comments={[theirs]} initiativeId={7} />
     ));

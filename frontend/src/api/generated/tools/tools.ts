@@ -26,7 +26,6 @@ import type {
   TagSetRequest,
   TagSummary,
   Tool,
-  ToolCommentSettings,
   ToolCountsByInitiativeResponse,
   ToolCountsResponse,
 } from "../initiativeAPI.schemas";
@@ -433,109 +432,4 @@ export const useSetToolTags = <TError = ErrorType<HTTPValidationError>, TContext
   TContext
 > => {
   return useMutation(getSetToolTagsMutationOptions(options), queryClient);
-};
-/**
- * Turn the comment thread on any tool entity on or off. Requires write
- * access, the same level that posting to the thread takes.
- *
- * Turning it off keeps the comments that are already there — nothing is
- * deleted; the thread stops being readable or writable until it is turned
- * back on. A task's thread is its own and is never affected by its project's
- * switch.
- * @summary Set Tool Comment Settings
- */
-export const setToolCommentSettings = (
-  communityId: number,
-  tool: Tool,
-  toolId: number,
-  toolCommentSettings: BodyType<ToolCommentSettings>,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<ToolCommentSettings>(
-    {
-      url: `/api/v1/c/${communityId}/tools/${tool}/${toolId}/comments`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: toolCommentSettings,
-      signal,
-    },
-    options
-  );
-};
-
-export const getSetToolCommentSettingsMutationKey = () => ["setToolCommentSettings"] as const;
-
-export const getSetToolCommentSettingsMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof setToolCommentSettings>>,
-    TError,
-    SetToolCommentSettingsMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof apiMutator>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof setToolCommentSettings>>,
-  TError,
-  SetToolCommentSettingsMutationVariables,
-  TContext
-> => {
-  const mutationKey = getSetToolCommentSettingsMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof setToolCommentSettings>>,
-    SetToolCommentSettingsMutationVariables
-  > = (props) => {
-    const { communityId, tool, toolId, data } = props ?? {};
-
-    return setToolCommentSettings(communityId, tool, toolId, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type SetToolCommentSettingsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof setToolCommentSettings>>
->;
-export type SetToolCommentSettingsMutationBody = BodyType<ToolCommentSettings>;
-export type SetToolCommentSettingsMutationError = ErrorType<HTTPValidationError>;
-export type SetToolCommentSettingsMutationVariables = {
-  communityId: number;
-  tool: Tool;
-  toolId: number;
-  data: BodyType<ToolCommentSettings>;
-};
-
-/**
- * @summary Set Tool Comment Settings
- */
-export const useSetToolCommentSettings = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof setToolCommentSettings>>,
-      TError,
-      SetToolCommentSettingsMutationVariables,
-      TContext
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseMutationResult<
-  Awaited<ReturnType<typeof setToolCommentSettings>>,
-  TError,
-  SetToolCommentSettingsMutationVariables,
-  TContext
-> => {
-  return useMutation(getSetToolCommentSettingsMutationOptions(options), queryClient);
 };

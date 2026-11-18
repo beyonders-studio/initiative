@@ -3,14 +3,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  type CommentCreate,
   type CommentRead,
+  type CommentSubject,
   ModerationAct,
-  type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
-import { useCreateComment, useDeleteComment, useUpdateComment } from "@/hooks/useComments";
+import {
+  type NewComment,
+  useCreateComment,
+  useDeleteComment,
+  useUpdateComment,
+} from "@/hooks/useComments";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useModerate } from "@/hooks/useModeration";
 import { useReadOnOpen } from "@/hooks/useNotifications";
@@ -33,15 +37,8 @@ export interface CommentWithReplies extends CommentRead {
   replies: CommentWithReplies[];
 }
 
-/** What a comment thread hangs off: any tool entity, plus tasks (a project's
- *  child, not a tool of its own). */
-/** What a comment can hang off: a tool entity, or one of the content-level
- *  extras that carries a thread of its own. Mirrors the backend's
- *  `COMMENT_TARGETS`. */
-export type CommentEntity = "task" | "wiki_page" | "collection" | Tool;
-
 interface CommentSectionProps {
-  entityType: CommentEntity;
+  entityType: CommentSubject;
   entityId: number;
   comments?: CommentRead[];
   onCommentCreated?: (comment: CommentRead) => void;
@@ -267,18 +264,12 @@ export const CommentSection = ({
     return map;
   }, [comments]);
 
-  // Each entity kind carries its id under its own `<entity>_id` field, and a
-  // comment names exactly one.
-  const buildPayload = (commentBody: string, parentCommentId?: number): CommentCreate => {
-    const payload: CommentCreate = {
-      content: commentBody,
-    };
-    payload[`${entityType}_id`] = entityId;
-    if (parentCommentId) {
-      payload.parent_comment_id = parentCommentId;
-    }
-    return payload;
-  };
+  const buildPayload = (commentBody: string, parentCommentId?: number): NewComment => ({
+    subject: { subject_type: entityType, subject_id: entityId },
+    body: parentCommentId
+      ? { content: commentBody, parent_comment_id: parentCommentId }
+      : { content: commentBody },
+  });
 
   const handleSubmit = (commentContent: string) => {
     const normalized = commentContent.trim();

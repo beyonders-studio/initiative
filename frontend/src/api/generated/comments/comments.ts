@@ -26,7 +26,17 @@ import type {
   CommentRead,
   CommentUpdate,
   HTTPValidationError,
-  ListCommentsParams,
+  ListCalendarCommentsParams,
+  ListCollectionCommentsParams,
+  ListContactCommentsParams,
+  ListCounterGroupCommentsParams,
+  ListDashboardCommentsParams,
+  ListFileCommentsParams,
+  ListPostCommentsParams,
+  ListProjectCommentsParams,
+  ListTaskCommentsParams,
+  ListWikiCommentsParams,
+  ListWikiPageCommentsParams,
   ReadCommentParams,
   RecentActivityEntry,
   RecentCommentsParams,
@@ -51,221 +61,6 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
-
-/**
- * @summary Create Comment
- */
-export const createComment = (
-  communityId: number,
-  commentCreate: BodyType<CommentCreate>,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<CommentRead>(
-    {
-      url: `/api/v1/c/${communityId}/comments/`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: commentCreate,
-      signal,
-    },
-    options
-  );
-};
-
-export const getCreateCommentMutationKey = () => ["createComment"] as const;
-
-export const getCreateCommentMutationOptions = <
-  TError = ErrorType<HTTPValidationError>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createComment>>,
-    TError,
-    CreateCommentMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof apiMutator>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createComment>>,
-  TError,
-  CreateCommentMutationVariables,
-  TContext
-> => {
-  const mutationKey = getCreateCommentMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createComment>>,
-    CreateCommentMutationVariables
-  > = (props) => {
-    const { communityId, data } = props ?? {};
-
-    return createComment(communityId, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type CreateCommentMutationResult = NonNullable<Awaited<ReturnType<typeof createComment>>>;
-export type CreateCommentMutationBody = BodyType<CommentCreate>;
-export type CreateCommentMutationError = ErrorType<HTTPValidationError>;
-export type CreateCommentMutationVariables = { communityId: number; data: BodyType<CommentCreate> };
-
-/**
- * @summary Create Comment
- */
-export const useCreateComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createComment>>,
-      TError,
-      CreateCommentMutationVariables,
-      TContext
-    >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseMutationResult<
-  Awaited<ReturnType<typeof createComment>>,
-  TError,
-  CreateCommentMutationVariables,
-  TContext
-> => {
-  return useMutation(getCreateCommentMutationOptions(options), queryClient);
-};
-/**
- * One page of a thread: ``limit`` conversations, newest first, each with
- * every reply under it. Follow ``next_cursor`` for older conversations.
- * @summary List Comments
- */
-export const listComments = (
-  communityId: number,
-  params?: ListCommentsParams,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<CommentListResponse>(
-    { url: `/api/v1/c/${communityId}/comments/`, method: "GET", params, signal },
-    options
-  );
-};
-
-export const getListCommentsQueryKey = (communityId: number, params?: ListCommentsParams) => {
-  return [`/api/v1/c/${communityId}/comments/`, ...(params ? [params] : [])] as const;
-};
-
-export const getListCommentsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listComments>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  params?: ListCommentsParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListCommentsQueryKey(communityId, params);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listComments>>> = ({ signal }) =>
-    listComments(communityId, params, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: communityId !== null && communityId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-};
-
-export type ListCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listComments>>>;
-export type ListCommentsQueryError = ErrorType<HTTPValidationError>;
-
-export function useListComments<
-  TData = Awaited<ReturnType<typeof listComments>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  params: undefined | ListCommentsParams,
-  options: {
-    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>> &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listComments>>,
-          TError,
-          Awaited<ReturnType<typeof listComments>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListComments<
-  TData = Awaited<ReturnType<typeof listComments>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  params?: ListCommentsParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>> &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listComments>>,
-          TError,
-          Awaited<ReturnType<typeof listComments>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListComments<
-  TData = Awaited<ReturnType<typeof listComments>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  params?: ListCommentsParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-/**
- * @summary List Comments
- */
-
-export function useListComments<
-  TData = Awaited<ReturnType<typeof listComments>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  params?: ListCommentsParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listComments>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListCommentsQueryOptions(communityId, params, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
 
 /**
  * Return the most recent comments across the guild.
@@ -713,3 +508,2830 @@ export const useDeleteComment = <TError = ErrorType<HTTPValidationError>, TConte
 > => {
   return useMutation(getDeleteCommentMutationOptions(options), queryClient);
 };
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Task Comment
+ */
+export const createTaskComment = (
+  communityId: number,
+  taskId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/tasks/${taskId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateTaskCommentMutationKey = () => ["createTaskComment"] as const;
+
+export const getCreateTaskCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTaskComment>>,
+    TError,
+    CreateTaskCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTaskComment>>,
+  TError,
+  CreateTaskCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateTaskCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTaskComment>>,
+    CreateTaskCommentMutationVariables
+  > = (props) => {
+    const { communityId, taskId, data } = props ?? {};
+
+    return createTaskComment(communityId, taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTaskCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTaskComment>>
+>;
+export type CreateTaskCommentMutationBody = BodyType<CommentCreate>;
+export type CreateTaskCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateTaskCommentMutationVariables = {
+  communityId: number;
+  taskId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Task Comment
+ */
+export const useCreateTaskComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createTaskComment>>,
+      TError,
+      CreateTaskCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createTaskComment>>,
+  TError,
+  CreateTaskCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateTaskCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Task Comments
+ */
+export const listTaskComments = (
+  communityId: number,
+  taskId: number,
+  params?: ListTaskCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    { url: `/api/v1/c/${communityId}/tasks/${taskId}/comments`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListTaskCommentsQueryKey = (
+  communityId: number,
+  taskId: number,
+  params?: ListTaskCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/tasks/${taskId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListTaskCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTaskComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  taskId: number,
+  params?: ListTaskCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTaskCommentsQueryKey(communityId, taskId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTaskComments>>> = ({ signal }) =>
+    listTaskComments(communityId, taskId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null && communityId !== undefined && taskId !== null && taskId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listTaskComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListTaskCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskComments>>>;
+export type ListTaskCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListTaskComments<
+  TData = Awaited<ReturnType<typeof listTaskComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  taskId: number,
+  params: undefined | ListTaskCommentsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskComments>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskComments>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListTaskComments<
+  TData = Awaited<ReturnType<typeof listTaskComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  taskId: number,
+  params?: ListTaskCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskComments>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskComments>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListTaskComments<
+  TData = Awaited<ReturnType<typeof listTaskComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  taskId: number,
+  params?: ListTaskCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Task Comments
+ */
+
+export function useListTaskComments<
+  TData = Awaited<ReturnType<typeof listTaskComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  taskId: number,
+  params?: ListTaskCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListTaskCommentsQueryOptions(communityId, taskId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Wiki Page Comment
+ */
+export const createWikiPageComment = (
+  communityId: number,
+  wikiPageId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/wiki-pages/${wikiPageId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateWikiPageCommentMutationKey = () => ["createWikiPageComment"] as const;
+
+export const getCreateWikiPageCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createWikiPageComment>>,
+    TError,
+    CreateWikiPageCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createWikiPageComment>>,
+  TError,
+  CreateWikiPageCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateWikiPageCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createWikiPageComment>>,
+    CreateWikiPageCommentMutationVariables
+  > = (props) => {
+    const { communityId, wikiPageId, data } = props ?? {};
+
+    return createWikiPageComment(communityId, wikiPageId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateWikiPageCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createWikiPageComment>>
+>;
+export type CreateWikiPageCommentMutationBody = BodyType<CommentCreate>;
+export type CreateWikiPageCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateWikiPageCommentMutationVariables = {
+  communityId: number;
+  wikiPageId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Wiki Page Comment
+ */
+export const useCreateWikiPageComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createWikiPageComment>>,
+      TError,
+      CreateWikiPageCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createWikiPageComment>>,
+  TError,
+  CreateWikiPageCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateWikiPageCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Wiki Page Comments
+ */
+export const listWikiPageComments = (
+  communityId: number,
+  wikiPageId: number,
+  params?: ListWikiPageCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/wiki-pages/${wikiPageId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListWikiPageCommentsQueryKey = (
+  communityId: number,
+  wikiPageId: number,
+  params?: ListWikiPageCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/wiki-pages/${wikiPageId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListWikiPageCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWikiPageComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiPageId: number,
+  params?: ListWikiPageCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWikiPageComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListWikiPageCommentsQueryKey(communityId, wikiPageId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWikiPageComments>>> = ({ signal }) =>
+    listWikiPageComments(communityId, wikiPageId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      wikiPageId !== null &&
+      wikiPageId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listWikiPageComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListWikiPageCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWikiPageComments>>
+>;
+export type ListWikiPageCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListWikiPageComments<
+  TData = Awaited<ReturnType<typeof listWikiPageComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiPageId: number,
+  params: undefined | ListWikiPageCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWikiPageComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWikiPageComments>>,
+          TError,
+          Awaited<ReturnType<typeof listWikiPageComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListWikiPageComments<
+  TData = Awaited<ReturnType<typeof listWikiPageComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiPageId: number,
+  params?: ListWikiPageCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWikiPageComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWikiPageComments>>,
+          TError,
+          Awaited<ReturnType<typeof listWikiPageComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListWikiPageComments<
+  TData = Awaited<ReturnType<typeof listWikiPageComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiPageId: number,
+  params?: ListWikiPageCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWikiPageComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Wiki Page Comments
+ */
+
+export function useListWikiPageComments<
+  TData = Awaited<ReturnType<typeof listWikiPageComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiPageId: number,
+  params?: ListWikiPageCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listWikiPageComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListWikiPageCommentsQueryOptions(
+    communityId,
+    wikiPageId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Collection Comment
+ */
+export const createCollectionComment = (
+  communityId: number,
+  collectionId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateCollectionCommentMutationKey = () => ["createCollectionComment"] as const;
+
+export const getCreateCollectionCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCollectionComment>>,
+    TError,
+    CreateCollectionCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCollectionComment>>,
+  TError,
+  CreateCollectionCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateCollectionCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCollectionComment>>,
+    CreateCollectionCommentMutationVariables
+  > = (props) => {
+    const { communityId, collectionId, data } = props ?? {};
+
+    return createCollectionComment(communityId, collectionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCollectionCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCollectionComment>>
+>;
+export type CreateCollectionCommentMutationBody = BodyType<CommentCreate>;
+export type CreateCollectionCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateCollectionCommentMutationVariables = {
+  communityId: number;
+  collectionId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Collection Comment
+ */
+export const useCreateCollectionComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createCollectionComment>>,
+      TError,
+      CreateCollectionCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createCollectionComment>>,
+  TError,
+  CreateCollectionCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateCollectionCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Collection Comments
+ */
+export const listCollectionComments = (
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListCollectionCommentsQueryKey = (
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/collections/${collectionId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListCollectionCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCollectionComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCollectionCommentsQueryKey(communityId, collectionId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollectionComments>>> = ({ signal }) =>
+    listCollectionComments(communityId, collectionId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      collectionId !== null &&
+      collectionId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCollectionComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCollectionCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCollectionComments>>
+>;
+export type ListCollectionCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCollectionComments<
+  TData = Awaited<ReturnType<typeof listCollectionComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params: undefined | ListCollectionCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollectionComments>>,
+          TError,
+          Awaited<ReturnType<typeof listCollectionComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCollectionComments<
+  TData = Awaited<ReturnType<typeof listCollectionComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollectionComments>>,
+          TError,
+          Awaited<ReturnType<typeof listCollectionComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCollectionComments<
+  TData = Awaited<ReturnType<typeof listCollectionComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Collection Comments
+ */
+
+export function useListCollectionComments<
+  TData = Awaited<ReturnType<typeof listCollectionComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCollectionCommentsQueryOptions(
+    communityId,
+    collectionId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Project Comment
+ */
+export const createProjectComment = (
+  communityId: number,
+  projectId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/projects/${projectId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateProjectCommentMutationKey = () => ["createProjectComment"] as const;
+
+export const getCreateProjectCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProjectComment>>,
+    TError,
+    CreateProjectCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createProjectComment>>,
+  TError,
+  CreateProjectCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateProjectCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createProjectComment>>,
+    CreateProjectCommentMutationVariables
+  > = (props) => {
+    const { communityId, projectId, data } = props ?? {};
+
+    return createProjectComment(communityId, projectId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateProjectCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createProjectComment>>
+>;
+export type CreateProjectCommentMutationBody = BodyType<CommentCreate>;
+export type CreateProjectCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateProjectCommentMutationVariables = {
+  communityId: number;
+  projectId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Project Comment
+ */
+export const useCreateProjectComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createProjectComment>>,
+      TError,
+      CreateProjectCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createProjectComment>>,
+  TError,
+  CreateProjectCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateProjectCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Project Comments
+ */
+export const listProjectComments = (
+  communityId: number,
+  projectId: number,
+  params?: ListProjectCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/projects/${projectId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListProjectCommentsQueryKey = (
+  communityId: number,
+  projectId: number,
+  params?: ListProjectCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/projects/${projectId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListProjectCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  projectId: number,
+  params?: ListProjectCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listProjectComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListProjectCommentsQueryKey(communityId, projectId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjectComments>>> = ({ signal }) =>
+    listProjectComments(communityId, projectId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      projectId !== null &&
+      projectId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listProjectComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListProjectCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjectComments>>
+>;
+export type ListProjectCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListProjectComments<
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  projectId: number,
+  params: undefined | ListProjectCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listProjectComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listProjectComments>>,
+          TError,
+          Awaited<ReturnType<typeof listProjectComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListProjectComments<
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  projectId: number,
+  params?: ListProjectCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listProjectComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listProjectComments>>,
+          TError,
+          Awaited<ReturnType<typeof listProjectComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListProjectComments<
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  projectId: number,
+  params?: ListProjectCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listProjectComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Project Comments
+ */
+
+export function useListProjectComments<
+  TData = Awaited<ReturnType<typeof listProjectComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  projectId: number,
+  params?: ListProjectCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listProjectComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListProjectCommentsQueryOptions(communityId, projectId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create File Comment
+ */
+export const createFileComment = (
+  communityId: number,
+  fileId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/files/${fileId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateFileCommentMutationKey = () => ["createFileComment"] as const;
+
+export const getCreateFileCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFileComment>>,
+    TError,
+    CreateFileCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFileComment>>,
+  TError,
+  CreateFileCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateFileCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFileComment>>,
+    CreateFileCommentMutationVariables
+  > = (props) => {
+    const { communityId, fileId, data } = props ?? {};
+
+    return createFileComment(communityId, fileId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFileCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFileComment>>
+>;
+export type CreateFileCommentMutationBody = BodyType<CommentCreate>;
+export type CreateFileCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateFileCommentMutationVariables = {
+  communityId: number;
+  fileId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create File Comment
+ */
+export const useCreateFileComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createFileComment>>,
+      TError,
+      CreateFileCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createFileComment>>,
+  TError,
+  CreateFileCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateFileCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List File Comments
+ */
+export const listFileComments = (
+  communityId: number,
+  fileId: number,
+  params?: ListFileCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    { url: `/api/v1/c/${communityId}/files/${fileId}/comments`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListFileCommentsQueryKey = (
+  communityId: number,
+  fileId: number,
+  params?: ListFileCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/files/${fileId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListFileCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFileComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  fileId: number,
+  params?: ListFileCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listFileComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListFileCommentsQueryKey(communityId, fileId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFileComments>>> = ({ signal }) =>
+    listFileComments(communityId, fileId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null && communityId !== undefined && fileId !== null && fileId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listFileComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListFileCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listFileComments>>>;
+export type ListFileCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListFileComments<
+  TData = Awaited<ReturnType<typeof listFileComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  fileId: number,
+  params: undefined | ListFileCommentsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listFileComments>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFileComments>>,
+          TError,
+          Awaited<ReturnType<typeof listFileComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListFileComments<
+  TData = Awaited<ReturnType<typeof listFileComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  fileId: number,
+  params?: ListFileCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listFileComments>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFileComments>>,
+          TError,
+          Awaited<ReturnType<typeof listFileComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListFileComments<
+  TData = Awaited<ReturnType<typeof listFileComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  fileId: number,
+  params?: ListFileCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listFileComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List File Comments
+ */
+
+export function useListFileComments<
+  TData = Awaited<ReturnType<typeof listFileComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  fileId: number,
+  params?: ListFileCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listFileComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListFileCommentsQueryOptions(communityId, fileId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Counter Group Comment
+ */
+export const createCounterGroupComment = (
+  communityId: number,
+  counterGroupId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/counter-groups/${counterGroupId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateCounterGroupCommentMutationKey = () => ["createCounterGroupComment"] as const;
+
+export const getCreateCounterGroupCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCounterGroupComment>>,
+    TError,
+    CreateCounterGroupCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCounterGroupComment>>,
+  TError,
+  CreateCounterGroupCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateCounterGroupCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCounterGroupComment>>,
+    CreateCounterGroupCommentMutationVariables
+  > = (props) => {
+    const { communityId, counterGroupId, data } = props ?? {};
+
+    return createCounterGroupComment(communityId, counterGroupId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCounterGroupCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCounterGroupComment>>
+>;
+export type CreateCounterGroupCommentMutationBody = BodyType<CommentCreate>;
+export type CreateCounterGroupCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateCounterGroupCommentMutationVariables = {
+  communityId: number;
+  counterGroupId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Counter Group Comment
+ */
+export const useCreateCounterGroupComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createCounterGroupComment>>,
+      TError,
+      CreateCounterGroupCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createCounterGroupComment>>,
+  TError,
+  CreateCounterGroupCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateCounterGroupCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Counter Group Comments
+ */
+export const listCounterGroupComments = (
+  communityId: number,
+  counterGroupId: number,
+  params?: ListCounterGroupCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/counter-groups/${counterGroupId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListCounterGroupCommentsQueryKey = (
+  communityId: number,
+  counterGroupId: number,
+  params?: ListCounterGroupCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/counter-groups/${counterGroupId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListCounterGroupCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCounterGroupComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  counterGroupId: number,
+  params?: ListCounterGroupCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCounterGroupComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListCounterGroupCommentsQueryKey(communityId, counterGroupId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCounterGroupComments>>> = ({
+    signal,
+  }) => listCounterGroupComments(communityId, counterGroupId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      counterGroupId !== null &&
+      counterGroupId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCounterGroupComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCounterGroupCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCounterGroupComments>>
+>;
+export type ListCounterGroupCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCounterGroupComments<
+  TData = Awaited<ReturnType<typeof listCounterGroupComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  counterGroupId: number,
+  params: undefined | ListCounterGroupCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCounterGroupComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCounterGroupComments>>,
+          TError,
+          Awaited<ReturnType<typeof listCounterGroupComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCounterGroupComments<
+  TData = Awaited<ReturnType<typeof listCounterGroupComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  counterGroupId: number,
+  params?: ListCounterGroupCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCounterGroupComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCounterGroupComments>>,
+          TError,
+          Awaited<ReturnType<typeof listCounterGroupComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCounterGroupComments<
+  TData = Awaited<ReturnType<typeof listCounterGroupComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  counterGroupId: number,
+  params?: ListCounterGroupCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCounterGroupComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Counter Group Comments
+ */
+
+export function useListCounterGroupComments<
+  TData = Awaited<ReturnType<typeof listCounterGroupComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  counterGroupId: number,
+  params?: ListCounterGroupCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCounterGroupComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCounterGroupCommentsQueryOptions(
+    communityId,
+    counterGroupId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Calendar Comment
+ */
+export const createCalendarComment = (
+  communityId: number,
+  calendarId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/calendars/${calendarId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateCalendarCommentMutationKey = () => ["createCalendarComment"] as const;
+
+export const getCreateCalendarCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCalendarComment>>,
+    TError,
+    CreateCalendarCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCalendarComment>>,
+  TError,
+  CreateCalendarCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateCalendarCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCalendarComment>>,
+    CreateCalendarCommentMutationVariables
+  > = (props) => {
+    const { communityId, calendarId, data } = props ?? {};
+
+    return createCalendarComment(communityId, calendarId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCalendarCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCalendarComment>>
+>;
+export type CreateCalendarCommentMutationBody = BodyType<CommentCreate>;
+export type CreateCalendarCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateCalendarCommentMutationVariables = {
+  communityId: number;
+  calendarId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Calendar Comment
+ */
+export const useCreateCalendarComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createCalendarComment>>,
+      TError,
+      CreateCalendarCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createCalendarComment>>,
+  TError,
+  CreateCalendarCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateCalendarCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Calendar Comments
+ */
+export const listCalendarComments = (
+  communityId: number,
+  calendarId: number,
+  params?: ListCalendarCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/calendars/${calendarId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListCalendarCommentsQueryKey = (
+  communityId: number,
+  calendarId: number,
+  params?: ListCalendarCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/calendars/${calendarId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListCalendarCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCalendarComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  calendarId: number,
+  params?: ListCalendarCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCalendarComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCalendarCommentsQueryKey(communityId, calendarId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCalendarComments>>> = ({ signal }) =>
+    listCalendarComments(communityId, calendarId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      calendarId !== null &&
+      calendarId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCalendarComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCalendarCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCalendarComments>>
+>;
+export type ListCalendarCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCalendarComments<
+  TData = Awaited<ReturnType<typeof listCalendarComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  calendarId: number,
+  params: undefined | ListCalendarCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCalendarComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCalendarComments>>,
+          TError,
+          Awaited<ReturnType<typeof listCalendarComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCalendarComments<
+  TData = Awaited<ReturnType<typeof listCalendarComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  calendarId: number,
+  params?: ListCalendarCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCalendarComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCalendarComments>>,
+          TError,
+          Awaited<ReturnType<typeof listCalendarComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCalendarComments<
+  TData = Awaited<ReturnType<typeof listCalendarComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  calendarId: number,
+  params?: ListCalendarCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCalendarComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Calendar Comments
+ */
+
+export function useListCalendarComments<
+  TData = Awaited<ReturnType<typeof listCalendarComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  calendarId: number,
+  params?: ListCalendarCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCalendarComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCalendarCommentsQueryOptions(
+    communityId,
+    calendarId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Dashboard Comment
+ */
+export const createDashboardComment = (
+  communityId: number,
+  dashboardId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateDashboardCommentMutationKey = () => ["createDashboardComment"] as const;
+
+export const getCreateDashboardCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDashboardComment>>,
+    TError,
+    CreateDashboardCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createDashboardComment>>,
+  TError,
+  CreateDashboardCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateDashboardCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createDashboardComment>>,
+    CreateDashboardCommentMutationVariables
+  > = (props) => {
+    const { communityId, dashboardId, data } = props ?? {};
+
+    return createDashboardComment(communityId, dashboardId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateDashboardCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createDashboardComment>>
+>;
+export type CreateDashboardCommentMutationBody = BodyType<CommentCreate>;
+export type CreateDashboardCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateDashboardCommentMutationVariables = {
+  communityId: number;
+  dashboardId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Dashboard Comment
+ */
+export const useCreateDashboardComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createDashboardComment>>,
+      TError,
+      CreateDashboardCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createDashboardComment>>,
+  TError,
+  CreateDashboardCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateDashboardCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Dashboard Comments
+ */
+export const listDashboardComments = (
+  communityId: number,
+  dashboardId: number,
+  params?: ListDashboardCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/dashboards/${dashboardId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListDashboardCommentsQueryKey = (
+  communityId: number,
+  dashboardId: number,
+  params?: ListDashboardCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/dashboards/${dashboardId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListDashboardCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDashboardComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  dashboardId: number,
+  params?: ListDashboardCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listDashboardComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDashboardCommentsQueryKey(communityId, dashboardId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDashboardComments>>> = ({ signal }) =>
+    listDashboardComments(communityId, dashboardId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      dashboardId !== null &&
+      dashboardId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listDashboardComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListDashboardCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDashboardComments>>
+>;
+export type ListDashboardCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListDashboardComments<
+  TData = Awaited<ReturnType<typeof listDashboardComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  dashboardId: number,
+  params: undefined | ListDashboardCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listDashboardComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDashboardComments>>,
+          TError,
+          Awaited<ReturnType<typeof listDashboardComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListDashboardComments<
+  TData = Awaited<ReturnType<typeof listDashboardComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  dashboardId: number,
+  params?: ListDashboardCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listDashboardComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDashboardComments>>,
+          TError,
+          Awaited<ReturnType<typeof listDashboardComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListDashboardComments<
+  TData = Awaited<ReturnType<typeof listDashboardComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  dashboardId: number,
+  params?: ListDashboardCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listDashboardComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Dashboard Comments
+ */
+
+export function useListDashboardComments<
+  TData = Awaited<ReturnType<typeof listDashboardComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  dashboardId: number,
+  params?: ListDashboardCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listDashboardComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListDashboardCommentsQueryOptions(
+    communityId,
+    dashboardId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Post Comment
+ */
+export const createPostComment = (
+  communityId: number,
+  postId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/posts/${postId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreatePostCommentMutationKey = () => ["createPostComment"] as const;
+
+export const getCreatePostCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPostComment>>,
+    TError,
+    CreatePostCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPostComment>>,
+  TError,
+  CreatePostCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreatePostCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPostComment>>,
+    CreatePostCommentMutationVariables
+  > = (props) => {
+    const { communityId, postId, data } = props ?? {};
+
+    return createPostComment(communityId, postId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePostCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPostComment>>
+>;
+export type CreatePostCommentMutationBody = BodyType<CommentCreate>;
+export type CreatePostCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreatePostCommentMutationVariables = {
+  communityId: number;
+  postId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Post Comment
+ */
+export const useCreatePostComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createPostComment>>,
+      TError,
+      CreatePostCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createPostComment>>,
+  TError,
+  CreatePostCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreatePostCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Post Comments
+ */
+export const listPostComments = (
+  communityId: number,
+  postId: number,
+  params?: ListPostCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    { url: `/api/v1/c/${communityId}/posts/${postId}/comments`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListPostCommentsQueryKey = (
+  communityId: number,
+  postId: number,
+  params?: ListPostCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/posts/${postId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListPostCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPostComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  postId: number,
+  params?: ListPostCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPostComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPostCommentsQueryKey(communityId, postId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPostComments>>> = ({ signal }) =>
+    listPostComments(communityId, postId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null && communityId !== undefined && postId !== null && postId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listPostComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListPostCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listPostComments>>>;
+export type ListPostCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListPostComments<
+  TData = Awaited<ReturnType<typeof listPostComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  postId: number,
+  params: undefined | ListPostCommentsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPostComments>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPostComments>>,
+          TError,
+          Awaited<ReturnType<typeof listPostComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListPostComments<
+  TData = Awaited<ReturnType<typeof listPostComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  postId: number,
+  params?: ListPostCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPostComments>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPostComments>>,
+          TError,
+          Awaited<ReturnType<typeof listPostComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListPostComments<
+  TData = Awaited<ReturnType<typeof listPostComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  postId: number,
+  params?: ListPostCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPostComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Post Comments
+ */
+
+export function useListPostComments<
+  TData = Awaited<ReturnType<typeof listPostComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  postId: number,
+  params?: ListPostCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPostComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListPostCommentsQueryOptions(communityId, postId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Wiki Comment
+ */
+export const createWikiComment = (
+  communityId: number,
+  wikiId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/wikis/${wikiId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateWikiCommentMutationKey = () => ["createWikiComment"] as const;
+
+export const getCreateWikiCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createWikiComment>>,
+    TError,
+    CreateWikiCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createWikiComment>>,
+  TError,
+  CreateWikiCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateWikiCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createWikiComment>>,
+    CreateWikiCommentMutationVariables
+  > = (props) => {
+    const { communityId, wikiId, data } = props ?? {};
+
+    return createWikiComment(communityId, wikiId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateWikiCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createWikiComment>>
+>;
+export type CreateWikiCommentMutationBody = BodyType<CommentCreate>;
+export type CreateWikiCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateWikiCommentMutationVariables = {
+  communityId: number;
+  wikiId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Wiki Comment
+ */
+export const useCreateWikiComment = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createWikiComment>>,
+      TError,
+      CreateWikiCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createWikiComment>>,
+  TError,
+  CreateWikiCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateWikiCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Wiki Comments
+ */
+export const listWikiComments = (
+  communityId: number,
+  wikiId: number,
+  params?: ListWikiCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    { url: `/api/v1/c/${communityId}/wikis/${wikiId}/comments`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListWikiCommentsQueryKey = (
+  communityId: number,
+  wikiId: number,
+  params?: ListWikiCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/wikis/${wikiId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListWikiCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWikiComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiId: number,
+  params?: ListWikiCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWikiComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListWikiCommentsQueryKey(communityId, wikiId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWikiComments>>> = ({ signal }) =>
+    listWikiComments(communityId, wikiId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null && communityId !== undefined && wikiId !== null && wikiId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listWikiComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListWikiCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listWikiComments>>>;
+export type ListWikiCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListWikiComments<
+  TData = Awaited<ReturnType<typeof listWikiComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiId: number,
+  params: undefined | ListWikiCommentsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWikiComments>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWikiComments>>,
+          TError,
+          Awaited<ReturnType<typeof listWikiComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListWikiComments<
+  TData = Awaited<ReturnType<typeof listWikiComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiId: number,
+  params?: ListWikiCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWikiComments>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWikiComments>>,
+          TError,
+          Awaited<ReturnType<typeof listWikiComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListWikiComments<
+  TData = Awaited<ReturnType<typeof listWikiComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiId: number,
+  params?: ListWikiCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWikiComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Wiki Comments
+ */
+
+export function useListWikiComments<
+  TData = Awaited<ReturnType<typeof listWikiComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  wikiId: number,
+  params?: ListWikiCommentsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listWikiComments>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListWikiCommentsQueryOptions(communityId, wikiId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Post a comment on it. An installed plug-in posts as itself: the
+ * comment names no author, and the notices it sends name the plug-in.
+ * @summary Create Contact Comment
+ */
+export const createContactComment = (
+  communityId: number,
+  contactId: number,
+  commentCreate: BodyType<CommentCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentRead>(
+    {
+      url: `/api/v1/c/${communityId}/contacts/${contactId}/comments`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: commentCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateContactCommentMutationKey = () => ["createContactComment"] as const;
+
+export const getCreateContactCommentMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createContactComment>>,
+    TError,
+    CreateContactCommentMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createContactComment>>,
+  TError,
+  CreateContactCommentMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateContactCommentMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createContactComment>>,
+    CreateContactCommentMutationVariables
+  > = (props) => {
+    const { communityId, contactId, data } = props ?? {};
+
+    return createContactComment(communityId, contactId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateContactCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createContactComment>>
+>;
+export type CreateContactCommentMutationBody = BodyType<CommentCreate>;
+export type CreateContactCommentMutationError = ErrorType<HTTPValidationError>;
+export type CreateContactCommentMutationVariables = {
+  communityId: number;
+  contactId: number;
+  data: BodyType<CommentCreate>;
+};
+
+/**
+ * @summary Create Contact Comment
+ */
+export const useCreateContactComment = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createContactComment>>,
+      TError,
+      CreateContactCommentMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createContactComment>>,
+  TError,
+  CreateContactCommentMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateContactCommentMutationOptions(options), queryClient);
+};
+/**
+ * One page of its thread: ``limit`` conversations, newest first, each
+ * with every reply under it. Follow ``next_cursor`` for older
+ * conversations.
+ * @summary List Contact Comments
+ */
+export const listContactComments = (
+  communityId: number,
+  contactId: number,
+  params?: ListContactCommentsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CommentListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/contacts/${contactId}/comments`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListContactCommentsQueryKey = (
+  communityId: number,
+  contactId: number,
+  params?: ListContactCommentsParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/contacts/${contactId}/comments`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListContactCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listContactComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  contactId: number,
+  params?: ListContactCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listContactComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListContactCommentsQueryKey(communityId, contactId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listContactComments>>> = ({ signal }) =>
+    listContactComments(communityId, contactId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      contactId !== null &&
+      contactId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listContactComments>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListContactCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listContactComments>>
+>;
+export type ListContactCommentsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListContactComments<
+  TData = Awaited<ReturnType<typeof listContactComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  contactId: number,
+  params: undefined | ListContactCommentsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listContactComments>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listContactComments>>,
+          TError,
+          Awaited<ReturnType<typeof listContactComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListContactComments<
+  TData = Awaited<ReturnType<typeof listContactComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  contactId: number,
+  params?: ListContactCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listContactComments>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listContactComments>>,
+          TError,
+          Awaited<ReturnType<typeof listContactComments>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListContactComments<
+  TData = Awaited<ReturnType<typeof listContactComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  contactId: number,
+  params?: ListContactCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listContactComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Contact Comments
+ */
+
+export function useListContactComments<
+  TData = Awaited<ReturnType<typeof listContactComments>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  contactId: number,
+  params?: ListContactCommentsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listContactComments>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListContactCommentsQueryOptions(communityId, contactId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

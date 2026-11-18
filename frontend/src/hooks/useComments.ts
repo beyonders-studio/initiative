@@ -6,29 +6,27 @@ import {
 } from "@tanstack/react-query";
 
 import {
-  createComment,
   deleteComment,
-  getListCommentsQueryKey,
-  listComments,
   readComment,
   updateComment,
   useRecentComments as useRecentCommentsQuery,
 } from "@/api/generated/comments/comments";
 import {
   CommentAudience,
+  type CommentCreate,
   type CommentListResponse,
   type CommentRead,
-  type ListCommentsParams,
   type RecentActivityEntry,
   type RecentCommentsParams,
 } from "@/api/generated/initiativeAPI.schemas";
+import { apiMutator } from "@/api/mutator";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { refreshTaskCase } from "@/hooks/useTickets";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { queryClient } from "@/lib/queryClient";
-import { singularOf } from "@/lib/tools";
+import { singularOf, toolRouteSegment } from "@/lib/tools";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -37,24 +35,35 @@ import type { QueryOpts } from "@/types/query";
 /** Conversations per page — a top-level comment and every reply under it. */
 const COMMENT_PAGE_SIZE = 20;
 
-/** Which thread: exactly one `{target}_id`. The page size and the cursor are
- *  the query's own, so they stay out of the key. */
-export type CommentThreadParams = Omit<ListCommentsParams, "limit" | "cursor">;
+/** Which thread: what it is said on, as a comment names it. */
+export type ThreadSubject = Pick<CommentRead, "subject_type" | "subject_id">;
 
 type CommentThreadData = InfiniteData<CommentListResponse>;
 
+/** Where a thread is read and added to: at what it is said on, whose path
+ *  follows the rule every tool's does. */
+const threadUrl = (communityId: number, subject: ThreadSubject) =>
+  `/api/v1/c/${communityId}/${toolRouteSegment(subject.subject_type)}/${subject.subject_id}/comments`;
+
+/** Every thread's cache key starts here, whatever it is said on, so one
+ *  prefix (`q.allComments`) reaches them all. */
+const threadKey = (communityId: number, subject?: ThreadSubject) =>
+  subject
+    ? ([`/api/v1/c/${communityId}/comments/`, subject] as const)
+    : ([`/api/v1/c/${communityId}/comments/`] as const);
+
 /** One thread as an infinite query — shared by the hook and the route loaders
  *  that warm it, so both land in the same cache entry. */
-export const commentThreadQueryOptions = (communityId: number, params: CommentThreadParams) =>
+export const commentThreadQueryOptions = (communityId: number, subject: ThreadSubject) =>
   infiniteQueryOptions({
-    queryKey: getListCommentsQueryKey(communityId, params),
+    queryKey: threadKey(communityId, subject),
     queryFn: ({ pageParam, signal }) =>
-      listComments(
-        communityId,
-        { ...params, limit: COMMENT_PAGE_SIZE, cursor: pageParam },
-        undefined,
-        signal
-      ),
+      apiMutator<CommentListResponse>({
+        url: threadUrl(communityId, subject),
+        method: "GET",
+        params: { limit: COMMENT_PAGE_SIZE, cursor: pageParam },
+        signal,
+      }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last: CommentListResponse) => last.next_cursor ?? undefined,
   });
@@ -79,10 +88,10 @@ const flattenThread = (data: CommentThreadData) => {
  * `data` is every comment loaded so far as one list; `fetchNextPage` brings
  * the next older page of conversations.
  */
-export const useComments = (params: CommentThreadParams, options?: { enabled?: boolean }) => {
+export const useComments = (subject: ThreadSubject, options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
   return useInfiniteQuery({
-    ...commentThreadQueryOptions(communityId, params),
+    ...commentThreadQueryOptions(communityId, subject),
     select: flattenThread,
     enabled: options?.enabled,
   });
@@ -93,13 +102,10 @@ export const useComments = (params: CommentThreadParams, options?: { enabled?: b
  * whether this reader moderates the initiative it is in. Read off the same
  * query as the thread itself, so it costs nothing more.
  */
-export const useCommentThreadState = (
-  params: CommentThreadParams,
-  options?: { enabled?: boolean }
-) => {
+export const useCommentThreadState = (subject: ThreadSubject, options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
   return useInfiniteQuery({
-    ...commentThreadQueryOptions(communityId, params),
+    ...commentThreadQueryOptions(communityId, subject),
     select: (data: CommentThreadData) => ({
       locked: data.pages[0]?.locked ?? false,
       canModerate: data.pages[0]?.can_moderate ?? false,
@@ -155,10 +161,10 @@ const placeComment = (data: CommentThreadData, comment: CommentRead): CommentThr
 const dropComment = (data: CommentThreadData, commentId: number): CommentThreadData =>
   mapPages(data, (comments) => comments.filter((c) => c.id !== commentId));
 
-export const useCommentsCache = (params: CommentThreadParams) => {
+export const useCommentsCache = (subject: ThreadSubject) => {
   const communityId = useActiveCommunityId();
   const qc = useQueryClient();
-  const { queryKey } = commentThreadQueryOptions(communityId, params);
+  const { queryKey } = commentThreadQueryOptions(communityId, subject);
 
   /** A comment just posted or edited, written straight into the thread. */
   const putComment = (comment: CommentRead) => {
@@ -172,42 +178,22 @@ export const useCommentsCache = (params: CommentThreadParams) => {
   return { putComment, removeComment };
 };
 
-/**
- * The thread a comment belongs to: the one target it names. A task comment
- * also reports its task's project, so the task is read first, as the backend
- * reads a comment's columns.
- */
-const COMMENT_TARGETS = [
-  "task_id",
-  "wiki_page_id",
-  "collection_id",
-  "file_id",
-  "project_id",
-  "counter_group_id",
-  "calendar_id",
-  "dashboard_id",
-  "post_id",
-  "wiki_id",
-  "contact_id",
-] as const satisfies readonly (keyof CommentThreadParams & keyof CommentRead)[];
-
-const inThread = (comment: CommentRead, params: CommentThreadParams) => {
+const inThread = (comment: CommentRead, subject: ThreadSubject) =>
   // What is said with whoever filed a case is the case's conversation, read
   // on the case, never a comment in the task's thread.
-  if (comment.audience === CommentAudience.filer) return false;
-  const target = COMMENT_TARGETS.find((key) => comment[key] != null);
-  return target !== undefined && params[target] === comment[target];
-};
+  comment.audience !== CommentAudience.filer &&
+  comment.subject_type === subject.subject_type &&
+  comment.subject_id === subject.subject_id;
 
 /** The cached threads of `parent`. */
 const threadsOf = (communityId: number, parent: { type: string; id: number }) => {
-  const param = `${singularOf(parent.type)}_id` as keyof CommentThreadParams;
+  const kind = singularOf(parent.type);
   return queryClient
     .getQueryCache()
-    .findAll({ queryKey: getListCommentsQueryKey(communityId) })
+    .findAll({ queryKey: threadKey(communityId) })
     .filter((query) => {
-      const params = query.queryKey[1] as CommentThreadParams | undefined;
-      return params?.[param] === parent.id;
+      const subject = query.queryKey[1] as ThreadSubject | undefined;
+      return subject?.subject_type === kind && subject.subject_id === parent.id;
     });
 };
 
@@ -257,7 +243,7 @@ const readBack = async (
     return;
   }
   for (const thread of threads) {
-    const params = thread.queryKey[1] as CommentThreadParams;
+    const subject = thread.queryKey[1] as ThreadSubject;
     queryClient.setQueryData<CommentThreadData>(
       thread.queryKey,
       (prev) =>
@@ -266,7 +252,7 @@ const readBack = async (
           (data, read) =>
             typeof read === "number"
               ? dropComment(data, read)
-              : inThread(read, params)
+              : inThread(read, subject)
                 ? placeComment(data, read)
                 : data,
           prev
@@ -301,12 +287,19 @@ export const syncComments = (
 
 // ── Mutations ───────────────────────────────────────────────────────────────
 
-export const useCreateComment = (
-  options?: MutationOpts<CommentRead, Parameters<typeof createComment>[1]>
-) =>
-  useCommunityMutation<CommentRead, Parameters<typeof createComment>[1]>(
+/** A comment to post, and what it is said on. */
+export type NewComment = { subject: ThreadSubject; body: CommentCreate };
+
+export const useCreateComment = (options?: MutationOpts<CommentRead, NewComment>) =>
+  useCommunityMutation<CommentRead, NewComment>(
     {
-      mutationFn: (communityId, data) => createComment(communityId, data),
+      mutationFn: (communityId, { subject, body }) =>
+        apiMutator<CommentRead>({
+          url: threadUrl(communityId, subject),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          data: body,
+        }),
       invalidate: () => invalidate(q.recentComments(), q.relationships()),
       errorKey: "common:error",
     },

@@ -205,9 +205,8 @@ describe("CasePanel", () => {
     await user.type(screen.getByRole("textbox"), "Try a recovery code.");
     await user.click(screen.getByRole("button", { name: "Send reply" }));
     expect(createComment).toHaveBeenCalledWith({
-      content: "Try a recovery code.",
-      task_id: 3,
-      audience: "filer",
+      subject: { subject_type: "task", subject_id: 3 },
+      body: { content: "Try a recovery code.", audience: "filer" },
     });
     expect(updateTask).not.toHaveBeenCalled();
   });

@@ -148,8 +148,8 @@ describe("DetailsPage comments switch", () => {
   it("turns comments off and keeps the new state", async () => {
     resetFactories();
     server.use(
-      communityHttp.put("/tools/:tool/:toolId/comments", () =>
-        HttpResponse.json({ comments_enabled: false })
+      communityHttp.patch("/:segment/:toolId", () =>
+        HttpResponse.json({ ...buildEntity(), comments_enabled: false })
       )
     );
     renderSection(DetailsPage, buildEntity());
@@ -166,7 +166,7 @@ describe("DetailsPage comments switch", () => {
   it("puts the switch back when the write fails", async () => {
     resetFactories();
     server.use(
-      communityHttp.put("/tools/:tool/:toolId/comments", () =>
+      communityHttp.patch("/:segment/:toolId", () =>
         HttpResponse.json({ detail: "NOPE" }, { status: 500 })
       )
     );
