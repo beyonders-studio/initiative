@@ -1,30 +1,27 @@
 {
   "ownerOnly": "Solo los propietarios de la plataforma pueden configurar dónde llega el trabajo de operaciones.",
   "contacts": {
-    "title": "A quién contactar",
-    "description": "La dirección que da un aviso cuando pide a alguien que se ponga en contacto; por ejemplo, alguien cuya cuenta o comunidad está suspendida. Un tipo de trabajo sin dirección propia usa el contacto general; si no hay ninguno, el aviso remite a quien gestiona este servidor.",
     "generalLabel": "Contacto general",
     "generalPlaceholder": "nombre@example.com",
     "streamPlaceholder": "Usa el contacto general",
     "save": "Guardar contactos",
     "saving": "Guardando…",
     "saved": "Contactos guardados.",
-    "saveError": "No se pudieron guardar los contactos."
+    "saveError": "No se pudieron guardar los contactos.",
+    "generalHelp": "Para cualquier tipo de caso sin contacto propio. Si no hay ninguno, el aviso dice que se contacte con quien administra este servidor."
   },
   "community": {
     "title": "Comunidad de operaciones",
-    "description": "La comunidad que recibe el trabajo de seguridad, moderación, soporte y comentarios de esta instalación.",
+    "description": "Dónde llegan los casos de seguridad, moderación, soporte y comentarios, en los proyectos que elijas abajo.",
     "label": "Comunidad",
     "placeholder": "Elige una comunidad",
     "none": "Ninguna — no dirigir nada",
-    "helpText": "Una comunidad corriente en todos los aspectos. En qué proyecto llega cada canal se define abajo, dentro de ella.",
     "saveError": "No se pudo guardar la comunidad de operaciones.",
     "clearTitle": "¿Dejar de dirigir el trabajo de operaciones?",
     "clearBody": "Todos los canales dejan de recibir. Los proyectos y todo lo que contienen quedan igual, y al elegir esta comunidad de nuevo se restaura lo configurado.",
     "clearConfirm": "Dejar de dirigir"
   },
   "streams": {
-    "chooseCommunityFirst": "Elige una comunidad arriba y luego indica dónde llega cada canal.",
     "security": {
       "title": "Seguridad",
       "description": "Casos abiertos por reglas que vigilan esta instalación."
@@ -48,8 +45,6 @@
   },
   "stream": {
     "notSetUp": "Sin configurar",
-    "receiving": "Recibiendo",
-    "paused": "En pausa",
     "setUpHelp": "Al configurarlo obtienes un proyecto listo con sus propios estados y campos, que puedes reorganizar como quieras después. O dirige el canal a un proyecto que ya tengas.",
     "initiativeLabel": "Iniciativa",
     "initiativePlaceholder": "Elige una iniciativa",
@@ -64,7 +59,6 @@
     "caseTypeDefault": "El tipo por defecto del proyecto",
     "ideaTypeLabel": "El tipo que lleva una tarea a la página de Sugerencias",
     "ideaTypeNone": "Ninguno: no se publica nada",
-    "enabledLabel": "Recibiendo casos nuevos",
     "lastCase": "Último caso abierto el {{when}}.",
     "noCasesYet": "Aún no hay casos.",
     "unbind": "Dejar de dirigir este canal",
@@ -83,7 +77,12 @@
     "statusRolesHelp": "Un caso en el primer estado le muestra a quien lo envió «Esperando tu respuesta». Cuando responde, pasa al segundo.",
     "noAwaitingHelp": "Sin un estado elegido, quien envía ve Recibido, En curso y Cerrado, nunca «Esperando tu respuesta».",
     "sharesIsolated": "Otro canal también llega a esta iniciativa. Los casos de seguridad y moderación deberían tener su propia iniciativa, para que solo quienes los atienden puedan leerlos.",
-    "sharesWithIsolated": "Esta iniciativa también recibe casos de seguridad o moderación, que deberían tener su propia iniciativa. Dirige uno de los canales a otro lugar."
+    "sharesWithIsolated": "Esta iniciativa también recibe casos de seguridad o moderación, que deberían tener su propia iniciativa. Dirige uno de los canales a otro lugar.",
+    "contactLabel": "Contacto",
+    "contactHelp": "La dirección que da un aviso cuando pide a alguien que se ponga en contacto por este tipo de caso. En blanco, se usa el contacto general.",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "saved": "Guardado."
   },
   "help": {
     "action": "Pedir ayuda",
@@ -332,7 +331,7 @@
     "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
   },
   "feedbackSwitch": {
-    "title": "Comentarios",
+    "title": "Comentarios para el equipo de Initiative",
     "description": "Las ideas, los problemas y los elogios van al equipo que hace Initiative. Desactivado, aquí nadie ve Enviar comentarios y no se envía nada.",
     "label": "Permitir enviar comentarios al equipo de Initiative",
     "error": "No se pudo cambiar. Inténtalo de nuevo en un momento."
@@ -425,5 +424,17 @@
       "card": "la tarjeta",
       "text": "el texto"
     }
+  },
+  "rows": {
+    "landsIn": "Llega a",
+    "contact": "Contacto",
+    "usesGeneral": "Contacto general",
+    "chooseCommunity": "Elige una comunidad para dirigir los casos. Los contactos funcionan sin ella.",
+    "sharesInitiative": "Comparte su iniciativa con otro tipo de caso",
+    "receivingLabel": "Recibir casos nuevos de {{stream}}",
+    "edit": "Editar",
+    "setUp": "Configurar",
+    "editLabel": "Editar {{stream}}",
+    "setUpLabel": "Configurar {{stream}}"
   }
 }

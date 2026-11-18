@@ -1,10 +1,10 @@
 /**
  * The owner's intake settings.
  *
- * Two things matter here and neither is cosmetic: nothing below the community
- * picker is offered until a community is named, because every id in it belongs
- * to that community; and a stream that has never been set up offers both ways
- * of setting one up rather than only the blueprint.
+ * Two things matter here and neither is cosmetic: no stream is routed until a
+ * community is named, because every id it would take belongs to that
+ * community; and a stream that has never been set up offers both ways of
+ * setting one up rather than only the blueprint. Contacts work either way.
  */
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -90,7 +90,11 @@ vi.mock("@/hooks/useIntakeSettings", () => ({
     },
   }),
   useUpdateOperationsCommunity: () => ({ mutate: communityMutate, isPending: false }),
-  useUpsertIntakeBinding: () => ({ mutate: upsertMutate, isPending: false }),
+  useUpsertIntakeBinding: () => ({
+    mutate: upsertMutate,
+    mutateAsync: upsertMutate,
+    isPending: false,
+  }),
   useImportIntakeBlueprint: () => ({ mutate: importMutate, isPending: false }),
   useDeleteIntakeBinding: () => ({ mutate: deleteMutate, isPending: false }),
   useUpdateIntakeGeneralContact: () => ({ mutateAsync: generalContactMutate, isPending: false }),
@@ -124,21 +128,37 @@ describe("IntakePage", () => {
     state.isFetching = false;
   });
 
-  it("offers nothing to bind until a community is named", () => {
+  const boundSecurity = (overrides: Record<string, unknown> = {}) => [
+    {
+      ...unbound("security"),
+      binding_id: 1,
+      project_id: 21,
+      project_name: "Security",
+      initiative_id: 7,
+      initiative_name: "Trust and Safety",
+      enabled: true,
+      ...overrides,
+    },
+    ...STREAMS.slice(1).map(unbound),
+  ];
+
+  /** The stream's row, named by its title. */
+  const row = (title: string) => screen.getByRole("listitem", { name: title });
+
+  it("routes nothing until a community is named, but still lists every stream", () => {
     renderPage();
-    expect(
-      screen.getByText("Choose a community above, then say where each stream lands.")
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Set this up for me")).not.toBeInTheDocument();
+    expect(screen.getByText(/^Choose a community to route cases/)).toBeVisible();
+    for (const title of ["Security", "Moderation", "Support", "Feedback"]) {
+      expect(within(row(title)).getByText("—")).toBeVisible();
+    }
+    expect(screen.queryByRole("button", { name: /^Set up/ })).not.toBeInTheDocument();
   });
 
-  it("lists every stream once a community is named, bound or not", () => {
+  it("offers each unrouted stream a Set up once a community is named", () => {
     state.operationsCommunityId = 3;
     renderPage();
-    for (const title of ["Security", "Moderation", "Support", "Feedback"]) {
-      expect(screen.getByRole("region", { name: title })).toBeInTheDocument();
-    }
     expect(screen.getAllByText("Not set up")).toHaveLength(STREAMS.length);
+    expect(screen.getByRole("button", { name: "Set up Security" })).toBeEnabled();
   });
 
   it("sets a stream up from its blueprint", async () => {
@@ -146,66 +166,55 @@ describe("IntakePage", () => {
     renderPage();
     const user = userEvent.setup();
 
-    // Each stream's card is a region named after the stream, so "the security
-    // one" is unambiguous without reaching into the DOM.
-    const card = screen.getByRole("region", { name: "Security" });
-    const setUp = () => within(card).getByRole("button", { name: "Set this up for me" });
+    await user.click(screen.getByRole("button", { name: "Set up Security" }));
+    const dialog = await screen.findByRole("dialog");
+    const setUp = () => within(dialog).getByRole("button", { name: "Set this up for me" });
 
     // Disabled until an initiative is chosen: the import has to land somewhere.
     expect(setUp()).toBeDisabled();
-    await user.click(within(card).getByRole("combobox", { name: "Initiative" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Initiative" }));
     await user.click(await screen.findByRole("option", { name: "Trust and Safety" }));
     await user.click(setUp());
 
     expect(importMutate).toHaveBeenCalledWith({ stream: "security", initiativeId: 7 });
   });
 
-  it("shows where a bound stream lands and when it last opened a case", () => {
+  it("shows where a bound stream lands on its row, and switches it there", async () => {
     state.operationsCommunityId = 3;
-    state.bindings = [
-      {
-        ...unbound("security"),
-        binding_id: 1,
-        project_id: 21,
-        project_name: "Security",
-        initiative_id: 7,
-        initiative_name: "Trust and Safety",
-        default_status_id: 31,
-        default_status_name: "Triage",
-        enabled: true,
-        last_case_at: "2026-09-15T10:00:00Z",
-      },
-      ...STREAMS.slice(1).map(unbound),
-    ];
-    renderPage();
-
-    expect(screen.getByText("Receiving")).toBeInTheDocument();
-    expect(screen.getByText(/Last case opened/)).toBeInTheDocument();
-  });
-
-  it("files a stream's cases as the type chosen, or the project's default", async () => {
-    state.operationsCommunityId = 3;
-    state.bindings = [
-      {
-        ...unbound("security"),
-        binding_id: 1,
-        project_id: 21,
-        project_name: "Security",
-        initiative_id: 7,
-        initiative_name: "Trust and Safety",
-        enabled: true,
-      },
-      ...STREAMS.slice(1).map(unbound),
-    ];
+    state.bindings = boundSecurity({ last_case_at: "2026-09-15T10:00:00Z" });
     renderPage();
     const user = userEvent.setup();
-    const card = screen.getByRole("region", { name: "Security" });
-    const picker = within(card).getByRole("combobox", { name: "New cases are" });
 
+    expect(within(row("Security")).getByText("Trust and Safety › Security")).toBeVisible();
+    const receiving = screen.getByRole("switch", { name: "Receive new Security cases" });
+    expect(receiving).toBeChecked();
+    await user.click(receiving);
+    expect(upsertMutate).toHaveBeenCalledWith({
+      stream: "security",
+      body: expect.objectContaining({ project_id: 21, enabled: false }),
+    });
+
+    // When it last opened a case is in its dialog, with the rest.
+    await user.click(screen.getByRole("button", { name: "Edit Security" }));
+    expect(await screen.findByText(/Last case opened/)).toBeInTheDocument();
+  });
+
+  it("files a stream's cases as the type chosen, once saved", async () => {
+    state.operationsCommunityId = 3;
+    state.bindings = boundSecurity();
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit Security" }));
+    const dialog = await screen.findByRole("dialog");
+    const picker = within(dialog).getByRole("combobox", { name: "New cases are" });
     expect(picker).toHaveTextContent("The project's default type");
     await user.click(picker);
     await user.click(await screen.findByRole("option", { name: "Bug" }));
 
+    // Nothing is sent until Save.
+    expect(upsertMutate).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
     expect(upsertMutate).toHaveBeenCalledWith({
       stream: "security",
       body: expect.objectContaining({ project_id: 21, task_type_id: 42 }),
@@ -228,9 +237,7 @@ describe("IntakePage", () => {
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Choose a community above, then say where each stream lands.")
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 
   it("offers no destination while the two reads disagree", () => {
@@ -241,8 +248,7 @@ describe("IntakePage", () => {
     renderPage();
 
     expect(screen.getByRole("combobox", { name: "Community" })).toBeDisabled();
-    const card = screen.getByRole("region", { name: "Security" });
-    expect(within(card).getByRole("button", { name: "Set this up for me" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Set up Security" })).toBeDisabled();
   });
 
   it("says so when the options read is the one that failed", () => {
@@ -256,62 +262,63 @@ describe("IntakePage", () => {
     expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
   });
 
-  it("says a stream whose project was archived receives nothing", () => {
+  it("says a stream whose project was archived receives nothing", async () => {
     state.operationsCommunityId = 3;
-    state.bindings = [
-      {
-        ...unbound("security"),
-        binding_id: 1,
-        project_id: 99,
-        project_name: "Old Security",
-        initiative_id: 7,
-        initiative_name: "Trust and Safety",
-        enabled: true,
-        project_archived: true,
-      },
-      ...STREAMS.slice(1).map(unbound),
-    ];
+    state.bindings = boundSecurity({
+      project_id: 99,
+      project_name: "Old Security",
+      project_archived: true,
+    });
     renderPage();
+    const user = userEvent.setup();
 
-    const card = screen.getByRole("region", { name: "Security" });
-    expect(within(card).getByText("Destination archived")).toBeInTheDocument();
-    expect(within(card).queryByText("Receiving")).not.toBeInTheDocument();
+    expect(within(row("Security")).getByText("Destination archived")).toBeVisible();
+    expect(screen.getByRole("switch", { name: "Receive new Security cases" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Edit Security" }));
     expect(
-      within(card).getByText(
+      await screen.findByText(
         "This project has been archived, so nothing can land in it. Bring it back, or point this stream at a live project."
       )
     ).toBeInTheDocument();
   });
 
-  it("says who to contact before any community is named", async () => {
-    state.generalContact = "ops@example.com";
+  it("shows each stream's contact on its row and edits it in its dialog", async () => {
     state.contactEmails = { moderation: "trust@example.com" };
-    const { rerender } = renderPage();
+    renderPage();
     const user = userEvent.setup();
 
-    const general = screen.getByLabelText("General contact");
-    expect(general).toHaveValue("ops@example.com");
-    expect(screen.getByLabelText("Moderation")).toHaveValue("trust@example.com");
-    expect(screen.getByLabelText("Support")).toHaveValue("");
+    expect(within(row("Moderation")).getByText("trust@example.com")).toBeVisible();
+    expect(within(row("Support")).getByText("General contact")).toBeVisible();
 
-    const save = screen.getByRole("button", { name: "Save contacts" });
-    expect(save).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Edit Moderation" }));
+    const dialog = await screen.findByRole("dialog");
+    const contact = within(dialog).getByLabelText("Contact");
+    expect(contact).toHaveValue("trust@example.com");
+    await user.clear(contact);
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await user.type(screen.getByLabelText("Support"), "help@example.com");
-    // A refetch while the form is being filled in keeps what was typed.
-    rerender(<IntakePage />);
-    expect(screen.getByLabelText("Support")).toHaveValue("help@example.com");
-    await user.clear(screen.getByLabelText("Moderation"));
-    await user.click(save);
-
-    expect(generalContactMutate).not.toHaveBeenCalled();
     expect(streamContactMutate).toHaveBeenCalledWith({
       stream: "moderation",
       body: { email: null },
     });
-    expect(streamContactMutate).toHaveBeenCalledWith({
-      stream: "support",
-      body: { email: "help@example.com" },
-    });
+    expect(upsertMutate).not.toHaveBeenCalled();
+  });
+
+  it("saves the general contact on its own", async () => {
+    state.generalContact = "ops@example.com";
+    renderPage();
+    const user = userEvent.setup();
+
+    const general = screen.getByLabelText("General contact");
+    expect(general).toHaveValue("ops@example.com");
+    const save = screen.getByRole("button", { name: "Save contacts" });
+    expect(save).toBeDisabled();
+
+    await user.clear(general);
+    await user.type(general, "hello@example.com");
+    await user.click(save);
+
+    expect(generalContactMutate).toHaveBeenCalledWith({ email: "hello@example.com" });
+    expect(streamContactMutate).not.toHaveBeenCalled();
   });
 });
