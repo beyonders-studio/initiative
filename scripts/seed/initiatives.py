@@ -16,6 +16,7 @@ from app.models.tenant.initiative import (
     InitiativeRoleModel,
     InitiativeRule,
 )
+from app.services.tenant.initiative_tools import switches, write_switches
 from app.services.tenant.initiatives import create_builtin_roles, creator_role
 from seed.common import Community
 
@@ -212,6 +213,8 @@ async def seed_initiative(
     )
     session.add(initiative)
     await session.flush()
+    # Each tool's own switch, as a new initiative's: its record's default.
+    await write_switches(session, initiative.id, switches({}))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     role = await creator_role(
@@ -236,7 +239,7 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
     gets one: ``private`` is invite-only, ``request`` puts them in the
     manager's queue, ``open`` is one click. ``auto_join`` enrols every new
     arrival and the check constraint only allows it on an ``open`` one. Tools
-    not named keep the model's own default.
+    not named keep their record's default, as a new initiative's do.
     """
     tools = d.get("tools", ())
     initiative = Initiative(
@@ -245,10 +248,12 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
         color=d["color"],
         join_policy=d.get("join_policy", InitiativeJoinPolicy.private).value,
         auto_join=d.get("auto_join", False),
-        **{tool.view_permission: True for tool in tools},
     )
     c.session.add(initiative)
     await c.session.flush()
+    await write_switches(
+        c.session, initiative.id, switches({tool: True for tool in tools})
+    )
     c.ids["initiatives"].append(initiative.id)
 
     roles = await create_builtin_roles(c.session, initiative_id=initiative.id)
