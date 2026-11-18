@@ -19,7 +19,7 @@
 
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { Download, SearchX } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
@@ -31,8 +31,9 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useWidgetCatalog } from "@/hooks/useDashboards";
 import { useMarketplaceListing } from "@/hooks/useMarketplace";
+import { ThemeContext } from "@/hooks/useTheme";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { minimumAgeFor, parseCommunityShelf } from "@/lib/marketplace";
+import { listingImageUrl, minimumAgeFor, parseCommunityShelf } from "@/lib/marketplace";
 import { listingShownHere } from "@/lib/marketplaceCuration";
 import { returnPath } from "@/lib/returnPath";
 import { listingKindTool } from "@/lib/tools";
@@ -78,6 +79,7 @@ export function ListingPage() {
   const { activeCommunity } = useCommunities();
 
   const listing = listingQuery.data;
+  const dark = useContext(ThemeContext)?.resolvedTheme === "dark";
   const isPlugin = listing?.kind === ListingKind.plugin;
   // The tool a listing installs into; none for a plug-in or an automation.
   const tool = listing ? listingKindTool(listing.kind) : null;
@@ -301,7 +303,7 @@ export function ListingPage() {
             {listing.images.map((image) => (
               <CarouselItem key={image} className="max-w-full basis-auto pl-3">
                 <img
-                  src={resolveArtworkUrl(image) ?? undefined}
+                  src={resolveArtworkUrl(listingImageUrl(image, listing.source, dark)) ?? undefined}
                   alt=""
                   aria-hidden
                   className="h-48 rounded-lg border object-cover"

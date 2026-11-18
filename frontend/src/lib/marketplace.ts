@@ -1,4 +1,5 @@
-import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
+import { ListingKind, ListingSource } from "@/api/generated/initiativeAPI.schemas";
+import { darkVariant } from "@/lib/releaseImages";
 
 /**
  * Which marketplace offers a listing.
@@ -102,3 +103,9 @@ export const minimumAgeFor = (
   const age = (region ? ages[region] : undefined) ?? ages.default;
   return typeof age === "number" ? age : null;
 };
+
+/** A listing's picture in the theme the app is drawn in. A built-in listing's
+ *  pictures come in two, `name.webp` and `name.dark.webp`, as `pnpm
+ *  screenshots` takes them; any other catalog's are drawn as written. */
+export const listingImageUrl = (image: string, source: ListingSource, dark: boolean): string =>
+  dark && source === ListingSource.builtin ? darkVariant(image) : image;

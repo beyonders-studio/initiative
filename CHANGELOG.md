@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Send something to someone, in the app.** **Send to…** beside the bell on a project, file, task, event or page puts it in their notifications, with a note if you add one, and tapping it opens it on whichever device they are using. Somebody who can't open it yet is let in if you can share it, or can ask for access.
 - **Giving someone access tells them.** Adding a person in a thing's Access settings sends them a notification, with an optional note, and answers any request for access the new sharing covers, including sharing with their role or the whole initiative.
+- **See Community calendar and Community contacts before you install them.** Their marketplace pages picture what each adds to a community, in your light or dark theme.
 - **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
 
 ### Changed
