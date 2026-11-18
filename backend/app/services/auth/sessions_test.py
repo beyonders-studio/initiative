@@ -250,9 +250,11 @@ async def test_a_replay_is_graded_by_the_renewal_it_was_spent_on(session):
     assert (await replayed(browser, browser)).lost_reply
     assert not (await replayed(browser, {**browser, "ip": "198.51.100.7"})).lost_reply
     assert not (await replayed(browser, browser, renew_again=True)).lost_reply
-    # An app is its install, wherever it connects from.
+    # An app's install is carried from its sign-in, so it is asked beside the
+    # address the renewal came from, never in its place.
     app = {"install_id": install, "ip": "203.0.113.5", "user_agent": "App/1"}
-    assert (await replayed(app, {**app, "ip": "198.51.100.7"})).lost_reply
+    assert (await replayed(app, app)).lost_reply
+    assert not (await replayed(app, {**app, "ip": "198.51.100.7"})).lost_reply
     assert not (await replayed(app, {**app, "install_id": uuid.uuid4()})).lost_reply
 
 

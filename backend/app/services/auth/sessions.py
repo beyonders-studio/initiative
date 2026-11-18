@@ -188,8 +188,8 @@ class Replay:
     #: Whether the session it was renewed into was still unused: never
     #: renewed itself, and not ended.
     successor_unused: bool
-    #: Whether it came from the device the renewal did: the same install of
-    #: the app, or for a browser the same address and browser.
+    #: Whether it came from the device the renewal did: the same address and
+    #: browser, and for an app the same install.
     same_device: bool
 
     @property
@@ -332,15 +332,16 @@ async def _answer_ended(
         # Ended without being renewed (signed out, ended from another device,
         # gone idle): no session came of it, so it is simply over.
         return RotationResult(RefreshOutcome.EXPIRED, user_id=row.user_id)
-    if successor.install_id is not None:
-        same_device = install_id == successor.install_id
-    else:
-        same_device = (
-            ip is not None
-            and user_agent is not None
-            and str(successor.ip) == ip
-            and successor.user_agent == user_agent
-        )
+    # The renewal records the address and browser that sent it; an app's
+    # install is carried from its sign-in, so for an app it is asked as well,
+    # not instead.
+    same_device = (
+        ip is not None
+        and user_agent is not None
+        and str(successor.ip) == ip
+        and successor.user_agent == user_agent
+        and (successor.install_id is None or install_id == successor.install_id)
+    )
     replay = Replay(
         since_renewal=now - successor.created_at,
         successor_unused=successor.revoked_at is None,
