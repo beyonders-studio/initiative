@@ -134,35 +134,32 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
             ), kind.value
 
 
-def test_every_tool_has_an_initiative_master_switch():
-    # EVERY tool has an initiative-level `{plural}_enabled` master switch (model
-    # column + read/create/update schema fields) — projects and files
-    # included, which is the whole of making them optional.
-    from app.models.tenant.initiative import Initiative
-    from app.schemas.tenant.initiative import InitiativeBase, InitiativeUpdate
+def test_every_tool_has_an_initiative_switch():
+    # EVERY tool has an initiative-level switch, a rule keyed by its view
+    # permission, read and written as the initiative's ``tools`` map —
+    # projects and files included, which is the whole of making them optional.
+    from app.models.tenant.initiative import PermissionKey
+    from app.schemas.tenant.initiative import (
+        InitiativeCreate,
+        InitiativeRead,
+        InitiativeUpdate,
+    )
 
-    switches = {t.view_permission for t in Tool}
-    model_fields = set(Initiative.model_fields)
-    schema_fields = set(InitiativeBase.model_fields)
-    update_fields = set(InitiativeUpdate.model_fields)
-    assert switches <= model_fields
-    assert switches <= schema_fields
-    assert switches <= update_fields
+    for tool in Tool:
+        assert PermissionKey(tool.view_permission)
+    for schema in (InitiativeCreate, InitiativeRead, InitiativeUpdate):
+        assert schema.model_fields["tools"].annotation == dict[Tool, bool]
 
 
 def test_an_initiative_starts_with_projects_and_files_on():
     # Optional is not the same as off. An initiative created without an opinion
     # about its tools is the one people already had, so the two that used to be
     # unconditional keep arriving switched on and everything else stays opt-in.
-    from app.core.tools import Tool
-    from app.models.tenant.initiative import Initiative
-    from app.schemas.tenant.initiative import InitiativeBase
+    from app.services.tenant.initiative_tools import switches
 
     assert {t for t in Tool if t.spec.on_by_default} == {Tool.project, Tool.file}
-    for tool in Tool:
-        expected = tool.spec.on_by_default
-        assert Initiative.model_fields[tool.view_permission].default is expected
-        assert InitiativeBase.model_fields[tool.view_permission].default is expected
+    assert switches({}) == {tool: tool.spec.on_by_default for tool in Tool}
+    assert switches({Tool.post: True})[Tool.post] is True
 
 
 def test_every_tool_is_commentable():

@@ -38,22 +38,11 @@ TOOL_LISTS = [
     pytest.param("/dashboards/", create_dashboard, id="dashboards"),
 ]
 
-# Projects and files are core (always on); the rest are opt-in switches
-# that default to off, and a tool has to be on for its list to return anything
-# at all — so every initiative these tests make has all of them on.
-ALL_TOOLS_ON = {
-    "counter_groups_enabled": True,
-    "calendars_enabled": True,
-    "dashboards_enabled": True,
-}
-
 
 async def _workspace(session, acting_user):
     """A guild admin and an initiative with every tool switched on."""
     actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    initiative = await create_initiative(
-        session, actor.guild, actor.user, name="Home", **ALL_TOOLS_ON
-    )
+    initiative = await create_initiative(session, actor.guild, actor.user, name="Home")
     return actor, initiative
 
 
@@ -108,12 +97,8 @@ async def test_sort_by_initiative(
     the table shows — not by its id."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     # Made in the opposite order to their names, so an id ordering would fail.
-    zebra = await create_initiative(
-        session, a.guild, a.user, name="Zebra", **ALL_TOOLS_ON
-    )
-    aardvark = await create_initiative(
-        session, a.guild, a.user, name="Aardvark", **ALL_TOOLS_ON
-    )
+    zebra = await create_initiative(session, a.guild, a.user, name="Zebra")
+    aardvark = await create_initiative(session, a.guild, a.user, name="Aardvark")
     await factory(session, zebra, a.user, name="In Zebra")
     await factory(session, aardvark, a.user, name="In Aardvark")
 

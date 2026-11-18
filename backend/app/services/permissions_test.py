@@ -63,6 +63,7 @@ from app.testing import (
     create_task,
     create_user,
     route_as,
+    switch_tools,
 )
 from app.testing.factories import TOOL_FACTORIES
 
@@ -139,11 +140,7 @@ class World:
 async def build_world(session, role_session, acting_user, tool: Tool) -> World:
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     initiative, guild = owner.initiative, owner.guild
-    for t in Tool:
-        if hasattr(initiative, t.view_permission):
-            setattr(initiative, t.view_permission, True)
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, dict.fromkeys(Tool, True))
 
     co_member = await acting_user(
         guild_role=CommunityRole.member,

@@ -44,7 +44,7 @@ from app.services.marketplace.definitions import (
 )
 from app.services.query import resolve
 from app.services.tenant.dashboard_definition import WIDGET_SPECS
-from app.testing import route_session_to_guild
+from app.testing import route_session_to_guild, switch_tools
 
 pytestmark = pytest.mark.always
 
@@ -306,10 +306,9 @@ class TestShippedManifests:
         await seed_builtin_listings(session)
         await session.commit()
         actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        for tool in TOOL_LISTING_KINDS.values():
-            setattr(actor.initiative, tool.view_permission, True)
-        session.add(actor.initiative)
-        await session.commit()
+        await switch_tools(
+            session, actor.initiative, dict.fromkeys(TOOL_LISTING_KINDS.values(), True)
+        )
 
         for manifest in load_builtin_manifests():
             if manifest["kind"] not in TOOL_LISTING_KINDS:

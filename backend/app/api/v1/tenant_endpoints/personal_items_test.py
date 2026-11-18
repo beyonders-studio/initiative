@@ -41,6 +41,7 @@ from app.testing import (
     enable_all_tools,
     route_as,
     route_session_to_guild,
+    switch_tools,
 )
 
 TABS = "/api/v1/me/personal-items?mark=view"
@@ -334,9 +335,7 @@ async def test_recent_guild_level_calendar_has_no_initiative(
     """A guild-level calendar reports ``initiative_id: None`` — the tabs bar
     reads that as "address me at the guild route", not as missing data."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.calendars_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, a.initiative, a.user, name="GuildCal")
     calendar.initiative_id = None
     session.add(calendar)

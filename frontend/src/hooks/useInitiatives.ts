@@ -237,8 +237,6 @@ export const useCreateInitiative = (options?: MutationOpts<InitiativeRead, Initi
   const { t } = useTranslation("initiatives");
   return useCommunityMutation<InitiativeRead, InitiativeCreate>(
     {
-      // The generated InitiativeCreate carries one `{plural}_enabled` field per
-      // toggleable tool — no hand-maintained field list to drift.
       mutationFn: (communityId, data) => createInitiative(communityId, data),
       invalidate: (initiative) => {
         toast.success(t("createDialog.created", { name: initiative.name }));

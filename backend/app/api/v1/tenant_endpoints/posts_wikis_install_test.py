@@ -18,6 +18,7 @@ import pytest
 from sqlmodel import select
 
 from app.core.messages import PluginMessages
+from app.core.tools import Tool
 from app.main import plugin_openapi
 from app.models.tenant.post import Post
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
@@ -32,6 +33,7 @@ from app.testing import (
     lexical_body,
     png_bytes,
     route_session_to_guild,
+    switch_tools,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
@@ -48,8 +50,6 @@ class _Tool:
     plural: str
     #: What a grant on one calls it.
     resource_type: str
-    #: The initiative's switch for the tool.
-    switch: str
     #: Makes one open to its initiative's members, as its seat.
     make: Callable[..., Awaitable[Any]]
     #: A change the tool's PATCH takes, and the field it shows up in.
@@ -57,8 +57,8 @@ class _Tool:
 
 
 TOOLS = [
-    _Tool("posts", "post", "posts_enabled", create_post, {"name": "Renamed"}),
-    _Tool("wikis", "wiki", "wikis_enabled", create_wiki, {"name": "Renamed"}),
+    _Tool("posts", "post", create_post, {"name": "Renamed"}),
+    _Tool("wikis", "wiki", create_wiki, {"name": "Renamed"}),
 ]
 
 
@@ -66,9 +66,7 @@ async def _switch_on(session: Any, tool: _Tool, *initiatives: Any) -> None:
     """Turn ``tool`` on in each of ``initiatives``."""
     await route_session_to_guild(session, guild_of(initiatives[0]))
     for initiative in initiatives:
-        setattr(initiative, tool.switch, True)
-        session.add(initiative)
-    await session.commit()
+        await switch_tools(session, initiative, {Tool(tool.resource_type): True})
 
 
 # ---------------------------------------------------------------------------

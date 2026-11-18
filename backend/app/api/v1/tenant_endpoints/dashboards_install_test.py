@@ -19,9 +19,15 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import MarketplaceMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.services.marketplace.plugin_api import PLUGIN_API_VERSION
-from app.testing import create_marketplace_listing, marketplace_uid, route_as
+from app.testing import (
+    create_marketplace_listing,
+    marketplace_uid,
+    route_as,
+    switch_tools,
+)
 
 INSTALL_UID = marketplace_uid("sprinthealth")
 WITHDRAWN_UID = marketplace_uid("withdrawn")
@@ -49,10 +55,7 @@ def _definition(
 
 
 async def _enable(session: AsyncSession, initiative) -> None:
-    initiative.dashboards_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.dashboard: True})
 
 
 @pytest.fixture

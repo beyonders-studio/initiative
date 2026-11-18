@@ -19,6 +19,7 @@ from app.testing import (
     create_counter_group,
     create_initiative,
     create_resource_grant,
+    switch_tools,
 )
 
 # ---------------------------------------------------------------------------
@@ -129,8 +130,7 @@ async def test_feature_disabled_blocks_creation(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.counter_groups_enabled = False
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
 
     response = await client.post(
         a.g("/counter-groups/"),
@@ -860,7 +860,7 @@ async def test_counter_group_counts_by_initiative(
     )
     other_initiative = await create_initiative(session, admin.guild, admin.user)
     disabled_initiative = await create_initiative(
-        session, admin.guild, admin.user, counter_groups_enabled=False
+        session, admin.guild, admin.user, tools={Tool.counter_group: False}
     )
 
     await create_counter_group(session, admin.initiative, member.user)

@@ -20,6 +20,10 @@ A's rows. On the request login routed through the seam:
 - a moderator of A reads its row, and inserts, updates and deletes one, so
   the rows the others are refused are well formed.
 
+Then each tool is switched off in A in turn, and with every tool's switch row
+gone: a moderator of A reads none of the rows of a table a switched-off tool
+governs, is refused an INSERT into it, and updates and deletes none of them.
+
 A table the seeder cannot fill fails here; it is never skipped.
 """
 
@@ -39,10 +43,17 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
 from app.db.guild_ddl import _WRITTEN_BY
-from app.db.initiative_rls import INITIATIVE_PATHS, entity_tables, initiative_of
+from app.db.initiative_rls import (
+    INITIATIVE_PATHS,
+    entity_tables,
+    governing_path,
+    initiative_of,
+)
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.platform.guild import CommunityRole
 from app.models.tenant._mixins import ActorKind
+from app.models.tenant.initiative import InitiativeRule
+from app.services.tenant.initiative_tools import write_switches
 from app.testing import (
     Actor,
     create_initiative,
@@ -751,5 +762,49 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         if (answer := await _attempt(reader, insert)) != _REFUSED:
             failures.append(f"{name}: A's moderator inserts a row into B ({answer})")
     await reader.rollback()
+
+    # A switched-off tool's rows read as absent to A's own moderator: each
+    # tool off in turn, then every switch row gone, since no row is off.
+    governed = {
+        name: governing[0]
+        for name in cases
+        if (governing := governing_path(name)) is not None
+    }
+    assert set(governed.values()) == set(Tool)
+    for off in [{tool} for tool in Tool] + [set(Tool)]:
+        await route_session_to_guild(session, guild.id)
+        if off == set(Tool):
+            await session.exec(
+                sa.delete(InitiativeRule).where(
+                    InitiativeRule.initiative_id == initiative_a,
+                    InitiativeRule.initiative_role_id.is_(None),
+                    InitiativeRule.install_id.is_(None),
+                )
+            )
+        else:
+            await write_switches(
+                session, initiative_a, {tool: tool not in off for tool in Tool}
+            )
+        await session.commit()
+        state = "no switch rows" if len(off) > 1 else f"{next(iter(off)).value} off"
+        reader = await reading_as(people.moderator_a, guild.id)
+        for name, tool in governed.items():
+            if tool not in off:
+                continue
+            case = cases[name]
+            if (seen := await _count(reader, case.table)) != 0:
+                failures.append(f"{name}: A's moderator reads {seen} with {state}")
+            if (
+                answer := await _attempt(reader, _insert(case, people.moderator_a))
+            ) != _REFUSED:
+                failures.append(
+                    f"{name}: A's moderator can INSERT with {state} ({answer})"
+                )
+            for command, statement in _blind_writes(case).items():
+                if (answer := await _attempt(reader, statement)) not in (0, _REFUSED):
+                    failures.append(
+                        f"{name}: A's moderator can {command} with {state} ({answer})"
+                    )
+        await reader.rollback()
 
     assert not failures, "\n".join(failures)

@@ -37,12 +37,14 @@ LATER: tuple[str, ...] = (
     "20261106_0583_roles_take_the_contacts_pair.py",
 )
 
-#: Who made a row, and the triggers that stamp it: every table an older
-#: revision writes now names its author's kind, so a test running an older
-#: revision takes these off around it too (:func:`step_authorship`).
-AUTHORSHIP: tuple[str, ...] = (
+#: The revisions that reshape tables every older revision writes, oldest
+#: first: who made a row and the triggers that stamp it, then each tool's
+#: switch leaving ``initiatives`` for ``initiative_rules``. A test running an
+#: older revision takes these off around it too (:func:`step_newest`).
+NEWEST: tuple[str, ...] = (
     "20261109_0591_who_made_it.py",
     "20261109_0592_every_author_is_stamped.py",
+    "20261118_0613_each_tools_switch_is_a_rule.py",
 )
 
 
@@ -69,11 +71,11 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             lambda: queues._upgrade_schema(bind),
             contacts._apply_upgrade,
             pair._upgrade,
-            lambda: step_authorship(forward=True),
+            lambda: step_newest(forward=True),
             lambda: restate_kind_code(bind),
         ]
     return [
-        lambda: step_authorship(forward=False),
+        lambda: step_newest(forward=False),
         pair._downgrade,
         contacts._apply_downgrade,
         lambda: queues._downgrade_schema(bind),
@@ -85,18 +87,17 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
     ]
 
 
-def step_authorship(*, forward: bool) -> None:
-    """Take :data:`AUTHORSHIP` off the schema the search path leads with
+def step_newest(*, forward: bool) -> None:
+    """Take :data:`NEWEST` off the schema the search path leads with
     (``forward=False``), newest first, or put it back. Run inside an alembic
     ``Operations`` context."""
-    authors, stamped = (_load(name) for name in AUTHORSHIP)
-    steps = (
-        (authors._upgrade, stamped._upgrade)
-        if forward
-        else (stamped._downgrade, authors._downgrade)
-    )
-    for step in steps:
-        step()
+    revisions = [_load(name) for name in NEWEST]
+    if forward:
+        for revision in revisions:
+            revision._upgrade()
+    else:
+        for revision in reversed(revisions):
+            revision._downgrade()
 
 
 def restate_kind_code(bind: Any) -> None:

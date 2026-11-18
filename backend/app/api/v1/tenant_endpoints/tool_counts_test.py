@@ -26,9 +26,7 @@ async def _one_of_each(session, acting_user, tool: Tool):
     one tagged, beside a second live row with no tag. A tool with templates
     also has an archived template, which belongs to the archive."""
     actor = await acting_user(guild_role=CommunityRole.admin)
-    home = await create_initiative(
-        session, actor.guild, actor.user, **{t.view_permission: True for t in Tool}
-    )
+    home = await create_initiative(session, actor.guild, actor.user)
     factory = TOOL_FACTORIES[tool]
     tagged = await factory(session, home, actor.user)
     await factory(session, home, actor.user)

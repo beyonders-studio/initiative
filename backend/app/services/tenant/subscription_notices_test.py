@@ -10,6 +10,7 @@ from sqlalchemy import text, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
@@ -24,6 +25,7 @@ from app.testing import (
     create_resource_grant,
     create_task,
     drain_notices,
+    switch_tools,
 )
 
 SUBSCRIBED = NotificationType.subscription_activity
@@ -253,9 +255,7 @@ async def test_a_reaction_on_a_post_reaches_its_subscribers(
     client, session: AsyncSession, acting_user
 ):
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
     post = await create_post(session, a.initiative, a.user)
     b = await acting_user(
         guild_role=CommunityRole.member,

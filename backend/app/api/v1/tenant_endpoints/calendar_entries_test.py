@@ -13,6 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
 from app.core.messages import CalendarEventMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.testing import (
     create_calendar,
@@ -23,6 +24,7 @@ from app.testing import (
     create_project,
     create_task,
     get_auth_headers,
+    switch_tools,
 )
 from app.testing.factories import (
     create_guild,
@@ -38,10 +40,7 @@ WINDOW_END = (NOW + timedelta(days=30)).isoformat()
 
 async def _enable_events(session: AsyncSession, initiative, creator):
     """Enable the calendars tool and return a calendar to hang events off."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     return await create_calendar(session, initiative, creator)
 
 
@@ -212,9 +211,7 @@ async def test_guild_entries_include_flags_skip_legs(
     assert only_events.json()["projects"] == []
     assert only_events.json()["polls"] == []
 
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
     ending = await create_project(session, a.initiative, a.user, end_date=NOW.date())
     await create_project(
         session, a.initiative, a.user, start_date=(NOW + timedelta(days=60)).date()

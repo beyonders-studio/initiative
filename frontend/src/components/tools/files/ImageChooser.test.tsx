@@ -18,7 +18,7 @@ describe("ImageChooser", () => {
         HttpResponse.json([
           buildInitiative({ id: 1, name: "First" }),
           buildInitiative({ id: 2, name: "The page's" }),
-          buildInitiative({ id: 3, name: "No files", files_enabled: false }),
+          buildInitiative({ id: 3, name: "No files", tools: { file: false } }),
         ])
       ),
       communityHttp.get("/files/", ({ request }) => {

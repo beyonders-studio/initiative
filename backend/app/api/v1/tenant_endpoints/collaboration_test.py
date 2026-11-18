@@ -51,6 +51,7 @@ from app.testing import (
     get_auth_headers,
     get_auth_token,
     route_as,
+    switch_tools,
 )
 
 WHITEBOARD = {"elements": [], "appState": {}, "files": {}}
@@ -315,9 +316,7 @@ async def test_a_wiki_page_takes_a_handover_too(
     client: AsyncClient, session: AsyncSession, acting_user
 ) -> None:
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    owner.initiative.wikis_enabled = True
-    session.add(owner.initiative)
-    await session.commit()
+    await switch_tools(session, owner.initiative, {Tool.wiki: True})
     wiki = await create_wiki(session, owner.initiative, owner.user)
     page = await create_wiki_page(session, wiki, owner.user)
 

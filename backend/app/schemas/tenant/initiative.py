@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from pydantic import AliasChoices, ConfigDict, Field, create_model
+from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.identity_boundary import GuildId
 from app.core.tools import Tool
@@ -55,26 +55,7 @@ class InitiativeListScope(str, Enum):
     community = "community"
 
 
-# Derived bases: one `{tool.plural}_enabled` master-switch field per Tool. A new
-# Tool member grows these schemas automatically (the SQLModel column itself is
-# still declared on the Initiative model — real DDL stays explicit, pinned by
-# its migration and the drift test).
-#
-# The field default matches the column default, so a create that names no tools
-# gets projects and files rather than an initiative with nothing in it.
-_InitiativeToolSwitches = create_model(
-    "_InitiativeToolSwitches",
-    __base__=SanitizedBaseModel,
-    **{t.view_permission: (bool, t.spec.on_by_default) for t in Tool},
-)
-_InitiativeToolSwitchesPatch = create_model(
-    "_InitiativeToolSwitchesPatch",
-    __base__=SanitizedBaseModel,
-    **{t.view_permission: (bool | None, None) for t in Tool},
-)
-
-
-class InitiativeBase(_InitiativeToolSwitches):
+class InitiativeBase(SanitizedBaseModel):
     name: str
     description: RichMentionStr | None = None
     color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
@@ -82,12 +63,15 @@ class InitiativeBase(_InitiativeToolSwitches):
 
 class InitiativeCreate(InitiativeBase):
     name: TitleStr
+    #: Each tool's switch, by tool. A tool left out starts as its record
+    #: says (``ToolSpec.on_by_default``).
+    tools: dict[Tool, bool] = Field(default_factory=dict)
     # Creation is guild-admin only, so the policy is theirs to set from the
     # start; defaulting private keeps "open" an explicit choice.
     join_policy: InitiativeJoinPolicy = InitiativeJoinPolicy.private
 
 
-class InitiativeUpdate(_InitiativeToolSwitchesPatch):
+class InitiativeUpdate(SanitizedBaseModel):
     name: TitleStr | None = None
     description: RichMentionStr | None = None
     color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
@@ -99,14 +83,11 @@ class InitiativeUpdate(_InitiativeToolSwitchesPatch):
     auto_join: bool | None = None
     # Settable by whoever may already update the initiative.
     keep_content_in: bool | None = None
+    #: The tools to switch, by tool; a tool left out stays as it is.
+    #: Settable by whoever may already update the initiative.
+    tools: dict[Tool, bool] = Field(default_factory=dict)
 
-    _required = reject_null(
-        "name",
-        "join_policy",
-        "auto_join",
-        "keep_content_in",
-        *(t.view_permission for t in Tool),
-    )
+    _required = reject_null("name", "join_policy", "auto_join", "keep_content_in")
 
 
 # Role schemas
@@ -339,6 +320,9 @@ class InitiativeRead(InitiativeBase):
     keep_content_in: bool = False
     created_at: datetime
     updated_at: datetime
+    #: Each tool's switch here, by tool: the community's where it set one,
+    #: the initiative's own otherwise.
+    tools: dict[Tool, bool] = Field(default_factory=dict)
     can: InitiativeCan = Field(default_factory=InitiativeCan)
     member_count: int = 0
     #: The caller's role here, when they are a member.
@@ -554,7 +538,7 @@ def serialize_initiative(
         can=initiative_can(initiative),
         member_count=initiative.member_count,
         role_display_name=initiative.role_display_name,
-        **{t.view_permission: tool_on(context, initiative, t) for t in Tool},
+        tools={t: tool_on(context, initiative, t) for t in Tool},
     )
 
 

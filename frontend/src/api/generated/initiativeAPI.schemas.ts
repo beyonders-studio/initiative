@@ -7559,17 +7559,10 @@ export const InitiativeJoinPolicy = {
 } as const;
 
 export interface InitiativeCreate {
-  projects_enabled?: boolean;
-  files_enabled?: boolean;
-  counter_groups_enabled?: boolean;
-  calendars_enabled?: boolean;
-  dashboards_enabled?: boolean;
-  posts_enabled?: boolean;
-  wikis_enabled?: boolean;
-  contacts_enabled?: boolean;
   name: string;
   description?: string | null;
   color?: string | null;
+  tools?: Partial<Record<Tool, boolean>>;
   join_policy?: InitiativeJoinPolicy;
 }
 
@@ -7784,14 +7777,6 @@ export interface InitiativeMemberUpdate {
  * ``GET /initiatives/{id}/members``.
  */
 export interface InitiativeRead {
-  projects_enabled: boolean;
-  files_enabled: boolean;
-  counter_groups_enabled: boolean;
-  calendars_enabled: boolean;
-  dashboards_enabled: boolean;
-  posts_enabled: boolean;
-  wikis_enabled: boolean;
-  contacts_enabled: boolean;
   name: string;
   description: string | null;
   color: string | null;
@@ -7803,6 +7788,7 @@ export interface InitiativeRead {
   keep_content_in: boolean;
   created_at: string;
   updated_at: string;
+  tools: Partial<Record<Tool, boolean>>;
   can: InitiativeCan;
   member_count: number;
   role_display_name: string | null;
@@ -8061,20 +8047,13 @@ export interface InitiativeToolLayoutsRead {
 }
 
 export interface InitiativeUpdate {
-  projects_enabled?: boolean | null;
-  files_enabled?: boolean | null;
-  counter_groups_enabled?: boolean | null;
-  calendars_enabled?: boolean | null;
-  dashboards_enabled?: boolean | null;
-  posts_enabled?: boolean | null;
-  wikis_enabled?: boolean | null;
-  contacts_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
   color?: string | null;
   join_policy?: InitiativeJoinPolicy | null;
   auto_join?: boolean | null;
   keep_content_in?: boolean | null;
+  tools?: Partial<Record<Tool, boolean>>;
 }
 
 /**
