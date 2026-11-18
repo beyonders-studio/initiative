@@ -109,6 +109,7 @@ import { Route as ServerRequiredAuthenticatedCCommunityIdGoRefTypeRefIdRouteImpo
 import { Route as ServerRequiredAuthenticatedCCommunityIdIInitiativeIdIndexRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/index'
 import { Route as ServerRequiredAuthenticatedCCommunityIdIInitiativeIdModerationRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/moderation'
 import { Route as ServerRequiredAuthenticatedCCommunityIdIInitiativeIdSettingsRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/settings'
+import { Route as ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRouteImport } from './routes/_serverRequired/_authenticated/settings/platform/integrations_.plugins.$registrationId'
 import { Route as ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRouteImport } from './routes/_serverRequired/_authenticated/settings/platform/integrations_.vendor-setup.$registrationId'
 import { Route as ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdSettingsIndexRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/calendars/$calendarId/settings/index'
 import { Route as ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdSettingsAccessRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/calendars/$calendarId/settings/access'
@@ -797,6 +798,14 @@ const ServerRequiredAuthenticatedCCommunityIdIInitiativeIdSettingsRoute =
       path: '/settings',
       getParentRoute: () =>
         ServerRequiredAuthenticatedCCommunityIdIInitiativeIdRoute,
+    } as any,
+  )
+const ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute =
+  ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRouteImport.update(
+    {
+      id: '/integrations_/plugins/$registrationId',
+      path: '/integrations/plugins/$registrationId',
+      getParentRoute: () => ServerRequiredAuthenticatedSettingsPlatformRoute,
     } as any,
   )
 const ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute =
@@ -1632,6 +1641,7 @@ export interface FileRoutesByFullPath {
   '/c/$communityId/go/$refType/$refId': typeof ServerRequiredAuthenticatedCCommunityIdGoRefTypeRefIdRoute
   '/c/$communityId/i/$initiativeId/moderation': typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdModerationRoute
   '/c/$communityId/i/$initiativeId/settings': typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdSettingsRouteWithChildren
+  '/settings/platform/integrations/plugins/$registrationId': typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute
   '/settings/platform/integrations/vendor-setup/$registrationId': typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute
   '/c/$communityId/calendars/$calendarId/': typeof ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdIndexRoute
   '/c/$communityId/contacts/$contactId/': typeof ServerRequiredAuthenticatedCCommunityIdContactsContactIdIndexRoute
@@ -1805,6 +1815,7 @@ export interface FileRoutesByTo {
   '/c/$communityId/settings': typeof ServerRequiredAuthenticatedCCommunityIdSettingsIndexRoute
   '/c/$communityId/go/$refType/$refId': typeof ServerRequiredAuthenticatedCCommunityIdGoRefTypeRefIdRoute
   '/c/$communityId/i/$initiativeId/moderation': typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdModerationRoute
+  '/settings/platform/integrations/plugins/$registrationId': typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute
   '/settings/platform/integrations/vendor-setup/$registrationId': typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute
   '/c/$communityId/calendars/$calendarId': typeof ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdIndexRoute
   '/c/$communityId/contacts/$contactId': typeof ServerRequiredAuthenticatedCCommunityIdContactsContactIdIndexRoute
@@ -1982,6 +1993,7 @@ export interface FileRoutesById {
   '/_serverRequired/_authenticated/c/$communityId/go/$refType/$refId': typeof ServerRequiredAuthenticatedCCommunityIdGoRefTypeRefIdRoute
   '/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/moderation': typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdModerationRoute
   '/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/settings': typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdSettingsRouteWithChildren
+  '/_serverRequired/_authenticated/settings/platform/integrations_/plugins/$registrationId': typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute
   '/_serverRequired/_authenticated/settings/platform/integrations_/vendor-setup/$registrationId': typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute
   '/_serverRequired/_authenticated/c/$communityId/calendars/$calendarId/': typeof ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdIndexRoute
   '/_serverRequired/_authenticated/c/$communityId/contacts/$contactId/': typeof ServerRequiredAuthenticatedCCommunityIdContactsContactIdIndexRoute
@@ -2166,6 +2178,7 @@ export interface FileRouteTypes {
     | '/c/$communityId/go/$refType/$refId'
     | '/c/$communityId/i/$initiativeId/moderation'
     | '/c/$communityId/i/$initiativeId/settings'
+    | '/settings/platform/integrations/plugins/$registrationId'
     | '/settings/platform/integrations/vendor-setup/$registrationId'
     | '/c/$communityId/calendars/$calendarId/'
     | '/c/$communityId/contacts/$contactId/'
@@ -2339,6 +2352,7 @@ export interface FileRouteTypes {
     | '/c/$communityId/settings'
     | '/c/$communityId/go/$refType/$refId'
     | '/c/$communityId/i/$initiativeId/moderation'
+    | '/settings/platform/integrations/plugins/$registrationId'
     | '/settings/platform/integrations/vendor-setup/$registrationId'
     | '/c/$communityId/calendars/$calendarId'
     | '/c/$communityId/contacts/$contactId'
@@ -2515,6 +2529,7 @@ export interface FileRouteTypes {
     | '/_serverRequired/_authenticated/c/$communityId/go/$refType/$refId'
     | '/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/moderation'
     | '/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/settings'
+    | '/_serverRequired/_authenticated/settings/platform/integrations_/plugins/$registrationId'
     | '/_serverRequired/_authenticated/settings/platform/integrations_/vendor-setup/$registrationId'
     | '/_serverRequired/_authenticated/c/$communityId/calendars/$calendarId/'
     | '/_serverRequired/_authenticated/c/$communityId/contacts/$contactId/'
@@ -3308,6 +3323,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/c/$communityId/i/$initiativeId/settings'
       preLoaderRoute: typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdSettingsRouteImport
       parentRoute: typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdRoute
+    }
+    '/_serverRequired/_authenticated/settings/platform/integrations_/plugins/$registrationId': {
+      id: '/_serverRequired/_authenticated/settings/platform/integrations_/plugins/$registrationId'
+      path: '/integrations/plugins/$registrationId'
+      fullPath: '/settings/platform/integrations/plugins/$registrationId'
+      preLoaderRoute: typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRouteImport
+      parentRoute: typeof ServerRequiredAuthenticatedSettingsPlatformRoute
     }
     '/_serverRequired/_authenticated/settings/platform/integrations_/vendor-setup/$registrationId': {
       id: '/_serverRequired/_authenticated/settings/platform/integrations_/vendor-setup/$registrationId'
@@ -4473,6 +4495,7 @@ interface ServerRequiredAuthenticatedSettingsPlatformRouteChildren {
   ServerRequiredAuthenticatedSettingsPlatformSecurityRoute: typeof ServerRequiredAuthenticatedSettingsPlatformSecurityRoute
   ServerRequiredAuthenticatedSettingsPlatformStorageRoute: typeof ServerRequiredAuthenticatedSettingsPlatformStorageRoute
   ServerRequiredAuthenticatedSettingsPlatformIndexRoute: typeof ServerRequiredAuthenticatedSettingsPlatformIndexRoute
+  ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute: typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute
   ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute: typeof ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute
 }
 
@@ -4498,6 +4521,8 @@ const ServerRequiredAuthenticatedSettingsPlatformRouteChildren: ServerRequiredAu
       ServerRequiredAuthenticatedSettingsPlatformStorageRoute,
     ServerRequiredAuthenticatedSettingsPlatformIndexRoute:
       ServerRequiredAuthenticatedSettingsPlatformIndexRoute,
+    ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute:
+      ServerRequiredAuthenticatedSettingsPlatformIntegrationsPluginsRegistrationIdRoute,
     ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute:
       ServerRequiredAuthenticatedSettingsPlatformIntegrationsVendorSetupRegistrationIdRoute,
   }
