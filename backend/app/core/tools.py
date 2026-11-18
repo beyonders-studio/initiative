@@ -7,9 +7,15 @@ of truth for that set — the DAC registries and every tool endpoint reference i
 rather than repeating string literals. Kept free of app imports beyond the leaf
 ``errors`` and ``messages`` modules, so it can be imported anywhere. ``tools_test.py`` asserts every per-tool surface covers
 this enum, so a new member that forgets to wire one fails CI.
+
+What is a fact about one tool rather than a rule every tool follows is its
+record (:class:`ToolSpec`, in :data:`TOOL_SPECS`): adding a tool is its tables
+plus one record. The frontend reads the records from the file
+``scripts/build_tool_records.py`` writes beside its API types.
 """
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import Enum
 
 from app.core.errors import CodedError
@@ -49,6 +55,11 @@ class Tool(str, Enum):
         after a consonant becomes ``ies``, and everything else takes an ``s``.
         """
         return plural_of(self.value)
+
+    @property
+    def spec(self) -> ToolSpec:
+        """This tool's record."""
+        return TOOL_SPECS[self]
 
     @property
     def route_segment(self) -> str:
@@ -105,6 +116,131 @@ class Tool(str, Enum):
 
 
 @dataclass(frozen=True)
+class Layouts:
+    """How a tool lays out what it holds (``tool_layouts``)."""
+
+    #: Each instance keeps layouts of its own (a project's, a counter
+    #: group's). Otherwise the tool is one page per initiative (its calendar,
+    #: its posts feed), so its layouts are the initiative's and name no
+    #: instance.
+    per_instance: bool
+    #: How it lists what it holds, in the order offered.
+    lists: tuple[str, ...] = ()
+    #: The item it shows on its own (a project's task), if it lays one out.
+    detail: str | None = None
+    #: The detail is laid out once per type of item rather than once per
+    #: instance: a project's task page is one per task type
+    #: (``tool_layouts.task_type_id``).
+    typed: bool = False
+
+
+@dataclass(frozen=True)
+class CommunityRows:
+    """A tool whose rows may belong to the whole community (``initiative_id``
+    NULL), each held by the community plug-in that mounts it. Such a row is
+    made and changed by the holders of the tool's ``community_<plural>`` admin
+    surface (``authorization.community_surface``)."""
+
+    #: Whether a write grant on such a row changes it too. A contact holds
+    #: nothing but itself, so writing one is changing it; a write grant on a
+    #: calendar writes its events, and the calendar is the surface's.
+    granted_writes_row: bool = False
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """The facts about one tool that are not a rule every tool follows."""
+
+    #: Its kind code: permanent, as every :attr:`Kind.code` is.
+    code: int
+    #: Switched on in an initiative that says nothing about its tools.
+    #:
+    #: Every tool carries a ``{plural}_enabled`` switch on the initiative.
+    #: Projects and files used to be exempt — always on, with no column at all
+    #: — because they were the only places content could live. Relationships
+    #: ended that: anything links to anything, so an initiative that is only a
+    #: calendar is a coherent thing to want. They keep the default, which is
+    #: the part that was ever load-bearing.
+    on_by_default: bool = False
+    #: The formats a selection of it exports to, in the order they are
+    #: offered, all served by ``GET /exports/{tool}``. ``None`` for a tool
+    #: whose formats depend on each row (a file's, on its type). Every tool
+    #: exports by default, so leaving one out has to be written down, as an
+    #: empty tuple; whether a row was built on a plug-in this build does not
+    #: ship is the row's question (``services.export.provenance``), not the
+    #: tool's.
+    export_formats: tuple[str, ...] | None = ("json",)
+    #: The formats an initiative or community report may write it in, in the
+    #: order offered. With none chosen — or none offered — it rides as its
+    #: envelope.
+    report_formats: tuple[str, ...] = ()
+    #: Report formats per file type, for a tool whose formats depend on each
+    #: row rather than the tool (a file's, on its type).
+    type_report_formats: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    #: A person can subscribe to it from another app: a personal API key
+    #: limited to one of them (``user_api_keys.resource_type``/``resource_id``)
+    #: reads its feed and nothing else, served from the tool's own router.
+    feed: bool = False
+    #: Whether its rows may belong to the whole community, and how they are
+    #: written.
+    community_rows: CommunityRows | None = None
+    #: How it lays out what it holds, if it does.
+    layouts: Layouts | None = None
+
+
+#: Every tool's record, in enum order.
+TOOL_SPECS: dict[Tool, ToolSpec] = {
+    Tool.project: ToolSpec(
+        code=10,
+        on_by_default=True,
+        export_formats=("json", "pdf", "csv", "xlsx"),
+        report_formats=("pdf", "csv", "xlsx"),
+        layouts=Layouts(
+            per_instance=True,
+            lists=("table", "board", "gantt", "calendar"),
+            detail="task",
+            typed=True,
+        ),
+    ),
+    Tool.file: ToolSpec(
+        code=6,
+        on_by_default=True,
+        export_formats=None,
+        type_report_formats={
+            "lexical": ("pdf", "md", "docx"),
+            "sheet": ("csv", "xlsx"),
+        },
+    ),
+    Tool.counter_group: ToolSpec(
+        code=4,
+        export_formats=("pdf", "csv", "xlsx", "md", "json"),
+        report_formats=("pdf", "csv", "xlsx", "md"),
+        layouts=Layouts(per_instance=True, detail="counter"),
+    ),
+    Tool.calendar: ToolSpec(
+        code=1,
+        export_formats=("ics", "json"),
+        report_formats=("ics", "json"),
+        feed=True,
+        community_rows=CommunityRows(),
+        layouts=Layouts(
+            per_instance=False, lists=("calendar",), detail="calendar_event"
+        ),
+    ),
+    Tool.dashboard: ToolSpec(code=5),
+    Tool.post: ToolSpec(code=9, layouts=Layouts(per_instance=False, detail="post")),
+    Tool.wiki: ToolSpec(code=15, export_formats=("pdf", "md", "docx", "json")),
+    Tool.contact: ToolSpec(
+        code=19,
+        export_formats=("json", "csv"),
+        # One spreadsheet of each initiative's contacts.
+        report_formats=("csv",),
+        community_rows=CommunityRows(granted_writes_row=True),
+    ),
+}
+
+
+@dataclass(frozen=True)
 class Kind:
     """A kind of thing a guild holds that can be addressed as ``(kind, id)``:
     every tool, the things that live inside one, and the guild's tags.
@@ -125,6 +261,12 @@ class Kind:
     #: row, and its own row security answers for it rather than a parent's
     #: sharing (a collection, in Files).
     standalone: bool = False
+    #: Inside a tool, and holds a conversation of its own (every tool does):
+    #: :data:`COMMENT_TARGETS`.
+    commentable: bool = False
+    #: Inside a tool, and is put away when finished with (every tool is):
+    #: :data:`ARCHIVE_TARGETS`.
+    archivable: bool = False
 
     @property
     def table(self) -> str:
@@ -155,25 +297,25 @@ class Kind:
 #: (``app.core.relationships.PERSON``), an edge end that is not a kind, and is
 #: never reused. The initial set was assigned in alphabetical order, which is
 #: where the resemblance ends — a derived ordinal changes under you the first
-#: time a member is added in the middle. Declared
-#: tools first, then what lives inside them, then the guild's vocabulary; the
+#: time a member is added in the middle. The tools first, with the codes their
+#: records hold, then what lives inside them, then the guild's vocabulary; the
 #: lists below derived from it keep that order.
 KINDS: dict[str, Kind] = {
     kind.value: kind
     for kind in (
-        Kind(Tool.project.value, 10),
-        Kind(Tool.file.value, 6),
-        Kind(Tool.counter_group.value, 4),
-        Kind(Tool.calendar.value, 1),
-        Kind(Tool.dashboard.value, 5),
-        Kind(Tool.post.value, 9),
-        Kind(Tool.wiki.value, 15),
-        Kind(Tool.contact.value, 19),
-        Kind("task", 14, parent=Tool.project),
+        *(Kind(tool.value, tool.spec.code) for tool in Tool),
+        Kind("task", 14, parent=Tool.project, commentable=True, archivable=True),
         Kind("calendar_event", 2, parent=Tool.calendar),
         Kind("counter", 3, parent=Tool.counter_group),
-        Kind("wiki_page", 16, parent=Tool.wiki),
-        Kind("collection", 17, parent=Tool.file, standalone=True),
+        Kind("wiki_page", 16, parent=Tool.wiki, commentable=True),
+        Kind(
+            "collection",
+            17,
+            parent=Tool.file,
+            standalone=True,
+            commentable=True,
+            archivable=True,
+        ),
         Kind("tag", 13),
     )
 }
@@ -189,62 +331,32 @@ CHILD_KINDS: tuple[str, ...] = tuple(k.value for k in KINDS.values() if k.parent
 CONTENT_KINDS: tuple[str, ...] = tuple(t.value for t in Tool) + CHILD_KINDS
 
 
-# EVERY tool is toggleable: each carries a ``{plural}_enabled`` master switch on
-# the initiative. Projects and files used to be exempt — always on, with no
-# column at all — because they were the only places content could live and the
-# other tools hung off them. Relationships ended that: anything links to
-# anything, so an initiative that is only a calendar, or only a wiki, is a
-# coherent thing to want rather than a half-built one.
-#
-# They keep the *default*, which is the part that was ever load-bearing. An
-# initiative that says nothing about its tools still arrives with projects and
-# files on, so nothing about making one changes; the switch is simply there
-# to turn off now.
-DEFAULT_ENABLED_TOOLS = frozenset({Tool.project, Tool.file})
-
-# Tools WITHOUT an export-engine source, and why. Stated as an exclusion so the
-# default is "a new tool is exportable": the adapter-coverage test then fails
-# until the tool either has an adapter or is listed here deliberately. An
-# inclusion list would instead let a new tool silently ship with no export.
-#
-# Empty, and that is the point: every tool has an export source. What used to
-# sit here (``Tool.dashboard``) is now handled where it belongs — an entity
-# built on a plug-in this build does not ship is filtered by provenance in
-# ``services.export.provenance``, which is a property of the ROW, not of the
-# tool. A whole tool is the wrong unit for that rule: most dashboards are
-# hand-built here and are ordinary content.
-NON_EXPORTABLE_TOOLS: frozenset[Tool] = frozenset()
-
 # Tools with an export-engine source (single-entity + bulk selection export),
-# all served by ``GET /exports/{tool}``. The engine's source name is the KEBAB
-# SINGULAR of the tool ("counter_group" -> "counter-group"). The frontend
-# mirrors this as TOOL_REGISTRY's ``bulkExport`` flag.
-BULK_EXPORT_TOOLS = tuple(t for t in Tool if t not in NON_EXPORTABLE_TOOLS)
-
-# Tools a person can subscribe to from another app: a personal API key limited
-# to one of them (``user_api_keys.resource_type``/``resource_id``) reads that
-# one's feed and nothing else. Each serves its feed from its own router.
-FEED_TOOLS: frozenset[Tool] = frozenset({Tool.calendar})
+# all served by ``GET /exports/{tool}``: every tool whose record does not say it
+# exports nothing. The engine's source name is the KEBAB SINGULAR of the tool
+# ("counter_group" -> "counter-group").
+BULK_EXPORT_TOOLS = tuple(t for t in Tool if t.spec.export_formats != ())
 
 
-# Comment surfaces: EVERY tool carries a thread, plus these content-level
-# extras — sub-resources with a conversation of their own. A task holds one
+# Comment surfaces: EVERY tool carries a thread, plus the kinds inside one that
+# say so — sub-resources with a conversation of their own. A task holds one
 # because a task is a piece of work people talk about; a wiki page holds one
 # because a page is what somebody reads, and a note about the rota belongs on
 # the rota rather than on the handbook it is filed in; a collection holds one
 # because it is a thing in Files people talk about apart from its files.
 #
-# An extra carries no ``comments_enabled`` column of its own; it is reached
+# Such a kind carries no ``comments_enabled`` column of its own; it is reached
 # through the tool that owns it, and that tool's switch is what answers for it
 # — a wiki's switch turns off the threads on its pages. The task is one
 # exception, and deliberately so: its thread predates the switch and belongs
 # to the task rather than to the project's tool surface. A collection is the
 # other: it sits in no one instance of Files, so it carries its own switch.
 #
-# Extras come first so the declaration order — and every derived column list —
-# keeps reading task-first, as it always has.
-COMMENTABLE_EXTRAS: tuple[str, ...] = ("task", "wiki_page", "collection")
-COMMENT_TARGETS: tuple[str, ...] = COMMENTABLE_EXTRAS + tuple(t.value for t in Tool)
+# The kinds come first so every derived column list keeps reading task-first,
+# as it always has.
+COMMENT_TARGETS: tuple[str, ...] = tuple(
+    k for k in CHILD_KINDS if KINDS[k].commentable
+) + tuple(t.value for t in Tool)
 
 
 # Tag-assignment surfaces: EVERY tool is taggable, plus everything that lives
@@ -264,12 +376,16 @@ TAG_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + TAGGABLE_EXTRAS
 TRASHABLE_EXTRAS: tuple[str, ...] = ("comment", "initiative", "tag")
 TRASH_TARGETS: tuple[str, ...] = CONTENT_KINDS + TRASHABLE_EXTRAS
 
-#: Archivable things that are not tools. Archiving says "this is finished with",
-#: which is true of anything an initiative offers — so every Tool is archivable,
-#: with no exceptions — and of these, which are worked through and put away
-#: without being tools: a task, an initiative itself, and a collection.
-ARCHIVABLE_EXTRAS: tuple[str, ...] = ("task", "initiative", "collection")
-ARCHIVE_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + ARCHIVABLE_EXTRAS
+#: Everything archivable. Archiving says "this is finished with", which is true
+#: of anything an initiative offers — so every Tool is archivable, with no
+#: exceptions — and of the kinds inside one that say so, which are worked
+#: through and put away without being tools (a task, a collection), and of an
+#: initiative itself.
+ARCHIVE_TARGETS: tuple[str, ...] = (
+    *(t.value for t in Tool),
+    *(k for k in CHILD_KINDS if KINDS[k].archivable),
+    "initiative",
+)
 
 # Property surfaces: EVERY tool carries custom properties, plus every sub-tool —
 # the rows inside a tool that are things in their own right. The properties
@@ -294,15 +410,14 @@ INSTALL_METADATA_KIND = "plugin"
 METADATA_TARGETS: tuple[str, ...] = ITEM_KINDS + (INSTALL_METADATA_KIND,)
 
 # Layouts (``tool_layouts``): how an instance of a tool draws its items, and
-# one of them. Each of these tools has its own layouts per instance (a
-# project's, a counter group's); the calendar and the posts feed are one page per
-# initiative, so their layouts belong to the initiative and name no instance.
-# The table's CHECKs, its policies, its events and its purge derive from these.
-LAYOUTS_PER_INSTANCE: tuple[Tool, ...] = (
-    Tool.project,
-    Tool.counter_group,
+# one of them, as each tool's record says (:class:`Layouts`). The table's
+# CHECKs, its policies, its events and its purge derive from these.
+LAYOUTS_PER_INSTANCE: tuple[Tool, ...] = tuple(
+    t for t in Tool if t.spec.layouts is not None and t.spec.layouts.per_instance
 )
-LAYOUTS_SHARED: tuple[Tool, ...] = (Tool.calendar, Tool.post)
+LAYOUTS_SHARED: tuple[Tool, ...] = tuple(
+    t for t in Tool if t.spec.layouts is not None and not t.spec.layouts.per_instance
+)
 LAYOUT_TOOLS: tuple[Tool, ...] = LAYOUTS_PER_INSTANCE + LAYOUTS_SHARED
 #: Kinds inside a tool that lay out what they hold themselves, as an instance
 #: does: a collection's files. ``tool_id`` is the row's own id.
@@ -323,8 +438,11 @@ LAYOUT_INSTANCE_TABLES: dict[str, str] = {
     **{kind: KINDS[kind].table for kind in LAYOUT_KIND_TARGETS},
 }
 LIST_LAYOUTS: dict[str, tuple[str, ...]] = {
-    Tool.project: ("table", "board", "gantt", "calendar"),
-    Tool.calendar: ("calendar",),
+    **{
+        tool: layouts.lists
+        for tool in LAYOUT_TOOLS
+        if (layouts := tool.spec.layouts) is not None and layouts.lists
+    },
     "collection": ("masonry", "grid", "timeline", "table"),
 }
 #: Lists a target draws hidden until it shows them; every other list shows as
@@ -333,15 +451,22 @@ LISTS_HIDDEN_AS_SHIPPED: dict[str, frozenset[str]] = {
     "collection": frozenset({"masonry", "timeline"}),
 }
 DETAIL_LAYOUTS: dict[str, tuple[str, ...]] = {
-    Tool.project: ("task",),
-    Tool.calendar: ("calendar_event",),
-    Tool.counter_group: ("counter",),
-    Tool.post: ("post",),
+    **{
+        tool: (layouts.detail,)
+        for tool in LAYOUT_TOOLS
+        if (layouts := tool.spec.layouts) is not None and layouts.detail
+    },
     "collection": ("file",),
 }
-#: The details laid out once per type of item rather than once per target: a
-#: project's task page is one per task type (``tool_layouts.task_type_id``).
-TYPED_DETAILS: dict[Tool, str] = {Tool.project: "task"}
+#: The details laid out once per type of item rather than once per target
+#: (:attr:`Layouts.typed`).
+TYPED_DETAILS: dict[Tool, str] = {
+    tool: layouts.detail
+    for tool in LAYOUT_TOOLS
+    if (layouts := tool.spec.layouts) is not None
+    and layouts.typed
+    and layouts.detail is not None
+}
 #: The per-instance tools that lay out anything of their own, a list or an
 #: item: those an initiative's settings list.
 INSTANCE_LAYOUT_TOOLS: tuple[Tool, ...] = tuple(
@@ -350,11 +475,16 @@ INSTANCE_LAYOUT_TOOLS: tuple[Tool, ...] = tuple(
     if tool in LIST_LAYOUTS or tool in DETAIL_LAYOUTS
 )
 LAYOUT_DEFAULT = "default"
+_DETAIL_KINDS = [kind for kinds in DETAIL_LAYOUTS.values() for kind in kinds]
+#: Every value ``tool_layouts.kind`` takes: the lists, then the details — the
+#: items in the order their kinds are declared, then what a kind target shows
+#: (a collection's file) — then the default.
 LAYOUT_KINDS: tuple[str, ...] = tuple(
     dict.fromkeys(
         [
             *(kind for kinds in LIST_LAYOUTS.values() for kind in kinds),
-            *(kind for kinds in DETAIL_LAYOUTS.values() for kind in kinds),
+            *(kind for kind in ITEM_KINDS if kind in _DETAIL_KINDS),
+            *_DETAIL_KINDS,
             LAYOUT_DEFAULT,
         ]
     )

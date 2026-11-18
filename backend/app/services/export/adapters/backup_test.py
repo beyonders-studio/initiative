@@ -54,7 +54,6 @@ def test_report_formats_a_section_does_not_offer_are_refused(formats):
 
 def test_report_formats_are_formats_the_tools_adapter_renders():
     for section in _SECTIONS:
-        offered = set(section.report_formats).union(
-            *section.type_report_formats.values()
-        )
+        spec = section.tool.spec
+        offered = set(spec.report_formats).union(*spec.type_report_formats.values())
         assert offered <= set(section.adapter.formats), section.key

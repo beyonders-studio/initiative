@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import column_property
 from sqlmodel import Field, Relationship, SQLModel
 
-from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+from app.core.tools import Tool
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.platform.user import ABSENT_STATUSES
 from app.models.platform.user_profile_view import MemberProfile
@@ -104,7 +104,7 @@ PermissionKey = Enum(
 # master switch: the switch says whether a tool exists here at all, and this
 # says what an ordinary member may do with one that does.
 DEFAULT_PERMISSION_VALUES: dict["PermissionKey", bool] = {
-    **{PermissionKey(t.view_permission): t in DEFAULT_ENABLED_TOOLS for t in Tool},
+    **{PermissionKey(t.view_permission): t.spec.on_by_default for t in Tool},
     **{PermissionKey(t.create_permission): False for t in Tool},
     **{PermissionKey(name): False for name in EXTRA_PERMISSION_KEYS},
 }
@@ -421,7 +421,7 @@ class InitiativeJoinRequest(SQLModel, table=True):
 # ships as a guild migration (and the provisioning drift tests catch a
 # model/schema mismatch).
 #
-# Only the default varies: the tools in DEFAULT_ENABLED_TOOLS start on, so an
+# Only the default varies: a tool its record has on by default starts on, so an
 # initiative created without an opinion is the one people already had.
 _InitiativeToolSwitchColumns = type(
     "_InitiativeToolSwitchColumns",
@@ -431,11 +431,9 @@ _InitiativeToolSwitchColumns = type(
         "__annotations__": {t.view_permission: bool for t in Tool},
         **{
             t.view_permission: Field(
-                default=t in DEFAULT_ENABLED_TOOLS,
+                default=t.spec.on_by_default,
                 nullable=False,
-                sa_column_kwargs={
-                    "server_default": str(t in DEFAULT_ENABLED_TOOLS).lower()
-                },
+                sa_column_kwargs={"server_default": str(t.spec.on_by_default).lower()},
             )
             for t in Tool
         },

@@ -86,7 +86,6 @@ class TaskFilters(BaseModel):
 class ProjectAdapter(ToolExportAdapter):
     tool = Tool.project
     template_id = "project-report"
-    formats = ("json", "pdf", "csv", "xlsx")
     content_filters: ClassVar[dict[str, type[BaseModel]]] = {"tasks": TaskFilters}
 
     async def count(

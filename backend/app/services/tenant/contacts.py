@@ -4,7 +4,7 @@ community's contacts.
 A contact is its own item with its own sharing, as a file is, so the loaders
 here eager-load its grants and the actions the request may take on it. One
 with no initiative belongs to the whole community, held by the community
-contacts plug-in (``authorization.COMMUNITY_ROWS``).
+contacts plug-in (``ToolSpec.community_rows``).
 """
 
 from __future__ import annotations

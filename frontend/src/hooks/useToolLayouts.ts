@@ -35,10 +35,6 @@ import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
 import type { LayoutChange } from "@/ui/layouts/layoutSet";
 
-/** The tools whose every instance lays out its own items: the backend's
- *  per-instance layout tools that draw a detail. */
-export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set([Tool.project, Tool.counter_group]);
-
 /** The layouts one instance of a tool keeps as its own: a project's, or a
  *  collection's, which lays out its files as an instance does. */
 export const instanceTarget = (tool: LayoutTarget, id: number): GetLayoutsParams => ({

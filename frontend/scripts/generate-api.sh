@@ -51,6 +51,9 @@ fi
 echo "Generating TypeScript types and React Query hooks..."
 cd "$FRONTEND_DIR"
 pnpm orval
+# The tool records, beside the types: written after Orval, which empties the
+# folder first.
+(cd "${FRONTEND_DIR}/../backend" && uv run python ../scripts/build_tool_records.py)
 pnpm format:api
 
 echo "Done! Generated files in src/api/generated/"

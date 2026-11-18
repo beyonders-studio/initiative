@@ -51,8 +51,8 @@ mid-build access revocation).
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field, replace
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -225,17 +225,18 @@ def _validate_params(params: dict, *, scope_kind: str) -> None:
     if mode == "report":
         for tool, fmt in (params.get("formats") or {}).items():
             section = _SECTIONS_BY_KEY.get(tool)
-            if section is not None and section.type_report_formats:
-                allowed = section.type_report_formats
+            spec = section.tool.spec if section is not None else None
+            if spec is not None and spec.type_report_formats:
+                allowed = spec.type_report_formats
                 if not isinstance(fmt, dict) or not all(
                     file_type in allowed and value in allowed[file_type]
                     for file_type, value in fmt.items()
                 ):
                     raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
             elif (
-                section is None
+                spec is None
                 or not isinstance(fmt, str)
-                or fmt not in section.report_formats
+                or fmt not in spec.report_formats
             ):
                 raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
 
@@ -1548,19 +1549,14 @@ class BackupSection:
     """How one tool is written into an initiative or community export.
 
     Which rows the tool has, how one is loaded and how it serialises are its
-    export adapter's. A section states what the aggregate adds: the formats a
-    report may ask for, and the hooks for a tool whose entries carry more than
-    their envelope. Every hook is optional; a tool with none writes each entity
-    as its envelope, or in the report format chosen for it.
+    export adapter's, and the formats a report may ask for are its record's
+    (``ToolSpec.report_formats``). A section states what the aggregate adds:
+    the hooks for a tool whose entries carry more than their envelope. Every
+    hook is optional; a tool with none writes each entity as its envelope, or
+    in the report format chosen for it.
     """
 
     tool: Tool
-    #: The formats a report-mode export may choose for this tool. With none
-    #: chosen — or none offered — the tool rides as its envelope.
-    report_formats: frozenset[str] = frozenset()
-    #: Report formats per file type, for the tool whose formats depend on
-    #: the entity rather than the tool.
-    type_report_formats: Mapping[str, frozenset[str]] = field(default_factory=dict)
     #: Whether a report writes the initiative's entities of this tool as one
     #: file rather than one each: a spreadsheet of its contacts.
     one_report: bool = False
@@ -1617,28 +1613,21 @@ class BackupSection:
 _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(
         Tool.project,
-        report_formats=frozenset({"pdf", "csv", "xlsx"}),
         before_envelope=_ScopeBuilder._note_project_people,
     ),
     BackupSection(
         Tool.file,
-        type_report_formats={
-            FileType.lexical.value: frozenset({"pdf", "md", "docx"}),
-            FileType.sheet.value: frozenset({"csv", "xlsx"}),
-        },
         type_in_filename=False,
         preload=_ScopeBuilder._preload_embedded_assets,
         format_for=_ScopeBuilder._file_format,
         write_apart=_ScopeBuilder._write_uploaded_file,
         before_envelope=_ScopeBuilder._collect_embedded_assets,
     ),
-    BackupSection(
-        Tool.counter_group, report_formats=frozenset({"pdf", "csv", "xlsx", "md"})
-    ),
-    BackupSection(Tool.calendar, report_formats=frozenset({"ics", "json"})),
+    BackupSection(Tool.counter_group),
+    BackupSection(Tool.calendar),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
-    BackupSection(Tool.contact, report_formats=frozenset({"csv"}), one_report=True),
+    BackupSection(Tool.contact, one_report=True),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.
     BackupSection(Tool.dashboard, finish=_ScopeBuilder._record_foreign_dashboards),
