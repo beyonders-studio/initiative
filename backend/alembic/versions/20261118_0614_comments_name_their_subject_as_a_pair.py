@@ -68,26 +68,31 @@ _READERS = """
 """
 
 
-def _held(*statements: str) -> None:
-    """Run ``statements`` on ``comments`` with its row security unforced and its
-    user triggers held, both restored after."""
+def _held(*statements: str, reads: tuple[str, ...] = ()) -> None:
+    """Run ``statements`` on ``comments`` with its user triggers held and its row
+    security unforced, and that of the tables in ``reads`` too, so they see every
+    row; each is restored after."""
     bind = op.get_bind()
-    forced = bind.execute(
-        sa.text(
-            "SELECT relforcerowsecurity FROM pg_class"
-            " WHERE oid = to_regclass('comments')"
-        )
-    ).scalar()
-    if forced:
-        bind.exec_driver_sql("ALTER TABLE comments NO FORCE ROW LEVEL SECURITY")
+    forced = [
+        table
+        for table in ("comments", *reads)
+        if bind.execute(
+            sa.text(
+                "SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:t)"
+            ),
+            {"t": table},
+        ).scalar()
+    ]
+    for table in forced:
+        bind.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
     bind.exec_driver_sql("ALTER TABLE comments DISABLE TRIGGER USER")
     try:
         for statement in statements:
             bind.exec_driver_sql(statement)
     finally:
         bind.exec_driver_sql("ALTER TABLE comments ENABLE TRIGGER USER")
-        if forced:
-            bind.exec_driver_sql("ALTER TABLE comments FORCE ROW LEVEL SECURITY")
+        for table in forced:
+            bind.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def _drop_readers(*columns: str) -> None:
@@ -142,7 +147,11 @@ def _apply_downgrade() -> None:
         f"{column} = CASE WHEN subject_type = '{kind}' THEN subject_id END"
         for kind, column, _ in _KINDS
     )
-    _held(f"DELETE FROM comments WHERE {gone}", f"UPDATE comments SET {fill}")
+    _held(
+        f"DELETE FROM comments WHERE {gone}",
+        f"UPDATE comments SET {fill}",
+        reads=tuple(dict.fromkeys(table for _, _, table in _KINDS)),
+    )
     for _, column, table in _KINDS:
         op.create_foreign_key(
             f"comments_{column}_fkey",
