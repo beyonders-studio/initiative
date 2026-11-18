@@ -2,10 +2,10 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Initiative plug-in API",
-    "version": "10.2.0",
+    "version": "11.0.0",
     "x-initiative-source": {
-      "version": "0.78.0",
-      "commit": "1562389f16c51c04a73c4aa442d31c2a80aaa128"
+      "version": "0.79.2",
+      "commit": "9e90f0dc5e36893e569376cf7cda1596982fc403"
     }
   },
   "servers": [
@@ -2222,7 +2222,7 @@
           "contacts"
         ],
         "summary": "Create Contact",
-        "description": "Create a contact.\n\nIn an initiative it needs that initiative's contacts switch on and the\n``create_contacts`` permission (or guild admin), and its maker owns it.\nWith ``initiative_id`` omitted it is one of the community's contacts: it\nneeds the ``community_contacts`` surface and the community contacts\nplug-in, whose install owns it. An installed plug-in creates initiative\ncontacts only, owned by its install.",
+        "description": "Create a contact.\n\nIn an initiative it needs that initiative's contacts switch on and the\n``create_contacts`` permission (or guild admin), and its maker owns it.\nWith ``initiative_id`` omitted it is one of the community's contacts: it\nneeds the ``community_contacts`` surface and the community contacts\nplug-in, whose install owns it. An installed plug-in's initiative contact\nis owned by its install; it makes a community contact on a token not\nnarrowed to one initiative, as itself or for a member holding the\nsurface, and the database gives that one to the\ncommunity contacts plug-in's install as it goes in.",
         "operationId": "create_contact",
         "security": [
           {
@@ -4384,7 +4384,7 @@
           "comments"
         ],
         "summary": "List Comments",
-        "description": "One page of a thread: ``limit`` conversations, newest first, each with\nevery reply under it. Follow ``next_cursor`` for older conversations.",
+        "description": "One page of the thread on one subject: ``limit`` conversations, newest\nfirst, each with every reply under it. Follow ``next_cursor`` for older\nconversations.",
         "operationId": "list_comments",
         "security": [
           {
@@ -4416,6 +4416,24 @@
         "x-plugin-scope": "comments:read",
         "parameters": [
           {
+            "name": "subject_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CommentSubject"
+            }
+          },
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Subject Id"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -4441,193 +4459,6 @@
                 }
               ],
               "title": "Cursor"
-            }
-          },
-          {
-            "name": "task_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "wiki_page_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Wiki Page Id"
-            }
-          },
-          {
-            "name": "collection_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Collection Id"
-            }
-          },
-          {
-            "name": "project_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Project Id"
-            }
-          },
-          {
-            "name": "file_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "File Id"
-            }
-          },
-          {
-            "name": "counter_group_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Counter Group Id"
-            }
-          },
-          {
-            "name": "calendar_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Calendar Id"
-            }
-          },
-          {
-            "name": "dashboard_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Dashboard Id"
-            }
-          },
-          {
-            "name": "post_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Post Id"
-            }
-          },
-          {
-            "name": "wiki_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Wiki Id"
-            }
-          },
-          {
-            "name": "contact_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Contact Id"
             }
           },
           {
@@ -8713,6 +8544,25 @@
             }
           },
           {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
+          },
+          {
             "name": "session_token",
             "in": "cookie",
             "required": false,
@@ -8790,6 +8640,25 @@
               "type": "integer",
               "title": "File Id"
             }
+          },
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
           },
           {
             "name": "session_token",
@@ -8871,6 +8740,25 @@
             }
           },
           {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
+          },
+          {
             "name": "session_token",
             "in": "cookie",
             "required": false,
@@ -8948,6 +8836,25 @@
               "type": "integer",
               "title": "Calendar Id"
             }
+          },
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
           },
           {
             "name": "session_token",
@@ -9029,6 +8936,25 @@
             }
           },
           {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
+          },
+          {
             "name": "session_token",
             "in": "cookie",
             "required": false,
@@ -9108,6 +9034,25 @@
             }
           },
           {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
+          },
+          {
             "name": "session_token",
             "in": "cookie",
             "required": false,
@@ -9185,6 +9130,25 @@
               "type": "integer",
               "title": "Contact Id"
             }
+          },
+          {
+            "name": "note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A note to each person the new sharing lets in.",
+              "title": "Note"
+            },
+            "description": "A note to each person the new sharing lets in."
           },
           {
             "name": "session_token",
@@ -10980,8 +10944,8 @@
           "wiki",
           "contact",
           "task",
-          "initiative",
-          "collection"
+          "collection",
+          "initiative"
         ],
         "title": "ArchivableType",
         "description": "Things that can be archived."
@@ -13489,137 +13453,13 @@
             "x-mentions": "markdown",
             "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
           },
-          "task_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Id"
+          "subject_type": {
+            "$ref": "#/components/schemas/CommentSubject"
           },
-          "wiki_page_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Wiki Page Id"
-          },
-          "collection_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collection Id"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "file_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Id"
-          },
-          "counter_group_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Counter Group Id"
-          },
-          "calendar_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Calendar Id"
-          },
-          "dashboard_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dashboard Id"
-          },
-          "post_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Post Id"
-          },
-          "wiki_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Wiki Id"
-          },
-          "contact_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Id"
+          "subject_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "title": "Subject Id"
           },
           "parent_comment_id": {
             "anyOf": [
@@ -13640,9 +13480,12 @@
         },
         "type": "object",
         "required": [
-          "content"
+          "content",
+          "subject_type",
+          "subject_id"
         ],
-        "title": "CommentCreate"
+        "title": "CommentCreate",
+        "description": "A comment, and what it is said on."
       },
       "CommentListResponse": {
         "properties": {
@@ -13719,130 +13562,16 @@
             "x-mentions": "markdown",
             "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
           },
-          "task_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Id"
-          },
-          "wiki_page_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Wiki Page Id"
-          },
-          "collection_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Collection Id"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "file_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Id"
-          },
-          "counter_group_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Counter Group Id"
-          },
-          "calendar_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Calendar Id"
-          },
-          "dashboard_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dashboard Id"
-          },
-          "post_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Post Id"
-          },
-          "wiki_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Wiki Id"
-          },
-          "contact_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contact Id"
-          },
           "id": {
             "type": "integer",
             "title": "Id"
+          },
+          "subject_type": {
+            "$ref": "#/components/schemas/CommentSubject"
+          },
+          "subject_id": {
+            "type": "integer",
+            "title": "Subject Id"
           },
           "parent_comment_id": {
             "anyOf": [
@@ -13937,18 +13666,9 @@
           "created_by_kind",
           "created_by_install",
           "content",
-          "task_id",
-          "wiki_page_id",
-          "collection_id",
-          "project_id",
-          "file_id",
-          "counter_group_id",
-          "calendar_id",
-          "dashboard_id",
-          "post_id",
-          "wiki_id",
-          "contact_id",
           "id",
+          "subject_type",
+          "subject_id",
           "parent_comment_id",
           "created_at",
           "updated_at",
@@ -13961,7 +13681,7 @@
           "system_kind"
         ],
         "title": "CommentRead",
-        "description": "One comment. ``project_id`` is its own for a comment on a project and\nthe task's for a task comment (filled by the service's serializer)."
+        "description": "One comment, and what it is said on."
       },
       "CommentRemoval": {
         "properties": {
@@ -13986,6 +13706,23 @@
         ],
         "title": "CommentRemoval",
         "description": "What a tombstone says in place of a comment: who took it out, and,\nfor a moderator, why. Never what it said, or who wrote it."
+      },
+      "CommentSubject": {
+        "type": "string",
+        "enum": [
+          "task",
+          "wiki_page",
+          "collection",
+          "project",
+          "file",
+          "counter_group",
+          "calendar",
+          "dashboard",
+          "post",
+          "wiki",
+          "contact"
+        ],
+        "title": "CommentSubject"
       },
       "ContactAddress": {
         "properties": {
@@ -17114,46 +16851,6 @@
       },
       "InitiativeRead": {
         "properties": {
-          "projects_enabled": {
-            "type": "boolean",
-            "title": "Projects Enabled",
-            "default": true
-          },
-          "files_enabled": {
-            "type": "boolean",
-            "title": "Files Enabled",
-            "default": true
-          },
-          "counter_groups_enabled": {
-            "type": "boolean",
-            "title": "Counter Groups Enabled",
-            "default": false
-          },
-          "calendars_enabled": {
-            "type": "boolean",
-            "title": "Calendars Enabled",
-            "default": false
-          },
-          "dashboards_enabled": {
-            "type": "boolean",
-            "title": "Dashboards Enabled",
-            "default": false
-          },
-          "posts_enabled": {
-            "type": "boolean",
-            "title": "Posts Enabled",
-            "default": false
-          },
-          "wikis_enabled": {
-            "type": "boolean",
-            "title": "Wikis Enabled",
-            "default": false
-          },
-          "contacts_enabled": {
-            "type": "boolean",
-            "title": "Contacts Enabled",
-            "default": false
-          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -17235,6 +16932,16 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "tools": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Tool"
+            },
+            "type": "object",
+            "title": "Tools"
+          },
           "can": {
             "$ref": "#/components/schemas/InitiativeCan"
           },
@@ -17257,14 +16964,6 @@
         },
         "type": "object",
         "required": [
-          "projects_enabled",
-          "files_enabled",
-          "counter_groups_enabled",
-          "calendars_enabled",
-          "dashboards_enabled",
-          "posts_enabled",
-          "wikis_enabled",
-          "contacts_enabled",
           "name",
           "description",
           "color",
@@ -17276,6 +16975,7 @@
           "keep_content_in",
           "created_at",
           "updated_at",
+          "tools",
           "can",
           "member_count",
           "role_display_name"
