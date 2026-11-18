@@ -30,6 +30,7 @@ from app.core import usernames
 from app.core.references import NOT_REFERENCEABLE
 from app.core.relationships import PERSON, EndpointKind
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.core.user_display import display_name
 from app.db.authorization import standing_arg
@@ -161,13 +162,13 @@ def visible_ids(
             )
         )
 
-    resource = SQLModel.metadata.tables[source.dac_tool.plural]
+    resource = source.dac_tool.table
     if resource is table:
         # The row IS the shared resource — a project, a file. Nothing to
         # join to; it answers for itself.
         return statement.where(
             func.resource_access(
-                source.dac_tool.value,
+                source.dac_tool.kind,
                 table.c["id"],
                 user_id,
                 table.c["initiative_id"],
@@ -181,7 +182,7 @@ def visible_ids(
     local = table.c[source.dac_id] if source.dac_id else table.c["id"]
     return statement.select_from(table.join(resource, resource.c["id"] == local)).where(
         func.resource_access(
-            source.dac_tool.value,
+            source.dac_tool.kind,
             resource.c["id"],
             user_id,
             resource.c["initiative_id"],
@@ -303,7 +304,7 @@ def _governing_tool(table_name: str, table: Table):
     return source.dac_tool, local
 
 
-def _container_title(table_name: str, table: Table, tool: Tool | None):
+def _container_title(table_name: str, table: Table, tool: ToolRecord | None):
     """The table holding what a row is addressed inside, and its name column.
 
     A name on its own identifies nothing in a list of mixed things: six
@@ -314,8 +315,8 @@ def _container_title(table_name: str, table: Table, tool: Tool | None):
     source = SEARCH_SOURCES[table_name]
     if tool is None or source.dac_id is None:
         return None, null()
-    container = SQLModel.metadata.tables[tool.plural]
-    return container, container.c[SEARCH_SOURCES[tool.plural].title]
+    container = tool.table
+    return container, container.c[SEARCH_SOURCES[container.name].title]
 
 
 @dataclass(frozen=True)

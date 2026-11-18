@@ -16,6 +16,7 @@ import re
 
 import pytest
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.guild_ddl import render_guild_rls_ddl
 from app.db.initiative_rls import INITIATIVE_PATHS, parent_answers_for_reads
 
@@ -30,7 +31,9 @@ _SELECT_POLICY = re.compile(
 
 def _permissive_select_policies() -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
-    for name, table, kind in _SELECT_POLICY.findall(render_guild_rls_ddl()):
+    for name, table, kind in _SELECT_POLICY.findall(
+        render_guild_rls_ddl(BUILTIN_TOOLS)
+    ):
         if kind == "PERMISSIVE":
             out.setdefault(table, []).append(name)
     return out

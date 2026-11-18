@@ -10,6 +10,7 @@ import importlib
 
 import pytest
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.frozen import render_resource_frozen_fn
 from app.db.initiative_rls import entity_tables, render_entity_initiative_fn
 from app.schemas.tenant.property import PropertiesOnCreate, PropertiesOnUpdate
@@ -24,9 +25,9 @@ def test_every_target_is_known_to_the_gates_and_its_read():
     create — every JSON create; a picture is created by uploading its file,
     and takes its values once it exists. An update that carries its row's
     tags carries its properties the same way."""
-    tables = entity_tables()
-    initiative_of = render_entity_initiative_fn()
-    frozen = render_resource_frozen_fn()
+    tables = entity_tables(BUILTIN_TOOLS)
+    initiative_of = render_entity_initiative_fn(BUILTIN_TOOLS)
+    frozen = render_resource_frozen_fn(BUILTIN_TOOLS)
     for target, spec in PROPERTY_LINKS.items():
         assert tables.get(target) == spec.model.__tablename__, target
         assert f"WHEN '{target}' THEN" in initiative_of, target

@@ -32,11 +32,15 @@ first; provisioning puts it back.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Integer, String, column, table
 
 from app.db import gucs
 from app.db.authorization import IN_POLICY
+
+if TYPE_CHECKING:
+    from app.core.tool_set import ToolSet
 
 VIEW = "entity_presence"
 POLICY = "presence_read"
@@ -107,16 +111,15 @@ class Arm:
         )
 
 
-def arms() -> tuple[Arm, ...]:
+def arms(tools: ToolSet) -> tuple[Arm, ...]:
     """Every kind with sharing behind it, from the edge registry."""
     from app.core.relationships import ENDPOINT_KINDS
     from app.core.search import SearchEntityType
-    from app.core.tools import Tool
 
-    tools = {tool.value for tool in Tool}
+    kinds = {tool.kind for tool in tools}
     out: list[Arm] = []
     for kind, spec in sorted(ENDPOINT_KINDS.items(), key=lambda item: item[0].value):
-        if spec.parent is None and kind.value in tools:
+        if spec.parent is None and kind.value in kinds:
             out.append(Arm(kind.value, spec.table, kind.value))
         elif spec.parent is not None and spec.parent_column is not None:
             parent = ENDPOINT_KINDS[SearchEntityType(spec.parent.value)]
@@ -132,7 +135,7 @@ def arms() -> tuple[Arm, ...]:
     return tuple(out)
 
 
-def view_statements(schema: str, readers: tuple[str, ...]) -> list[str]:
+def view_statements(schema: str, readers: tuple[str, ...], tools: ToolSet) -> list[str]:
     """Make ``schema``'s view, owned by :data:`READER` and readable by
     ``readers`` and by nobody else.
 
@@ -142,7 +145,7 @@ def view_statements(schema: str, readers: tuple[str, ...]) -> list[str]:
     which would give the guild roles writes and the query role a read, so
     everything is taken back before the read is given.
     """
-    body = "\nUNION ALL\n".join(arm.select(schema) for arm in arms())
+    body = "\nUNION ALL\n".join(arm.select(schema) for arm in arms(tools))
     view = f'"{schema}".{VIEW}'
     names = ", ".join(f'"{role}"' for role in readers)
     return [
@@ -159,19 +162,20 @@ def view_statements(schema: str, readers: tuple[str, ...]) -> list[str]:
     ]
 
 
-def render_presence_policies() -> str:
+def render_presence_policies(tools: ToolSet) -> str:
     """The ``presence_read`` policy on each arm's table, for :data:`READER`
     alone. Rendered after every table's own row security is on."""
-    from app.db.initiative_rls import INITIATIVE_PATHS
+    from app.db.initiative_rls import paths_for
 
+    paths = paths_for(tools)
     lines = [
         "-- " + "=" * 75,
         "-- Presence: what the entity_presence view's owner reads, on a",
         "-- request's standing (app.db.presence).",
         "-- " + "=" * 75,
     ]
-    for name in sorted({arm.table for arm in arms()}):
-        initiative = INITIATIVE_PATHS[name].initiative_expr(name)
+    for name in sorted({arm.table for arm in arms(tools)}):
+        initiative = paths[name].initiative_expr(name)
         lines += [
             f"DROP POLICY IF EXISTS {POLICY} ON {name};",
             f"CREATE POLICY {POLICY} ON {name} FOR SELECT TO {READER}",

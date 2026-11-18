@@ -18,6 +18,7 @@ from sqlalchemy import text
 
 from app.core.reactions import ReactionTarget
 from app.core.relationships import PERSON
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.guild_ddl import _QUERY_TOMBSTONES
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
@@ -575,25 +576,22 @@ def test_every_declared_hop_walks_a_real_column_to_a_real_table():
 def test_every_item_table_is_read_as_its_record_says():
     """A tool's item tables take the path derived from their keys, and nothing
     written by hand replaces it."""
-    from sqlmodel import SQLModel
-
-    from app.core.tools import Tool
     from app.db.initiative_rls import INITIATIVE_PATHS, item_path
 
-    for tool in Tool:
-        for table in tool.spec.item_tables:
-            derived = item_path(
-                tool.plural, tool.spec.item_tables, table, SQLModel.metadata.tables
-            )
+    for tool in BUILTIN_TOOLS:
+        for item in tool.items:
+            derived = item_path(tool, item)
             for write in (False, True):
-                assert INITIATIVE_PATHS[table].predicate(
-                    table, write
-                ) == derived.predicate(table, write), table
+                assert INITIATIVE_PATHS[item.name].predicate(
+                    item.name, write
+                ) == derived.predicate(item.name, write), item.name
 
 
 def test_an_item_table_names_exactly_one_parent_in_its_tool():
     """An item follows its one key into its tool, or its one key to an item
     that has one; two keys, or none, stop the derivation rather than choosing."""
+    from dataclasses import replace
+
     from sqlalchemy import Column, ForeignKey, Integer, MetaData, Table
 
     from app.db.initiative_rls import item_path
@@ -615,17 +613,22 @@ def test_an_item_table_names_exactly_one_parent_in_its_tool():
     table("loose")
     table("through_two", task_id="tasks", blocked_by_id="tasks")
     items = ("tasks", "task_assignees", "twice", "loose", "through_two")
+    tool = replace(
+        BUILTIN_TOOLS.by_kind["project"],
+        table=md.tables["projects"],
+        items=tuple(md.tables[name] for name in items),
+    )
 
-    one_hop = item_path("projects", items, "tasks", md.tables).dac
+    one_hop = item_path(tool, md.tables["tasks"]).dac
     assert one_hop is not None and one_hop.via == (("project_id", "projects"),)
-    two_hop = item_path("projects", items, "task_assignees", md.tables).dac
+    two_hop = item_path(tool, md.tables["task_assignees"]).dac
     assert two_hop is not None and two_hop.via == (
         ("task_id", "tasks"),
         ("project_id", "projects"),
     )
     for name in ("twice", "loose", "through_two"):
         with pytest.raises(ValueError):
-            item_path("projects", items, name, md.tables)
+            item_path(tool, md.tables[name])
 
 
 _GID_QUERY_TRASH = 990_412
@@ -702,7 +705,7 @@ def test_every_comment_parent_is_a_kind_the_entity_function_answers_for():
     """A comment's policy names its subject as a ``(kind, id)`` pair and asks
     ``entity_access`` about it, so every subject kind has to resolve to one of
     the function's arms — at the table the subject actually lives in."""
-    tables = entity_tables()
+    tables = entity_tables(BUILTIN_TOOLS)
     for parent in COMMENT_PARENTS.values():
         assert parent.kind in tables, parent.kind
         assert tables[parent.kind] == parent.table, parent.kind
@@ -716,7 +719,7 @@ def test_initiative_of_reads_its_own_column_or_walks_to_it():
 
 
 def test_every_reaction_target_and_recentable_kind_is_an_arm():
-    tables = entity_tables()
+    tables = entity_tables(BUILTIN_TOOLS)
     for target in ReactionTarget:
         assert tables[target.value] == target.table
     for kind, table in CONTENT_KIND_TABLES.items():
@@ -725,9 +728,9 @@ def test_every_reaction_target_and_recentable_kind_is_an_arm():
 
 def test_the_entity_function_carries_one_arm_per_kind():
     """And one for a person on an edge's end, which reads no table."""
-    fn = render_entity_access_fn()
-    for kind, table in entity_tables().items():
+    fn = render_entity_access_fn(BUILTIN_TOOLS)
+    for kind, table in entity_tables(BUILTIN_TOOLS).items():
         assert f"WHEN '{kind}' THEN" in fn, kind
         assert f"FROM {table} re WHERE re.id = p_entity_id" in fn, kind
     assert f"WHEN '{PERSON.value}' THEN\n            RETURN true;" in fn
-    assert fn.count("WHEN '") == len(entity_tables()) + 1
+    assert fn.count("WHEN '") == len(entity_tables(BUILTIN_TOOLS)) + 1

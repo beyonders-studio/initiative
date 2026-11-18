@@ -49,12 +49,11 @@ from sqlmodel import SQLModel
 import app.db.base  # noqa: F401 — registers every model's table on the metadata
 from app.core.reactions import ReactionTarget
 from app.core.relationships import ENDPOINT_KINDS
+from app.core.tool_set import ToolSet
 from app.core.tools import (
     ARCHIVE_TARGETS,
     KINDS,
     LAYOUT_INSTANCE_TABLES,
-    PROPERTY_TARGETS,
-    Tool,
 )
 from app.db import gucs
 from app.db.errors import (
@@ -64,10 +63,10 @@ from app.db.errors import (
 )
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
-    INITIATIVE_PATHS,
     NAMED_PEOPLE,
     entity_tables,
-    governing_path,
+    governing_walk,
+    paths_for,
 )
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.tenant._mixins import ArchiveMixin, SoftDeleteMixin, archive_models
@@ -373,7 +372,9 @@ def _any(legs: list[str]) -> str | None:
     return "(" + " OR ".join(legs) + ")"
 
 
-def _parent_legs(table: str, alias: str, *, trashed_ok: str) -> list[str]:
+def _parent_legs(
+    table: str, alias: str, *, trashed_ok: str, tools: ToolSet
+) -> list[str]:
     """Each way up from ``table``, one call apiece: the hop toward its tool,
     and the row it is filed under when that is one of its own kind."""
     legs = [
@@ -381,18 +382,20 @@ def _parent_legs(table: str, alias: str, *, trashed_ok: str) -> list[str]:
         f"'{table}', {alias}.{column}, {trashed_ok}))"
         for column in _OWN_KIND_PARENTS.get(table, ())
     ]
-    toward_tool = _tool_hop(table, alias, trashed_ok=trashed_ok)
+    toward_tool = _tool_hop(table, alias, trashed_ok=trashed_ok, tools=tools)
     if toward_tool is not None:
         legs.insert(0, toward_tool)
     return legs
 
 
-def _parent_call(table: str, alias: str, *, trashed_ok: str) -> str | None:
+def _parent_call(
+    table: str, alias: str, *, trashed_ok: str, tools: ToolSet
+) -> str | None:
     """Whether anything up any of ``table``'s ways up is frozen."""
-    return _any(_parent_legs(table, alias, trashed_ok=trashed_ok))
+    return _any(_parent_legs(table, alias, trashed_ok=trashed_ok, tools=tools))
 
 
-def _tool_hop(table: str, alias: str, *, trashed_ok: str) -> str | None:
+def _tool_hop(table: str, alias: str, *, trashed_ok: str, tools: ToolSet) -> str | None:
     """The call that carries the walk one hop up from ``table``, toward its tool.
 
     Read off the join chain the table already declares for sharing: the first
@@ -402,8 +405,8 @@ def _tool_hop(table: str, alias: str, *, trashed_ok: str) -> str | None:
     deviation = _FREEZE_DEVIATIONS.get(table)
     if deviation is not None:
         # Its ancestors are a property of the row, not of the table.
-        return deviation(alias, trashed_ok)
-    walk = governing_path(table)
+        return deviation(alias, trashed_ok, tools)
+    walk = governing_walk(table, paths_for(tools))
     if walk is None:
         # Nothing above it this registry knows about: the initiative anchor
         # itself, and the tables that name only an initiative (below).
@@ -418,17 +421,18 @@ def _tool_hop(table: str, alias: str, *, trashed_ok: str) -> str | None:
 #: Every kind ``resource_frozen`` can be asked about: the tables a row can be
 #: frozen on, plus the tables that merely sit ON a walk (a poll between an
 #: option and its notice) and have to forward the question upward.
-def _dispatch_tables() -> tuple[str, ...]:
+def _dispatch_tables(tools: ToolSet) -> tuple[str, ...]:
+    paths = paths_for(tools)
     hops = {
         hop[0][1]
-        for table in INITIATIVE_PATHS
-        if (walk := governing_path(table)) is not None and (hop := walk[1])
+        for table in paths
+        if (walk := governing_walk(table, paths)) is not None and (hop := walk[1])
     }
-    guild_frozen = {t for t in FROZEN_TABLES if t in INITIATIVE_PATHS}
+    guild_frozen = {t for t in FROZEN_TABLES if t in paths}
     return tuple(sorted(hops | guild_frozen | {"initiatives"}))
 
 
-def render_resource_frozen_fn() -> str:
+def render_resource_frozen_fn(tools: ToolSet) -> str:
     """``resource_frozen(kind, id, trashed_ok)`` — one walk, every caller.
 
     A row that carries both lifecycle columns answers from itself and stops:
@@ -451,7 +455,7 @@ def render_resource_frozen_fn() -> str:
     whoever calls it.
     """
     arms = []
-    for table in _dispatch_tables():
+    for table in _dispatch_tables(tools):
         lines = [
             f"      WHEN '{table}' THEN",
             f"        SELECT * INTO fz FROM {table} WHERE id = rid;",
@@ -470,7 +474,7 @@ def render_resource_frozen_fn() -> str:
                 _own_frozen("fz", table),
                 None
                 if table in SELF_STAMPED_TABLES
-                else _parent_call(table, "fz", trashed_ok="trashed_ok"),
+                else _parent_call(table, "fz", trashed_ok="trashed_ok", tools=tools),
             )
             if c is not None
         ]
@@ -505,7 +509,7 @@ $resource_frozen_for_grant$;
 """
 
 
-def render_resource_frozen_for_grant_fn() -> str:
+def render_resource_frozen_for_grant_fn(tools: ToolSet) -> str:
     """``resource_frozen_for_grant(tool, id, trashed_ok)`` — the freeze,
     asked the way a grant has to ask it.
 
@@ -526,10 +530,10 @@ def render_resource_frozen_for_grant_fn() -> str:
     takes no subquery.
     """
     arms = "\n".join(
-        f"      WHEN '{tool.value}' THEN\n"
+        f"      WHEN '{tool.kind}' THEN\n"
         f"        RETURN resource_frozen("
-        f"'{tool.plural}', rid, trashed_ok);"
-        for tool in Tool
+        f"'{tool.table.name}', rid, trashed_ok);"
+        for tool in tools
     )
     return _RESOURCE_FROZEN_FOR_GRANT_TEMPLATE.format(arms=arms)
 
@@ -562,7 +566,7 @@ $frozen_ancestor$;
 """
 
 
-def frozen_write_triggers(table: str) -> list[str]:
+def frozen_write_triggers(table: str, tools: ToolSet) -> list[str]:
     """What refuses a write to one table, beyond the row's own UPDATE guard.
 
     A cascade says where a row has BEEN, never where it is going. That is the
@@ -605,8 +609,8 @@ def frozen_write_triggers(table: str) -> list[str]:
             f"WHEN (({own}) AND NOT ({trashed})) "
             f"EXECUTE FUNCTION public.fn_frozen_ancestor_guard()"
         )
-        moving_into = freeze_leg(table, "UPDATE", alias="NEW")
-        prior = freeze_leg(table, "UPDATE", alias="OLD")
+        moving_into = freeze_leg(table, "UPDATE", tools, alias="NEW")
+        prior = freeze_leg(table, "UPDATE", tools, alias="OLD")
         if moving_into is not None and prior is not None:
             moving_into = f"{prior} OR {moving_into}"
         if moving_into is not None:
@@ -615,7 +619,7 @@ def frozen_write_triggers(table: str) -> list[str]:
                 f"BEFORE UPDATE ON {table} FOR EACH ROW WHEN ({moving_into}) "
                 f"EXECUTE FUNCTION public.fn_frozen_parent_guard()"
             )
-        under_trash = _trashed_ancestor_leg(table, "NEW")
+        under_trash = _trashed_ancestor_leg(table, "NEW", tools)
         if under_trash is not None:
             out.append(
                 f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_trashed_ancestor_update "
@@ -637,8 +641,8 @@ def frozen_write_triggers(table: str) -> list[str]:
             return f"pg_trigger_depth() = 0 AND ({when})"
         return when
 
-    prior = freeze_leg(table, "UPDATE", alias="OLD")
-    proposed = freeze_leg(table, "UPDATE", alias="NEW")
+    prior = freeze_leg(table, "UPDATE", tools, alias="OLD")
+    proposed = freeze_leg(table, "UPDATE", tools, alias="NEW")
     if prior is not None and proposed is not None:
         inherits_the_archive = table in TRASHABLE_TABLES - ARCHIVABLE_TABLES
         guard = (
@@ -659,15 +663,15 @@ def frozen_write_triggers(table: str) -> list[str]:
             # It can be trashed but never archived, so it has no stamp to hold
             # while the thing above it is archived — the orphan rule is asked
             # about the trash alone, or a tree could never be restored.
-            was = _trashed_ancestor_leg(table, "OLD")
-            will_be = _trashed_ancestor_leg(table, "NEW")
+            was = _trashed_ancestor_leg(table, "OLD", tools)
+            will_be = _trashed_ancestor_leg(table, "NEW", tools)
             out.append(
                 f"CREATE OR REPLACE TRIGGER tr_{table}_frozen_trashed_ancestor_update "
                 f"BEFORE UPDATE ON {table} FOR EACH ROW "
                 f"WHEN ({on_departure('UPDATE', f'{was} OR {will_be}')}) "
                 f"EXECUTE FUNCTION public.fn_frozen_parent_guard()"
             )
-    doomed = freeze_leg(table, "DELETE", alias="OLD")
+    doomed = freeze_leg(table, "DELETE", tools, alias="OLD")
     if doomed is None:
         return out
     out.append(
@@ -838,7 +842,7 @@ $resource_frozen$;
 """
 
 
-def _comments_leg(alias: str, trashed_ok: str) -> str:
+def _comments_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     """A comment freezes with the one thing it is said on.
 
     Which table that is comes from the subject registry the policies are
@@ -853,7 +857,7 @@ def _comments_leg(alias: str, trashed_ok: str) -> str:
     return f"COALESCE((CASE {alias}.subject_type {arms} ELSE false END), false)"
 
 
-def _reactions_leg(alias: str, trashed_ok: str) -> str:
+def _reactions_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     """A reaction freezes with the thing it is on."""
     arms = " ".join(
         f"WHEN '{target.value}' THEN resource_frozen("
@@ -863,18 +867,18 @@ def _reactions_leg(alias: str, trashed_ok: str) -> str:
     return f"COALESCE((CASE {alias}.target_type {arms} ELSE false END), false)"
 
 
-def _metadata_values_leg(alias: str, trashed_ok: str) -> str:
+def _metadata_values_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     """A metadata value freezes with the thing it is on."""
-    tables = entity_tables()
+    tables = entity_tables(tools)
     arms = " ".join(
         f"WHEN '{target}' THEN resource_frozen("
         f"'{tables[target]}', {alias}.entity_id, {trashed_ok})"
-        for target in PROPERTY_TARGETS
+        for target in tools.content_kinds
     )
     return f"COALESCE((CASE {alias}.entity_type {arms} ELSE false END), false)"
 
 
-def _edge_leg(alias: str, trashed_ok: str) -> str:
+def _edge_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     """An edge freezes with EITHER end.
 
     A link shows on both ends — following it one way is a backlink the other —
@@ -893,7 +897,7 @@ def _edge_leg(alias: str, trashed_ok: str) -> str:
     return "(" + " OR ".join(ends) + ")"
 
 
-def _tool_layouts_leg(alias: str, trashed_ok: str) -> str:
+def _tool_layouts_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     """A view freezes with the instance it is for, or with its initiative
     when it is for a shared page."""
     arms = " ".join(
@@ -908,7 +912,7 @@ def _tool_layouts_leg(alias: str, trashed_ok: str) -> str:
     )
 
 
-def _resource_grants_leg(alias: str, trashed_ok: str) -> str:
+def _resource_grants_leg(alias: str, trashed_ok: str, tools: ToolSet) -> str:
     """A grant freezes with the resource it shares, WHEN it can see it.
 
     Sharing an archived project is a change to the project, which is why the
@@ -940,7 +944,7 @@ _UNFROZEN_ROWS: dict[str, Callable[[str], str]] = {
 #: so the walk cannot be read off a join chain and is declared here instead.
 #: Read by BOTH halves — the policy leg and the dispatch function's own arm —
 #: so a polymorphic row is never gated through one parent and frozen by another.
-_FREEZE_DEVIATIONS: dict[str, Callable[[str, str], str]] = {
+_FREEZE_DEVIATIONS: dict[str, Callable[[str, str, ToolSet], str]] = {
     "comments": _comments_leg,
     "reactions": _reactions_leg,
     "metadata_values": _metadata_values_leg,
@@ -953,6 +957,7 @@ _FREEZE_DEVIATIONS: dict[str, Callable[[str, str], str]] = {
 def freeze_leg(
     table: str,
     command: str,
+    tools: ToolSet,
     *,
     alias: str | None = None,
     trashed_ok: bool | None = None,
@@ -977,17 +982,19 @@ def freeze_leg(
     if trashed_ok is None:
         trashed_ok = command == "DELETE"
     alias = alias or table
-    leg = _any(_freeze_branches(table, alias, trashed_ok=trashed_ok))
+    leg = _any(_freeze_branches(table, alias, trashed_ok=trashed_ok, tools=tools))
     unfrozen = _UNFROZEN_ROWS.get(table)
     if leg is None or unfrozen is None or command == "UPDATE":
         return leg
     return f"(NOT ({unfrozen(alias)}) AND {leg})"
 
 
-def _freeze_branches(table: str, alias: str, *, trashed_ok: bool) -> list[str]:
+def _freeze_branches(
+    table: str, alias: str, *, trashed_ok: bool, tools: ToolSet
+) -> list[str]:
     """The freeze walk from ``table``, one call per way up."""
     flag = "true" if trashed_ok else "false"
-    walked = _parent_legs(table, alias, trashed_ok=flag)
+    walked = _parent_legs(table, alias, trashed_ok=flag, tools=tools)
     if walked:
         return walked
 
@@ -1000,7 +1007,7 @@ def _freeze_branches(table: str, alias: str, *, trashed_ok: bool) -> list[str]:
     return []
 
 
-def _trashed_ancestor_leg(table: str, alias: str) -> str | None:
+def _trashed_ancestor_leg(table: str, alias: str, tools: ToolSet) -> str | None:
     """Whether the thing above this row is IN THE TRASH, rather than archived.
 
     The freeze walk answers "archived or trashed" in one call; this is the half
@@ -1023,8 +1030,8 @@ def _trashed_ancestor_leg(table: str, alias: str) -> str | None:
     if table in FREEZE_EXEMPT_TABLES:
         return None
     pairs = zip(
-        _freeze_branches(table, alias, trashed_ok=False),
-        _freeze_branches(table, alias, trashed_ok=True),
+        _freeze_branches(table, alias, trashed_ok=False, tools=tools),
+        _freeze_branches(table, alias, trashed_ok=True, tools=tools),
         strict=True,
     )
     return _any([f"(({frozen}) AND NOT ({archived}))" for frozen, archived in pairs])

@@ -16,7 +16,7 @@ community, ``guild_<id>_guest_ro``. Three things bound it:
   at a time passes the initiative gate in those items' initiatives
   (``guest_item_initiatives``), and sharing decides which rows: every tool
   table and its children ask ``resource_access``.
-* **Row narrowing for guests,** in :data:`GUEST_ROWS`: restrictive policies
+* **Row narrowing for guests,** in :func:`guest_rows`: restrictive policies
   ``TO guest_base``, so they never run for anyone else. They keep a guest to
   the initiatives they reach and the sharing rows that name them, on the
   tables no tool's sharing governs.
@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from app.core.tools import Tool
+from app.core.tool_set import ToolSet
 from app.db import gucs
 from app.db.authorization import IN_POLICY
 from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
@@ -81,7 +81,7 @@ _NAMED: dict[str, GuestAccess] = {
     "relationships": GuestAccess.write,
     "metadata_values": GuestAccess.write,
     "metadata_definitions": GuestAccess.read,
-    # Read beside a task, and refused to a guest row by row (GUEST_ROWS).
+    # Read beside a task, and refused to a guest row by row (guest_rows).
     "intake_cases": GuestAccess.read,
     # The files content shows, stored and claimed as a step of saving it.
     "uploads": GuestAccess.write,
@@ -146,65 +146,68 @@ _IN_INITIATIVES = (
 _ITEM_INITIATIVES = (
     f"(SELECT g.initiative_id FROM resource_grants g WHERE g.user_id = {_UID})"
 )
-#: Each tool's switch key in an initiative (its row with no role and no
-#: install).
-_TOOL_SWITCH_KEYS = ", ".join(f"'{tool.view_permission}'" for tool in Tool)
 
-#: The rows of each table a guest reaches, as SQL over that table. Read
-#: narrowing only: what a guest may write is the table's own policies'.
-GUEST_ROWS: dict[str, str] = {
-    # The initiatives they are in, and those of the items shared with them.
-    "initiatives": (
-        f"(initiatives.id IN {_IN_INITIATIVES}"
-        f" OR initiatives.id IN {_ITEM_INITIATIVES})"
-    ),
-    # The rosters and roles of the initiatives they are in, and nothing of an
-    # initiative they reach only through items.
-    "initiative_members": (
-        f"(initiative_members.user_id = {_UID}"
-        f" OR initiative_members.initiative_id = ANY ({_MEMBER_OF}))"
-    ),
-    "initiative_roles": f"(initiative_roles.initiative_id IN {_IN_INITIATIVES})",
-    # The community's own rows say what every initiative is held to, which a
-    # guest's standing reads too; and in the initiatives of the items shared
-    # with them, only which tools are switched on.
-    "initiative_rules": (
-        f"(initiative_rules.initiative_id IN {_IN_INITIATIVES}"
-        " OR initiative_rules.initiative_id IS NULL"
-        " OR (initiative_rules.initiative_role_id IS NULL"
-        " AND initiative_rules.install_id IS NULL"
-        f" AND initiative_rules.key IN ({_TOOL_SWITCH_KEYS})"
-        f" AND initiative_rules.initiative_id IN {_ITEM_INITIATIVES}))"
-    ),
-    # Their own custom role, if one was given: not who else holds what.
-    "custom_role_members": f"custom_role_members.user_id = {_UID}",
-    "custom_roles": (
-        "custom_roles.id IN (SELECT cm.role_id FROM custom_role_members cm"
-        f" WHERE cm.user_id = {_UID})"
-    ),
-    "custom_role_plugin_permissions": (
-        "custom_role_plugin_permissions.role_id IN (SELECT cm.role_id"
-        f" FROM custom_role_members cm WHERE cm.user_id = {_UID})"
-    ),
-    # Only the sharing rows that reach them: not who else something is
-    # shared with.
-    "resource_grants": (
-        f"(resource_grants.user_id = {_UID}"
-        f" OR resource_grants.role_id = ANY ({_P.field('member_role_ids')})"
-        " OR (resource_grants.all_initiative_members"
-        f" AND resource_grants.initiative_id = ANY ({_MEMBER_OF})))"
-    ),
-    # Operations intake is the community's staff's: a task's case reads as
-    # none.
-    "intake_cases": "false",
-    # Files of the initiatives they reach, as a member of one reads them, and
-    # their own; none that belongs to the whole community.
-    "uploads": (
-        f"((uploads.created_by_kind = 'member' AND uploads.created_by = {_UID})"
-        f" OR uploads.initiative_id = ANY ({_MEMBER_OF})"
-        f" OR uploads.initiative_id = ANY ({_P.guest_items}))"
-    ),
-}
+
+def guest_rows(tools: ToolSet) -> dict[str, str]:
+    """The rows of each table a guest reaches, as SQL over that table. Read
+    narrowing only: what a guest may write is the table's own policies'."""
+    # Each tool's switch key in an initiative (its row with no role and no
+    # install).
+    switch_keys = ", ".join(f"'{tool.view_permission}'" for tool in tools)
+    return {
+        # The initiatives they are in, and those of the items shared with them.
+        "initiatives": (
+            f"(initiatives.id IN {_IN_INITIATIVES}"
+            f" OR initiatives.id IN {_ITEM_INITIATIVES})"
+        ),
+        # The rosters and roles of the initiatives they are in, and nothing of an
+        # initiative they reach only through items.
+        "initiative_members": (
+            f"(initiative_members.user_id = {_UID}"
+            f" OR initiative_members.initiative_id = ANY ({_MEMBER_OF}))"
+        ),
+        "initiative_roles": f"(initiative_roles.initiative_id IN {_IN_INITIATIVES})",
+        # The community's own rows say what every initiative is held to, which a
+        # guest's standing reads too; and in the initiatives of the items shared
+        # with them, only which tools are switched on.
+        "initiative_rules": (
+            f"(initiative_rules.initiative_id IN {_IN_INITIATIVES}"
+            " OR initiative_rules.initiative_id IS NULL"
+            " OR (initiative_rules.initiative_role_id IS NULL"
+            " AND initiative_rules.install_id IS NULL"
+            f" AND initiative_rules.key IN ({switch_keys})"
+            f" AND initiative_rules.initiative_id IN {_ITEM_INITIATIVES}))"
+        ),
+        # Their own custom role, if one was given: not who else holds what.
+        "custom_role_members": f"custom_role_members.user_id = {_UID}",
+        "custom_roles": (
+            "custom_roles.id IN (SELECT cm.role_id FROM custom_role_members cm"
+            f" WHERE cm.user_id = {_UID})"
+        ),
+        "custom_role_plugin_permissions": (
+            "custom_role_plugin_permissions.role_id IN (SELECT cm.role_id"
+            f" FROM custom_role_members cm WHERE cm.user_id = {_UID})"
+        ),
+        # Only the sharing rows that reach them: not who else something is
+        # shared with.
+        "resource_grants": (
+            f"(resource_grants.user_id = {_UID}"
+            f" OR resource_grants.role_id = ANY ({_P.field('member_role_ids')})"
+            " OR (resource_grants.all_initiative_members"
+            f" AND resource_grants.initiative_id = ANY ({_MEMBER_OF})))"
+        ),
+        # Operations intake is the community's staff's: a task's case reads as
+        # none.
+        "intake_cases": "false",
+        # Files of the initiatives they reach, as a member of one reads them, and
+        # their own; none that belongs to the whole community.
+        "uploads": (
+            f"((uploads.created_by_kind = 'member' AND uploads.created_by = {_UID})"
+            f" OR uploads.initiative_id = ANY ({_MEMBER_OF})"
+            f" OR uploads.initiative_id = ANY ({_P.guest_items}))"
+        ),
+    }
+
 
 #: A guest reads the sharing rows naming them, whatever the initiative gate
 #: says: the standing statement reads them to find the item initiatives.
@@ -221,10 +224,10 @@ _GUEST_SECTION = """\
 -- ==========================================================================="""
 
 
-def render_guest_rls_ddl() -> str:
+def render_guest_rls_ddl(tools: ToolSet) -> str:
     """The guest policies, schema-relative, for the community's RLS render."""
     lines = [_GUEST_SECTION]
-    for table, rows in sorted(GUEST_ROWS.items()):
+    for table, rows in sorted(guest_rows(tools).items()):
         lines += [
             f"DROP POLICY IF EXISTS {GUEST_ROWS_POLICY} ON {table};",
             f"CREATE POLICY {GUEST_ROWS_POLICY} ON {table} AS RESTRICTIVE FOR SELECT",

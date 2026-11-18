@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db import schema_provisioning
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_ddl import rendered_constraint_names, rendered_trigger_names
@@ -888,7 +889,9 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
     # What an earlier boot did: render the registry into the template. Its
     # policies name the presence view, which provisioning makes beside them.
     view = f'"{_TEMPLATE_SCHEMA}".{presence.VIEW}'
-    body = "\nUNION ALL\n".join(arm.select(_TEMPLATE_SCHEMA) for arm in presence.arms())
+    body = "\nUNION ALL\n".join(
+        arm.select(_TEMPLATE_SCHEMA) for arm in presence.arms(BUILTIN_TOOLS)
+    )
     async with engine.begin() as conn:
         await conn.execute(text(f"CREATE VIEW {view} AS\n{body}"))
         await apply_guild_rls(conn, _TEMPLATE_SCHEMA)

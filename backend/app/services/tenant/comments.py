@@ -300,7 +300,7 @@ async def _get_extra_context(
         )
     anchor = await _get_tool_context(
         session,
-        TOOL_COMMENT_TARGETS[parent.governed_by],
+        TOOL_COMMENT_TARGETS[Tool(parent.governed_by.kind)],
         entity_id=getattr(row, cast(str, parent.tool_fk)),
         guild_id=guild_id,
     )
@@ -1300,7 +1300,7 @@ async def recent_activity(
         elif extra.anchor_switch:
             rows = rows.where(
                 getattr(extra.model, parent.tool_fk).in_(
-                    reachable[parent.governed_by.value]
+                    reachable[parent.governed_by.kind]
                 )
             )
         reachable[kind] = rows
@@ -1344,7 +1344,7 @@ async def recent_activity(
         parent = COMMENT_PARENTS[kind]
         if parent.tool_fk is None or parent.governed_by is None:
             continue
-        anchor_model = TOOL_COMMENT_TARGETS[parent.governed_by].model
+        anchor_model = TOOL_COMMENT_TARGETS[Tool(parent.governed_by.kind)].model
         anchor_ids = {getattr(row, parent.tool_fk) for row in rows_by_id.values()}
         anchors[kind] = (
             {

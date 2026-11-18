@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Optional
@@ -17,12 +18,14 @@ from sqlalchemy import (
 from sqlmodel import Field, Relationship
 
 from app.core.tools import COMMENT_TARGETS
-from app.db.registry_checks import FROM_REGISTRY
+from app.db.registry_checks import FROM_REGISTRY, listed
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant._mixins import CreatedByMixin, HoldMixin, SoftDeleteMixin
 
+
 #: The kinds a comment may be said on, as the CHECK spells them.
-_SUBJECT_VALUES = ", ".join(f"'{target}'" for target in COMMENT_TARGETS)
+def _subject_check(subjects: Iterable[str]) -> str:
+    return f"subject_type IN ({listed(subjects)})"
 
 
 class CommentAudience(str, Enum):
@@ -52,9 +55,9 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     _display_field = "content"
     __table_args__ = (
         CheckConstraint(
-            f"subject_type IN ({_SUBJECT_VALUES})",
+            _subject_check(COMMENT_TARGETS),
             name="ck_comments_subject_type",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: lambda tools: _subject_check(tools.comment_targets)},
         ),
         # Every read of a thread, a count or a lifecycle walk names one kind
         # and the ids of that kind, so the id leads.

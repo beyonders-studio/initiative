@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import bootstrap
 from app.db import session as db_session
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -301,16 +302,16 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
         engine = db_session.provisioning_engine
         schema_ddl = await render_guild_schema_ddl(engine)
         checks_ddl, operations_checks = split_operations(
-            render_guild_registry_check_ddl()
+            render_guild_registry_check_ddl(BUILTIN_TOOLS)
         )
-        rls_ddl, operations_rls = split_operations(render_guild_rls_ddl())
+        rls_ddl, operations_rls = split_operations(render_guild_rls_ddl(BUILTIN_TOOLS))
         capture_ddl, operations_capture = split_operations(render_guild_capture_ddl())
         # Naming the operator class in the rendered text is what makes the
         # digest move when it is installed later, so the sweep rebuilds indexes
         # that were created without it.
         opclass = f"public.{SEARCH_OPCLASS}" if await search_operator_ready() else None
         search_ddl, operations_search = split_operations(
-            render_guild_search_ddl(opclass)
+            render_guild_search_ddl(opclass, BUILTIN_TOOLS)
         )
         timer_ddl = render_guild_timer_ddl()
         operations = {
@@ -321,7 +322,7 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             "search": operations_search,
             "timers": render_guild_timer_ddl(operations=True),
         }
-        grants = _grant_statements("__stamp__", 0)
+        grants = _grant_statements("__stamp__", 0, BUILTIN_TOOLS)
         _bundle = ProvisioningBundle(
             schema_ddl=schema_ddl,
             checks_ddl=checks_ddl,
@@ -608,8 +609,10 @@ PLUGIN_ROLE_MACHINERY_WRITES: dict[str, tuple[str, ...]] = {
 }
 
 
-def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
-    """The plug-in role's grants, rendered from ``PLUGIN_TABLE_ACCESS`` in table order.
+def _plugin_role_grant_statements(
+    schema: str, plugin_role: str, tools: ToolSet
+) -> list[str]:
+    """The plug-in role's grants, rendered from ``plugin_table_access`` in table order.
 
     A scoped table a plug-in writes, a side-effect table and the subscriptions
     table take DML (the row policies decide which rows); a scoped read-only
@@ -617,14 +620,15 @@ def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
     The role's table grants are cleared first, so a re-provision leaves it
     holding what the registry says now.
     """
-    from app.db.plugin_rls import PLUGIN_TABLE_ACCESS, PluginTableKind
+    from app.db.plugin_rls import PluginTableKind, plugin_table_access
 
     stmts = [
         f'REVOKE ALL ON ALL TABLES IN SCHEMA "{schema}" FROM "{plugin_role}"',
         f'GRANT USAGE ON SCHEMA "{schema}" TO "{plugin_role}"',
     ]
-    for table in sorted(PLUGIN_TABLE_ACCESS):
-        access = PLUGIN_TABLE_ACCESS[table]
+    access_by_table = plugin_table_access(tools)
+    for table in sorted(access_by_table):
+        access = access_by_table[table]
         if access.writable or access.kind is PluginTableKind.side_effect:
             verbs = "SELECT, INSERT, UPDATE, DELETE"
         else:
@@ -654,7 +658,7 @@ def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
     return stmts
 
 
-def _grant_statements(schema: str, guild_id: int) -> list[str]:
+def _grant_statements(schema: str, guild_id: int, tools: ToolSet) -> list[str]:
     """Fail-closed grants tying each of the guild's roles to its ``schema``.
 
     NOTE: the provisioning-bundle stamp hashes this function's RENDERED
@@ -787,7 +791,7 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         )
     # Plug-in role: table by table from the plug-in registry, with no default
     # privileges and no guild role composed in.
-    stmts.extend(_plugin_role_grant_statements(schema, plugin_role))
+    stmts.extend(_plugin_role_grant_statements(schema, plugin_role, tools))
     # Guest roles: table by table from the guest registry, likewise.
     from app.db.guest_access import guest_role_grant_statements
 
@@ -812,6 +816,7 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
                 guest_role,
                 guest_ro_role,
             ),
+            tools,
         )
     )
     return stmts
@@ -925,7 +930,7 @@ async def _apply_parts(
                 *(f'CREATE ROLE "{r}" NOLOGIN' for r in roles if r not in existing),
                 *(
                     s
-                    for s in _grant_statements(schema, guild_id)
+                    for s in _grant_statements(schema, guild_id, BUILTIN_TOOLS)
                     if operations or not is_operations_statement(s)
                 ),
             ],

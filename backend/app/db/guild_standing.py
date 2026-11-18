@@ -42,7 +42,7 @@ routing of one community and the standing of another.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
 from typing import TYPE_CHECKING, Any
 
@@ -54,6 +54,7 @@ from app.core.plugin_scopes import (
     InstallLevel,
 )
 from app.core.rules import SetBy
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
 from app.db.authorization import LIVE_GRANT, live_membership, sql_values
@@ -128,15 +129,15 @@ _SETTINGS_RUNG_CASE = "\n".join(
 )
 
 
-def _tool_switches() -> str:
+def _tool_switches(tools: ToolSet) -> str:
     """Each tool's own switch in the initiative ``i`` names, as rows of
     ``(tool, enabled)``: its ``initiative_rules`` row with no role and no
     install, and ``NULL`` (off) where it has none.
 
-    Rendered from the ``Tool`` enum, so a new tool reaches the standing the
-    moment it reaches the enum.
+    Rendered from the community's tools, so a new tool reaches the standing
+    the moment it is one of them.
     """
-    keys = ", ".join(f"('{tool.value}', '{tool.view_permission}')" for tool in Tool)
+    keys = ", ".join(f"('{tool.kind}', '{tool.view_permission}')" for tool in tools)
     return f"""(
         SELECT k.tool, sw.enabled
         FROM (VALUES {keys}) AS k(tool, key)
@@ -146,11 +147,16 @@ def _tool_switches() -> str:
       )"""
 
 
-def _writes(values: dict[gucs.Guc, str]) -> str:
+#: A key's expression, or how one reads the community's tools.
+_Expr = str | Callable[[ToolSet], str]
+
+
+def _writes(values: dict[gucs.Guc, _Expr], tools: ToolSet) -> str:
     """A standing statement's select list: each key written with its
     expression, and returned under its name."""
     return ",\n".join(
-        f"  set_config('{guc.name}', {expr}, true) AS {guc.bind}"
+        f"  set_config('{guc.name}', {expr(tools) if callable(expr) else expr}, true)"
+        f" AS {guc.bind}"
         for guc, expr in values.items()
     )
 
@@ -307,7 +313,7 @@ def _held_surfaces(membership: str) -> str:
 
 
 #: What the person statement writes: each standing key and its expression.
-_PERSON_STANDING: dict[gucs.Guc, str] = {
+_PERSON_STANDING: dict[gucs.Guc, _Expr] = {
     gucs.STANDING_GUILD_ID: f"""COALESCE({gucs.ROUTED_COMMUNITY}, '')""",
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
@@ -419,17 +425,19 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: f"""COALESCE((
+    gucs.ENABLED_TOOLS: lambda tools: (
+        f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
-      CROSS JOIN LATERAL {_tool_switches()} AS t(tool, enabled)
+      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
       WHERE {_TOOL_ON}
         AND i.id IN (
           SELECT mi.initiative_id FROM my_initiatives mi
           UNION ALL
           SELECT it.initiative_id FROM my_items it
         )
-    ), '')""",
+    ), '')"""
+    ),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT mi.initiative_id::text, ',')
       FROM my_initiatives mi
@@ -464,16 +472,23 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     ), 'false')""",
 }
 
+
 #: The one statement. Runs as the routed role, after ``SET ROLE``, so the
 #: reads of the shared tables go through those tables' own policies and the
 #: routed role's grants (``app_guild_base`` holds ``SELECT`` on
 #: ``guild_memberships`` and ``access_grants``, and the read-only floor is
 #: derived from it), and the read of ``initiative_members`` resolves in the
 #: community's own schema.
-STANDING_SQL = f"""{_PERSON_ROWS}
+def standing_sql(tools: ToolSet) -> str:
+    """The person statement of a community with ``tools``."""
+    return f"""{_PERSON_ROWS}
 SELECT
-{_writes(_PERSON_STANDING)}
+{_writes(_PERSON_STANDING, tools)}
 """
+
+
+#: :func:`standing_sql` of the built-in tools.
+STANDING_SQL = standing_sql(BUILTIN_TOOLS)
 
 
 # --- An installed plug-in's standing -----------------------------------------
@@ -502,13 +517,13 @@ _IN_INSTALL_SECTOR = (
 _GRACE_INTERVAL = f"interval '{int(REF_GRACE_PERIOD.total_seconds())} seconds'"
 
 
-def _tool_permission_values() -> str:
+def _tool_permission_values(tools: ToolSet) -> str:
     """Each tool's two role keys as a ``VALUES`` list of ``(resource, key,
     for_write)``: viewing it answers to the tool's read scope, creating it to
-    its write scope. Rendered from the ``Tool`` enum, as the switches are."""
+    its write scope. Rendered from the community's tools, as the switches are."""
     return ", ".join(
-        f"('{tool.plural}', '{key}', {str(for_write).lower()})"
-        for tool in Tool
+        f"('{tool.scope}', '{key}', {str(for_write).lower()})"
+        for tool in tools
         for key, for_write in (
             (tool.view_permission, False),
             (tool.create_permission, True),
@@ -560,7 +575,7 @@ _INSTALL_HOLD = f"""(g.status = '{CommunityStatus.read_only.value}' OR EXISTS (
 
 
 #: What the install statement writes: each key and its expression.
-_INSTALL_STANDING: dict[gucs.Guc, str] = {
+_INSTALL_STANDING: dict[gucs.Guc, _Expr] = {
     gucs.STANDING_GUILD_ID: f"""COALESCE({gucs.GUILD_ID.text}, '')""",
     gucs.GUILD_ADMIN: """COALESCE((
       SELECT lv.administers::text FROM standing_level lv
@@ -609,13 +624,15 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
       FROM community_defaults cd
       WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
-    gucs.ENABLED_TOOLS: f"""COALESCE((
+    gucs.ENABLED_TOOLS: lambda tools: (
+        f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       JOIN placed p ON p.initiative_id = i.id
-      CROSS JOIN LATERAL {_tool_switches()} AS t(tool, enabled)
+      CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
       WHERE {_TOOL_ON}
-    ), '')""",
+    ), '')"""
+    ),
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
       FROM (
@@ -661,6 +678,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
           AND EXISTS (SELECT 1 FROM install)
       )"""),
 }
+
 
 #: An installed plug-in's standing, in one statement. Runs as
 #: ``guild_<id>_plugin`` after the install routing. The community, the install, the client the token
@@ -720,7 +738,9 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: name. A replaced reference still
 #: resolves for its grace window, as ``identity_refs.resolve_ref`` has it. The
 #: array chooses which rows are looked up; the sector is the routing's.
-INSTALL_STANDING_SQL = f"""
+def install_standing_sql(tools: ToolSet) -> str:
+    """The install statement of a community with ``tools``."""
+    return f"""
 WITH {_COMMUNITY_DEFAULTS_CTE},
 consent AS (
   SELECT c.initiative_id,
@@ -853,7 +873,7 @@ permitted AS (
 granted AS (
   SELECT DISTINCT p.initiative_id || ':' || k.key AS pair
   FROM placed p
-  CROSS JOIN (VALUES {_tool_permission_values()}) AS k(resource, key, for_write)
+  CROSS JOIN (VALUES {_tool_permission_values(tools)}) AS k(resource, key, for_write)
   JOIN held h ON h.resource = k.resource AND (h.writes OR NOT k.for_write)
   WHERE {gucs.USER_ID} IS NULL OR EXISTS (
     SELECT 1 FROM permitted pm
@@ -870,7 +890,7 @@ denied AS (
 )
 SELECT
   (SELECT EXISTS (SELECT 1 FROM install)) AS live,
-{_writes(_INSTALL_STANDING)},
+{_writes(_INSTALL_STANDING, tools)},
   (
     SELECT r.ref
     FROM public.identity_refs r
@@ -897,6 +917,10 @@ SELECT
         AND EXISTS (SELECT 1 FROM install)
     ), '{{}}'::jsonb) AS named_refs
 """
+
+
+#: :func:`install_standing_sql` of the built-in tools.
+INSTALL_STANDING_SQL = install_standing_sql(BUILTIN_TOOLS)
 
 
 def _standing_fields(context: Any, row: dict[str, Any]) -> dict[str, Any]:
@@ -1002,6 +1026,8 @@ class GuildContext:
     #: reached by membership). The routing already chose ``guild_<id>_ro``
     #: from the same fact; the gates read it here.
     content_hold: bool = False
+    #: The community's tools, which its rules were rendered from.
+    tools: ToolSet = BUILTIN_TOOLS
 
     # --- Identity ------------------------------------------------------------
 

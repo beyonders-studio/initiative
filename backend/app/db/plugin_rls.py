@@ -25,12 +25,12 @@ from enum import Enum
 from app.core.plugin_scopes import (
     READ_ONLY_RESOURCES,
     PluginScopeResource,
-    tool_resource,
 )
 from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
-from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
+from app.db.initiative_rls import governing_walk, paths_for
 from app.db.search_index import SEARCH_SOURCES
 from app.models.platform.guild import AdminSurface
 
@@ -125,21 +125,25 @@ _NAMED: dict[str, PluginTableAccess] = {
 }
 
 
-def _derive() -> dict[str, PluginTableAccess]:
+def plugin_table_access(tools: ToolSet) -> dict[str, PluginTableAccess]:
+    """What an installed plug-in reaches of each table, in a community with
+    ``tools``: a table a tool governs takes that tool's scope."""
+    paths = paths_for(tools)
     access: dict[str, PluginTableAccess] = {}
-    for table in INITIATIVE_PATHS:
+    for table in paths:
         if table in _NOT_PLUGIN_SURFACE or table in _NAMED:
             continue
-        governed = governing_path(table)
+        governed = governing_walk(table, paths)
         if governed is not None:
             access[table] = PluginTableAccess(
-                PluginTableKind.scoped, tool_resource(governed[0])
+                PluginTableKind.scoped, PluginScopeResource(governed[0].scope)
             )
     access.update(_NAMED)
     return access
 
 
-PLUGIN_TABLE_ACCESS: dict[str, PluginTableAccess] = _derive()
+#: :func:`plugin_table_access` of the built-in tools.
+PLUGIN_TABLE_ACCESS: dict[str, PluginTableAccess] = plugin_table_access(BUILTIN_TOOLS)
 
 
 def _search_entry_read_scopes() -> dict[SearchEntityType, PluginScopeResource]:

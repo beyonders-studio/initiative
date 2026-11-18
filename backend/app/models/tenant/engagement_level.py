@@ -1,15 +1,18 @@
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint, Column, DateTime, Index, SmallInteger, Text
 from sqlmodel import Field, SQLModel
 
 from app.core.tools import CONTENT_KINDS
-from app.db.registry_checks import FROM_REGISTRY
+from app.db.registry_checks import FROM_REGISTRY, listed
 
 #: The highest level an item reaches, however many people engage with it.
 LEVEL_MAX = 7
 
-_ENTITY_TYPE_VALUES = ", ".join(f"'{kind}'" for kind in CONTENT_KINDS)
+
+def _kind_check(kinds: Iterable[str]) -> str:
+    return f"entity_type IN ({listed(kinds)})"
 
 
 class EngagementLevel(SQLModel, table=True):
@@ -24,9 +27,9 @@ class EngagementLevel(SQLModel, table=True):
     __tablename__ = "engagement_levels"
     __table_args__ = (
         CheckConstraint(
-            f"entity_type IN ({_ENTITY_TYPE_VALUES})",
+            _kind_check(CONTENT_KINDS),
             name="ck_engagement_levels_entity_type",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: lambda tools: _kind_check(tools.content_kinds)},
         ),
         CheckConstraint(
             f"level BETWEEN 1 AND {LEVEL_MAX}",
