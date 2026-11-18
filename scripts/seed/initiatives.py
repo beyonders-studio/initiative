@@ -213,6 +213,8 @@ async def seed_initiative(
     )
     session.add(initiative)
     await session.flush()
+    # Each tool's own switch, as a new initiative's: its record's default.
+    await write_switches(session, initiative.id, switches({}))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     role = await creator_role(
