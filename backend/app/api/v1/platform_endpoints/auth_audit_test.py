@@ -210,6 +210,9 @@ async def test_a_replayed_refresh_token_is_recorded_against_its_owner(
     # so the owner of the chain is the target, not the one who presented it.
     assert [r["actor_user_id"] for r in rows] == [None]
     assert [r["target_user_id"] for r in rows] == [user_id]
+    # The same browser, the session its renewal opened never used: the record
+    # says so, which is what grades the case.
+    assert rows[0]["detail"]["lost_reply"] is True
 
 
 async def test_an_oidc_sign_in_records_its_provider_and_whether_it_stepped_up(
