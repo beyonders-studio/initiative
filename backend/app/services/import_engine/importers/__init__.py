@@ -1,31 +1,32 @@
 """Per-type importer registry: envelope ``type`` → importer instance.
 
-The single dispatch point for both the envelope endpoint and (later) the
-backup orchestrator — an unknown discriminator is rejected centrally by
-``engine.get_importer``.
+The single dispatch point for both the envelope endpoint and the backup
+orchestrator — an unknown discriminator is rejected centrally by
+``engine.get_importer``. Every tool whose record exports
+(``BULK_EXPORT_TOOLS``) imports too, through the importer the module named
+after the tool declares.
 """
 
-from app.services.import_engine.importers.calendar import CalendarImporter
-from app.services.import_engine.importers.contact import ContactImporter
-from app.services.import_engine.importers.counter_group import CounterGroupImporter
-from app.services.import_engine.importers.dashboard import DashboardImporter
-from app.services.import_engine.importers.file import FileImporter
-from app.services.import_engine.importers.post import PostImporter
-from app.services.import_engine.importers.project import ProjectImporter
-from app.services.import_engine.importers.wiki import WikiImporter
+from importlib import import_module
 
-IMPORTERS = {
-    importer.envelope_type: importer
-    for importer in (
-        ProjectImporter(),
-        FileImporter(),
-        CounterGroupImporter(),
-        DashboardImporter(),
-        CalendarImporter(),
-        PostImporter(),
-        WikiImporter(),
-        ContactImporter(),
+from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
+from app.services.import_engine.contract import EnvelopeImporter
+
+
+def _tool_importer(tool: Tool) -> EnvelopeImporter:
+    """The importer ``importers/<tool>.py`` declares for ``tool``'s envelope."""
+    module = import_module(f"{__name__}.{tool.value}")
+    (importer,) = (
+        value
+        for value in vars(module).values()
+        if isinstance(value, type)
+        and value.__dict__.get("envelope_type") == tool_envelope_type(tool)
     )
+    return importer()
+
+
+IMPORTERS: dict[str, EnvelopeImporter] = {
+    tool_envelope_type(tool): _tool_importer(tool) for tool in BULK_EXPORT_TOOLS
 }
 
 # Fail at import time, not request time: every importer's create permission
@@ -35,6 +36,6 @@ IMPORTERS = {
 from app.core.tools import tool_for_create_permission as _tool_lookup
 
 for _importer in IMPORTERS.values():
-    _tool_lookup(_importer.permission.value)
+    _tool_lookup(_importer.permission)
 
 __all__ = ["IMPORTERS"]
