@@ -106,9 +106,7 @@ describe("CreateInitiativeWizard", () => {
     await waitFor(() => expect(created).toHaveLength(1));
     expect(created[0]).toMatchObject({
       name: "Apollo",
-      projects_enabled: true,
-      files_enabled: true,
-      calendars_enabled: true,
+      tools: { project: true, file: true, calendar: true },
     });
   });
 

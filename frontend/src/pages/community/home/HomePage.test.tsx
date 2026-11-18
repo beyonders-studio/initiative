@@ -24,7 +24,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import type { BannerTextAlign } from "@/api/generated/initiativeAPI.schemas";
+import type { BannerTextAlign, InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
 import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
 import { isToolEnabled, TOOLS } from "@/lib/tools";
@@ -38,7 +38,7 @@ const READER = buildUser({ id: 42 });
 
 /** The listing is the reader's own memberships, community admin or not, so the
  *  stub carries their role, and may view every tool the initiative has on. */
-function stubInitiatives(overrides: Record<string, boolean> = {}) {
+function stubInitiatives(overrides: Partial<InitiativeRead> = {}) {
   const initiative = buildInitiative({
     id: INITIATIVE_ID,
     name: "Apollo",
@@ -83,7 +83,7 @@ const NEBULA = () => buildInitiativeDirectoryEntry({ id: 9, name: "Nebula", join
  *  has to lead. */
 type FeedCase = [
   label: string,
-  community: { initiative?: Record<string, boolean> },
+  community: { initiative?: Partial<InitiativeRead> },
   entry: Parameters<typeof buildActivityEntry>[0],
   href: string,
 ];
@@ -104,7 +104,7 @@ function stubFeed(...entries: ReturnType<typeof buildActivityEntry>[]) {
  *  has to lead. */
 type CommentCase = [
   label: string,
-  community: { initiative?: Record<string, boolean> },
+  community: { initiative?: Partial<InitiativeRead> },
   entry: NonNullable<Parameters<typeof buildRecentActivityEntry>[0]>,
   says: string,
   href: string,
@@ -265,7 +265,7 @@ describe("HomePage", () => {
     ],
     [
       "a tool entity, to that entity",
-      { initiative: { counter_groups_enabled: true } },
+      { initiative: { tools: { counter_group: true } } },
       {
         title: "Combat Order",
         entity_type: "counter_group",
@@ -277,7 +277,7 @@ describe("HomePage", () => {
     ],
     [
       "a community-level calendar, at the community route",
-      { initiative: { calendars_enabled: true } },
+      { initiative: { tools: { calendar: true } } },
       {
         title: "Club Nights",
         entity_type: "calendar",
@@ -322,7 +322,7 @@ describe("HomePage", () => {
     ],
     [
       "a comment left on a tool entity, to that entity",
-      { initiative: { counter_groups_enabled: true } },
+      { initiative: { tools: { counter_group: true } } },
       {
         comment_id: 12,
         content: "Order looks wrong",
@@ -336,7 +336,7 @@ describe("HomePage", () => {
     ],
     [
       "a community-level calendar's comment, at the community route",
-      { initiative: { calendars_enabled: true } },
+      { initiative: { tools: { calendar: true } } },
       {
         comment_id: 13,
         content: "Moving this to Thursday",

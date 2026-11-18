@@ -538,12 +538,9 @@ export const NO_ACTIVITY_DRAWER: ReadonlySet<Tool> = new Set<Tool>([
 /** Whether this tool's pages carry the activity drawer. */
 export const showsActivity = (tool: Tool): boolean => !NO_ACTIVITY_DRAWER.has(tool);
 
-/**
- * The initiative master-switch field for a tool (same spelling as the view
- * permission). Every tool has one.
- */
+/** Whether the initiative has this tool switched on. Every tool has a switch. */
 export const isToolEnabled = (tool: Tool, initiative: InitiativeRead): boolean =>
-  Boolean(initiative[`${toolPlural(tool)}_enabled` as keyof InitiativeRead]);
+  Boolean(initiative.tools[tool]);
 
 /** Community-relative create target for a tool inside an initiative: the tool's
  *  own tab, with its create dialog open (`?create=true`). Callers prepend the
