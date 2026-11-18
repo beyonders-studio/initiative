@@ -48,7 +48,7 @@ class Contact(
 
     Each contact is an item of its own with its own sharing, as a file is. One
     with no initiative belongs to the whole community, and the community
-    contacts plug-in's install owns it (``authorization.COMMUNITY_ROWS``).
+    contacts plug-in's install owns it (``ToolSpec.community_rows``).
 
     Its fixed fields are lists of ``{label, value}``, several of each in the
     order they were written; the first is the one a table shows. An address is

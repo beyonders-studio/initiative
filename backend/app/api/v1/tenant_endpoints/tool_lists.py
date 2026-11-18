@@ -403,7 +403,8 @@ class ToolListSpec:
     grants_note: str | None = None
     #: async (spec, req) -> the whole WHERE. Defaults to the shared set.
     conditions: Callable[..., Awaitable[list]] | None = None
-    #: Rows belonging to the guild rather than to an initiative (``COMMUNITY_ROWS``).
+    #: Rows belonging to the guild rather than to an initiative
+    #: (``ToolSpec.community_rows``).
     guild_level_rows: bool = False
     #: Send a reader whose page has fallen off the end back to the first one.
     clamp_page: bool = False

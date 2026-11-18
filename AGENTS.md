@@ -36,6 +36,7 @@ Frontend TypeScript types and React Query hooks in `frontend/src/api/generated/`
 
 - Import types directly from `@/api/generated/initiativeAPI.schemas` (there is no re-export barrel).
 - Generated files are committed to the repo so the frontend builds without a running backend.
+- `tools.json` beside them is the backend's tool records (`app/core/tools.py` `TOOL_SPECS`: default switches, export formats, the kinds inside each tool), written by `scripts/build_tool_records.py` in the same run. `frontend/src/lib/tools.ts` derives from it; a backend fact about a tool is never copied into the frontend by hand.
 
 **After changing backend schemas** (`backend/app/schemas/`), run `scripts/ci/check codegen` (or `cd frontend && pnpm generate:api`, which exports the spec itself when no backend is running) and commit the regenerated output; CI's `check-generated-types` job fails while it differs.
 

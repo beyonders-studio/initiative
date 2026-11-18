@@ -73,7 +73,6 @@ FILES_DIR = "files/"
 class WikiAdapter(ToolExportAdapter):
     tool = Tool.wiki
     template_id = "document"  # the Lexical PDF template files use
-    formats = ("json", "pdf", "md", "docx")
     #: Always a zip: the wiki and the files filed in it are one download.
     force_zip = True
 

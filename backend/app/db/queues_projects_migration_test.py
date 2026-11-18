@@ -52,8 +52,8 @@ async def _one(session, sql: str, **params: Any) -> Any:
 def _runner(schema: str):
     """Revision 0581 one way or the other, on one guild's schema only, with the
     authorship revisions off around it. Back up,
-    ``public.relationship_kind_code`` is put back as the newest revision left
-    it (``app.testing.later_revisions``)."""
+    ``public.relationship_kind_code`` is put back as boot renders it
+    (``app.testing.later_revisions``)."""
     migration = _load()
 
     def run(forward: bool):

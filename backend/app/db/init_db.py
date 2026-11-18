@@ -389,6 +389,12 @@ async def _prepare_database() -> None:
     from app.db.billing_managed import ensure_billing_managed
 
     await ensure_billing_managed()
+    # The kind codes the relationships node columns are packed from, from the
+    # kinds registry (app.db.kind_codes). Before the back-fill, whose
+    # relationships tables call the function.
+    from app.db.kind_codes import ensure_kind_codes
+
+    await ensure_kind_codes()
     # The shared tables' row security, from its registry (app.db.public_rls),
     # the way the guild schemas get theirs from INITIATIVE_PATHS. Stamped on
     # the public schema, so a boot with nothing changed does nothing.

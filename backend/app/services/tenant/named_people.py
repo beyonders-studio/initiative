@@ -41,7 +41,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import CommonMessages
-from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+from app.core.tools import Tool
 from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import (
@@ -192,7 +192,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
     else:
         im = aliased(InitiativeMember)
         role = aliased(InitiativeRoleModel)
-        default = true() if tool in DEFAULT_ENABLED_TOOLS else false()
+        default = true() if tool.spec.on_by_default else false()
 
         def role_says(enabled: bool) -> ColumnElement[bool]:
             return (

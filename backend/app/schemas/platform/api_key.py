@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from app.core.messages import UserMessages
-from app.core.tools import FEED_TOOLS, Tool
+from app.core.tools import Tool
 from app.schemas.base import RawTextStr, SanitizedBaseModel
 
 
@@ -40,8 +40,9 @@ class ApiKeyCreateRequest(SanitizedBaseModel):
     # the key to a single guild. Recommended for machine credentials (MCP, CI).
     read_only: bool = False
     community_id: int | None = None
-    # One tool resource the key reads, for a tool in ``FEED_TOOLS``: its feed
-    # and nothing else. Needs ``community_id``; such a key is read-only.
+    # One tool resource the key reads, for a tool that serves a feed
+    # (``ToolSpec.feed``): its feed and nothing else. Needs ``community_id``;
+    # such a key is read-only.
     resource_type: Tool | None = None
     resource_id: int | None = None
 
@@ -50,7 +51,8 @@ class ApiKeyCreateRequest(SanitizedBaseModel):
         if self.resource_type is None and self.resource_id is None:
             return self
         if (
-            self.resource_type not in FEED_TOOLS
+            self.resource_type is None
+            or not self.resource_type.spec.feed
             or self.resource_id is None
             or self.community_id is None
         ):

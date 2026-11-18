@@ -27,6 +27,11 @@
  * below with its reason — the same way `app/core/tools.py` states these facts
  * — so a new tool gets every surface by default and an omission has to be
  * written down to happen.
+ *
+ * What the backend knows about a tool (its default switch, what it exports
+ * to, the kinds inside it) is its record there, which `pnpm generate:api`
+ * writes beside the API types; the facts here are the ones only the frontend
+ * has.
  */
 
 import type { ParseKeys } from "i18next";
@@ -42,8 +47,13 @@ import {
   Megaphone,
 } from "lucide-react";
 
-import type { InitiativeRead, PermissionKey } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  FileType,
+  InitiativeRead,
+  PermissionKey,
+} from "@/api/generated/initiativeAPI.schemas";
 import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
+import records from "@/api/generated/tools.json";
 
 /**
  * The icon each tool renders with everywhere (sidebar, recents, palette,
@@ -63,30 +73,66 @@ export const TOOL_ICONS: Record<Tool, LucideIcon> = {
 /** Every tool, in canonical enum order. */
 export const TOOLS = Object.values(Tool) as Tool[];
 
-/**
- * On unless an initiative says otherwise. Mirrors backend
- * `DEFAULT_ENABLED_TOOLS`.
- *
- * Projects and files used to be exempt from the master switch entirely —
- * always on, with no `{plural}_enabled` column. Relationships ended that: a
- * tool no longer needs either of them to be linkable, so an initiative that is
- * only a calendar is a coherent thing to want. What they keep is the default,
- * which is the part that was ever load-bearing.
- */
-export const DEFAULT_ENABLED_TOOLS: ReadonlySet<Tool> = new Set([Tool.project, Tool.file]);
+/** A tool's record, as the backend's `ToolSpec` declares it. */
+interface ToolRecord {
+  /** Switched on in an initiative that says nothing about its tools. */
+  on_by_default: boolean;
+  /** What a selection of it exports to, in the order offered: null where it
+   *  depends on each row (a file's, on its type), empty for none. */
+  export_formats: string[] | null;
+  /** What an initiative or community report may write it in, in the order
+   *  offered; empty where it rides as its envelope. */
+  report_formats: string[];
+  /** How it lays out what it holds, if it does. */
+  layouts: { per_instance: boolean; lists: string[]; detail: string | null } | null;
+}
+
+const TOOL_RECORDS = records.tools as Record<Tool, ToolRecord>;
+
+/** On unless an initiative says otherwise. */
+export const DEFAULT_ENABLED_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].on_by_default)
+);
 
 /**
- * Tools WITHOUT an export-engine source, and why. Stated as an exclusion so
- * the default is "a new tool is portable" — mirrors backend
- * `NON_EXPORTABLE_TOOLS`. Export and import are ONE capability (a tool's JSON
- * envelope round-trips through both), so this set governs each.
+ * Tools WITHOUT an export-engine source. Export and import are ONE capability
+ * (a tool's JSON envelope round-trips through both), so this set governs each.
  */
-export const NON_EXPORTABLE_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
-  // Empty, and that is the point: every tool has an export source. What used
-  // to sit here (Tool.dashboard) is now handled where it belongs — an entity
-  // built on a plug-in this build does not ship is filtered by provenance on the
-  // server, which is a property of the ROW, not of the tool.
-]);
+export const NON_EXPORTABLE_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].export_formats?.length === 0)
+);
+
+/** What a selection of a tool's rows exports to, in the order offered; null
+ *  for a tool whose formats depend on each row (files). */
+export const toolExportFormats = (tool: Tool): readonly string[] | null =>
+  TOOL_RECORDS[tool].export_formats;
+
+/** What a report may write a tool's rows in, in the order offered. */
+export const toolReportFormats = (tool: Tool): readonly string[] =>
+  TOOL_RECORDS[tool].report_formats;
+
+/** What a file of this type exports as, in the order offered: the editor's
+ *  formats for its own types, the stored file itself (`file`) for the rest. */
+export const fileTypeExportFormats = (type: FileType): readonly string[] =>
+  records.file_types[type].export_formats;
+
+/** What a report may write each type of file in, in the order offered. */
+export const FILE_TYPE_REPORT_FORMATS = records.tools.file.type_report_formats;
+
+/** The tools whose every instance lays out its own items (a project's, a
+ *  counter group's). */
+export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => {
+    const layouts = TOOL_RECORDS[tool].layouts;
+    return layouts?.per_instance && (layouts.lists.length > 0 || layouts.detail !== null);
+  })
+);
+
+/** The tools the whole initiative shares one page of (its calendar, its
+ *  posts), whose layouts are the initiative's. */
+export const SHARED_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].layouts?.per_instance === false)
+);
 
 /** Tools with an export-engine source (single + bulk selection export), and
  *  equally the tools whose envelope can be imported. */
@@ -452,25 +498,19 @@ export interface ToolRelationEntity {
   initiative_id?: number | null;
 }
 
+/** An entity kind a tool holds: a task, an event, a page. */
+export type ChildKind = keyof typeof records.child_kinds;
+
 /**
  * The tool an entity that is not one of its own is addressed inside.
  *
  * A link is cached against a TOOL, so writing one from a child has to refresh
  * the container's copy: a task's is its project, an event's its calendar, a
- * counter's its group. Exactly the non-tool entity kinds the search vocabulary
- * names, minus the two nothing links from — a comment, which no edge may name,
- * and a tag, which is picked with the tag picker.
+ * counter's its group.
  */
-export const PARENT_TOOL = {
-  task: Tool.project,
-  calendar_event: Tool.calendar,
-  counter: Tool.counter_group,
-  collection: Tool.file,
-  wiki_page: Tool.wiki,
-} as const satisfies Record<string, Tool>;
-
-/** An entity kind a tool holds: a task, an event, a page. */
-export type ChildKind = keyof typeof PARENT_TOOL;
+export const PARENT_TOOL = Object.fromEntries(
+  Object.entries(records.child_kinds).map(([kind, { parent }]) => [kind, parent])
+) as Record<ChildKind, Tool>;
 
 /**
  * Tools whose detail page does NOT carry a relations panel, and why. Stated as

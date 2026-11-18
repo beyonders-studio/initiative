@@ -779,7 +779,7 @@ class Legs:
 
     def guild_row_writer(self, surface: AdminSurface) -> str:
         """Who makes and changes a row that belongs to the whole community
-        rather than one initiative (:data:`COMMUNITY_ROWS`): the system, a
+        rather than one initiative (``ToolSpec.community_rows``): the system, a
         holder of ``surface``, a live write grant, or an installed plug-in on
         a token not narrowed to one initiative, as itself or for a member
         holding ``surface``."""
@@ -789,27 +789,10 @@ class Legs:
         )
 
 
-@dataclass(frozen=True)
-class CommunityRows:
-    """How a tool's rows that belong to the whole community, rather than one
-    initiative, are written."""
-
-    #: The admin surface whose holders make such a row and change it.
-    surface: AdminSurface
-    #: Whether a write grant on such a row changes it too. A contact holds
-    #: nothing but itself, so writing one is changing it; a write grant on a
-    #: calendar writes its events, and the calendar is the surface's.
-    granted_writes_row: bool = False
-
-
-#: The tools whose rows may belong to the whole community (``initiative_id``
-#: NULL), each held by the community plug-in that mounts it.
-COMMUNITY_ROWS: dict[Tool, CommunityRows] = {
-    Tool.calendar: CommunityRows(AdminSurface.community_calendars),
-    Tool.contact: CommunityRows(
-        AdminSurface.community_contacts, granted_writes_row=True
-    ),
-}
+def community_surface(tool: Tool) -> AdminSurface:
+    """The admin surface whose holders make and change the rows of ``tool``
+    that belong to the whole community (``ToolSpec.community_rows``)."""
+    return AdminSurface(f"community_{tool.plural}")
 
 
 def standing_arg():
@@ -1128,14 +1111,15 @@ _MAY_CHANGE = f"""(p_archived_at IS NULL AND p_deleted_at IS NULL
 #: The request may change the row itself, as the table's write policy answers
 #: it for a row naming no initiative (``initiative_rls.direct_or_guild``): by
 #: its tool's writer, or a write grant where that changes the row
-#: (:data:`COMMUNITY_ROWS`). Read where ``v_level`` is the request's rung.
+#: (``ToolSpec.community_rows``). Read where ``v_level`` is the request's rung.
 _WRITES_ROW = f"""(p_initiative_id IS NOT NULL
                OR COALESCE((CASE p_tool {
     " ".join(
-        f"WHEN '{tool.value}' THEN ({_B.guild_row_writer(rows.surface)}"
+        f"WHEN '{tool.value}' THEN ({_B.guild_row_writer(community_surface(tool))}"
         + (f" OR v_level IN ({_WRITE_RUNGS})" if rows.granted_writes_row else "")
         + ")"
-        for tool, rows in COMMUNITY_ROWS.items()
+        for tool in Tool
+        if (rows := tool.spec.community_rows) is not None
     )
 } END), false))"""
 
@@ -1161,7 +1145,7 @@ _SHARES = f"""(v_level = '{_OWNER}'
 #:   tasks).
 #: - ``edit``: as contribute, and the request may change the row itself. A row
 #:   that belongs to the whole community rather than one initiative is changed
-#:   by the writer its policy names (``COMMUNITY_ROWS``).
+#:   by the writer its policy names (``ToolSpec.community_rows``).
 #: - ``delete``: owner, the row can be changed, and the request may change
 #:   the row itself (as ``edit``).
 #: - ``share``: as delete, and see ``_SHARES`` above.

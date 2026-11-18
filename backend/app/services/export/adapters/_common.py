@@ -298,8 +298,9 @@ class ToolExportAdapter:
     # template. A tool with report formats names its own.
     template_id: str = "data-table"
     #: The formats this tool exports in, in the order its route publishes
-    #: them.
-    formats: tuple[str, ...] = ("json",)
+    #: them: its record's (``ToolSpec.export_formats``), or, for a tool whose
+    #: formats depend on each row, the adapter's own.
+    formats: tuple[str, ...]
     #: What a marketplace listing of this tool shows beside what it installs.
     #: A tool made of content previews with an example the publisher filled in;
     #: a tool made of queries over the community's data previews with sample
@@ -313,6 +314,8 @@ class ToolExportAdapter:
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.source = tool_export_source(cls.tool)
+        if (formats := cls.tool.spec.export_formats) is not None:
+            cls.formats = formats
 
     # -- what a tool states --------------------------------------------------
 
