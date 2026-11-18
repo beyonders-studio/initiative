@@ -12,6 +12,7 @@ from sqlalchemy.orm import undefer
 from app.core.tools import CHILD_KINDS, KINDS, Tool
 from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.comment import said_on
 from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.schemas.tenant.tag import annotated_tags
 from app.services import data_jobs
@@ -2310,7 +2311,7 @@ async def test_project_envelope_carries_comments_dates_and_links(
 
     comment = (
         await session.exec(
-            select(Comment).where(Comment.task_id == tasks["Pour the footings"].id)
+            select(Comment).where(said_on("task", tasks["Pour the footings"].id))
         )
     ).one()
     # The author's handle is a member of the target initiative, so the comment
@@ -2762,7 +2763,7 @@ async def test_mentions_link_to_whoever_the_people_step_names(
     comments = {
         c.content: c
         for c in (
-            await session.exec(select(Comment).where(Comment.task_id == imported.id))
+            await session.exec(select(Comment).where(said_on("task", imported.id)))
         ).all()
     }
     parent = comments["The frame is out of true"]
@@ -3451,7 +3452,7 @@ async def test_a_restored_mention_links_to_whoever_its_handle_is_here(
     ).one()
     assert restored_task.description == f"Ask @[]({c.user.id})"
     comment = (
-        await session.exec(select(Comment).where(Comment.task_id == restored_task.id))
+        await session.exec(select(Comment).where(said_on("task", restored_task.id)))
     ).one()
     assert comment.content == f"@[]({c.user.id}) agreed"
 
@@ -3739,7 +3740,7 @@ async def _restored(session, initiative_id: int) -> dict:
         ).one(),
         "comment": (
             await session.exec(
-                select(Comment).where(Comment.task_id == tasks["Ship it"].id)
+                select(Comment).where(said_on("task", tasks["Ship it"].id))
             )
         ).one(),
     }
@@ -5025,9 +5026,7 @@ async def test_a_jira_import_brings_its_comments_to_whoever_wrote_them(
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
     comments = (
         await session.exec(
-            select(Comment)
-            .where(Comment.task_id == task.id)
-            .order_by(Comment.created_at)
+            select(Comment).where(said_on("task", task.id)).order_by(Comment.created_at)
         )
     ).all()
     assert [c.content for c in comments] == ["Measured twice", "Cut once"]
@@ -5996,7 +5995,7 @@ async def test_a_confluence_pages_comments_arrive_on_its_wiki_page(
     thread = (
         await session.exec(
             select(Comment)
-            .where(Comment.wiki_page_id == pages["Home"].id)
+            .where(said_on("wiki_page", pages["Home"].id))
             .order_by(Comment.id)
         )
     ).all()

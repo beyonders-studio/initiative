@@ -202,7 +202,7 @@ async def annotate_post_rows(
     """
     await tags_service.annotate_tags(session, rows)
     await metadata_service.annotate_properties(session, rows)
-    await comments_service.annotate_comment_counts(session, rows, column="post_id")
+    await comments_service.annotate_comment_counts(session, rows, kind="post")
     if user_id is None:
         return
     await posts_service.attach_reactions(session, *rows)
@@ -468,6 +468,9 @@ async def update_post(
 
     if "name" in update_data and update_data["name"] is not None:
         post.name = update_data["name"].strip()
+        updated = True
+    if "comments_enabled" in update_data:
+        post.comments_enabled = update_data["comments_enabled"]
         updated = True
     body_changed = False
     if "body" in update_data and update_data["body"] is not None:

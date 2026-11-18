@@ -155,9 +155,7 @@ async def get_file_hydrated(
     if file:
         await tags_service.annotate_tags(session, [file])
         await metadata_service.annotate_properties(session, [file])
-        await comments_service.annotate_comment_counts(
-            session, [file], column="file_id"
-        )
+        await comments_service.annotate_comment_counts(session, [file], kind="file")
         await ownership_service.annotate_owner_plugins(session, [file])
         held = await collections_service.collection_ids_of(session, [file.id])
         object.__setattr__(file, "collection_ids", held.get(file.id, []))

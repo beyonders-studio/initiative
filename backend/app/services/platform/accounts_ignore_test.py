@@ -10,7 +10,7 @@ from sqlmodel import select
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user_ignore import UserIgnore
 from app.services.platform import accounts as accounts_service
-from app.testing import create_resource_grant, create_user, drain_notices
+from app.testing import create_resource_grant, create_user, drain_notices, thread_path
 
 
 def _mentions(rows: list[Notification]) -> list[Notification]:
@@ -139,9 +139,8 @@ async def test_a_mention_from_an_ignored_account_writes_no_notification(
     before = len(await _inbox(session, ada.user.id))
 
     posted = await client.post(
-        bram.g("/comments/"),
+        bram.g(thread_path("task", task.id)),
         json={
-            "task_id": task.id,
             "content": f"hello @[{ada.user.username}]({ada.user.id})",
         },
         headers=bram.headers,
@@ -160,9 +159,8 @@ async def test_a_mention_from_an_ignored_account_writes_no_notification(
     await session.commit()
 
     again = await client.post(
-        bram.g("/comments/"),
+        bram.g(thread_path("task", task.id)),
         json={
-            "task_id": task.id,
             "content": f"still here @[{ada.user.username}]({ada.user.id})",
         },
         headers=bram.headers,

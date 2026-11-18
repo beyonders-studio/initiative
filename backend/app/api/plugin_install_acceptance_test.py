@@ -59,6 +59,7 @@ from app.testing import (
     route_as,
     route_as_install,
     route_session_to_guild,
+    thread_path,
 )
 from app.testing.plugin_clients import (
     CLIENT,
@@ -696,7 +697,7 @@ async def test_a_person_is_named_to_a_plugin_only_under_members_read(
         for path in (
             f"/tasks/{task.id}",
             "/tasks/",
-            f"/comments/?task_id={task.id}",
+            thread_path("task", task.id),
         )
     ]
     for response in responses:
@@ -891,7 +892,7 @@ async def test_a_mention_names_a_person_by_reference_and_never_by_name(
         await client.get(guild_url(guild_id, path), headers=headers)
         for path in (
             f"/tasks/{task.id}",
-            f"/comments/?task_id={task.id}",
+            thread_path("task", task.id),
             f"/files/{file.id}",
             f"/posts/{post.id}",
             f"/tasks/?project_id={project.id}",
@@ -947,7 +948,7 @@ async def test_a_response_mentioning_three_people_costs_one_statement_cold(
         content=" ".join(f"@[Them]({person.user.id})" for person in people),
     )
     headers = install_headers(installed, scopes)
-    url = guild_url(installed.guild.id, f"/comments/?task_id={task.id}")
+    url = guild_url(installed.guild.id, thread_path("task", task.id))
 
     first = await client.get(url, headers=headers)
     assert first.status_code == 200, first.text
@@ -984,9 +985,9 @@ async def test_a_mention_it_writes_is_stored_by_row_id(
     ]
 
     posted = await client.post(
-        guild_url(guild_id, "/comments/"),
+        guild_url(guild_id, thread_path("file", file.id)),
         headers=headers,
-        json={"content": f"Over to @[]({ref})", "file_id": file.id},
+        json={"content": f"Over to @[]({ref})"},
     )
     assert posted.status_code == 201, posted.text
     assert posted.json()["content"] == f"Over to @[]({ref})"
@@ -1024,9 +1025,9 @@ async def test_a_mention_it_writes_is_stored_by_row_id(
 
     for content in (f"@[Sam]({member.user.id})", "@[Sam](uplu_nobody-at-all)"):
         refused = await client.post(
-            guild_url(guild_id, "/comments/"),
+            guild_url(guild_id, thread_path("file", file.id)),
             headers=headers,
-            json={"content": content, "file_id": file.id},
+            json={"content": content},
         )
         assert refused.status_code == 422, refused.text
         assert PluginMessages.REFERENCE_UNKNOWN in refused.text

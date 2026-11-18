@@ -15,7 +15,7 @@ from fastmcp import Client
 from fastmcp.tools.base import ToolResult
 from mcp.types import CallToolRequestParams, TextContent
 
-from app.core.tools import Tool
+from app.core.tools import COMMENT_TARGETS, Tool
 from app.main import app
 from app.mcp_descriptions import TOOL_DESCRIPTIONS, described_names
 from app.mcp_server import (
@@ -97,7 +97,7 @@ _SAFE_WRITES = {
     # `move`, which takes a parent and a position, so it sits with the reorders.
     "create_wiki_page",
     "update_wiki_page",
-    "create_comment",
+    *(f"create_{kind}_comment" for kind in COMMENT_TARGETS),
     "update_comment",
     # A counter's count, which its update schema doesn't carry.
     "set_counter_count",
@@ -196,7 +196,7 @@ async def test_comment_reads_are_exposed():
     """
     names = {t.name.lower() for t in await build_mcp_server(app).list_tools()}
 
-    assert "list_comments" in names
+    assert {f"list_{kind}_comments" for kind in COMMENT_TARGETS} <= names
     assert "read_comment" in names
     assert "recent_comments" not in names
     assert "search_mentionables" not in names

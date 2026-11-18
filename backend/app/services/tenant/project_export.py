@@ -39,7 +39,7 @@ from app.core.tools import Tool
 from app.core.user_display import display_name, handle_of
 from app.core.version import get_version
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.tenant.comment import Comment, in_thread
+from app.models.tenant.comment import Comment, in_thread, said_on
 from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
@@ -401,7 +401,7 @@ async def _load_comments(
         await session.exec(
             select(Comment)
             .where(
-                Comment.task_id.in_(task_ids),
+                said_on("task", task_ids),
                 Comment.deleted_at.is_(None),
                 in_thread(),
             )
@@ -412,7 +412,7 @@ async def _load_comments(
     by_task: dict[int, list[ProjectExportComment]] = {}
     for row in rows:
         author = getattr(row, "author", None)
-        by_task.setdefault(row.task_id, []).append(
+        by_task.setdefault(row.subject_id, []).append(
             ProjectExportComment(
                 author_handle=handle_of(author) if author is not None else None,
                 author_name=display_name(author) if author is not None else None,

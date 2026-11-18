@@ -22,7 +22,7 @@ from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.task_status import TaskStatusRead
 from app.schemas.tenant.task_type import TaskTypeRead
-from app.schemas.tenant.tool import ToolSummaryBase
+from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -51,7 +51,7 @@ class ProjectCreate(ProjectBase, PropertiesOnCreate):
     grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
-class ProjectUpdate(SanitizedBaseModel):
+class ProjectUpdate(ToolUpdate):
     name: TitleStr | None = None
     description: RichMentionStr | None = None
     icon: str | None = Field(default=None, max_length=PROJECT_ICON_MAX_LENGTH)

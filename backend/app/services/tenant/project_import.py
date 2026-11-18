@@ -596,7 +596,8 @@ async def _import_task(
             importer_id=importer_id,
         )
         comment = Comment(
-            task_id=task.id,
+            subject_type="task",
+            subject_id=task.id,
             content=place_markdown_mentions(
                 body,
                 envelope_comment.mention_handles,

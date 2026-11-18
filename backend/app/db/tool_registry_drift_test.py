@@ -12,7 +12,7 @@ would pass on exactly the change that breaks a deployment.
 Three joins, one per way a tool reaches the schema:
 
 - a tool's own **model**, found by the table name the enum derives;
-- the **comment parent column** that model needs on ``comments``;
+- the **comment subject kind** ``comments`` admits for that model;
 - the **endpoint kind code** the ``relationships`` node ids are packed from.
 """
 
@@ -20,8 +20,7 @@ import pytest
 from sqlalchemy import text
 
 from app.core.relationships import ENDPOINT_KINDS, PERSON, EndpointKind, node_id
-from app.core.tools import Tool
-from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
+from app.core.tools import COMMENT_TARGETS, Tool
 from app.db.schema_provisioning import (
     drop_guild_schema,
     guild_schema_name,
@@ -50,32 +49,31 @@ def test_every_tool_has_a_model_at_the_table_its_name_derives():
     )
 
 
-async def test_every_comment_parent_column_exists_on_comments(engine):
-    """Every tool carries a comment thread, and the column that hangs it there
-    is derived from the enum — so a tool whose migration forgot the column
-    leaves the rendered comment policy naming a column that is not there."""
+async def test_every_comment_subject_is_admitted_on_comments(engine):
+    """Every tool carries a comment thread, and the kinds a comment may be said
+    on are derived from the enum — so a freshly provisioned schema's CHECK on
+    ``comments.subject_type`` admits every one of them."""
     schema = guild_schema_name(_GID_DRIFT)
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, _GID_DRIFT)
         async with engine.connect() as conn:
-            rows = await conn.execute(
+            check = await conn.scalar(
                 text(
-                    "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_schema = :schema AND table_name = 'comments'"
+                    "SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c"
+                    " JOIN pg_namespace n ON n.oid = c.connamespace"
+                    " WHERE n.nspname = :schema AND c.conname = 'ck_comments_subject_type'"
                 ),
                 {"schema": schema},
             )
-            present = {row[0] for row in rows}
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, _GID_DRIFT)
 
-    missing = [column for column in COMMENT_PARENT_COLUMNS if column not in present]
+    assert check is not None, "comments carries no CHECK on its subject's kind"
+    missing = [target for target in COMMENT_TARGETS if f"'{target}'" not in check]
     assert not missing, (
-        f"comments is missing parent columns {missing} in a freshly provisioned "
-        "schema — a tool was added to the enum without the migration that gives "
-        "its comments somewhere to hang."
+        f"comments cannot be said on {missing} in a freshly provisioned schema"
     )
 
 

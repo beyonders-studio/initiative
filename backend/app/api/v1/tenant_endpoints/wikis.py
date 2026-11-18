@@ -221,6 +221,7 @@ async def update_wiki(
 
     # The settings proper: each is written exactly when it was sent.
     for field in (
+        "comments_enabled",
         "page_order",
         "contents_depth",
         "show_connections",

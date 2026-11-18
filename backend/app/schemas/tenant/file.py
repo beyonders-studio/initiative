@@ -21,7 +21,7 @@ from app.schemas.tenant.initiative import InitiativeSummary
 from app.schemas.tenant.ownership import OwnerPluginSummary, owner_profile
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
-from app.schemas.tenant.tool import ToolSummaryBase, serialize_tool
+from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate, serialize_tool
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -52,7 +52,7 @@ class FileCreate(FileBase, PropertiesOnCreate):
     grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
-class FileUpdate(SanitizedBaseModel):
+class FileUpdate(ToolUpdate):
     name: str | None = None
     content: LexicalState | None = None
     #: The ``content_version`` of the read this ``content`` was made from.

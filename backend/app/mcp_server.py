@@ -133,8 +133,6 @@ _WRITABLE_SEGMENTS = (
     ("calendar-events", "calendar-events"),
     ("counter-groups/" + _ID + "/counters", "counters"),
     ("wikis/" + _ID + "/pages", "wiki-pages"),
-    # The comment surface every tool shares.
-    ("comments", "comments"),
 )
 
 # Two writes that ``create``/``edit`` doesn't reach, added by hand:
@@ -170,15 +168,27 @@ _EXTRA_WRITE_ROUTE_MAPS = [
     ),
 ]
 
+# The comment surface every tool shares: a comment is posted on the thing it
+# is said on, at that thing's own path, and edited at its own id.
+_COMMENT_WRITE_ROUTE_MAPS = [
+    RouteMap(
+        methods=["POST"], pattern=r".*/" + _ID + "/comments$", mcp_type=MCPType.TOOL
+    ),
+    RouteMap(
+        methods=["PATCH"], pattern=r".*/comments/" + _ID + "$", mcp_type=MCPType.TOOL
+    ),
+]
+
 _WRITE_ROUTE_MAPS = [
     *(m for segments in _WRITABLE_SEGMENTS for m in _create_and_edit(*segments)),
     *_EXTRA_WRITE_ROUTE_MAPS,
+    *_COMMENT_WRITE_ROUTE_MAPS,
 ]
 
 # Comment reads, matched by exact path shape rather than by adding ``comments``
-# to ``READ_TAGS``, so only these two of the router's four GETs are exposed:
-# list a parent's thread (``GET /comments/``) and read one comment back by id
-# (``GET /comments/{id}``). Together they close the loop on the comment write —
+# to ``READ_TAGS``, so only these two shapes of its GETs are exposed: list a
+# thread at the thing it is on (``GET /<kind>/{id}/comments``) and read one
+# comment back by id (``GET /comments/{id}``). Together they close the loop on the comment write —
 # an agent can see the discussion on the task it is working and read back what
 # it posted in a later session.
 #
@@ -190,8 +200,12 @@ _WRITE_ROUTE_MAPS = [
 # ``GET /comments/mentions/search`` backs the editor's @-mention picker; the
 # member and task lookups an agent needs are already tools of their own.
 _COMMENT_READ_ROUTE_MAPS = [
-    RouteMap(methods=["GET"], pattern=r".*/comments/$", mcp_type=MCPType.TOOL),
-    RouteMap(methods=["GET"], pattern=r".*/comments/\{[^}]+\}$", mcp_type=MCPType.TOOL),
+    RouteMap(
+        methods=["GET"], pattern=r".*/" + _ID + "/comments$", mcp_type=MCPType.TOOL
+    ),
+    RouteMap(
+        methods=["GET"], pattern=r".*/comments/" + _ID + "$", mcp_type=MCPType.TOOL
+    ),
 ]
 
 # The guild's general search: how a caller reaches a thing it knows the name of

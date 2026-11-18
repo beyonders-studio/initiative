@@ -19,7 +19,7 @@ from app.schemas.tenant.property import (
     annotated_properties,
 )
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
-from app.schemas.tenant.tool import ToolSummaryBase, from_row
+from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate, from_row
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
@@ -190,7 +190,7 @@ class CounterGroupCreate(CounterGroupBase, PropertiesOnCreate):
     grants: list[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
 
-class CounterGroupUpdate(SanitizedBaseModel):
+class CounterGroupUpdate(ToolUpdate):
     name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
     description: MentionStr | None = None
 

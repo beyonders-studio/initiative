@@ -1,5 +1,5 @@
-"""The fields every tool's read carries, and the one way they are filled, and
-the body every tool's duplicate takes."""
+"""The fields every tool's read carries, and the one way they are filled, the
+field every tool's update takes, and the body every tool's duplicate takes."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.core.identity_boundary import GuildId
-from app.schemas.base import MAX_TITLE_LENGTH, SanitizedBaseModel
+from app.schemas.base import MAX_TITLE_LENGTH, SanitizedBaseModel, reject_null
 from app.schemas.tenant.archive import ToolCan, ToolState
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.property import PropertySummary, annotated_properties
@@ -55,6 +55,17 @@ class ToolSummaryBase[CanT: ToolCan](ToolState[CanT], CreatedByRead):
         """The fields this tool works out from ``row`` rather than reading off
         it by name."""
         return {}
+
+
+class ToolUpdate(SanitizedBaseModel):
+    """What every tool's update takes beside its own fields."""
+
+    #: Its comment thread on or off. Off keeps the comments already there:
+    #: the thread is neither read nor added to until it is back on. A task's
+    #: thread is its own, and its project's switch leaves it be.
+    comments_enabled: bool | None = None
+
+    _comments_switch = reject_null("comments_enabled")
 
 
 class ToolDuplicateRequest(SanitizedBaseModel):

@@ -18,13 +18,13 @@ from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
 from app.services.platform.intake import CaseFiler, open_case
 from app.services.platform.ticket_notices import notify_filers
 from app.services.tenant import task_statuses as task_statuses_service
-from app.testing import make_operations_community
+from app.testing import make_operations_community, thread_path
 
 TICKETS = "/api/v1/me/tickets"
 
@@ -106,8 +106,8 @@ async def _file(
 async def _say(client, desk, task_id: int, content: str, audience="filer"):
     staff = desk["staff"]
     return await client.post(
-        staff.g("/comments/"),
-        json={"content": content, "task_id": task_id, "audience": audience},
+        staff.g(thread_path("task", task_id)),
+        json={"content": content, "audience": audience},
         headers=staff.headers,
     )
 
@@ -227,9 +227,7 @@ async def test_answering_a_case_that_waits_on_you_moves_it_back(
     assert task.task_status_id == desk["active"]
     reply = (
         await session.exec(
-            select(Comment)
-            .where(Comment.task_id == task_id)
-            .order_by(Comment.id.desc())
+            select(Comment).where(said_on("task", task_id)).order_by(Comment.id.desc())
         )
     ).first()
     assert reply.created_by == filer.user.id
@@ -327,7 +325,7 @@ async def test_the_case_carries_the_conversation_apart_from_the_thread(
     ]
 
     thread = await client.get(
-        staff.g("/comments/"), headers=staff.headers, params={"task_id": task_id}
+        staff.g(thread_path("task", task_id)), headers=staff.headers
     )
     assert thread.status_code == 200, thread.text
     assert [c["content"] for c in thread.json()["comments"]] == ["Internal."]
@@ -879,7 +877,7 @@ async def test_an_answer_to_a_case_closed_since_it_was_read_is_refused(
     task = (await session.exec(select(Task).where(Task.id == task_id))).one()
     assert task.task_status_id == desk["done"]
     said = (
-        await session.exec(select(Comment.content).where(Comment.task_id == task_id))
+        await session.exec(select(Comment.content).where(said_on("task", task_id)))
     ).all()
     assert "Still there?" not in said
 
@@ -903,7 +901,7 @@ async def test_an_answer_lands_only_on_the_filers_own_case(session, acting_user,
     assert taken is False
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
     said = (
-        await session.exec(select(Comment.content).where(Comment.task_id == theirs))
+        await session.exec(select(Comment.content).where(said_on("task", theirs)))
     ).all()
     assert "Hello" not in said
 
@@ -917,10 +915,9 @@ async def test_a_reply_keeps_the_audience_of_what_it_answers(client, acting_user
     staff = desk["staff"]
 
     response = await client.post(
-        staff.g("/comments/"),
+        staff.g(thread_path("task", task_id)),
         json={
             "content": "Internal aside.",
-            "task_id": task_id,
             "parent_comment_id": said.json()["id"],
         },
         headers=staff.headers,

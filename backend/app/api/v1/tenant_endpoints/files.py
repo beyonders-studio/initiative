@@ -251,7 +251,7 @@ async def serialize_file_page(
     """
     await tags_service.annotate_tags(session, files)
     await metadata_service.annotate_properties(session, files)
-    await comments_service.annotate_comment_counts(session, files, column="file_id")
+    await comments_service.annotate_comment_counts(session, files, kind="file")
     await ownership_service.annotate_owner_plugins(session, files)
     context = require_actor_context(session)
     return [
@@ -846,6 +846,10 @@ async def update_file(
 
     if "is_template" in update_data:
         file.is_template = bool(update_data["is_template"])
+        updated = True
+
+    if "comments_enabled" in update_data:
+        file.comments_enabled = update_data["comments_enabled"]
         updated = True
 
     if updated:

@@ -24,6 +24,7 @@ from app.testing import (
     create_user,
     drain_notices,
     route_session_to_guild,
+    thread_path,
 )
 
 
@@ -43,8 +44,8 @@ async def _mentions(user_id: int) -> list[Notification]:
 
 async def _mention(client, actor, task_id: int, user) -> int:
     posted = await client.post(
-        actor.g("/comments/"),
-        json={"task_id": task_id, "content": f"hi @[{user.username}]({user.id})"},
+        actor.g(thread_path("task", task_id)),
+        json={"content": f"hi @[{user.username}]({user.id})"},
         headers=actor.headers,
     )
     assert posted.status_code in (200, 201), posted.text
@@ -79,8 +80,8 @@ async def test_a_mention_reaches_only_people_the_project_is_shared_with(
     mentioned = await _mention(client, owner, task.id, member.user)
     assert len(await _mentions(member.user.id)) == 1
     plain = await client.post(
-        owner.g("/comments/"),
-        json={"task_id": task.id, "content": "and another thing"},
+        owner.g(thread_path("task", task.id)),
+        json={"content": "and another thing"},
         headers=owner.headers,
     )
     assert plain.status_code in (200, 201), plain.text

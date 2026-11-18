@@ -26,6 +26,7 @@ from app.testing import (
     create_task,
     drain_notices,
     guild_of,
+    thread_path,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -57,9 +58,9 @@ async def _strip_grants(session, tool: Tool, entity):
 
 async def _comment_on_task(client, actor, task_id: int, content: str = "Hello") -> int:
     created = await client.post(
-        actor.g("/comments/"),
+        actor.g(thread_path("task", task_id)),
         headers=actor.headers,
-        json={"content": content, "task_id": task_id},
+        json={"content": content},
     )
     assert created.status_code == 201, created.text
     return created.json()["id"]
@@ -124,9 +125,7 @@ class TestReactionToggle:
             )
             assert resp.status_code == 200, resp.text
 
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=a.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         group = comment["reactions"][0]
@@ -164,9 +163,7 @@ class TestReactionToggle:
             json={"emoji": THUMBS},
         )
 
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=a.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         assert [g["emoji"] for g in comment["reactions"]] == [THUMBS]
@@ -398,9 +395,7 @@ class TestReactionAccess:
             json={"emoji": THUMBS},
         )
 
-        listed = await client.get(
-            a.g("/comments/"), headers=b.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=b.headers)
         assert listed.status_code == 200
         [comment] = listed.json()["comments"]
         assert comment["reactions"][0]["count"] == 1
@@ -483,9 +478,9 @@ class TestReactionAccess:
         a = await acting_user(guild_role=CommunityRole.member, initiative=True)
         project = await create_project(session, a.initiative, a.user)
         created = await client.post(
-            a.g("/comments/"),
+            a.g(thread_path("project", project.id)),
             headers=a.headers,
-            json={"content": "before", "project_id": project.id},
+            json={"content": "before"},
         )
         assert created.status_code == 201
         comment_id = created.json()["id"]

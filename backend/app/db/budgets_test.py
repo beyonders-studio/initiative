@@ -19,6 +19,7 @@ from app.api.deps import establish_guild_access
 from app.db.authorization import GUILD_FUNCTION_SIGNATURES, READ_FUNCTIONS
 from app.db.schema_provisioning import guild_role_name, guild_schema_name
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.comment import Comment, in_thread, said_on
 from app.models.tenant.task import Task
 from app.schemas.query import FilterOp
 from app.services.tenant import activity_feed, task_queries
@@ -306,6 +307,74 @@ async def test_a_list_reads_only_its_own_rows_edges(
         plan = plan if isinstance(plan, list) else json.loads(plan)
         read = _rows_read(plan[0]["Plan"], "relationships")
         assert read <= 3, f"{name} on 3 tasks read {read} edges"
+
+
+async def test_a_list_and_a_thread_read_only_their_own_comments(
+    acting_user, session: AsyncSession, role_session
+):
+    """A list's comment counts and a thread read the comments said on the
+    listed rows, matched by their kind and id through the subject index, not
+    every comment in the community. Each comment read is one the comment
+    policy asks about, so a read that walked them all would cost a small list
+    as much as the busiest community. Comments said on another kind of thing
+    with the same ids are there too, so a read that matched the id alone
+    would read them."""
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    small = await create_project(session, a.initiative, a.user)
+    await route_session_to_guild(session, a.guild.id)
+    await _many_tasks(session, a.project, 2000)
+    await _many_tasks(session, small, 3)
+    for kind in ("task", "project"):
+        await session.exec(
+            text(
+                "INSERT INTO comments (subject_type, subject_id, content, audience,"
+                " created_by, created_by_kind, created_at) "
+                "SELECT :kind, id, 'Said', 'members', :author, 'member', now()"
+                " FROM tasks"
+            ).bindparams(kind=kind, author=a.user.id)
+        )
+    await session.commit()
+    await route_session_to_guild(session, a.guild.id)
+    for table in ("tasks", "comments"):
+        await session.exec(text(f"ANALYZE {table}"))
+    small_ids = list(
+        (await session.exec(select(Task.id).where(Task.project_id == small.id))).all()
+    )
+    await session.commit()
+
+    member = await role_session("app_user")
+    await establish_guild_access(member, a.user, a.guild.id)
+    for name, query in (
+        (
+            "a list's counts, with the rows",
+            select(Task.id, task_queries._comment_count_expression()).where(
+                Task.project_id == small.id
+            ),
+        ),
+        (
+            "a list's counts, for the page",
+            select(Comment.subject_id, func.count(Comment.id))
+            .where(said_on("task", small_ids), in_thread())
+            .group_by(Comment.subject_id),
+        ),
+        (
+            "a thread",
+            select(Comment.id).where(said_on("task", small_ids[0]), in_thread()),
+        ),
+    ):
+        sql = str(
+            query.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
+        )
+        (plan,) = (
+            await member.exec(text(f"EXPLAIN (ANALYZE, FORMAT JSON) {sql}"))
+        ).one()
+        plan = plan if isinstance(plan, list) else json.loads(plan)
+        read = _rows_read(plan[0]["Plan"], "comments")
+        assert read <= 3, f"{name} on 3 tasks read {read} comments"
 
 
 async def _changes(session: AsyncSession, task, actor_id: int, count: int) -> None:

@@ -2156,17 +2156,18 @@ async def create_comment(
     missing = [tool.value for tool in Tool if tool.value not in named]
     if missing:
         raise ValueError(f"create_comment has no parent keyword for: {missing}")
-    provided = {f"{name}_id": row for name, row in named.items() if row is not None}
+    provided = {name: row for name, row in named.items() if row is not None}
     if len(provided) != 1:
         raise ValueError("pass exactly one comment parent")
-    column, parent = next(iter(provided.items()))
+    kind, parent = next(iter(provided.items()))
     await route_session_to_guild(session, guild_of(parent))
 
     defaults = {
         "content": content,
         "created_by": author.id,
         "created_by_kind": ActorKind.member,
-        column: parent.id,
+        "subject_type": kind,
+        "subject_id": parent.id,
     }
     comment = Comment(**{**defaults, **overrides})
     session.add(comment)

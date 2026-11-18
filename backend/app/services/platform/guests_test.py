@@ -40,6 +40,7 @@ from app.testing import (
     create_user,
     drain_notices,
     get_auth_headers,
+    thread_path,
 )
 from app.testing.routing import route_as
 
@@ -354,10 +355,9 @@ async def test_a_guest_given_an_item_hears_of_it_and_is_heard_there(
     )
     assert assigned.status_code == 201, assigned.text
     posted = await client.post(
-        a.g("/comments/"),
+        a.g(thread_path("task", assigned.json()["id"])),
         headers=get_auth_headers(guest),
         json={
-            "task_id": assigned.json()["id"],
             "content": f"Done @[{username}]({member_id})",
         },
     )

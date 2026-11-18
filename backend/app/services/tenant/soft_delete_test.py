@@ -22,7 +22,7 @@ from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
 from app.models.tenant.upload import Upload
-from app.services.tenant.lifecycle_tree import CASCADE_CHILDREN, CASCADE_PARENTS
+from app.services.tenant.lifecycle_tree import CASCADE_CHILDREN, CASCADE_PARENTS, Edge
 from app.services.tenant.soft_delete import (
     restore_entity,
     soft_delete_entity,
@@ -418,7 +418,8 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     task = await _create_task(session, project, title="Task with comments")
 
     parent = Comment(
-        task_id=task.id,
+        subject_type="task",
+        subject_id=task.id,
         created_by=user.id,
         created_by_kind=ActorKind.member,
         content="Top-level",
@@ -428,7 +429,8 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     await session.refresh(parent)
 
     reply = Comment(
-        task_id=task.id,
+        subject_type="task",
+        subject_id=task.id,
         created_by=user.id,
         created_by_kind=ActorKind.member,
         content="Reply",
@@ -927,11 +929,11 @@ async def _file(
     session: AsyncSession,
     model: type,
     parent: SQLModel,
-    fk: str,
+    edge: Edge,
     user: User,
     built: dict[type, SQLModel],
 ) -> SQLModel:
-    """A row of ``model`` filed under ``parent`` through ``fk``. ``built`` holds
+    """A row of ``model`` filed under ``parent`` through ``edge``. ``built`` holds
     the rows above ``parent``, by model, for a child that names one of them."""
     from app.core.tools import Tool
     from app.models.tenant._mixins import tool_models
@@ -959,37 +961,30 @@ async def _file(
     if model is Counter:
         return await create_counter(session, parent)
     if model is CalendarEvent:
-        if fk != "calendar_id":
+        if edge.column != "calendar_id":
             # An occurrence of a series, in the series' calendar.
-            on_model, on_fk = _first_way_up(CalendarEvent)
             return await create_calendar_event(
                 session,
-                built[on_model],
+                built[_first_way_up(CalendarEvent).model],
                 user,
-                **{fk: parent.id, "original_start": parent.start_at},
+                **{edge.column: parent.id, "original_start": parent.start_at},
             )
         return await create_calendar_event(session, parent, user)
     if model is Collection:
         return await create_collection(session, parent, user)
     if model is WikiPage:
-        if fk == "wiki_id":
+        if edge.column == "wiki_id":
             return await create_wiki_page(session, parent, user)
-        return await create_wiki_page(session, built[Wiki], user, **{fk: parent.id})
-    if model is Comment:
-        if fk != "parent_comment_id":
-            return await create_comment(
-                session, user, **{fk.removesuffix("_id"): parent}
-            )
-        # A reply sits on the same thing as the comment it answers.
-        on_model, on_fk = _first_way_up(Comment)
-        return await create_comment(
-            session, user, **{on_fk.removesuffix("_id"): built[on_model], fk: parent.id}
+        return await create_wiki_page(
+            session, built[Wiki], user, **{edge.column: parent.id}
         )
+    if model is Comment and edge.kind is not None:
+        return await create_comment(session, user, **{edge.kind: parent})
     raise AssertionError(f"this test has no way to file a {model.__name__}")
 
 
-def _first_way_up(model: type) -> tuple[type, str]:
-    return next((p, fk) for p, fk in CASCADE_PARENTS[model] if p is not model)
+def _first_way_up(model: type) -> Edge:
+    return next(edge for edge in CASCADE_PARENTS[model] if edge.model is not model)
 
 
 async def _build(
@@ -1004,11 +999,12 @@ async def _build(
     if model is Initiative:
         built[Initiative] = initiative
         return initiative
-    parent_model, fk = _first_way_up(model)
+    edge = _first_way_up(model)
+    parent_model = edge.model
     parent = built.get(parent_model) or await _build(
         session, parent_model, initiative, user, built
     )
-    built[model] = await _file(session, model, parent, fk, user, built)
+    built[model] = await _file(session, model, parent, edge, user, built)
     return built[model]
 
 
@@ -1020,9 +1016,14 @@ def _trash_kind(model: type) -> str:
 
 def _trash_edges() -> list:
     return [
-        pytest.param(parent, child, fk, id=f"{child.__name__}.{fk}")
+        pytest.param(
+            parent,
+            edge.model,
+            edge,
+            id=f"{edge.model.__name__}.{edge.kind or edge.column}",
+        )
         for parent, children in CASCADE_CHILDREN.items()
-        for child, fk in children
+        for edge in children
     ]
 
 
@@ -1034,9 +1035,9 @@ def _under_an_initiative() -> list:
 
 
 @pytest.mark.parametrize("archived", [False, True])
-@pytest.mark.parametrize(("parent_model", "child_model", "fk"), _trash_edges())
+@pytest.mark.parametrize(("parent_model", "child_model", "edge"), _trash_edges())
 async def test_nothing_comes_back_under_something_still_in_the_trash(
-    session: AsyncSession, client, parent_model, child_model, fk, archived
+    session: AsyncSession, client, parent_model, child_model, edge, archived
 ):
     """A child binned before its parent keeps its own stamp, so it stays in the
     bin when the parent comes back — and until then it cannot come back at all,
@@ -1055,7 +1056,7 @@ async def test_nothing_comes_back_under_something_still_in_the_trash(
     initiative = await create_initiative(session, guild, user)
     built: dict[type, SQLModel] = {}
     parent = await _build(session, parent_model, initiative, user, built)
-    child = await _file(session, child_model, parent, fk, user, built)
+    child = await _file(session, child_model, parent, edge, user, built)
     for trashed in (child, parent):
         await soft_delete_entity(
             session, trashed, deleted_by_user_id=user.id, retention_days=30

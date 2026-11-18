@@ -118,17 +118,17 @@ def test_an_initiative_starts_with_projects_and_files_on():
 
 def test_every_tool_is_commentable():
     # Comments span EVERY tool plus the content-level extras: the service
-    # registry, the comments table's parent FKs, the RLS parent declaration,
-    # and the create schema's target fields all agree. A new tool that forgets
-    # its CommentTarget — or an extra that forgets its column — fails here.
+    # registry, the RLS subject declaration, the CHECK on ``subject_type`` and
+    # the thread routes all agree. A new tool that forgets its CommentTarget —
+    # or an extra that forgets its entry — fails here.
     from sqlalchemy import inspect as sa_inspect
 
+    from app.api.v1.tenant_endpoints.comments import subject_segment
     from app.core.tools import CHILD_KINDS, COMMENT_TARGETS, KINDS
-    from app.db.initiative_rls import _COMMENT_PARENTS
+    from app.db.initiative_rls import COMMENT_PARENTS
+    from app.main import app
     from app.models.tenant.comment import Comment
-    from app.schemas.tenant.comment import COMMENT_TARGET_FIELDS
     from app.services.tenant.comments import (
-        COMMENT_PARENT_COLUMNS,
         EXTRA_COMMENT_TARGETS,
         TOOL_COMMENT_TARGETS,
     )
@@ -137,29 +137,39 @@ def test_every_tool_is_commentable():
     # The extras are the kinds inside a tool that say they take comments.
     extras = {k for k in CHILD_KINDS if KINDS[k].commentable}
     assert set(COMMENT_TARGETS) == extras | {t.value for t in Tool}
-    assert set(COMMENT_PARENT_COLUMNS) == {f"{target}_id" for target in COMMENT_TARGETS}
-    assert set(EXTRA_COMMENT_TARGETS) == {f"{extra}_id" for extra in extras}
+    assert set(EXTRA_COMMENT_TARGETS) == extras
+    assert tuple(COMMENT_PARENTS) == COMMENT_TARGETS
 
-    model_columns = {c.name for c in sa_inspect(Comment).persist_selectable.columns}
-    assert set(COMMENT_PARENT_COLUMNS) <= model_columns
+    [check] = [
+        c for c in Comment.__table__.constraints if c.name == "ck_comments_subject_type"
+    ]
+    assert all(f"'{target}'" in str(check.sqltext) for target in COMMENT_TARGETS)
 
-    assert {p.column for p in _COMMENT_PARENTS} == set(COMMENT_PARENT_COLUMNS)
-    assert set(COMMENT_TARGET_FIELDS) == set(COMMENT_PARENT_COLUMNS)
+    # Every kind's thread is served at the kind's own path, read and posted.
+    routes = {
+        (method, getattr(route, "path", ""))
+        for route in iter_route_contexts(app.routes)
+        for method in getattr(route, "methods", ())
+    }
+    for target in COMMENT_TARGETS:
+        path = f"/{subject_segment(target)}/{{{target}_id}}/comments"
+        assert any(m == "GET" and p.endswith(path) for m, p in routes), target
+        assert any(m == "POST" and p.endswith(path) for m, p in routes), target
 
     # Every extra names a tool to answer for it, and a real column to reach it
     # by — that is what makes a thread on something that is not a tool gated
     # like one — or answers for itself, as a kind no sharing governs does.
-    for column, extra in EXTRA_COMMENT_TARGETS.items():
-        parent = next(p for p in _COMMENT_PARENTS if p.column == column)
+    for kind, extra in EXTRA_COMMENT_TARGETS.items():
+        parent = COMMENT_PARENTS[kind]
         if parent.governed_by is None:
-            assert KINDS[extra.kind].standalone, column
+            assert KINDS[extra.kind].standalone, kind
             continue
-        assert parent.tool_fk is not None, column
+        assert parent.tool_fk is not None, kind
         extra_columns = {
             c.name for c in sa_inspect(extra.model).persist_selectable.columns
         }
-        assert parent.tool_fk in extra_columns, column
-        assert extra.title_field in extra_columns, column
+        assert parent.tool_fk in extra_columns, kind
+        assert extra.title_field in extra_columns, kind
 
 
 def test_every_tool_row_is_written_without_returning():
@@ -196,10 +206,11 @@ def test_every_tool_records_where_it_came_from():
 
 
 def test_every_tool_carries_the_comment_switch():
+    import re
+
     # Every tool can turn its own thread off: the column on the content table
-    # and the flag on the read schema are spelled the same on all six, and the
-    # generic route that sets it takes the Tool enum as its path param. A new
-    # tool that forgets the mixin — or a read schema that never exposes it —
+    # and the field on its update are spelled the same on all of them. A new
+    # tool that forgets the mixin — or an update that never takes the switch —
     # fails here.
     from sqlalchemy import inspect as sa_inspect
 
@@ -212,8 +223,21 @@ def test_every_tool_carries_the_comment_switch():
         columns = {c.name for c in sa_inspect(target.model).persist_selectable.columns}
         assert "comments_enabled" in columns, tool
 
-    routes = {getattr(route, "path", "") for route in iter_route_contexts(app.routes)}
-    assert any(path.endswith("/tools/{tool}/{tool_id}/comments") for path in routes)
+    schema = app.openapi()
+    for tool in Tool:
+        pattern = re.compile(
+            r"^/api/v1/c/\{community_id\}/"
+            + re.escape(tool.route_segment)
+            + r"/\{\w+\}$"
+        )
+        [patch] = [
+            ops["patch"]
+            for path, ops in schema["paths"].items()
+            if pattern.match(path) and "patch" in ops
+        ]
+        body = patch["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+        update = schema["components"]["schemas"][body.rsplit("/", 1)[-1]]
+        assert "comments_enabled" in update["properties"], tool
 
 
 def test_every_tool_read_schema_reports_the_comment_switch():

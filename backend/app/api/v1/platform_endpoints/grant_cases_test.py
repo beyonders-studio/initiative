@@ -19,7 +19,7 @@ from app.models.platform.access_grant_activity import AccessGrantActivity
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
 from app.models.tenant.case_grant import CaseGrant
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.intake import IntakeBinding
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -116,7 +116,7 @@ async def _notes(session: AsyncSession, desk: dict, task_id: int) -> list[Commen
     notes = (
         await session.exec(
             select(Comment)
-            .where(Comment.task_id == task_id)
+            .where(said_on("task", task_id))
             .where(Comment.system_kind.is_not(None))
             .order_by(Comment.id)
         )

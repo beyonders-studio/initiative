@@ -11,7 +11,7 @@ from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
-from app.schemas.tenant.tool import ToolSummaryBase
+from app.schemas.tenant.tool import ToolSummaryBase, ToolUpdate
 from app.services.fields.spec import FieldType
 from app.services.tenant.dashboard_definition import (
     TABULAR_SOURCES,
@@ -76,7 +76,7 @@ class DashboardInstalledListings(SanitizedBaseModel):
     counts: dict[str, int] = Field(default_factory=dict)
 
 
-class DashboardUpdate(SanitizedBaseModel):
+class DashboardUpdate(ToolUpdate):
     name: TitleStr | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     # Absent = unchanged. Sending either re-runs validation over the pair, so

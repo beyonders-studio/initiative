@@ -29,6 +29,7 @@ from app.testing import (
     drain_notices,
     guild_url,
     route_session_to_guild,
+    thread_path,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
@@ -74,7 +75,7 @@ async def test_reads_the_comments_on_what_it_can_read(
     guild_id = installed.guild.id
 
     listed = await client.get(
-        guild_url(guild_id, f"/comments/?file_id={in_a.id}"), headers=headers
+        guild_url(guild_id, thread_path("file", in_a.id)), headers=headers
     )
     assert listed.status_code == 200, listed.text
     [comment] = listed.json()["comments"]
@@ -93,7 +94,7 @@ async def test_reads_the_comments_on_what_it_can_read(
     assert_names_nobody(read.text, [installed.seat.user.id, guild_id])
 
     other = await client.get(
-        guild_url(guild_id, f"/comments/?file_id={in_b.id}"), headers=headers
+        guild_url(guild_id, thread_path("file", in_b.id)), headers=headers
     )
     assert other.status_code == 404, other.text
     other_one = await client.get(
@@ -112,7 +113,7 @@ async def test_without_the_parents_scope_the_thread_is_not_there(
     await create_comment(session, installed.seat.user, file=in_a)
 
     listed = await client.get(
-        guild_url(installed.guild.id, f"/comments/?file_id={in_a.id}"),
+        guild_url(installed.guild.id, thread_path("file", in_a.id)),
         headers=install_headers(installed, ["comments:read"]),
     )
     assert listed.status_code == 404, listed.text
@@ -126,9 +127,9 @@ async def test_posting_a_comment_needs_the_write_scope(
     in_a, _in_b = await _open_files(session, installed)
 
     posted = await client.post(
-        guild_url(installed.guild.id, "/comments/"),
+        guild_url(installed.guild.id, thread_path("file", in_a.id)),
         headers=install_headers(installed, scopes),
-        json={"content": "Hello", "file_id": in_a.id},
+        json={"content": "Hello"},
     )
     assert posted.status_code == 403, posted.text
     assert posted.json()["detail"] == PluginMessages.SCOPE_REQUIRED
@@ -152,11 +153,10 @@ async def test_posts_as_itself_and_the_notices_name_the_plugin(
     guild_id = installed.guild.id
 
     posted = await client.post(
-        guild_url(guild_id, "/comments/"),
+        guild_url(guild_id, thread_path("file", in_a.id)),
         headers=headers,
         json={
             "content": "An answer",
-            "file_id": in_a.id,
             "parent_comment_id": theirs.id,
         },
     )
@@ -193,9 +193,9 @@ async def test_posts_as_itself_and_the_notices_name_the_plugin(
     ]
 
     elsewhere = await client.post(
-        guild_url(guild_id, "/comments/"),
+        guild_url(guild_id, thread_path("file", in_b.id)),
         headers=headers,
-        json={"content": "Not here", "file_id": in_b.id},
+        json={"content": "Not here"},
     )
     assert elsewhere.status_code == 404, elsewhere.text
 

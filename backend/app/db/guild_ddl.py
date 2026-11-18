@@ -672,13 +672,23 @@ def _trashed_with(table: str, column: str) -> str:
     )
 
 
+def _subject_trashed_with() -> str:
+    """Whether what the comment is said on went to the trash with it."""
+    arms = " ".join(
+        f"WHEN '{p.kind}' THEN EXISTS (SELECT 1 FROM {p.table} c"
+        " WHERE c.id = NEW.subject_id AND c.deleted_at = NEW.deleted_at)"
+        for p in COMMENT_PARENTS.values()
+    )
+    return f"COALESCE((CASE NEW.subject_type {arms} END), false)"
+
+
 _COMMENT_TRASH_FOLLOWS_FN = f"""
 CREATE OR REPLACE FUNCTION public.fn_comment_trash_follows() RETURNS trigger
     LANGUAGE plpgsql AS $trash_follows$
 BEGIN
     IF {IN_POLICY.system} OR {_OLD_AUTHOR_IS_ME}
        OR {_trashed_with("comments", "parent_comment_id")}
-       OR {" OR ".join(_trashed_with(p.table, p.column) for p in COMMENT_PARENTS.values())} THEN
+       OR {_subject_trashed_with()} THEN
         RETURN NULL;
     END IF;
     RAISE EXCEPTION 'a comment goes to the trash with what it is on'

@@ -33,6 +33,7 @@ from app.testing import (
     lexical_body,
     route_as,
     strip_non_owner_grants,
+    thread_path,
 )
 
 
@@ -976,16 +977,16 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             "reading its comments",
             lambda s: (
                 "GET",
-                s.reader.g("/comments/"),
-                {"params": {"post_id": s.draft.id}},
+                s.reader.g(thread_path("post", s.draft.id)),
+                {"params": {}},
             ),
         ),
         (
             "adding a comment",
             lambda s: (
                 "POST",
-                s.reader.g("/comments/"),
-                {"json": {"content": "Seen it", "post_id": s.draft.id}},
+                s.reader.g(thread_path("post", s.draft.id)),
+                {"json": {"content": "Seen it"}},
             ),
         ),
         (

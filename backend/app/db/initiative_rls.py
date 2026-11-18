@@ -616,50 +616,44 @@ def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
 
 @dataclass(frozen=True)
 class CommentParent:
-    """One thing a comment can hang off, declared once and rendered five ways.
+    """One kind a comment can be said on, declared once and rendered four ways.
 
-    ``frm``/``tie``/``initiative`` give the membership legs and the outbox
-    locator; ``chain`` names the addressable resources an event about the
-    comment carries, read off that same join. So a comment cannot be gated
-    through one parent and have its events attributed through another.
+    ``frm``/``tie``/``initiative`` give the outbox locator; ``chain`` names the
+    addressable resources an event about the comment carries, read off that
+    same join. The membership and sharing gate is not here: the comment's
+    policy asks :data:`ENTITY_ACCESS_FN` about its ``(subject_type,
+    subject_id)``, which is the kind's own entry.
 
     ``table``/``governed_by``/``tool_fk`` say which tool's SHARING answers for
-    the thread, which is not always the parent itself: a task is shared as part
+    the thread, which is not always the subject itself: a task is shared as part
     of its project and a wiki page as part of its wiki. Everything that has to
-    resolve a comment's tool — the DAC legs here, the search index's sharing
-    columns, the freeze check, the initiative lookup — reads them from here
-    rather than carrying its own special case per parent.
+    resolve a comment's tool — the search index's sharing columns, the
+    initiative lookup, the comment service — reads them from here rather than
+    carrying its own special case per kind.
     """
 
-    #: The ``comments`` column naming this parent.
-    column: str
-    #: FROM clause reaching the parent.
+    #: The kind, as ``comments.subject_type`` holds it.
+    kind: str
+    #: FROM clause reaching the subject.
     frm: str
-    #: What ties the parent row to ``column``.
+    #: What ties the subject row to ``comments.subject_id``.
     tie: str
-    #: The parent's initiative column.
+    #: The subject's initiative column.
     initiative: str
     #: (addressable table, column of ``frm`` holding its id), innermost first.
     chain: tuple[tuple[str, str], ...]
-    #: The parent's own table.
+    #: The subject's own table.
     table: str
-    #: The tool whose sharing governs this parent's rows, or ``None`` for a
-    #: parent no sharing governs (a collection), whose own row answers.
+    #: The tool whose sharing governs this subject's rows, or ``None`` for a
+    #: subject no sharing governs (a collection), whose own row answers.
     governed_by: Tool | None
     #: The column of :attr:`table` holding that tool's id, or ``None`` when the
-    #: parent IS the tool row and ``column`` already names it.
+    #: subject IS the tool row.
     tool_fk: str | None = None
-
-    @property
-    def kind(self) -> str:
-        """The parent's kind as ``entity_access`` is asked about it — the
-        column name without its ``_id``, which is the vocabulary an edge end
-        and a search entry already use for the same thing."""
-        return self.column.removesuffix("_id")
 
 
 def _tool_comment_parent(tool: Tool) -> CommentParent:
-    """The comment parent for one tool — every tool's is the same shape.
+    """The comment subject for one tool — every tool's is the same shape.
 
     A tool entity names its own initiative, so the join is the table itself and
     the table stands as its own alias. Derived rather than listed so a comment
@@ -667,7 +661,7 @@ def _tool_comment_parent(tool: Tool) -> CommentParent:
     """
     table = tool.plural
     return CommentParent(
-        f"{tool.value}_id",
+        tool.value,
         table,
         f"{table}.id",
         f"{table}.initiative_id",
@@ -677,14 +671,15 @@ def _tool_comment_parent(tool: Tool) -> CommentParent:
     )
 
 
-#: Every Tool appears here plus the content-level extras, matching the comment
-#: table's single-parent constraint. The extras are written out rather than
-#: derived because each names its own way up to a tool: a comment on a task
-#: names the project too — it is the surface a task comment shows up on, and
-#: the join is already made — and a comment on a wiki page names its wiki too.
+#: Every Tool plus the kinds inside one that take comments, in
+#: ``COMMENT_TARGETS`` order. The kinds inside a tool are written out rather
+#: than derived because each names its own way up to a tool: a comment on a
+#: task names the project too — it is the surface a task comment shows up on,
+#: and the join is already made — and a comment on a wiki page names its wiki
+#: too.
 _COMMENT_PARENTS: tuple[CommentParent, ...] = (
     CommentParent(
-        "task_id",
+        "task",
         "tasks tk JOIN projects pr ON pr.id = tk.project_id",
         "tk.id",
         "pr.initiative_id",
@@ -694,7 +689,7 @@ _COMMENT_PARENTS: tuple[CommentParent, ...] = (
         tool_fk="project_id",
     ),
     CommentParent(
-        "wiki_page_id",
+        "wiki_page",
         "wiki_pages wp JOIN wikis wkp ON wkp.id = wp.wiki_id",
         "wp.id",
         "wkp.initiative_id",
@@ -704,7 +699,7 @@ _COMMENT_PARENTS: tuple[CommentParent, ...] = (
         tool_fk="wiki_id",
     ),
     CommentParent(
-        "collection_id",
+        "collection",
         "collections",
         "collections.id",
         "collections.initiative_id",
@@ -716,26 +711,10 @@ _COMMENT_PARENTS: tuple[CommentParent, ...] = (
 )
 
 
-#: Every comment parent by its column — what the other derivations look it up
-#: by, so the parent set is stated once and they cannot disagree.
-COMMENT_PARENTS: dict[str, CommentParent] = {p.column: p for p in _COMMENT_PARENTS}
-
-#: The comment columns naming a parent, in declaration order. Search reads this
-#: to work out which tool's sharing governs a comment, so the parent set is
-#: stated once and the two derivations cannot disagree.
-COMMENT_PARENT_COLUMNS: tuple[str, ...] = tuple(COMMENT_PARENTS)
-
-
-def _comment_parent_kind(t: str) -> str:
-    """The kind of the one parent a comment row names, read off its columns."""
-    arms = " ".join(
-        f"WHEN {t}.{p.column} IS NOT NULL THEN '{p.kind}'" for p in _COMMENT_PARENTS
-    )
-    return f"(CASE {arms} END)"
-
-
-def _comment_parent_id(t: str) -> str:
-    return "COALESCE(" + ", ".join(f"{t}.{p.column}" for p in _COMMENT_PARENTS) + ")"
+#: Every kind a comment is said on, keyed by the kind — what the other
+#: derivations look it up by, so the set is stated once and they cannot
+#: disagree.
+COMMENT_PARENTS: dict[str, CommentParent] = {p.kind: p for p in _COMMENT_PARENTS}
 
 
 def _entity_call(kind: str, entity_id: str, write: WriteFlag, share: WriteFlag) -> str:
@@ -746,36 +725,34 @@ def _entity_call(kind: str, entity_id: str, write: WriteFlag, share: WriteFlag) 
 
 
 def comments_path() -> InitiativePath:
-    """Comments hang off exactly one parent — a task, a wiki page or any tool
-    entity — declared once in ``_COMMENT_PARENTS``.
+    """A comment is said on one subject — a task, a wiki page, a collection or
+    any tool entity — which the row names as ``(subject_type, subject_id)``.
 
-    The policy names that parent as the ``(kind, id)`` pair read off the row
-    and asks :data:`ENTITY_ACCESS_FN` about it, so a comment on a task is gated
-    by the same arm an edge to that task is. Membership and sharing ride in
-    the one call; a comment is a response, so the renderer passes read for the
-    sharing flag on every command (``DAC_WRITE_COMMANDS``).
+    The policy asks :data:`ENTITY_ACCESS_FN` about that pair, so a comment on a
+    task is gated by the same arm an edge to that task is. Membership and
+    sharing ride in the one call; a comment is a response, so the renderer
+    passes read for the sharing flag on every command (``DAC_WRITE_COMMANDS``).
     """
 
     def folded(t: str, w: WriteFlag, sw: WriteFlag) -> str:
-        return _entity_call(_comment_parent_kind(t), _comment_parent_id(t), w, sw)
+        return _entity_call(f"{t}.subject_type", f"{t}.subject_id", w, sw)
 
     def locate(r: str) -> str:
-        lookups = ", ".join(
-            f"(SELECT {p.initiative} FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"
+        arms = " ".join(
+            f"WHEN '{p.kind}' THEN "
+            f"(SELECT {p.initiative} FROM {p.frm} WHERE {p.tie} = {r}.subject_id)"
             for p in _COMMENT_PARENTS
         )
-        return f"COALESCE({lookups})"
+        return f"(CASE {r}.subject_type {arms} END)"
 
     def chain(r: str) -> str:
-        # Same COALESCE as the locator, over the same joins: the first parent
-        # that resolves is the one parent a comment has.
-        lookups = ", ".join(
-            "(SELECT jsonb_build_array("
+        arms = " ".join(
+            f"WHEN '{p.kind}' THEN (SELECT jsonb_build_array("
             + ", ".join(_parent(table, column) for table, column in p.chain)
-            + f") FROM {p.frm} WHERE {p.tie} = {r}.{p.column})"
+            + f") FROM {p.frm} WHERE {p.tie} = {r}.subject_id)"
             for p in _COMMENT_PARENTS
         )
-        return f"COALESCE({lookups}, {NO_PARENTS})"
+        return f"COALESCE((CASE {r}.subject_type {arms} END), {NO_PARENTS})"
 
     return InitiativePath(
         predicate=lambda t, w: folded(t, w, False),
