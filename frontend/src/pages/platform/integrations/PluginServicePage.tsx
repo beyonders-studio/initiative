@@ -56,6 +56,9 @@ export const PluginServicePage = () => {
   // What the plug-in's vendor check refused the last save for, shown on the
   // fields it blames until a save goes through.
   const [refusal, setRefusal] = useState<VendorRefusal | null>(null);
+  // Vendor values a save wrote without the vendor being asked about them:
+  // the next form starts with them typed, so saving again asks again.
+  const [unchecked, setUnchecked] = useState<Record<string, string>>({});
 
   const back = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
@@ -125,12 +128,9 @@ export const PluginServicePage = () => {
         onSuccess: (saved) => {
           setRefusal(null);
           toast.success(t("pluginServices.saved"));
-          if (saved.vendor_check === "not_run") {
-            // The form keeps what was typed, so saving again sends it again
-            // and the vendor is asked again.
-            toast.warning(t("pluginServices.vendorCheckNotRun"));
-            return;
-          }
+          const notRun = saved.vendor_check === "not_run";
+          if (notRun) toast.warning(t("pluginServices.vendorCheckNotRun"));
+          setUnchecked(notRun ? values.vendorValues : {});
           setSaves((count) => count + 1);
         },
         onError: (error) => {
@@ -296,6 +296,7 @@ export const PluginServicePage = () => {
         editing={registration}
         onSubmit={handleSubmit}
         vendorRefusal={refusal}
+        initialVendorValues={unchecked}
         footer={
           <div className="flex justify-end">
             <Button type="submit" disabled={updateService.isPending}>

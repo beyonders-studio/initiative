@@ -78,6 +78,8 @@ export interface PluginServiceFormProps {
   plain?: boolean;
   /** What the plug-in's vendor check refused the last save for. */
   vendorRefusal?: VendorRefusal | null;
+  /** Vendor values to start typed: those a save wrote unchecked. */
+  initialVendorValues?: Record<string, string>;
 }
 
 /**
@@ -101,9 +103,13 @@ export const PluginServiceForm = ({
   footer,
   plain,
   vendorRefusal,
+  initialVendorValues,
 }: PluginServiceFormProps) => {
   const { t } = useTranslation("settings");
-  const [form, setForm] = useState<FormState>(() => seed(editing));
+  const [form, setForm] = useState<FormState>(() => ({
+    ...seed(editing),
+    vendorValues: { ...initialVendorValues },
+  }));
   // Only whether the paste is JSON at all. Whether it is a key set we could
   // verify against is the server's answer, and it gives a message code.
   const [jwksError, setJwksError] = useState<string | null>(null);
