@@ -234,6 +234,7 @@
     "connections": 20,
     "fieldsPerConnection": 12,
     "vendorFields": 12,
+    "vendorChecks": 12,
     "githubAppPermissions": 100,
     "githubAppEvents": 100,
     "flowScopes": 24,
@@ -473,6 +474,10 @@
         "setup": {
           "ref": "vendorSetup",
           "description": "How the vendor's client can be made for a deployment by the vendor itself, rather than registered by hand. Absent: the operator enters every value."
+        },
+        "check": {
+          "ref": "vendorCheck",
+          "description": "How Initiative asks the vendor, when an operator saves the vendor values, whether they name one client it knows. Absent: the values are saved as they are typed."
         }
       }
     },
@@ -501,6 +506,153 @@
           "ref": "localizedText"
         }
       }
+    },
+    "vendorCheck": {
+      "type": "object",
+      "description": "A call Initiative makes to the vendor when an operator saves the vendor values, before they are written, to learn whether they name one client the vendor knows. An answer an 'expect' row refuses keeps the values from being written: the operator's form marks that row's fields and shows its message. When the vendor cannot be reached, an expression fails, or the answer is not 2xx and no row applies to it, the values are written and the form says the check could not run. It runs when a save sets a vendor value the check reads, as typed on the form or written by the vendor's setup.",
+      "required": [
+        "request",
+        "expect"
+      ],
+      "properties": {
+        "request": {
+          "ref": "vendorCheckRequest"
+        },
+        "sign": {
+          "ref": "vendorCheckSigning"
+        },
+        "auth": {
+          "ref": "vendorAuth",
+          "description": "How the signed JWT is put on the request. Absent: 'Authorization: Bearer <jwt>'. Only beside 'sign'."
+        },
+        "expect": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "vendorChecks",
+          "items": {
+            "ref": "vendorCheckRule"
+          },
+          "description": "Tried in order. A row applies to an answer its 'status' matches and refuses it when its 'holds' does not answer true; the first row that refuses decides. An answer no row refuses is accepted."
+        }
+      },
+      "additionalProperties": false
+    },
+    "vendorCheckRequest": {
+      "type": "object",
+      "description": "The call a vendor check makes: https, and on one of the plug-in's hosts when it names hosts. It carries no connection's credential: with 'sign', the check's own signed JWT, and otherwise none.",
+      "required": [
+        "method",
+        "url"
+      ],
+      "properties": {
+        "method": {
+          "enum": "httpMethod"
+        },
+        "url": {
+          "ref": "expression",
+          "description": "The address, as an expression answering a string. Query parameters may be written into it or given in 'query'."
+        },
+        "query": {
+          "type": "object",
+          "maxProperties": "requestQuery",
+          "propertyNames": {
+            "ref": "queryName"
+          },
+          "additionalProperties": {
+            "ref": "expression"
+          },
+          "description": "Query parameters by name, each an expression. One answering null or nothing is left out, and a list repeats the parameter once per value."
+        },
+        "headers": {
+          "type": "object",
+          "maxProperties": "requestHeaders",
+          "propertyNames": {
+            "ref": "headerName"
+          },
+          "additionalProperties": {
+            "ref": "expression"
+          },
+          "description": "Headers by name, each an expression answering a string; one answering null or nothing is left out. Never the header the signed JWT is put in."
+        },
+        "body": {
+          "ref": "expression",
+          "description": "The JSON body, as an expression."
+        }
+      },
+      "additionalProperties": false
+    },
+    "vendorCheckSigning": {
+      "type": "object",
+      "description": "A JWT Initiative signs with a vendor value and sends as the check's credential, for a vendor that knows its client by such a JWT. Nothing is exchanged: the JWT itself is put on the request.",
+      "required": [
+        "iss",
+        "key"
+      ],
+      "properties": {
+        "iss": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": "urlLength",
+          "description": "The JWT's issuer, normally a vendor value such as '{vendor.app_id}'. May name vendor values as '{vendor.<key>}'."
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": "urlLength",
+          "description": "The signing key, as one secret vendor value: '{vendor.private_key}'. A PEM private key."
+        },
+        "alg": {
+          "enum": "jwtAlgorithm",
+          "default": "RS256"
+        },
+        "lifetime": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": "tokenLifetimeSeconds",
+          "default": 60,
+          "description": "How long the signed JWT lives, in seconds."
+        }
+      },
+      "additionalProperties": false
+    },
+    "vendorCheckRule": {
+      "type": "object",
+      "description": "One thing a vendor check's answer must show, and which vendor values are wrong when it does not.",
+      "required": [
+        "holds",
+        "fields",
+        "message"
+      ],
+      "properties": {
+        "status": {
+          "ref": "statusMatch",
+          "description": "The answers the row applies to. Absent: '2xx'."
+        },
+        "holds": {
+          "ref": "expression",
+          "description": "Must answer true for the answer to pass this row. Reads the answer as 'response' and the non-secret values being saved as 'vendor'. 'false' refuses every answer the row applies to."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "vendorFields",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "ref": "identifier"
+          },
+          "description": "The vendor fields that are wrong when the row refuses. The form marks them."
+        },
+        "message": {
+          "ref": "localizedText",
+          "description": "What the operator is told when the row refuses."
+        },
+        "shows": {
+          "ref": "expression",
+          "description": "A short text the form shows beside the message when the row refuses, such as the value the vendor holds instead. Reads what 'holds' reads. An answer that is not a string shows nothing."
+        }
+      },
+      "additionalProperties": false
     },
     "vendorSetup": {
       "description": "A flow at the vendor that creates the vendor's client and answers with its values. Initiative runs it from the operator's browser and writes what the vendor answers into the deployment's vendor values, so none is typed or copied. One member per flow, told apart by 'kind'.",
@@ -2307,7 +2459,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": "expressionLength",
-      "description": "A JSONata expression (https://jsonata.org): standard JSONata, with no functions added. It reads one document. On the way out that holds 'params', the call's parameters as the caller sent them; 'connection', the non-secret fields of the connection the request names; 'connections', on an endpoint's requests and map, each connection its 'requires' names that the call has, by its id, holding the same fields; 'now', the time of the call in ISO 8601, which $now() and $millis() also answer; 'steps', each earlier step's answer by its name; and, on the call an action makes, 'item', the item it runs on: {kind, id, title}, and 'element', the 'ref' of the list element it was run from, if it was. On the way back it also holds 'response', the answer being read: {status, headers, body}, with header names in lowercase. Every expression of a declarative plug-in also reads 'settings', the install's settings by key, and 'aliases', each unique setting's earlier values by key, as a list, except a token's 'exchange_body', which reads only its connection. Each evaluation is bounded: at most {expressionTimeMs} milliseconds, {expressionDepth} levels of nesting and an answer of {expressionOutputBytes} bytes as JSON. An expression that fails or passes a bound answers 'unavailable: mapping-failed'."
+      "description": "A JSONata expression (https://jsonata.org): standard JSONata, with no functions added. It reads one document. On the way out that holds 'params', the call's parameters as the caller sent them; 'connection', the non-secret fields of the connection the request names; 'connections', on an endpoint's requests and map, each connection its 'requires' names that the call has, by its id, holding the same fields; 'now', the time of the call in ISO 8601, which $now() and $millis() also answer; 'steps', each earlier step's answer by its name; and, on the call an action makes, 'item', the item it runs on: {kind, id, title}, and 'element', the 'ref' of the list element it was run from, if it was. On the way back it also holds 'response', the answer being read: {status, headers, body}, with header names in lowercase. Every expression of a declarative plug-in also reads 'settings', the install's settings by key, and 'aliases', each unique setting's earlier values by key, as a list, except a token's 'exchange_body', which reads only its connection, and a vendor check's, which read only 'vendor', the non-secret vendor values being saved, by key, 'now' and, on the way back, 'response'. Each evaluation is bounded: at most {expressionTimeMs} milliseconds, {expressionDepth} levels of nesting and an answer of {expressionOutputBytes} bytes as JSON. An expression that fails or passes a bound answers 'unavailable: mapping-failed'."
     },
     "host": {
       "type": "string",
