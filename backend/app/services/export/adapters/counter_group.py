@@ -39,7 +39,6 @@ from app.services.export.property_values import exported_properties
 
 class CounterGroupAdapter(ToolExportAdapter):
     tool = Tool.counter_group
-    formats = ("json", "pdf", "csv", "xlsx", "md")
 
     def rows(self, group: CounterGroup, /) -> int:
         return len(group.counters)

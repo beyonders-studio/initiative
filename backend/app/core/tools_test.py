@@ -40,6 +40,24 @@ def test_every_builtin_role_answers_for_every_permission_key():
         assert set(role_permissions) == set(PermissionKey)
 
 
+def test_every_tool_has_one_record():
+    """A tool is its tables plus one record, declared in enum order; what the
+    record says about layouts and archiving names kinds that exist."""
+    from app.core.tools import KINDS, TOOL_SPECS
+
+    assert list(TOOL_SPECS) == list(Tool)
+    for tool, spec in TOOL_SPECS.items():
+        assert KINDS[tool.value].code == spec.code
+        if spec.layouts is not None and spec.layouts.detail is not None:
+            assert spec.layouts.detail in KINDS, tool.value
+        if spec.export_formats is not None:
+            assert len(set(spec.export_formats)) == len(spec.export_formats)
+    for kind in KINDS.values():
+        # Only what lives inside a tool says whether it takes comments or is
+        # archived; every tool does both.
+        assert kind.parent is not None or not (kind.commentable or kind.archivable)
+
+
 def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
     """Codes are the high bits of every stored node id.
 
@@ -87,13 +105,13 @@ def test_an_initiative_starts_with_projects_and_files_on():
     # Optional is not the same as off. An initiative created without an opinion
     # about its tools is the one people already had, so the two that used to be
     # unconditional keep arriving switched on and everything else stays opt-in.
-    from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+    from app.core.tools import Tool
     from app.models.tenant.initiative import Initiative
     from app.schemas.tenant.initiative import InitiativeBase
 
-    assert DEFAULT_ENABLED_TOOLS == {Tool.project, Tool.file}
+    assert {t for t in Tool if t.spec.on_by_default} == {Tool.project, Tool.file}
     for tool in Tool:
-        expected = tool in DEFAULT_ENABLED_TOOLS
+        expected = tool.spec.on_by_default
         assert Initiative.model_fields[tool.view_permission].default is expected
         assert InitiativeBase.model_fields[tool.view_permission].default is expected
 
@@ -105,7 +123,7 @@ def test_every_tool_is_commentable():
     # its CommentTarget — or an extra that forgets its column — fails here.
     from sqlalchemy import inspect as sa_inspect
 
-    from app.core.tools import COMMENT_TARGETS, COMMENTABLE_EXTRAS, KINDS
+    from app.core.tools import CHILD_KINDS, COMMENT_TARGETS, KINDS
     from app.db.initiative_rls import _COMMENT_PARENTS
     from app.models.tenant.comment import Comment
     from app.schemas.tenant.comment import COMMENT_TARGET_FIELDS
@@ -116,11 +134,11 @@ def test_every_tool_is_commentable():
     )
 
     assert set(TOOL_COMMENT_TARGETS) == set(Tool)
-    # The extras are the ones that are NOT tools, and nothing is both.
-    assert set(COMMENT_TARGETS) == set(COMMENTABLE_EXTRAS) | {t.value for t in Tool}
-    assert not set(COMMENTABLE_EXTRAS) & {t.value for t in Tool}
+    # The extras are the kinds inside a tool that say they take comments.
+    extras = {k for k in CHILD_KINDS if KINDS[k].commentable}
+    assert set(COMMENT_TARGETS) == extras | {t.value for t in Tool}
     assert set(COMMENT_PARENT_COLUMNS) == {f"{target}_id" for target in COMMENT_TARGETS}
-    assert set(EXTRA_COMMENT_TARGETS) == {f"{extra}_id" for extra in COMMENTABLE_EXTRAS}
+    assert set(EXTRA_COMMENT_TARGETS) == {f"{extra}_id" for extra in extras}
 
     model_columns = {c.name for c in sa_inspect(Comment).persist_selectable.columns}
     assert set(COMMENT_PARENT_COLUMNS) <= model_columns
@@ -423,6 +441,13 @@ def test_export_adapters_cover_exactly_the_bulk_export_tools():
     assert not unflagged, (
         f"adapter exists but tool not in BULK_EXPORT_TOOLS: {unflagged}"
     )
+    # Each serves the formats its record names, in the record's order; a tool
+    # whose formats depend on each row names none, and its adapter answers.
+    for tool in BULK_EXPORT_TOOLS:
+        formats = ADAPTERS[tool_export_source(tool)].formats
+        assert formats, tool.value
+        if tool.spec.export_formats is not None:
+            assert formats == tool.spec.export_formats, tool.value
 
 
 def test_importers_cover_exactly_the_portable_tools():

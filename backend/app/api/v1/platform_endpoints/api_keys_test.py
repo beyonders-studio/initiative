@@ -504,7 +504,7 @@ async def test_password_change_deactivates_api_keys(
 async def test_a_key_names_one_resource_only_of_a_tool_with_a_feed(
     client: AsyncClient, session: AsyncSession
 ):
-    """In its community, and for a tool in ``FEED_TOOLS``; a resource without
+    """In its community, and for a tool that serves a feed; a resource without
     a community, or of a tool with no feed, is refused before any key is
     made."""
     user = await create_user(session)

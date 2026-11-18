@@ -39,7 +39,6 @@ from app.core.relationships import (
 )
 from app.core.tools import (
     CONTENT_KINDS,
-    DEFAULT_ENABLED_TOOLS,
     INSTALL_METADATA_KIND,
     ITEM_KINDS,
     KINDS,
@@ -49,10 +48,10 @@ from app.core.tools import (
 )
 from app.db import gucs
 from app.db.authorization import (
-    COMMUNITY_ROWS,
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
     STANDING,
+    community_surface,
     in_body,
     plugin_narrowed,
     plugin_scope,
@@ -255,7 +254,7 @@ def _tool_gate(
     legs.append(_switch_leg(tool, initiative))
 
     key = tool.create_permission if creating else tool.view_permission
-    default = "false" if creating else str(tool in DEFAULT_ENABLED_TOOLS).lower()
+    default = "false" if creating else str(tool.spec.on_by_default).lower()
     legs.append(
         f"initiative_role_permits({initiative}, {gucs.USER_ID}, '{key}', {default}, {STANDING})"
     )
@@ -465,16 +464,16 @@ def direct_or_guild(tool: Tool) -> InitiativePath:
     changing it is for the holders of its tool's surface (or a live write
     grant), or the installed plug-in's on a token not narrowed to one
     initiative, as itself or for a member holding that surface — and, where
-    the tool says so (``COMMUNITY_ROWS``), for whoever its sharing lets write
-    it. Sharing still applies on top, which is how the
+    the tool says so (``ToolSpec.community_rows``), for whoever its sharing
+    lets write it. Sharing still applies on top, which is how the
     admin decides who writes what the row holds. ``resource_actions`` asks the
     same writer for ``edit``.
     """
-    rows = COMMUNITY_ROWS[tool]
-    writer = _P.guild_row_writer(rows.surface)
+    rows = tool.spec.community_rows
+    writer = _P.guild_row_writer(community_surface(tool))
 
     def writes(t: str) -> str:
-        if not rows.granted_writes_row:
+        if rows is None or not rows.granted_writes_row:
             return writer
         return (
             f"({writer} OR resource_access('{tool.value}', {t}.id, {gucs.USER_ID},"
@@ -1404,7 +1403,7 @@ def _named_tool_gate(t: str, write: bool) -> str:
         f"WHEN '{tool.value}' THEN '{tool.view_permission}'" for tool in Tool
     )
     key = f"(CASE {t}.dac_tool {key_arms} END)"
-    defaults = sql_values(tool.value for tool in Tool if tool in DEFAULT_ENABLED_TOOLS)
+    defaults = sql_values(tool.value for tool in Tool if tool.spec.on_by_default)
     role = (
         f"({key} IS NULL OR initiative_role_permits({t}.initiative_id, "
         f"{gucs.USER_ID}, {key}, {t}.dac_tool IN ({defaults}), {STANDING}))"
@@ -1677,7 +1676,7 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # Every tool's table: its own initiative_id column. A calendar or a contact
     # may name no initiative, being made for the whole guild.
     **{
-        tool.plural: direct_or_guild(tool) if tool in COMMUNITY_ROWS else direct()
+        tool.plural: direct_or_guild(tool) if tool.spec.community_rows else direct()
         for tool in Tool
     },
     "metadata_definitions": metadata_definitions_path(),

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import AliasChoices, ConfigDict, Field, create_model
 
 from app.core.identity_boundary import GuildId
-from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+from app.core.tools import Tool
 from app.models.platform.user import Presence
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
@@ -65,7 +65,7 @@ class InitiativeListScope(str, Enum):
 _InitiativeToolSwitches = create_model(
     "_InitiativeToolSwitches",
     __base__=SanitizedBaseModel,
-    **{t.view_permission: (bool, t in DEFAULT_ENABLED_TOOLS) for t in Tool},
+    **{t.view_permission: (bool, t.spec.on_by_default) for t in Tool},
 )
 _InitiativeToolSwitchesPatch = create_model(
     "_InitiativeToolSwitchesPatch",
