@@ -1165,7 +1165,6 @@ async def create_imported_initiative(
     master switches and join policy taken from the backup manifest.
     ``member_ids`` join it with the built-in member role. Flush-only — the
     backup orchestrator owns its per-chunk transaction."""
-    from app.core.tools import DEFAULT_ENABLED_TOOLS
     from app.services.import_engine.common import unique_name
 
     existing = {row for row in (await session.exec(select(Initiative.name))).all()}
@@ -1180,7 +1179,7 @@ async def create_imported_initiative(
             # projects and files had switches names no state for them, and
             # restoring it must not produce an initiative with neither.
             t.view_permission: bool(
-                tool_flags.get(t.view_permission, t in DEFAULT_ENABLED_TOOLS)
+                tool_flags.get(t.view_permission, t.spec.on_by_default)
             )
             for t in Tool
         },

@@ -62,8 +62,8 @@ class UserApiKey(SQLModel, table=True):
         ),
     )
     # The one tool resource a key reads, named as ``resource_grants`` names
-    # it: that resource's feed, for a tool in ``FEED_TOOLS``, and no other
-    # route. No FK — the row lives in the guild's schema.
+    # it: that resource's feed, for a tool that serves one
+    # (``ToolSpec.feed``), and no other route. No FK — the row lives in the guild's schema.
     resource_type: Tool | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )

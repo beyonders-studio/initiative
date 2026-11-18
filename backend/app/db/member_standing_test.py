@@ -22,7 +22,7 @@ from app.api.deps import InstallAccessError
 from app.core.file_types import FileType
 from app.core.plugin_scopes import tool_resource
 from app.core.tools import Tool
-from app.db.authorization import COMMUNITY_ROWS
+from app.db.authorization import community_surface
 from app.db.guild_standing import InstallContext
 from app.db.schema_provisioning import GuildRoleKind, guild_role_name, guild_schema_name
 from app.models.platform.guild import AdminSurface, CommunityRole
@@ -593,7 +593,9 @@ async def test_a_member_token_makes_a_community_contact_as_a_surface_holder(
 _COMMUNITY_ROW_MODELS = {Tool.calendar: Calendar, Tool.contact: Contact}
 
 
-@pytest.mark.parametrize("tool", sorted(COMMUNITY_ROWS, key=lambda t: t.value))
+@pytest.mark.parametrize(
+    "tool", sorted((t for t in Tool if t.spec.community_rows), key=lambda t: t.value)
+)
 async def test_a_member_token_changes_a_community_row_as_the_member_would(
     session, acting_user, role_session, tool
 ):
@@ -601,7 +603,8 @@ async def test_a_member_token_changes_a_community_row_as_the_member_would(
     through a member token exactly where they could themselves: where the
     grant changes the row, or once they hold the surface that administers
     it."""
-    rows = COMMUNITY_ROWS[tool]
+    rows = tool.spec.community_rows
+    assert rows is not None
     scope = f"{tool_resource(tool).value}:write"
     installed = await install_plugin(
         session, acting_user, role_session, granted=[scope]
@@ -636,7 +639,7 @@ async def test_a_member_token_changes_a_community_row_as_the_member_would(
     role = CustomRole(
         name="Community rows",
         base_rung=CommunityRole.member.value,
-        surfaces=[rows.surface.value],
+        surfaces=[community_surface(tool).value],
     )
     session.add(role)
     await session.flush()

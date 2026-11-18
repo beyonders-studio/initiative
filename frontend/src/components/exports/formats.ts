@@ -1,39 +1,15 @@
 import type { FileType } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { ExportFormatOption } from "@/components/exports/ExportButton";
-import { NON_EXPORTABLE_TOOLS, SIDEBAR_TOOLS } from "@/lib/tools";
-import { type EditorFileType, isStoredFileType } from "@/ui/lib/fileTypes";
-
-// Engine formats per editor file type — mirrors the backend adapter's rules.
-const EDITOR_FILE_FORMATS: Record<EditorFileType, ExportFormatOption[]> = {
-  lexical: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "docx", labelKey: "export.formatDocx" },
-    // The lossless one: the file envelope, round-trippable through the
-    // editor toolbar's import.
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  excalidraw: [{ format: "json", labelKey: "export.formatJson" }],
-  sheet: [
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  url: [
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-};
-
-const STORED_FILE_FORMATS: ExportFormatOption[] = [
-  { format: "file", labelKey: "export.formatOriginal" },
-];
-
-/** What a file of this type exports as: the editor's formats for its own
- *  types, the stored file itself for the rest. */
-export const fileTypeFormats = (type: FileType): ExportFormatOption[] =>
-  isStoredFileType(type) ? STORED_FILE_FORMATS : EDITOR_FILE_FORMATS[type];
+import {
+  FILE_TYPE_REPORT_FORMATS,
+  fileTypeExportFormats,
+  NON_EXPORTABLE_TOOLS,
+  SIDEBAR_TOOLS,
+  TOOLS,
+  toolExportFormats,
+  toolReportFormats,
+} from "@/lib/tools";
 
 // Type-neutral labels for mixed-type selections, where a per-type label
 // ("Lexical file (.lexical)") would misdescribe the other entries in the zip.
@@ -44,6 +20,7 @@ const GENERIC_FORMAT_LABELS: Record<string, string> = {
   json: "export.formatJson",
   csv: "export.formatCsv",
   xlsx: "export.formatXlsx",
+  ics: "export.formatIcs",
   file: "export.formatOriginal",
 };
 
@@ -64,59 +41,43 @@ export function fileSelectionFormats(types: FileType[]): ExportFormatOption[] {
   }));
 }
 
-// Per-tool export formats, keyed by the canonical Tool enum — each mirrors
-// its backend adapter's format set. Files are deliberately ABSENT: their
-// formats depend on the selected files' types (selectionExportFormats
-// below / fileTypeFormats). The registry drift test holds this table to
-// NON_EXPORTABLE_TOOLS's bulkExport flags.
-export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = {
-  [Tool.post]: [
-    // The importable envelope, and only that: a notice has no report shape,
-    // so the backend offers no rendered format for one either.
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  [Tool.wiki]: [
-    // Every page as one document, as a text document exports, then the
-    // importable envelope. Always a zip: the files filed in the wiki ride
-    // beside either.
-    { format: "pdf", labelKey: "export.formatWikiPdf" },
-    { format: "md", labelKey: "export.formatWikiMarkdown" },
-    { format: "docx", labelKey: "export.formatWikiDocx" },
-    { format: "json", labelKey: "export.formatWikiJson" },
-  ],
-  [Tool.contact]: [
-    // The importable envelope, then one spreadsheet of the selection, which
-    // the contacts import reads back.
-    { format: "json", labelKey: "export.formatJson" },
-    { format: "csv", labelKey: "export.formatCsv" },
-  ],
-  [Tool.dashboard]: [
-    // The importable envelope, and only that: a dashboard is a live canvas
-    // over other tools' data, so there is nothing to render it as.
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  [Tool.project]: [
-    // The importable JSON backup, then the task-table report formats.
-    { format: "json", labelKey: "export.formatJson" },
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-  ],
-  [Tool.counter_group]: [
-    // Table reports, then the importable envelope.
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "md", labelKey: "export.formatMd" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  [Tool.calendar]: [
-    // One combined file per calendar: standard iCalendar, or the importable
-    // envelope carrying the calendar and its events.
-    { format: "ics", labelKey: "export.formatIcs" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
+/** What a file of this type exports as: the editor's formats for its own
+ *  types, the stored file itself for the rest (the backend's rule, from the
+ *  records). */
+export function fileTypeFormats(type: FileType): ExportFormatOption[] {
+  return fileTypeExportFormats(type).map((format) => ({
+    format,
+    labelKey: GENERIC_FORMAT_LABELS[format],
+  }));
+}
+
+// What a tool calls a format where the generic label would misdescribe it.
+const TOOL_FORMAT_LABELS: Partial<Record<Tool, Record<string, string>>> = {
+  // Always a zip: the files filed in the wiki ride beside every format.
+  [Tool.wiki]: {
+    pdf: "export.formatWikiPdf",
+    md: "export.formatWikiMarkdown",
+    docx: "export.formatWikiDocx",
+    json: "export.formatWikiJson",
+  },
+  // One markdown table of the counters.
+  [Tool.counter_group]: { md: "export.formatMd" },
 };
+
+// Per-tool export formats, in the order the tool's record offers them. Files
+// are deliberately ABSENT: their formats depend on the selected files' types
+// (selectionExportFormats below / fileTypeFormats).
+export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = Object.fromEntries(
+  TOOLS.flatMap((tool) => {
+    const formats = toolExportFormats(tool);
+    if (!formats?.length) return [];
+    const options = formats.map((format) => ({
+      format,
+      labelKey: TOOL_FORMAT_LABELS[tool]?.[format] ?? GENERIC_FORMAT_LABELS[format],
+    }));
+    return [[tool, options]];
+  })
+);
 
 /** Formats a selection of one tool's rows can export: the tool's own, or for
  * files the ones every selected file's type shares. Null for a tool
@@ -143,40 +104,21 @@ export const AGGREGATE_EXPORT_TOOLS: Tool[] = SIDEBAR_TOOLS.filter(
   (tool) => !NON_EXPORTABLE_TOOLS.has(tool)
 );
 
-/** Report-mode format choices per tool — mirrors the backend aggregate
- * adapter's ``_REPORT_FORMATS`` (adapters/backup.py). Files are absent:
- * they choose per file type (REPORT_FILE_FORMATS). */
-export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = {
-  [Tool.project]: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-  ],
-  [Tool.counter_group]: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-  ],
-  [Tool.calendar]: [
-    { format: "ics", labelKey: "export.formatIcs" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
-  // One spreadsheet of each initiative's contacts.
-  [Tool.contact]: [{ format: "csv", labelKey: "export.formatCsv" }],
-};
+/** A report's choices, labelled as anything but a tool's own export is. */
+const reportOptions = (formats: readonly string[]): ExportFormatOption[] =>
+  formats.map((format) => ({ format, labelKey: GENERIC_FORMAT_LABELS[format] }));
 
-/** Report-mode per-type file formats — mirrors the backend's
- * ``_FILE_REPORT_FORMATS``. Whiteboards/links/uploads ride in their
- * canonical format and offer no choice. */
-export const REPORT_FILE_FORMATS: Record<"lexical" | "sheet", ExportFormatOption[]> = {
-  lexical: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "docx", labelKey: "export.formatDocx" },
-  ],
-  sheet: [
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-  ],
-};
+/** Report-mode format choices per tool, from the tool's record. Files are
+ * absent: they choose per file type (REPORT_FILE_FORMATS). */
+export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = Object.fromEntries(
+  TOOLS.flatMap((tool) => {
+    const formats = toolReportFormats(tool);
+    return formats.length ? [[tool, reportOptions(formats)]] : [];
+  })
+);
+
+/** Report-mode per-type file formats, from the files record. Whiteboards,
+ * links and uploads ride in their canonical format and offer no choice. */
+export const REPORT_FILE_FORMATS = Object.fromEntries(
+  Object.entries(FILE_TYPE_REPORT_FORMATS).map(([type, formats]) => [type, reportOptions(formats)])
+) as Record<keyof typeof FILE_TYPE_REPORT_FORMATS, ExportFormatOption[]>;

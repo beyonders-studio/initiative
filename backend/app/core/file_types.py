@@ -150,8 +150,8 @@ class FileTypeSpec:
     #: The extensions a file of this type is named with, the one it is stored
     #: under first.
     extensions: tuple[str, ...] = ()
-    #: For the editor's own types: what an export of one may be written as.
-    #: Every other type exports as its stored file.
+    #: For the editor's own types: what an export of one may be written as,
+    #: in the order offered. Every other type exports as its stored file.
     exports: tuple[str, ...] = ()
     #: The format Pillow reads it as, for a type the app makes a thumbnail of.
     picture_format: str | None = None
@@ -200,7 +200,7 @@ _C_LIKE = ("text/plain", "text/x-c", "text/x-c++")
 
 SPECS: dict[FileType, FileTypeSpec] = {
     FileType.lexical: FileTypeSpec(
-        FileKind.document, exports=("json", "md", "pdf", "docx")
+        FileKind.document, exports=("pdf", "md", "docx", "json")
     ),
     FileType.excalidraw: FileTypeSpec(FileKind.whiteboard, exports=("json",)),
     FileType.sheet: FileTypeSpec(FileKind.spreadsheet, exports=("csv", "xlsx", "json")),

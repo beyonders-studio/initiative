@@ -8,7 +8,7 @@ backup at all, so a guild that exported and re-imported got its content back
 and lost everything that made it that community.
 
 Declared as a registry rather than as a list of calls inside the adapter, for
-the reason ``NON_EXPORTABLE_TOOLS`` is an exclusion list: the default is
+the reason a tool exports unless its record says otherwise: the default is
 "a guild-level table is exported", and ``guild_sections_test`` fails until a
 new one is either carried by a section here or named in ``EXEMPT`` with a
 reason. Remembering to come back to this file is not the mechanism.

@@ -877,8 +877,8 @@ export const ArchivableType = {
   wiki: "wiki",
   contact: "contact",
   task: "task",
-  initiative: "initiative",
   collection: "collection",
+  initiative: "initiative",
 } as const;
 
 export interface ArchiveDoneResponse {
@@ -14370,7 +14370,7 @@ export const ExportCommunityMode = {
 export type ExportToolParams = {
   /** What to export: one artifact per id, zipped when there is more than one */
   ids?: number[] | null;
-  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx; contact: json, csv). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
+  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: pdf, md, docx, json, csv, xlsx, file; counter_group: pdf, csv, xlsx, md, json; calendar: ics, json; dashboard: json; post: json; wiki: pdf, md, docx, json; contact: json, csv). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
   format?: ExportToolFormat;
   /** Calendars only: with no ids, every calendar the caller may export in this initiative */
   initiative_id?: number | null;

@@ -47,7 +47,6 @@ from app.services.tenant import contacts as contacts_service
 
 class ContactAdapter(ToolExportAdapter):
     tool = Tool.contact
-    formats = ("json", "csv")
 
     def item(self, contact: Contact, ctx: BuildContext, /) -> RenderItem:
         return RenderItem(

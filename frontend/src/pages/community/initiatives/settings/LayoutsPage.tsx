@@ -10,14 +10,12 @@ import { Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { detailLayoutLooks } from "@/components/tools/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/tools/projects/TaskTypeDeleteDialog";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
-  INSTANCE_LAYOUT_TOOLS,
   instanceTarget,
   sharedTarget,
   useInitiativeLayouts,
@@ -26,7 +24,9 @@ import {
 } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
+  INSTANCE_LAYOUT_TOOLS,
   isToolEnabled,
+  SHARED_LAYOUT_TOOLS,
   SIDEBAR_TOOLS,
   toolDetailRoute,
   toolListRoute,
@@ -50,7 +50,7 @@ export const LayoutsPage = () => {
 
 /** The tools with layouts, in the order the sidebar lists them. */
 const TOOLS_WITH_LAYOUTS = SIDEBAR_TOOLS.filter(
-  (tool) => tool in SHARED_LAYOUTS || INSTANCE_LAYOUT_TOOLS.has(tool)
+  (tool) => SHARED_LAYOUT_TOOLS.has(tool) || INSTANCE_LAYOUT_TOOLS.has(tool)
 );
 
 const InitiativeLayouts = ({
@@ -81,7 +81,7 @@ const InitiativeLayouts = ({
     >
       {isError ? <StatusMessage onRetry={refetch} /> : null}
       {TOOLS_WITH_LAYOUTS.map((tool) =>
-        tool in SHARED_LAYOUTS ? (
+        SHARED_LAYOUT_TOOLS.has(tool) ? (
           enabled(tool) ? (
             <SharedLayouts key={tool} tool={tool} initiativeId={initiativeId} />
           ) : null

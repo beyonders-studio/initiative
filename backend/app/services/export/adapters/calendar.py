@@ -70,7 +70,6 @@ class _Events:
 
 class CalendarAdapter(ToolExportAdapter):
     tool = Tool.calendar
-    formats = ("ics", "json")
     content_filters: ClassVar[dict[str, type[BaseModel]]] = {"events": EventWindow}
 
     async def count(
