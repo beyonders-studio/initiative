@@ -10195,10 +10195,6 @@ export interface PluginServiceRegistrationCreate {
   vendor_values?: PluginServiceRegistrationCreateVendorValues;
 }
 
-export type PluginServiceRegistrationReadJwks = { [key: string]: unknown } | null;
-
-export type PluginServiceRegistrationReadVendorValues = { [key: string]: string };
-
 export type PluginVendorFieldReadLabel = { [key: string]: string };
 
 /**
@@ -10212,6 +10208,10 @@ export interface PluginVendorFieldRead {
   label: PluginVendorFieldReadLabel;
 }
 
+export type PluginServiceRegistrationReadJwks = { [key: string]: unknown } | null;
+
+export type PluginServiceRegistrationReadVendorValues = { [key: string]: string };
+
 /**
  * A registration as the owner's settings see it.
  */
@@ -10219,6 +10219,10 @@ export interface PluginServiceRegistrationRead {
   id: number;
   public_id: string;
   listing_uid: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  version: string | null;
+  first_party: boolean;
   kind: string;
   publisher_id: number;
   publisher_prefix: string;
@@ -10250,6 +10254,18 @@ export interface PluginServiceRegistrationRead {
   live: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * One page of the plug-in services this deployment has wired up.
+ */
+export interface PluginServiceRegistrationListResponse {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: PluginServiceRegistrationRead[];
 }
 
 export type PluginServiceRegistrationUpdateJwks = { [key: string]: unknown } | null;
@@ -13634,6 +13650,18 @@ export const CreatePlatformCommunityBillingServiceHandoffConsole = {
   support: "support",
   operator: "operator",
 } as const;
+
+export type ListPluginServicesParams = {
+  /** Matches the plug-in's id or its publisher's name. */
+  search?: string | null;
+  /** @minimum 1 */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  page_size?: number;
+};
 
 export type ReadPluginPlatformJwks200 = { [key: string]: unknown };
 

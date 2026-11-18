@@ -1,6 +1,10 @@
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+
 import type {
+  ListPluginServicesParams,
   PluginServicePublishedKey,
   PluginServiceRegistrationCreate,
+  PluginServiceRegistrationListResponse,
   PluginServiceRegistrationRead,
   PluginServiceRegistrationUpdate,
   PluginServiceVendorSetup,
@@ -10,19 +14,29 @@ import {
   connectPluginService,
   createPluginService,
   deletePluginService,
+  getReadPluginServiceQueryKey,
   readPluginServiceKeys,
   startPluginServiceVendorSetup,
   updatePluginService,
   useListPluginServices,
+  useReadPluginService,
 } from "@/api/generated/plugin-services/plugin-services";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
-/** Every plug-in service this deployment has wired up (`plugins.manage`). */
-export const usePluginServices = (options?: QueryOpts<PluginServiceRegistrationRead[]>) =>
-  useListPluginServices({ query: options });
+/** One page of the plug-in services this deployment has wired up (`plugins.manage`). */
+export const usePluginServices = (
+  params: ListPluginServicesParams,
+  options?: QueryOpts<PluginServiceRegistrationListResponse>
+) => useListPluginServices(params, { query: { placeholderData: keepPreviousData, ...options } });
+
+/** One plug-in service (`plugins.manage`). */
+export const usePluginService = (
+  registrationId: number,
+  options?: QueryOpts<PluginServiceRegistrationRead>
+) => useReadPluginService(registrationId, { query: options });
 
 export const useCreatePluginService = (
   options?: MutationOpts<PluginServiceRegistrationRead, PluginServiceRegistrationCreate>
@@ -41,16 +55,23 @@ export interface UpdatePluginServiceVariables {
   data: PluginServiceRegistrationUpdate;
 }
 
+/** Change a plug-in service. Its own read takes the answer at once, so a page
+ *  that remounts its form on success shows what was saved. */
 export const useUpdatePluginService = (
   options?: MutationOpts<PluginServiceRegistrationRead, UpdatePluginServiceVariables>
-) =>
-  useApiMutation<PluginServiceRegistrationRead, UpdatePluginServiceVariables>(
+) => {
+  const client = useQueryClient();
+  return useApiMutation<PluginServiceRegistrationRead, UpdatePluginServiceVariables>(
     {
       mutationFn: ({ registrationId, data }) => updatePluginService(registrationId, data),
-      invalidate: () => invalidate(q.pluginServices()),
+      invalidate: (registration) => {
+        client.setQueryData(getReadPluginServiceQueryKey(registration.id), registration);
+        return invalidate(q.pluginServices());
+      },
     },
     options
   );
+};
 
 export const useDeletePluginService = (options?: MutationOpts<void, number>) =>
   useApiMutation<void, number>(
