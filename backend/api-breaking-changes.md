@@ -9,6 +9,15 @@ matter and can be deleted.
 
 ## After 0.79.2
 
+### The plug-in services list is paged
+
+A deployment may run any number of plug-ins, so the owner's list of plug-in
+services is searched and paged on the server: it answers one page, with its
+total, and each plug-in is read on its own at
+`GET /api/v1/plugin-services/{registration_id}`.
+
+- GET /api/v1/plugin-services/ the response's body `type` changed from `array<object>` to `object` for status `200`
+
 ### Sending somebody something
 
 `NotificationType` takes `item_sent`: somebody pointed the reader at a thing,

@@ -18,12 +18,13 @@ delegate.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import SystemSessionDep, require_capability
 from app.core.capabilities import Capability
 from app.core.messages import PluginServiceMessages
+from app.db.query import build_paginated_response
 from app.models.platform.plugin_service_registration import PluginAvailability
 from app.models.platform.publisher import Publisher
 from app.models.platform.user import User
@@ -35,6 +36,7 @@ from app.schemas.platform.plugin_service import (
     PluginServiceConnect,
     PluginServicePublishedKey,
     PluginServiceRegistrationCreate,
+    PluginServiceRegistrationListResponse,
     PluginServiceRegistrationRead,
     PluginServiceRegistrationUpdate,
     PluginServiceVendorSetup,
@@ -69,6 +71,10 @@ def _to_read(
         id=row.id,
         public_id=row.public_id,
         listing_uid=row.listing_uid,
+        name=view.name,
+        avatar_url=view.avatar_url,
+        version=view.version,
+        first_party=view.first_party,
         kind=row.kind,
         publisher_id=view.publisher.id,
         publisher_prefix=view.publisher.prefix,
@@ -128,15 +134,40 @@ async def _definitions(
     )
 
 
-@router.get("/", response_model=list[PluginServiceRegistrationRead])
+@router.get("/", response_model=PluginServiceRegistrationListResponse)
 async def list_plugin_services(
     session: SystemSessionDep,
     _owner: PluginsManageDep,
-) -> list[PluginServiceRegistrationRead]:
-    """Every plug-in service this deployment has wired up (``plugins.manage``)."""
-    views = await registrations_service.registration_views(session)
+    search: str | None = Query(
+        default=None, description="Matches the plug-in's id or its publisher's name."
+    ),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> PluginServiceRegistrationListResponse:
+    """One page of the plug-in services this deployment has wired up
+    (``plugins.manage``), by id."""
+    views, total_count, actual_page = await registrations_service.registration_page(
+        session, search=search, page=page, page_size=page_size
+    )
     definitions = await _definitions(session, views)
-    return [_to_read(view, definitions) for view in views]
+    return PluginServiceRegistrationListResponse(
+        **build_paginated_response(
+            [_to_read(view, definitions) for view in views],
+            total_count,
+            actual_page,
+            page_size,
+        )
+    )
+
+
+@router.get("/{registration_id}", response_model=PluginServiceRegistrationRead)
+async def read_plugin_service(
+    registration_id: int,
+    session: SystemSessionDep,
+    _owner: PluginsManageDep,
+) -> PluginServiceRegistrationRead:
+    """One plug-in service (``plugins.manage``)."""
+    return await _read_one(session, registration_id)
 
 
 @router.post(

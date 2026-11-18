@@ -51,7 +51,7 @@ from fastapi import HTTPException
 from fastapi import status as http_status
 from jwt import PyJWK
 from jwt.exceptions import InvalidKeyError, PyJWKError
-from sqlalchemy import delete, update
+from sqlalchemy import delete, func, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -63,8 +63,13 @@ from app.core.messages import GuildMessages, PluginServiceMessages
 from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
 from app.core.security import plugin_platform_signing_enabled
 from app.db.errors import dbapi_constraint
+from app.db.query import paginated_query
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import Guild
+from app.models.platform.marketplace import (
+    MarketplaceListing,
+    MarketplaceListingVersion,
+)
 from app.models.platform.plugin_install import EXCLUSIVE_ROUTE_INDEX, PluginInstall
 from app.models.platform.plugin_service_registration import (
     IMAGE_REFERENCE_MAX_LENGTH,
@@ -84,6 +89,7 @@ from app.models.platform.publisher import (
 from app.services import audit as audit_service
 from app.services.marketplace import plugin_installs
 from app.services.marketplace import vendor_values as vendor_values_service
+from app.services.marketplace.definitions import published_by_us
 from app.services.marketplace.plugin_keys import (
     PRIVATE_JWK_MEMBERS,
     KeySetUnreadableError,
@@ -153,6 +159,7 @@ __all__ = [
     "published_keys",
     "read_listing_registration",
     "reconcile_from_config",
+    "registration_page",
     "registration_views",
     "row_browser_base",
     "update_registration",
@@ -434,29 +441,49 @@ async def list_registrations(
 
 @dataclass(frozen=True)
 class RegistrationView:
-    """A registration with its publisher, whether it is live, and the
-    communities on its beta list, by id and name."""
+    """A registration with its publisher, whether it is live, what its listing
+    says it is called, looks like and is on, and the communities on its beta
+    list, by id and name."""
 
     row: PluginServiceRegistration
     publisher: Publisher
     live: bool
+    #: The listing's name, art and latest version; null until it arrives.
+    name: str | None = None
+    avatar_url: str | None = None
+    version: str | None = None
+    #: This project publishes its listing (:func:`published_by_us`).
+    first_party: bool = False
     beta_communities: tuple[tuple[int, str], ...] = ()
 
 
-async def registration_views(
-    session: AsyncSession, registration_id: int | None = None
-) -> list[RegistrationView]:
-    """Every registration, or the one ``registration_id`` names, each with its
-    publisher and whether it is live, in one statement, and their beta lists
-    in a second."""
-    query = (
-        select(PluginServiceRegistration, Publisher, live_registration_clause())
+def _views_query() -> Any:
+    return (
+        select(
+            PluginServiceRegistration,
+            Publisher,
+            live_registration_clause(),
+            MarketplaceListing.name,
+            MarketplaceListing.avatar_url,
+            MarketplaceListing.source,
+            MarketplaceListing.public_id,
+            MarketplaceListingVersion.version,
+        )
         .join(Publisher, Publisher.id == PluginServiceRegistration.publisher_id)
-        .order_by(PluginServiceRegistration.public_id.asc())
+        .outerjoin(
+            MarketplaceListing,
+            MarketplaceListing.uid == PluginServiceRegistration.listing_uid,
+        )
+        .outerjoin(
+            MarketplaceListingVersion,
+            MarketplaceListingVersion.id == MarketplaceListing.latest_version_id,
+        )
     )
-    if registration_id is not None:
-        query = query.where(PluginServiceRegistration.id == registration_id)
-    rows = (await session.exec(query)).all()
+
+
+async def _views(session: AsyncSession, rows: Sequence[Any]) -> list[RegistrationView]:
+    """The views of ``rows`` from :func:`_views_query`, with their beta lists
+    read in one more statement."""
     picked: dict[str, list[tuple[int, str]]] = {}
     for listing_uid, guild_id, name in (
         await session.exec(
@@ -464,7 +491,7 @@ async def registration_views(
             .join(Guild, col(Guild.id) == PluginBetaCommunity.community_id)
             .where(
                 col(PluginBetaCommunity.listing_uid).in_(
-                    [row.listing_uid for row, _, _ in rows if row.listing_uid]
+                    [row.listing_uid for row, *_ in rows if row.listing_uid]
                 )
             )
             .order_by(Guild.name, Guild.id)
@@ -476,10 +503,60 @@ async def registration_views(
             row=row,
             publisher=publisher,
             live=bool(live),
+            name=name,
+            avatar_url=avatar_url,
+            version=version,
+            first_party=listing_source is not None
+            and published_by_us(listing_source, listing_public_id),
             beta_communities=tuple(picked.get(row.listing_uid or "", ())),
         )
-        for row, publisher, live in rows
+        for (
+            row,
+            publisher,
+            live,
+            name,
+            avatar_url,
+            listing_source,
+            listing_public_id,
+            version,
+        ) in rows
     ]
+
+
+async def registration_views(
+    session: AsyncSession, registration_id: int
+) -> list[RegistrationView]:
+    """The registration ``registration_id`` names, as a view, or none."""
+    rows = (
+        await session.exec(
+            _views_query().where(PluginServiceRegistration.id == registration_id)
+        )
+    ).all()
+    return await _views(session, rows)
+
+
+async def registration_page(
+    session: AsyncSession, *, search: str | None, page: int, page_size: int
+) -> tuple[list[RegistrationView], int, int]:
+    """One page of the registrations by ``public_id``, those whose id or
+    publisher's name holds ``search`` when one is given, with the total and the
+    page answered."""
+    query = _views_query()
+    if search and (term := search.strip()):
+        query = query.where(
+            or_(
+                col(PluginServiceRegistration.public_id).ilike(f"%{term}%"),
+                col(Publisher.display_name).ilike(f"%{term}%"),
+            )
+        )
+    rows, total_count, actual_page = await paginated_query(
+        session,
+        query.order_by(PluginServiceRegistration.public_id.asc()),
+        select(func.count()).select_from(query.subquery()),
+        page=page,
+        page_size=page_size,
+    )
+    return await _views(session, rows), total_count, actual_page
 
 
 async def get_registration(

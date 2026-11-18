@@ -261,9 +261,13 @@ class TestUploadingAListingFile:
 
         assert response.status_code == 201, response.text
         services = await client.get("/api/v1/plugin-services/", headers=owner.headers)
-        [registration] = services.json()
+        [registration] = services.json()["items"]
         assert registration["public_id"] == "ours.tracker"
         assert registration["listing_uid"] == manifest["uid"]
+        assert registration["version"] == manifest["version"]
+        assert registration["name"] == manifest["name"]
+        # Uploaded by this deployment, so not built by Initiative.
+        assert registration["first_party"] is False
         assert registration["scope_ceiling"] == ["projects:read"]
         assert registration["live"] is False
 
