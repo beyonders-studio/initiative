@@ -165,6 +165,7 @@
   "/settings/platform/email",
   "/settings/platform/intake",
   "/settings/platform/integrations",
+  "/settings/platform/integrations/plugins/$registrationId",
   "/settings/platform/integrations/vendor-setup/$registrationId",
   "/settings/platform/push",
   "/settings/platform/security",
