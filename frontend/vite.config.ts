@@ -216,11 +216,9 @@ const thirdPartyNoticesPlugin = () => ({
   },
 });
 
-// Use relative paths for Capacitor builds (mobile apps load from file:// or local server)
 const isCapacitorBuild = process.env.CAPACITOR_BUILD === "true";
 
 export default defineConfig({
-  base: isCapacitorBuild ? "" : "/",
   define: {
     __APP_VERSION__: JSON.stringify(getVersion()),
     __CLOUD_ORIGIN__: JSON.stringify(CLOUD_ORIGIN),

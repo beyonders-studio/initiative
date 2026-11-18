@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reload in the desktop app no longer leaves a blank window.** The page reloads where you were.
 - **Fewer unexpected sign-outs on a laptop or phone that sleeps.** A tab or app nobody is looking at no longer renews its sign-in in the background; it waits until you come back to it, so a renewal can no longer be cut off by the device going to sleep.
 
 ## [0.79.2] - 2026-11-16
