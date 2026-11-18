@@ -46,8 +46,10 @@ def _node_expression(side: str) -> str:
     ``public.relationship_kind_code`` is an IMMUTABLE function rather than an
     inlined CASE, which is what makes admitting a new kind a
     ``CREATE OR REPLACE FUNCTION`` instead of a table rewrite in every guild
-    schema. Existing rows keep their values because a kind's code never changes
-    — the permanence rule in ``app.core.relationships`` is what makes that safe.
+    schema. Boot renders it from the kinds (``app.db.kind_codes``), so a new
+    kind needs no migration. Existing rows keep their values because a kind's
+    code never changes — the permanence rule in ``app.core.relationships`` is
+    what makes that safe.
     """
     return f"(public.relationship_kind_code({side}_type) << 32) | {side}_id::bigint"
 
