@@ -337,19 +337,35 @@ const deleteHook = (
     );
 };
 
+/** A thing's whole non-owner sharing, and the note to whoever it lets in. */
+export interface GrantsChange {
+  grants: ResourceGrantSchema[];
+  note?: string | null;
+}
+
+type SetGrants<TRead> = (
+  communityId: number,
+  id: number,
+  grants: ResourceGrantSchema[],
+  params?: { note?: string | null }
+) => Promise<TRead>;
+
 /** The whole non-owner sharing state at once (unified resource sharing). */
 const grantsHook = <TRead>(
   endpoints: {
-    setGrants: (communityId: number, id: number, grants: ResourceGrantSchema[]) => Promise<TRead>;
+    setGrants: SetGrants<TRead>;
     tool: Tool;
   },
   errorKey: string
 ) => {
-  return (id: number, options?: MutationOpts<TRead, ResourceGrantSchema[]>) =>
-    useCommunityMutation<TRead, ResourceGrantSchema[]>(
+  return (id: number, options?: MutationOpts<TRead, GrantsChange>) =>
+    useCommunityMutation<TRead, GrantsChange>(
       {
-        mutationFn: (communityId, grants) => endpoints.setGrants(communityId, id, grants),
-        invalidate: () => invalidate(q.tool(endpoints.tool, id)),
+        mutationFn: (communityId, { grants, note }) =>
+          endpoints.setGrants(communityId, id, grants, note ? { note } : undefined),
+        // A change of sharing answers the requests it reaches, so the queue
+        // above the sharing is read again too.
+        invalidate: () => invalidate(q.tool(endpoints.tool, id), q.shareRequests()),
         errorKey,
       },
       options
@@ -375,7 +391,7 @@ interface ToolEndpoints<TRead, TList, TMyList, TCreate, TUpdate, TParams> {
   create: (communityId: number, data: TCreate) => Promise<TRead>;
   update: (communityId: number, id: number, data: TUpdate) => Promise<TRead>;
   remove: (communityId: number, id: number) => Promise<void>;
-  setGrants: (communityId: number, id: number, grants: ResourceGrantSchema[]) => Promise<TRead>;
+  setGrants: SetGrants<TRead>;
   duplicate: Duplicate;
   /** Which tool this is — what its writes make stale follows from it. */
   tool: Tool;

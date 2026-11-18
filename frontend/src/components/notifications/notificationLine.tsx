@@ -139,9 +139,10 @@ export const notificationLink = (notification: NotificationRead): string | null 
     case "subscription_activity":
     case "assigned_activity":
       return entityRefFromData(data);
-    // A granted request opens what was shared; one asking opens the requests
-    // through its `target_path`.
+    // A granted request opens what was shared, and a sent thing itself; one
+    // asking opens the requests through its `target_path`.
     case "share_granted":
+    case "item_sent":
       return entityRefFromData(data);
     case "post_published":
       if (typeof data.post_id === "number") {
@@ -258,6 +259,16 @@ export const commentSummary = (
   const count = Number(data.comment_count);
   return { name, others, count: Number.isFinite(count) ? count : 1 };
 };
+
+/** A line with the note its sender wrote, where they wrote one. */
+const withNote = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  data: Record<string, unknown>,
+  line: string
+): string =>
+  typeof data.note === "string" && data.note
+    ? t("notifications.withNote", { line, note: data.note })
+    : line;
 
 export const notificationText = (
   notification: NotificationRead,
@@ -440,11 +451,30 @@ export const notificationText = (
         count: shareCount(data.count),
       });
     case "share_granted":
-      return t(`notifications.shareGranted.${shareLevel(data.level)}`, {
-        answerer: data.answerer_name ?? t("notifications.someone"),
-        title: data.entity_name ?? t("notifications.plain.item"),
-        count: shareCount(data.count),
-      });
+      return withNote(
+        t,
+        data,
+        t(`notifications.shareGranted.${shareLevel(data.level)}`, {
+          answerer: data.answerer_name ?? t("notifications.someone"),
+          title: data.entity_name ?? t("notifications.plain.item"),
+          count: shareCount(data.count),
+        })
+      );
+    // Named only to a reader who can open it; anybody else is told it is
+    // there, and opening it offers to ask.
+    case "item_sent":
+      return withNote(
+        t,
+        data,
+        data.entity_name
+          ? t("notifications.itemSent", {
+              sender: data.sender_name ?? t("notifications.someone"),
+              title: data.entity_name,
+            })
+          : t("notifications.itemSentUnnamed", {
+              sender: data.sender_name ?? t("notifications.someone"),
+            })
+      );
     case "share_declined":
       return t("notifications.shareDeclined", {
         answerer: data.answerer_name ?? t("notifications.someone"),

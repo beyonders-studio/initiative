@@ -69,6 +69,7 @@ async def bulk_set_resource_grants(
                 current_user,
                 guild_context,
                 item.grants,
+                note=(payload.note or "").strip() or None,
             )
             # As a single replace does: whoever the new sharing leaves out is
             # closed now, and whoever stays is told to refetch.

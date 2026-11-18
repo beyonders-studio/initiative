@@ -429,7 +429,10 @@
       "custom_status": "Your status line was cleared by a moderator.",
       "decorations": "Your profile decorations were cleared by a moderator.",
       "other": "Part of your profile was cleared by a moderator."
-    }
+    },
+    "itemSent": "{{sender}} sent you {{title}}.",
+    "itemSentUnnamed": "{{sender}} sent you something you can ask to open.",
+    "withNote": "{{line}} “{{note}}”"
   },
   "version": {
     "versionInformation": "Version Information",

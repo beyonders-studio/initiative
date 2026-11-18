@@ -22,6 +22,9 @@ class NotificationType(str, Enum):
     share_requested = "share_requested"
     share_granted = "share_granted"
     share_declined = "share_declined"
+    #: Somebody pointed the recipient at something, with a note if they wrote
+    #: one. Names the thing only where the recipient can open it.
+    item_sent = "item_sent"
     project_added = "project_added"
     mention = "mention"
     comment_on_task = "comment_on_task"

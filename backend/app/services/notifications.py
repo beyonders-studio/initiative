@@ -17,7 +17,7 @@ there.
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from functools import partial
@@ -353,6 +353,7 @@ async def notify(
     rollup_key: str | None = None,
     email: Callable[[User], email_service.EmailPieces] | None = None,
     email_names_line: bool = True,
+    present: Collection[int] = (),
 ) -> None:
     """Tell ``recipients`` one thing: a bell line each, then email and push.
 
@@ -377,7 +378,18 @@ async def notify(
     thread, naming ``actor``, and email and push go only when it opened a new
     one. ``email_names_line=False`` leaves the mail standing when the line is
     read — for a notice waiting on somebody's decision.
+
+    ``present`` is for a send alone (``item_sent``): recipients the sender
+    named who can't open ``about`` but are in its initiative, so may know it is
+    there and ask for it. They are told though they can't open it; the line
+    names the thing only to whoever can, when it is read.
     """
+    if present and (
+        notification_type is not NotificationType.item_sent
+        or recipients == SHARED_WITH
+        or about is None
+    ):
+        raise ValueError("only a send names people who can't open its subject")
     if recipients != SHARED_WITH:
         recipients = [
             user_id
@@ -425,7 +437,7 @@ async def notify(
         for user_id in dict.fromkeys(cast(Iterable[int | None], recipients))
         if user_id is not None
         and user_id != actor_id(actor)
-        and (about is None or user_id in allowed)
+        and (about is None or user_id in allowed or user_id in present)
     ]
     if not wanted:
         return

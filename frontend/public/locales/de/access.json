@@ -30,7 +30,9 @@
     "plugins": "Plug-ins",
     "pluginFallback": "Plug-in {{id}}",
     "pluginGrantHint": "Was ein Plug-in erreichen kann, legen die Einstellungen der Community fest, deshalb lässt es sich hier nicht ändern.",
-    "settingsDescription": "Legen Sie fest, wer dies ansehen und bearbeiten kann."
+    "settingsDescription": "Legen Sie fest, wer dies ansehen und bearbeiten kann.",
+    "noteLabel": "Notiz an Personen, die du hinzufügst",
+    "notePlaceholder": "Geht an die nächste Person, die du hinzufügst (optional)"
   },
   "bulkAccess": {
     "title": "Zugriff bearbeiten",
@@ -157,5 +159,20 @@
     "answered": "Schon beantwortet",
     "answeredDescription": "Hier gibt es nichts mehr zu beantworten.",
     "error": "Deine Antwort konnte nicht gesendet werden. Bitte versuch es noch einmal."
+  },
+  "send": {
+    "button": "Senden an…",
+    "title": "Senden an…",
+    "description": "Sie bekommen es in ihren Benachrichtigungen und öffnen es auf dem Gerät, das sie gerade nutzen.",
+    "people": "Personen",
+    "addPeople": "Personen hinzufügen",
+    "remove": "{{name}} entfernen",
+    "letIn": "Wenn jemand es noch nicht öffnen kann",
+    "letAsk": "Um Zugriff bitten lassen",
+    "submit": "Senden",
+    "sent": "Gesendet",
+    "sentSomeMayAsk_one": "Gesendet. {{count}} Person kann es noch nicht öffnen und kann um Zugriff bitten.",
+    "sentSomeMayAsk_other": "Gesendet. {{count}} Personen können es noch nicht öffnen und können um Zugriff bitten.",
+    "error": "Senden fehlgeschlagen. Bitte versuche es erneut."
   }
 }

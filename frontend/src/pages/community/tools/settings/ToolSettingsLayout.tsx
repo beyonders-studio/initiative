@@ -23,9 +23,10 @@ import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ResourceGrantSchema, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import type { GrantsChange } from "@/hooks/toolHooks";
 import { INSTANCE_LAYOUT_TOOLS, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute, toolSettingsSectionRoute } from "@/lib/tools";
@@ -54,7 +55,7 @@ export interface ToolSettingsLayoutProps {
   update?: ToolMutation<{ name?: string; description?: string | null }>;
   /** Marks it a template or takes it back — projects and files. */
   template?: ToolMutation<{ is_template: boolean }>;
-  setGrants: ToolMutation<ResourceGrantSchema[]>;
+  setGrants: ToolMutation<GrantsChange>;
   remove: ToolMutation<number>;
   /** Extra cards for the Details section, e.g. a calendar's color. */
   detailsExtra?: ReactNode;

@@ -9,6 +9,7 @@ import {
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SendButton } from "@/components/access/SendTo";
 import { CounterView } from "@/components/tools/counterGroups/views/CounterView";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
@@ -61,7 +62,12 @@ const NameEditor = ({ item: counter, label }: EditorProps) => {
       save={useSave(counter, label)}
       readOnly={useCounterLayout().readOnly}
       placeholder={t("counterNamePlaceholder")}
-      beside={<SubscribeButton kind="counter" entityId={counter.id} className="mt-0.5" />}
+      beside={
+        <>
+          <SubscribeButton kind="counter" entityId={counter.id} className="mt-0.5" />
+          <SendButton kind="counter" entityId={counter.id} className="mt-0.5" />
+        </>
+      }
     />
   );
 };

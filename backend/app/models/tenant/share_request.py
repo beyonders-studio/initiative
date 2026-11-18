@@ -39,11 +39,12 @@ class ShareRequestStatus(str, Enum):
 
 
 class ShareRequestScope(str, Enum):
-    """Who an approval reached: the requester, or every member of the
-    initiative."""
+    """Who an approval reached: the requester, every member of the
+    initiative, or an initiative role the requester holds."""
 
     user = "user"
     initiative = "initiative"
+    role = "role"
 
 
 #: The most a note to the person asked may say.
@@ -63,7 +64,7 @@ class ShareRequest(SQLModel, table=True):
             name="ck_share_requests_status",
         ),
         CheckConstraint(
-            "scope IS NULL OR scope IN ('user', 'initiative')",
+            "scope IS NULL OR scope IN ('user', 'initiative', 'role')",
             name="ck_share_requests_scope",
         ),
         # An approval says what it gave and to whom; nothing else does.

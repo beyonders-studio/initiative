@@ -25,6 +25,7 @@ import type {
   HTTPValidationError,
   ListWikisParams,
   ResourceGrantSchema,
+  SetWikiGrantsParams,
   ToolDuplicateRequest,
   WikiCreate,
   WikiListResponse,
@@ -1671,6 +1672,7 @@ export const setWikiGrants = (
   communityId: number,
   wikiId: number,
   resourceGrantSchema: BodyType<ResourceGrantSchema[]>,
+  params?: SetWikiGrantsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -1680,6 +1682,7 @@ export const setWikiGrants = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: resourceGrantSchema,
+      params,
       signal,
     },
     options
@@ -1716,9 +1719,9 @@ export const getSetWikiGrantsMutationOptions = <
     Awaited<ReturnType<typeof setWikiGrants>>,
     SetWikiGrantsMutationVariables
   > = (props) => {
-    const { communityId, wikiId, data } = props ?? {};
+    const { communityId, wikiId, data, params } = props ?? {};
 
-    return setWikiGrants(communityId, wikiId, data, requestOptions);
+    return setWikiGrants(communityId, wikiId, data, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -1731,6 +1734,7 @@ export type SetWikiGrantsMutationVariables = {
   communityId: number;
   wikiId: number;
   data: BodyType<ResourceGrantSchema[]>;
+  params?: SetWikiGrantsParams;
 };
 
 /**

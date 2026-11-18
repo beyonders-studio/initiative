@@ -9,6 +9,7 @@ import {
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SendButton } from "@/components/access/SendTo";
 import { isRepeating, occurrenceTarget } from "@/components/calendar/eventCalendarEntry";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
@@ -16,6 +17,7 @@ import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { ToolAccessStatus } from "@/components/tools/ToolAccessStatus";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import {
   useCalendarEvent,
   useDeleteCalendarEvent,
@@ -63,6 +65,7 @@ export function EventPage() {
     occurrenceParam && !Number.isNaN(Date.parse(occurrenceParam)) ? occurrenceParam : undefined;
   const navigate = useNavigate();
   const gp = useCommunityPath();
+  const activeCommunityId = useActiveCommunityId();
 
   const eventQuery = useCalendarEvent(eventId, undefined, occurrence);
   const event = eventQuery.data;
@@ -184,6 +187,10 @@ export function EventPage() {
         entityId={event.id}
         communityId={event.community_id}
       />
+      {/* Sent within the community the page is in, so only an event of it. */}
+      {event.community_id === activeCommunityId ? (
+        <SendButton kind={ContentKind.calendar_event} entityId={event.id} />
+      ) : null}
       <ReportButton
         targetType={SearchEntityType.calendar_event}
         targetId={event.id}

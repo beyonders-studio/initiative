@@ -17,6 +17,7 @@ import type { TaskRead } from "@/api/generated/initiativeAPI.schemas";
 import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
 import { invalidate, q } from "@/api/query-keys";
+import { SendButton } from "@/components/access/SendTo";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
@@ -426,6 +427,7 @@ export const TaskPage = () => {
   const actions = (
     <div className="flex items-center gap-1">
       <SubscribeButton kind={ContentKind.task} entityId={parsedTaskId} />
+      <SendButton kind={ContentKind.task} entityId={parsedTaskId} />
       <ModerationMenu
         targetType="task"
         targetId={parsedTaskId}

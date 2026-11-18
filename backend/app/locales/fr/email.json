@@ -607,6 +607,16 @@
         "title": "Vous pouvez le modifier",
         "body_one": "<strong>{{answerer}}</strong> vous a permis de modifier <strong>{{title}}</strong>",
         "body_other": "<strong>{{answerer}}</strong> vous a permis de modifier {{count}} fichiers"
+      },
+      "read_note": {
+        "subject": "Vous pouvez le voir maintenant",
+        "title": "Vous pouvez le voir maintenant",
+        "body": "<strong>{{answerer}}</strong> vous permet de voir <strong>{{title}}</strong>: « {{note}} »"
+      },
+      "write_note": {
+        "subject": "Vous pouvez le modifier maintenant",
+        "title": "Vous pouvez le modifier maintenant",
+        "body": "<strong>{{answerer}}</strong> vous permet de modifier <strong>{{title}}</strong>: « {{note}} »"
       }
     },
     "declined": {
@@ -621,6 +631,28 @@
       "subject": "Rappel : {{task}}",
       "title": "Rappel",
       "body": "Vous avez demandé un rappel pour <strong>{{task}}</strong>."
+    }
+  },
+  "item": {
+    "sent": {
+      "subject": "{{sender}} vous a envoyé {{title}}",
+      "title": "Envoyé pour vous",
+      "body": "<strong>{{sender}}</strong> vous a envoyé <strong>{{title}}</strong>"
+    },
+    "sent_note": {
+      "subject": "{{sender}} vous a envoyé {{title}}",
+      "title": "Envoyé pour vous",
+      "body": "<strong>{{sender}}</strong> vous a envoyé <strong>{{title}}</strong>: « {{note}} »"
+    },
+    "sent_unnamed": {
+      "subject": "{{sender}} vous a envoyé quelque chose",
+      "title": "Envoyé pour vous",
+      "body": "<strong>{{sender}}</strong> vous a envoyé quelque chose dont vous pouvez demander l’accès"
+    },
+    "sent_unnamed_note": {
+      "subject": "{{sender}} vous a envoyé quelque chose",
+      "title": "Envoyé pour vous",
+      "body": "<strong>{{sender}}</strong> vous a envoyé quelque chose dont vous pouvez demander l’accès: « {{note}} »"
     }
   }
 }

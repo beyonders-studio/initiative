@@ -1,6 +1,8 @@
 import type {
   ListShareRequestsParams,
   SearchEntityType,
+  SendCreate,
+  SendResult,
   ShareRequestAnswer,
   ShareRequestBatch,
   ShareRequestCreate,
@@ -9,6 +11,7 @@ import type {
 import {
   answerShareRequests,
   createShareRequest,
+  send,
   useListShareRequests,
   useReadShareStanding,
 } from "@/api/generated/sharing/sharing";
@@ -63,6 +66,18 @@ export const useCreateShareRequest = (
           ...(data.wiki_id != null ? [q.wiki(data.wiki_id)] : [])
         ),
       errorKey: "access:request.error",
+    },
+    options
+  );
+
+/** Send people one thing, in their bell. Letting somebody in to it answers
+ *  what they asked for, so the queues are read again. */
+export const useSendTo = (options?: MutationOpts<SendResult, SendCreate>) =>
+  useCommunityMutation<SendResult, SendCreate>(
+    {
+      mutationFn: (communityId, data) => send(communityId, data),
+      invalidate: () => invalidate(q.shareRequests()),
+      errorKey: "access:send.error",
     },
     options
   );

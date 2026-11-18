@@ -873,5 +873,8 @@
   "VIEW_KEPT_IN_THE_COMMUNITY": "Vuelve a cargar la aplicación para conservar esta vista.",
   "BANNED_FROM_COMMUNITY": "No puedes unirte a esta comunidad.",
   "TIMEOUT_NOT_FOR_ADMINS": "No se puede silenciar a los administradores. Cambia primero su rol.",
-  "TIMEOUT_MUST_END_LATER": "Elige una hora de fin en el futuro."
+  "TIMEOUT_MUST_END_LATER": "Elige una hora de fin en el futuro.",
+  "SEND_NOBODY": "Elige a quién enviarlo",
+  "SEND_NOT_IN_INITIATIVE": "Alguien que elegiste no está en esta iniciativa",
+  "SEND_NOTHING_TO_SHARE": "Esto no se puede compartir, así que no se puede dar acceso a nadie"
 }

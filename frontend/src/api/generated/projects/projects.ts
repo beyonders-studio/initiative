@@ -30,6 +30,7 @@ import type {
   ProjectUpdate,
   ReadProjectParams,
   ResourceGrantSchema,
+  SetProjectGrantsParams,
   ToolDuplicateRequest,
 } from "../initiativeAPI.schemas";
 
@@ -687,6 +688,7 @@ export const setProjectGrants = (
   communityId: number,
   projectId: number,
   resourceGrantSchema: BodyType<ResourceGrantSchema[]>,
+  params?: SetProjectGrantsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -696,6 +698,7 @@ export const setProjectGrants = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: resourceGrantSchema,
+      params,
       signal,
     },
     options
@@ -732,9 +735,9 @@ export const getSetProjectGrantsMutationOptions = <
     Awaited<ReturnType<typeof setProjectGrants>>,
     SetProjectGrantsMutationVariables
   > = (props) => {
-    const { communityId, projectId, data } = props ?? {};
+    const { communityId, projectId, data, params } = props ?? {};
 
-    return setProjectGrants(communityId, projectId, data, requestOptions);
+    return setProjectGrants(communityId, projectId, data, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -749,6 +752,7 @@ export type SetProjectGrantsMutationVariables = {
   communityId: number;
   projectId: number;
   data: BodyType<ResourceGrantSchema[]>;
+  params?: SetProjectGrantsParams;
 };
 
 /**

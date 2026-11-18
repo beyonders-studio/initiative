@@ -49,6 +49,7 @@ import type {
   ReadFileParams,
   RemoveCollectionFilesParams,
   ResourceGrantSchema,
+  SetFileGrantsParams,
   SpreadsheetImportRead,
   TimelineResponse,
   ToolDuplicateRequest,
@@ -2976,6 +2977,7 @@ export const setFileGrants = (
   communityId: number,
   fileId: number,
   resourceGrantSchema: BodyType<ResourceGrantSchema[]>,
+  params?: SetFileGrantsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -2985,6 +2987,7 @@ export const setFileGrants = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: resourceGrantSchema,
+      params,
       signal,
     },
     options
@@ -3021,9 +3024,9 @@ export const getSetFileGrantsMutationOptions = <
     Awaited<ReturnType<typeof setFileGrants>>,
     SetFileGrantsMutationVariables
   > = (props) => {
-    const { communityId, fileId, data } = props ?? {};
+    const { communityId, fileId, data, params } = props ?? {};
 
-    return setFileGrants(communityId, fileId, data, requestOptions);
+    return setFileGrants(communityId, fileId, data, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -3036,6 +3039,7 @@ export type SetFileGrantsMutationVariables = {
   communityId: number;
   fileId: number;
   data: BodyType<ResourceGrantSchema[]>;
+  params?: SetFileGrantsParams;
 };
 
 /**

@@ -29,9 +29,10 @@ import {
   readCollection,
   readFile,
 } from "@/api/generated/files/files";
-import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { SearchEntityType, type ShareStanding, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
+import { getReadShareStandingQueryKey, readShareStanding } from "@/api/generated/sharing/sharing";
 import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
 import {
   getReadWikiPageQueryKey,
@@ -217,6 +218,37 @@ export const entityRefTypeFor = (type: SearchEntityType): string | null => {
  * resolved — it was deleted, the reader can't see it, or its parent is gone.
  * Callers send `null` to the community home rather than guessing at an address.
  */
+/**
+ * Where something the reader can't open but may know is there lives, built from
+ * its presence (`/share-requests/standing`): the tool that decides it and its
+ * initiative. Its page then offers to ask for it, so a link sent to somebody
+ * who can't open it yet still leads somewhere they can act. Outside the
+ * reader's initiatives nothing is present, and this is `null` as before.
+ */
+const PRESENT_CHILD_ROUTES: Record<string, (standing: ShareStanding, id: number) => string> = {
+  task: (standing, id) => taskRoute(standing.initiative_id, standing.resource_id, id),
+  "calendar-event": (standing, id) => eventRoute(standing.initiative_id, standing.resource_id, id),
+  "wiki-page": (standing, id) => wikiPageRoute(standing.initiative_id, standing.resource_id, id),
+  collection: (standing, id) => collectionRoute(standing.initiative_id, id),
+};
+
+const resolvePresent = async (
+  read: Read,
+  communityId: number,
+  refType: string,
+  id: number
+): Promise<string | null> => {
+  const kind = refType.replaceAll("-", "_");
+  const child = PRESENT_CHILD_ROUTES[refType];
+  const tool = TOOLS.find((t) => t === kind);
+  if (!isSearchEntityType(kind) || (!child && !tool)) return null;
+  const params = { kind, entity_id: id };
+  const standing = await read(getReadShareStandingQueryKey(communityId, params), () =>
+    readShareStanding(communityId, params)
+  );
+  return child ? child(standing, id) : toolDetailRoute(tool as Tool, standing.initiative_id, id);
+};
+
 export async function resolveEntityPath(
   queryClient: QueryClient,
   communityId: number,
@@ -232,7 +264,13 @@ export async function resolveEntityPath(
   try {
     return await resolve(read, communityId, entityId);
   } catch {
-    // Deleted, or the reader can't see it. The caller lands on the community home.
-    return null;
+    // The reader can't open it: where they may know it is there, its page
+    // offers to ask for it. Deleted, or not there for them at all, and the
+    // caller lands on the community home.
+    try {
+      return await resolvePresent(read, communityId, refType, entityId);
+    } catch {
+      return null;
+    }
   }
 }

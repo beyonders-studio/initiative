@@ -429,7 +429,10 @@
       "custom_status": "Votre ligne de statut a été effacée par un modérateur.",
       "decorations": "Les décorations de votre profil ont été retirées par un modérateur.",
       "other": "Une partie de votre profil a été effacée par un modérateur."
-    }
+    },
+    "itemSent": "{{sender}} vous a envoyé {{title}}.",
+    "itemSentUnnamed": "{{sender}} vous a envoyé quelque chose dont vous pouvez demander l’accès.",
+    "withNote": "{{line}} « {{note}} »"
   },
   "version": {
     "versionInformation": "Informations sur la version",

@@ -36,6 +36,7 @@ import type {
   ReadCounterGroupParams,
   ReadCounterParams,
   ResourceGrantSchema,
+  SetCounterGroupGrantsParams,
   ToolDuplicateRequest,
 } from "../initiativeAPI.schemas";
 
@@ -1552,6 +1553,7 @@ export const setCounterGroupGrants = (
   communityId: number,
   groupId: number,
   resourceGrantSchema: BodyType<ResourceGrantSchema[]>,
+  params?: SetCounterGroupGrantsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -1561,6 +1563,7 @@ export const setCounterGroupGrants = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: resourceGrantSchema,
+      params,
       signal,
     },
     options
@@ -1597,9 +1600,9 @@ export const getSetCounterGroupGrantsMutationOptions = <
     Awaited<ReturnType<typeof setCounterGroupGrants>>,
     SetCounterGroupGrantsMutationVariables
   > = (props) => {
-    const { communityId, groupId, data } = props ?? {};
+    const { communityId, groupId, data, params } = props ?? {};
 
-    return setCounterGroupGrants(communityId, groupId, data, requestOptions);
+    return setCounterGroupGrants(communityId, groupId, data, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -1614,6 +1617,7 @@ export type SetCounterGroupGrantsMutationVariables = {
   communityId: number;
   groupId: number;
   data: BodyType<ResourceGrantSchema[]>;
+  params?: SetCounterGroupGrantsParams;
 };
 
 /**
