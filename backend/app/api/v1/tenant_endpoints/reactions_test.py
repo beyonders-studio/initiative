@@ -26,6 +26,7 @@ from app.testing import (
     create_task,
     drain_notices,
     guild_of,
+    switch_tools,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -35,10 +36,7 @@ PARTY = "\N{PARTY POPPER}"
 
 async def _posts_enabled(session, initiative) -> None:
     """Posts are off on a fresh initiative, so a notice test turns them on."""
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 async def _strip_grants(session, tool: Tool, entity):

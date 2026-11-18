@@ -22,14 +22,12 @@ from app.testing import (
     create_wiki_page,
     lexical_body,
     strip_non_owner_grants,
+    switch_tools,
 )
 
 
 async def _wikis_enabled(session: AsyncSession, initiative) -> None:
-    initiative.wikis_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.wiki: True})
 
 
 # ---------------------------------------------------------------------------
@@ -66,9 +64,7 @@ async def test_create_requires_feature_enabled(
     client: AsyncClient, acting_user, session
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.wikis_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.wiki: False})
 
     response = await client.post(
         a.g("/wikis/"),

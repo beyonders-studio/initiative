@@ -40,6 +40,7 @@ from app.testing import (
     create_user,
     drain_notices,
     get_auth_headers,
+    switch_tools,
 )
 from app.testing.routing import route_as
 
@@ -388,9 +389,7 @@ async def test_a_guest_hears_of_an_item_only_while_it_reaches_it(
     calendar = await create_guild_calendar(session, a.guild, a.user)
     guest = await create_guest(session, a.guild, ends_in=ends_in)
     await create_resource_grant(session, a.project, user=guest)
-    a.initiative.projects_enabled = projects_on
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.project: projects_on})
     project = named_people.Governing.of(Tool.project, a.project)
     everyone = named_people.Governing.of(Tool.calendar, calendar)
     guild_id, guest_id, member_id = a.guild.id, guest.id, member.user.id

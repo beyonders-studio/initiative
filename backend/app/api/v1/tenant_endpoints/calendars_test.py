@@ -21,6 +21,7 @@ from app.testing import (
     create_resource_grant,
     route_session_to_guild,
     strip_non_owner_grants,
+    switch_tools,
 )
 
 CALENDAR_PLUGIN = {
@@ -43,10 +44,7 @@ async def _install_calendar_plugin(session, guild, creator):
 
 
 async def _calendars_enabled(session: AsyncSession, initiative) -> None:
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
 
 
 # ---------------------------------------------------------------------------
@@ -94,9 +92,7 @@ async def test_create_calendar_requires_feature_enabled(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     # The factory switches every tool on, so a test about one being OFF
     # turns it off.
-    a.initiative.calendars_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: False})
 
     response = await client.post(
         a.g("/calendars/"),
@@ -308,7 +304,7 @@ async def test_calendar_counts_by_initiative(
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _calendars_enabled(session, admin.initiative)
     disabled_initiative = await create_initiative(
-        session, admin.guild, admin.user, calendars_enabled=False
+        session, admin.guild, admin.user, tools={Tool.calendar: False}
     )
 
     await create_calendar(session, admin.initiative, admin.user, name="Team")
@@ -570,7 +566,7 @@ async def test_a_copy_elsewhere_lets_go_of_invitees_who_cannot_read_it(
     )
     await _calendars_enabled(session, a.initiative)
     elsewhere = await create_initiative(
-        session, a.guild, a.user, calendars_enabled=True
+        session, a.guild, a.user, tools={Tool.calendar: True}
     )
     calendar = await create_calendar(session, a.initiative, a.user)
     event = await create_calendar_event(session, calendar, a.user)

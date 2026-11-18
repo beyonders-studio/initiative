@@ -17,6 +17,7 @@ from sqlmodel import select
 from app.core.file_types import FileType
 from app.core.references import NOT_REFERENCEABLE, REFERENCEABLE_TYPES
 from app.core.smart_chips import SMART_CHIP_KINDS, SmartChipKind, kind_value
+from app.core.tools import Tool
 from app.db.reference_targets import referenceable_types
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import TaskPriority, TaskStatus, TaskStatusCategory
@@ -36,6 +37,7 @@ from app.testing import (
     create_user,
     create_wiki,
     create_wiki_page,
+    switch_tools,
 )
 
 ActingUser = Callable[..., Awaitable[Actor]]
@@ -330,9 +332,7 @@ async def test_an_embedded_wiki_page_shows_its_body_but_not_a_draft(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     initiative = a.initiative
     assert initiative is not None
-    initiative.wikis_enabled = True
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, {Tool.wiki: True})
     wiki = await create_wiki(session, initiative, a.user)
     page = await create_wiki_page(
         session, wiki, a.user, title="Rota", content=_prose("Tuesdays.")

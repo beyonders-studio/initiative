@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
+from app.core.tools import Tool
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.engagement_level import LEVEL_MAX, EngagementLevel
@@ -28,6 +29,7 @@ from app.testing import (
     create_wiki_page,
     lexical_body,
     route_system,
+    switch_tools,
 )
 
 ActingUser = Callable[..., Awaitable[Actor]]
@@ -697,9 +699,7 @@ async def test_a_scheduled_notice_is_not_searchable_until_it_goes_up(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     initiative = a.initiative
     assert initiative is not None
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, {Tool.post: True})
 
     draft = await create_post(
         session,

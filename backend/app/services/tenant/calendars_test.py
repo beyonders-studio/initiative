@@ -12,6 +12,7 @@ it is pinned separately from the unfiltered one.
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.models.platform.guild import Guild, GuildMembership
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
@@ -34,7 +35,7 @@ async def _workspace(
     guild = await create_guild(session, creator=user)
     membership = await create_guild_membership(session, user=user, guild=guild)
     initiative = await create_initiative(
-        session, guild, user, calendars_enabled=calendars_enabled
+        session, guild, user, tools={Tool.calendar: calendars_enabled}
     )
     return user, guild, membership, initiative
 

@@ -13,6 +13,7 @@ from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ToolLayoutMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.metadata import MetadataType
 from app.services.tenant import task_types as task_types_service
@@ -29,6 +30,7 @@ from app.testing import (
     create_task,
     guild_url,
     route_session_to_guild,
+    switch_tools,
 )
 from app.testing.plugin_clients import install_headers, install_plugin
 
@@ -605,9 +607,7 @@ async def test_a_plugin_retypes_and_moves_without_meeting_a_page(
 
 
 async def _calendar(session: AsyncSession, a: Any) -> Any:
-    a.initiative.calendars_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
     return await create_calendar(session, a.initiative, a.user)
 
 
@@ -697,9 +697,7 @@ async def test_a_post_is_added_with_the_tags_its_page_requires(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
     tag = await create_tag(session, a.guild)
     await _require(
         client,

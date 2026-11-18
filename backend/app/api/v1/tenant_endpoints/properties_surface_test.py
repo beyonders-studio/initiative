@@ -57,6 +57,7 @@ from app.testing import (
     create_wiki_page,
     enable_all_tools,
     route_session_to_guild,
+    switch_tools,
 )
 
 # ---------------------------------------------------------------------------
@@ -137,10 +138,7 @@ def _event_filters(a, parent, property_id, value):
 
 
 async def _calendar_in(session, a, initiative):
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     return await create_calendar(session, initiative, a.user)
 
 

@@ -479,7 +479,7 @@ async def test_updating_an_initiative_records_the_new_name_and_description(
     assert data["description"] == "Updated description"
 
     # A required field is omitted to keep it, never nulled.
-    for field in ("name", "join_policy", "keep_content_in", "projects_enabled"):
+    for field in ("name", "join_policy", "keep_content_in", "tools"):
         response = await client.patch(
             owner.g(f"/initiatives/{initiative.id}"),
             headers=owner.headers,
@@ -2432,7 +2432,7 @@ async def test_changing_what_an_initiative_allows_rechecks_its_members(
     switched = await client.patch(
         manager.g(f"/initiatives/{initiative_id}"),
         headers=manager.headers,
-        json={"files_enabled": False},
+        json={"tools": {"file": False}},
     )
     assert switched.status_code == 200, switched.text
     assert rechecked.pop() == {manager.user.id, member.user.id}
@@ -2483,7 +2483,7 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
     defaults_url = admin.g("/initiatives/defaults")
     initiative_url = pm.g(f"/initiatives/{initiative_id}")
     own = await client.patch(
-        initiative_url, headers=pm.headers, json={"posts_enabled": False}
+        initiative_url, headers=pm.headers, json={"tools": {"post": False}}
     )
     assert own.status_code == 200, own.text
     # A custom role that predates the community keeping initiatives to their
@@ -2533,11 +2533,11 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
     read = await client.get(member.g("/initiatives/defaults"), headers=member.headers)
     assert read.json() == {**set_, **no_own}
     seen = await members_view()
-    assert seen["posts_enabled"] is True
+    assert seen["tools"]["post"] is True
     assert Tool.post.value in seen["can"]["view"]
 
     switch = await client.patch(
-        initiative_url, headers=pm.headers, json={"posts_enabled": False}
+        initiative_url, headers=pm.headers, json={"tools": {"post": False}}
     )
     assert switch.status_code == 409
     assert switch.json()["detail"] == InitiativeMessages.SET_BY_COMMUNITY
@@ -2592,7 +2592,7 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
     assert initiative_id not in own_read["own_member_permissions"]["posts_enabled"]
     assert initiative_id in own_read["own_member_permissions"]["create_files"]
     seen = await members_view()
-    assert seen["posts_enabled"] is False
+    assert seen["tools"]["post"] is False
     assert Tool.post.value not in seen["can"]["view"]
     roles = (await client.get(f"{initiative_url}/roles", headers=pm.headers)).json()
     member_role = next(r for r in roles if r["name"] == "member")

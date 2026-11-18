@@ -14,17 +14,21 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.post_poll import PostPoll, PostPollVote
 from app.models.tenant.post_read import PostRead
-from app.testing import create_post, create_post_poll, lexical_body, route_as
+from app.testing import (
+    create_post,
+    create_post_poll,
+    lexical_body,
+    route_as,
+    switch_tools,
+)
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 def _poll_payload(**overrides):

@@ -1359,7 +1359,7 @@ def _initiative_tool_actions() -> str:
         switch = (
             f"(CASE WHEN '{tool.value}=on' = ANY ({community}) THEN true"
             f" WHEN '{tool.value}=off' = ANY ({community}) THEN false"
-            f" ELSE v_initiative.{tool.view_permission} END)"
+            f" ELSE '{tool.view_permission}' = ANY (v_switched) END)"
         )
         view_default = str(
             DEFAULT_PERMISSION_VALUES[PermissionKey(tool.view_permission)]
@@ -1398,13 +1398,18 @@ CREATE OR REPLACE FUNCTION initiative_actions(p_initiative_id integer, p_user_id
  STABLE
 AS $function$
 DECLARE
-    v_initiative initiatives%ROWTYPE;
+    v_switched text[];
     v_actions text[] := ARRAY[]::text[];
 BEGIN
-    SELECT * INTO v_initiative FROM initiatives WHERE id = p_initiative_id;
+    PERFORM 1 FROM initiatives WHERE id = p_initiative_id;
     IF NOT FOUND THEN
         RETURN v_actions;
     END IF;
+    -- The initiative's own switches: its rules with no role and no install.
+    SELECT COALESCE(array_agg(r.key::text), ARRAY[]::text[]) INTO v_switched
+    FROM initiative_rules r
+    WHERE r.initiative_id = p_initiative_id
+      AND r.initiative_role_id IS NULL AND r.install_id IS NULL AND r.enabled;
     IF {_B.system} OR {_B.holds(AdminSurface.initiatives)}
        OR ({_B.this_guild} AND NOT {_B.guest}
            AND p_initiative_id = ANY ({_B.field("manager_initiatives")})) THEN

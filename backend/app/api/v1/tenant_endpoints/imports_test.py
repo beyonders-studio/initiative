@@ -21,7 +21,8 @@ from app.services.import_engine import worker as import_worker
 from app.services.import_engine.atlassian_test import answered
 from app.services.storage import get_guild_storage
 from app.services.tenant import tags as tags_service
-from app.testing import drain_notices
+from app.services.tenant.initiative_tools import own_switch
+from app.testing import drain_notices, switch_tools
 from app.testing.factories import (
     assign_tag,
     create_calendar_event,
@@ -102,7 +103,7 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
     assert envelope["tags"] == ["Loot"]
     # A name listed again in another case is the same tag, attached once.
     envelope["tags"].append("loot")
-    target = await _second_initiative(session, a, counter_groups_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.counter_group: True})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     assert resp.json()["result"]["matched"]["tags"] == 1
@@ -209,9 +210,7 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    a.initiative.calendars_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, a.initiative, a.user, name="Raid Nights")
     await assign_tag(
         session, calendar, await create_tag(session, a.guild, name="Raids"), commit=True
@@ -238,7 +237,7 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
     )
     assert envelope["type"] == "initiative-calendar"
 
-    target = await _second_initiative(session, a, calendars_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.calendar: True})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     created = resp.json()["result"]["created"]
@@ -544,9 +543,7 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
         "name": "Q",
         "counters": [],
     }
-    a.initiative.counter_groups_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
     disabled = await _import_envelope(client, a, group_envelope, a.initiative.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
@@ -1057,8 +1054,8 @@ async def test_backup_import_end_to_end_with_assets(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one()
     assert restored.description == "from backup"
-    assert restored.counter_groups_enabled is True
-    assert restored.dashboards_enabled is False  # "disabled" in manifest
+    assert own_switch(restored, Tool.counter_group) is True
+    assert own_switch(restored, Tool.dashboard) is False  # "disabled" in manifest
     member = (
         await session.exec(
             select(InitiativeMember).where(
@@ -2171,9 +2168,7 @@ async def test_importing_a_post_over_the_body_limit_is_refused(
     from app.testing import lexical_body
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
 
     response = await _import_envelope(
         client,
@@ -2193,9 +2188,7 @@ async def test_importing_a_structurally_oversized_body_is_refused(
     from app.schemas.tenant.post import MAX_POST_BODY_BYTES
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
 
     # Wide rather than wordy: thousands of empty paragraphs carry no text at
     # all, so the character limit lets them straight through.
@@ -2215,9 +2208,7 @@ async def test_importing_a_long_headline_trims_rather_than_fails(
     """A headline is display text. The column holds 255, and failing a whole
     restore over a long title helps nobody — so it is trimmed and said."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
 
     response = await _import_envelope(
         client, a, _post_envelope(name="H" * 400), a.initiative.id
@@ -3534,7 +3525,7 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    target = await _second_initiative(session, a, files_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.file: True})
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
@@ -3893,7 +3884,7 @@ async def test_a_wiki_zip_imports_back_from_the_wiki_page(client, acting_user, s
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     await _all_tools_enabled(session, a.initiative)
-    target = await _second_initiative(session, a, wikis_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.wiki: True})
     settings = {
         "page_order": WikiPageOrder.title,
         "contents_depth": 2,
@@ -5148,9 +5139,7 @@ async def test_a_jira_file_stays_behind_when_the_initiative_has_no_files(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
@@ -5291,7 +5280,7 @@ async def test_starting_a_jira_import_refuses_what_it_can_up_front(
     )
     assert malformed.status_code == 422
 
-    target = await _second_initiative(session, a, projects_enabled=False)
+    target = await _second_initiative(session, a, tools={Tool.project: False})
     disabled = await _start_jira(client, a, initiative_id=target.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
@@ -5896,9 +5885,7 @@ async def test_an_initiative_without_files_takes_only_the_pictures(
 
     monkeypatch.setattr(atlassian_service, "request_public_target", _attachment_site())
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
 
     job_id = (await _start_confluence(client, a, initiative_id=a.initiative.id)).json()[
         "id"
