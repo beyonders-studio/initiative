@@ -626,7 +626,7 @@ class TestRefusals:
         assert listing is not None and listing.available is True
 
     async def test_a_version_republished_with_other_content_says_so(
-        self, session, repo, trusted
+        self, session, repo, trusted, monkeypatch, tmp_path
     ):
         entry = repo.add_listing("acme", PLUGIN_UID, slug="tracker", name="Tracker")
         repo.publish()
@@ -651,13 +651,24 @@ class TestRefusals:
         status = await _status(session)
         assert status is not None
         assert status.last_error == Codes.VERSION_REUSED
+        path = f"publishers/acme/{PLUGIN_UID}/listing.json"
         assert status.last_skipped == [
-            {"code": Codes.VERSION_REUSED, "listing_name": "Tracker"}
+            {"name": path, "code": Codes.VERSION_REUSED, "listing_name": "Tracker"}
         ]
         read = await tuf_registry.read_status(session, enabled=True)
         assert read.skipped == [
-            tuf_registry.SkippedEntry(code=Codes.VERSION_REUSED, listing_name="Tracker")
+            tuf_registry.SkippedEntry(
+                name=path, code=Codes.VERSION_REUSED, listing_name="Tracker"
+            )
         ]
+
+        # A trusted root that stops loading is what the status reports; the
+        # skips from before do not bury it.
+        broken = _write_root(tmp_path / "broken.json", b"not a root")
+        monkeypatch.setattr(tuf_registry, "BUILTIN_ROOT_PATH", broken)
+        read = await tuf_registry.read_status(session, enabled=True)
+        assert (read.last_error, read.skipped) == (Codes.ROOT_INVALID, [])
+        monkeypatch.setattr(tuf_registry, "BUILTIN_ROOT_PATH", trusted)
 
         # Published as a new version, it lands and the status clears.
         repo.add_listing(
@@ -1055,7 +1066,11 @@ class TestPackageTerms:
         repo.publish()
         result, _ = await _refresh(session, repo)
 
-        assert [entry.name for entry in result.skipped] == ["package"]
+        # The package's own role: no listing or publisher to name it by.
+        assert [
+            (entry.name, entry.code, entry.listing_name, entry.publisher_name)
+            for entry in result.skipped
+        ] == [("package", Codes.METADATA_REJECTED, None, None)]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None and listing.access == "entitled"
 

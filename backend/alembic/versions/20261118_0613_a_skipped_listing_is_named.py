@@ -1,8 +1,8 @@
 """a skipped listing is named
 
 ``marketplace_registry_status.last_skipped``: what the last registry refresh
-skipped, as a list of ``{"code"}`` with the listing's or the publisher's
-display name when known. The status panel names each one and says why,
+skipped, as a list of ``{"name", "code"}`` with the listing's or the
+publisher's display name when known. The status panel names each one and says why,
 rather than reading the first skip's code alone from ``last_error``. NULL
 until the next refresh records it.
 

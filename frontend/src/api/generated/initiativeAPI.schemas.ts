@@ -11214,11 +11214,9 @@ export interface RefreshRequest {
 
 /**
  * A listing (or a publisher) the repository carried that did not land.
- *
- * Named by display name only, never a target path or a uid, since this is
- * what the operator is shown.
  */
 export interface RegistrySkippedListing {
+  name: string;
   code: string;
   listing_name: string | null;
   publisher_name: string | null;

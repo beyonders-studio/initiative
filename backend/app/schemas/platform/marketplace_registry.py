@@ -13,13 +13,13 @@ from app.schemas.base import SanitizedBaseModel
 
 
 class RegistrySkippedListing(SanitizedBaseModel):
-    """A listing (or a publisher) the repository carried that did not land.
-
-    Named by display name only, never a target path or a uid, since this is
-    what the operator is shown."""
+    """A listing (or a publisher) the repository carried that did not land."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
+    #: The listing's target path, or the publisher's role name. Not for
+    #: showing: the operator is shown the display names below.
+    name: str
     #: A ``MarketplaceRegistryMessages`` code naming why.
     code: str
     #: The listing's display name, when a listing was skipped and its name is

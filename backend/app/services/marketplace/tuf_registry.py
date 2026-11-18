@@ -799,18 +799,20 @@ async def _claim_refresh(session: AsyncSession) -> bool:
 class SkippedEntry:
     """What the repository carried that did not land, and why.
 
-    Named for the operator by display name, never by a target path or a uid:
-    the listing's when one was skipped, the publisher's when none of its
-    listings could be read. Neither, for the package's own role or a listing
-    this deployment has never held under a name.
+    ``name`` is the listing's target path, or the role's name: bookkeeping,
+    and the API's since before the display names. The operator is shown the
+    display name: the listing's when one was skipped, the publisher's when
+    none of its listings could be read. Neither, for the package's own role or
+    a listing this deployment has never held under a name.
     """
 
+    name: str
     code: str
     listing_name: str | None = None
     publisher_name: str | None = None
 
     def to_json(self) -> dict[str, str]:
-        kept = {"code": self.code}
+        kept = {"name": self.name, "code": self.code}
         if self.listing_name:
             kept["listing_name"] = self.listing_name
         if self.publisher_name:
@@ -821,9 +823,11 @@ class SkippedEntry:
     def from_json(cls, value: object) -> SkippedEntry | None:
         if not isinstance(value, dict) or not isinstance(value.get("code"), str):
             return None
+        name = value.get("name")
         listing_name = value.get("listing_name")
         publisher_name = value.get("publisher_name")
         return cls(
+            name=name if isinstance(name, str) else "",
             code=value["code"],
             listing_name=listing_name if isinstance(listing_name, str) else None,
             publisher_name=publisher_name if isinstance(publisher_name, str) else None,
@@ -921,6 +925,7 @@ async def _apply(
         for failed, code in repo.failed:
             result.skipped.append(
                 SkippedEntry(
+                    name=failed.name,
                     code=code,
                     publisher_name=await _publisher_name(session, failed.name),
                 )
@@ -968,6 +973,7 @@ async def _apply(
                 )
                 result.skipped.append(
                     SkippedEntry(
+                        name=path,
                         code=exc.code,
                         listing_name=exc.listing_name
                         or await _stored_listing_name(session, parsed.uid),
@@ -1018,7 +1024,9 @@ async def _read_terms(
             exc.code,
             exc.detail,
         )
-        result.skipped.append(SkippedEntry(code=exc.code))
+        result.skipped.append(
+            SkippedEntry(name=package_terms.PACKAGE_ROLE, code=exc.code)
+        )
         return {}, None
     if package is None:
         return {}, set()
@@ -1039,6 +1047,7 @@ async def _read_terms(
             )
             result.skipped.append(
                 SkippedEntry(
+                    name=package_terms.terms_path(uid),
                     code=exc.code,
                     listing_name=await _stored_listing_name(session, uid),
                 )
@@ -1226,7 +1235,9 @@ async def read_status(session: AsyncSession, *, enabled: bool) -> RegistryStatus
         last_success_at=row.last_success_at if row is not None and current else None,
         last_error=root_error or (row.last_error if row is not None else None),
         listing_count=row.listing_count if row is not None else 0,
-        skipped=_kept_skips(row),
+        # A trusted root that does not load is the problem now; what an
+        # earlier refresh skipped would only bury it.
+        skipped=[] if root_error is not None else _kept_skips(row),
     )
 
 

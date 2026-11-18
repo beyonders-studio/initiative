@@ -183,6 +183,7 @@ def _skipped_read(
 ) -> list[RegistrySkippedListing]:
     return [
         RegistrySkippedListing(
+            name=item.name,
             code=item.code,
             listing_name=item.listing_name,
             publisher_name=item.publisher_name,

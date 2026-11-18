@@ -118,10 +118,10 @@ class MarketplaceRegistryStatus(SQLModel, table=True):
     )
     # Message code of the last refusal, or NULL after a clean refresh.
     last_error: str | None = Field(default=None, sa_column=Column(String(64)))
-    # What the last refresh skipped, and why: a list of ``{"code", and
-    # "listing_name" or "publisher_name" when known}``, at most
-    # ``MAX_SKIPPED_KEPT`` of them. NULL when nothing was skipped. Display
-    # names only, never a path or uid: this is what the operator is shown.
+    # What the last refresh skipped, and why: a list of ``{"name" (the target
+    # path or role), "code", and "listing_name" or "publisher_name" when
+    # known}``, at most ``MAX_SKIPPED_KEPT`` of them. NULL when nothing was
+    # skipped. The operator is shown the display names, never the path.
     last_skipped: list[dict[str, str]] | None = Field(
         default=None, sa_column=Column(JSONB)
     )

@@ -32,6 +32,7 @@ const buildStatus = (overrides: Partial<RegistryStatusRead> = {}): RegistryStatu
 });
 
 const skip = (overrides: Partial<RegistrySkippedListing>): RegistrySkippedListing => ({
+  name: "publishers/beyonders-studio/TSJVTCM0S7GV2X/listing.json",
   code: VERSION_REUSED,
   listing_name: null,
   publisher_name: null,
