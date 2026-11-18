@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from app.core.tools import Tool
 from app.db.guild_standing import compute_guild_standing
 from app.db.request_context import Member
 from app.db.session import set_rls_context
@@ -15,13 +16,16 @@ from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.custom_role import CustomRole, CustomRoleMember
+from app.models.tenant.initiative import InitiativeRule
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
+from app.services.tenant.initiatives import get_member_role
 from app.testing import (
     create_guest,
     create_guild_calendar,
+    create_guild_plugin,
     create_initiative,
     create_initiative_member,
     create_project,
@@ -87,6 +91,54 @@ async def test_a_guest_given_one_item_reaches_it_and_nothing_else_there(
     )
     with pytest.raises(DBAPIError):
         await s.flush()
+
+
+async def test_a_guest_reads_only_the_tool_switches_of_an_item_initiative(
+    session, acting_user, role_session
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    guest = await create_guest(session, a.guild)
+    await create_resource_grant(session, a.project, user=guest)
+    plugin = await create_guild_plugin(
+        session, a.guild, a.user, definition={"plugin_kind": "service"}
+    )
+    member = await get_member_role(session, initiative_id=a.initiative.id)
+    assert member is not None
+    session.add(
+        InitiativeRule(
+            initiative_id=a.initiative.id,
+            initiative_role_id=member.id,
+            install_id=plugin.id,
+            key="use",
+            enabled=True,
+        )
+    )
+    await session.commit()
+    await route_session_to_guild(session, a.guild.id)
+    # The community sets no switch, so the initiative's own decides.
+    assert (
+        await _ids(
+            session, "SELECT id FROM initiative_rules WHERE initiative_id IS NULL"
+        )
+        == set()
+    )
+    initiative_id, project_id = a.initiative.id, a.project.id
+
+    s, context = await _routed(role_session, guest.id, a.guild.id)
+
+    assert f"{initiative_id}:{Tool.project.value}" in context.enabled_tools
+    assert await _ids(s, "SELECT id FROM projects") == {project_id}
+    read = (
+        await s.exec(
+            text(
+                "SELECT initiative_id, initiative_role_id, install_id, key"
+                " FROM initiative_rules"
+            )
+        )
+    ).all()
+    assert {tuple(row) for row in read} == {
+        (initiative_id, None, None, tool.view_permission) for tool in Tool
+    }
 
 
 async def test_a_guest_opens_a_project_shared_with_them(client, session, acting_user):

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from enum import Enum
 
+from app.core.tools import Tool
 from app.db import gucs
 from app.db.authorization import IN_POLICY
 from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
@@ -140,6 +141,14 @@ _MEMBER_OF = _P.field("member_initiatives")
 _IN_INITIATIVES = (
     f"(SELECT im.initiative_id FROM initiative_members im WHERE im.user_id = {_UID})"
 )
+#: The initiatives of the items shared with a guest by name, read from their
+#: own sharing rows for the same reason.
+_ITEM_INITIATIVES = (
+    f"(SELECT g.initiative_id FROM resource_grants g WHERE g.user_id = {_UID})"
+)
+#: Each tool's switch key in an initiative (its row with no role and no
+#: install).
+_TOOL_SWITCH_KEYS = ", ".join(f"'{tool.view_permission}'" for tool in Tool)
 
 #: The rows of each table a guest reaches, as SQL over that table. Read
 #: narrowing only: what a guest may write is the table's own policies'.
@@ -147,8 +156,7 @@ GUEST_ROWS: dict[str, str] = {
     # The initiatives they are in, and those of the items shared with them.
     "initiatives": (
         f"(initiatives.id IN {_IN_INITIATIVES}"
-        " OR initiatives.id IN (SELECT g.initiative_id FROM resource_grants g"
-        f" WHERE g.user_id = {_UID}))"
+        f" OR initiatives.id IN {_ITEM_INITIATIVES})"
     ),
     # The rosters and roles of the initiatives they are in, and nothing of an
     # initiative they reach only through items.
@@ -158,10 +166,15 @@ GUEST_ROWS: dict[str, str] = {
     ),
     "initiative_roles": f"(initiative_roles.initiative_id IN {_IN_INITIATIVES})",
     # The community's own rows say what every initiative is held to, which a
-    # guest's standing reads too.
+    # guest's standing reads too; and in the initiatives of the items shared
+    # with them, only which tools are switched on.
     "initiative_rules": (
         f"(initiative_rules.initiative_id IN {_IN_INITIATIVES}"
-        " OR initiative_rules.initiative_id IS NULL)"
+        " OR initiative_rules.initiative_id IS NULL"
+        " OR (initiative_rules.initiative_role_id IS NULL"
+        " AND initiative_rules.install_id IS NULL"
+        f" AND initiative_rules.key IN ({_TOOL_SWITCH_KEYS})"
+        f" AND initiative_rules.initiative_id IN {_ITEM_INITIATIVES}))"
     ),
     # Their own custom role, if one was given: not who else holds what.
     "custom_role_members": f"custom_role_members.user_id = {_UID}",
