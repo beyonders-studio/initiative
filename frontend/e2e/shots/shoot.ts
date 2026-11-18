@@ -7,6 +7,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from "@pla
 const RELEASE_IMAGES = fileURLToPath(new URL("../../../docs/images/releases/", import.meta.url));
 const HELP_IMAGES = fileURLToPath(new URL("../../../docs/en/images/", import.meta.url));
 const SITE_IMAGES = fileURLToPath(new URL("../../public/site/", import.meta.url));
+const MARKETPLACE_IMAGES = fileURLToPath(new URL("../../public/marketplace/", import.meta.url));
 
 /** Small enough to keep in the repository, sharp enough to read a label. */
 const QUALITY = 0.85;
@@ -48,6 +49,17 @@ export async function shootHelp(page: Page, name: string, target?: Locator) {
  */
 export async function shootSite(page: Page, name: string, target?: Locator) {
   await capture(page, SITE_IMAGES, name, target);
+}
+
+/**
+ * Take a picture for a built-in marketplace listing, saved as
+ * `frontend/public/marketplace/<name>.webp` and `<name>.dark.webp`. These ship
+ * with the app, like the front door's: the listing's `images` in
+ * `backend/app/marketplace_catalog/` name the light one, as
+ * `/marketplace/<name>.webp`.
+ */
+export async function shootMarketplace(page: Page, name: string, target?: Locator) {
+  await capture(page, MARKETPLACE_IMAGES, name, target);
 }
 
 async function capture(page: Page, folder: string, name: string, target?: Locator) {
