@@ -6,17 +6,18 @@ publisher's display name when known. The status panel names each one and says wh
 rather than reading the first skip's code alone from ``last_error``. NULL
 until the next refresh records it.
 
-Revision ID: 20261118_0613
-Revises: 20261117_0612
+A database that ran this as ``20261118_0613`` already has the column, so both
+directions are conditional.
+
+Revision ID: 20261118_0615
+Revises: 20261118_0614
 Create Date: 2026-11-18
 """
 
-import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "20261118_0613"
-down_revision = "20261117_0612"
+revision = "20261118_0615"
+down_revision = "20261118_0614"
 branch_labels = None
 depends_on = None
 
@@ -25,8 +26,8 @@ COLUMN = "last_skipped"
 
 
 def upgrade() -> None:
-    op.add_column(TABLE, sa.Column(COLUMN, JSONB(), nullable=True))
+    op.execute(f"ALTER TABLE {TABLE} ADD COLUMN IF NOT EXISTS {COLUMN} JSONB")
 
 
 def downgrade() -> None:
-    op.drop_column(TABLE, COLUMN)
+    op.execute(f"ALTER TABLE {TABLE} DROP COLUMN IF EXISTS {COLUMN}")
