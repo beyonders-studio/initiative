@@ -35,6 +35,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.tools import Tool
 from app.db import post_commit
 from app.models.platform.guild import CommunityRole
+from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -51,6 +52,7 @@ from app.testing import (
     grant_role_permission,
     route_session_to_guild,
 )
+from app.testing.notices import drain_notices
 
 #: Every tool, as its own test case.
 TOOLS = pytest.mark.parametrize("tool", list(Tool), ids=[t.value for t in Tool])
@@ -78,6 +80,7 @@ async def test_the_owner_shares_it_with_somebody(
     response = await client.put(
         a.g(f"/{tool.route_segment}/{entity.id}/grants"),
         headers=a.headers,
+        params={"note": "For Thursday"},
         json=[{"user_id": b.user.id, "level": "write"}],
     )
     assert response.status_code == 200, response.text
@@ -88,6 +91,25 @@ async def test_the_owner_shares_it_with_somebody(
     # The owner is kept whether or not the replacement list names them.
     assert [grant["level"] for grant in grants if grant["user_id"] == a.user.id] == [
         "owner"
+    ]
+    # The person let in is told, with the note; saving the same sharing again
+    # tells nobody.
+    await client.put(
+        a.g(f"/{tool.route_segment}/{entity.id}/grants"),
+        headers=a.headers,
+        json=[{"user_id": b.user.id, "level": "write"}],
+    )
+    await drain_notices()
+    told = (
+        await session.exec(
+            select(Notification).where(
+                Notification.user_id == b.user.id,
+                Notification.type == NotificationType.share_granted,
+            )
+        )
+    ).all()
+    assert [(n.data["level"], n.data["note"]) for n in told] == [
+        ("write", "For Thursday")
     ]
 
 

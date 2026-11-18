@@ -5,6 +5,8 @@ from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
+from app.models.tenant.initiative import InitiativeRoleModel
+from app.models.tenant.share_request import ShareRequest
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
 from app.testing import (
@@ -113,6 +115,47 @@ async def test_a_member_asks_for_a_file_and_the_owner_shares_it(client, session,
     assert (
         len(await _told(session, reader.user.id, NotificationType.share_granted)) == 1
     )
+
+
+async def test_sharing_with_their_role_answers_what_they_asked(client, session, two):
+    """A request is answered by whatever sharing reaches the requester, not
+    only by a yes: here, the sharing settings give their role edit."""
+    owner, reader = two
+    file = await create_file(session, owner.initiative, owner.user, name="Budget")
+    file_id = file.id
+    await client.post(
+        reader.g("/share-requests/"),
+        json={"resource_type": "file", "resource_id": file_id, "level": "write"},
+        headers=reader.headers,
+    )
+    role_id = (
+        await session.exec(
+            select(InitiativeRoleModel.id).where(
+                InitiativeRoleModel.initiative_id == owner.initiative.id,
+                InitiativeRoleModel.name == "member",
+            )
+        )
+    ).one()
+
+    shared = await client.put(
+        owner.g(f"/files/{file_id}/grants"),
+        json=[{"role_id": role_id, "level": "write"}],
+        headers=owner.headers,
+    )
+
+    assert shared.status_code == 200, shared.text
+    (request,) = (
+        await session.exec(
+            select(ShareRequest).where(ShareRequest.resource_id == file_id)
+        )
+    ).all()
+    assert (request.status, request.granted_level, request.scope) == (
+        "approved",
+        "write",
+        "role",
+    )
+    told = await _told(session, reader.user.id, NotificationType.share_granted)
+    assert [n.data["level"] for n in told] == ["write"]
 
 
 async def test_nothing_outside_the_readers_initiatives_can_be_asked_about(

@@ -607,6 +607,16 @@
         "title": "You can edit it now",
         "body_one": "<strong>{{answerer}}</strong> let you edit <strong>{{title}}</strong>",
         "body_other": "<strong>{{answerer}}</strong> let you edit {{count}} files"
+      },
+      "read_note": {
+        "subject": "You can view it now",
+        "title": "You can view it now",
+        "body": "<strong>{{answerer}}</strong> let you view <strong>{{title}}</strong>: “{{note}}”"
+      },
+      "write_note": {
+        "subject": "You can edit it now",
+        "title": "You can edit it now",
+        "body": "<strong>{{answerer}}</strong> let you edit <strong>{{title}}</strong>: “{{note}}”"
       }
     },
     "declined": {
@@ -621,6 +631,28 @@
       "subject": "Reminder: {{task}}",
       "title": "Reminder",
       "body": "You asked to be reminded of <strong>{{task}}</strong>."
+    }
+  },
+  "item": {
+    "sent": {
+      "subject": "{{sender}} sent you {{title}}",
+      "title": "Sent to you",
+      "body": "<strong>{{sender}}</strong> sent you <strong>{{title}}</strong>"
+    },
+    "sent_note": {
+      "subject": "{{sender}} sent you {{title}}",
+      "title": "Sent to you",
+      "body": "<strong>{{sender}}</strong> sent you <strong>{{title}}</strong>: “{{note}}”"
+    },
+    "sent_unnamed": {
+      "subject": "{{sender}} sent you something",
+      "title": "Sent to you",
+      "body": "<strong>{{sender}}</strong> sent you something you can ask to open"
+    },
+    "sent_unnamed_note": {
+      "subject": "{{sender}} sent you something",
+      "title": "Sent to you",
+      "body": "<strong>{{sender}}</strong> sent you something you can ask to open: “{{note}}”"
     }
   }
 }

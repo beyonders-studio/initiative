@@ -40,6 +40,7 @@ from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.session import require_actor_context
+from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.collection import Collection
@@ -49,6 +50,7 @@ from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
+from app.services import notifications as notifications_service
 from app.services import permissions as permissions_service
 from app.services import reachability
 from app.services import rls as rls_service
@@ -64,6 +66,7 @@ from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import named_people, project_grants, task_queries
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import posts as posts_service
+from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import wikis as wikis_service
 from app.services.tenant.initiative_tools import tool_on
 
@@ -658,6 +661,7 @@ async def set_resource_grants(
     user: User | None,
     guild_context: ActorContext,
     grants: list[ResourceGrantSchema],
+    note: str | None = None,
 ) -> None:
     """Replace one resource's sharing the unified way: load + 404, authorize
     the share action (``Action.share``), rebuild every non-owner grant from
@@ -669,7 +673,13 @@ async def set_resource_grants(
 
     An installed plug-in changes sharing where a person with its rung could, and
     only with ``sharing:write`` and the tool's write scope
-    (:func:`require_install_may_share`)."""
+    (:func:`require_install_may_share`).
+
+    A person's change is told: each pending request the new sharing reaches is
+    answered (``share_requests.settle_reached``), and each person it newly
+    names, or raises to edit, hears they were let in, with ``note`` where the
+    giver wrote one. A grant to a role or to every member tells only those who
+    asked."""
     require_install_may_share(guild_context, kind)
     row = await load_authorized(
         session,
@@ -684,10 +694,11 @@ async def set_resource_grants(
     if kind is Tool.file:
         # Who a collection may name is whoever can open a file in it.
         collections_service.settle_after_commit(session, left_files=[row.id])
-    await permissions_service.replace_resource_grants(
+    resource_id = row.id
+    before, after = await permissions_service.replace_resource_grants(
         session,
         resource_type=kind,
-        resource_id=row.id,
+        resource_id=resource_id,
         guild_id=guild_context.guild_id,
         initiative_id=row.initiative_id,
         owner_id=ownership_service.owner_user_id_of(row),
@@ -700,3 +711,57 @@ async def set_resource_grants(
     # sharing does not reach are let go, once that sharing is committed.
     if await named_people.sweep(session, settled):
         await session.commit()
+    if user is not None:
+        await _tell_let_in(session, kind, resource_id, user, before, after, note)
+        await session.commit()
+
+
+async def _tell_let_in(
+    session: Any,
+    kind: Tool,
+    resource_id: int,
+    giver: User,
+    before: dict[tuple[str, int | None], str],
+    after: dict[tuple[str, int | None], str],
+    note: str | None,
+) -> None:
+    """Tell whoever a change of sharing let in: those who asked, however it
+    reaches them, then those it names who were not named before or could only
+    view."""
+    told = await share_requests_service.settle_reached(
+        session,
+        tool=kind,
+        resource_id=resource_id,
+        sharing=after,
+        answerer=giver,
+        note=note,
+    )
+    let_in: dict[ResourceAccessLevel, list[int]] = {}
+    for (grantee, user_id), level in after.items():
+        was = before.get((grantee, user_id))
+        if grantee != "user" or user_id is None or user_id in told:
+            continue
+        if was is not None and ResourceAccessLevel(was).reaches(
+            ResourceAccessLevel(level)
+        ):
+            continue
+        let_in.setdefault(ResourceAccessLevel(level), []).append(user_id)
+    if not let_in:
+        return
+    name = await notifications_service.actor_name(session, giver)
+    title = (
+        await share_requests_service.names(session, [(kind.value, resource_id)])
+    ).get((kind.value, resource_id), "")
+    for level, user_ids in let_in.items():
+        await notifications_service.notify(
+            session,
+            NotificationType.share_granted,
+            user_ids,
+            about=(kind.value, resource_id),
+            key=share_requests_service.granted_key(level, note),
+            values={"answerer": name, "count": "1", "title": title, "note": note or ""},
+            data=share_requests_service.granted_data(
+                name, level, kind.value, resource_id, note
+            ),
+            actor=giver,
+        )

@@ -319,12 +319,38 @@
         "title": "Du kannst es jetzt bearbeiten",
         "body_one": "{{answerer}} hat dir {{title}} zum Bearbeiten freigegeben",
         "body_other": "{{answerer}} hat dir {{count}} Dateien zum Bearbeiten freigegeben"
+      },
+      "read_note": {
+        "title": "Du kannst es jetzt ansehen",
+        "body": "{{answerer}} lässt dich {{title}} ansehen: „{{note}}“"
+      },
+      "write_note": {
+        "title": "Du kannst es jetzt bearbeiten",
+        "body": "{{answerer}} lässt dich {{title}} bearbeiten: „{{note}}“"
       }
     },
     "declined": {
       "title": "Anfrage abgelehnt",
       "body_one": "{{answerer}} hat deine Anfrage abgelehnt",
       "body_other": "{{answerer}} hat deine Anfrage für {{count}} Dateien abgelehnt"
+    }
+  },
+  "item": {
+    "sent": {
+      "title": "Für dich",
+      "body": "{{sender}} hat dir {{title}} geschickt"
+    },
+    "sent_note": {
+      "title": "{{sender}} hat dir {{title}} geschickt",
+      "body": "{{note}}"
+    },
+    "sent_unnamed": {
+      "title": "Für dich",
+      "body": "{{sender}} hat dir etwas geschickt, um dessen Zugriff du bitten kannst"
+    },
+    "sent_unnamed_note": {
+      "title": "{{sender}} hat dir etwas geschickt",
+      "body": "{{note}}"
     }
   }
 }

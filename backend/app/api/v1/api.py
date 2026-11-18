@@ -104,6 +104,7 @@ from app.api.v1.tenant_endpoints import (
     relationships,
     resource_grants,
     resumable_uploads,
+    sends,
     share_requests,
     smart_chips,
     storage,
@@ -341,6 +342,8 @@ guild_router.include_router(
 guild_router.include_router(
     share_requests.router, prefix="/share-requests", tags=["sharing"]
 )
+# Pointing somebody at a thing, in their bell. Every kind, so mounted once.
+guild_router.include_router(sends.router, prefix="/sends", tags=["sharing"])
 guild_router.include_router(data_jobs.router, prefix="/data-jobs", tags=["data-jobs"])
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])

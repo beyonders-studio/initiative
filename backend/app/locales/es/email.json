@@ -607,6 +607,16 @@
         "title": "Ya puedes editarlo",
         "body_one": "<strong>{{answerer}}</strong> te dejó editar <strong>{{title}}</strong>",
         "body_other": "<strong>{{answerer}}</strong> te dejó editar {{count}} archivos"
+      },
+      "read_note": {
+        "subject": "Ya puedes verlo",
+        "title": "Ya puedes verlo",
+        "body": "<strong>{{answerer}}</strong> te ha dejado ver <strong>{{title}}</strong>: «{{note}}»"
+      },
+      "write_note": {
+        "subject": "Ya puedes editarlo",
+        "title": "Ya puedes editarlo",
+        "body": "<strong>{{answerer}}</strong> te ha dejado editar <strong>{{title}}</strong>: «{{note}}»"
       }
     },
     "declined": {
@@ -621,6 +631,28 @@
       "subject": "Recordatorio: {{task}}",
       "title": "Recordatorio",
       "body": "Pediste que te recordáramos <strong>{{task}}</strong>."
+    }
+  },
+  "item": {
+    "sent": {
+      "subject": "{{sender}} te ha enviado {{title}}",
+      "title": "Te lo han enviado",
+      "body": "<strong>{{sender}}</strong> te ha enviado <strong>{{title}}</strong>"
+    },
+    "sent_note": {
+      "subject": "{{sender}} te ha enviado {{title}}",
+      "title": "Te lo han enviado",
+      "body": "<strong>{{sender}}</strong> te ha enviado <strong>{{title}}</strong>: «{{note}}»"
+    },
+    "sent_unnamed": {
+      "subject": "{{sender}} te ha enviado algo",
+      "title": "Te lo han enviado",
+      "body": "<strong>{{sender}}</strong> te ha enviado algo a lo que puedes pedir acceso"
+    },
+    "sent_unnamed_note": {
+      "subject": "{{sender}} te ha enviado algo",
+      "title": "Te lo han enviado",
+      "body": "<strong>{{sender}}</strong> te ha enviado algo a lo que puedes pedir acceso: «{{note}}»"
     }
   }
 }

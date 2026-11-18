@@ -213,6 +213,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.community_join_denied,
                 NotificationType.share_granted,
                 NotificationType.share_declined,
+                NotificationType.item_sent,
             }
         ),
         group=CategoryGroup.your_communities,

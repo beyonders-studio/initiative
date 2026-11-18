@@ -298,7 +298,7 @@ async def replace_resource_grants(
     grants: Any,
     actor_user_id: int | None = None,
     by_install: bool = False,
-) -> None:
+) -> tuple[dict[_Grantee, str], dict[_Grantee, str]]:
     """Rebuild a resource's non-owner grants from ``grants`` (a list of
     ResourceAccessGrant rows). Each row is sorted by grantee kind — all-members,
     per-user, or per-role. The owner grant is preserved; owner-level entries and
@@ -315,7 +315,9 @@ async def replace_resource_grants(
     and the move of every grantee whose level actually changed is recorded in
     the same transaction. ``by_install`` records an installed plug-in's change the
     same way, with no person as its actor. Left at neither, nothing is
-    recorded."""
+    recorded.
+
+    Returns the level each grantee held before and holds after."""
     all_members_level: str | None = None
     user_levels: dict[int, str] = {}
     role_levels: dict[int, str] = {}
@@ -474,24 +476,24 @@ async def replace_resource_grants(
         if rid in valid_roles
     )
 
+    after: dict[_Grantee, str] = {}
+    if all_members_level is not None:
+        after[("all_members", None)] = all_members_level
+    after.update(
+        {
+            ("user", uid): level
+            for uid, level in user_levels.items()
+            if uid in valid_users
+        }
+    )
+    after.update(
+        {
+            ("role", rid): level
+            for rid, level in role_levels.items()
+            if rid in valid_roles
+        }
+    )
     if actor_user_id is not None or by_install:
-        after: dict[_Grantee, str] = {}
-        if all_members_level is not None:
-            after[("all_members", None)] = all_members_level
-        after.update(
-            {
-                ("user", uid): level
-                for uid, level in user_levels.items()
-                if uid in valid_users
-            }
-        )
-        after.update(
-            {
-                ("role", rid): level
-                for rid, level in role_levels.items()
-                if rid in valid_roles
-            }
-        )
         await _record_grant_changes(
             session,
             actor_user_id=actor_user_id,
@@ -502,6 +504,7 @@ async def replace_resource_grants(
             before=before,
             after=after,
         )
+    return before, after
 
 
 async def share_with(

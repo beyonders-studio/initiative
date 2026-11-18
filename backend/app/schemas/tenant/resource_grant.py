@@ -16,6 +16,7 @@ from pydantic import ConfigDict, Field, model_validator
 from app.core.identity_boundary import PersonId
 from app.core.tools import Tool
 from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.models.tenant.share_request import MAX_MESSAGE_LENGTH
 from app.schemas.base import SanitizedBaseModel
 
 # Upper bound on how many resources one bulk grant request may touch. Each item is
@@ -91,6 +92,8 @@ class ResourceGrantBulkRequest(SanitizedBaseModel):
     items: list[ResourceGrantBulkItem] = Field(
         min_length=1, max_length=MAX_BULK_GRANT_ITEMS
     )
+    #: Said to each person the new sharing lets in.
+    note: str | None = Field(default=None, max_length=MAX_MESSAGE_LENGTH)
 
 
 class ResourceGrantBulkItemResult(SanitizedBaseModel):

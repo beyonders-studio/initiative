@@ -340,6 +340,15 @@ class ShareRequestMessages:
     CANNOT_ANSWER = "SHARE_REQUEST_CANNOT_ANSWER"
 
 
+class SendMessages:
+    #: Nobody to send it to but the sender.
+    NOBODY = "SEND_NOBODY"
+    #: Somebody named can't open it and isn't in its initiative.
+    NOT_IN_INITIATIVE = "SEND_NOT_IN_INITIATIVE"
+    #: Access was to be given with it, and it has no sharing of its own.
+    NOTHING_TO_SHARE = "SEND_NOTHING_TO_SHARE"
+
+
 class InitiativeMessages:
     NOT_FOUND = "INITIATIVE_NOT_FOUND"
     MANAGER_REQUIRED = "INITIATIVE_MANAGER_REQUIRED"

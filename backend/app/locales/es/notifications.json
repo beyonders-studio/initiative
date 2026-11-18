@@ -319,12 +319,38 @@
         "title": "Ya puedes editarlo",
         "body_one": "{{answerer}} te dejó editar {{title}}",
         "body_other": "{{answerer}} te dejó editar {{count}} archivos"
+      },
+      "read_note": {
+        "title": "Ya puedes verlo",
+        "body": "{{answerer}} te ha dejado ver {{title}}: «{{note}}»"
+      },
+      "write_note": {
+        "title": "Ya puedes editarlo",
+        "body": "{{answerer}} te ha dejado editar {{title}}: «{{note}}»"
       }
     },
     "declined": {
       "title": "Solicitud rechazada",
       "body_one": "{{answerer}} rechazó tu solicitud",
       "body_other": "{{answerer}} rechazó tu solicitud de {{count}} archivos"
+    }
+  },
+  "item": {
+    "sent": {
+      "title": "Te lo han enviado",
+      "body": "{{sender}} te ha enviado {{title}}"
+    },
+    "sent_note": {
+      "title": "{{sender}} te ha enviado {{title}}",
+      "body": "{{note}}"
+    },
+    "sent_unnamed": {
+      "title": "Te lo han enviado",
+      "body": "{{sender}} te ha enviado algo a lo que puedes pedir acceso"
+    },
+    "sent_unnamed_note": {
+      "title": "{{sender}} te ha enviado algo",
+      "body": "{{note}}"
     }
   }
 }

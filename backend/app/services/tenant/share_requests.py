@@ -552,3 +552,131 @@ async def answer(
                 actor=answerer,
             )
     return found
+
+
+#: How a grantee in a resource's sharing is spelled (``permissions._Grantee``):
+#: the requester by name, an initiative role, or every member.
+_SCOPE_OF_GRANTEE = {
+    "user": ShareRequestScope.user,
+    "role": ShareRequestScope.role,
+    "all_members": ShareRequestScope.initiative,
+}
+
+
+def _reached(
+    sharing: dict[tuple[str, int | None], str], user_id: int, role_id: int | None
+) -> tuple[ResourceAccessLevel, ShareRequestScope] | None:
+    """The rung ``sharing`` gives one member and the grant that gives it: the
+    highest of a grant naming them, one on their role and one to every member,
+    the narrowest first where two give the same."""
+    best: tuple[ResourceAccessLevel, ShareRequestScope] | None = None
+    for grantee in (("user", user_id), ("role", role_id), ("all_members", None)):
+        held = sharing.get(grantee)
+        if held is None:
+            continue
+        level = ResourceAccessLevel(held)
+        if best is None or not best[0].reaches(level):
+            best = (level, _SCOPE_OF_GRANTEE[grantee[0]])
+    return best
+
+
+async def settle_reached(
+    session: AsyncSession,
+    *,
+    tool: Tool,
+    resource_id: int,
+    sharing: dict[tuple[str, int | None], str],
+    answerer: User,
+    note: str | None,
+    tell: bool = True,
+) -> set[int]:
+    """Answer the pending requests on one thing that its new ``sharing``
+    reaches, however it reaches them: by name, by a role they hold, or by every
+    member. A request reached at the rung it asked for is approved; one asking
+    to edit that is now let view stays open for the rest. Each requester the
+    new sharing lets in is told, as a yes is, unless ``tell`` is off for a
+    caller that tells them itself. Returns who was let in. Rides the caller's
+    transaction, after the sharing is written."""
+    pending = (
+        await session.exec(
+            select(ShareRequest).where(
+                ShareRequest.resource_type == tool.value,
+                ShareRequest.resource_id == resource_id,
+                ShareRequest.status == ShareRequestStatus.pending.value,
+            )
+        )
+    ).all()
+    if not pending:
+        return set()
+    subject = await notifications_service.resolve_subject(
+        session, (tool.value, resource_id)
+    )
+    if subject is None:
+        return set()
+    roles = dict(
+        (
+            await session.exec(
+                select(InitiativeMember.user_id, InitiativeMember.role_id).where(
+                    InitiativeMember.initiative_id == subject.initiative_id,
+                    InitiativeMember.user_id.in_([r.user_id for r in pending]),
+                )
+            )
+        ).all()
+    )
+    let_in: dict[int, ResourceAccessLevel] = {}
+    for request in pending:
+        if request.user_id not in subject.readers:
+            continue
+        reach = _reached(sharing, request.user_id, roles.get(request.user_id))
+        if reach is None:
+            continue
+        level, scope = reach
+        if level.reaches(ResourceAccessLevel(request.level)):
+            request.status = ShareRequestStatus.approved.value
+            request.granted_level = level.value
+            request.scope = scope.value
+            session.add(request)
+        let_in[request.user_id] = level
+    await session.flush()
+    if not let_in or not tell:
+        return set(let_in)
+    name = await notifications_service.actor_name(session, answerer)
+    title = (await names(session, [(tool.value, resource_id)])).get(
+        (tool.value, resource_id), ""
+    )
+    for level in {*let_in.values()}:
+        await notifications_service.notify(
+            session,
+            NotificationType.share_granted,
+            [user_id for user_id, held in let_in.items() if held is level],
+            about=subject,
+            key=granted_key(level, note),
+            values={"answerer": name, "count": "1", "title": title, "note": note or ""},
+            data=granted_data(name, level, tool.value, resource_id, note),
+            actor=answerer,
+        )
+    return set(let_in)
+
+
+def granted_key(level: ResourceAccessLevel, note: str | None) -> str:
+    """The push and email words for being let in, with the giver's note or
+    without."""
+    return f"share.granted.{level.value}{'_note' if note else ''}"
+
+
+def granted_data(
+    answerer: str,
+    level: ResourceAccessLevel,
+    kind: str,
+    entity_id: int,
+    note: str | None,
+) -> dict[str, object]:
+    """What a line saying somebody was let in carries."""
+    return {
+        "answerer_name": answerer,
+        "level": level.value,
+        "count": 1,
+        "entity_type": kind,
+        "entity_id": entity_id,
+        **({"note": note} if note else {}),
+    }
