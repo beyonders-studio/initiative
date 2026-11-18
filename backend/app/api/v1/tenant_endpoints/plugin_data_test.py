@@ -45,6 +45,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
 from app.core.messages import GuildPluginMessages, PluginDataMessages
+from app.core.tools import Tool
 from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
@@ -82,6 +83,7 @@ from app.testing import (
     create_user,
     get_auth_headers,
     route_session_to_guild,
+    switch_tools,
 )
 from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
 
@@ -369,9 +371,7 @@ async def _workspace(session: AsyncSession, acting_user, *sources: str):
     """A guild admin with a dashboards-enabled initiative, an installed plug-in, a
     live registration, and a dashboard binding the given sources."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.dashboards_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.dashboard: True})
 
     await _register(session)
     plugin = await _install(session, a)
@@ -592,9 +592,7 @@ class TestKillSwitches:
         self, client, acting_user, session, upstream
     ):
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        a.initiative.dashboards_enabled = True
-        session.add(a.initiative)
-        await session.commit()
+        await switch_tools(session, a.initiative, {Tool.dashboard: True})
         plugin = await _install(session, a)
         dashboard = await create_dashboard(
             session,
@@ -765,9 +763,7 @@ class TestConnections:
         definition["endpoints"][0]["requires"] = {"all_of": ["admin"]}
 
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        a.initiative.dashboards_enabled = True
-        session.add(a.initiative)
-        await session.commit()
+        await switch_tools(session, a.initiative, {Tool.dashboard: True})
         await _register(session)
         plugin = await create_guild_plugin(
             session, a.guild, a.user, definition=definition, listing_uid=PLUGIN_UID
@@ -1536,9 +1532,7 @@ class TestDeclarative:
         vendor = FakeVendor()
         vendor.install(monkeypatch)
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        a.initiative.dashboards_enabled = True
-        session.add(a.initiative)
-        await session.commit()
+        await switch_tools(session, a.initiative, {Tool.dashboard: True})
         await create_plugin_service_registration(
             session,
             public_id="acme.issues",

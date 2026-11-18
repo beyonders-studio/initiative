@@ -27,7 +27,6 @@ from app.core.messages import (
     InitiativeMessages,
     UserMessages,
 )
-from app.core.tools import Tool
 from app.db.query import (
     MAX_ID_FILTER_VALUES,
     build_paginated_response,
@@ -81,6 +80,7 @@ from app.services.platform import presence
 from app.services.platform import users as users_service
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant.initiative_tools import switches, write_switches
 from app.services.tenant.names import ensure_name_free
 
 #: A route that administers the community's initiatives.
@@ -835,14 +835,12 @@ async def create_initiative(
         name=initiative_in.name,
         description=initiative_in.description,
         join_policy=initiative_in.join_policy.value,
-        # One master switch per toggleable tool, derived — a new Tool member
-        # flows through without touching this endpoint.
-        **{t.view_permission: getattr(initiative_in, t.view_permission) for t in Tool},
     )
     if initiative_in.color:
         initiative.color = initiative_in.color
     session.add(initiative)
     await session.flush()
+    await write_switches(session, initiative.id, switches(initiative_in.tools))
 
     # Create built-in roles for this initiative
     roles = await initiatives_service.create_builtin_roles(
@@ -892,10 +890,11 @@ async def update_initiative(
     )
 
     update_data = initiative_in.model_dump(exclude_unset=True)
-    if any(tool.view_permission in update_data for tool in Tool):
+    tools = dict(update_data.pop("tools", None) or {})
+    if tools:
         defaults = await initiatives_service.community_defaults(session)
         if any(
-            update_data.get(tool.view_permission, enabled) != enabled
+            tools.get(tool, enabled) != enabled
             for tool, enabled in defaults.tools.items()
         ):
             raise HTTPException(
@@ -905,7 +904,7 @@ async def update_initiative(
         # The community's switch is shown back as the initiative's; the
         # initiative's own value under it is left as it was.
         for tool in defaults.tools:
-            update_data.pop(tool.view_permission, None)
+            tools.pop(tool, None)
     # Auto-join enrols every future guild member, so it shapes onboarding for
     # the whole guild rather than for one initiative — guild admins only, the
     # same shape as the archive toggle above. join_policy stays with whoever may
@@ -950,8 +949,8 @@ async def update_initiative(
     for field, value in update_data.items():
         setattr(initiative, field, value)
     session.add(initiative)
-    switched = any(field.endswith("_enabled") for field in update_data)
-    members = await _member_ids(session, initiative_id) if switched else []
+    await write_switches(session, initiative_id, tools)
+    members = await _member_ids(session, initiative_id) if tools else []
     await session.commit()
     await content_sockets.refresh_users(guild_context.guild_id, members)
     return await _read_initiative(initiative_id, session, guild_context)

@@ -9,6 +9,125 @@ matter and can be deleted.
 
 ## After 0.79.2
 
+### An initiative's tool switches are one map
+
+Each initiative's switch for each tool is a rule of the initiative's, read and
+written as one `tools` map, `{tool: on}`, in place of a `<plural>_enabled`
+field per tool: an initiative reads `tools`, and creating or changing one takes
+`tools` with the tools it names.
+
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/calendars_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/contacts_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/counter_groups_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/dashboards_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/files_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/posts_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/projects_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/wikis_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `calendars_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `contacts_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `counter_groups_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `dashboards_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `files_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `posts_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `projects_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `wikis_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `calendars_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `contacts_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `counter_groups_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `dashboards_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `files_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `posts_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `projects_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `wikis_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `calendars_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `contacts_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `counter_groups_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `dashboards_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `files_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `posts_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `projects_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `wikis_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `calendars_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `contacts_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `counter_groups_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `dashboards_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `files_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `posts_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `projects_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `wikis_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `calendars_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `contacts_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `counter_groups_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `dashboards_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `files_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `posts_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `projects_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `wikis_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `calendars_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `contacts_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `counter_groups_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `dashboards_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `files_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `posts_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `projects_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `wikis_enabled` from the response with the `200` status
+
+### A comment is said on its subject
+
+A comment names what it is said on as `subject_type` and `subject_id` in
+place of eleven `<kind>_id` fields: the thread is listed by them, a comment is
+posted with them, and every comment read carries them.
+
+- GET /api/v1/c/{community_id}/comments/ added the new required `query` request parameter `subject_id`
+- GET /api/v1/c/{community_id}/comments/ added the new required `query` request parameter `subject_type`
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/calendar_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/collection_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/contact_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/counter_group_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/dashboard_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/file_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/post_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/project_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/task_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/wiki_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/wiki_page_id` from the response with the `200` status
+- POST /api/v1/c/{community_id}/comments/ added the new required request property `subject_id`
+- POST /api/v1/c/{community_id}/comments/ added the new required request property `subject_type`
+- POST /api/v1/c/{community_id}/comments/ removed the required property `calendar_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `collection_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `contact_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `counter_group_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `dashboard_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `file_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `post_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `project_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `task_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `wiki_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/comments/ removed the required property `wiki_page_id` from the response with the `201` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `calendar_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `collection_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `contact_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `counter_group_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `dashboard_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `file_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `post_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `project_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `task_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `wiki_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `wiki_page_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `calendar_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `collection_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `contact_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `counter_group_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `dashboard_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `file_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `post_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `project_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `task_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `wiki_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `wiki_page_id` from the response with the `200` status
+
 ### The plug-in services list is paged
 
 A deployment may run any number of plug-ins, so the owner's list of plug-in

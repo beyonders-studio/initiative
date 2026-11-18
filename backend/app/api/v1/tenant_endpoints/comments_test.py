@@ -17,6 +17,8 @@ from app.testing import (
     create_task,
     create_wiki_page,
     guild_of,
+    switch_tools,
+    thread_path,
 )
 
 # One factory per tool, uniform (session, initiative, creator) shape. The
@@ -32,10 +34,7 @@ async def _tool_entity(session, tool: Tool, initiative, creator):
     test states the sharing it needs explicitly (some factories seed an
     all-members read grant). Toggleable tools are switched on for the
     initiative first."""
-    if not getattr(initiative, tool.view_permission, True):
-        setattr(initiative, tool.view_permission, True)
-        session.add(initiative)
-        await session.commit()
+    await switch_tools(session, initiative, {tool: True})
     entity = await TOOL_FACTORIES[tool](session, initiative, creator)
     await route_session_to_guild(session, guild_of(initiative))
     await session.exec(
@@ -47,10 +46,6 @@ async def _tool_entity(session, tool: Tool, initiative, creator):
     )
     await session.commit()
     return entity
-
-
-def _param(tool: Tool) -> str:
-    return f"{tool.value}_id"
 
 
 class TestToolComments:
@@ -66,16 +61,18 @@ class TestToolComments:
         created = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "First!", _param(tool): entity.id},
+            json={
+                "subject_type": tool.value,
+                "subject_id": entity.id,
+                "content": "First!",
+            },
         )
         assert created.status_code == 201, created.text
         body = created.json()
-        assert body[_param(tool)] == entity.id
-        if tool is Tool.project:
-            assert body["project_id"] == entity.id
+        assert (body["subject_type"], body["subject_id"]) == (tool.value, entity.id)
 
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=a.headers
         )
         assert listed.status_code == 200, listed.text
         assert [c["id"] for c in listed.json()["comments"]] == [body["id"]]
@@ -94,7 +91,7 @@ class TestToolComments:
         )
 
         listed = await client.get(
-            a.g("/comments/"), headers=b.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=b.headers
         )
         assert listed.status_code == 403
         assert listed.json()["detail"] == CommentMessages.PERMISSION_DENIED
@@ -102,7 +99,7 @@ class TestToolComments:
         posted = await client.post(
             a.g("/comments/"),
             headers=b.headers,
-            json={"content": "Hi", _param(tool): entity.id},
+            json={"subject_type": tool.value, "subject_id": entity.id, "content": "Hi"},
         )
         assert posted.status_code == 403
 
@@ -125,14 +122,14 @@ class TestToolComments:
         )
 
         listed = await client.get(
-            a.g("/comments/"), headers=b.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=b.headers
         )
         assert listed.status_code == 200
 
         posted = await client.post(
             a.g("/comments/"),
             headers=b.headers,
-            json={"content": "Hi", _param(tool): entity.id},
+            json={"subject_type": tool.value, "subject_id": entity.id, "content": "Hi"},
         )
         assert posted.status_code == 201, posted.text
 
@@ -145,14 +142,18 @@ class TestToolComments:
         admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
 
         listed = await client.get(
-            a.g("/comments/"), headers=admin.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=admin.headers
         )
         assert listed.status_code == 200
 
         posted = await client.post(
             a.g("/comments/"),
             headers=admin.headers,
-            json={"content": "Hello", _param(tool): entity.id},
+            json={
+                "subject_type": tool.value,
+                "subject_id": entity.id,
+                "content": "Hello",
+            },
         )
         assert posted.status_code == 201, posted.text
 
@@ -163,9 +164,8 @@ class TestToolComments:
         outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
 
         listed = await client.get(
-            a.g("/comments/"),
+            a.g(thread_path(tool.value, entity.id)),
             headers=outsider.headers,
-            params={_param(tool): entity.id},
         )
         assert listed.status_code == 404
 
@@ -175,12 +175,10 @@ class TestToolComments:
     ):
         a = await acting_user(guild_role=CommunityRole.member, initiative=True)
         entity = await _tool_entity(session, tool, a.initiative, a.user)
-        setattr(a.initiative, tool.view_permission, False)
-        session.add(a.initiative)
-        await session.commit()
+        await switch_tools(session, a.initiative, {tool: False})
 
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=a.headers
         )
         assert listed.status_code == 403
 
@@ -192,7 +190,11 @@ class TestToolComments:
         root = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Root", "counter_group_id": group.id},
+            json={
+                "subject_type": "counter_group",
+                "subject_id": group.id,
+                "content": "Root",
+            },
         )
         assert root.status_code == 201
 
@@ -200,8 +202,9 @@ class TestToolComments:
             a.g("/comments/"),
             headers=a.headers,
             json={
+                "subject_type": "counter_group",
+                "subject_id": other.id,
                 "content": "Reply",
-                "counter_group_id": other.id,
                 "parent_comment_id": root.json()["id"],
             },
         )
@@ -212,35 +215,35 @@ class TestToolComments:
             a.g("/comments/"),
             headers=a.headers,
             json={
+                "subject_type": "counter_group",
+                "subject_id": group.id,
                 "content": "Reply",
-                "counter_group_id": group.id,
                 "parent_comment_id": root.json()["id"],
             },
         )
         assert reply.status_code == 201
 
-    async def test_exactly_one_target(self, client, session, acting_user):
+    async def test_a_comment_names_a_subject_that_is_there(
+        self, client, session, acting_user
+    ):
         a = await acting_user(guild_role=CommunityRole.member, initiative=True)
         project = await _tool_entity(session, Tool.project, a.initiative, a.user)
-        group = await _tool_entity(session, Tool.counter_group, a.initiative, a.user)
 
-        two = await client.post(
-            a.g("/comments/"),
-            headers=a.headers,
-            json={
-                "content": "Hi",
-                "project_id": project.id,
-                "counter_group_id": group.id,
-            },
+        missing = {"subject_type": "project", "subject_id": project.id + 10_000}
+        posted = await client.post(
+            a.g("/comments/"), headers=a.headers, json={**missing, "content": "Hi"}
         )
-        assert two.status_code == 422
+        assert posted.status_code == 404
+        listed = await client.get(a.g("/comments/"), headers=a.headers, params=missing)
+        assert listed.status_code == 404
 
-        none = await client.post(
-            a.g("/comments/"), headers=a.headers, json={"content": "Hi"}
-        )
-        assert none.status_code == 422
+        for subject in ({}, {"subject_type": "tag", "subject_id": project.id}):
+            refused = await client.post(
+                a.g("/comments/"), headers=a.headers, json={**subject, "content": "Hi"}
+            )
+            assert refused.status_code == 422, subject
 
-    async def test_a_task_comment_reports_its_project(
+    async def test_a_task_comment_reports_its_subject(
         self, client, session, acting_user
     ):
         a = await acting_user(
@@ -251,12 +254,15 @@ class TestToolComments:
         created = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "On the task", "task_id": task.id},
+            json={
+                "subject_type": "task",
+                "subject_id": task.id,
+                "content": "On the task",
+            },
         )
         assert created.status_code == 201, created.text
         body = created.json()
-        assert body["task_id"] == task.id
-        assert body["project_id"] == a.project.id
+        assert (body["subject_type"], body["subject_id"]) == ("task", task.id)
 
     async def test_recent_carries_tool_comments(self, client, session, acting_user):
         a = await acting_user(
@@ -265,12 +271,18 @@ class TestToolComments:
         group = await _tool_entity(session, Tool.counter_group, a.initiative, a.user)
         task = await create_task(session, a.project)
 
-        for payload in (
-            {"content": "On the counter group", "counter_group_id": group.id},
-            {"content": "On the task", "task_id": task.id},
+        for kind, subject_id, content in (
+            ("counter_group", group.id, "On the counter group"),
+            ("task", task.id, "On the task"),
         ):
             posted = await client.post(
-                a.g("/comments/"), headers=a.headers, json=payload
+                a.g("/comments/"),
+                headers=a.headers,
+                json={
+                    "subject_type": kind,
+                    "subject_id": subject_id,
+                    "content": content,
+                },
             )
             assert posted.status_code == 201, posted.text
 
@@ -330,14 +342,17 @@ async def test_guild_calendar_comments_reach_every_member(client, session, actin
     posted = await client.post(
         admin.g("/comments/"),
         headers=member.headers,
-        json={"content": "Game night?", "calendar_id": calendar.id},
+        json={
+            "subject_type": "calendar",
+            "subject_id": calendar.id,
+            "content": "Game night?",
+        },
     )
     assert posted.status_code == 201, posted.text
 
     listed = await client.get(
-        admin.g("/comments/"),
+        admin.g(thread_path("calendar", calendar.id)),
         headers=member.headers,
-        params={"calendar_id": calendar.id},
     )
     assert listed.status_code == 200
     assert [c["content"] for c in listed.json()["comments"]] == ["Game night?"]
@@ -374,8 +389,9 @@ async def test_a_comment_is_its_authors_to_change(
     )
     forge = text(
         "INSERT INTO comments"
-        " (task_id, content, created_by, created_by_kind, created_at, updated_at)"
-        " VALUES (:task, 'Said for you', :author, 'member', now(), now())"
+        " (subject_type, subject_id, content, created_by, created_by_kind,"
+        " created_at, updated_at)"
+        " VALUES ('task', :task, 'Said for you', :author, 'member', now(), now())"
         " RETURNING created_by"
     )
 
@@ -434,7 +450,7 @@ async def test_a_thread_pages_by_conversation(client, session, acting_user):
     )
 
     pages = []
-    params = {"task_id": task.id, "limit": 2}
+    params = {"subject_type": "task", "subject_id": task.id, "limit": 2}
     while True:
         listed = await client.get(a.g("/comments/"), headers=a.headers, params=params)
         assert listed.status_code == 200, listed.text
@@ -460,16 +476,18 @@ async def test_recent_drops_comments_of_a_disabled_tool(client, session, acting_
     posted = await client.post(
         a.g("/comments/"),
         headers=a.headers,
-        json={"content": "Counter talk", "counter_group_id": group.id},
+        json={
+            "subject_type": "counter_group",
+            "subject_id": group.id,
+            "content": "Counter talk",
+        },
     )
     assert posted.status_code == 201, posted.text
 
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert any(e["entity_type"] == "counter_group" for e in recent.json())
 
-    setattr(a.initiative, Tool.counter_group.view_permission, False)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
 
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert recent.status_code == 200
@@ -498,7 +516,11 @@ class TestToolCommentSwitch:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Before", _param(tool): entity.id},
+            json={
+                "subject_type": tool.value,
+                "subject_id": entity.id,
+                "content": "Before",
+            },
         )
         assert posted.status_code == 201, posted.text
 
@@ -518,7 +540,7 @@ class TestToolCommentSwitch:
         assert detail.json()["comments_enabled"] is False
 
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=a.headers
         )
         assert listed.status_code == 403
         assert listed.json()["detail"] == CommentMessages.COMMENTS_DISABLED
@@ -526,7 +548,11 @@ class TestToolCommentSwitch:
         blocked = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "After", _param(tool): entity.id},
+            json={
+                "subject_type": tool.value,
+                "subject_id": entity.id,
+                "content": "After",
+            },
         )
         assert blocked.status_code == 403
         assert blocked.json()["detail"] == CommentMessages.COMMENTS_DISABLED
@@ -546,7 +572,7 @@ class TestToolCommentSwitch:
         )
         assert on.status_code == 200
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=a.headers
         )
         assert listed.status_code == 200
         assert [c["content"] for c in listed.json()["comments"]] == ["Before"]
@@ -565,13 +591,17 @@ class TestToolCommentSwitch:
             posted = await client.post(
                 a.g("/comments/"),
                 headers=a.headers,
-                json={"content": said, "wiki_page_id": page.id},
+                json={
+                    "subject_type": "wiki_page",
+                    "subject_id": page.id,
+                    "content": said,
+                },
             )
             assert posted.status_code == 201, posted.text
-            assert posted.json()["wiki_page_id"] == page.id
+            assert posted.json()["subject_id"] == page.id
 
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"wiki_page_id": rota.id}
+            a.g(thread_path("wiki_page", rota.id)), headers=a.headers
         )
         assert listed.status_code == 200, listed.text
         assert [c["content"] for c in listed.json()["comments"]] == [
@@ -580,7 +610,7 @@ class TestToolCommentSwitch:
 
         # The wiki's own thread is a different thread, and empty.
         wiki_thread = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"wiki_id": wiki.id}
+            a.g(thread_path("wiki", wiki.id)), headers=a.headers
         )
         assert wiki_thread.status_code == 200
         assert wiki_thread.json()["comments"] == []
@@ -603,7 +633,11 @@ class TestToolCommentSwitch:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Before", "wiki_page_id": page.id},
+            json={
+                "subject_type": "wiki_page",
+                "subject_id": page.id,
+                "content": "Before",
+            },
         )
         assert posted.status_code == 201, posted.text
 
@@ -615,7 +649,7 @@ class TestToolCommentSwitch:
         assert off.status_code == 200, off.text
 
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"wiki_page_id": page.id}
+            a.g(thread_path("wiki_page", page.id)), headers=a.headers
         )
         assert listed.status_code == 403
         assert listed.json()["detail"] == CommentMessages.COMMENTS_DISABLED
@@ -623,7 +657,11 @@ class TestToolCommentSwitch:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "After", "wiki_page_id": page.id},
+            json={
+                "subject_type": "wiki_page",
+                "subject_id": page.id,
+                "content": "After",
+            },
         )
         assert posted.status_code == 403
 
@@ -646,7 +684,7 @@ class TestToolCommentSwitch:
         )
 
         denied = await client.get(
-            a.g("/comments/"), headers=b.headers, params={"wiki_page_id": page.id}
+            a.g(thread_path("wiki_page", page.id)), headers=b.headers
         )
         assert denied.status_code == 403
         assert denied.json()["detail"] == CommentMessages.PERMISSION_DENIED
@@ -656,14 +694,18 @@ class TestToolCommentSwitch:
         )
 
         allowed = await client.get(
-            a.g("/comments/"), headers=b.headers, params={"wiki_page_id": page.id}
+            a.g(thread_path("wiki_page", page.id)), headers=b.headers
         )
         assert allowed.status_code == 200, allowed.text
 
         posted = await client.post(
             a.g("/comments/"),
             headers=b.headers,
-            json={"content": "Joining in", "wiki_page_id": page.id},
+            json={
+                "subject_type": "wiki_page",
+                "subject_id": page.id,
+                "content": "Joining in",
+            },
         )
         assert posted.status_code == 201, posted.text
 
@@ -686,13 +728,15 @@ class TestToolCommentSwitch:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Still talking", "task_id": task.id},
+            json={
+                "subject_type": "task",
+                "subject_id": task.id,
+                "content": "Still talking",
+            },
         )
         assert posted.status_code == 201, posted.text
 
-        listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={"task_id": task.id}
-        )
+        listed = await client.get(a.g(thread_path("task", task.id)), headers=a.headers)
         assert listed.status_code == 200
         assert [c["content"] for c in listed.json()["comments"]] == ["Still talking"]
 
@@ -737,7 +781,11 @@ class TestEditingAComment:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Before", _param(tool): entity.id},
+            json={
+                "subject_type": tool.value,
+                "subject_id": entity.id,
+                "content": "Before",
+            },
         )
         assert posted.status_code == 201, posted.text
         comment_id = posted.json()["id"]
@@ -752,12 +800,10 @@ class TestEditingAComment:
         assert body["content"] == "After"
         assert body["author"] is not None
         assert body["author"]["id"] == a.user.id
-        assert body[_param(tool)] == entity.id
-        if tool is Tool.project:
-            assert body["project_id"] == entity.id
+        assert (body["subject_type"], body["subject_id"]) == (tool.value, entity.id)
 
         listed = await client.get(
-            a.g("/comments/"), headers=a.headers, params={_param(tool): entity.id}
+            a.g(thread_path(tool.value, entity.id)), headers=a.headers
         )
         assert [c["content"] for c in listed.json()["comments"]] == ["After"]
 
@@ -769,7 +815,7 @@ class TestEditingAComment:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Before", "task_id": task.id},
+            json={"subject_type": "task", "subject_id": task.id, "content": "Before"},
         )
         assert posted.status_code == 201, posted.text
         comment_id = posted.json()["id"]
@@ -789,8 +835,7 @@ class TestEditingAComment:
         assert edited.status_code == 200, edited.text
         body = edited.json()
         assert body["author"] is not None
-        # A task comment reports its task's project, same as the list reply.
-        assert body["project_id"] == project.id
+        assert (body["subject_type"], body["subject_id"]) == ("task", task.id)
         assert [(g["emoji"], g["count"]) for g in body["reactions"]] == [("🎉", 1)]
 
     async def test_only_the_author_may_edit(self, client, session, acting_user):
@@ -809,7 +854,11 @@ class TestEditingAComment:
         posted = await client.post(
             a.g("/comments/"),
             headers=a.headers,
-            json={"content": "Mine", "project_id": project.id},
+            json={
+                "subject_type": "project",
+                "subject_id": project.id,
+                "content": "Mine",
+            },
         )
         assert posted.status_code == 201, posted.text
 
@@ -876,9 +925,8 @@ class TestRemovingAComment:
     ):
         actor = thread[reader]
         listed = await client.get(
-            actor.g("/comments/"),
+            actor.g(thread_path("task", thread["task"].id)),
             headers=actor.headers,
-            params={"task_id": thread["task"].id},
         )
         assert listed.status_code == 200, listed.text
         (shown,) = listed.json()["comments"]

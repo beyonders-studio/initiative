@@ -20,6 +20,13 @@ A's rows. On the request login routed through the seam:
 - a moderator of A reads its row, and inserts, updates and deletes one, so
   the rows the others are refused are well formed.
 
+A table whose row names its subject by kind (a comment) is swept once per
+kind it may name, so every kind's arm of its policy answers.
+
+Then each tool is switched off in A in turn, and with every tool's switch row
+gone: a moderator of A reads none of the rows of a table a switched-off tool
+governs, is refused an INSERT into it, and updates and deletes none of them.
+
 A table the seeder cannot fill fails here; it is never skipped.
 """
 
@@ -37,12 +44,19 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool
+from app.core.tools import COMMENT_TARGETS, Tool
 from app.db.guild_ddl import _WRITTEN_BY
-from app.db.initiative_rls import INITIATIVE_PATHS, entity_tables, initiative_of
+from app.db.initiative_rls import (
+    INITIATIVE_PATHS,
+    entity_tables,
+    governing_path,
+    initiative_of,
+)
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.platform.guild import CommunityRole
 from app.models.tenant._mixins import ActorKind
+from app.models.tenant.initiative import InitiativeRule
+from app.services.tenant.initiative_tools import write_switches
 from app.testing import (
     Actor,
     create_initiative,
@@ -105,8 +119,6 @@ _DISTINCT = object()
 _SHAPES: dict[str, dict[str, Any]] = {
     # A grant names exactly one grantee.
     "resource_grants": {"user_id": _PERSON},
-    # A comment hangs off exactly one parent.
-    "comments": {"project_id": _Parent("projects")},
     # Evidence belongs to exactly one report or case.
     "evidence": {"report_id": _Parent("moderation_reports")},
     # A layout of a project names the project.
@@ -145,6 +157,20 @@ _NOT_A_MODERATORS: dict[str, frozenset[str]] = {
 #: Tables the community's administration reads and writes rather than an
 #: initiative's members, whose positive control is the community admin.
 _ADMINISTERED: frozenset[str] = frozenset({"guest_invite_grants"})
+
+#: Tables whose row names its subject by kind, swept once per kind it may name,
+#: so every kind's arm of the policy is proven and not only the first.
+_EVERY_SUBJECT: dict[str, tuple[str, tuple[str, ...]]] = {
+    "comments": ("subject_type", COMMENT_TARGETS),
+}
+
+
+def _variants(name: str) -> list[tuple[str, dict[str, Any] | None]]:
+    """The cases one table is swept as: once, or once per subject kind."""
+    if name not in _EVERY_SUBJECT:
+        return [(name, None)]
+    column, kinds = _EVERY_SUBJECT[name]
+    return [(f"{name} on a {kind}", {column: kind}) for kind in kinds]
 
 
 @dataclass(frozen=True)
@@ -430,6 +456,19 @@ class _Case:
     rows: dict[int, tuple[Any, ...]]
     #: What each person tries to insert, with its parents already written.
     candidates: dict[int, dict[str, Any]]
+    #: What the case's rows are made with beyond the generic fill: the
+    #: subject kind, for one of several cases on its table.
+    inherit: dict[str, Any] | None = None
+    #: One of several cases on its table, each naming a different subject
+    #: kind: what is read is counted on its own rows.
+    one_of_several: bool = False
+
+    def counted(self) -> sa.ColumnElement[bool] | None:
+        """Which rows a read is counted on: the whole table, which holds only
+        A's rows, or this case's own."""
+        if not self.one_of_several:
+            return None
+        return _matching(self.table, list(set(self.rows.values())))
 
 
 def _sqlstate(error: DBAPIError) -> str | None:
@@ -632,20 +671,28 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     for name in INITIATIVE_PATHS:
         table = seeder.table(name)
         owners = everyone if seeder.personal(table) else (people.moderator_a,)
-        savepoint = await session.begin_nested()
-        try:
-            rows = {p: _pk(table, await seeder.make(name, p)) for p in owners}
-            candidates = {p: await seeder.values(name, p) for p in everyone}
-        except (DBAPIError, AssertionError) as error:
-            await savepoint.rollback()
-            unseeded[name] = str(error).splitlines()[0]
-            continue
-        await savepoint.commit()
-        cases[name] = _Case(
-            table,
-            {p: rows.get(p, rows[people.moderator_a]) for p in everyone},
-            candidates,
-        )
+        variants = _variants(name)
+        for label, inherit in variants:
+            savepoint = await session.begin_nested()
+            try:
+                rows = {
+                    p: _pk(table, await seeder.make(name, p, inherit)) for p in owners
+                }
+                candidates = {
+                    p: await seeder.values(name, p, inherit) for p in everyone
+                }
+            except (DBAPIError, AssertionError) as error:
+                await savepoint.rollback()
+                unseeded[label] = str(error).splitlines()[0]
+                continue
+            await savepoint.commit()
+            cases[label] = _Case(
+                table,
+                {p: rows.get(p, rows[people.moderator_a]) for p in everyone},
+                candidates,
+                inherit,
+                one_of_several=len(variants) > 1,
+            )
     assert not unseeded, (
         "The sweep could not put a row of these tables in an initiative; teach "
         f"_Seeder or give the table a shape in _SHAPES: {unseeded}"
@@ -659,8 +706,8 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     assert not misplaced, f"rows meant for initiative A that are not in it: {misplaced}"
     # The community's other rows (B's, and its own) are cleared, so the rows a
     # statement on a whole table reaches are A's.
-    for case in cases.values():
-        await _keep_only(session, case.table, initiative_a)
+    for table in {case.table for case in cases.values()}:
+        await _keep_only(session, table, initiative_a)
     await session.commit()
 
     await _tools_on(role_session, people.moderator_a, guild.id, initiative_a)
@@ -673,7 +720,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     ):
         reader = await reading_as(person, guild.id)
         for name, case in cases.items():
-            if (seen := await _count(reader, case.table)) != 0:
+            if (seen := await _count(reader, case.table, case.counted())) != 0:
                 failures.append(f"{name}: {who} reads {seen} of A's rows")
             if (inserted := await _attempt(reader, _insert(case, person))) != _REFUSED:
                 failures.append(f"{name}: {who} can INSERT in A ({inserted})")
@@ -690,13 +737,17 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         "the community admin": await reading_as(admin.user.id, guild.id),
     }
     for name, case in cases.items():
-        who = "the community admin" if name in _ADMINISTERED else "A's moderator"
+        who = (
+            "the community admin"
+            if case.table.name in _ADMINISTERED
+            else "A's moderator"
+        )
         reader = readers[who]
         own = _matching(case.table, [case.rows[people.moderator_a]])
         if (seen := await _count(reader, case.table, own)) != 1:
             failures.append(f"{name}: {who} reads {seen} of its own row")
         for command, statement in _own_writes(case, people.moderator_a).items():
-            if command in _NOT_A_MODERATORS.get(name, ()):
+            if command in _NOT_A_MODERATORS.get(case.table.name, ()):
                 continue
             if (answer := await _attempt(reader, statement)) != 1:
                 failures.append(f"{name}: {who} cannot {command} in A ({answer})")
@@ -711,10 +762,12 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     moves: dict[str, sa.Update] = {}
     in_b: dict[str, dict[str, Any]] = {}
     for name, case in cases.items():
-        if name in _ADMINISTERED:
+        if case.table.name in _ADMINISTERED:
             continue
         own = case.rows[people.moderator_a]
-        in_b[name] = await seeder.values(name, people.moderator_a)
+        in_b[name] = await seeder.values(
+            case.table.name, people.moderator_a, case.inherit
+        )
         move = _move(case, own, in_b[name])
         moves[name] = move.blind(case)
         # Each lands its row in B: the move with triggers and foreign keys
@@ -741,7 +794,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     reader = await reading_as(people.moderator_a, guild.id)
     for name, move in moves.items():
         refused = {_REFUSED}
-        if "UPDATE" in _NOT_A_MODERATORS.get(name, ()):
+        if "UPDATE" in _NOT_A_MODERATORS.get(cases[name].table.name, ()):
             # Updating nothing at all, its move reaches no row or meets the
             # table's own refusal of any change.
             refused |= {0, _FROZEN}
@@ -751,5 +804,49 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         if (answer := await _attempt(reader, insert)) != _REFUSED:
             failures.append(f"{name}: A's moderator inserts a row into B ({answer})")
     await reader.rollback()
+
+    # A switched-off tool's rows read as absent to A's own moderator: each
+    # tool off in turn, then every switch row gone, since no row is off.
+    governed = {
+        name: governing[0]
+        for name, case in cases.items()
+        if (governing := governing_path(case.table.name)) is not None
+    }
+    assert set(governed.values()) == set(Tool)
+    for off in [{tool} for tool in Tool] + [set(Tool)]:
+        await route_session_to_guild(session, guild.id)
+        if off == set(Tool):
+            await session.exec(
+                sa.delete(InitiativeRule).where(
+                    InitiativeRule.initiative_id == initiative_a,
+                    InitiativeRule.initiative_role_id.is_(None),
+                    InitiativeRule.install_id.is_(None),
+                )
+            )
+        else:
+            await write_switches(
+                session, initiative_a, {tool: tool not in off for tool in Tool}
+            )
+        await session.commit()
+        state = "no switch rows" if len(off) > 1 else f"{next(iter(off)).value} off"
+        reader = await reading_as(people.moderator_a, guild.id)
+        for name, tool in governed.items():
+            if tool not in off:
+                continue
+            case = cases[name]
+            if (seen := await _count(reader, case.table, case.counted())) != 0:
+                failures.append(f"{name}: A's moderator reads {seen} with {state}")
+            if (
+                answer := await _attempt(reader, _insert(case, people.moderator_a))
+            ) != _REFUSED:
+                failures.append(
+                    f"{name}: A's moderator can INSERT with {state} ({answer})"
+                )
+            for command, statement in _blind_writes(case).items():
+                if (answer := await _attempt(reader, statement)) not in (0, _REFUSED):
+                    failures.append(
+                        f"{name}: A's moderator can {command} with {state} ({answer})"
+                    )
+        await reader.rollback()
 
     assert not failures, "\n".join(failures)

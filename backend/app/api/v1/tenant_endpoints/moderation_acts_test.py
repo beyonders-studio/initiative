@@ -18,7 +18,7 @@ from app.core.messages import CommentMessages, ModerationMessages
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.notification import Notification, NotificationType
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.moderation import ModerationAction, ModerationReport
 from app.models.tenant.post import Post
@@ -30,6 +30,7 @@ from app.testing import (
     create_post,
     create_reaction,
     drain_notices,
+    thread_path,
 )
 
 # The moderation suite's fixtures, by name.
@@ -47,7 +48,7 @@ async def _act(client, actor, act: str, target_type: str, target_id: int, **extr
 
 async def _thread(client, actor, task_id: int) -> dict:
     response = await client.get(
-        actor.g("/comments/"), params={"task_id": task_id}, headers=actor.headers
+        actor.g(thread_path("task", task_id)), headers=actor.headers
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -183,8 +184,9 @@ async def test_a_tombstone_is_not_edited_reacted_to_or_deleted(client, session, 
     replied = await client.post(
         member.g("/comments/"),
         json={
+            "subject_type": "task",
+            "subject_id": scene["task"].id,
             "content": "Fair enough",
-            "task_id": scene["task"].id,
             "parent_comment_id": comment.id,
         },
         headers=member.headers,
@@ -345,7 +347,7 @@ async def test_a_locked_thread_reads_and_nobody_adds_to_it(client, session, scen
     assert page["locked"] is True and page["can_moderate"] is False
     assert len(page["comments"]) == 1
 
-    body = {"content": "One more thing", "task_id": task_id}
+    body = {"content": "One more thing", "subject_type": "task", "subject_id": task_id}
     # Nobody, the moderators included: reopening it is how anyone adds to it.
     for actor in (scene["member"], scene["mod"]):
         refused = await client.post(
@@ -357,7 +359,9 @@ async def test_a_locked_thread_reads_and_nobody_adds_to_it(client, session, scen
     unlocked = await _act(client, scene["mod"], "unlock_comments", "task", task_id)
     assert unlocked.status_code == 201, unlocked.text
     reopened = await client.post(
-        scene["member"].g("/comments/"), json=body, headers=scene["member"].headers
+        scene["member"].g("/comments/"),
+        json=body,
+        headers=scene["member"].headers,
     )
     assert reopened.status_code == 201, reopened.text
 
@@ -374,7 +378,11 @@ async def test_a_locked_thread_keeps_its_comments_as_they_were(client, session, 
     task_id = scene["task"].id
     said = await client.post(
         scene["mod"].g("/comments/"),
-        json={"content": "Please keep it civil.", "task_id": task_id},
+        json={
+            "subject_type": "task",
+            "subject_id": task_id,
+            "content": "Please keep it civil.",
+        },
         headers=scene["mod"].headers,
     )
     assert said.status_code == 201, said.text
@@ -722,7 +730,7 @@ async def test_an_illegal_report_goes_to_the_community_and_the_platform(
     await _system(session, operations["guild"].id)
     notes = (
         await session.exec(
-            select(Comment.system_kind).where(Comment.task_id == case.task_id)
+            select(Comment.system_kind).where(said_on("task", case.task_id))
         )
     ).all()
     assert "community_settled" in notes
@@ -791,7 +799,7 @@ async def test_a_child_safety_report_carries_no_files_and_asks_for_a_hold(
     case = (await session.exec(select(IntakeCase))).one()
     notes = (
         await session.exec(
-            select(Comment.system_kind).where(Comment.task_id == case.task_id)
+            select(Comment.system_kind).where(said_on("task", case.task_id))
         )
     ).all()
     assert "hold_requested" in notes
@@ -859,7 +867,7 @@ async def test_child_safety_asks_for_a_hold_on_a_case_already_open(
     case = (await session.exec(select(IntakeCase))).one()
     notes = (
         await session.exec(
-            select(Comment.system_kind).where(Comment.task_id == case.task_id)
+            select(Comment.system_kind).where(said_on("task", case.task_id))
         )
     ).all()
     assert notes.count("hold_requested") == 1

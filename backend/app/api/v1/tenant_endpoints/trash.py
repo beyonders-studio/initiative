@@ -125,11 +125,11 @@ def _trashed(only_deleted_by: int | None) -> Subquery:
         # the child (Comment threaded replies via parent_comment_id), otherwise
         # unaliased ``Comment.id == Comment.parent_comment_id`` references the
         # same row in both clauses.
-        for parent_model, fk_col in CASCADE_PARENTS.get(model, []):
-            parent = aliased(parent_model)
+        for edge in CASCADE_PARENTS.get(model, []):
+            parent = aliased(edge.model)
             leg = leg.where(
                 ~select(parent.id)
-                .where(parent.id == getattr(model, fk_col))
+                .where(edge.ties(model, parent))
                 .where(parent.deleted_at == model.deleted_at)
                 .exists()
             )

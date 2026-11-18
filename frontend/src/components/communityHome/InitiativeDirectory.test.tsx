@@ -225,7 +225,7 @@ describe("InitiativeDirectory", () => {
 
   it("counts what is inside an initiative you're in, tool by tool", async () => {
     const user = stubMembership({
-      counter_groups_enabled: true,
+      tools: { counter_group: true },
       // Calendars stay off for this reader, so they get no stat.
       can: initiativeCan({ view: [Tool.project, Tool.counter_group] }),
     });

@@ -210,7 +210,7 @@ def test_every_table_inside_a_tool_is_copied_or_left_on_purpose(tool: Tool):
     """A table filed under a tool is either copied with it or, like its
     comments, stays with the original. A new one fails here until its copier
     says which."""
-    inside = {child for child, _ in CASCADE_CHILDREN.get(TOOL_LISTS[tool].model, ())}
+    inside = {edge.model for edge in CASCADE_CHILDREN.get(TOOL_LISTS[tool].model, ())}
     assert inside - {Comment} == TOOL_COPIERS[tool].copies
 
 

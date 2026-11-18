@@ -416,33 +416,7 @@ class InitiativeJoinRequest(SQLModel, table=True):
     )
 
 
-# One `{tool.plural}_enabled` master-switch column per Tool — derived from the
-# enum, so a new tool grows its column here automatically. The actual DDL still
-# ships as a guild migration (and the provisioning drift tests catch a
-# model/schema mismatch).
-#
-# Only the default varies: a tool its record has on by default starts on, so an
-# initiative created without an opinion is the one people already had.
-_InitiativeToolSwitchColumns = type(
-    "_InitiativeToolSwitchColumns",
-    (SQLModel,),
-    {
-        "__module__": __name__,
-        "__annotations__": {t.view_permission: bool for t in Tool},
-        **{
-            t.view_permission: Field(
-                default=t.spec.on_by_default,
-                nullable=False,
-                sa_column_kwargs={"server_default": str(t.spec.on_by_default).lower()},
-            )
-            for t in Tool
-        },
-    },
-)
-
-
 class Initiative(
-    _InitiativeToolSwitchColumns,
     CreatedByMixin,
     ArchiveMixin,
     SoftDeleteMixin,
@@ -558,5 +532,30 @@ Initiative.__mapper__.add_property(  # type: ignore[attr-defined]
         .correlate_except(InitiativeMember, InitiativeRoleModel)
         .scalar_subquery(),
         deferred=True,
+    ),
+)
+
+#: Each initiative's own switch for each tool is an ``initiative_rules`` row
+#: with no role and no install, keyed by the tool's view key; a tool with no
+#: row is off. A new initiative is written a row per tool from the tool's
+#: record (``app.services.tenant.initiative_tools.write_switches``).
+_switch = InitiativeRule.__table__.alias("switch")  # type: ignore[attr-defined]
+Initiative.__mapper__.add_property(  # type: ignore[attr-defined]
+    "switched_on",
+    column_property(
+        select(
+            func.coalesce(
+                func.array_agg(_switch.c.key),
+                text("ARRAY[]::varchar[]"),
+            )
+        )
+        .where(
+            _switch.c.initiative_id == Initiative.id,
+            _switch.c.initiative_role_id.is_(None),
+            _switch.c.install_id.is_(None),
+            _switch.c.enabled.is_(True),
+        )
+        .correlate_except(_switch)
+        .scalar_subquery(),
     ),
 )

@@ -3059,19 +3059,30 @@ export const CommentAudience = {
   filer: "filer",
 } as const;
 
+export type CommentSubject = (typeof CommentSubject)[keyof typeof CommentSubject];
+
+export const CommentSubject = {
+  task: "task",
+  wiki_page: "wiki_page",
+  collection: "collection",
+  project: "project",
+  file: "file",
+  counter_group: "counter_group",
+  calendar: "calendar",
+  dashboard: "dashboard",
+  post: "post",
+  wiki: "wiki",
+  contact: "contact",
+} as const;
+
+/**
+ * A comment, and what it is said on.
+ */
 export interface CommentCreate {
   content: string;
-  task_id?: number | null;
-  wiki_page_id?: number | null;
-  collection_id?: number | null;
-  project_id?: number | null;
-  file_id?: number | null;
-  counter_group_id?: number | null;
-  calendar_id?: number | null;
-  dashboard_id?: number | null;
-  post_id?: number | null;
-  wiki_id?: number | null;
-  contact_id?: number | null;
+  subject_type: CommentSubject;
+  /** @exclusiveMinimum 0 */
+  subject_id: number;
   parent_comment_id?: number | null;
   audience?: CommentAudience;
 }
@@ -3116,26 +3127,16 @@ export interface CommentRemoval {
 }
 
 /**
- * One comment. ``project_id`` is its own for a comment on a project and
- * the task's for a task comment (filled by the service's serializer).
+ * One comment, and what it is said on.
  */
 export interface CommentRead {
   created_by: number | null;
   created_by_kind: ActorKind;
   created_by_install: number | null;
   content: string;
-  task_id: number | null;
-  wiki_page_id: number | null;
-  collection_id: number | null;
-  project_id: number | null;
-  file_id: number | null;
-  counter_group_id: number | null;
-  calendar_id: number | null;
-  dashboard_id: number | null;
-  post_id: number | null;
-  wiki_id: number | null;
-  contact_id: number | null;
   id: number;
+  subject_type: CommentSubject;
+  subject_id: number;
   parent_comment_id: number | null;
   created_at: string;
   updated_at: string | null;
@@ -7559,17 +7560,10 @@ export const InitiativeJoinPolicy = {
 } as const;
 
 export interface InitiativeCreate {
-  projects_enabled?: boolean;
-  files_enabled?: boolean;
-  counter_groups_enabled?: boolean;
-  calendars_enabled?: boolean;
-  dashboards_enabled?: boolean;
-  posts_enabled?: boolean;
-  wikis_enabled?: boolean;
-  contacts_enabled?: boolean;
   name: string;
   description?: string | null;
   color?: string | null;
+  tools?: Partial<Record<Tool, boolean>>;
   join_policy?: InitiativeJoinPolicy;
 }
 
@@ -7784,14 +7778,6 @@ export interface InitiativeMemberUpdate {
  * ``GET /initiatives/{id}/members``.
  */
 export interface InitiativeRead {
-  projects_enabled: boolean;
-  files_enabled: boolean;
-  counter_groups_enabled: boolean;
-  calendars_enabled: boolean;
-  dashboards_enabled: boolean;
-  posts_enabled: boolean;
-  wikis_enabled: boolean;
-  contacts_enabled: boolean;
   name: string;
   description: string | null;
   color: string | null;
@@ -7803,6 +7789,7 @@ export interface InitiativeRead {
   keep_content_in: boolean;
   created_at: string;
   updated_at: string;
+  tools: Partial<Record<Tool, boolean>>;
   can: InitiativeCan;
   member_count: number;
   role_display_name: string | null;
@@ -8061,20 +8048,13 @@ export interface InitiativeToolLayoutsRead {
 }
 
 export interface InitiativeUpdate {
-  projects_enabled?: boolean | null;
-  files_enabled?: boolean | null;
-  counter_groups_enabled?: boolean | null;
-  calendars_enabled?: boolean | null;
-  dashboards_enabled?: boolean | null;
-  posts_enabled?: boolean | null;
-  wikis_enabled?: boolean | null;
-  contacts_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
   color?: string | null;
   join_policy?: InitiativeJoinPolicy | null;
   auto_join?: boolean | null;
   keep_content_in?: boolean | null;
+  tools?: Partial<Record<Tool, boolean>>;
 }
 
 /**
@@ -11234,6 +11214,8 @@ export interface RefreshRequest {
 export interface RegistrySkippedListing {
   name: string;
   code: string;
+  listing_name: string | null;
+  publisher_name: string | null;
 }
 
 /**
@@ -11269,6 +11251,7 @@ export interface RegistryStatusRead {
   last_success_at: string | null;
   last_error: string | null;
   listing_count: number;
+  skipped: RegistrySkippedListing[];
 }
 
 /**
@@ -14166,23 +14149,15 @@ export type ListHoldsParams = {
 };
 
 export type ListCommentsParams = {
+  subject_type: CommentSubject;
+  /** @exclusiveMinimum 0 */
+  subject_id: number;
   /**
    * @minimum 1
    * @maximum 100
    */
   limit?: number;
   cursor?: string | null;
-  task_id?: number | null;
-  wiki_page_id?: number | null;
-  collection_id?: number | null;
-  project_id?: number | null;
-  file_id?: number | null;
-  counter_group_id?: number | null;
-  calendar_id?: number | null;
-  dashboard_id?: number | null;
-  post_id?: number | null;
-  wiki_id?: number | null;
-  contact_id?: number | null;
 };
 
 export type RecentCommentsParams = {

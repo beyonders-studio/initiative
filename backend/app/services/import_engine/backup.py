@@ -371,8 +371,8 @@ async def stage_backup_job(
     return job
 
 
-def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[str, bool]:
-    """A manifest's per-tool states as initiative master-switch fields.
+def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[Tool, bool]:
+    """A manifest's per-tool states as the initiative's tool switches.
 
     "disabled" -> off; "included"/"excluded" -> on, because the switch records
     the source's configuration rather than what this import was asked to carry.
@@ -383,13 +383,13 @@ def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[str, bool]:
     those name no switch, so they are skipped rather than raising on an
     initiative that is otherwise importable.
     """
-    flags: dict[str, bool] = {}
+    flags: dict[Tool, bool] = {}
     for name, state in (tools or {}).items():
         try:
             tool = Tool(name)
         except ValueError:
             continue
-        flags[tool.view_permission] = state != "disabled"
+        flags[tool] = state != "disabled"
     return flags
 
 
@@ -513,7 +513,7 @@ async def apply_backup(
                     name=mi.name,
                     description=mi.description,
                     color=mi.color,
-                    tool_flags=_manifest_tool_flags(mi.tools),
+                    tools=_manifest_tool_flags(mi.tools),
                     manager_id=user.id,
                     join_policy=mi.join_policy,
                     member_ids=joining,

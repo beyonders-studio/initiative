@@ -18,7 +18,7 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import rules
@@ -409,7 +409,7 @@ async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
     for value in DEVICE.values():
         assert f"`{value}`" in task.description
     (opening,) = (
-        await session.exec(select(Comment).where(Comment.task_id == case.task_id))
+        await session.exec(select(Comment).where(said_on("task", case.task_id)))
     ).all()
     assert opening.content == "Help."
     assert opening.created_by == member.user.id

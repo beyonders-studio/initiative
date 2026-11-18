@@ -1,5 +1,9 @@
 """An initiative's tools and roles, once its community's defaults apply.
 
+Each initiative's own switch for a tool is one of its ``initiative_rules``
+rows: no role, no install, the tool's view key (``Initiative.switched_on``
+holds the keys whose row is on). A tool with no row is off.
+
 A community may set a tool's switch, and what the built-in member role may
 do, for every initiative in it (``COMMUNITY_DEFAULT_KEYS``, its
 ``initiative_rules`` rows with no initiative); its value stands over the
@@ -14,9 +18,11 @@ does not.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from sqlalchemy import and_, case, exists, func, not_, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -56,11 +62,48 @@ def community_switch(context: ActorContext, tool: Tool) -> bool | None:
     return None
 
 
+def own_switch(initiative: Any, tool: Tool) -> bool:
+    """Whether ``initiative``'s own switch has ``tool`` on, beneath anything
+    its community set."""
+    return tool.view_permission in (initiative.switched_on or ())
+
+
+def switches(tools: Mapping[Tool, bool]) -> dict[Tool, bool]:
+    """Every tool's switch for a new initiative: ``tools`` where it names one,
+    the tool's record otherwise."""
+    return {tool: tools.get(tool, tool.spec.on_by_default) for tool in Tool}
+
+
+async def write_switches(
+    session: AsyncSession, initiative_id: int, tools: Mapping[Tool, bool]
+) -> None:
+    """Set ``initiative_id``'s own switch for each tool in ``tools``, leaving
+    the others as they are."""
+    if not tools:
+        return
+    statement = pg_insert(InitiativeRule).values(
+        [
+            {
+                "initiative_id": initiative_id,
+                "key": tool.view_permission,
+                "enabled": enabled,
+            }
+            for tool, enabled in tools.items()
+        ]
+    )
+    await session.exec(
+        statement.on_conflict_do_update(  # type: ignore[call-overload]
+            constraint="uq_initiative_rules_subject",
+            set_={"enabled": statement.excluded.enabled},
+        )
+    )
+
+
 def tool_on(context: ActorContext, initiative: Any, tool: Tool) -> bool:
     """Whether ``tool`` is on in ``initiative``, by the request's standing."""
     switch = community_switch(context, tool)
     if switch is None:
-        return bool(getattr(initiative, tool.view_permission))
+        return own_switch(initiative, tool)
     return switch
 
 
@@ -74,7 +117,7 @@ async def tool_on_in(session: AsyncSession, initiative: Any, tool: Tool) -> bool
     row, where = _community(INITIATIVE_TOOL_KEYS[tool])
     switch = await session.scalar(select(row.enabled).where(where))
     if switch is None:
-        return bool(getattr(initiative, tool.view_permission))
+        return own_switch(initiative, tool)
     return switch
 
 
@@ -82,9 +125,16 @@ def tool_on_sql(tool: Tool) -> ColumnElement[bool]:
     """:func:`tool_on` over ``initiatives`` rows, for a query's filter. The
     community's row is read once for the statement."""
     row, where = _community(INITIATIVE_TOOL_KEYS[tool])
+    own = aliased(InitiativeRule)
     return func.coalesce(
         select(row.enabled).where(where).scalar_subquery(),
-        getattr(Initiative, tool.view_permission),
+        exists().where(
+            own.initiative_id == Initiative.id,
+            own.initiative_role_id.is_(None),  # type: ignore[union-attr]
+            own.install_id.is_(None),  # type: ignore[union-attr]
+            own.key == tool.view_permission,
+            own.enabled.is_(True),  # type: ignore[union-attr]
+        ),
     )
 
 

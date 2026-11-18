@@ -333,7 +333,7 @@ describe("initiative settings sections", () => {
    * has to say so, or the two halves of the gate stay invisible to each other.
    */
   it("says on /settings/roles when a tool's permissions grant nothing yet", async () => {
-    stubInitiative({ posts_enabled: false });
+    stubInitiative({ tools: { post: false } });
     server.use(
       communityHttp.get("/initiatives/:id/roles", () =>
         HttpResponse.json([buildInitiativeRole({ display_name: "Member" })])
@@ -485,7 +485,7 @@ describe("initiative settings sections", () => {
   });
 
   it("lists the calendar's and each project's layouts at /settings/layouts", async () => {
-    stubInitiative({ calendars_enabled: true });
+    stubInitiative({ tools: { calendar: true } });
     server.use(
       communityHttp.get("/layouts/", () =>
         HttpResponse.json(buildToolLayoutSet({ tool: "calendar" }))

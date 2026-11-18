@@ -84,6 +84,7 @@ from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
 from app.services.export.filters import narrow, parse_filters
 from app.services.platform.csv_export import safe_filename_component
+from app.services.tenant.initiative_tools import own_switch
 
 # Tool keys as they appear in the selector's include/formats maps. Derived:
 # a backup covers what the engine can export, so a ninth tool is carried by
@@ -487,11 +488,7 @@ async def _build_scope(
 def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
     states: dict[str, str] = {}
     for tool in _TOOLS:
-        # The switch column via the enum, not `tool + "s"`: every tool now
-        # carries a column, so a missing-attribute default would hide a real
-        # mismatch rather than cover for the two that used to have none.
-        flag = getattr(initiative, Tool(tool).view_permission)
-        if not flag:
+        if not own_switch(initiative, Tool(tool)):
             states[tool] = "disabled"
         elif _included(params, tool):
             states[tool] = "included"
@@ -824,7 +821,7 @@ class _ScopeBuilder:
         """
         if self.mode != "backup":
             return
-        if not getattr(initiative, Tool.dashboard.view_permission, False):
+        if not own_switch(initiative, Tool.dashboard):
             return
         from sqlmodel import select
 
@@ -1678,7 +1675,7 @@ async def estimate_backup(
     estimated_rows = 0
     for tool in _TOOLS:
         count = sum(len(v) for v in ids[tool].values())
-        disabled = all(not getattr(i, Tool(tool).view_permission) for i in initiatives)
+        disabled = all(not own_switch(i, Tool(tool)) for i in initiatives)
         tools[tool] = BackupToolEstimate(count=count, disabled=disabled)
         estimated_rows += count
 

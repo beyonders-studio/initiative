@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from app.core.messages import InitiativeMessages, PluginMessages, PropertyMessages
+from app.core.tools import Tool
 from app.models.tenant.metadata import MetadataType
 from app.services.marketplace import plugin_refs
 from app.testing import (
@@ -23,6 +24,7 @@ from app.testing import (
     guild_of,
     guild_url,
     route_session_to_guild,
+    switch_tools,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
@@ -60,9 +62,7 @@ async def _task(client: Any, session: Any, installed: Any, headers: dict) -> int
 
 async def _event(client: Any, session: Any, installed: Any, headers: dict) -> int:
     await route_session_to_guild(session, guild_of(installed.placed))
-    installed.placed.calendars_enabled = True
-    session.add(installed.placed)
-    await session.commit()
+    await switch_tools(session, installed.placed, {Tool.calendar: True})
     calendar = await client.post(
         guild_url(installed.guild.id, "/calendars/"),
         headers=headers,

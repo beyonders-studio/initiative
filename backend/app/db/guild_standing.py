@@ -128,13 +128,22 @@ _SETTINGS_RUNG_CASE = "\n".join(
 )
 
 
-def _tool_switch_values() -> str:
-    """The per-initiative tool switches as a ``VALUES`` list.
+def _tool_switches() -> str:
+    """Each tool's own switch in the initiative ``i`` names, as rows of
+    ``(tool, enabled)``: its ``initiative_rules`` row with no role and no
+    install, and ``NULL`` (off) where it has none.
 
-    Rendered from the ``Tool`` enum, the way the switch column names already
-    are, so a new tool reaches the standing the moment it reaches the enum.
+    Rendered from the ``Tool`` enum, so a new tool reaches the standing the
+    moment it reaches the enum.
     """
-    return ", ".join(f"('{tool.value}', i.{tool.plural}_enabled)" for tool in Tool)
+    keys = ", ".join(f"('{tool.value}', '{tool.view_permission}')" for tool in Tool)
+    return f"""(
+        SELECT k.tool, sw.enabled
+        FROM (VALUES {keys}) AS k(tool, key)
+        LEFT JOIN initiative_rules sw
+          ON sw.initiative_id = i.id AND sw.key = k.key
+         AND sw.initiative_role_id IS NULL AND sw.install_id IS NULL
+      )"""
 
 
 def _writes(values: dict[gucs.Guc, str]) -> str:
@@ -413,7 +422,7 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.ENABLED_TOOLS: f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
-      CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
+      CROSS JOIN LATERAL {_tool_switches()} AS t(tool, enabled)
       WHERE {_TOOL_ON}
         AND i.id IN (
           SELECT mi.initiative_id FROM my_initiatives mi
@@ -604,7 +613,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       JOIN placed p ON p.initiative_id = i.id
-      CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
+      CROSS JOIN LATERAL {_tool_switches()} AS t(tool, enabled)
       WHERE {_TOOL_ON}
     ), '')""",
     gucs.OVERRIDE_INITIATIVES: """COALESCE((

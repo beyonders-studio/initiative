@@ -839,18 +839,18 @@ $resource_frozen$;
 
 
 def _comments_leg(alias: str, trashed_ok: str) -> str:
-    """A comment freezes with the one thing it hangs off.
+    """A comment freezes with the one thing it is said on.
 
-    Which table that is comes from the parent registry the policies are
-    rendered from, so a comment cannot freeze with one parent and be gated
+    Which table that is comes from the subject registry the policies are
+    rendered from, so a comment cannot freeze with one subject and be gated
     through another.
     """
-    legs = [
-        f"({alias}.{column} IS NOT NULL AND resource_frozen("
-        f"'{parent.table}', {alias}.{column}, {trashed_ok}))"
-        for column, parent in COMMENT_PARENTS.items()
-    ]
-    return "(" + " OR ".join(legs) + ")"
+    arms = " ".join(
+        f"WHEN '{kind}' THEN resource_frozen("
+        f"'{parent.table}', {alias}.subject_id, {trashed_ok})"
+        for kind, parent in COMMENT_PARENTS.items()
+    )
+    return f"COALESCE((CASE {alias}.subject_type {arms} ELSE false END), false)"
 
 
 def _reactions_leg(alias: str, trashed_ok: str) -> str:

@@ -1446,7 +1446,15 @@ class MarketplaceRegistryMessages:
     SOURCE_CONFLICT = "MARKETPLACE_REGISTRY_SOURCE_CONFLICT"
     #: This deployment's operator added a publisher with the same prefix.
     PUBLISHER_CONFLICT = "MARKETPLACE_REGISTRY_PUBLISHER_CONFLICT"
-    #: The listing itself was refused by the catalog's validator.
+    #: The listing's uid or name is held by a different registry listing here,
+    #: or it moved into or out of a plug-in it was published as part of.
+    IDENTITY_CONFLICT = "MARKETPLACE_REGISTRY_IDENTITY_CONFLICT"
+    #: A version this deployment already holds came back with different
+    #: content. A published version is immutable: the publisher has to publish
+    #: the change as a new version.
+    VERSION_REUSED = "MARKETPLACE_REGISTRY_VERSION_REUSED"
+    #: The listing's contents were refused by the catalog's validator. Every
+    #: refusal with a more specific reason has its own code above.
     LISTING_REJECTED = "MARKETPLACE_REGISTRY_LISTING_REJECTED"
     #: A package's terms for a listing are not in the expected format, or name
     #: a combination terms never take. The listing keeps the terms it had.

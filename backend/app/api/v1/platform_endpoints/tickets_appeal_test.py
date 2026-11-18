@@ -15,12 +15,16 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.models.tenant.comment import Comment, CommentAudience
+from app.models.tenant.comment import Comment, CommentAudience, said_on
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform.intake import CaseFiler, open_case
 from app.services.tenant import task_statuses as task_statuses_service
-from app.testing import create_user, get_auth_headers, make_operations_community
+from app.testing import (
+    create_user,
+    get_auth_headers,
+    make_operations_community,
+)
 
 TICKETS = "/api/v1/me/tickets"
 
@@ -235,8 +239,9 @@ async def test_the_team_answers_an_appeal(client, session, appeals_desk):
     response = await client.post(
         staff.g("/comments/"),
         json={
+            "subject_type": "task",
+            "subject_id": case.task_id,
             "content": "We have lifted it.",
-            "task_id": case.task_id,
             "audience": "filer",
         },
         headers=staff.headers,
@@ -281,7 +286,7 @@ async def test_a_report_still_has_no_conversation(client, session, appeals_desk)
 
     await set_rls_context(session, SystemGuild(appeals_desk["guild_id"]))
     said = (
-        await session.exec(select(Comment).where(Comment.task_id == outcome.task_id))
+        await session.exec(select(Comment).where(said_on("task", outcome.task_id)))
     ).all()
     assert [c.audience for c in said] == [CommentAudience.filer]
     await set_rls_context(session, Unattributed())

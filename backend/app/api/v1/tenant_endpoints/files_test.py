@@ -29,6 +29,7 @@ from app.testing import (
     guild_of,
     lexical_body,
     route_as,
+    switch_tools,
 )
 
 
@@ -70,9 +71,7 @@ async def test_create_refuses_when_files_are_switched_off(
     them off refuses to hold one, and names the reason instead of failing at
     the row."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
 
     response = await client.post(
         a.g("/files/"),
@@ -97,9 +96,7 @@ async def test_a_guild_admin_does_not_list_files_of_a_switched_off_initiative(
     assert listed.status_code == 200
     assert doc.id in [d["id"] for d in listed.json()["items"]]
 
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
 
     listed = await client.get(a.g("/files/"), headers=a.headers)
     assert listed.status_code == 200

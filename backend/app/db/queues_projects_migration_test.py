@@ -22,7 +22,11 @@ from app.testing import (
     create_tag,
     create_user,
 )
-from app.testing.later_revisions import restate_kind_code, step_authorship
+from app.testing.later_revisions import (
+    restate_kind_code,
+    step_comment_subjects,
+    step_newest,
+)
 
 _MIGRATION = (
     Path(__file__).resolve().parents[2]
@@ -51,7 +55,7 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 def _runner(schema: str):
     """Revision 0581 one way or the other, on one guild's schema only, with the
-    authorship revisions off around it. Back up,
+    newest revisions (``later_revisions.NEWEST``) off around it. Back up,
     ``public.relationship_kind_code`` is put back as boot renders it
     (``app.testing.later_revisions``)."""
     migration = _load()
@@ -68,13 +72,15 @@ def _runner(schema: str):
                 step()
 
             with Operations.context(MigrationContext.configure(bind)):
-                # 0581 ran before the authorship revisions, so they come off
+                # 0581 ran before the newest revisions, so they come off
                 # around it.
                 if not forward:
-                    in_schema(lambda: step_authorship(forward=False))
+                    in_schema(lambda: step_comment_subjects(forward=False))
+                    in_schema(lambda: step_newest(forward=False))
                 migration._convert(bind, forward, in_schema)
                 if forward:
-                    in_schema(lambda: step_authorship(forward=True))
+                    in_schema(lambda: step_newest(forward=True))
+                    in_schema(lambda: step_comment_subjects(forward=True))
                     restate_kind_code(bind)
 
         return apply
@@ -232,8 +238,10 @@ async def test_a_queue_becomes_a_project_of_tasks(session) -> None:
     converted, description, projects_on, archived = (
         await _rows(
             session,
-            f"SELECT p.id, p.description, i.projects_enabled, p.archived_at "
-            f"FROM {s}.projects p JOIN {s}.initiatives i ON i.id = p.initiative_id "
+            f"SELECT p.id, p.description, sw.enabled, p.archived_at "
+            f"FROM {s}.projects p JOIN {s}.initiative_rules sw "
+            "ON sw.initiative_id = p.initiative_id AND sw.initiative_role_id IS NULL "
+            "AND sw.install_id IS NULL AND sw.key = 'projects_enabled' "
             "WHERE p.name = 'Chores'",
         )
     )[0]
@@ -294,8 +302,10 @@ async def test_a_queue_becomes_a_project_of_tasks(session) -> None:
         p=converted,
     ) == [("project", converted, owner.id, "owner")]
     assert await _rows(
-        session, f"SELECT project_id FROM {s}.comments WHERE id = :c", c=comment
-    ) == [(converted,)]
+        session,
+        f"SELECT subject_type, subject_id FROM {s}.comments WHERE id = :c",
+        c=comment,
+    ) == [("project", converted)]
     assert sorted(
         await _rows(
             session,

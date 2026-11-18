@@ -51,7 +51,12 @@ from app.services.guild_sweeps import Scope, each_guild
 from app.services.platform import rules
 from app.services.storage import get_guild_storage
 from app.services.tenant import ical_service
-from app.testing import create_resource_grant, drain_notices, route_session_to_guild
+from app.testing import (
+    create_resource_grant,
+    drain_notices,
+    route_session_to_guild,
+    switch_tools,
+)
 from app.testing.factories import (
     assign_tag,
     checklist_items,
@@ -2174,9 +2179,7 @@ async def test_bulk_project_selection_exports_backup_zip(
 async def _events_enabled(session, initiative):
     """Calendar events are a toggleable tool (off by default) — flip the
     initiative's master switch so the enumeration includes it."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, {Tool.calendar: True})
 
 
 async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, session):
@@ -2447,7 +2450,7 @@ async def test_calendar_export_narrows_by_initiative_and_date_range(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     await _events_enabled(session, a.initiative)
     other = await create_initiative(
-        session, a.guild, a.user, name="Side quests", calendars_enabled=True
+        session, a.guild, a.user, name="Side quests", tools={Tool.calendar: True}
     )
     main_cal = await create_calendar(session, a.initiative, a.user, name="Main Cal")
     side_cal = await create_calendar(session, other, a.user, name="Side Cal")
@@ -2516,10 +2519,7 @@ async def _all_tools_enabled(session, initiative):
 
     Derived from the enum rather than listed, so a new tool is switched on
     here the day it exists instead of quietly sitting out the backup tests."""
-    for tool in Tool:
-        setattr(initiative, tool.view_permission, True)
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, dict.fromkeys(Tool, True))
 
 
 async def _populate_initiative(session, a, initiative):
@@ -3243,11 +3243,11 @@ async def test_empty_initiative_backup_is_manifest_only_zip(
     await create_project(session, a.initiative, a.user, name="Switched off")
     # The factory switches every tool on; turn some off so the inventory has
     # deliberately disabled ones to report, one of them holding a project.
-    a.initiative.counter_groups_enabled = False
-    a.initiative.calendars_enabled = False
-    a.initiative.projects_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(
+        session,
+        a.initiative,
+        {Tool.counter_group: False, Tool.calendar: False, Tool.project: False},
+    )
 
     resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
@@ -3871,9 +3871,7 @@ async def test_a_backup_says_which_wiki_page_a_file_is_filed_under(
     from app.testing.factories import create_wiki, create_wiki_page
 
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    a.initiative.wikis_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.wiki: True})
     file_doc = await _uploaded_file(
         session,
         a,

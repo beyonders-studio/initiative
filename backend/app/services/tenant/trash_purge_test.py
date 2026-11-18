@@ -324,8 +324,8 @@ async def test_purging_an_initiative_takes_everything_under_it(session: AsyncSes
     assert await count("projects", "id", project.id) == 0
     assert await count("task_statuses", "project_id", project.id) == 0
     assert await count("tasks", "id", task.id) == 0
-    assert await count("comments", "project_id", project.id) == 0
-    assert await count("comments", "task_id", task.id) == 0
+    assert await count("comments", "subject_id", project.id) == 0
+    assert await count("comments", "subject_id", task.id) == 0
     assert (
         await session.exec(
             select_including_deleted(Comment).where(Comment.id == on_project.id)

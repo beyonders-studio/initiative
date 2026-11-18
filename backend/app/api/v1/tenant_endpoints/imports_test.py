@@ -12,6 +12,7 @@ from sqlalchemy.orm import undefer
 from app.core.tools import CHILD_KINDS, KINDS, Tool
 from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.comment import said_on
 from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.schemas.tenant.tag import annotated_tags
 from app.services import data_jobs
@@ -21,7 +22,8 @@ from app.services.import_engine import worker as import_worker
 from app.services.import_engine.atlassian_test import answered
 from app.services.storage import get_guild_storage
 from app.services.tenant import tags as tags_service
-from app.testing import drain_notices
+from app.services.tenant.initiative_tools import own_switch
+from app.testing import drain_notices, switch_tools
 from app.testing.factories import (
     assign_tag,
     create_calendar_event,
@@ -102,7 +104,7 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
     assert envelope["tags"] == ["Loot"]
     # A name listed again in another case is the same tag, attached once.
     envelope["tags"].append("loot")
-    target = await _second_initiative(session, a, counter_groups_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.counter_group: True})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     assert resp.json()["result"]["matched"]["tags"] == 1
@@ -209,9 +211,7 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    a.initiative.calendars_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, a.initiative, a.user, name="Raid Nights")
     await assign_tag(
         session, calendar, await create_tag(session, a.guild, name="Raids"), commit=True
@@ -238,7 +238,7 @@ async def test_envelope_import_roundtrips_calendar(client, acting_user, session)
     )
     assert envelope["type"] == "initiative-calendar"
 
-    target = await _second_initiative(session, a, calendars_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.calendar: True})
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
     created = resp.json()["result"]["created"]
@@ -544,9 +544,7 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
         "name": "Q",
         "counters": [],
     }
-    a.initiative.counter_groups_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
     disabled = await _import_envelope(client, a, group_envelope, a.initiative.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
@@ -1057,8 +1055,8 @@ async def test_backup_import_end_to_end_with_assets(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one()
     assert restored.description == "from backup"
-    assert restored.counter_groups_enabled is True
-    assert restored.dashboards_enabled is False  # "disabled" in manifest
+    assert own_switch(restored, Tool.counter_group) is True
+    assert own_switch(restored, Tool.dashboard) is False  # "disabled" in manifest
     member = (
         await session.exec(
             select(InitiativeMember).where(
@@ -2171,9 +2169,7 @@ async def test_importing_a_post_over_the_body_limit_is_refused(
     from app.testing import lexical_body
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
 
     response = await _import_envelope(
         client,
@@ -2193,9 +2189,7 @@ async def test_importing_a_structurally_oversized_body_is_refused(
     from app.schemas.tenant.post import MAX_POST_BODY_BYTES
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
 
     # Wide rather than wordy: thousands of empty paragraphs carry no text at
     # all, so the character limit lets them straight through.
@@ -2215,9 +2209,7 @@ async def test_importing_a_long_headline_trims_rather_than_fails(
     """A headline is display text. The column holds 255, and failing a whole
     restore over a long title helps nobody — so it is trimmed and said."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.posts_enabled = True
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: True})
 
     response = await _import_envelope(
         client, a, _post_envelope(name="H" * 400), a.initiative.id
@@ -2310,7 +2302,7 @@ async def test_project_envelope_carries_comments_dates_and_links(
 
     comment = (
         await session.exec(
-            select(Comment).where(Comment.task_id == tasks["Pour the footings"].id)
+            select(Comment).where(said_on("task", tasks["Pour the footings"].id))
         )
     ).one()
     # The author's handle is a member of the target initiative, so the comment
@@ -2762,7 +2754,7 @@ async def test_mentions_link_to_whoever_the_people_step_names(
     comments = {
         c.content: c
         for c in (
-            await session.exec(select(Comment).where(Comment.task_id == imported.id))
+            await session.exec(select(Comment).where(said_on("task", imported.id)))
         ).all()
     }
     parent = comments["The frame is out of true"]
@@ -3451,7 +3443,7 @@ async def test_a_restored_mention_links_to_whoever_its_handle_is_here(
     ).one()
     assert restored_task.description == f"Ask @[]({c.user.id})"
     comment = (
-        await session.exec(select(Comment).where(Comment.task_id == restored_task.id))
+        await session.exec(select(Comment).where(said_on("task", restored_task.id)))
     ).one()
     assert comment.content == f"@[]({c.user.id}) agreed"
 
@@ -3534,7 +3526,7 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    target = await _second_initiative(session, a, files_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.file: True})
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
@@ -3739,7 +3731,7 @@ async def _restored(session, initiative_id: int) -> dict:
         ).one(),
         "comment": (
             await session.exec(
-                select(Comment).where(Comment.task_id == tasks["Ship it"].id)
+                select(Comment).where(said_on("task", tasks["Ship it"].id))
             )
         ).one(),
     }
@@ -3893,7 +3885,7 @@ async def test_a_wiki_zip_imports_back_from_the_wiki_page(client, acting_user, s
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     await _all_tools_enabled(session, a.initiative)
-    target = await _second_initiative(session, a, wikis_enabled=True)
+    target = await _second_initiative(session, a, tools={Tool.wiki: True})
     settings = {
         "page_order": WikiPageOrder.title,
         "contents_depth": 2,
@@ -4852,9 +4844,7 @@ async def test_a_jira_sprint_becomes_an_event_its_tasks_are_related_to(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    setattr(a.initiative, Tool.calendar.view_permission, True)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: True})
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
@@ -4929,9 +4919,7 @@ async def test_sprints_are_left_behind_and_said_so_when_calendars_are_off(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    setattr(a.initiative, Tool.calendar.view_permission, False)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.calendar: False})
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
@@ -5025,9 +5013,7 @@ async def test_a_jira_import_brings_its_comments_to_whoever_wrote_them(
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
     comments = (
         await session.exec(
-            select(Comment)
-            .where(Comment.task_id == task.id)
-            .order_by(Comment.created_at)
+            select(Comment).where(said_on("task", task.id)).order_by(Comment.created_at)
         )
     ).all()
     assert [c.content for c in comments] == ["Measured twice", "Cut once"]
@@ -5148,9 +5134,7 @@ async def test_a_jira_file_stays_behind_when_the_initiative_has_no_files(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
@@ -5291,7 +5275,7 @@ async def test_starting_a_jira_import_refuses_what_it_can_up_front(
     )
     assert malformed.status_code == 422
 
-    target = await _second_initiative(session, a, projects_enabled=False)
+    target = await _second_initiative(session, a, tools={Tool.project: False})
     disabled = await _start_jira(client, a, initiative_id=target.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
@@ -5896,9 +5880,7 @@ async def test_an_initiative_without_files_takes_only_the_pictures(
 
     monkeypatch.setattr(atlassian_service, "request_public_target", _attachment_site())
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    a.initiative.files_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.file: False})
 
     job_id = (await _start_confluence(client, a, initiative_id=a.initiative.id)).json()[
         "id"
@@ -5996,7 +5978,7 @@ async def test_a_confluence_pages_comments_arrive_on_its_wiki_page(
     thread = (
         await session.exec(
             select(Comment)
-            .where(Comment.wiki_page_id == pages["Home"].id)
+            .where(said_on("wiki_page", pages["Home"].id))
             .order_by(Comment.id)
         )
     ).all()

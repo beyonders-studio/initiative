@@ -41,8 +41,8 @@ from app.models.platform.marketplace_registry import (
 )
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher
+from app.services.marketplace import catalog, registry_entries, tuf_registry
 from app.services.marketplace import registrations as registrations_service
-from app.services.marketplace import tuf_registry
 from app.services.marketplace.catalog import upsert_listing
 from app.services.platform import rules
 from app.testing import (
@@ -559,10 +559,12 @@ class TestRefusals:
 
         result, _ = await _refresh(session, repo)
 
-        # The publisher's role no longer verifies; nothing of it lands.
-        assert [(item.name, item.code) for item in result.skipped] == [
-            ("acme", Codes.METADATA_REJECTED)
-        ]
+        # The publisher's role no longer verifies; nothing of it lands. It
+        # has never been seen here, so there is no name to give it.
+        assert [
+            (item.publisher_name, item.listing_name, item.code)
+            for item in result.skipped
+        ] == [(None, None, Codes.METADATA_REJECTED)]
         assert await _listing(session, PLUGIN_UID) is None
 
     async def test_a_tampered_top_level_role_refuses_the_whole_repository(
@@ -592,7 +594,10 @@ class TestRefusals:
         repo.files[served] = repo.files[served].replace(b"Renamed", b"Changed")
         result, _ = await _refresh(session, repo)
 
-        assert [item.code for item in result.skipped] == [Codes.TARGET_REJECTED]
+        # The entry did not verify, so it is named as this deployment holds it.
+        assert [(item.listing_name, item.code) for item in result.skipped] == [
+            ("Tracker", Codes.TARGET_REJECTED)
+        ]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None
         assert listing.name == "Tracker"
@@ -610,11 +615,104 @@ class TestRefusals:
         repo.publish(publisher_expires=datetime.now(UTC) - timedelta(days=1))
         result, _ = await _refresh(session, repo)
 
-        assert [(item.name, item.code) for item in result.skipped] == [
-            ("acme", Codes.EXPIRED)
+        # Named by the publisher's display name, which the first refresh
+        # recorded.
+        publisher = await _publisher(session, "acme")
+        assert publisher is not None
+        assert [(item.publisher_name, item.code) for item in result.skipped] == [
+            (publisher.display_name, Codes.EXPIRED)
         ]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None and listing.available is True
+
+    async def test_a_version_republished_with_other_content_says_so(
+        self, session, repo, trusted, monkeypatch, tmp_path
+    ):
+        entry = repo.add_listing("acme", PLUGIN_UID, slug="tracker", name="Tracker")
+        repo.publish()
+        await _refresh(session, repo)
+
+        # The same version, its release notes changed: content a published
+        # version may not change.
+        changed = [{**v, "release_notes": "Changed."} for v in entry["versions"]]
+        repo.add_listing(
+            "acme",
+            PLUGIN_UID,
+            slug="tracker",
+            name="Tracker",
+            extra={"versions": changed},
+        )
+        repo.publish()
+        result, _ = await _refresh(session, repo)
+
+        assert [(item.listing_name, item.code) for item in result.skipped] == [
+            ("Tracker", Codes.VERSION_REUSED)
+        ]
+        status = await _status(session)
+        assert status is not None
+        assert status.last_error == Codes.VERSION_REUSED
+        path = f"publishers/acme/{PLUGIN_UID}/listing.json"
+        assert status.last_skipped == [
+            {"name": path, "code": Codes.VERSION_REUSED, "listing_name": "Tracker"}
+        ]
+        read = await tuf_registry.read_status(session, enabled=True)
+        assert read.skipped == [
+            tuf_registry.SkippedEntry(
+                name=path, code=Codes.VERSION_REUSED, listing_name="Tracker"
+            )
+        ]
+
+        # A trusted root that stops loading is what the status reports; the
+        # skips from before do not bury it.
+        broken = _write_root(tmp_path / "broken.json", b"not a root")
+        monkeypatch.setattr(tuf_registry, "BUILTIN_ROOT_PATH", broken)
+        read = await tuf_registry.read_status(session, enabled=True)
+        assert (read.last_error, read.skipped) == (Codes.ROOT_INVALID, [])
+        monkeypatch.setattr(tuf_registry, "BUILTIN_ROOT_PATH", trusted)
+
+        # Published as a new version, it lands and the status clears.
+        repo.add_listing(
+            "acme",
+            PLUGIN_UID,
+            slug="tracker",
+            name="Tracker",
+            versions=("1.0.0", "1.0.1"),
+        )
+        repo.publish()
+        result, _ = await _refresh(session, repo)
+        assert result.skipped == []
+        status = await _status(session)
+        assert status is not None
+        assert (status.last_error, status.last_skipped) == (None, None)
+        assert (await tuf_registry.read_status(session, enabled=True)).skipped == []
+
+    async def test_a_name_another_registry_listing_holds_is_an_identity_conflict(
+        self, session, repo, trusted
+    ):
+        repo.add_listing("acme", BOARD_UID, slug="board", kind="dashboard")
+        repo.add_listing("acme", OTHER_UID, slug="board", kind="dashboard", name="Copy")
+        repo.publish()
+
+        result, _ = await _refresh(session, repo)
+
+        assert [(item.listing_name, item.code) for item in result.skipped] == [
+            ("Copy", Codes.IDENTITY_CONFLICT)
+        ]
+        assert await _listing(session, OTHER_UID) is None
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (catalog.CatalogSourceConflict, Codes.SOURCE_CONFLICT),
+        (catalog.CatalogIdentityConflict, Codes.IDENTITY_CONFLICT),
+        (catalog.CatalogReservedName, Codes.RESERVED_NAMESPACE),
+        (catalog.CatalogVersionReused, Codes.VERSION_REUSED),
+        (catalog.CatalogError, Codes.LISTING_REJECTED),
+    ],
+)
+def test_each_catalog_refusal_has_its_own_code(error, code):
+    assert registry_entries.catalog_code(error("refused")) == code
 
 
 # ---------------------------------------------------------------------------
@@ -968,7 +1066,11 @@ class TestPackageTerms:
         repo.publish()
         result, _ = await _refresh(session, repo)
 
-        assert [entry.name for entry in result.skipped] == ["package"]
+        # The package's own role: no listing or publisher to name it by.
+        assert [
+            (entry.name, entry.code, entry.listing_name, entry.publisher_name)
+            for entry in result.skipped
+        ] == [("package", Codes.METADATA_REJECTED, None, None)]
         listing = await _listing(session, PLUGIN_UID)
         assert listing is not None and listing.access == "entitled"
 

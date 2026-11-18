@@ -592,7 +592,8 @@ async def _write_comments(
         ).strip()
         created = parse_datetime(comment_env.created_at)
         comment = Comment(
-            wiki_page_id=row.id,
+            subject_type="wiki_page",
+            subject_id=row.id,
             content=body,
             created_by=author if author is not None else importer.id,
             created_by_kind=ActorKind.member,

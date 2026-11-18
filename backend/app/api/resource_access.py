@@ -106,11 +106,6 @@ class ResourceAccessConfig:
         """Key into ``permissions.DAC_RESOURCES``."""
         return self.tool
 
-    @property
-    def feature_attr(self) -> str:
-        """The initiative flag gating the whole tool."""
-        return self.tool.view_permission
-
 
 RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
     Tool.project: ResourceAccessConfig(
@@ -174,12 +169,10 @@ def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> 
     refusal again at each create endpoint.
 
     The database asks the same question on INSERT — the rendered policy's
-    ``{plural}_enabled`` leg. This runs first so the answer is a named 403
-    rather than a row that silently fails to appear.
+    switch leg. This runs first so the answer is a named 403 rather than a row
+    that silently fails to appear.
     """
-    if RESOURCE_ACCESS[kind].feature_attr is not None and not tool_on(
-        context, initiative, kind
-    ):
+    if not tool_on(context, initiative, kind):
         raise kind.disabled()
 
 

@@ -33,9 +33,7 @@ function stubEverything(hidden: Tool[] = [], roster = true) {
           name: "Apollo",
           member_count: 4,
           role_display_name: "Project Manager",
-          dashboards_enabled: true,
-          calendars_enabled: true,
-          counter_groups_enabled: true,
+          tools: { dashboard: true, calendar: true, counter_group: true },
           can: {
             manage: false,
             moderate: false,

@@ -30,6 +30,11 @@ const MANAGER_ID = 42;
 function stubInitiative(overrides: Partial<InitiativeRead> = {}, patchFails?: [number, string]) {
   const patches: unknown[] = [];
   server.use(
+    // The community sets nothing, unless a test says otherwise; declared
+    // before `:id`, which would also match it.
+    communityHttp.get("/initiatives/defaults", () =>
+      HttpResponse.json({ tools: {}, member_permissions: {}, custom_roles: true })
+    ),
     communityHttp.get("/initiatives/:id", () =>
       HttpResponse.json(
         buildInitiative({
@@ -138,7 +143,7 @@ describe("DetailsPage", () => {
       await userEvent.click(await screen.findByRole("radio", { name: /Everyone in this/ }));
       await userEvent.click(screen.getByRole("button", { name: "Turn it on" }));
 
-      await waitFor(() => expect(initiativePatches).toEqual([{ posts_enabled: true }]));
+      await waitFor(() => expect(initiativePatches).toEqual([{ tools: { post: true } }]));
       await waitFor(() => expect(rolePatches).toHaveLength(1));
       // The member role, not the manager one — a manager already sees everything.
       expect(rolePatches[0].roleId).toBe("2");
@@ -161,12 +166,12 @@ describe("DetailsPage", () => {
       await userEvent.click(await screen.findByRole("radio", { name: /Managers only/ }));
       await userEvent.click(screen.getByRole("button", { name: "Turn it on" }));
 
-      await waitFor(() => expect(initiativePatches).toEqual([{ posts_enabled: true }]));
+      await waitFor(() => expect(initiativePatches).toEqual([{ tools: { post: true } }]));
       expect(rolePatches).toHaveLength(0);
     });
 
     it("says who can see a tool that is already on", async () => {
-      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
 
       renderDetails();
@@ -182,7 +187,7 @@ describe("DetailsPage", () => {
     });
 
     it("shows a switch the community set as set, and offers no change", async () => {
-      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
       server.use(
         communityHttp.get("/initiatives/defaults", () =>
@@ -199,7 +204,7 @@ describe("DetailsPage", () => {
     });
 
     it("warns when a tool is on but no ordinary role has been given it", async () => {
-      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole()]);
 
       renderDetails();
@@ -208,7 +213,7 @@ describe("DetailsPage", () => {
     });
 
     it("grants it to everyone from that warning, without touching the switch", async () => {
-      const initiativePatches = stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      const initiativePatches = stubInitiative({ tools: { post: true } });
       const rolePatches = stubRoles([managerRole(), memberRole()]);
 
       renderDetails();
@@ -238,13 +243,13 @@ describe("DetailsPage", () => {
 
       // The switch still moves — that half succeeded — but the grant that
       // could not read the roster reports failure rather than success.
-      await waitFor(() => expect(initiativePatches).toEqual([{ posts_enabled: true }]));
+      await waitFor(() => expect(initiativePatches).toEqual([{ tools: { post: true } }]));
       await waitFor(() => expect(toast.error).toHaveBeenCalled());
       expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("can now see"));
     });
 
     it("says what turning a tool off hides before it hides it", async () => {
-      const patches = stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      const patches = stubInitiative({ tools: { post: true } });
       stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
 
       renderDetails();
@@ -257,7 +262,7 @@ describe("DetailsPage", () => {
       expect(patches).toHaveLength(0);
 
       await userEvent.click(screen.getByRole("button", { name: "Turn it off" }));
-      await waitFor(() => expect(patches).toEqual([{ posts_enabled: false }]));
+      await waitFor(() => expect(patches).toEqual([{ tools: { post: false } }]));
     });
   });
 });

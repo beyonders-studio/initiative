@@ -263,7 +263,8 @@ async def test_a_guest_comments_on_what_it_reaches_only(
     s.add(
         Comment(
             content="Looks good",
-            task_id=task_id,
+            subject_type="task",
+            subject_id=task_id,
             created_by=guest_id,
             created_by_kind=ActorKind.member,
         )

@@ -426,7 +426,7 @@ async def _tell_the_platform(
     if legal_basis is LegalBasis.child_safety:
         # Asked once per case, whichever report brought child safety to it:
         # the case may have been opened by a report naming another law.
-        from app.models.tenant.comment import Comment
+        from app.models.tenant.comment import Comment, said_on
 
         operations = await configured_operations_guild_id()
         if operations is not None:
@@ -435,7 +435,7 @@ async def _tell_the_platform(
                 asked = (
                     await ops.exec(
                         select(Comment.id)
-                        .where(Comment.task_id == opened.task_id)
+                        .where(said_on("task", opened.task_id))
                         .where(
                             Comment.system_kind
                             == case_activity.ActivityKind.hold_requested.value
@@ -932,10 +932,6 @@ async def reporters_for(
 #: The entity type a comment's parent column names. Every declared parent is a
 #: kind in its own right, so the column's own name is the answer and there is no
 #: second list to keep in step.
-def _parent_entity(column: str) -> SearchEntityType:
-    return SearchEntityType(column.removesuffix("_id"))
-
-
 class TargetLocation:
     """What to open to go and read a reported thing.
 
@@ -976,34 +972,23 @@ async def _comment_parents(
 ) -> dict[int, tuple[str, int]]:
     """What each of these comments was said on — the kind, and which one.
 
-    Read from the comment's own parent columns, declared once in
-    ``COMMENT_PARENT_COLUMNS``, rather than from the index's sharing pair: the
-    two differ for the one parent whose sharing is not its own — a comment on a
-    task is shared as part of the task's *project*, and read on the task.
+    Read from the comment's own subject, rather than from the index's sharing
+    pair: the two differ for the one subject whose sharing is not its own — a
+    comment on a task is shared as part of the task's *project*, and read on
+    the task.
     """
-    from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
+    from app.models.tenant.comment import Comment
 
     if not comment_ids:
         return {}
-
-    comments = SQLModel.metadata.tables["comments"]
-    columns = [comments.c[name] for name in COMMENT_PARENT_COLUMNS]
     rows = (
         await session.exec(
-            sa_select(comments.c["id"], *columns).where(
-                comments.c["id"].in_(comment_ids)
+            select(Comment.id, Comment.subject_type, Comment.subject_id).where(
+                Comment.id.in_(comment_ids)
             )
         )
     ).all()
-
-    parents: dict[int, tuple[str, int]] = {}
-    for row in rows:
-        for name, value in zip(COMMENT_PARENT_COLUMNS, row[1:]):
-            if value is not None:
-                # Exactly one is set — the table's own check constraint says so.
-                parents[row[0]] = (_parent_entity(name).value, int(value))
-                break
-    return parents
+    return {int(row[0]): (row[1], int(row[2])) for row in rows}
 
 
 async def target_previews(

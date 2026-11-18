@@ -38,8 +38,8 @@ from app.core.references import references_in_body, references_in_text
 from app.core.relationships import PERSON, EndpointKind, Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.db import reference_targets
-from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
-from app.models.tenant.comment import Comment
+from app.db.initiative_rls import COMMENT_PARENTS
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.file import File
 from app.models.tenant.post import Post
 from app.models.tenant.relationship import EntityRelationship
@@ -65,13 +65,12 @@ BODY_COLUMNS: dict[SearchEntityType, tuple[type, str]] = {
     SearchEntityType.wiki_page: (WikiPage, "content"),
 }
 
-#: Kind -> the comment column naming a parent of that kind. Derived from the
-#: registry the comment policies are rendered from, so a new commentable tool is
-#: declared once and picked up here without an edit.
-_COMMENT_COLUMNS: dict[SearchEntityType, str] = {
-    SearchEntityType(column.removesuffix("_id")): column
-    for column in COMMENT_PARENT_COLUMNS
-}
+#: The kinds comments are said on. Derived from the registry the comment
+#: policies are rendered from, so a new commentable tool is declared once and
+#: picked up here without an edit.
+_COMMENTED: frozenset[SearchEntityType] = frozenset(
+    SearchEntityType(kind) for kind in COMMENT_PARENTS
+)
 
 
 async def sync_for_entity(
@@ -122,8 +121,6 @@ async def sync_for_comment(
     comment's own edges, because a comment has none.
     """
     parent = comment_parent(comment)
-    if parent is None:
-        return
     await sync_for_entity(
         session,
         parent,
@@ -156,13 +153,9 @@ async def referencing_files(session: AsyncSession, file_id: int) -> list[File]:
     return list(rows.all())
 
 
-def comment_parent(comment: Comment) -> Endpoint | None:
+def comment_parent(comment: Comment) -> Endpoint:
     """The thing a comment is about, as an edge would name it."""
-    for kind, column in _COMMENT_COLUMNS.items():
-        entity_id = getattr(comment, column, None)
-        if entity_id is not None:
-            return Endpoint(kind, entity_id)
-    return None
+    return Endpoint(SearchEntityType(comment.subject_type), comment.subject_id)
 
 
 async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
@@ -180,11 +173,10 @@ async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
 
 async def _comment_bodies(session: AsyncSession, entity: Endpoint) -> Sequence[str]:
     """Every live comment written about this thing."""
-    column = _COMMENT_COLUMNS.get(entity.kind)
-    if column is None:
+    if entity.kind not in _COMMENTED:
         return ()
     rows = await session.exec(
-        select(Comment.content).where(getattr(Comment, column) == entity.id)
+        select(Comment.content).where(said_on(entity.kind.value, entity.id))
     )
     return list(rows.all())
 

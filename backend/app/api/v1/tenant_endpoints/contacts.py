@@ -35,7 +35,7 @@ from app.api.deps import (
 from app.core.messages import ContactMessages
 from app.core.tools import Tool
 from app.models.platform.user import User
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.contact import DETAILS, Contact
 from app.schemas.tenant.contact import ContactCreate, ContactRead, ContactUpdate
 from app.schemas.tenant.resource_grant import initiative_readable
@@ -218,9 +218,7 @@ async def move_contact(
         grants=initiative_readable(),
         actor_user_id=current_user.id,
     )
-    comments = await session.exec(
-        select(Comment).where(Comment.contact_id == contact.id)
-    )
+    comments = await session.exec(select(Comment).where(said_on("contact", contact.id)))
     await attachments_service.claim_uploads(session, *comments.all(), carried=True)
     await session.commit()
     return await read_after_write(session, contact_id, current_user, guild_context)

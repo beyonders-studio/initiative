@@ -26,6 +26,7 @@ from app.testing import (
     guild_of,
     guild_url,
     route_session_to_guild,
+    switch_tools,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
@@ -39,8 +40,7 @@ async def _switch_on(session: Any, *initiatives: Any) -> None:
     """Turn counters on in each of ``initiatives``."""
     await route_session_to_guild(session, guild_of(initiatives[0]))
     for initiative in initiatives:
-        initiative.counter_groups_enabled = True
-        session.add(initiative)
+        await switch_tools(session, initiative, {Tool.counter_group: True})
     await session.commit()
 
 

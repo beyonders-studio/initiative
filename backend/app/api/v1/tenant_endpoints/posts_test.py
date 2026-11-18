@@ -33,14 +33,12 @@ from app.testing import (
     lexical_body,
     route_as,
     strip_non_owner_grants,
+    switch_tools,
 )
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 async def _joins(acting_user, actor: Actor, **overrides: Any) -> Actor:
@@ -188,9 +186,7 @@ async def test_create_requires_feature_enabled(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     # The factory switches every tool on, so a test about one being OFF
     # turns it off.
-    a.initiative.posts_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.post: False})
 
     response = await client.post(
         a.g("/posts/"),
@@ -977,7 +973,7 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             lambda s: (
                 "GET",
                 s.reader.g("/comments/"),
-                {"params": {"post_id": s.draft.id}},
+                {"params": {"subject_type": "post", "subject_id": s.draft.id}},
             ),
         ),
         (
@@ -985,7 +981,13 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
             lambda s: (
                 "POST",
                 s.reader.g("/comments/"),
-                {"json": {"content": "Seen it", "post_id": s.draft.id}},
+                {
+                    "json": {
+                        "content": "Seen it",
+                        "subject_type": "post",
+                        "subject_id": s.draft.id,
+                    }
+                },
             ),
         ),
         (

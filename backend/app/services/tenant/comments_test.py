@@ -41,9 +41,7 @@ async def test_task_comment_access_honors_grant(session: AsyncSession, reading_a
     project = await create_project(session, init, owner, name="P")
     task = await create_task(session, project)
 
-    ctx = await _load_parent(
-        session, column="task_id", entity_id=task.id, guild_id=guild.id
-    )
+    ctx = await _load_parent(session, kind="task", entity_id=task.id, guild_id=guild.id)
     assert ctx is not None
 
     # No grant: there is no way into the community at all.
@@ -87,9 +85,7 @@ async def test_file_comment_access_honors_grant(session: AsyncSession, reading_a
     await session.commit()
     await session.refresh(file)
 
-    ctx = await _load_parent(
-        session, column="file_id", entity_id=file.id, guild_id=guild.id
-    )
+    ctx = await _load_parent(session, kind="file", entity_id=file.id, guild_id=guild.id)
     assert ctx is not None
 
     from app.api.deps import GuildAccessError
@@ -136,9 +132,9 @@ async def test_a_read_only_grant_cannot_post(session: AsyncSession, reading_as):
     task = await create_task(session, project)
 
     insert = text(
-        "INSERT INTO comments (task_id, content, created_by, created_by_kind,"
-        " created_at, updated_at)"
-        " VALUES (:t, 'let me in', :u, 'member', now(), now())"
+        "INSERT INTO comments (subject_type, subject_id, content, created_by,"
+        " created_by_kind, created_at, updated_at)"
+        " VALUES ('task', :t, 'let me in', :u, 'member', now(), now())"
     ).bindparams(t=task.id, u=support.id)
 
     # A grantee reaches the community through the row, and the row says at
@@ -187,8 +183,9 @@ class TestCommentRlsLegs:
         await create_guild_membership(session, user=outsider, guild=guild)
 
         count_sql = text(
-            f"SELECT count(*) FROM comments WHERE {tool.value}_id = :eid"
-        ).bindparams(eid=entity.id)
+            "SELECT count(*) FROM comments WHERE subject_type = :kind"
+            " AND subject_id = :eid"
+        ).bindparams(kind=tool.value, eid=entity.id)
 
         s = await role_session("app_user")
         await route_as(s, user_id=outsider.id, guild_id=guild.id)

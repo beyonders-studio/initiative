@@ -41,6 +41,7 @@ from app.testing import (
     drain_notices,
     get_auth_headers,
     route_session_to_guild,
+    switch_tools,
 )
 
 
@@ -90,10 +91,7 @@ async def _enable_calendars(session: AsyncSession, initiative, creator):
 
     ``create_calendar`` seeds the creator-owner grant + an all-initiative-members
     read grant, mirroring the create endpoint's default sharing."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     return await create_calendar(session, initiative, creator)
 
 
@@ -1317,10 +1315,7 @@ async def _switch_calendars_on(session: AsyncSession, initiative) -> None:
 
     Off by default — and a guild calendar answers to this switch not at all,
     which is part of what the tests below check."""
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
 
 
 class TestGuildCalendarEvents:

@@ -72,7 +72,8 @@ async def post(
     truthful answer for a note nobody signed in wrote.
     """
     note = Comment(
-        task_id=task_id,
+        subject_type="task",
+        subject_id=task_id,
         content=text,
         audience=CommentAudience.members,
         system_kind=kind.value,

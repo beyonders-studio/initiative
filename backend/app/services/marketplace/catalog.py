@@ -59,7 +59,10 @@ from app.services.marketplace.manifest_values import check_public_id
 __all__ = [
     "REGISTRY_SOURCE",
     "CatalogError",
+    "CatalogIdentityConflict",
+    "CatalogReservedName",
     "CatalogSourceConflict",
+    "CatalogVersionReused",
     "bump_installs_count",
     "get_listing",
     "get_listing_by_uid",
@@ -92,6 +95,20 @@ class CatalogError(ValueError):
 
 class CatalogSourceConflict(CatalogError):
     """The listing's uid or name is held by a listing from another source."""
+
+
+class CatalogIdentityConflict(CatalogError):
+    """The listing's uid or name is held by another listing from the same
+    source, or it is published as part of a different plug-in than before."""
+
+
+class CatalogReservedName(CatalogError):
+    """The listing's public_id is under a prefix its source may not publish."""
+
+
+class CatalogVersionReused(CatalogError):
+    """The version is already published here with different content. A
+    published version is immutable, so a change is a new version."""
 
 
 #: The source every listing a registry refresh publishes is stored under.
@@ -453,7 +470,7 @@ async def upsert_listing(
     public_id = _check_public_id(str(manifest.get("public_id", "")))
     reserved = reserved_prefix_problem(public_id, source=source)
     if reserved is not None:
-        raise CatalogError(f"{public_id}: {reserved}")
+        raise CatalogReservedName(f"{public_id}: {reserved}")
     kind = str(manifest.get("kind", ""))
     if kind not in LISTING_KINDS:
         raise CatalogError(f"unknown listing kind {kind!r}")
@@ -515,7 +532,7 @@ async def upsert_listing(
             error = (
                 CatalogSourceConflict
                 if _crosses_sources(by_public_id, source)
-                else CatalogError
+                else CatalogIdentityConflict
             )
             raise error(
                 f"{public_id} is already published under uid {by_public_id.uid}"
@@ -526,7 +543,7 @@ async def upsert_listing(
             f"the {source} catalog does not replace it"
         )
     elif existing.public_id != public_id:
-        raise CatalogError(
+        raise CatalogIdentityConflict(
             f"uid {uid} is already held by {existing.public_id}; refusing to reassign"
         )
     elif existing.bundled_with_uid != bundled_with:
@@ -541,7 +558,7 @@ async def upsert_listing(
             else "on its own"
         )
         wants = f"as part of {bundled_with}" if bundled_with else "on its own"
-        raise CatalogError(
+        raise CatalogIdentityConflict(
             f"{public_id} is already published {held}; refusing to republish {wants}"
         )
 
@@ -621,7 +638,7 @@ async def upsert_listing(
         #
         # Correcting a listing means publishing a new version. Its name, blurb
         # and artwork are listing-level and stay editable without one.
-        raise CatalogError(
+        raise CatalogVersionReused(
             f"{public_id}: version {version_str} is already published with "
             "different content; publish a new version instead"
         )

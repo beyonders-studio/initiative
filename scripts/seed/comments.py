@@ -184,8 +184,10 @@ async def seed(c: Community) -> None:
                 content=d["content"],
                 created_by=author.id,
                 created_by_kind=ActorKind.member,
-                task_id=c.tasks[d["task"]].id if "task" in d else None,
-                file_id=c.files[d["file"]].id if "file" in d else None,
+                subject_type="task" if "task" in d else "file",
+                subject_id=(
+                    c.tasks[d["task"]].id if "task" in d else c.files[d["file"]].id
+                ),
             )
             session.add(comment)
             await session.commit()

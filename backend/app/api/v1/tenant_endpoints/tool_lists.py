@@ -478,7 +478,7 @@ def _summaries(
         await metadata_service.annotate_properties(req.session, rows)
         if "comment_count" in schema.model_fields:
             await comments_service.annotate_comment_counts(
-                req.session, rows, column=f"{spec.tool.value}_id"
+                req.session, rows, kind=spec.tool.value
             )
         items = [
             serialize_tool(schema, row, context=req.guild_context, user_id=req.user_id)

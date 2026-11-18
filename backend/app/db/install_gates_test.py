@@ -462,13 +462,13 @@ async def test_comments_ask_the_comments_scope(session, acting_user, role_sessio
 
     s, _ = await _route(role_session, install, ["files:read", "comments:read"])
     assert (await s.exec(select(Comment.content))).all() == ["First"]
-    s.add(Comment(content="From a reader", file_id=file.id))
+    s.add(Comment(content="From a reader", subject_type="file", subject_id=file.id))
     with pytest.raises(DBAPIError, match="row-level security"):
         await s.flush()
     await s.rollback()
 
     s, _ = await _route(role_session, install, ["files:read", "comments:write"])
-    s.add(Comment(content="From the plug-in", file_id=file.id))
+    s.add(Comment(content="From the plug-in", subject_type="file", subject_id=file.id))
     await s.flush()
     assert set((await s.exec(select(Comment.content))).all()) == {
         "First",
@@ -479,7 +479,9 @@ async def test_comments_ask_the_comments_scope(session, acting_user, role_sessio
     member = await _member(acting_user, install)
     person = await _as_person(role_session, member, install)
     assert (await person.exec(select(Comment.content))).all() == ["First"]
-    person.add(Comment(content="From a member", file_id=file.id))
+    person.add(
+        Comment(content="From a member", subject_type="file", subject_id=file.id)
+    )
     await person.flush()
     await person.rollback()
 

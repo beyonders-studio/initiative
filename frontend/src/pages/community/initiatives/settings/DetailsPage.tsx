@@ -2,11 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  InitiativeRoleRead,
-  InitiativeUpdate,
-  Tool,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { InitiativeRoleRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolsSection } from "@/components/initiatives/ToolsToggles";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
@@ -21,7 +17,7 @@ import { useUpdateInitiative } from "@/hooks/useInitiatives";
 import { useServerForm } from "@/hooks/useServerForm";
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
-import { isToolEnabled, TOOLS, toolCamelPlural, toolViewPermission } from "@/lib/tools";
+import { isToolEnabled, TOOLS, toolCamelPlural } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Field } from "@/ui/field";
@@ -207,7 +203,7 @@ export const DetailsPage = () => {
     updateInitiative.mutate(
       {
         initiativeId,
-        data: { [toolViewPermission(tool)]: value } as InitiativeUpdate,
+        data: { tools: { [tool]: value } },
       },
       onSuccess ? { onSuccess } : undefined
     );
@@ -260,7 +256,7 @@ export const DetailsPage = () => {
         color={color}
         setColor={setColor}
         toolSwitches={Object.fromEntries(
-          TOOLS.map((tool) => [tool, Boolean(isToolEnabled(tool, initiative))])
+          TOOLS.map((tool) => [tool, isToolEnabled(tool, initiative)])
         )}
         onToggleTool={handleToggleTool}
         canManageMembers={canManageMembers}

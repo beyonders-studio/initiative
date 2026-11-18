@@ -385,10 +385,11 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     )
     assert await _rows(
         session,
-        f"SELECT collection_id, content FROM {s}.comments WHERE id = :c",
+        f"SELECT subject_type, subject_id, content FROM {s}.comments WHERE id = :c",
         c=comment,
     ) == [
         (
+            "collection",
             gallery,
             f"Lovely, as #file[Spec]({spec.id}) says of #file[it]({sunset_file})",
         )
@@ -493,7 +494,9 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     ) == [(None, 17)]
     assert await _rows(
         session,
-        f"SELECT files_enabled FROM {s}.initiatives WHERE id = :i",
+        f"SELECT enabled FROM {s}.initiative_rules WHERE initiative_id = :i "
+        "AND initiative_role_id IS NULL AND install_id IS NULL "
+        "AND key = 'files_enabled'",
         i=initiative.id,
     ) == [(True,)]
     assert {("create_files", True), ("files_enabled", True)} <= set(

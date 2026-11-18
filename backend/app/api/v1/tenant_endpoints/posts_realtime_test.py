@@ -17,6 +17,7 @@ from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.post import Post
@@ -33,15 +34,13 @@ from app.testing import (
     lexical_body,
     route_session_to_guild,
     route_system,
+    switch_tools,
 )
 from app.testing.sockets import FakeWebSocket, settle, watch_events_bus
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.post: True})
 
 
 class _Room:

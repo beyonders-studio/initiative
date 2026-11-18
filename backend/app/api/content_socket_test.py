@@ -19,7 +19,7 @@ from app.core.security import SESSION_COOKIE_NAME
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.services.content_sockets import resource_room, sockets
-from app.testing import create_counter_group, get_auth_token
+from app.testing import create_counter_group, get_auth_token, switch_tools
 from app.testing.sockets import settle
 
 
@@ -201,9 +201,7 @@ async def test_a_counter_group_whose_tool_is_switched_off_is_not_streamed(
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
-    a.initiative.counter_groups_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
 
     websocket = await _watch(a.guild.id, group.id, get_auth_token(a.user))
     await websocket.serving  # type: ignore[attr-defined]
