@@ -790,6 +790,8 @@
   "PLUGIN_SERVICE_VENDOR_SETUP_INVALID_ORGANIZATION": "That isn't an organization name GitHub uses. Use letters, numbers and hyphens, up to 39 characters.",
   "PLUGIN_SERVICE_VENDOR_SETUP_EXPIRED": "This setup has expired or was already finished. Start it again from the plug-in's settings.",
   "PLUGIN_SERVICE_VENDOR_SETUP_FAILED": "GitHub didn't hand over the new app's values. Start the setup again.",
+  "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED": "The vendor says these values don't belong together. Check the marked fields.",
+  "PLUGIN_SERVICE_VENDOR_KEY_UNUSABLE": "That isn't a key that can sign. Paste the whole private key the vendor issued, including its BEGIN and END lines.",
   "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE": "Sharing can't be turned off while an installation is connected to more than one community.",
   "PLUGIN_CHANNEL_CONNECTION_EXPIRED": "That connection has run out, and the member has to connect again.",
   "PLUGIN_CHANNEL_CONNECTION_NO_TOKEN": "That connection holds no token to give.",

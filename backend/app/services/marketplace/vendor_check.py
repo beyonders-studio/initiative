@@ -126,11 +126,15 @@ async def run(
     if check.get("sign"):
         credential = _sign(check["sign"], values)
         if credential is None:
-            logger.info("plug-in services: a value the vendor check signs with is not set")
+            logger.info(
+                "plug-in services: a value the vendor check signs with is not set"
+            )
             return CheckResult.not_run
 
     secret = {
-        field["key"] for field in vendor_fields(definition) if field.get("type") == "secret"
+        field["key"]
+        for field in vendor_fields(definition)
+        if field.get("type") == "secret"
     }
     try:
         refusal = await declarative.vendor_check(

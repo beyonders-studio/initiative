@@ -904,7 +904,9 @@ def _vendor_check(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
         if named is None or "{" in named or "}" in named:
             fail(f"{what}.sign.key is one vendor value, '{{vendor.<key>}}'")
         if named not in vendor_keys:
-            fail(f"{what}.sign.key names {{vendor.{named}}}, which the vendor block does not declare")
+            fail(
+                f"{what}.sign.key names {{vendor.{named}}}, which the vendor block does not declare"
+            )
         if named not in secret_keys:
             fail(f"{what}.sign.key: {named!r} signs, so it is a secret field")
         alg = sign.get("alg", "RS256")
@@ -916,7 +918,9 @@ def _vendor_check(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
             or not isinstance(lifetime, int)
             or not 1 <= lifetime <= MAX_TOKEN_LIFETIME_SECONDS
         ):
-            fail(f"{what}.sign.lifetime must be 1..{MAX_TOKEN_LIFETIME_SECONDS} seconds")
+            fail(
+                f"{what}.sign.lifetime must be 1..{MAX_TOKEN_LIFETIME_SECONDS} seconds"
+            )
         cleaned["sign"] = {
             "iss": _template(
                 sign.get("iss"),
@@ -930,7 +934,9 @@ def _vendor_check(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
         }
     if check.get("auth") is not None:
         if "sign" not in cleaned:
-            fail(f"{what}.auth puts the signed JWT on the request, and there is none without 'sign'")
+            fail(
+                f"{what}.auth puts the signed JWT on the request, and there is none without 'sign'"
+            )
         cleaned["auth"] = _auth(check["auth"])
     auth_header = (cleaned.get("auth") or {}).get("header", DEFAULT_AUTH_HEADER)
 
@@ -954,12 +960,16 @@ def _vendor_check(raw: Any, *, fields: list[dict[str, Any]]) -> dict[str, Any]:
     for index, entry in enumerate(rows):
         where = f"{what}.expect.{index}"
         row = require_mapping(entry, where)
-        named_fields = require_list(row.get("fields"), f"{where}.fields", MAX_VENDOR_FIELDS)
+        named_fields = require_list(
+            row.get("fields"), f"{where}.fields", MAX_VENDOR_FIELDS
+        )
         if not named_fields:
             fail(f"{where}.fields names at least one vendor field")
         for field in named_fields:
             if field not in vendor_keys:
-                fail(f"{where}.fields names {field!r}, which the vendor block does not declare")
+                fail(
+                    f"{where}.fields names {field!r}, which the vendor block does not declare"
+                )
         if len(set(named_fields)) != len(named_fields):
             fail(f"{where}.fields names a field twice")
         message = localized_text(row.get("message"), MAX_TEXT_LENGTH)

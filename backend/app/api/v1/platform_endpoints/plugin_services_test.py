@@ -1389,7 +1389,11 @@ async def test_a_signing_value_that_is_not_a_key_is_refused(
         f"{BASE}{row.id}",
         headers=headers,
         json={
-            "vendor_values": {"app_id": "7", "app_name": "x", "private_key": "not a key"}
+            "vendor_values": {
+                "app_id": "7",
+                "app_name": "x",
+                "private_key": "not a key",
+            }
         },
     )
 

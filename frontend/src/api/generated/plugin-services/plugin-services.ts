@@ -404,6 +404,11 @@ export function useReadPluginService<
  * off while an installation is connected to more than one community is
  * refused (409), and so is a list of communities for a plug-in that is not
  * beta; one naming a community that does not exist is refused (400).
+ *
+ * Vendor values the listing's vendor check reads are checked with the
+ * vendor before anything is written (:mod:`~app.services.marketplace.vendor_check`):
+ * a refusal is a 400 naming the fields, and a check the vendor could not
+ * answer saves the values and says so in ``vendor_check``.
  * @summary Update Plugin Service
  */
 export const updatePluginService = (
