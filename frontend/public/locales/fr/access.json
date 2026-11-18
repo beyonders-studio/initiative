@@ -30,7 +30,9 @@
     "plugins": "Plug-ins",
     "pluginFallback": "Plug-in {{id}}",
     "pluginGrantHint": "Les paramètres de la communauté décident de ce qu'un plug-in peut atteindre, cela ne se modifie donc pas ici.",
-    "settingsDescription": "Choisissez qui peut consulter et modifier ceci."
+    "settingsDescription": "Choisissez qui peut consulter et modifier ceci.",
+    "noteLabel": "Note aux personnes que vous ajoutez",
+    "notePlaceholder": "Envoyée avec la prochaine personne que vous ajoutez (facultatif)"
   },
   "bulkAccess": {
     "title": "Modifier l'accès",
@@ -157,5 +159,20 @@
     "answered": "Déjà traitée",
     "answeredDescription": "Il n'y a plus rien à traiter ici.",
     "error": "Impossible d'envoyer votre réponse. Veuillez réessayer."
+  },
+  "send": {
+    "button": "Envoyer à…",
+    "title": "Envoyer à…",
+    "description": "Ils le reçoivent dans leurs notifications et l’ouvrent sur l’appareil qu’ils utilisent.",
+    "people": "Personnes",
+    "addPeople": "Ajouter des personnes",
+    "remove": "Retirer {{name}}",
+    "letIn": "Si quelqu’un ne peut pas encore l’ouvrir",
+    "letAsk": "Le laisser demander",
+    "submit": "Envoyer",
+    "sent": "Envoyé",
+    "sentSomeMayAsk_one": "Envoyé. {{count}} personne ne peut pas encore l’ouvrir et peut demander l’accès.",
+    "sentSomeMayAsk_other": "Envoyé. {{count}} personnes ne peuvent pas encore l’ouvrir et peuvent demander l’accès.",
+    "error": "Impossible de l’envoyer. Veuillez réessayer."
   }
 }

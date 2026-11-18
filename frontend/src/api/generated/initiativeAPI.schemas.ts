@@ -8938,6 +8938,7 @@ export const NotificationType = {
   share_requested: "share_requested",
   share_granted: "share_granted",
   share_declined: "share_declined",
+  item_sent: "item_sent",
   project_added: "project_added",
   mention: "mention",
   comment_on_task: "comment_on_task",
@@ -11374,6 +11375,7 @@ export interface ResourceGrantBulkRequest {
    * @maxItems 200
    */
   items: ResourceGrantBulkItem[];
+  note?: string | null;
 }
 
 export interface ResourceGrantBulkResponse {
@@ -11522,12 +11524,37 @@ export interface SecondFactorStepUpAnswer {
 }
 
 /**
- * Who an approval reached: the requester, or every member of the
- * initiative.
+ * Point people at one thing, with a note if there is one.
+ *
+ * ``level`` lets those who can't open it in, at that rung, where the sender
+ * may share it; left out, they are told it is there and may ask for it.
  */
-export type ShareRequestScope = (typeof ShareRequestScope)[keyof typeof ShareRequestScope];
+export interface SendCreate {
+  kind: ContentKind;
+  entity_id: number;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  user_ids: number[];
+  note?: string | null;
+  level?: ResourceAccessLevel | null;
+}
 
-export const ShareRequestScope = {
+/**
+ * Who heard, and how: sent what they can open, let in to it first, or
+ * told it is there to ask for.
+ */
+export interface SendResult {
+  sent: number[];
+  let_in: number[];
+  may_ask: number[];
+}
+
+export type ShareRequestAnswerScope =
+  (typeof ShareRequestAnswerScope)[keyof typeof ShareRequestAnswerScope];
+
+export const ShareRequestAnswerScope = {
   user: "user",
   initiative: "initiative",
 } as const;
@@ -11543,7 +11570,7 @@ export interface ShareRequestAnswer {
   ids: number[];
   approve: boolean;
   level?: ResourceAccessLevel | null;
-  scope?: ShareRequestScope;
+  scope?: ShareRequestAnswerScope;
   tell?: boolean;
 }
 
@@ -14599,6 +14626,46 @@ export type GetTagEntitiesParams = {
    * @maximum 100
    */
   page_size?: number;
+};
+
+export type SetProjectGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetFileGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetCounterGroupGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetCalendarGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetDashboardGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetPostGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetWikiGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
+};
+
+export type SetContactGrantsParams = {
+  /** A note to each person the new sharing lets in. */
+  note?: string | null;
 };
 
 export type SearchCommunityParams = {

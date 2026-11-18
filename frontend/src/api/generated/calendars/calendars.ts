@@ -29,6 +29,7 @@ import type {
   ListCalendarsParams,
   ReadCalendarParams,
   ResourceGrantSchema,
+  SetCalendarGrantsParams,
   ToolDuplicateRequest,
 } from "../initiativeAPI.schemas";
 
@@ -618,6 +619,7 @@ export const setCalendarGrants = (
   communityId: number,
   calendarId: number,
   resourceGrantSchema: BodyType<ResourceGrantSchema[]>,
+  params?: SetCalendarGrantsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -627,6 +629,7 @@ export const setCalendarGrants = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: resourceGrantSchema,
+      params,
       signal,
     },
     options
@@ -663,9 +666,9 @@ export const getSetCalendarGrantsMutationOptions = <
     Awaited<ReturnType<typeof setCalendarGrants>>,
     SetCalendarGrantsMutationVariables
   > = (props) => {
-    const { communityId, calendarId, data } = props ?? {};
+    const { communityId, calendarId, data, params } = props ?? {};
 
-    return setCalendarGrants(communityId, calendarId, data, requestOptions);
+    return setCalendarGrants(communityId, calendarId, data, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -680,6 +683,7 @@ export type SetCalendarGrantsMutationVariables = {
   communityId: number;
   calendarId: number;
   data: BodyType<ResourceGrantSchema[]>;
+  params?: SetCalendarGrantsParams;
 };
 
 /**

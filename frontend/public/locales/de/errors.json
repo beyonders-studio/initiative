@@ -873,5 +873,8 @@
   "VIEW_KEPT_IN_THE_COMMUNITY": "Lade die App neu, um diese Ansicht zu behalten.",
   "BANNED_FROM_COMMUNITY": "Du kannst dieser Community nicht beitreten.",
   "TIMEOUT_NOT_FOR_ADMINS": "Administratoren können nicht stummgeschaltet werden. Ändere zuerst ihre Rolle.",
-  "TIMEOUT_MUST_END_LATER": "Wähle ein Ende in der Zukunft."
+  "TIMEOUT_MUST_END_LATER": "Wähle ein Ende in der Zukunft.",
+  "SEND_NOBODY": "Wähle jemanden aus, an den es gehen soll",
+  "SEND_NOT_IN_INITIATIVE": "Jemand, den du ausgewählt hast, ist nicht in dieser Initiative",
+  "SEND_NOTHING_TO_SHARE": "Das kann nicht geteilt werden, also kann niemand Zugriff bekommen"
 }

@@ -521,6 +521,47 @@ describe("notificationText — access requests", () => {
     expect(notificationLink(granted)).toBe("/go/file/8");
     expect(notificationLink(notice("share_declined", {}))).toBeNull();
   });
+
+  it("carries the giver's note", () => {
+    const granted = notice("share_granted", {
+      answerer_name: "Grace",
+      level: "write",
+      count: 1,
+      entity_name: "Flight plan",
+      note: "For Thursday",
+    });
+
+    expect(notificationText(granted, t)).toMatch(/^notifications\.withNote/);
+    expect(notificationText(granted, t)).toContain('"note":"For Thursday"');
+  });
+});
+
+describe("sent to you", () => {
+  it("names what was sent to a reader who can open it, with the note", () => {
+    const line = notice("item_sent", {
+      sender_name: "Grace",
+      entity_type: "file",
+      entity_id: 8,
+      entity_name: "Flight plan",
+      note: "For Thursday",
+    });
+
+    expect(notificationText(line, t)).toContain("notifications.itemSent(");
+    expect(notificationText(line, t)).toContain("Flight plan");
+    expect(notificationText(line, t)).toContain('"note":"For Thursday"');
+    expect(notificationLink(line)).toBe("/go/file/8");
+  });
+
+  it("names nothing to a reader who can't open it, and still opens it", () => {
+    const line = notice("item_sent", {
+      sender_name: "Grace",
+      entity_type: "file",
+      entity_id: 8,
+    });
+
+    expect(notificationText(line, t)).toBe('notifications.itemSentUnnamed({"sender":"Grace"})');
+    expect(notificationLink(line)).toBe("/go/file/8");
+  });
 });
 
 describe("task reminders", () => {

@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
 import { HiddenFilesRequest } from "@/components/access/RequestAccess";
+import { SendButton } from "@/components/access/SendTo";
 import { FileChooserDialog } from "@/components/tools/files/FileChooserDialog";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { WikiPageActions } from "@/components/tools/wikis/WikiPageActions";
@@ -146,6 +147,7 @@ export const WikiSidebarContent = ({
             {wikiQuery.data?.name ?? t("title")}
           </h2>
           <SubscribeButton kind={Tool.wiki} entityId={wikiId} className="size-8" />
+          <SendButton kind={Tool.wiki} entityId={wikiId} className="size-8" />
           {canWrite ? (
             <Button variant="ghost" size="icon" className="size-8 shrink-0" asChild>
               <Link to={gp(toolSettingsRoute(Tool.wiki, initiativeId, wikiId))}>

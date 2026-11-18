@@ -873,5 +873,8 @@
   "VIEW_KEPT_IN_THE_COMMUNITY": "Rechargez l'application pour conserver cet affichage.",
   "BANNED_FROM_COMMUNITY": "Vous ne pouvez pas rejoindre cette communauté.",
   "TIMEOUT_NOT_FOR_ADMINS": "Les administrateurs ne peuvent pas être mis en sourdine. Changez d’abord leur rôle.",
-  "TIMEOUT_MUST_END_LATER": "Choisissez une fin dans le futur."
+  "TIMEOUT_MUST_END_LATER": "Choisissez une fin dans le futur.",
+  "SEND_NOBODY": "Choisissez à qui l’envoyer",
+  "SEND_NOT_IN_INITIATIVE": "Une personne choisie ne fait pas partie de cette initiative",
+  "SEND_NOTHING_TO_SHARE": "Ceci ne peut pas être partagé, personne ne peut donc y avoir accès"
 }

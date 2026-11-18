@@ -30,7 +30,9 @@
     "plugins": "Complementos",
     "pluginFallback": "Complemento {{id}}",
     "pluginGrantHint": "La configuración de la comunidad decide a qué puede acceder un complemento, así que no se puede cambiar aquí.",
-    "settingsDescription": "Elige quién puede ver y editar esto."
+    "settingsDescription": "Elige quién puede ver y editar esto.",
+    "noteLabel": "Nota para las personas que añadas",
+    "notePlaceholder": "Se envía con la próxima persona que añadas (opcional)"
   },
   "bulkAccess": {
     "title": "Editar acceso",
@@ -157,5 +159,20 @@
     "answered": "Ya respondida",
     "answeredDescription": "Aquí ya no queda nada por responder.",
     "error": "No se pudo enviar tu respuesta. Inténtalo de nuevo."
+  },
+  "send": {
+    "button": "Enviar a…",
+    "title": "Enviar a…",
+    "description": "Lo reciben en sus notificaciones y lo abren en lo que estén usando.",
+    "people": "Personas",
+    "addPeople": "Añadir personas",
+    "remove": "Quitar a {{name}}",
+    "letIn": "Si alguien todavía no puede abrirlo",
+    "letAsk": "Que pida acceso",
+    "submit": "Enviar",
+    "sent": "Enviado",
+    "sentSomeMayAsk_one": "Enviado. {{count}} persona todavía no puede abrirlo y puede pedir acceso.",
+    "sentSomeMayAsk_other": "Enviado. {{count}} personas todavía no pueden abrirlo y pueden pedir acceso.",
+    "error": "No se pudo enviar. Inténtalo de nuevo."
   }
 }

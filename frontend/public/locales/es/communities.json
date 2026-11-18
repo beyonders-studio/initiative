@@ -429,7 +429,10 @@
       "custom_status": "Un moderador borró tu línea de estado.",
       "decorations": "Un moderador quitó las decoraciones de tu perfil.",
       "other": "Un moderador borró parte de tu perfil."
-    }
+    },
+    "itemSent": "{{sender}} te ha enviado {{title}}.",
+    "itemSentUnnamed": "{{sender}} te ha enviado algo a lo que puedes pedir acceso.",
+    "withNote": "{{line}} «{{note}}»"
   },
   "version": {
     "versionInformation": "Información de versión",

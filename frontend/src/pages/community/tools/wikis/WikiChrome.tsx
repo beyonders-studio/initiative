@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool, type WikiRead } from "@/api/generated/initiativeAPI.schemas";
+import { SendButton } from "@/components/access/SendTo";
 import { BookmarkButton } from "@/components/tools/BookmarkButton";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
@@ -155,6 +156,7 @@ export const WikiChrome = ({
         />
         {/* This subscription is the page's: the wiki is subscribed to from its sidebar. */}
         {pageId ? <SubscribeButton kind="wiki_page" entityId={pageId} className="size-8" /> : null}
+        {pageId ? <SendButton kind="wiki_page" entityId={pageId} className="size-8" /> : null}
         {trailing}
 
         {/* A page is written before it is published, so the one thing a writer
