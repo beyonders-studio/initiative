@@ -4,10 +4,11 @@ is built on.
 A tool's export is the same shape every time: take the selection out of the
 job params, fetch each entity under the caller's RLS session, count the rows
 it is worth, and turn it into a render item named after the entity and the
-date. ``ToolExportAdapter`` holds that shape and derives the registry key and
+date. ``ToolExportAdapter`` holds that shape, derives the registry key and
 the envelope suffix from the tool's own ``Tool`` value, the way
-``tool_envelope_type`` already does — so a per-tool module states only which
-rows it loads and how one row serialises.
+``tool_envelope_type`` already does, and writes every tool's envelope the same
+way (``export.envelope``) — so a per-tool module states only which rows it
+loads and the formats of its own.
 """
 
 from __future__ import annotations
@@ -287,9 +288,11 @@ class ToolExportAdapter:
     :meth:`get_row` (how one row loads, when not the tool's registered
     loader), :meth:`in_initiative` (which of them one initiative's export
     holds, when not every row the initiative has), :meth:`rows` (how many
-    rows one entity is worth) and :meth:`item` (how one entity serialises). Everything else — the registry key, the selection
-    params, counting, and the ``RenderRequest`` — is the same for every tool
-    and lives here.
+    rows one entity is worth), :meth:`fields` (what its envelope carries that
+    the row does not hold as it is) and :meth:`item` (how one entity
+    serialises in a format of the tool's own). Everything else — the registry
+    key, the selection params, counting, the envelope, and the
+    ``RenderRequest`` — is the same for every tool and lives here.
     """
 
     tool: Tool
@@ -379,8 +382,20 @@ class ToolExportAdapter:
         return 1
 
     def item(self, entity: Any, ctx: BuildContext, /) -> RenderItem:
-        """Serialise one entity into its render item."""
-        raise NotImplementedError
+        """Serialise one entity into its render item: its envelope, which every
+        tool writes the same way (``export.envelope``). A tool with formats of
+        its own writes those."""
+        from app.services.export.envelope import envelope
+
+        return RenderItem(
+            key=envelope_key(self.tool, self.title(entity), ctx.date),
+            data=envelope(self.tool, entity, **self.fields(entity, ctx)),
+        )
+
+    def fields(self, entity: Any, ctx: BuildContext, /) -> dict[str, Any]:
+        """What the entity's envelope carries that its row does not hold as it
+        is: none, unless the tool says."""
+        return {}
 
     def items(self, entity: Any, ctx: BuildContext, /) -> tuple[RenderItem, ...]:
         """Every file one entity becomes. One, unless its contents travel

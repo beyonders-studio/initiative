@@ -40,7 +40,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.file_types import FileType, export_formats, is_stored
 from app.core.messages import ExportMessages
-from app.core.tools import Tool, tool_envelope_type
+from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.file import File
 from app.services.export.adapters._common import (
@@ -191,21 +191,10 @@ def build_file_item(
 
 
 def _envelope(file: File, *, content: dict) -> dict:
-    """The generic ``initiative-file`` envelope: type + schema_version
-    discriminate the file for a future import; tags (by name) and custom
-    properties (flat, by name) ride along so a backup keeps the file's
-    metadata."""
-    from app.services.export.property_values import exported_properties
+    """The file's envelope, with ``content`` as its type writes it."""
+    from app.services.export.envelope import envelope
 
-    return {
-        "type": tool_envelope_type(Tool.file),
-        "schema_version": 1,
-        "file_type": file_type_of(file),
-        "name": file.name,
-        "content": content,
-        "tags": sorted(tag.name for tag in file.tags or []),
-        "properties": exported_properties(file),
-    }
+    return envelope(Tool.file, file, content=content)
 
 
 def file_type_of(file: File) -> str:

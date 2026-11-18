@@ -1,5 +1,5 @@
-"""Contact source adapter: the importable backup envelope (json), and a
-spreadsheet of the selection (csv).
+"""Contact source adapter: a spreadsheet of the selection (csv), beside the
+envelope (json) every tool writes.
 
 A contact is its name, whether it is an organization, and how to reach it, so
 the envelope carries those whole, with its tags and properties. Its sharing
@@ -24,7 +24,7 @@ from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool, tool_envelope_type
+from app.core.tools import Tool
 from app.models.tenant.contact import DETAILS, Contact
 from app.models.tenant.metadata import MetadataType
 from app.schemas.tenant.tag import annotated_tags
@@ -32,13 +32,11 @@ from app.services.export import values
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
-    envelope_key,
     export_stem,
 )
 from app.services.export.contract import RenderItem
 from app.services.export.i18n import et, export_locale
 from app.services.export.property_values import (
-    exported_properties,
     portable_summaries,
     property_export_dict,
 )
@@ -47,12 +45,6 @@ from app.services.tenant import contacts as contacts_service
 
 class ContactAdapter(ToolExportAdapter):
     tool = Tool.contact
-
-    def item(self, contact: Contact, ctx: BuildContext, /) -> RenderItem:
-        return RenderItem(
-            key=envelope_key(Tool.contact, contact.name, ctx.date),
-            data=_envelope(contact),
-        )
 
     async def prepare(
         self, session: AsyncSession, contacts: list[Contact], ctx: BuildContext, /
@@ -77,18 +69,6 @@ class ContactAdapter(ToolExportAdapter):
                 data=_table(contacts, ctx.prepared or {}, export_locale(ctx.user)),
             ),
         )
-
-
-def _envelope(contact: Contact) -> dict[str, Any]:
-    return {
-        "type": tool_envelope_type(Tool.contact),
-        "schema_version": 1,
-        "name": contact.name,
-        "is_organization": contact.is_organization,
-        **{field: list(getattr(contact, field)) for field in DETAILS},
-        "tags": sorted(tag.name for tag in annotated_tags(contact)),
-        "properties": exported_properties(contact),
-    }
 
 
 def _property_cell(summary: Any, locale: str) -> Any:

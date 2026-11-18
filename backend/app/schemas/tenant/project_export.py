@@ -9,7 +9,7 @@ cross-database move.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import (
     AliasChoices,
@@ -27,12 +27,17 @@ from app.core.tools import (
     LIST_LAYOUTS,
     TYPED_DETAILS,
     Tool,
+    tool_envelope_type,
 )
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.recurrence import validate_task_recurrence
-from app.schemas.tenant.import_envelopes import EnvelopePropertyValue, _EnvelopeBase
+from app.schemas.tenant.import_envelopes import (
+    EnvelopePropertyValue,
+    _EnvelopeBase,
+    envelope_literal,
+)
 from app.schemas.tenant.property import CounterSettings
 from app.schemas.tenant.tool_layout import (
     DetailLayoutWrite,
@@ -43,6 +48,9 @@ from app.schemas.tenant.tool_layout import (
 #: Where a row's property values are read from. ``property_values`` is what
 #: project exports called them before every envelope said ``properties``.
 _PROPERTIES = AliasChoices("properties", "property_values")
+
+#: The project envelope's ``type``.
+ProjectEnvelopeType: Any = envelope_literal(Tool.project)
 
 
 class ProjectExportProject(SanitizedBaseModel):
@@ -289,7 +297,7 @@ class ProjectExportEnvelope(_EnvelopeBase):
     """
 
     # Defaulted so files exported before the field existed still validate.
-    type: Literal["initiative-project"] = "initiative-project"
+    type: ProjectEnvelopeType = tool_envelope_type(Tool.project)
     app_version: str
     exported_at: datetime
     exported_by_handle: str | None = None
