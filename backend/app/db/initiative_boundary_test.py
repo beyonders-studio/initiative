@@ -22,7 +22,7 @@ A's rows. On the request login routed through the seam:
 
 Then each tool is switched off in A in turn, and with every tool's switch row
 gone: a moderator of A reads none of the rows of a table a switched-off tool
-governs, and updates and deletes none of them.
+governs, is refused an INSERT into it, and updates and deletes none of them.
 
 A table the seeder cannot fill fails here; it is never skipped.
 """
@@ -794,6 +794,12 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
             case = cases[name]
             if (seen := await _count(reader, case.table)) != 0:
                 failures.append(f"{name}: A's moderator reads {seen} with {state}")
+            if (
+                answer := await _attempt(reader, _insert(case, people.moderator_a))
+            ) != _REFUSED:
+                failures.append(
+                    f"{name}: A's moderator can INSERT with {state} ({answer})"
+                )
             for command, statement in _blind_writes(case).items():
                 if (answer := await _attempt(reader, statement)) not in (0, _REFUSED):
                     failures.append(

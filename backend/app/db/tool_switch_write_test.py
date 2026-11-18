@@ -48,6 +48,8 @@ async def _rung(acting_user, w: _Workspace, rung: str) -> Actor:
         return await acting_user(guild=guild, initiative=w.a)
     if rung == "plain member":
         return await acting_user(guild=guild, initiative=w.a, initiative_role="member")
+    if rung == "member of another initiative":
+        return await acting_user(guild=guild, initiative=w.b, initiative_role="member")
     if rung == "manager of another initiative":
         return await acting_user(guild=guild, initiative=w.b)
     return await acting_user(guild=guild)
@@ -58,6 +60,7 @@ RUNGS = {
     "community admin": True,
     "initiative manager": True,
     "plain member": False,
+    "member of another initiative": False,
     "manager of another initiative": False,
     "community member in no initiative": False,
 }
