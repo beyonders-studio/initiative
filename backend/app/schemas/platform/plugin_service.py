@@ -18,6 +18,7 @@ from app.models.platform.plugin_service_registration import (
     PluginAvailability,
 )
 from app.schemas.base import RawTextStr, SanitizedBaseModel
+from app.schemas.query import PageMeta
 
 __all__ = [
     "PluginBetaCommunityRead",
@@ -65,6 +66,14 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     public_id: str
     #: The catalog listing its plug-in facts come from. Null until it arrives.
     listing_uid: str | None = None
+    #: What its listing calls it, its art, and the version it is on. Null
+    #: until the listing arrives.
+    name: str | None = None
+    avatar_url: str | None = None
+    version: str | None = None
+    #: This project publishes it: shipped in this build, or from the registry
+    #: under this project's own publisher.
+    first_party: bool = False
     #: ``container``, or ``declarative`` for a plug-in whose calls Initiative
     #: makes itself: it has no address, origins or keys.
     kind: str = "container"
@@ -134,6 +143,12 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     live: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PluginServiceRegistrationListResponse(PageMeta):
+    """One page of the plug-in services this deployment has wired up."""
+
+    items: list[PluginServiceRegistrationRead]
 
 
 class _DeploymentFacts(SanitizedBaseModel):
