@@ -30,6 +30,7 @@ A table the seeder cannot fill fails here; it is never skipped.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -54,6 +55,7 @@ from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import InitiativeRule
 from app.services.tenant.initiative_tools import write_switches
 from app.testing import (
+    Actor,
     create_initiative,
     make_operations_community,
     route_as,
@@ -64,6 +66,32 @@ pytestmark = pytest.mark.always
 
 #: insufficient_privilege: a missing grant, and a row a policy refuses.
 _REFUSED = "42501"
+
+#: object_not_in_prerequisite_state: a table's own trigger refusing a change.
+_FROZEN = "55000"
+
+_SET_ASIDE_FREEZE_GUARDS = sa.text(
+    """
+    DO $$
+    DECLARE r record;
+    BEGIN
+        FOR r IN
+            SELECT c.relname, t.tgname
+            FROM pg_trigger t
+            JOIN pg_class c ON c.oid = t.tgrelid
+            JOIN pg_proc p ON p.oid = t.tgfoid
+            WHERE c.relnamespace = current_schema()::regnamespace
+              AND p.proname IN (
+                  'fn_frozen_row_guard', 'fn_frozen_parent_guard',
+                  'fn_frozen_ancestor_guard'
+              )
+        LOOP
+            EXECUTE format('ALTER TABLE %I DISABLE TRIGGER %I', r.relname, r.tgname);
+        END LOOP;
+    END
+    $$
+    """
+)
 
 _TOOL_BY_TABLE: dict[str, Tool] = {tool.plural: tool for tool in Tool}
 
@@ -212,8 +240,11 @@ class _Seeder:
 
     session: AsyncSession
     catalog: _Catalog
+    #: The initiative rows are made in; switched to B once A's are done.
     initiative_id: int
-    people: _People
+    #: Who makes the grants on tool rows, and who they are made to.
+    grantor: int
+    grantees: tuple[int, ...]
     counter: int = 0
     #: How many rows took a ``_DISTINCT`` value, by ``(table, column)``.
     taken: dict[tuple[str, str], int] = field(default_factory=dict)
@@ -366,8 +397,8 @@ class _Seeder:
         *,
         share: bool = True,
     ) -> dict[str, Any]:
-        """Write a row of ``name`` in A and return it. A tool's row is shared
-        with both outsiders by name, at write."""
+        """Write a row of ``name`` and return it. A tool's row is shared with
+        the grantees by name, at write."""
         table = self.table(name)
         values = await self.values(name, owner, inherit)
         statement = sa.insert(table).values(**values).returning(*table.c)
@@ -378,10 +409,10 @@ class _Seeder:
         tool = _TOOL_BY_TABLE.get(name)
         if tool is not None and share:
             grants = self.table("resource_grants")
-            for person in self.people.outsiders:
+            for person in self.grantees:
                 shared = await self.values(
                     "resource_grants",
-                    self.people.moderator_a,
+                    self.grantor,
                     inherit={
                         "resource_type": tool.value,
                         "resource_id": row["id"],
@@ -468,10 +499,67 @@ def _own_writes(case: _Case, person: int) -> dict[str, sa.Executable]:
     }
 
 
+def _locating(table: sa.Table) -> list[str]:
+    """The columns that say which initiative a row is in: its own
+    ``initiative_id``, its foreign keys to initiative-scoped rows, and the
+    ``(kind, id)`` pairs naming its subject."""
+    columns = ["initiative_id"] if "initiative_id" in table.c else []
+    for fk in table.foreign_key_constraints:
+        if fk.referred_table.name in INITIATIVE_PATHS:
+            columns += [element.parent.name for element in fk.elements]
+    for pair in _kind_pairs(table):
+        columns += pair
+    return list(dict.fromkeys(columns))
+
+
+@dataclass
+class _Move:
+    """Moving A's moderator's own row into B: the columns it sets, and the
+    row's primary key once moved."""
+
+    values: dict[str, Any]
+    moved_pk: tuple[Any, ...]
+
+    def statement(self, case: _Case, own: tuple[Any, ...]) -> sa.Update:
+        """The move of ``own`` alone."""
+        return (
+            sa.update(case.table)
+            .where(_matching(case.table, [own]))
+            .values(**self.values)
+        )
+
+    def blind(self, case: _Case) -> sa.Update:
+        """The move of every row the writer may update, reading no column:
+        a statement that reads one is also held to the read policy on the
+        row it writes, which would answer before the write policy did."""
+        return sa.update(case.table).values(**self.values)
+
+
+def _move(case: _Case, own: tuple[Any, ...], in_b: dict[str, Any]) -> _Move:
+    """Repoint ``own`` at the parents of ``in_b``, a row built in B."""
+    values = {c: in_b[c] for c in _locating(case.table) if c in in_b}
+    keys = [c.name for c in case.table.primary_key.columns]
+    moved = tuple(values.get(k, v) for k, v in zip(keys, own, strict=True))
+    return _Move(values, moved)
+
+
 def _initiative_of(table: sa.Table) -> str:
     """The initiative of a row ``r`` of ``table``, by the lookup the change
     capture stamps events with."""
     return initiative_of(table.name, "r")
+
+
+async def _initiative_of_row(
+    session: AsyncSession, table: sa.Table, row: tuple[Any, ...]
+) -> int | None:
+    """The initiative one row of ``table`` is in."""
+    keys = [c.name for c in table.primary_key.columns]
+    where = " AND ".join(f"r.{k} = :{k}" for k in keys)
+    statement = sa.text(
+        f"SELECT {_initiative_of(table)} FROM {table.name} r WHERE {where}"
+    )
+    result = await session.exec(statement, params=dict(zip(keys, row, strict=True)))
+    return result.scalar_one_or_none()
 
 
 async def _outside(session: AsyncSession, case: _Case, initiative_id: int) -> int:
@@ -486,7 +574,9 @@ async def _outside(session: AsyncSession, case: _Case, initiative_id: int) -> in
     return len(rows - {tuple(row) for row in result.all()})
 
 
-async def _keep_only(session: AsyncSession, table: sa.Table, initiative_id: int):
+async def _keep_only(
+    session: AsyncSession, table: sa.Table, initiative_id: int
+) -> None:
     """Delete every row of ``table`` not in ``initiative_id``, with triggers
     off, so whatever a statement on the whole table reaches is A's."""
     await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
@@ -500,7 +590,12 @@ async def _keep_only(session: AsyncSession, table: sa.Table, initiative_id: int)
     await session.exec(sa.text("SET LOCAL session_replication_role = origin"))
 
 
-async def _tools_on(role_session, person: int, guild_id: int, initiative_id: int):
+async def _tools_on(
+    role_session: Callable[[str], Awaitable[AsyncSession]],
+    person: int,
+    guild_id: int,
+    initiative_id: int,
+) -> None:
     """Assert every tool is switched on in ``initiative_id`` for ``person``."""
     session = await role_session("app_user")
     context = await route_as(session, user_id=person, guild_id=guild_id)
@@ -510,14 +605,19 @@ async def _tools_on(role_session, person: int, guild_id: int, initiative_id: int
 
 
 async def test_nobody_outside_an_initiative_reaches_its_rows(
-    session: AsyncSession, acting_user, reading_as, role_session
-):
+    session: AsyncSession,
+    acting_user: Callable[..., Awaitable[Actor]],
+    reading_as: Callable[[int, int], Awaitable[AsyncSession]],
+    role_session: Callable[[str], Awaitable[AsyncSession]],
+) -> None:
     # A and B are each in the hands of a moderator, the role with every tool
     # permission and full access to the initiative's content.
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     guild = admin.guild
     initiative_a = admin.initiative.id
     initiative_b = await create_initiative(session, guild, admin.user)
+    initiative_b_id = initiative_b.id
+    assert initiative_b_id is not None
     moderator_a = await acting_user(
         guild=guild, initiative=admin.initiative, initiative_role="moderator"
     )
@@ -531,7 +631,13 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     # The operations community holds every table the others do and its own.
     await make_operations_community(session, guild.id)
     await route_session_to_guild(session, guild.id)
-    seeder = _Seeder(session, await _Catalog.read(session), initiative_a, people)
+    seeder = _Seeder(
+        session,
+        await _Catalog.read(session),
+        initiative_a,
+        grantor=people.moderator_a,
+        grantees=people.outsiders,
+    )
     cases: dict[str, _Case] = {}
     unseeded: dict[str, str] = {}
     for name in INITIATIVE_PATHS:
@@ -569,7 +675,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     await session.commit()
 
     await _tools_on(role_session, people.moderator_a, guild.id, initiative_a)
-    await _tools_on(role_session, people.moderator_b, guild.id, initiative_b.id)
+    await _tools_on(role_session, people.moderator_b, guild.id, initiative_b_id)
 
     failures: list[str] = []
     for person, who in (
@@ -587,6 +693,9 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
                     failures.append(f"{name}: {who} can {command} in A ({answer})")
         await reader.rollback()
 
+    # Rows built in B, with every parent in B, for A's moderator, who is not
+    # in B, to move A's rows to and to insert. Made after A's rows were the
+    # only ones, so the whole-table statements above reached A's alone.
     readers = {
         "A's moderator": await reading_as(people.moderator_a, guild.id),
         "the community admin": await reading_as(admin.user.id, guild.id),
@@ -604,6 +713,55 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
                 failures.append(f"{name}: {who} cannot {command} in A ({answer})")
     for reader in readers.values():
         await reader.rollback()
+
+    # Rows built in B, every parent in B, for A's moderator, who is not in B,
+    # to move its own rows of A onto and to insert. Made after the
+    # whole-table statements above, which were to reach A's rows alone.
+    seeder.initiative_id = initiative_b_id
+    seeder.grantees = (people.moderator_a,)
+    moves: dict[str, sa.Update] = {}
+    in_b: dict[str, dict[str, Any]] = {}
+    for name, case in cases.items():
+        if name in _ADMINISTERED:
+            continue
+        own = case.rows[people.moderator_a]
+        in_b[name] = await seeder.values(name, people.moderator_a)
+        move = _move(case, own, in_b[name])
+        moves[name] = move.blind(case)
+        # Each lands its row in B: the move with triggers and foreign keys
+        # off (a collection's entries hold it to its initiative by key).
+        savepoint = await session.begin_nested()
+        await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.exec(move.statement(case, own))
+        moved = await _initiative_of_row(session, case.table, move.moved_pk)
+        await savepoint.rollback()
+        savepoint = await session.begin_nested()
+        insert = sa.insert(case.table).values(**in_b[name])
+        made = (await session.exec(insert.returning(*case.table.primary_key))).one()
+        inserted = await _initiative_of_row(session, case.table, tuple(made))
+        await savepoint.rollback()
+        assert (moved, inserted) == (initiative_b_id, initiative_b_id), (
+            f"{name}: a row moved or built for B lands in {moved} and {inserted}"
+        )
+    # The freeze guards take a parent the writer cannot see for a frozen one
+    # and refuse before the row security is asked; they are set aside here so
+    # that the row security answers a move on its own.
+    await session.exec(_SET_ASIDE_FREEZE_GUARDS)
+    await session.commit()
+
+    reader = await reading_as(people.moderator_a, guild.id)
+    for name, move in moves.items():
+        refused = {_REFUSED}
+        if "UPDATE" in _NOT_A_MODERATORS.get(name, ()):
+            # Updating nothing at all, its move reaches no row or meets the
+            # table's own refusal of any change.
+            refused |= {0, _FROZEN}
+        if (answer := await _attempt(reader, move)) not in refused:
+            failures.append(f"{name}: A's moderator moves its row into B ({answer})")
+        insert = sa.insert(cases[name].table).values(**in_b[name]).inline()
+        if (answer := await _attempt(reader, insert)) != _REFUSED:
+            failures.append(f"{name}: A's moderator inserts a row into B ({answer})")
+    await reader.rollback()
 
     # A switched-off tool's rows read as absent to A's own moderator: each
     # tool off in turn, then every switch row gone, since no row is off.
