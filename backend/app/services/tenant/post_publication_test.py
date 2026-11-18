@@ -14,6 +14,7 @@ from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.db import cohorts
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.post import Post
@@ -33,6 +34,7 @@ from app.testing import (
     guild_of,
     route_session_to_guild,
     route_system,
+    switch_tools,
 )
 
 
@@ -45,9 +47,7 @@ async def _board(session: AsyncSession):
     await create_guild_membership(session, user=reader, guild=guild)
     initiative = await create_initiative(session, guild, author)
     await create_initiative_member(session, initiative, reader)
-    initiative.posts_enabled = True
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, {Tool.post: True})
     # Ids, not rows: publishing commits (the claim has to be durable before
     # anything is sent), and a commit expires whatever these tests still hold.
     return author, reader, initiative, guild

@@ -17,6 +17,7 @@ from app.testing import (
     create_task,
     create_wiki_page,
     guild_of,
+    switch_tools,
 )
 
 # One factory per tool, uniform (session, initiative, creator) shape. The
@@ -32,10 +33,7 @@ async def _tool_entity(session, tool: Tool, initiative, creator):
     test states the sharing it needs explicitly (some factories seed an
     all-members read grant). Toggleable tools are switched on for the
     initiative first."""
-    if not getattr(initiative, tool.view_permission, True):
-        setattr(initiative, tool.view_permission, True)
-        session.add(initiative)
-        await session.commit()
+    await switch_tools(session, initiative, {tool: True})
     entity = await TOOL_FACTORIES[tool](session, initiative, creator)
     await route_session_to_guild(session, guild_of(initiative))
     await session.exec(
@@ -175,9 +173,7 @@ class TestToolComments:
     ):
         a = await acting_user(guild_role=CommunityRole.member, initiative=True)
         entity = await _tool_entity(session, tool, a.initiative, a.user)
-        setattr(a.initiative, tool.view_permission, False)
-        session.add(a.initiative)
-        await session.commit()
+        await switch_tools(session, a.initiative, {tool: False})
 
         listed = await client.get(
             a.g("/comments/"), headers=a.headers, params={_param(tool): entity.id}
@@ -467,9 +463,7 @@ async def test_recent_drops_comments_of_a_disabled_tool(client, session, acting_
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert any(e["entity_type"] == "counter_group" for e in recent.json())
 
-    setattr(a.initiative, Tool.counter_group.view_permission, False)
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.counter_group: False})
 
     recent = await client.get(a.g("/comments/recent"), headers=a.headers)
     assert recent.status_code == 200

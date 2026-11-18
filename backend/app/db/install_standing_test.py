@@ -41,6 +41,7 @@ from app.models.tenant.initiative import Initiative, PermissionKey
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.platform.identity_refs import ensure_ref
 from app.services.platform.intake_setup import set_operations_guild
+from app.services.tenant.initiative_tools import own_switch
 from app.testing import (
     create_file,
     create_guild_plugin,
@@ -206,7 +207,7 @@ async def test_the_standing_is_what_the_rows_say(session, acting_user, role_sess
             await session.exec(select(Initiative).where(Initiative.id.in_(placed)))
         ).all()
         for tool in Tool
-        if getattr(initiative, tool.view_permission)
+        if own_switch(initiative, tool)
     }
     assert set(context.enabled_tools) == switched_on
 

@@ -14,6 +14,7 @@ from typing import Any
 from sqlmodel import select
 
 from app.core.messages import CalendarMessages, PluginMessages
+from app.core.tools import Tool
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
@@ -33,6 +34,7 @@ from app.testing import (
     guild_of,
     guild_url,
     route_session_to_guild,
+    switch_tools,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
@@ -54,8 +56,7 @@ async def _switch_on(session: Any, *initiatives: Any) -> None:
     """Turn calendars on in each of ``initiatives``."""
     await route_session_to_guild(session, guild_of(initiatives[0]))
     for initiative in initiatives:
-        initiative.calendars_enabled = True
-        session.add(initiative)
+        await switch_tools(session, initiative, {Tool.calendar: True})
     await session.commit()
 
 

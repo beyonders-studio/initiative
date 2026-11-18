@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 
 from app.core.messages import MarketplaceMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.platform.publisher import Publisher
 from app.services.marketplace import catalog as catalog_service
@@ -29,6 +30,7 @@ from app.testing import (
     create_plugin_service_registration,
     marketplace_uid,
     set_beta_communities,
+    switch_tools,
 )
 from app.testing.fake_vendor import declarative_plugin
 
@@ -426,9 +428,7 @@ class TestABundledDashboardFollowsItsPlugin:
     ):
         """What is not offered cannot be taken by asking for it directly."""
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        actor.initiative.dashboards_enabled = True
-        session.add(actor.initiative)
-        await session.commit()
+        await switch_tools(session, actor.initiative, {Tool.dashboard: True})
 
         assert "tests.tracker-overview" not in await _shelf(
             client, actor, kind="dashboard"
@@ -806,9 +806,7 @@ async def _counter_listing(session, *, example: bool = True):
 
 
 async def _counters_on(session, initiative):
-    initiative.counter_groups_enabled = True
-    session.add(initiative)
-    await session.commit()
+    await switch_tools(session, initiative, {Tool.counter_group: True})
 
 
 async def _read_group(session, guild_id: int, group_id: int):
@@ -914,9 +912,7 @@ class TestInstallingAToolListing:
         self, client, acting_user, session
     ):
         actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        actor.initiative.counter_groups_enabled = False
-        session.add(actor.initiative)
-        await session.commit()
+        await switch_tools(session, actor.initiative, {Tool.counter_group: False})
         await _counter_listing(session)
 
         response = await client.post(
@@ -971,9 +967,7 @@ class TestInstallingAToolListing:
         from app.testing import route_session_to_guild
 
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        actor.initiative.dashboards_enabled = True
-        session.add(actor.initiative)
-        await session.commit()
+        await switch_tools(session, actor.initiative, {Tool.dashboard: True})
 
         response = await client.post(
             actor.g(f"/marketplace/listings/by-uid/{listing.uid}/install"),
@@ -1015,9 +1009,7 @@ class TestADashboardPreviewsOnSampleData:
         self, client, acting_user, listing, session
     ):
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-        actor.initiative.dashboards_enabled = True
-        session.add(actor.initiative)
-        await session.commit()
+        await switch_tools(session, actor.initiative, {Tool.dashboard: True})
 
         response = await client.post(
             actor.g(f"/marketplace/listings/by-uid/{listing.uid}/install"),

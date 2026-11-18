@@ -95,8 +95,8 @@ def initiative_switch_clause(
 ) -> ColumnElement[bool]:
     """Rows whose initiative has this tool switched on.
 
-    One spelling for every tool, from the initiative's switch column the tool
-    names (``Tool.view_permission``).
+    One spelling for every tool, from the initiative's switch the tool names
+    (``Tool.view_permission``).
     An initiative with the tool off has nothing to list, so the switch is a
     plain leg of the WHERE rather than a lookup the handler makes first: asking
     for that initiative by id and asking for the whole guild then answer the

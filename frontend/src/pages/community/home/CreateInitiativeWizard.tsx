@@ -32,7 +32,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { InitiativeCreate, InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
+import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeJoinPolicy, type Tool } from "@/api/generated/initiativeAPI.schemas";
 import yonderTalking from "@/assets/yonder/talking.svg";
 import { JoinPolicySection } from "@/components/initiatives/JoinPolicySection";
@@ -44,7 +44,7 @@ import { useWizard } from "@/hooks/useWizard";
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
-import { DEFAULT_ENABLED_TOOLS, TOOLS, toolViewPermission } from "@/lib/tools";
+import { DEFAULT_ENABLED_TOOLS, TOOLS } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { DialogFooter } from "@/ui/dialog";
@@ -162,11 +162,9 @@ export const CreateInitiativeWizard = ({
         description: description.trim() || undefined,
         color,
         join_policy: joinPolicy,
-        // One `{plural}_enabled` field per tool, straight from the grid — every
-        // tool is answered here, so there is no default to fall back to.
-        ...(Object.fromEntries(
-          TOOLS.map((tool) => [toolViewPermission(tool), Boolean(selected[tool])])
-        ) as Partial<InitiativeCreate>),
+        // Every tool, straight from the grid — each is answered here, so there
+        // is no default to fall back to.
+        tools: Object.fromEntries(TOOLS.map((tool) => [tool, Boolean(selected[tool])])),
       });
     } catch {
       // The create hook reports its own failure; there is nothing to configure.

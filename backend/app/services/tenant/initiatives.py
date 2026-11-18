@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import case, desc, func, or_
@@ -49,6 +49,7 @@ from app.schemas.tenant.initiative import (
     PluginPermissionRule,
 )
 from app.services import audit as audit_service
+from app.services.tenant.initiative_tools import own_switch, switches, write_switches
 
 logger = logging.getLogger(__name__)
 
@@ -1154,7 +1155,7 @@ async def create_imported_initiative(
     name: str,
     description: str | None,
     color: str | None,
-    tool_flags: dict[str, bool],
+    tools: Mapping[Tool, bool],
     manager_id: int,
     join_policy: InitiativeJoinPolicy | None = None,
     member_ids: Sequence[int] = (),
@@ -1162,7 +1163,7 @@ async def create_imported_initiative(
     """Create an initiative for a backup import: the exact create-endpoint
     sequence (row → built-in roles → creator as PM), with the name suffixed
     on collision (always-create policy) instead of 409ing, and the tool
-    master switches and join policy taken from the backup manifest.
+    switches and join policy taken from the backup manifest.
     ``member_ids`` join it with the built-in member role. Flush-only — the
     backup orchestrator owns its per-chunk transaction."""
     from app.services.import_engine.common import unique_name
@@ -1173,19 +1174,14 @@ async def create_imported_initiative(
         description=description,
         color=color,
         join_policy=(join_policy or InitiativeJoinPolicy.private).value,
-        **{
-            # A manifest that says nothing about a tool falls back to that
-            # tool's own default rather than to off: a backup written before
-            # projects and files had switches names no state for them, and
-            # restoring it must not produce an initiative with neither.
-            t.view_permission: bool(
-                tool_flags.get(t.view_permission, t.spec.on_by_default)
-            )
-            for t in Tool
-        },
     )
     session.add(initiative)
     await session.flush()
+    # A manifest that says nothing about a tool falls back to that tool's own
+    # default rather than to off: a backup written before projects and files
+    # had switches names no state for them, and restoring it must not produce
+    # an initiative with neither.
+    await write_switches(session, initiative.id, switches(tools))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     session.add(
@@ -1296,8 +1292,7 @@ async def community_defaults(
         for rule in member_rules
     }
     defaults.own_tools = {
-        tool: [iid for iid, i in live.items() if getattr(i, tool.view_permission)]
-        for tool in Tool
+        tool: [iid for iid, i in live.items() if own_switch(i, tool)] for tool in Tool
     }
     defaults.own_member_permissions = {
         key: [

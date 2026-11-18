@@ -87,6 +87,7 @@ from app.testing.factories import (
     set_notification_prefs,
     signed_in_headers,
     strip_non_owner_grants,
+    switch_tools,
 )
 from app.testing.notices import drain_notices
 from app.testing.passkeys import (
@@ -202,4 +203,5 @@ __all__ = [
     "strip_non_owner_grants",
     "stub_assertion",
     "stub_registration",
+    "switch_tools",
 ]

@@ -8,9 +8,10 @@ tasks.
 from __future__ import annotations
 
 from app.core.messages import DashboardMessages
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserStatus
-from app.testing import create_counter_group, create_project, create_task
+from app.testing import create_counter_group, create_project, create_task, switch_tools
 
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
@@ -34,10 +35,7 @@ def dashboard_body(*statements: str) -> dict:
 async def dashboards_on(session, initiative) -> None:
     """The tool switch. A role permission gates creating one, and the switch
     gates the tool existing at all."""
-    initiative.dashboards_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.dashboard: True})
 
 
 async def make_dashboard(client, actor, sql: str = COUNT_TASKS) -> int:
@@ -178,9 +176,7 @@ class TestWhatAReaderSees:
         """Full read means every tool the initiative has switched on, not only
         those the reader's own role may open."""
         admin, reader = await two_people(session, acting_user)
-        admin.initiative.counter_groups_enabled = True
-        session.add(admin.initiative)
-        await session.commit()
+        await switch_tools(session, admin.initiative, {Tool.counter_group: True})
         await create_counter_group(session, admin.initiative, admin.user)
 
         dashboard_id = await make_dashboard(

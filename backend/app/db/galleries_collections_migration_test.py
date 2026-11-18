@@ -493,7 +493,9 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     ) == [(None, 17)]
     assert await _rows(
         session,
-        f"SELECT files_enabled FROM {s}.initiatives WHERE id = :i",
+        f"SELECT enabled FROM {s}.initiative_rules WHERE initiative_id = :i "
+        "AND initiative_role_id IS NULL AND install_id IS NULL "
+        "AND key = 'files_enabled'",
         i=initiative.id,
     ) == [(True,)]
     assert {("create_files", True), ("files_enabled", True)} <= set(

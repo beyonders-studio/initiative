@@ -11,17 +11,15 @@ from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
+from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
-from app.testing import emitted
+from app.testing import emitted, switch_tools
 
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
 
 async def _dashboards_on(session: AsyncSession, initiative) -> None:
-    initiative.dashboards_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.dashboard: True})
 
 
 async def _dashboard(client: AsyncClient, actor) -> int:

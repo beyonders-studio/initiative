@@ -11,7 +11,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
-from app.testing import create_dashboard, create_project, strip_non_owner_grants
+from app.testing import (
+    create_dashboard,
+    create_project,
+    strip_non_owner_grants,
+    switch_tools,
+)
 
 
 def _stat_definition() -> dict:
@@ -31,10 +36,7 @@ def _stat_definition() -> dict:
 
 
 async def _dashboards_enabled(session: AsyncSession, initiative) -> None:
-    initiative.dashboards_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.dashboard: True})
 
 
 async def test_canvas_retains_sql_calendar_date_kind(client, session, acting_user):
@@ -141,9 +143,7 @@ async def test_create_requires_feature_enabled(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     # The factory switches every tool on, so a test about one being OFF
     # turns it off.
-    a.initiative.dashboards_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.dashboard: False})
 
     response = await client.post(
         a.g("/dashboards/"),
@@ -468,7 +468,7 @@ async def test_dashboard_counts_by_initiative(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _dashboards_enabled(session, a.initiative)
     disabled_initiative = await create_initiative(
-        session, a.guild, a.user, dashboards_enabled=False
+        session, a.guild, a.user, tools={Tool.dashboard: False}
     )
 
     await create_dashboard(session, a.initiative, a.user, name="Health")

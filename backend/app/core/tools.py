@@ -70,8 +70,9 @@ class Tool(str, Enum):
 
     @property
     def view_permission(self) -> str:
-        """The role ``PermissionKey`` value gating viewing this tool. For
-        toggleable tools it is also the initiative master-switch column."""
+        """The role ``PermissionKey`` value gating viewing this tool. It is
+        also the key of each initiative's switch for the tool, its
+        ``initiative_rules`` row with no role."""
         return f"{self.plural}_enabled"
 
     @property
@@ -155,9 +156,10 @@ class ToolSpec:
     code: int
     #: Switched on in an initiative that says nothing about its tools.
     #:
-    #: Every tool carries a ``{plural}_enabled`` switch on the initiative.
-    #: Projects and files used to be exempt — always on, with no column at all
-    #: — because they were the only places content could live. Relationships
+    #: Every tool carries a switch in each initiative, an ``initiative_rules``
+    #: row keyed ``{plural}_enabled``. Projects and files used to be exempt —
+    #: always on, with no switch at all — because they were the only places
+    #: content could live. Relationships
     #: ended that: anything links to anything, so an initiative that is only a
     #: calendar is a coherent thing to want. They keep the default, which is
     #: the part that was ever load-bearing.

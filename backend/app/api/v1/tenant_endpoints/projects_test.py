@@ -23,7 +23,7 @@ from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import TaskStatus, TaskStatusCategory
 from app.services.tenant import tags as tags_service
-from app.testing import checklist_items, route_session_to_guild
+from app.testing import checklist_items, route_session_to_guild, switch_tools
 from app.testing.factories import (
     create_file,
     create_guild,
@@ -437,9 +437,7 @@ async def test_create_refuses_when_projects_are_switched_off(
     them off refuses to hold one, and says so rather than letting RLS drop the
     row and answering as though it were never asked."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    a.initiative.projects_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.project: False})
 
     response = await client.post(
         a.g("/projects/"),
@@ -463,9 +461,7 @@ async def test_a_guild_admin_does_not_list_projects_of_a_switched_off_initiative
     assert listed.status_code == 200
     assert [p["id"] for p in listed.json()["items"]] == [a.project.id]
 
-    a.initiative.projects_enabled = False
-    session.add(a.initiative)
-    await session.commit()
+    await switch_tools(session, a.initiative, {Tool.project: False})
 
     listed = await client.get(a.g("/projects/"), headers=a.headers)
     assert listed.status_code == 200

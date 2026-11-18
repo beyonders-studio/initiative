@@ -18,6 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import usernames
 from app.core.notification_categories import NotificationCategory
+from app.core.tools import Tool
 from app.db.request_context import Platform, SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
@@ -78,6 +79,7 @@ from app.testing import (
     route_session_to_guild,
     set_notification_prefs,
     strip_non_owner_grants,
+    switch_tools,
 )
 
 
@@ -96,10 +98,7 @@ async def _dispatch(session: AsyncSession) -> None:
 async def _events_initiative(session: AsyncSession, creator):
     guild = await create_guild(session)
     initiative = await create_initiative(session, guild, creator, name="Reminders")
-    initiative.calendars_enabled = True
-    session.add(initiative)
-    await session.commit()
-    await session.refresh(initiative)
+    await switch_tools(session, initiative, {Tool.calendar: True})
     calendar = await create_calendar(session, initiative, creator)
     return guild, initiative, calendar
 
@@ -1392,10 +1391,7 @@ async def test_event_reminders_fire_across_a_users_guilds(session: AsyncSession)
         creator = await create_user(session, email=f"organizer-{label}@example.com")
         guild = await create_guild(session, creator=creator)
         initiative = await create_initiative(session, guild, creator, name=label)
-        initiative.calendars_enabled = True
-        session.add(initiative)
-        await session.commit()
-        await session.refresh(initiative)
+        await switch_tools(session, initiative, {Tool.calendar: True})
         calendar = await create_calendar(session, initiative, creator)
         # Starts in 10 min; with the attendee's 15-min lead the reminder is due.
         start_at = datetime.now(UTC) + timedelta(minutes=10)

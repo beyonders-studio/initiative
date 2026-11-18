@@ -20,7 +20,7 @@ import base64
 import functools
 import json
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -118,6 +118,7 @@ from app.services.tenant import relationships as relationships_service
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_definition,
 )
+from app.services.tenant.initiative_tools import write_switches
 from app.services.tenant.initiatives import create_builtin_roles
 from app.services.tenant.names import slugify
 from app.services.tenant.ownership import tool_for_row
@@ -670,6 +671,7 @@ async def create_initiative(
     creator: User,
     commit: bool = True,
     member_tool_access: bool = True,
+    tools: Mapping[Tool, bool] | None = None,
     **overrides: Any,
 ) -> Initiative:
     """
@@ -691,6 +693,8 @@ async def create_initiative(
         creator: User who creates the initiative (will become project manager)
         commit: Whether to commit the transaction (default True)
         member_tool_access: Whether the built-in member role may view each tool
+        tools: Tool switches to set; every tool is switched on otherwise. A
+            test about a tool being OFF says so here (``{Tool.post: False}``).
         **overrides: Override any default field values
 
     Returns:
@@ -701,19 +705,9 @@ async def create_initiative(
     """
     await route_session_to_guild(session, guild.id)
 
-    from app.core.tools import Tool as _Tool
-
     defaults: dict[str, Any] = {
         "name": f"Test Initiative {datetime.now(UTC).timestamp()}",
         "description": "A test initiative",
-        # Every tool the initiative can switch on, switched on — derived from
-        # the enum, so a new tool is usable the day it exists. A test about a
-        # tool being OFF says so by overriding its own switch.
-        **{
-            tool.view_permission: True
-            for tool in _Tool
-            if tool.view_permission in Initiative.model_fields
-        },
     }
 
     initiative_data = {**defaults, **overrides}
@@ -722,6 +716,11 @@ async def create_initiative(
 
     if commit:
         await session.flush()
+        # Every tool switched on, derived from the enum, so a new tool is
+        # usable the day it exists.
+        await write_switches(
+            session, initiative.id, {tool: True for tool in Tool} | dict(tools or {})
+        )
 
         # Create built-in roles (moderator + PM + member)
         builtin_roles = await create_builtin_roles(session, initiative_id=initiative.id)
@@ -731,14 +730,13 @@ async def create_initiative(
         if member_tool_access:
             from sqlalchemy import update as sa_update
 
-            from app.core.tools import Tool as _Tool
             from app.models.tenant.initiative import InitiativeRule
 
             await session.exec(
                 sa_update(InitiativeRule)
                 .where(
                     InitiativeRule.initiative_role_id == member_role.id,
-                    InitiativeRule.key.in_([tool.view_permission for tool in _Tool]),
+                    InitiativeRule.key.in_([tool.view_permission for tool in Tool]),
                 )
                 .values(enabled=True)
             )
@@ -2841,17 +2839,21 @@ async def create_child_entity(
 
 
 async def enable_all_tools(session: AsyncSession, initiative: Initiative) -> Initiative:
-    """Flip on every tool's master switch, derived from the enum so a new tool
-    is enabled here without an edit."""
+    """Flip on every tool's switch, derived from the enum so a new tool is
+    enabled here without an edit."""
+    return await switch_tools(session, initiative, dict.fromkeys(Tool, True))
+
+
+async def switch_tools(
+    session: AsyncSession, initiative: Initiative, tools: Mapping[Tool, bool]
+) -> Initiative:
+    """Set ``initiative``'s own switch for each tool in ``tools``, and return
+    the initiative read again."""
     await route_session_to_guild(session, guild_of(initiative))
-    fresh = await session.get(Initiative, initiative.id)
-    assert fresh is not None
-    for tool in Tool:
-        setattr(fresh, tool.view_permission, True)
-    session.add(fresh)
+    await write_switches(session, initiative.id, tools)
     await session.commit()
-    await session.refresh(fresh)
-    return fresh
+    await session.refresh(initiative)
+    return initiative
 
 
 async def create_relationship(
