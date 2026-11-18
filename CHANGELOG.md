@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The My Tasks widget keeps its controls in view.** Its table reaches the card's edges, and while its rows scroll, the filter box, the column names and the page controls stay where they are, whatever size the widget is.
 
+### Fixed
+
+- **Fewer unexpected sign-outs on a laptop or phone that sleeps.** A tab or app nobody is looking at no longer renews its sign-in in the background; it waits until you come back to it, so a renewal can no longer be cut off by the device going to sleep.
+
 ## [0.79.2] - 2026-11-16
 
 ### Added
