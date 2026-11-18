@@ -500,9 +500,9 @@ def tool_envelope_type(tool: Tool) -> str:
     """The import/export envelope ``type`` discriminator for a tool.
 
     One rule, spelled once: a tool's envelope is ``initiative-<kebab
-    singular>``. The importers and the export adapters read it from here; only
-    the envelope schemas restate it, because a pydantic ``Literal`` cannot be
-    computed, and ``tools_test.py`` holds the importer registry to this.
+    singular>``. The importers, the export adapters and the envelope schemas'
+    ``type`` fields read it from here, and ``tools_test.py`` holds the
+    importer registry and the schemas to it.
     """
     return f"initiative-{tool_export_source(tool)}"
 

@@ -1,10 +1,11 @@
-"""Import-side pydantic mirrors of the export envelopes.
+"""The envelopes: the JSON a tool exports and its importer reads back.
 
-Each model parses the dict shape its export adapter emits (see
-``services/export/adapters/{file,counter_group,calendar,post,contact}.py``)
-with ``extra="ignore"``: informational export fields (event ids and
-timestamps, linked file titles) parse and drop — they reference guild-local
-state an import cannot rebind.
+Each model is both sides of one shape. The export writes an envelope from the
+tool's rows by reading its model field by field (``services/export/envelope.py``),
+and the import parses it with the same model, with ``extra="ignore"``:
+informational fields a tool writes of its own (event ids and timestamps,
+linked file titles) parse and drop — they reference guild-local state an
+import cannot rebind.
 
 Every envelope is schema version 1. There is no support for reading an
 earlier shape: the app imports what this build exports, and nothing else. The
@@ -14,10 +15,12 @@ lines (``app.core.recurrence.imported``).
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from functools import cache
+from typing import Any, Literal, get_args
 
 from pydantic import ConfigDict, Field, model_validator
 
+from app.core.tools import Tool, tool_envelope_type
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import SanitizedBaseModel
@@ -31,6 +34,23 @@ from app.schemas.tenant.contact import (
 
 CURRENT_SCHEMA_VERSION = 1
 MIN_SUPPORTED_IMPORT_VERSION = 1
+
+
+def envelope_literal(tool: Tool) -> Any:
+    """The ``type`` an envelope of ``tool``'s carries (``tool_envelope_type``),
+    as the ``Literal`` its model holds it to."""
+    return Literal[tool_envelope_type(tool)]  # ty: ignore[invalid-type-form]
+
+
+# Each tool's envelope ``type``, which its model below declares. Names rather
+# than calls, since an annotation holds a name.
+FileEnvelopeType: Any = envelope_literal(Tool.file)
+WikiEnvelopeType: Any = envelope_literal(Tool.wiki)
+CounterGroupEnvelopeType: Any = envelope_literal(Tool.counter_group)
+DashboardEnvelopeType: Any = envelope_literal(Tool.dashboard)
+PostEnvelopeType: Any = envelope_literal(Tool.post)
+ContactEnvelopeType: Any = envelope_literal(Tool.contact)
+CalendarEnvelopeType: Any = envelope_literal(Tool.calendar)
 
 
 class _EnvelopeBase(SanitizedBaseModel):
@@ -67,7 +87,7 @@ class EnvelopePropertyValue(SanitizedBaseModel):
 
 
 class FileEnvelope(_EnvelopeBase):
-    type: Literal["initiative-file"]
+    type: FileEnvelopeType
     file_type: str  # one of the editor's types: lexical | excalidraw | sheet | url
     name: str
     content: dict[str, Any] = {}
@@ -186,7 +206,7 @@ class WikiEnvelope(_EnvelopeBase):
     a wiki imported from one keeps the defaults.
     """
 
-    type: Literal["initiative-wiki"]
+    type: WikiEnvelopeType
     name: str
     description: str | None = None
     home_page: str | None = None
@@ -223,7 +243,7 @@ class CounterEnvelopeItem(SanitizedBaseModel):
 
 
 class CounterGroupEnvelope(_EnvelopeBase):
-    type: Literal["initiative-counter-group"]
+    type: CounterGroupEnvelopeType
     name: str
     description: str | None = None
     tags: list[str] = []
@@ -242,7 +262,7 @@ class DashboardEnvelope(_EnvelopeBase):
     is no second definition validator.
     """
 
-    type: Literal["initiative-dashboard"]
+    type: DashboardEnvelopeType
     name: str
     description: str | None = None
     # Present only for a dashboard built on a built-in plug-in. Dropped on import
@@ -315,7 +335,7 @@ class PostEnvelope(_EnvelopeBase):
     so rather than failing a whole restore over a long title.
     """
 
-    type: Literal["initiative-post"]
+    type: PostEnvelopeType
     name: str
     body: dict[str, Any] = {}
     tags: list[str] = []
@@ -343,7 +363,7 @@ class ContactEnvelope(_EnvelopeBase):
     it, held to the rules a contact's create holds them to, since a file is
     not a trusted source."""
 
-    type: Literal["initiative-contact"]
+    type: ContactEnvelopeType
     name: str = Field(min_length=1, max_length=255)
     is_organization: bool = False
     emails: list[ContactEmail] = Field(default_factory=list, max_length=MAX_DETAILS)
@@ -395,10 +415,27 @@ class EventEnvelopeItem(SanitizedBaseModel):
 
 
 class CalendarEnvelope(_EnvelopeBase):
-    type: Literal["initiative-calendar"]
+    type: CalendarEnvelopeType
     name: str
     description: str | None = None
     color: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
     events: list[EventEnvelopeItem] = []
+
+
+def tool_envelope(tool: Tool) -> type[_EnvelopeBase]:
+    """The model an envelope of ``tool``'s is read with: the one whose
+    ``type`` is the tool's."""
+    return _envelopes_by_type()[tool_envelope_type(tool)]
+
+
+@cache
+def _envelopes_by_type() -> dict[str, type[_EnvelopeBase]]:
+    # The project's envelope is a schema of its own, which reads this module.
+    from app.schemas.tenant import project_export  # noqa: F401
+
+    return {
+        get_args(model.model_fields["type"].annotation)[0]: model
+        for model in _EnvelopeBase.__subclasses__()
+    }
