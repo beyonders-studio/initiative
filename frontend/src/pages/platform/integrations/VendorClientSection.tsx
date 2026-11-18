@@ -18,6 +18,14 @@ import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
+/** A save the plug-in's vendor check refused: the fields it blames, what to
+ *  say, and what the vendor holds instead when the check says. */
+export interface VendorRefusal {
+  fields: string[];
+  text: string;
+  shows: string | null;
+}
+
 export interface VendorClientSectionProps {
   registration: PluginServiceRegistrationRead;
   /** The values typed so far, by key; a key left out keeps what is stored. */
@@ -26,6 +34,7 @@ export interface VendorClientSectionProps {
   sharedRoutes: boolean;
   onSharedRoutesChange: (sharedRoutes: boolean) => void;
   plain?: boolean;
+  refusal?: VendorRefusal | null;
 }
 
 /**
@@ -37,6 +46,10 @@ export interface VendorClientSectionProps {
  * nothing to copy. Entering the values by hand is the other way, in the order
  * it happens at the vendor: register this server's addresses there, then type
  * what the vendor issued. A secret is never shown again once saved.
+ *
+ * Once every value is set, the values come first and making a new client at
+ * the vendor folds away: it would replace them. A save the plug-in's vendor
+ * check refused marks the fields it blames.
  */
 export const VendorClientSection = ({
   registration,
@@ -45,9 +58,12 @@ export const VendorClientSection = ({
   sharedRoutes,
   onSharedRoutesChange,
   plain,
+  refusal,
 }: VendorClientSectionProps) => {
   const { t, i18n } = useTranslation("settings");
   const hasSetup = registration.vendor_setup === "github_app_manifest";
+  const blamed = new Set(refusal?.fields ?? []);
+  const [manualOpen, setManualOpen] = useState(false);
   // The GitHub organization to own the app the vendor's setup creates.
   const [organization, setOrganization] = useState("");
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -100,6 +116,20 @@ export const VendorClientSection = ({
           <h4 className="font-medium text-sm">{t("pluginServices.vendorValuesTitle")}</h4>
           <p className="text-muted-foreground text-sm">{t("pluginServices.vendorValuesHelp")}</p>
         </div>
+        {refusal && (
+          <div
+            role="alert"
+            className="space-y-1 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm"
+          >
+            <p>{refusal.text}</p>
+            {refusal.shows && (
+              <p className="text-muted-foreground">
+                {t("pluginServices.vendorCheckShows")}{" "}
+                <span className="font-mono text-foreground">{refusal.shows}</span>
+              </p>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-pair gap-4">
           {registration.vendor_fields.map((field) => {
             const id = `plugin-service-vendor-${field.key}`;
@@ -118,6 +148,7 @@ export const VendorClientSection = ({
                 {isSecret ? (
                   <Textarea
                     id={id}
+                    aria-invalid={blamed.has(field.key) || undefined}
                     value={value}
                     onChange={(event) => onValueChange(field.key, event.target.value)}
                     rows={3}
@@ -131,6 +162,7 @@ export const VendorClientSection = ({
                 ) : (
                   <Input
                     id={id}
+                    aria-invalid={blamed.has(field.key) || undefined}
                     type={field.type === "url" ? "url" : "text"}
                     value={value}
                     onChange={(event) => onValueChange(field.key, event.target.value)}
@@ -145,6 +177,44 @@ export const VendorClientSection = ({
         </div>
       </li>
     </ol>
+  );
+
+  const setup = (
+    <section
+      className="space-y-3 rounded-md border bg-muted/40 p-4"
+      aria-label={t("pluginServices.vendorSetupTitle")}
+    >
+      <div className="space-y-1">
+        <h4 className="font-medium text-sm">{t("pluginServices.vendorSetupTitle")}</h4>
+        <p className="text-muted-foreground text-sm">
+          {t(
+            registration.vendor_ready
+              ? "pluginServices.vendorSetupHelpReplace"
+              : "pluginServices.vendorSetupHelp"
+          )}
+        </p>
+      </div>
+      <Field
+        className="max-w-sm"
+        label={t("pluginServices.vendorSetupOrganizationLabel")}
+        hint={t("pluginServices.vendorSetupOrganizationHelp")}
+      >
+        <Input
+          value={organization}
+          onChange={(event) => setOrganization(event.target.value)}
+          placeholder={t("pluginServices.vendorSetupOrganizationPlaceholder")}
+          maxLength={39}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Field>
+      <Button type="button" onClick={handleVendorSetup} disabled={startSetup.isPending}>
+        {startSetup.isPending
+          ? t("pluginServices.vendorSetupStarting")
+          : t("pluginServices.vendorSetupCreate")}
+      </Button>
+      {setupError && <p className="text-destructive text-xs">{setupError}</p>}
+    </section>
   );
 
   return (
@@ -162,45 +232,11 @@ export const VendorClientSection = ({
         )
       }
     >
-      {hasSetup ? (
+      {hasSetup && !registration.vendor_ready ? (
         <>
-          <section
-            className="space-y-3 rounded-md border bg-muted/40 p-4"
-            aria-label={t("pluginServices.vendorSetupTitle")}
-          >
-            <div className="space-y-1">
-              <h4 className="font-medium text-sm">{t("pluginServices.vendorSetupTitle")}</h4>
-              <p className="text-muted-foreground text-sm">
-                {t(
-                  registration.vendor_ready
-                    ? "pluginServices.vendorSetupHelpReplace"
-                    : "pluginServices.vendorSetupHelp"
-                )}
-              </p>
-            </div>
-            <Field
-              className="max-w-sm"
-              label={t("pluginServices.vendorSetupOrganizationLabel")}
-              hint={t("pluginServices.vendorSetupOrganizationHelp")}
-            >
-              <Input
-                value={organization}
-                onChange={(event) => setOrganization(event.target.value)}
-                placeholder={t("pluginServices.vendorSetupOrganizationPlaceholder")}
-                maxLength={39}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </Field>
-            <Button type="button" onClick={handleVendorSetup} disabled={startSetup.isPending}>
-              {startSetup.isPending
-                ? t("pluginServices.vendorSetupStarting")
-                : t("pluginServices.vendorSetupCreate")}
-            </Button>
-            {setupError && <p className="text-destructive text-xs">{setupError}</p>}
-          </section>
+          {setup}
 
-          <Collapsible>
+          <Collapsible open={manualOpen || Boolean(refusal)} onOpenChange={setManualOpen}>
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" size="sm" className="group -ml-2">
                 <ChevronRight
@@ -211,6 +247,23 @@ export const VendorClientSection = ({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-3">{manual}</CollapsibleContent>
+          </Collapsible>
+        </>
+      ) : hasSetup ? (
+        <>
+          {manual}
+
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="group -ml-2">
+                <ChevronRight
+                  className="size-4 transition-transform group-data-[state=open]:rotate-90"
+                  aria-hidden="true"
+                />
+                {t("pluginServices.vendorSetupReplaceTitle")}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">{setup}</CollapsibleContent>
           </Collapsible>
         </>
       ) : (

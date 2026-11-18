@@ -48,6 +48,7 @@ from app.models.platform.marketplace import MarketplaceListing
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.services.auth import challenges as challenge_service
 from app.services.marketplace import registrations as registrations_service
+from app.services.marketplace import vendor_check as vendor_check_service
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace.manifest_values import ListingDefinitionError
 from app.services.marketplace.service_plugins import (
@@ -292,14 +293,17 @@ async def complete(
     code: str,
     state: str,
     actor_user_id: int,
-) -> PluginServiceRegistration:
+) -> tuple[PluginServiceRegistration, vendor_check_service.CheckResult | None]:
     """Finish the setup GitHub sent the operator back from: exchange its code,
     and write each value GitHub answers with to the vendor field the setup
     named when it started, all of them in one write or none.
 
     Refused without writing when the registration's listing is another one
     now, or when a newer version of it no longer declares a named field, or
-    no longer as a secret where a secret is written."""
+    no longer as a secret where a secret is written.
+
+    Answers the registration and what the plug-in's vendor check said about
+    the values, as a form save's ``vendor_check`` does."""
     sealed = await _spend_state(
         session,
         registration_id=registration_id,
@@ -328,6 +332,17 @@ async def complete(
         if not str(value).strip():
             raise _failed()
         values[key] = str(value)
-    return await registrations_service.update_registration(
-        session, registration_id, vendor_values=values, actor_user_id=actor_user_id
+    # What the vendor answered still passes the plug-in's own check before it
+    # is written, as values typed on the form do.
+    held = dict(row.vendor_values or {})
+    checked = await vendor_check_service.run(
+        definition, held=vendor_values_service.held_values(row), submitted=values
     )
+    written = await registrations_service.update_registration(
+        session,
+        registration_id,
+        vendor_values=values,
+        vendor_values_checked=held if checked is not None else None,
+        actor_user_id=actor_user_id,
+    )
+    return written, checked

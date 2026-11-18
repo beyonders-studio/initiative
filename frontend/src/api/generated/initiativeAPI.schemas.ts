@@ -10188,6 +10188,15 @@ export interface PluginVendorFieldRead {
   label: PluginVendorFieldReadLabel;
 }
 
+export type PluginServiceRegistrationReadVendorCheck =
+  | (typeof PluginServiceRegistrationReadVendorCheck)[keyof typeof PluginServiceRegistrationReadVendorCheck]
+  | null;
+
+export const PluginServiceRegistrationReadVendorCheck = {
+  passed: "passed",
+  not_run: "not_run",
+} as const;
+
 export type PluginServiceRegistrationReadJwks = { [key: string]: unknown } | null;
 
 export type PluginServiceRegistrationReadVendorValues = { [key: string]: string };
@@ -10228,6 +10237,7 @@ export interface PluginServiceRegistrationRead {
   vendor_set: string[];
   vendor_ready: boolean;
   vendor_setup: string | null;
+  vendor_check: PluginServiceRegistrationReadVendorCheck;
   connection_callback_url: string;
   connection_setup_url: string;
   webhook_url: string;

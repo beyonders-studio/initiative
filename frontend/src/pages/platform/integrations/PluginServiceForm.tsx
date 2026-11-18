@@ -20,7 +20,7 @@ import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
-import { VendorClientSection } from "./VendorClientSection";
+import { VendorClientSection, type VendorRefusal } from "./VendorClientSection";
 
 /** What the operator stated, before it is shaped into a create or a patch. */
 export interface PluginServiceFormValues {
@@ -76,6 +76,10 @@ export interface PluginServiceFormProps {
   footer: ReactNode;
   /** Sections drawn as headings rather than cards, for a dialog. */
   plain?: boolean;
+  /** What the plug-in's vendor check refused the last save for. */
+  vendorRefusal?: VendorRefusal | null;
+  /** Vendor values to start typed: those a save wrote unchecked. */
+  initialVendorValues?: Record<string, string>;
 }
 
 /**
@@ -93,9 +97,19 @@ export interface PluginServiceFormProps {
  * A container's listing may carry the Compose service its publisher wrote. It
  * is shown as text to copy, and its address pre-fills the base URL.
  */
-export const PluginServiceForm = ({ editing, onSubmit, footer, plain }: PluginServiceFormProps) => {
+export const PluginServiceForm = ({
+  editing,
+  onSubmit,
+  footer,
+  plain,
+  vendorRefusal,
+  initialVendorValues,
+}: PluginServiceFormProps) => {
   const { t } = useTranslation("settings");
-  const [form, setForm] = useState<FormState>(() => seed(editing));
+  const [form, setForm] = useState<FormState>(() => ({
+    ...seed(editing),
+    vendorValues: { ...initialVendorValues },
+  }));
   // Only whether the paste is JSON at all. Whether it is a key set we could
   // verify against is the server's answer, and it gives a message code.
   const [jwksError, setJwksError] = useState<string | null>(null);
@@ -406,6 +420,7 @@ export const PluginServiceForm = ({ editing, onSubmit, footer, plain }: PluginSe
           }
           sharedRoutes={form.sharedRoutes}
           onSharedRoutesChange={(sharedRoutes) => setForm((prev) => ({ ...prev, sharedRoutes }))}
+          refusal={vendorRefusal}
         />
       )}
 

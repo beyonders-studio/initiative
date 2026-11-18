@@ -42,6 +42,7 @@ const buildRegistration = (
   vendor_set: [],
   vendor_ready: true,
   vendor_setup: null,
+  vendor_check: null,
   connection_callback_url: "https://initiative.example.com/api/v1/plugin-connections/callback",
   connection_setup_url: "https://initiative.example.com/api/v1/plugin-connections/setup",
   webhook_url: "https://initiative.example.com/api/v1/plugin-hooks/core.github",
@@ -65,7 +66,7 @@ const startSetupMutate = vi.fn();
 const completeSetupMutate = vi.fn();
 
 vi.mock("@/lib/mascotToast", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock("@/hooks/usePluginServices", () => ({
@@ -645,6 +646,95 @@ describe("PluginServicePage", () => {
 
       expect(screen.getByLabelText(/client_id/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Create the GitHub App" })).toBeNull();
+    });
+
+    it("leads with the values once they are set, folding a new app away", async () => {
+      const user = userEvent.setup();
+      registrations = [
+        buildRegistration({
+          vendor_setup: "github_app_manifest",
+          vendor_fields: [
+            { key: "client_id", type: "string", required: true, label: { en: "Client id" } },
+          ],
+          vendor_values: { client_id: "Iv1.abc" },
+          vendor_set: ["client_id"],
+          vendor_ready: true,
+        }),
+      ];
+      await renderPluginPage();
+
+      expect(screen.getByLabelText(/Client id/)).toHaveValue("Iv1.abc");
+      expect(screen.queryByRole("button", { name: "Create the GitHub App" })).toBeNull();
+      await user.click(
+        screen.getByRole("button", { name: "Or replace them with a new app from the vendor" })
+      );
+      expect(screen.getByRole("button", { name: "Create the GitHub App" })).toBeInTheDocument();
+    });
+
+    it("marks the fields a vendor check blames, with what the vendor has", async () => {
+      const user = userEvent.setup();
+      const { toast } = await import("@/lib/mascotToast");
+      registrations = [
+        buildRegistration({
+          vendor_fields: [
+            { key: "app_slug", type: "string", required: true, label: { en: "App name" } },
+            { key: "app_id", type: "string", required: true, label: { en: "App id" } },
+          ],
+          vendor_values: { app_slug: "widgets", app_id: "7" },
+          vendor_set: ["app_slug", "app_id"],
+        }),
+      ];
+      updateMutate.mockImplementation((_vars, { onError }) =>
+        onError({
+          isAxiosError: true,
+          response: {
+            status: 400,
+            data: {
+              detail: "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED",
+              params: {
+                fields: "app_slug",
+                message: JSON.stringify({ en: "The id and key belong to another name." }),
+                shows: "widgets-for-acme",
+              },
+            },
+          },
+        })
+      );
+      await renderPluginPage();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("The id and key belong to another name.");
+      expect(alert).toHaveTextContent("widgets-for-acme");
+      expect(screen.getByLabelText(/App name/)).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByLabelText(/App id/)).not.toHaveAttribute("aria-invalid");
+      expect(toast.error).toHaveBeenCalledWith("The id and key belong to another name.");
+    });
+
+    it("says when the vendor could not be asked about the values", async () => {
+      const user = userEvent.setup();
+      const { toast } = await import("@/lib/mascotToast");
+      registrations = [
+        buildRegistration({
+          vendor_fields: [
+            { key: "app_id", type: "string", required: true, label: { en: "App id" } },
+          ],
+        }),
+      ];
+      updateMutate.mockImplementation((_vars, { onSuccess }) =>
+        onSuccess({ ...registrations[0], vendor_check: "not_run" })
+      );
+      await renderPluginPage();
+
+      await user.type(screen.getByLabelText(/App id/), "4735814");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(toast.warning).toHaveBeenCalled());
+      // Kept, so saving again sends it again and the vendor is asked again.
+      expect(screen.getByLabelText(/App id/)).toHaveValue("4735814");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      expect(updateMutate.mock.calls[1][0].data.vendor_values).toEqual({ app_id: "4735814" });
     });
 
     it("connects: shows the fingerprints the plug-in serves and pins them once confirmed", async () => {
