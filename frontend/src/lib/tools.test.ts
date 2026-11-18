@@ -33,8 +33,6 @@ import {
   INITIATIVES_ROUTE,
   initiativeRoute,
   NO_RELATIONS_PANEL,
-  NON_EXPORTABLE_TOOLS,
-  PARENT_TOOL,
   SIDEBAR_TOOLS,
   singularOf,
   TOOL_ICONS,
@@ -367,19 +365,6 @@ describe("tool relations", () => {
       expect(wired.has(tool), `${tool} opted out of relations but renders a panel`).toBe(false);
     }
   });
-
-  it("names a parent tool for every entity that is not one", () => {
-    // A link is cached against a tool, so a child entity has to say which one
-    // answers for it — otherwise a write leaves the container's copy stale.
-    expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
-    expect(Object.keys(PARENT_TOOL).sort()).toEqual([
-      "calendar_event",
-      "collection",
-      "counter",
-      "task",
-      "wiki_page",
-    ]);
-  });
 });
 
 describe("tool properties", () => {
@@ -433,31 +418,13 @@ describe("tool surfaces are wired, not just typed", () => {
 });
 
 describe("tool exports", () => {
-  it("every bulk-export tool has a format source, and only those", async () => {
-    const { fileTypeFormats, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
+  // Files are per-type (their format set depends on the selection); every
+  // file type must offer at least one engine format.
+  it("every file type has a format", async () => {
+    const { fileTypeFormats } = await import("@/components/exports/formats");
     const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
-    const { BULK_EXPORT_TOOLS } = await import("./tools");
-
-    for (const tool of BULK_EXPORT_TOOLS) {
-      // Files are per-type (their format set depends on the selection);
-      // every file type must offer at least one engine format.
-      if (tool === Tool.file) continue;
-      expect(
-        TOOL_EXPORT_FORMATS[tool]?.length,
-        `missing TOOL_EXPORT_FORMATS[${tool}]`
-      ).toBeGreaterThan(0);
-    }
     for (const type of Object.values(FileType)) {
       expect(fileTypeFormats(type).length, `missing formats for ${type}`).toBeGreaterThan(0);
-    }
-    // Exact coverage: a formats entry for a non-export tool is drift too.
-    for (const tool of TOOLS) {
-      if (NON_EXPORTABLE_TOOLS.has(tool) && tool !== Tool.file) {
-        expect(
-          TOOL_EXPORT_FORMATS[tool],
-          `${tool} declares formats but is in NON_EXPORTABLE_TOOLS`
-        ).toBeUndefined();
-      }
     }
   });
 });

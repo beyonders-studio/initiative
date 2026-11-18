@@ -14,7 +14,8 @@
 #   migrations  no released migration edited; one Alembic head
 #   biome       frontend lint
 #   tsc         frontend type check
-#   codegen     env-contract.json and the generated API client match the backend
+#   codegen     env-contract.json, the generated API client and the tool records
+#               match the backend
 #
 # BASE_REF is what "changed" and "released migration edited" compare against:
 # origin/dev by default, the pull request's base in CI.
@@ -155,7 +156,7 @@ checks_for_changes() {
     echo "biome tsc"
   fi
   # The same paths CI's codegen check watches.
-  if grep -qE '^(backend/|frontend/orval\.config\.ts$|frontend/src/api/mutator\.ts$|frontend/package\.json$|frontend/scripts/generate-api\.sh$|scripts/build_env_contract\.py$|env-contract\.json$)' <<<"$changed"; then
+  if grep -qE '^(backend/|frontend/orval\.config\.ts$|frontend/src/api/mutator\.ts$|frontend/package\.json$|frontend/scripts/generate-api\.sh$|scripts/build_env_contract\.py$|scripts/build_tool_records\.py$|env-contract\.json$)' <<<"$changed"; then
     echo "codegen"
   fi
 }

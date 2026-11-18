@@ -210,7 +210,8 @@ jobs:
 
           codegen() {
             if [[ -n "$(changed backend/ frontend/orval.config.ts frontend/src/api/mutator.ts frontend/package.json \
-                frontend/scripts/generate-api.sh scripts/build_env_contract.py env-contract.json .github/actions/)" ]]; then
+                frontend/scripts/generate-api.sh scripts/build_env_contract.py scripts/build_tool_records.py \
+                env-contract.json .github/actions/)" ]]; then
               out codegen true
               echo "Backend or codegen config changes detected"
             else

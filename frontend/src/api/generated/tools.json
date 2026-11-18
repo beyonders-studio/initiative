@@ -1,0 +1,129 @@
+{
+  "tools": {
+    "project": {
+      "code": 10,
+      "on_by_default": true,
+      "export_formats": ["json", "pdf", "csv", "xlsx"],
+      "feed": false,
+      "community_rows": null,
+      "layouts": {
+        "per_instance": true,
+        "lists": ["table", "board", "gantt", "calendar"],
+        "detail": "task",
+        "typed": true
+      }
+    },
+    "file": {
+      "code": 6,
+      "on_by_default": true,
+      "export_formats": null,
+      "feed": false,
+      "community_rows": null,
+      "layouts": null
+    },
+    "counter_group": {
+      "code": 4,
+      "on_by_default": false,
+      "export_formats": ["pdf", "csv", "xlsx", "md", "json"],
+      "feed": false,
+      "community_rows": null,
+      "layouts": {
+        "per_instance": true,
+        "lists": [],
+        "detail": "counter",
+        "typed": false
+      }
+    },
+    "calendar": {
+      "code": 1,
+      "on_by_default": false,
+      "export_formats": ["ics", "json"],
+      "feed": true,
+      "community_rows": {
+        "granted_writes_row": false
+      },
+      "layouts": {
+        "per_instance": false,
+        "lists": ["calendar"],
+        "detail": "calendar_event",
+        "typed": false
+      }
+    },
+    "dashboard": {
+      "code": 5,
+      "on_by_default": false,
+      "export_formats": ["json"],
+      "feed": false,
+      "community_rows": null,
+      "layouts": null
+    },
+    "post": {
+      "code": 9,
+      "on_by_default": false,
+      "export_formats": ["json"],
+      "feed": false,
+      "community_rows": null,
+      "layouts": {
+        "per_instance": false,
+        "lists": [],
+        "detail": "post",
+        "typed": false
+      }
+    },
+    "wiki": {
+      "code": 15,
+      "on_by_default": false,
+      "export_formats": ["pdf", "md", "docx", "json"],
+      "feed": false,
+      "community_rows": null,
+      "layouts": null
+    },
+    "contact": {
+      "code": 19,
+      "on_by_default": false,
+      "export_formats": ["json", "csv"],
+      "feed": false,
+      "community_rows": {
+        "granted_writes_row": true
+      },
+      "layouts": null
+    }
+  },
+  "child_kinds": {
+    "task": {
+      "code": 14,
+      "parent": "project",
+      "standalone": false,
+      "commentable": true,
+      "archivable": true
+    },
+    "calendar_event": {
+      "code": 2,
+      "parent": "calendar",
+      "standalone": false,
+      "commentable": false,
+      "archivable": false
+    },
+    "counter": {
+      "code": 3,
+      "parent": "counter_group",
+      "standalone": false,
+      "commentable": false,
+      "archivable": false
+    },
+    "wiki_page": {
+      "code": 16,
+      "parent": "wiki",
+      "standalone": false,
+      "commentable": true,
+      "archivable": false
+    },
+    "collection": {
+      "code": 17,
+      "parent": "file",
+      "standalone": true,
+      "commentable": true,
+      "archivable": true
+    }
+  }
+}
