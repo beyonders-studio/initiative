@@ -620,7 +620,7 @@ async def test_a_counter_keeps_its_settings_and_no_other_type_does(
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     payload = {"name": "Seats", "type": "counter", "initiative_id": a.initiative.id}
-    defaults = {"step": 1, "min": None, "max": None, "initial": 0}
+    defaults = {"step": 1, "min": None, "max": None, "initial": 0, "look": "number"}
 
     created = await client.post(
         a.g("/property-definitions/"), headers=a.headers, json=payload
@@ -634,6 +634,12 @@ async def test_a_counter_keeps_its_settings_and_no_other_type_does(
     )
     assert inverted.status_code == 422
     assert "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX" in str(inverted.json()["detail"])
+    unknown_look = await client.post(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        json={**payload, "name": "Laps", "counter": {"look": "dial"}},
+    )
+    assert unknown_look.status_code == 422
     number = await client.post(
         a.g("/property-definitions/"),
         headers=a.headers,
@@ -644,15 +650,19 @@ async def test_a_counter_keeps_its_settings_and_no_other_type_does(
     changed = await client.patch(
         a.g(f"/property-definitions/{created.json()['id']}"),
         headers=a.headers,
-        json={"counter": {"step": 5, "min": 0, "max": 100, "initial": 10}},
+        json={
+            "counter": {"step": 5, "min": 0, "max": 100, "initial": 10, "look": "clock"}
+        },
     )
     assert changed.status_code == 200, changed.text
-    assert changed.json()["definition"]["counter"] == {
-        "step": 5,
-        "min": 0,
-        "max": 100,
-        "initial": 10,
-    }
+    settings = {"step": 5, "min": 0, "max": 100, "initial": 10, "look": "clock"}
+    assert changed.json()["definition"]["counter"] == settings
+    listed = await client.get(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        params={"initiative_id": a.initiative.id},
+    )
+    assert [d["counter"] for d in listed.json() if d["name"] == "Seats"] == [settings]
 
 
 # ---------------------------------------------------------------------------
