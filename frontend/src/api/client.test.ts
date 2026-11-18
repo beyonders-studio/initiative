@@ -13,6 +13,7 @@ import {
   forgetSessionActivity,
   setAuthToken,
   setHasActiveSession,
+  startSessionActivity,
   watchForActivity,
 } from "./client";
 
@@ -187,6 +188,40 @@ describe("what keeps a session alive", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(seen.calls).toBe(1);
     unwatch();
+  });
+
+  it.each([
+    ["nothing has been done since it was issued", () => accessToken(16 * 60_000, -60_000)],
+    [
+      // Its issue time is whole seconds, so it reads as no later than the
+      // input that asked for it.
+      "the last input asked for it",
+      () => {
+        startSessionActivity();
+        return accessToken(0, 15 * 60_000);
+      },
+    ],
+  ])("holds a hidden window's renewal until somebody looks, when %s", async (_when, token) => {
+    const seen = stubRenewal(() =>
+      HttpResponse.json({ access_token: accessToken(0, 15 * 60_000) })
+    );
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    try {
+      setHasActiveSession(true);
+      setAuthToken(token());
+
+      const pending = apiClient.get("/me");
+      // Past the turn a window without a lock manager waits before renewing.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(seen.calls).toBe(0);
+
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      expect((await pending).data).toEqual({ id: 1 });
+      expect(seen.calls).toBe(1);
+    } finally {
+      visibility.mockRestore();
+    }
   });
 });
 
