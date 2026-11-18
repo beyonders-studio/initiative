@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
+
 ### Changed
 
 - **The My Tasks widget keeps its controls in view.** Its table reaches the card's edges, and while its rows scroll, the filter box, the column names and the page controls stay where they are, whatever size the widget is.
