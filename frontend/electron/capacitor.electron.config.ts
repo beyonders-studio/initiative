@@ -23,6 +23,14 @@ export default defineConfig({
     height: 320,
   },
   hooks: {
+    // The taskbar's Quit item starts the app with `--quit` (`Desktop.setTray`).
+    // With no copy running there is nothing to quit, so this one leaves before
+    // it shows anything; otherwise the running copy hears it and quits.
+    beforeReady: (app) => {
+      if (process.argv.includes("--quit") && app.requestSingleInstanceLock()) {
+        app.exit(0);
+      }
+    },
     // The page draws the title bar (`DesktopTitleBar`): the app's name, the
     // update button and the help links, in a row that still drags the window.
     // The computer keeps drawing the window's own buttons at its end, coloured

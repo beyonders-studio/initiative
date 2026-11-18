@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
+
 ### Changed
 
 - **Security cases say what to check, at the priority they deserve.** Each case opens with what its rule usually means and what to look at, and its task takes the rule's priority: a high rule files a high-priority task, a low one a low-priority task.

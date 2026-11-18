@@ -15,6 +15,12 @@ const APP_ID = "studio.beyonders.initiative";
 /** Passed when the computer opens the app at sign-in, to start in the tray. */
 const HIDDEN = "--hidden";
 
+/**
+ * Passed by the Quit item on the Windows taskbar button, which starts the app
+ * again: the copy already running hears it and quits.
+ */
+const QUIT = "--quit";
+
 /** The tray menu's words, in the person's language; the page sends them. */
 interface TrayMenu {
   open: string;
@@ -67,6 +73,11 @@ export class Desktop {
       this.quitting = true;
     });
     app.on("activate", () => this.show());
+    app.on("second-instance", (_event, argv) => {
+      if (argv.includes(QUIT)) {
+        app.quit();
+      }
+    });
     app.on("browser-window-created", (_event, window) => {
       window.on("close", (event) => {
         if (this.quitting || !isMainWindow(window) || !this.staysOpen()) {
@@ -119,9 +130,25 @@ export class Desktop {
     this.refreshTray();
   }
 
-  /** Name the tray menu's items, which puts the tray up where there is one. */
+  /**
+   * Name the tray menu's items, which puts the tray up where there is one. On
+   * Windows, Quit also goes on the taskbar button's menu, beside its own Close
+   * window, which only hides the window while the tray is up.
+   */
   async setTray(menu: TrayMenu) {
     this.menu = menu;
+    if (process.platform === "win32") {
+      app.setUserTasks([
+        {
+          program: process.execPath,
+          arguments: QUIT,
+          title: menu.quit,
+          description: menu.quit,
+          iconPath: process.execPath,
+          iconIndex: 0,
+        },
+      ]);
+    }
     this.refreshTray();
   }
 

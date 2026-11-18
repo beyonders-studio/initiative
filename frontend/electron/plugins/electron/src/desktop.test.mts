@@ -52,6 +52,7 @@ vi.mock("./app.mjs", () => {
     isPackaged: false,
     getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
     setLoginItemSettings: vi.fn(),
+    setUserTasks: vi.fn(),
     quit: vi.fn(),
   });
   electron.app = app as never;
@@ -99,6 +100,7 @@ beforeEach(() => {
   electron.userData = mkdtempSync(join(tmpdir(), "initiative-desktop-"));
   vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "initiative-xdg-")));
   FakeNotification.made = [];
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
@@ -148,6 +150,40 @@ describe("closing the window", () => {
     const { window } = started();
     window.url = "file:///app/assets/splash.html";
 
+    expect(close(window)).toBe(false);
+  });
+});
+
+describe("the taskbar's Quit item", () => {
+  it("goes on the Windows taskbar button's menu, in the page's words", async () => {
+    onPlatform("win32");
+    const { desktop } = started();
+
+    await desktop.setTray({ open: "Open Initiative", quit: "Quit Initiative" });
+    expect(electron.app.setUserTasks).toHaveBeenCalledWith([
+      expect.objectContaining({ arguments: "--quit", title: "Quit Initiative" }),
+    ]);
+  });
+
+  it("is Windows' alone", async () => {
+    onPlatform("linux");
+    const { desktop } = started();
+
+    await desktop.setTray({ open: "Open", quit: "Quit" });
+    expect(electron.app.setUserTasks).not.toHaveBeenCalled();
+  });
+
+  it("quits the copy already running, past the tray", async () => {
+    onPlatform("win32");
+    const { desktop, window } = started();
+    await desktop.setTray({ open: "Open", quit: "Quit" });
+
+    electron.app.emit("second-instance", {}, [process.execPath, "--hidden"]);
+    expect(electron.app.quit).not.toHaveBeenCalled();
+
+    electron.app.emit("second-instance", {}, [process.execPath, "--quit"]);
+    expect(electron.app.quit).toHaveBeenCalled();
+    electron.app.emit("before-quit");
     expect(close(window)).toBe(false);
   });
 });
