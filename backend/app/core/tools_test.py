@@ -368,6 +368,8 @@ def test_every_kind_mounts_its_universal_operations():
             and path.startswith("/api/v1/c/")
             and path.endswith(f"/{operation}")
             and path.count("/") == 7
+            # Acts on one row: the segment before the operation is its id.
+            and path.split("/")[-2].startswith("{")
         }
         assert mounted == {f"{item(kind)}/{operation}" for kind in kinds}, operation
         for kind in kinds:
