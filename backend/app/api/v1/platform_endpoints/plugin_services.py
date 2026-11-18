@@ -46,6 +46,7 @@ from app.schemas.platform.plugin_service import (
 )
 from app.services.marketplace import publishers as publishers_service
 from app.services.marketplace import registrations as registrations_service
+from app.services.marketplace import vendor_check as vendor_check_service
 from app.services.marketplace import vendor_setup as vendor_setup_service
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.tenant import plugin_connection_flows as flows_service
@@ -210,7 +211,25 @@ async def update_plugin_service(
     vendor values, or replace a beta plug-in's communities. Turning sharing
     off while an installation is connected to more than one community is
     refused (409), and so is a list of communities for a plug-in that is not
-    beta; one naming a community that does not exist is refused (400)."""
+    beta; one naming a community that does not exist is refused (400).
+
+    Vendor values the listing's vendor check reads are checked with the
+    vendor before anything is written (:mod:`~app.services.marketplace.vendor_check`):
+    a refusal is a 400 naming the fields, and a check the vendor could not
+    answer saves the values and says so in ``vendor_check``."""
+    checked = None
+    if payload.vendor_values:
+        current = await registrations_service.get_registration(session, registration_id)
+        definition = (
+            await vendor_values_service.listing_definitions(
+                session, [current.listing_uid]
+            )
+        ).get(current.listing_uid or "")
+        checked = await vendor_check_service.run(
+            definition,
+            held=vendor_values_service.held_values(current),
+            submitted=payload.vendor_values,
+        )
     row = await registrations_service.update_registration(
         session,
         registration_id,
@@ -226,7 +245,8 @@ async def update_plugin_service(
         vendor_values=payload.vendor_values,
         actor_user_id=owner.id,
     )
-    return await _read_one(session, row.id)
+    read = await _read_one(session, row.id)
+    return read.model_copy(update={"vendor_check": checked})
 
 
 @router.get(

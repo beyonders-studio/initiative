@@ -99,6 +99,36 @@ def maximal_manifest() -> dict:
                 },
                 "values": {"client_id": "client_id", "private_key": "pem"},
             },
+            "check": {
+                "sign": {
+                    "iss": "{vendor.client_id}",
+                    "key": "{vendor.private_key}",
+                    "alg": "ES256",
+                    "lifetime": 30,
+                },
+                "auth": {"header": "X-Acme-Token", "prefix": "Token"},
+                "request": {
+                    "method": "POST",
+                    "url": "'https://api.acme.test/client'",
+                    "query": {"client": "vendor.client_id"},
+                    "headers": {"Accept": "'application/json'"},
+                    "body": "{'id': vendor.client_id}",
+                },
+                "expect": [
+                    {
+                        "status": "4xx",
+                        "holds": "false",
+                        "fields": ["client_id", "private_key"],
+                        "message": {"en": "Acme knows no client by this id and key."},
+                    },
+                    {
+                        "holds": "response.body.id = vendor.client_id",
+                        "fields": ["client_id"],
+                        "message": {"en": "The key belongs to another client."},
+                        "shows": "response.body.id",
+                    },
+                ],
+            },
         },
         "connections": [
             {
@@ -717,6 +747,18 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("vendorField", published["vendor"]["fields"][0]),
         ("githubAppManifestSetup", published["vendor"]["setup"]),
         ("githubAppManifest", published["vendor"]["setup"]["app"]),
+        ("vendorCheck", published["vendor"]["check"]),
+        ("vendorCheckSigning", published["vendor"]["check"]["sign"]),
+        ("vendorCheckRequest", published["vendor"]["check"]["request"]),
+        # A row that names a status refuses outright, so the two rows are
+        # measured together for 'shows'.
+        (
+            "vendorCheckRule",
+            {
+                **published["vendor"]["check"]["expect"][0],
+                **published["vendor"]["check"]["expect"][1],
+            },
+        ),
         ("webhooks", {**published["webhooks"], **hooks}),
         ("webhookVerify", published["webhooks"]["verify"]),
         ("webhookRoute", {**published["webhooks"]["route"], **hooks["route"]}),

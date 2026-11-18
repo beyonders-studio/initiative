@@ -1670,6 +1670,14 @@ class PluginServiceMessages:
     VENDOR_SETUP_EXPIRED = "PLUGIN_SERVICE_VENDOR_SETUP_EXPIRED"
     #: The vendor did not answer the setup's code with the new client's values.
     VENDOR_SETUP_FAILED = "PLUGIN_SERVICE_VENDOR_SETUP_FAILED"
+    #: A row of the plug-in's vendor check refused the vendor's answer, so the
+    #: values were not saved. Raised with ``params``: ``fields``, the vendor
+    #: fields the row names, one a line; ``message``, its localized text as
+    #: JSON; and ``shows``, what its ``shows`` answered, when it did.
+    VENDOR_CHECK_REFUSED = "PLUGIN_SERVICE_VENDOR_CHECK_REFUSED"
+    #: The vendor value the check signs with is not a key that can sign.
+    #: Raised with ``params`` ``fields``: that value's key.
+    VENDOR_KEY_UNUSABLE = "PLUGIN_SERVICE_VENDOR_KEY_UNUSABLE"
     #: Sharing is turned off while a vendor installation is connected to more
     #: than one community.
     SHARED_ROUTES_IN_USE = "PLUGIN_SERVICE_SHARED_ROUTES_IN_USE"

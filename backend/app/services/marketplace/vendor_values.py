@@ -54,6 +54,7 @@ __all__ = [
     "VendorView",
     "apply_vendor_env",
     "apply_vendor_values",
+    "held_values",
     "listing_definitions",
     "load_vendor_values",
     "required_keys",
@@ -277,6 +278,13 @@ def _decrypt_all(stored: Mapping[str, Any], *, public_id: str) -> dict[str, str]
                 "plug-in services: %r vendor value %r does not decrypt", public_id, key
             )
     return values
+
+
+def held_values(row: PluginServiceRegistration) -> dict[str, str]:
+    """Every value a registration holds now, decrypted, for the vendor check
+    a save runs before it writes (:mod:`app.services.marketplace.vendor_check`).
+    Never for a response."""
+    return _decrypt_all(row.vendor_values or {}, public_id=row.public_id)
 
 
 @dataclass(frozen=True)

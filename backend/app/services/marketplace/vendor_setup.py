@@ -48,6 +48,7 @@ from app.models.platform.marketplace import MarketplaceListing
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.services.auth import challenges as challenge_service
 from app.services.marketplace import registrations as registrations_service
+from app.services.marketplace import vendor_check as vendor_check_service
 from app.services.marketplace import vendor_values as vendor_values_service
 from app.services.marketplace.manifest_values import ListingDefinitionError
 from app.services.marketplace.service_plugins import (
@@ -328,6 +329,11 @@ async def complete(
         if not str(value).strip():
             raise _failed()
         values[key] = str(value)
+    # What the vendor answered still passes the plug-in's own check before it
+    # is written, as values typed on the form do.
+    await vendor_check_service.run(
+        definition, held=vendor_values_service.held_values(row), submitted=values
+    )
     return await registrations_service.update_registration(
         session, registration_id, vendor_values=values, actor_user_id=actor_user_id
     )
