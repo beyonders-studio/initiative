@@ -13,7 +13,8 @@
         "lists": ["table", "board", "gantt", "calendar"],
         "detail": "task",
         "typed": true
-      }
+      },
+      "item_tables": ["tasks", "task_statuses", "task_types", "task_assignees"]
     },
     "file": {
       "code": 6,
@@ -26,7 +27,8 @@
       },
       "feed": false,
       "community_rows": null,
-      "layouts": null
+      "layouts": null,
+      "item_tables": ["file_versions"]
     },
     "counter_group": {
       "code": 4,
@@ -41,7 +43,8 @@
         "lists": [],
         "detail": "counter",
         "typed": false
-      }
+      },
+      "item_tables": ["counters"]
     },
     "calendar": {
       "code": 1,
@@ -58,7 +61,13 @@
         "lists": ["calendar"],
         "detail": "calendar_event",
         "typed": false
-      }
+      },
+      "item_tables": [
+        "calendar_events",
+        "calendar_event_attendees",
+        "calendar_event_answers",
+        "event_reminder_dispatches"
+      ]
     },
     "dashboard": {
       "code": 5,
@@ -68,7 +77,8 @@
       "type_report_formats": {},
       "feed": false,
       "community_rows": null,
-      "layouts": null
+      "layouts": null,
+      "item_tables": []
     },
     "post": {
       "code": 9,
@@ -83,7 +93,8 @@
         "lists": [],
         "detail": "post",
         "typed": false
-      }
+      },
+      "item_tables": ["post_reads", "post_polls", "post_poll_options"]
     },
     "wiki": {
       "code": 15,
@@ -93,7 +104,8 @@
       "type_report_formats": {},
       "feed": false,
       "community_rows": null,
-      "layouts": null
+      "layouts": null,
+      "item_tables": ["wiki_pages"]
     },
     "contact": {
       "code": 19,
@@ -105,7 +117,8 @@
       "community_rows": {
         "granted_writes_row": true
       },
-      "layouts": null
+      "layouts": null,
+      "item_tables": []
     }
   },
   "child_kinds": {
