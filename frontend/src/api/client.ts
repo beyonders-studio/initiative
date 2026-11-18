@@ -260,14 +260,20 @@ const sessionClock = (): SessionClock | null => {
   }
 };
 
+/** Whether the person has done nothing since the session was last renewed. */
+const idleSinceRenewal = (): boolean => {
+  const input = lastInput();
+  const clock = sessionClock();
+  return input === null || (clock !== null && input <= clock.issuedAt);
+};
+
 /** Renew if the person has done something since the last renewal and the token is near its end. */
 const renewIfDue = (): void => {
   clearTimeout(renewTimer);
   if (!hasActiveSession || !canRenewSession()) return;
-  const input = lastInput();
-  const clock = sessionClock();
   // Nothing since the last renewal: the next input asks again.
-  if (input === null || (clock !== null && input <= clock.issuedAt)) return;
+  if (idleSinceRenewal()) return;
+  const clock = sessionClock();
   if (clock !== null) {
     const due = clock.expiresAt - Math.min(RENEW_AHEAD_MS, (clock.expiresAt - clock.issuedAt) / 2);
     if (Date.now() < due) {
@@ -481,6 +487,34 @@ const attemptSessionRefresh = (): Promise<boolean> => {
   return refreshInFlight;
 };
 
+let inView: Promise<void> | null = null;
+
+/**
+ * Until this window is in view, when nobody can see it and nobody has done
+ * anything since the session was last renewed; `null` when somebody is here.
+ *
+ * A request that finds the access token run out then is the app's own — a
+ * socket catching up, a poll — and a renewal sent for it may go out as the
+ * device goes to sleep or the app closes. A renewal spends the token it sends,
+ * so one whose answer never arrives leaves the device holding a spent token,
+ * and the next renewal it sends ends the session. The request waits instead,
+ * and renews when somebody looks.
+ */
+const untilSomebodyIsHere = (): Promise<void> | null => {
+  if (typeof document === "undefined" || document.visibilityState !== "hidden") return null;
+  if (!idleSinceRenewal()) return null;
+  inView ??= new Promise((resolve) => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onVisible);
+      inView = null;
+      resolve();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+  });
+  return inView;
+};
+
 /**
  * Renew now, sharing whatever attempt is already running, and report the access
  * token it produced.
@@ -628,6 +662,7 @@ apiClient.interceptors.response.use(undefined, async (error) => {
     !config._sessionRefreshRetried &&
     !isAuthLifecyclePath(config.url)
   ) {
+    await untilSomebodyIsHere();
     if (await attemptSessionRefresh()) {
       config._sessionRefreshRetried = true;
       return apiClient(config);
