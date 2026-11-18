@@ -4,6 +4,8 @@
       "code": 10,
       "on_by_default": true,
       "export_formats": ["json", "pdf", "csv", "xlsx"],
+      "report_formats": ["pdf", "csv", "xlsx"],
+      "type_report_formats": {},
       "feed": false,
       "community_rows": null,
       "layouts": {
@@ -17,6 +19,11 @@
       "code": 6,
       "on_by_default": true,
       "export_formats": null,
+      "report_formats": [],
+      "type_report_formats": {
+        "lexical": ["pdf", "md", "docx"],
+        "sheet": ["csv", "xlsx"]
+      },
       "feed": false,
       "community_rows": null,
       "layouts": null
@@ -25,6 +32,8 @@
       "code": 4,
       "on_by_default": false,
       "export_formats": ["pdf", "csv", "xlsx", "md", "json"],
+      "report_formats": ["pdf", "csv", "xlsx", "md"],
+      "type_report_formats": {},
       "feed": false,
       "community_rows": null,
       "layouts": {
@@ -38,6 +47,8 @@
       "code": 1,
       "on_by_default": false,
       "export_formats": ["ics", "json"],
+      "report_formats": ["ics", "json"],
+      "type_report_formats": {},
       "feed": true,
       "community_rows": {
         "granted_writes_row": false
@@ -53,6 +64,8 @@
       "code": 5,
       "on_by_default": false,
       "export_formats": ["json"],
+      "report_formats": [],
+      "type_report_formats": {},
       "feed": false,
       "community_rows": null,
       "layouts": null
@@ -61,6 +74,8 @@
       "code": 9,
       "on_by_default": false,
       "export_formats": ["json"],
+      "report_formats": [],
+      "type_report_formats": {},
       "feed": false,
       "community_rows": null,
       "layouts": {
@@ -74,6 +89,8 @@
       "code": 15,
       "on_by_default": false,
       "export_formats": ["pdf", "md", "docx", "json"],
+      "report_formats": [],
+      "type_report_formats": {},
       "feed": false,
       "community_rows": null,
       "layouts": null
@@ -82,6 +99,8 @@
       "code": 19,
       "on_by_default": false,
       "export_formats": ["json", "csv"],
+      "report_formats": ["csv"],
+      "type_report_formats": {},
       "feed": false,
       "community_rows": {
         "granted_writes_row": true

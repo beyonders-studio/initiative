@@ -33,6 +33,7 @@ import {
   INITIATIVES_ROUTE,
   initiativeRoute,
   NO_RELATIONS_PANEL,
+  SHARED_LAYOUT_TOOLS,
   SIDEBAR_TOOLS,
   singularOf,
   TOOL_ICONS,
@@ -414,6 +415,15 @@ describe("tool surfaces are wired, not just typed", () => {
         `buildToolRows has no case for ${tool}`
       ).toEqual([]);
     }
+  });
+});
+
+describe("tool layouts", () => {
+  // The records say which tools the whole initiative shares one page of; each
+  // needs its detail (and presets, where its list has them) drawn here.
+  it("every shared-layout tool has its layouts drawn", async () => {
+    const { SHARED_LAYOUTS } = await import("@/components/layouts/details");
+    expect(Object.keys(SHARED_LAYOUTS).sort()).toEqual([...SHARED_LAYOUT_TOOLS].sort());
   });
 });
 

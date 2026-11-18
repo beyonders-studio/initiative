@@ -14,7 +14,8 @@ plus one record. The frontend reads the records from the file
 ``scripts/build_tool_records.py`` writes beside its API types.
 """
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import Enum
 
 from app.core.errors import CodedError
@@ -169,6 +170,13 @@ class ToolSpec:
     #: ship is the row's question (``services.export.provenance``), not the
     #: tool's.
     export_formats: tuple[str, ...] | None = ("json",)
+    #: The formats an initiative or community report may write it in, in the
+    #: order offered. With none chosen — or none offered — it rides as its
+    #: envelope.
+    report_formats: tuple[str, ...] = ()
+    #: Report formats per file type, for a tool whose formats depend on each
+    #: row rather than the tool (a file's, on its type).
+    type_report_formats: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     #: A person can subscribe to it from another app: a personal API key
     #: limited to one of them (``user_api_keys.resource_type``/``resource_id``)
     #: reads its feed and nothing else, served from the tool's own router.
@@ -186,6 +194,7 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
         code=10,
         on_by_default=True,
         export_formats=("json", "pdf", "csv", "xlsx"),
+        report_formats=("pdf", "csv", "xlsx"),
         layouts=Layouts(
             per_instance=True,
             lists=("table", "board", "gantt", "calendar"),
@@ -193,15 +202,25 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
             typed=True,
         ),
     ),
-    Tool.file: ToolSpec(code=6, on_by_default=True, export_formats=None),
+    Tool.file: ToolSpec(
+        code=6,
+        on_by_default=True,
+        export_formats=None,
+        type_report_formats={
+            "lexical": ("pdf", "md", "docx"),
+            "sheet": ("csv", "xlsx"),
+        },
+    ),
     Tool.counter_group: ToolSpec(
         code=4,
         export_formats=("pdf", "csv", "xlsx", "md", "json"),
+        report_formats=("pdf", "csv", "xlsx", "md"),
         layouts=Layouts(per_instance=True, detail="counter"),
     ),
     Tool.calendar: ToolSpec(
         code=1,
         export_formats=("ics", "json"),
+        report_formats=("ics", "json"),
         feed=True,
         community_rows=CommunityRows(),
         layouts=Layouts(
@@ -214,6 +233,8 @@ TOOL_SPECS: dict[Tool, ToolSpec] = {
     Tool.contact: ToolSpec(
         code=19,
         export_formats=("json", "csv"),
+        # One spreadsheet of each initiative's contacts.
+        report_formats=("csv",),
         community_rows=CommunityRows(granted_writes_row=True),
     ),
 }

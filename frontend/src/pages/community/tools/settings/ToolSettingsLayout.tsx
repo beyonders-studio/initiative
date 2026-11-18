@@ -27,9 +27,9 @@ import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import type { GrantsChange } from "@/hooks/toolHooks";
-import { INSTANCE_LAYOUT_TOOLS, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { toolDetailRoute, toolSettingsSectionRoute } from "@/lib/tools";
+import { INSTANCE_LAYOUT_TOOLS, toolDetailRoute, toolSettingsSectionRoute } from "@/lib/tools";
 import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 import { canUseArchiveCard } from "./ToolArchiveCard";

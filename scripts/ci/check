@@ -125,7 +125,7 @@ check_codegen() {
     echo "Run scripts/ci/check codegen locally: it regenerates them. Review and commit the result."
     return 1
   fi
-  echo "env-contract.json and the generated API client are up to date."
+  echo "env-contract.json, the generated API client and the tool records are up to date."
 }
 
 # What this branch changed against BASE_REF, committed or not.

@@ -76,6 +76,11 @@ interface ToolRecord {
   /** What a selection of it exports to, in the order offered: null where it
    *  depends on each row (a file's, on its type), empty for none. */
   export_formats: string[] | null;
+  /** What an initiative or community report may write it in, in the order
+   *  offered; empty where it rides as its envelope. */
+  report_formats: string[];
+  /** How it lays out what it holds, if it does. */
+  layouts: { per_instance: boolean; lists: string[]; detail: string | null } | null;
 }
 
 const TOOL_RECORDS = records.tools as Record<Tool, ToolRecord>;
@@ -97,6 +102,28 @@ export const NON_EXPORTABLE_TOOLS: ReadonlySet<Tool> = new Set(
  *  for a tool whose formats depend on each row (files). */
 export const toolExportFormats = (tool: Tool): readonly string[] | null =>
   TOOL_RECORDS[tool].export_formats;
+
+/** What a report may write a tool's rows in, in the order offered. */
+export const toolReportFormats = (tool: Tool): readonly string[] =>
+  TOOL_RECORDS[tool].report_formats;
+
+/** What a report may write each type of file in, in the order offered. */
+export const FILE_TYPE_REPORT_FORMATS = records.tools.file.type_report_formats;
+
+/** The tools whose every instance lays out its own items (a project's, a
+ *  counter group's). */
+export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => {
+    const layouts = TOOL_RECORDS[tool].layouts;
+    return layouts?.per_instance && (layouts.lists.length > 0 || layouts.detail !== null);
+  })
+);
+
+/** The tools the whole initiative shares one page of (its calendar, its
+ *  posts), whose layouts are the initiative's. */
+export const SHARED_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
+  TOOLS.filter((tool) => TOOL_RECORDS[tool].layouts?.per_instance === false)
+);
 
 /** Tools with an export-engine source (single + bulk selection export), and
  *  equally the tools whose envelope can be imported. */
