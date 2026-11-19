@@ -30,7 +30,6 @@ from app.core import usernames
 from app.core.references import NOT_REFERENCEABLE
 from app.core.relationships import PERSON, EndpointKind
 from app.core.search import SearchEntityType
-from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.core.user_display import display_name
 from app.db.authorization import standing_arg
@@ -301,10 +300,10 @@ def _governing_tool(table_name: str, table: Table):
     if source.dac_tool is None or source.dac_sql is not None:
         return None, null()
     local = table.c[source.dac_id] if source.dac_id else table.c["id"]
-    return source.dac_tool, local
+    return Tool(source.dac_tool.kind), local
 
 
-def _container_title(table_name: str, table: Table, tool: ToolRecord | None):
+def _container_title(table_name: str, table: Table, tool: Tool | None):
     """The table holding what a row is addressed inside, and its name column.
 
     A name on its own identifies nothing in a list of mixed things: six
@@ -315,8 +314,8 @@ def _container_title(table_name: str, table: Table, tool: ToolRecord | None):
     source = SEARCH_SOURCES[table_name]
     if tool is None or source.dac_id is None:
         return None, null()
-    container = tool.table
-    return container, container.c[SEARCH_SOURCES[container.name].title]
+    container = SQLModel.metadata.tables[tool.plural]
+    return container, container.c[SEARCH_SOURCES[tool.plural].title]
 
 
 @dataclass(frozen=True)
