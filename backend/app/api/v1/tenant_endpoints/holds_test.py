@@ -27,10 +27,13 @@ from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
 from app.services.platform import holds as holds_service
 from app.testing import (
+    COUNTERS_UID,
+    add_counter_group,
     create_collection,
     create_comment,
     create_file,
     create_user,
+    install_tool_plugin,
     thread_path,
 )
 from app.testing.factories import create_access_grant, get_auth_headers
@@ -685,3 +688,45 @@ async def test_holding_a_case_in_the_operations_community_under_itself(
     held = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
     assert held.held_at is not None
     await set_rls_context(session, Unattributed())
+
+
+async def test_a_tool_plugins_row_is_held_listed_and_released(
+    client, session, scene, operations, acting_user, reading_as
+):
+    """A row of a tool plug-in's tool is held as a built-in tool's row is:
+    with the item inside it, it reads as absent to the community, the
+    platform lists it by its name, and restoring it puts both back."""
+    guild = scene["guild"]
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    adding = await reading_as(scene["mod"].user.id, guild.id)
+    group, counter = await add_counter_group(adding, scene["initiative"].id)
+    await adding.commit()
+    kind = f"counter_group.{COUNTERS_UID.lower()}"
+    seen = text(
+        f"SELECT (SELECT count(*) FROM p_{COUNTERS_UID.lower()}_counter_group"
+        f" WHERE id = :g) + (SELECT count(*) FROM p_{COUNTERS_UID.lower()}_counter"
+        " WHERE id = :c)"
+    )
+
+    async def rows_read() -> int:
+        reader = await reading_as(scene["admin"].user.id, guild.id)
+        return (await reader.exec(seen, params={"g": group, "c": counter})).one()[0]
+
+    assert await rows_read() == 2
+    assert (await _hold(client, scene["mod"], kind, group)).status_code == 201
+    assert await rows_read() == 0
+
+    moderator = await _moderator(session, guild)
+    holds = await client.get(
+        f"/api/v1/c/{guild.id}/holds", headers=get_auth_headers(moderator)
+    )
+    (listed,) = holds.json()
+    assert (listed["target_type"], listed["target_id"], listed["label"]) == (
+        kind,
+        group,
+        "Scores",
+    )
+    released = await _release(client, moderator, guild, listed["id"], "restore")
+    assert released.status_code == 200, released.text
+    assert await rows_read() == 2

@@ -32,7 +32,9 @@ import logging
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
+import sqlalchemy as sa
 from fastapi import status
 from sqlalchemy import Table, update
 from sqlmodel import select
@@ -53,8 +55,14 @@ from app.db.guild_standing import GuildContext
 from app.db.plugin_tools import provisioned_tools
 from app.db.query import ids_in
 from app.db.request_context import SystemGuild
-from app.db.session import raise_flag, routed_guild_id, set_rls_context
+from app.db.session import (
+    raise_flag,
+    routed_guild_id,
+    routed_tools,
+    set_rls_context,
+)
 from app.db.soft_delete_filter import select_including_deleted
+from app.db.tool_rows import Located, ToolRow, locate
 from app.models.tenant._mixins import HoldMixin, hold_models
 from app.models.tenant.content_hold import ContentHold
 from app.services import audit as audit_service
@@ -70,8 +78,13 @@ class HoldError(CodedError):
     """A hold that can't be placed or released, and why."""
 
 
-def model_for(target_type: str) -> type[HoldMixin]:
-    """The model a hold names by its ``SearchEntityType`` value."""
+def _source(tools: ToolSet, target_type: str) -> Located | type[HoldMixin]:
+    """Where the thing a hold names by its kind is kept, in a community with
+    ``tools``: a model a ``SearchEntityType`` value names, or the table of a
+    kind a tool plug-in brings."""
+    located = locate(tools, target_type)
+    if located is not None:
+        return located
     model = MODELS_BY_TABLE.get(plural_of(target_type))
     if target_type not in SearchEntityType.__members__ or not (
         model and issubclass(model, HoldMixin)
@@ -80,26 +93,53 @@ def model_for(target_type: str) -> type[HoldMixin]:
     return model
 
 
+async def _target(
+    session: AsyncSession,
+    source: Located | type[HoldMixin],
+    target_id: int,
+    *,
+    lock: bool = False,
+) -> Any:
+    """The row ``source`` keeps under ``target_id``, trashed or not, as
+    ``session`` reads it: a model's instance, or a tool plug-in's row
+    (``app.db.tool_rows.ToolRow``). None where it reads none."""
+    if isinstance(source, Located):
+        table = source.table
+        statement = sa.select(table).where(table.c.id == target_id)
+    else:
+        statement = select_including_deleted(source).where(source.id == target_id)
+    statement = statement.execution_options(populate_existing=True)
+    if lock:
+        statement = statement.with_for_update()
+    found = (await session.exec(statement)).first()
+    if found is None or not isinstance(source, Located):
+        return found
+    return ToolRow(source.table, {c.name: found._mapping[c] for c in source.table.c})
+
+
+async def _held_by(session: AsyncSession, tools: ToolSet, hold: ContentHold) -> Any:
+    """What ``hold`` names, as ``session`` reads it: None once it is gone, or
+    once its kind is none of the community's (a tool plug-in uninstalled)."""
+    try:
+        source = _source(tools, hold.target_type)
+    except HoldError:
+        return None
+    return await _target(session, source, hold.target_id)
+
+
 # -- Who may hold what ----------------------------------------------------------
 
 
 async def _seen_in(
-    session: AsyncSession, target_type: str, target_id: int
+    session: AsyncSession, source: Located | type[HoldMixin], request: HoldRequest
 ) -> tuple[bool, int | None]:
     """Whether the reader's own session sees the target, and its initiative.
     Read under the reader's row security, so what they can't see isn't
     there."""
     from sqlalchemy import func
 
-    model = model_for(target_type)
-    seen = (
-        await session.exec(
-            select_including_deleted(model)
-            .where(model.id == target_id)
-            .with_only_columns(model.id)
-        )
-    ).first()
-    if seen is None:
+    target_type, target_id = request.target_type, request.target_id
+    if await _target(session, source, target_id) is None:
         return False, None
     initiative_id = (
         await session.exec(select(func.entity_initiative(target_type, target_id)))
@@ -233,14 +273,7 @@ async def _cover_again(session: AsyncSession, released_id: int, tools: ToolSet) 
         )
     ).all()
     for other in others:
-        model = model_for(other.target_type)
-        target = (
-            await session.exec(
-                select_including_deleted(model)
-                .where(model.id == other.target_id)
-                .execution_options(populate_existing=True)
-            )
-        ).first()
+        target = await _held_by(session, tools, other)
         if target is None:
             continue
         covered = await _covered(session, target, tools)
@@ -378,23 +411,18 @@ async def place(
     report settled as held hands its reporters' words and files to one — and
     the hold is worked there rather than on a case of its own.
     """
-    model = model_for(request.target_type)
+    tools = await provisioned_tools(guild_id)
+    source = _source(tools, request.target_type)
     if request.reason is HoldReason.illegal_content and request.legal_basis is None:
         raise HoldError(HoldMessages.LEGAL_BASIS_REQUIRED)
-    seen, initiative_id = await _seen_in(
-        session, request.target_type, request.target_id
-    )
+    seen, initiative_id = await _seen_in(session, source, request)
     if not seen:
         raise HoldError(HoldMessages.TARGET_NOT_FOUND, status.HTTP_404_NOT_FOUND)
     via = _via(context, initiative_id)
 
     async with cohorts.system_session(guild_id) as system:
         await set_rls_context(system, SystemGuild(guild_id))
-        target = (
-            await system.exec(
-                select_including_deleted(model).where(model.id == request.target_id)
-            )
-        ).first()
+        target = await _target(system, source, request.target_id)
         if target is None:
             raise HoldError(HoldMessages.TARGET_NOT_FOUND, status.HTTP_404_NOT_FOUND)
         if target.held_at is not None:
@@ -451,13 +479,7 @@ async def place(
             # Writing the hold columns of archived or trashed rows is a write to
             # frozen content on purpose, as a purge's is (``gucs.PURGING``).
             await raise_flag(system, gucs.PURGING)
-            target = (
-                await system.exec(
-                    select_including_deleted(model)
-                    .where(model.id == request.target_id)
-                    .with_for_update()
-                )
-            ).one()
+            target = await _target(system, source, request.target_id, lock=True)
             if target.held_at is not None:
                 raise HoldError(HoldMessages.ALREADY_HELD, status.HTTP_409_CONFLICT)
             hold = ContentHold(
@@ -474,7 +496,7 @@ async def place(
             )
             system.add(hold)
             await system.flush()
-            covered = await _covered(system, target, await provisioned_tools(guild_id))
+            covered = await _covered(system, target, tools)
             names = await _shown_uploads(system, covered)
             await _stamp(system, covered, names, hold)
             await raise_flag(system, gucs.PURGING, False)
@@ -548,14 +570,7 @@ async def release(
         await _unstamp(system, int(hold.id), tools)
         await _cover_again(system, int(hold.id), tools)
         await raise_flag(system, gucs.PURGING, False)
-        model = model_for(hold.target_type)
-        target = (
-            await system.exec(
-                select_including_deleted(model)
-                .where(model.id == hold.target_id)
-                .execution_options(populate_existing=True)
-            )
-        ).first()
+        target = await _held_by(system, tools, hold)
         if (
             target is not None
             and outcome is not HoldRelease.restore
@@ -705,22 +720,28 @@ def open_note(note: str | None) -> str | None:
 
 
 async def _label(session: AsyncSession, hold: ContentHold) -> str | None:
+    """What the held thing is called: a model's display field, a tool
+    plug-in's row its name."""
     try:
-        model = model_for(hold.target_type)
+        source = _source(routed_tools(session), hold.target_type)
     except HoldError:
         return None
-    display = getattr(model, "display_field", None)
-    column = display() if callable(display) else "name"
-    if column not in model.model_fields:
+    if isinstance(source, Located):
+        table, column = source.table, "name"
+    else:
+        display = getattr(source, "display_field", None)
+        table = source.__table__  # type: ignore[attr-defined]
+        column = display() if callable(display) else "name"
+    if column not in table.c:
         return None
     value = (
         await session.exec(
-            select_including_deleted(model)
-            .where(model.id == hold.target_id)
-            .with_only_columns(getattr(model, column))
+            sa.select(table.c[column])
+            .where(table.c.id == hold.target_id)
+            .execution_options(include_deleted=True)
         )
     ).first()
-    return str(value)[:200] if value else None
+    return str(value[0])[:200] if value and value[0] else None
 
 
 # -- The sweep ------------------------------------------------------------------
