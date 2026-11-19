@@ -76,6 +76,7 @@ from app.core.rate_limit import limiter
 from app.core.rules import SURFACE_PLUGINS
 from app.db import post_commit
 from app.db.guild_standing import GuildContext
+from app.db.plugin_tools import drop_fields_ddl
 from app.db.query import build_paginated_response, paginated_query
 from app.db.schema_provisioning import provision_community_tools
 from app.db.session import routed_guild_id
@@ -363,33 +364,35 @@ async def _require_removable(plugin: GuildPlugin, guild_id: int) -> None:
         )
 
 
-def _require_changeable(plugin: GuildPlugin) -> None:
-    """Refuse to remove, turn off or update a tool plug-in: its tables and
-    rules are made on install, and nothing yet takes them back or changes
-    them."""
-    if is_tool_plugin(plugin.definition):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=GuildPluginMessages.TOOL_UNCHANGEABLE,
-        )
-
-
-async def _provision_tool(session: AsyncSession, plugin: GuildPlugin) -> None:
-    """Make a tool plug-in's tables and render its community's rules, once
-    the install has committed, then switch its tool on in every initiative:
-    rule rows its community's rules admit once they are rendered with it.
-    Until then the tool is off everywhere. Where any of it fails, the install
-    is taken back, its rule rows with it, and the community rendered again
-    without it, so no install stands without its tables."""
+async def _provision_tool(
+    session: AsyncSession,
+    plugin: GuildPlugin,
+    *,
+    previous: tuple[str, dict[str, Any]] | None = None,
+    drop: str = "",
+) -> None:
+    """Make a tool plug-in's tables as its version declares them and render
+    its community's rules, once the install or its new version has
+    committed, then switch its tool on in every initiative and lay out each
+    of its tables: rows its community's rules admit once they are rendered
+    with it. Until then a new install's tool is off everywhere. ``drop`` is
+    the columns a new major version stops declaring, which the seat
+    confirmed. Where any of it fails, the install is taken back, or put back
+    on ``previous`` (its version and definition), and the community rendered
+    again, so no install stands without the tables its version declares."""
     guild_id, plugin_id = routed_guild_id(session), plugin.id
     try:
-        await provision_community_tools(guild_id)
+        await provision_community_tools(guild_id, drop=drop)
         await initiative_tools.write_plugin_tool_rules(session)
         await session.commit()
     except Exception as exc:
         logger.exception("tool plug-in %s: provisioning guild %s", plugin_id, guild_id)
         await session.rollback()
-        await session.exec(delete(GuildPlugin).where(GuildPlugin.id == plugin_id))
+        if previous is None:
+            await session.exec(delete(GuildPlugin).where(GuildPlugin.id == plugin_id))
+        else:
+            plugin.listing_version, plugin.definition = previous
+            session.add(plugin)
         await session.commit()
         await provision_community_tools(guild_id)
         raise HTTPException(
@@ -645,6 +648,15 @@ async def install_community_plugin(
         )
     ).first()
     if existing is not None:
+        # A tool plug-in the community uninstalled is still here until its
+        # window ends: installing it again calls the deletion off.
+        if is_tool_plugin(existing.definition):
+            await guild_plugins_service.lock_install(session, existing.id)
+            if await plugin_installs_service.reinstall_tool(
+                guild_context.guild_id, existing, actor_user_id=current_user.id
+            ):
+                await session.commit()
+                return await _read(session, existing, guild_context, viewer)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=GuildPluginMessages.ALREADY_INSTALLED,
@@ -746,12 +758,17 @@ async def upgrade_community_plugin(
     ``payload`` names the version the seat was shown and the scopes it grants
     with it. Without it the answer is 409, carrying what the version asks
     for; so is a consent naming a version the catalog no longer offers.
+
+    A tool plug-in's version asks for what it adds to the tool (tables,
+    fields, options, actions) the same way. One that drops fields, which only
+    a new major may, is applied only with ``drop_fields`` naming each: their
+    columns go, with what they hold, when the tool's tables are brought up to
+    the version.
     """
     # Upgrading prunes both configuration maps to the new definition, so it
     # takes the row: a plug-in writing a flow's result back at the same moment
     # must land on one side of the prune or the other.
     plugin = await _load(session, plugin_id, for_update=True)
-    _require_changeable(plugin)
 
     # The listing is resolved here rather than inside the shared apply, so a
     # withdrawn or missing one is reported as the HTTP answer it deserves
@@ -777,8 +794,14 @@ async def upgrade_community_plugin(
         registration.scope_ceiling if registration else (),
         await guild_plugins_service.installed_plugin_ids(session),
     )
-    if (payload is not None and payload.version != version.version) or (
-        payload is None and asks.asks_more
+    if (
+        (payload is not None and payload.version != version.version)
+        or (payload is None and asks.asks_more)
+        or (
+            asks.tool is not None
+            and set(asks.tool.dropped_fields)
+            != set(payload.drop_fields if payload is not None else ())
+        )
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -799,6 +822,7 @@ async def upgrade_community_plugin(
     await _require_grantable(session, add_scopes, definition, plugin.listing_uid)
 
     previous_version = plugin.listing_version
+    previous_definition = plugin.definition
     previous_grant = sorted(plugin.granted_scopes or [])
     await plugin_updates_service.apply_version(
         session,
@@ -834,6 +858,13 @@ async def upgrade_community_plugin(
         detail=record,
     )
     await session.commit()
+    if asks.tool is not None:
+        await _provision_tool(
+            session,
+            plugin,
+            previous=(previous_version, previous_definition),
+            drop=drop_fields_ddl(plugin.listing_uid, asks.tool.dropped_fields),
+        )
     await session.refresh(plugin)
     await guild_plugins_service.assign_settings(
         session, plugin, guild_id=guild_context.guild_id
@@ -935,7 +966,6 @@ async def update_community_plugin(
     if "enabled" in data and data["enabled"] is not None:
         if not data["enabled"]:
             await _require_removable(plugin, guild_context.guild_id)
-            _require_changeable(plugin)
         plugin.enabled = data["enabled"]
     if data.get("auto_update") is not None:
         plugin.auto_update = data["auto_update"]
@@ -1015,9 +1045,17 @@ async def uninstall_community_plugin(
     guild_context: SeatWriteContextDep,
     background_tasks: BackgroundTasks,
     erase: Annotated[bool, Query()] = False,
+    delete_content: Annotated[bool, Query()] = False,
 ) -> None:
     """Remove a plug-in, ending its access and trashing what it created
     (:func:`~app.services.tenant.guild_plugins.uninstall_plugin`).
+
+    A tool plug-in's tool is the community's content, so removing it is the
+    seat consenting, with ``delete_content``, to that content being deleted
+    once the deletion window ends (409
+    ``COMMUNITY_PLUGIN_TOOL_DELETION_UNCONFIRMED`` without it). The tool is
+    gone from the community at once and its content kept until then;
+    installing the plug-in again within the window brings all of it back.
 
     What the plug-in calls the community and its members is kept, so installing
     it again picks up where it left off. ``erase`` also asks the plug-in to
@@ -1034,7 +1072,17 @@ async def uninstall_community_plugin(
     # finds no install and is refused.
     plugin = await _load(session, plugin_id, for_update=True)
     await _require_removable(plugin, guild_context.guild_id)
-    _require_changeable(plugin)
+    if is_tool_plugin(plugin.definition):
+        if not delete_content:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=GuildPluginMessages.TOOL_DELETION_UNCONFIRMED,
+            )
+        await plugin_installs_service.uninstall_tool(
+            guild_context.guild_id, plugin, actor_user_id=current_user.id
+        )
+        await session.commit()
+        return
     if erase and not guild_context.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

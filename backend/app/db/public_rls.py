@@ -58,6 +58,7 @@ from app.db.authorization import (
     live_membership,
 )
 from app.models.platform.guild import GUILD_ADMIN_ROLES, AdminSurface
+from app.models.platform.plugin_service_registration import RegistrationKind
 from app.models.platform.user import UserRole
 
 logger = logging.getLogger(__name__)
@@ -2266,6 +2267,15 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                 ),
                 # The change log's writer reads an install's state to tell it.
                 Policy("billing_log_read", SELECT, ("app_billing_log",), using=OPEN),
+                # A member's standing reads the state of each tool plug-in
+                # installed in their community (column grant: guild_id,
+                # install_id, status and suspended_at; migration 20261118_0617).
+                Policy(
+                    "community_reads_its_installs",
+                    SELECT,
+                    ("app_guild_base", "app_guild_base_ro"),
+                    using=f"guild_id = {gucs.ROUTED_GUILD_ID}",
+                ),
             ),
         ),
         grants=Grants(
@@ -2366,6 +2376,15 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     ("plugin_install_base",),
                     using=f"public_id = {gucs.TOKEN_CLIENT_ID}",
                 ),
+                # A member's standing reads whether a tool plug-in is suspended
+                # or out of reach (column grant: listing_uid, kind,
+                # suspended_at and availability; migration 20261118_0617).
+                Policy(
+                    "community_reads_tool_registrations",
+                    SELECT,
+                    ("app_guild_base", "app_guild_base_ro"),
+                    using=f"kind = '{RegistrationKind.TOOL}'",
+                ),
                 # The change log's writer reads whether a plug-in is suspended
                 # (its column grant is listing_uid, suspended_at and
                 # availability; migrations 20261115_0609 and 20261115_0610).
@@ -2406,6 +2425,15 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     SELECT,
                     ("plugin_install_base",),
                     using=f"community_id = {gucs.GUILD_ID}",
+                ),
+                # A member's standing asks whether a beta tool plug-in reaches
+                # their community (column grant: listing_uid and community_id;
+                # migration 20261118_0617).
+                Policy(
+                    "community_reads_its_beta_rows",
+                    SELECT,
+                    ("app_guild_base", "app_guild_base_ro"),
+                    using=f"community_id = {gucs.ROUTED_GUILD_ID}",
                 ),
                 # The change log's writer reads whether an install is in reach
                 # (its column grant is listing_uid and community_id).

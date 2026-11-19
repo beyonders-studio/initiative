@@ -33,6 +33,7 @@ that serves or calls is refused rather than dropped.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -77,8 +78,10 @@ __all__ = [
     "TOOL_LAYOUT_FIELDS",
     "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
+    "ToolChanges",
     "is_tool_plugin",
     "normalize_tool_plugin_definition",
+    "tool_changes",
     "tool_kinds",
 ]
 
@@ -149,6 +152,98 @@ def tool_kinds(definition: dict[str, Any], *, listing_uid: str) -> list[str]:
     suffix = listing_uid.lower()
     keys = [tool["key"], *(item["key"] for item in tool.get("items", []))]
     return [f"{key}.{suffix}" for key in keys]
+
+
+# --- one version against another ----------------------------------------------
+
+
+@dataclass(frozen=True)
+class ToolChanges:
+    """What one version of a tool plug-in changes in its tool against another,
+    each named ``<table key>`` or ``<table key>.<field key>``.
+
+    A field a version stops declaring, or declares as another kind, or whose
+    options it narrows, is ``dropped``: its column goes, and a field declared
+    again under the same key comes back empty. An item table it stops
+    declaring, or puts under another table, is ``removed``."""
+
+    added_tables: tuple[str, ...] = ()
+    added_fields: tuple[str, ...] = ()
+    added_options: tuple[str, ...] = ()
+    added_actions: tuple[str, ...] = ()
+    dropped_fields: tuple[str, ...] = ()
+    removed_tables: tuple[str, ...] = ()
+
+    @property
+    def adds(self) -> bool:
+        """Whether the version gives the tool anything new."""
+        return bool(
+            self.added_tables
+            or self.added_fields
+            or self.added_options
+            or self.added_actions
+        )
+
+
+def _tables(definition: dict[str, Any]) -> dict[str, tuple[str | None, dict]]:
+    """Each table of a definition's tool by key: its parent's key (None for
+    the tool's own) and its fields by key."""
+    tool = definition["tool"]
+    tables = {tool["key"]: (None, {f["key"]: f for f in tool.get("fields", [])})}
+    for item in tool.get("items", []):
+        tables[item["key"]] = (
+            item.get("parent", tool["key"]),
+            {f["key"]: f for f in item["fields"]},
+        )
+    return tables
+
+
+def _options(field: dict[str, Any]) -> set[str]:
+    return {option["value"] for option in field.get("options", [])}
+
+
+def tool_changes(before: dict[str, Any], after: dict[str, Any]) -> ToolChanges:
+    """What moving from the definition ``before`` to ``after`` changes in the
+    tool's tables and actions."""
+    old, new = _tables(before), _tables(after)
+    added_tables = [key for key in new if key not in old]
+    removed = [
+        key for key, (parent, _) in old.items() if new.get(key, (0,))[0] != parent
+    ]
+    added_fields: list[str] = []
+    added_options: list[str] = []
+    dropped: list[str] = []
+    for key, (_, fields) in new.items():
+        if key not in old or key in removed:
+            continue
+        held = old[key][1]
+        for field_key, field in fields.items():
+            was = held.get(field_key)
+            if was is None:
+                added_fields.append(f"{key}.{field_key}")
+            elif was["kind"] != field["kind"] or _options(was) - _options(field):
+                dropped.append(f"{key}.{field_key}")
+            else:
+                added_options += [
+                    f"{key}.{field_key}.{value}"
+                    for value in sorted(_options(field) - _options(was))
+                ]
+        dropped += [
+            f"{key}.{field_key}" for field_key in held if field_key not in fields
+        ]
+    actions = {action["id"] for action in before["tool"].get("actions", [])}
+    return ToolChanges(
+        added_tables=tuple(added_tables),
+        added_fields=tuple(added_fields),
+        added_options=tuple(added_options),
+        added_actions=tuple(
+            action["id"]
+            for action in after["tool"].get("actions", [])
+            if action["id"] not in actions
+        ),
+        dropped_fields=tuple(sorted(dropped)),
+        removed_tables=tuple(removed),
+    )
 
 
 # --- pieces -----------------------------------------------------------------

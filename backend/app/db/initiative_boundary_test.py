@@ -27,6 +27,12 @@ Then each tool is switched off in A in turn, and with every tool's switch row
 gone: a moderator of A reads none of the rows of a table a switched-off tool
 governs, is refused an INSERT into it, and updates and deletes none of them.
 
+Last, the tool plug-in's state: suspended, and uninstalled by its community
+with its content kept for the deletion window, its rows (and the comments on
+them) read as absent to A's moderator and to the community's admin, and every
+write is refused; read-only, they read and every write is refused; installed
+again, A's moderator reads and writes its row and nobody outside A reads it.
+
 A table the seeder cannot fill fails here; it is never skipped.
 """
 
@@ -59,6 +65,7 @@ from app.db.initiative_rls import (
 from app.db.plugin_tools import provisioned_tools
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.platform.guild import CommunityRole
+from app.models.platform.plugin_install import PluginInstall, PluginInstallStatus
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import InitiativeRule
 from app.services.tenant.initiative_tools import write_switches
@@ -725,7 +732,7 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     # built-in tool is: its tables are the community's paths.
     await session.commit()
     seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
-    await install_tool_plugin(client, session, seat)
+    install = await install_tool_plugin(client, session, seat)
     tools = await provisioned_tools(guild.id)
     assert [tool.kind for tool in tools.installed] == [
         f"counter_group.{COUNTERS_UID.lower()}"
@@ -934,6 +941,118 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
                     failures.append(
                         f"{name}: A's moderator can {command} with {state} ({answer})"
                     )
+        await reader.rollback()
+
+    # A tool plug-in's state hides its tool from everyone, the community
+    # admin included, as no switch does: suspended by staff, and uninstalled
+    # by its community while its content waits out the deletion window. Read
+    # only, its rows read and refuse every write. Installed again within the
+    # window, everything is back.
+    await route_session_to_guild(session, guild.id)
+    await _write_switches(session, initiative_a, dict.fromkeys(tools, True))
+    await session.commit()
+    plugin_kinds = {
+        kind
+        for tool in tools.installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    }
+    plugin_cases = {
+        name: case
+        for name, case in cases.items()
+        if (name in governed and governed[name].install_id is not None)
+        or plugin_kinds & set((case.inherit or {}).values())
+    }
+    assert {case.table.name for case in plugin_cases.values()} >= plugin_tables
+    everybody = {
+        "A's moderator": people.moderator_a,
+        "the community admin": admin.user.id,
+    }
+
+    def in_a(case: _Case) -> sa.ColumnElement[bool]:
+        """The case's own rows in A: B holds rows of these tables by now."""
+        return _matching(case.table, list(set(case.rows.values())))
+
+    async def sweep_state(state: str, *, reads: bool) -> None:
+        """Every row of the tool plug-in's in A reads as ``reads`` says, to A's
+        moderator and the community admin, and none is written. A comment on
+        a read-only tool's row is said, changed and removed as on any row its
+        reader reads, so only the tool's own rows are held to that there."""
+        for who, person in everybody.items():
+            reader = await reading_as(person, guild.id)
+            for name, case in plugin_cases.items():
+                own = _matching(case.table, [case.rows[people.moderator_a]])
+                seen = await _count(reader, case.table, own)
+                if seen != int(reads):
+                    failures.append(f"{name}: {who} reads {seen} with it {state}")
+                if reads and case.table.name not in plugin_tables:
+                    continue
+                key = next(iter(case.table.primary_key.columns))
+                writes = {
+                    "INSERT": _insert(case, people.moderator_a),
+                    "UPDATE": sa.update(case.table)
+                    .where(in_a(case))
+                    .values({key.name: key}),
+                    "DELETE": sa.delete(case.table).where(in_a(case)),
+                }
+                for command, statement in writes.items():
+                    answer = await _attempt(reader, statement)
+                    if answer not in (
+                        (_REFUSED,) if command == "INSERT" else (0, _REFUSED)
+                    ):
+                        failures.append(
+                            f"{name}: {who} can {command} with it {state} ({answer})"
+                        )
+            await reader.rollback()
+
+    async def install_state(**values: Any) -> None:
+        statement = pg_insert(PluginInstall).values(
+            guild_id=guild.id,
+            install_id=install["id"],
+            listing_uid=COUNTERS_UID,
+            enabled=True,
+            **values,
+        )
+        await session.exec(
+            statement.on_conflict_do_update(
+                index_elements=["guild_id", "install_id"], set_=values
+            )
+        )
+        await session.commit()
+
+    await install_state(suspended_at=datetime.now(UTC))
+    await sweep_state("suspended", reads=False)
+    await install_state(suspended_at=None, status=PluginInstallStatus.read_only.value)
+    await sweep_state("read-only", reads=True)
+    await install_state(status=PluginInstallStatus.active.value)
+
+    plugin_path = seat.g(f"/plugins/{install['id']}")
+    removed = await client.delete(
+        plugin_path, headers=seat.headers, params={"delete_content": "true"}
+    )
+    assert removed.status_code == 204, removed.text
+    await sweep_state("uninstalled", reads=False)
+    back = await client.post(
+        seat.g("/plugins/"), headers=seat.headers, json={"listing_uid": COUNTERS_UID}
+    )
+    assert back.status_code == 201, back.text
+    reader = await reading_as(people.moderator_a, guild.id)
+    for name, case in plugin_cases.items():
+        own = _matching(case.table, [case.rows[people.moderator_a]])
+        if (seen := await _count(reader, case.table, own)) != 1:
+            failures.append(f"{name}: A's moderator reads {seen} once reinstalled")
+        for command, statement in _own_writes(case, people.moderator_a).items():
+            if command in not_a_moderators.get(case.table.name, ()):
+                continue
+            if (answer := await _attempt(reader, statement)) != 1:
+                failures.append(
+                    f"{name}: A's moderator cannot {command} once reinstalled ({answer})"
+                )
+    await reader.rollback()
+    for person in people.outsiders:
+        reader = await reading_as(person, guild.id)
+        for name, case in plugin_cases.items():
+            if (seen := await _count(reader, case.table, in_a(case))) != 0:
+                failures.append(f"{name}: an outsider reads {seen} once reinstalled")
         await reader.rollback()
 
     assert not failures, "\n".join(failures)

@@ -81,7 +81,11 @@ from app.services.marketplace.manifest_values import (
     MIN_UNIQUE_SETTING_VALUE_LENGTH,
     UNIQUE_SETTING_VALUE_CHARS,
 )
-from app.services.marketplace.registration_lookup import load_registrations
+from app.services.marketplace.registration_lookup import (
+    invalidate_registrations,
+    load_registrations,
+)
+from app.services.platform.retention import PLUGIN_INSTALL_DELETION_DAYS
 from app.services.tenant.plugin_config import REMOVED_AT, connection_by_id
 
 logger = logging.getLogger(__name__)
@@ -100,10 +104,12 @@ __all__ = [
     "page",
     "record",
     "reindex_community",
+    "reinstall_tool",
     "routed",
     "set_status",
     "set_suspended",
     "suspension_moved",
+    "uninstall_tool",
 ]
 
 #: The most installs one page lists.
@@ -579,6 +585,91 @@ async def set_status(
             detail={"from": before, "to": status.value},
         )
     return row
+
+
+def _uninstalled(row: PluginInstall) -> bool:
+    """Whether ``row`` is deleted by its community's uninstall, rather than by
+    staff or billing: its status has not moved since."""
+    return (
+        row.status == PluginInstallStatus.deleted.value
+        and row.uninstalled_at is not None
+        and row.uninstalled_at == row.status_changed_at
+    )
+
+
+async def uninstall_tool(
+    guild_id: int, plugin: GuildPlugin, *, actor_user_id: int
+) -> None:
+    """The community's admin uninstalls ``plugin``, a tool plug-in, consenting
+    to its content being deleted once the deletion window ends
+    (``retention.PLUGIN_INSTALL_DELETION``): its install moves to
+    ``deleted``, stamped as the community's uninstall, and its tool is gone
+    from the community until it is installed again. Its tables, rows and rules
+    stay until the window ends. Committed on the system engine; the caller
+    holds the install."""
+    await record(guild_id, plugin)
+    async with db_session.SystemSessionLocal() as session:
+        row = await _locked(session, guild_id, plugin.id or 0)
+        before, now = row.status, utcnow()
+        row.status = PluginInstallStatus.deleted.value
+        row.status_changed_at = row.uninstalled_at = now
+        session.add(row)
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.PLUGIN_UNINSTALLED,
+            actor_user_id=actor_user_id,
+            guild_id=guild_id,
+            target_type="plugin",
+            target_id=row.install_id,
+            detail={
+                "listing_uid": row.listing_uid,
+                "from": before,
+                "content_deleted_after_days": PLUGIN_INSTALL_DELETION_DAYS,
+            },
+        )
+        community_hooks.status_changed(session, guild_id)
+        await session.commit()
+    invalidate_registrations()
+
+
+async def reinstall_tool(
+    guild_id: int, plugin: GuildPlugin, *, actor_user_id: int
+) -> bool:
+    """Install ``plugin``, a tool plug-in its community uninstalled, again
+    within its window: the deletion is called off and the tool is back, with
+    everything it held. False, changing nothing, where its install is not
+    waiting on the community's uninstall. Committed on the system engine; the
+    caller holds the install."""
+    async with db_session.SystemSessionLocal() as session:
+        row = (
+            await session.exec(
+                select(PluginInstall)
+                .where(
+                    PluginInstall.guild_id == guild_id,
+                    PluginInstall.install_id == plugin.id,
+                )
+                .with_for_update()
+            )
+        ).one_or_none()
+        if row is None or not _uninstalled(row):
+            return False
+        row.status = PluginInstallStatus.active.value
+        row.status_changed_at = utcnow()
+        row.uninstalled_at = None
+        session.add(row)
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.PLUGIN_INSTALLED,
+            actor_user_id=actor_user_id,
+            guild_id=guild_id,
+            target_type="plugin",
+            target_id=row.install_id,
+            detail={"listing_uid": row.listing_uid, "reinstalled": True},
+        )
+        community_hooks.status_changed(session, guild_id)
+        await session.commit()
+    invalidate_registrations()
+    return True
 
 
 # --- claims on unique settings -------------------------------------------------

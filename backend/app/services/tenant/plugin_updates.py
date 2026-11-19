@@ -21,6 +21,12 @@ grant. The seat accepts it from the Update button, adding the scopes it
 consents to, or declines it, which stops the asking until a newer version is
 published. A version asking for nothing new applies as before.
 
+**A tool plug-in's version asks for what it adds to its tool**: a table, a
+field, a select's option or an action waits as a scope does, and a field a
+new major drops waits for the seat to confirm it. Taking one brings the
+community's tables up to it once it is pinned (``provision_community_tools``),
+which a version asking nothing gets from the sweep too.
+
 **A version waits only while the seat can take it.** Once the catalog no
 longer offers it (withdrawn, or replaced by one this server cannot run), the
 sweep clears ``pending_version``. While the deployment manages the community's
@@ -63,7 +69,11 @@ from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
 )
-from app.services.marketplace.tool_plugins import is_tool_plugin
+from app.services.marketplace.tool_plugins import (
+    ToolChanges,
+    is_tool_plugin,
+    tool_changes,
+)
 from app.services.platform import rules
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import metadata, plugin_schedules
@@ -118,10 +128,18 @@ class UpgradeAsks:
 
     added_scopes: tuple[str, ...] = ()
     added_surfaces: tuple[dict[str, Any], ...] = field(default=())
+    #: For a tool plug-in, what the version changes in its tool. One that
+    #: adds a table, a field, an option or an action asks the seat, and one
+    #: that drops a field (a new major) asks it to confirm each.
+    tool: ToolChanges | None = None
 
     @property
     def asks_more(self) -> bool:
-        return bool(self.added_scopes or self.added_surfaces)
+        return bool(
+            self.added_scopes
+            or self.added_surfaces
+            or (self.tool and (self.tool.adds or self.tool.dropped_fields))
+        )
 
 
 def upgrade_asks(
@@ -150,7 +168,15 @@ def upgrade_asks(
         if guild_plugins_service.surface_renders_in(page, "initiative")
         and page["id"] not in current
     )
-    return UpgradeAsks(added_scopes=added_scopes, added_surfaces=added_surfaces)
+    return UpgradeAsks(
+        added_scopes=added_scopes,
+        added_surfaces=added_surfaces,
+        tool=(
+            tool_changes(plugin.definition, definition)
+            if is_tool_plugin(plugin.definition) and is_tool_plugin(definition)
+            else None
+        ),
+    )
 
 
 async def _ceiling(definition: dict, listing_uid: str) -> tuple[str, ...]:
@@ -205,10 +231,9 @@ async def update_offer(
     if version.version == plugin.listing_version:
         return None
     definition = dict(version.definition)
-    # A tool plug-in stays at the version it was installed at: updating its
-    # tables is not built yet.
+    # A tool plug-in moves only to a version that declares the same tool.
     if definition.get("plugin_kind") not in GUILD_INSTALLABLE_PLUGIN_KINDS or (
-        is_tool_plugin(plugin.definition)
+        is_tool_plugin(plugin.definition) != is_tool_plugin(definition)
     ):
         return None
     asks = upgrade_asks(
@@ -398,6 +423,7 @@ async def _update_guild(
     guild_id: int,
     *,
     asked: list[AskedUpdate] | None = None,
+    tools_moved: list[int] | None = None,
 ) -> int:
     """Apply what the catalog offers to one guild's tracking installs.
 
@@ -421,7 +447,8 @@ async def _update_guild(
     is seen, so the caller can tell the seat once it has committed. A version
     the seat declined, or one already pending, is passed over quietly. An
     install with nothing the seat could take clears ``pending_version``.
-    Returns how many installs were moved.
+    Returns how many installs were moved; a tool plug-in moved is added to
+    ``tools_moved``, whose tables and rules follow once the pass commits.
 
     A version that declares an assigned setting the install holds no value for
     gives it one (:func:`guild_plugins.assign_settings`), which commits what
@@ -498,6 +525,8 @@ async def _update_guild(
         )
         await reconcile_repinned(guild_id, plugin, session=session)
         await guild_plugins_service.assign_settings(session, plugin, guild_id=guild_id)
+        if tools_moved is not None and is_tool_plugin(plugin.definition):
+            tools_moved.append(plugin.id)
         applied += 1
         logger.info(
             "plug-in auto-update: guild=%s plug-in=%s listing=%s%s %s -> %s",
@@ -521,8 +550,20 @@ async def update_guild(session: AsyncSession, guild_id: int) -> None:
     members see.
     """
     asked: list[AskedUpdate] = []
-    await _update_guild(session, guild_id, asked=asked)
+    tools_moved: list[int] = []
+    await _update_guild(session, guild_id, asked=asked, tools_moved=tools_moved)
     await session.commit()
+    if tools_moved:
+        # A version that asked nothing adds nothing to the tool's tables, but
+        # the community's rules are rendered from its declaration.
+        from app.db.schema_provisioning import provision_community_tools
+
+        try:
+            await provision_community_tools(guild_id)
+        except Exception:
+            logger.exception(
+                "plug-in auto-update: guild %s tools left to the next boot", guild_id
+            )
     # The versions now waiting are durable, so the seat is told about them. A
     # bell that cannot be written is logged: the version stays pending on the
     # install and the settings page still shows it.

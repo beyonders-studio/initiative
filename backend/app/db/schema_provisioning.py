@@ -1077,15 +1077,25 @@ async def provision_guild_schema(conn: AsyncConnection, guild_id: int) -> str:
     return guild_schema_name(guild_id)
 
 
-async def provision_community_tools(guild_id: int) -> None:
+async def provision_community_tools(guild_id: int, *, drop: str = "") -> None:
     """Give ``guild_id``'s schema what its tool plug-ins, as they are
-    installed now, need: their tables, and every part rendered from the
-    community's tool set. One transaction on the provisioning engine, under
-    the guild's provisioning lock, so a request routed into the community
-    sees all of it or none."""
+    installed now, need: their tables, as their versions declare them, and
+    every part rendered from the community's tool set; and take away the
+    tables of a tool no longer installed. ``drop`` is DDL run first: the
+    columns a new major version stops declaring, which its admin confirmed.
+    One transaction on the provisioning engine, under the guild's
+    provisioning lock, so a request routed into the community sees all of it
+    or none."""
+    from app.db.plugin_tools import drop_unclaimed_tables, provisioned_tools
+
+    schema = guild_schema_name(guild_id)
     async with db_session.provisioning_engine.begin() as conn:
         await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
-        await _apply_parts(conn, guild_id, PARTS)
+        tools = await provisioned_tools(guild_id)
+        if drop:
+            await _run_in_schema(conn, schema, drop)
+        await drop_unclaimed_tables(conn, schema, tools)
+        await _apply_parts(conn, guild_id, PARTS, tools=tools)
 
 
 async def drop_guild_schema(conn: AsyncConnection, guild_id: int) -> None:
@@ -1189,7 +1199,12 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
     Returns whether anything was applied, or None when ``wait`` is False and
     another process holds the lock.
     """
-    from app.db.plugin_tools import installed_tools, provisioned_tools, tools_digest
+    from app.db.plugin_tools import (
+        drop_unclaimed_tables,
+        installed_tools,
+        provisioned_tools,
+        tools_digest,
+    )
 
     async with db_session.provisioning_engine.begin() as conn:
         if not await advisory_lock(
@@ -1208,6 +1223,9 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
         tools = await provisioned_tools(guild_id, installed)
         bundle = (await get_provisioning_bundle()).for_tools(tools)
         parts = PARTS if settings.FORCE_GUILD_BACKFILL else bundle.stale_parts(stamp)
+        if stamp_tools(stamp) != tools_digest(installed):
+            # A tool removed whose tables were not dropped with it.
+            await drop_unclaimed_tables(conn, guild_schema_name(guild_id), tools)
         if parts:
             await _apply_parts(
                 conn, guild_id, parts, validate_checks=False, tools=tools

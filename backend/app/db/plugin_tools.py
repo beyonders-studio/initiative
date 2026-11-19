@@ -20,6 +20,16 @@ as it reads a built-in tool, and into the DDL that creates its tables.
   and the role key for viewing it, and ``<kind>:create``. Their rows are the
   install's.
 
+* **Versions** only add to the tables: the structure brings a table up to
+  its declaration (new columns, a select's new options, a field's default)
+  and takes nothing away. A field a new major drops goes by
+  :func:`drop_fields_ddl`, once the community's admin confirms it.
+* **Removal**: an uninstalled tool keeps its tables and every row naming it
+  until its install's deletion window ends; then
+  :func:`delete_tool_content` deletes what names it, and the community's
+  next provisioning drops the tables no installed tool declares
+  (:func:`drop_unclaimed_tables`).
+
 Every name is built from the declaration's keys and the listing's uid, so
 each is checked again here, one character at a time, whatever registration
 checked before: the renderers write table names into SQL as they are.
@@ -35,7 +45,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.schema import CreateIndex, CreateTable
+from sqlalchemy.schema import AddConstraint, CreateColumn, CreateIndex, CreateTable
 from sqlmodel import SQLModel
 from sqlmodel.main import get_column_from_field
 
@@ -63,8 +73,12 @@ __all__ = [
     "InstalledTool",
     "PluginKind",
     "PluginToolError",
+    "ToolContentHeld",
     "build_tool",
     "community_tool_set",
+    "delete_tool_content",
+    "drop_fields_ddl",
+    "drop_unclaimed_tables",
     "installed_digest",
     "installed_tools",
     "provisioned_tools",
@@ -96,6 +110,10 @@ _UID_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 _UID_LENGTH = 14
 
 _DIALECT = postgresql.dialect()
+
+#: The ``info`` key marking a select field's CHECK of its options, which a
+#: later version of the tool may widen.
+_OPTIONS = "options"
 
 
 class PluginToolError(ValueError):
@@ -239,7 +257,9 @@ def _field_column(field: Mapping[str, Any]) -> sa.Column:
         default = _literal(start if isinstance(start, int | float) else 0, "number")
     elif field.get("default") is not None:
         default = _literal(field["default"], kind)
-    return sa.Column(key, _FIELD_TYPES[kind](), server_default=default)
+    return sa.Column(
+        key, _FIELD_TYPES[kind](), server_default=default, info={"field": kind}
+    )
 
 
 def _checks(table: str, fields: Sequence[Mapping[str, Any]]) -> list[sa.Constraint]:
@@ -278,6 +298,7 @@ def _checks(table: str, fields: Sequence[Mapping[str, Any]]) -> list[sa.Constrai
             sa.CheckConstraint(
                 sa.column(field["key"]).in_(options),
                 name=object_name("ck", table, f"{field['key']}_option"),
+                info={_OPTIONS: True},
             )
         )
     return checks
@@ -454,6 +475,9 @@ def community_tool_set(
 
 
 def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
+    """``table`` as its tool declares it now: made where it is missing, and
+    otherwise brought up to it by adding what a later version adds (a column,
+    a select's options, a field's default). Nothing here removes anything."""
     create = CreateTable(
         table,
         if_not_exists=True,
@@ -463,12 +487,35 @@ def _structure(table: sa.Table, record: ToolRecord) -> list[str]:
             if fk.column.table.name != "users"
         ],
     )
+    quoted = _DIALECT.identifier_preparer.quote(table.name)
+    ddl = _DIALECT.ddl_compiler(_DIALECT, None)
     statements = [str(create.compile(dialect=_DIALECT)).strip()]
+    for column in table.columns:
+        if column.primary_key:
+            continue
+        spec = str(CreateColumn(column).compile(dialect=_DIALECT))
+        statements.append(f"ALTER TABLE {quoted} ADD COLUMN IF NOT EXISTS {spec}")
+        if "field" in column.info:
+            default = ddl.get_column_default_string(column)
+            name = _DIALECT.identifier_preparer.quote(column.name)
+            statements.append(
+                f"ALTER TABLE {quoted} ALTER COLUMN {name}"
+                + (" DROP DEFAULT" if default is None else f" SET DEFAULT {default}")
+            )
+    for check in sorted(
+        (c for c in table.constraints if c.info.get(_OPTIONS)),
+        key=lambda c: str(c.name),
+    ):
+        add = str(AddConstraint(check).compile(dialect=_DIALECT))
+        name = _DIALECT.identifier_preparer.quote(str(check.name))
+        statements.append(
+            f"ALTER TABLE {quoted} DROP CONSTRAINT IF EXISTS {name},"
+            + add.removeprefix(f"ALTER TABLE {quoted}")
+        )
     statements += [
         str(CreateIndex(index, if_not_exists=True).compile(dialect=_DIALECT))
         for index in sorted(table.indexes, key=lambda index: str(index.name))
     ]
-    quoted = _DIALECT.identifier_preparer.quote(table.name)
     statements.append(
         f"CREATE OR REPLACE TRIGGER {object_name('tr', table.name, 'set_created_by')}"
         f" BEFORE INSERT ON {quoted} FOR EACH ROW"
@@ -495,6 +542,158 @@ def structure_ddl(tools: ToolSet) -> str:
         for statement in _structure(table, record)
     ]
     return "".join(f"{statement};\n" for statement in statements)
+
+
+#: The tables of a schema a tool plug-in's tool may have made: named with
+#: :data:`TABLE_PREFIX`.
+_PLUGIN_TABLES = sa.text(
+    "SELECT c.relname FROM pg_class c"
+    " WHERE c.relnamespace = to_regnamespace(:schema) AND c.relkind = 'r'"
+    " AND starts_with(c.relname, :prefix) ORDER BY c.relname"
+)
+
+
+async def drop_unclaimed_tables(conn: Any, schema: str, tools: ToolSet) -> list[str]:
+    """Drop every tool plug-in table in ``schema`` that no tool in ``tools``
+    declares: an uninstalled tool's once its window has ended, and what an
+    install whose provisioning failed made. Returns their names. Run on the
+    provisioning connection, under the community's provisioning lock."""
+    declared = {
+        table.name
+        for record in tools.installed
+        for table in (record.table, *record.items)
+    }
+    found = (
+        (await conn.execute(_PLUGIN_TABLES, {"schema": schema, "prefix": TABLE_PREFIX}))
+        .scalars()
+        .all()
+    )
+    unclaimed = [name for name in found if name not in declared]
+    quote = _DIALECT.identifier_preparer.quote
+    for name in unclaimed:
+        await conn.exec_driver_sql(
+            f"DROP TABLE IF EXISTS {quote(schema)}.{quote(name)} CASCADE"
+        )
+    return unclaimed
+
+
+def drop_fields_ddl(listing_uid: str, fields: Sequence[str]) -> str:
+    """The DDL that drops ``fields`` (``<table key>.<field key>``, as
+    :func:`~app.services.marketplace.tool_plugins.tool_changes` names them)
+    from a tool plug-in's tables: what a new major version stops declaring,
+    once the community's admin confirms it. Schema-relative."""
+    quote = _DIALECT.identifier_preparer.quote
+    statements = []
+    for name in fields:
+        table_key, _, field_key = name.partition(".")
+        table = quote(tool_table_name(listing_uid, table_key))
+        # What reads the column goes with it, and the parts rendered after
+        # this put back what the version still has.
+        statements.append(
+            f"ALTER TABLE {table}"
+            f" DROP COLUMN IF EXISTS {quote(_field_key(field_key))} CASCADE"
+        )
+    return "".join(f"{statement};\n" for statement in statements)
+
+
+# --- deleting ----------------------------------------------------------------
+
+#: What the platform keeps about content, which outlives it: its holds and its
+#: moderation record.
+_PLATFORM_RECORDS = frozenset(
+    {"content_holds", "moderation_actions", "moderation_reports"}
+)
+
+
+def _naming_columns() -> list[tuple[str, str, str | None]]:
+    """Every column of a community's tables that names a tool or a kind inside
+    one, as ``(table, kind column, id column)``: a kind column ending in
+    ``_type`` beside its ``_id`` column with no key (a comment's subject, a
+    link's ends, a grant's resource, a recent view), a row's governing tool
+    (``dac_tool``, whose id column is not needed) and a layout's target."""
+    from app.db.tenancy import GUILD_SCOPED_TABLES
+
+    found: list[tuple[str, str, str | None]] = [("tool_layouts", "tool", "tool_id")]
+    for table in SQLModel.metadata.tables.values():
+        if table.name not in GUILD_SCOPED_TABLES or table.name in _PLATFORM_RECORDS:
+            continue
+        for column in table.columns:
+            if column.name == "dac_tool":
+                found.append((table.name, column.name, None))
+                continue
+            stem = column.name.removesuffix("_type")
+            ids = table.columns.get(f"{stem}_id") if stem != column.name else None
+            if ids is not None and not ids.foreign_keys:
+                found.append((table.name, column.name, ids.name))
+    return sorted(found)
+
+
+class ToolContentHeld(Exception):
+    """The platform holds content in a tool, so its deletion waits."""
+
+
+async def delete_tool_content(session: Any, listing_uid: str, definition: Any) -> None:
+    """Delete every row in the community that names the tool plug-in's tool
+    or a kind inside it, and every row that names a comment on one of those:
+    its links, comments, reactions, tags, search entries, layouts, personal
+    items, recent views and grants. The tool's own tables and its rule rows go
+    with it after (the tables by :func:`drop_unclaimed_tables`, the rules with
+    the install). On a system session routed into the community; raises
+    :class:`ToolContentHeld`, deleting nothing, while the platform holds any
+    of its rows or a comment on one."""
+    from app.services.marketplace.tool_plugins import tool_kinds
+
+    kinds = tool_kinds(definition, listing_uid=listing_uid)
+    tool = definition["tool"]
+    keys = [tool["key"], *(item["key"] for item in tool.get("items", []))]
+    tables = [tool_table_name(listing_uid, key) for key in keys]
+    present = [
+        name
+        for name in tables
+        if await session.scalar(sa.select(sa.func.to_regclass(name)))
+    ]
+    quote = _DIALECT.identifier_preparer.quote
+    held = " OR ".join(
+        [
+            *(
+                f"EXISTS (SELECT 1 FROM {quote(name)} WHERE held_at IS NOT NULL)"
+                for name in present
+            ),
+            (
+                "EXISTS (SELECT 1 FROM comments WHERE subject_type = ANY(:kinds)"
+                " AND held_at IS NOT NULL)"
+            ),
+        ]
+    )
+    if await session.scalar(sa.text(f"SELECT {held}"), {"kinds": kinds}):
+        raise ToolContentHeld(f"{kinds[0]} holds content the platform holds")
+    comments = list(
+        (
+            await session.exec(
+                sa.text("SELECT id FROM comments WHERE subject_type = ANY(:kinds)"),
+                params={"kinds": kinds},
+            )
+        ).scalars()
+    )
+    # What names a comment first, while the comment is there for its row's
+    # policy to find; then what names the tool, while its rows are.
+    naming = _naming_columns()
+    for table, kind_column, id_column in naming:
+        if id_column is not None and comments:
+            await session.exec(
+                sa.text(
+                    f"DELETE FROM {quote(table)} WHERE {quote(kind_column)} = 'comment'"
+                    f" AND {quote(id_column)} = ANY(:comments)"
+                ),
+                params={"comments": comments},
+            )
+    for table, kind_column, _ in naming:
+        await session.exec(
+            sa.text(
+                f"DELETE FROM {quote(table)} WHERE {quote(kind_column)} = ANY(:kinds)"
+            ),
+            params={"kinds": kinds},
+        )
 
 
 # --- loading -----------------------------------------------------------------
