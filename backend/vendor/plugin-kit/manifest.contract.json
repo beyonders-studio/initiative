@@ -3,7 +3,7 @@
   "schema": {
     "$id": "https://initiativetasks.com/schemas/plugin-manifest-v1.json",
     "title": "Initiative plug-in manifest (the 'definition' body)",
-    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. A tool plug-in is neither: it declares one tool in its `tool` block, runs no code, and Initiative creates and serves the tool as it does its own. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, and a part's size and depth are enforced by the platform on publish and are not expressible here."
+    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. A tool plug-in is neither: it declares one tool in its `tool` block, runs no code, and Initiative creates and serves the tool as it does its own. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, a part's size and depth, and the fields a tool's layouts name, the looks they draw them in and their size and depth are enforced by the platform on publish and are not expressible here."
   },
   "charsets": {
     "identifier": "-0123456789_abcdefghijklmnopqrstuvwxyz",
@@ -271,6 +271,30 @@
       "comments_locked_at",
       "actions"
     ],
+    "toolLayoutField": [
+      "name",
+      "created_by",
+      "created_at",
+      "updated_at",
+      "tags"
+    ],
+    "toolListKind": [
+      "grid",
+      "table"
+    ],
+    "toolDetailPart": [
+      "byline",
+      "notice",
+      "actions",
+      "relations",
+      "comments"
+    ],
+    "fieldDisplay": [
+      "number",
+      "stars",
+      "bar",
+      "clock"
+    ],
     "tone": [
       "accent",
       "positive",
@@ -371,6 +395,10 @@
     "dashboardBindingParams": 12,
     "identifierLength": 64,
     "toolKeyLength": 40,
+    "layoutNodes": 300,
+    "layoutDepth": 6,
+    "layoutBytes": 65536,
+    "layoutTitleLength": 100,
     "publicIdLength": 120,
     "pathLength": 200,
     "endpointIdLength": 200,
@@ -2069,12 +2097,13 @@
     },
     "tool": {
       "type": "object",
-      "description": "The tool a tool plug-in declares. Once a community installs the plug-in, the tool works as a built-in tool does and is offered in every initiative: Initiative creates its tables in that community, and every tool's rules (sharing, trash, archive, holds, comments, tags, links, search, export, its switch and its create permission) hold for it without being declared. So a tool declares only what is its own: its key, names and icon, the fields of its own rows and of each item table, which item tables sit under which, which items stay open, and its actions. Initiative builds a default list and item layout from the fields, which the community changes in its layout editor; the tool carries no layout. Every row holds the universal columns ('toolColumn') beside the fields it declares.",
+      "description": "The tool a tool plug-in declares. Once a community installs the plug-in, the tool works as a built-in tool does and is offered in every initiative: Initiative creates its tables in that community, and every tool's rules (sharing, trash, archive, holds, comments, tags, links, search, export, its switch and its create permission) hold for it without being declared. So a tool declares only what is its own: its key, names and icon, the fields of its own rows and of each item table, which item tables sit under which, which items stay open, what each table draws, and its actions. What a table draws is its 'layouts', in the layout format Initiative's own tools are drawn in: they are the tool's starting layouts, which each community then changes in its layout editor. Every row holds the universal columns ('toolColumn') beside the fields it declares.",
       "required": [
         "key",
         "name",
         "instance_name",
-        "icon"
+        "icon",
+        "layouts"
       ],
       "properties": {
         "key": {
@@ -2100,6 +2129,10 @@
             "ref": "toolField"
           },
           "description": "The fields of the tool's own rows, at most {toolFields}, each key at most once. Absent: its rows hold the universal columns alone."
+        },
+        "layouts": {
+          "ref": "toolLayouts",
+          "description": "How the tool's own rows are listed, and how one of them is shown."
         },
         "items": {
           "type": "array",
@@ -2128,7 +2161,7 @@
       "maxLength": "toolKeyLength",
       "patternFrom": "toolKey",
       "patternForm": "letterFirst",
-      "description": "A key a tool declares: a lower-case letter, then lower-case letters, digits and '_', at most {toolKeyLength} characters. Initiative builds table and column names from it, so a field's key is never a universal column's name ('toolColumn') and never ends in '_id', which Initiative's own keys to a parent end in."
+      "description": "A key a tool declares: a lower-case letter, then lower-case letters, digits and '_', at most {toolKeyLength} characters. Initiative builds table and column names from it, so a field's key is never a universal column's name ('toolColumn') nor a field every row has ('toolLayoutField'), and never ends in '_id', which Initiative's own keys to a parent end in."
     },
     "toolField": {
       "type": "object",
@@ -2253,7 +2286,8 @@
       "required": [
         "key",
         "name",
-        "fields"
+        "fields",
+        "layouts"
       ],
       "properties": {
         "key": {
@@ -2276,6 +2310,10 @@
             "ref": "toolField"
           },
           "description": "Its fields, at most {toolFields}, each key at most once."
+        },
+        "layouts": {
+          "ref": "toolLayouts",
+          "description": "How the item is listed under the row it sits under, and how one is shown."
         },
         "open_while": {
           "ref": "toolOpenWhile"
@@ -2453,6 +2491,403 @@
           "propertyNames": {
             "ref": "toolKey"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolLayouts": {
+      "type": "object",
+      "description": "What one of a tool's tables draws: how its rows are listed, and how one of them is shown on its own page. Both are written in the layout format Initiative stores and draws for its own tools, naming the table's fields. On install they become the community's layouts for the table, which its people change in the layout editor as they change any tool's.",
+      "required": [
+        "list",
+        "detail"
+      ],
+      "properties": {
+        "list": {
+          "ref": "toolListLayout"
+        },
+        "detail": {
+          "ref": "toolDetailLayout"
+        }
+      },
+      "additionalProperties": false
+    },
+    "toolListLayout": {
+      "type": "object",
+      "description": "How a table's rows are listed: as a 'grid' of cards, each drawn as its 'card' says, or as a 'table', a column per field in 'columns'. At most {layoutNodes} parts and columns together, nested at most {layoutDepth} deep.",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": "toolListKind"
+        },
+        "card": {
+          "ref": "layoutCard",
+          "description": "What a grid's card shows of a row. A grid's only, and required on one."
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "toolKey",
+            "description": "A field of the table the layout is for: one it declares, by its key, or one every row has ('toolLayoutField'): 'name', 'created_by' (who made it), 'created_at', 'updated_at' or 'tags'."
+          },
+          "description": "A table's columns, in order. A table's only, and required on one."
+        },
+        "displays": {
+          "type": "object",
+          "maxProperties": "toolFields",
+          "propertyNames": {
+            "ref": "toolKey"
+          },
+          "additionalProperties": {
+            "enum": "fieldDisplay"
+          },
+          "description": "How a scale or counter field the list shows is drawn, by its key: a scale as a 'number', 'stars' or a 'bar'; a counter as a 'number', a 'bar' or a 'clock'. A bar and a clock need the counter's 'min' and 'max', and a row missing one draws a number. Absent: a number."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "grid"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "card"
+            ],
+            "not": {
+              "required": [
+                "columns"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "table"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "columns"
+            ],
+            "not": {
+              "required": [
+                "card"
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "toolDetailLayout": {
+      "type": "object",
+      "description": "How one row is shown on its own page, in three regions, each its parts in order: 'header' across the top, 'main' and 'side' beside it. A region left out holds nothing, and what is placed nowhere is not shown. At most {layoutNodes} parts across the three, nested at most {layoutDepth} deep.",
+      "minProperties": 1,
+      "properties": {
+        "header": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        },
+        "main": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        },
+        "side": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCard": {
+      "type": "object",
+      "description": "A card: what a list shows of one row, its parts in order.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "card"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutCardPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCardPart": {
+      "description": "One part of a card, told apart by 'type'.",
+      "oneOf": [
+        {
+          "ref": "layoutCard"
+        },
+        {
+          "ref": "layoutCardStack"
+        },
+        {
+          "ref": "layoutCardField"
+        },
+        {
+          "ref": "layoutProperties"
+        }
+      ]
+    },
+    "layoutCardStack": {
+      "type": "object",
+      "description": "A card's parts side by side or one above another.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "stack"
+        },
+        "props": {
+          "ref": "layoutStackProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutCardPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutStackProps": {
+      "type": "object",
+      "description": "How a stack lays its parts out. Each absent: Initiative's own.",
+      "properties": {
+        "direction": {
+          "enum": [
+            "column",
+            "row"
+          ]
+        },
+        "gap": {
+          "enum": [
+            "xs",
+            "sm"
+          ],
+          "description": "The space between its parts."
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "A row runs onto a second line rather than past its edge."
+        },
+        "align": {
+          "enum": [
+            "start"
+          ],
+          "description": "Its parts keep their own width rather than filling the column."
+        },
+        "tone": {
+          "enum": [
+            "muted"
+          ],
+          "description": "Drawn in a quieter colour."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCardField": {
+      "type": "object",
+      "description": "One field of the row, drawn in its kind's look.",
+      "required": [
+        "type",
+        "props"
+      ],
+      "properties": {
+        "type": {
+          "const": "field"
+        },
+        "props": {
+          "ref": "layoutFieldProps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutFieldProps": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "A field of the table the layout is for: one it declares, by its key, or one every row has ('toolLayoutField'): 'name', 'created_by' (who made it), 'created_at', 'updated_at' or 'tags'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutProperties": {
+      "type": "object",
+      "description": "Every property the community's initiative gives the row, in its own order.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutDetailPart": {
+      "description": "One part of a page, told apart by 'type'.",
+      "oneOf": [
+        {
+          "ref": "layoutDetailStack"
+        },
+        {
+          "ref": "layoutSection"
+        },
+        {
+          "ref": "layoutDetailField"
+        },
+        {
+          "ref": "layoutProperties"
+        },
+        {
+          "ref": "layoutOwnPart"
+        }
+      ]
+    },
+    "layoutDetailStack": {
+      "type": "object",
+      "description": "A page's parts side by side or one above another.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "stack"
+        },
+        "props": {
+          "ref": "layoutStackProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutSection": {
+      "type": "object",
+      "description": "A bordered group of a page's parts.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "section"
+        },
+        "props": {
+          "ref": "layoutSectionProps"
+        },
+        "children": {
+          "type": "array",
+          "maxItems": "layoutNodes",
+          "items": {
+            "ref": "layoutDetailPart"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutSectionProps": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": "layoutTitleLength",
+          "description": "Drawn as written, in every language, as the community's own section titles are."
+        },
+        "collapsed": {
+          "type": "boolean",
+          "description": "Drawn folded until the reader opens it."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutDetailField": {
+      "type": "object",
+      "description": "One field of the row, which a reader edits there.",
+      "required": [
+        "type",
+        "props"
+      ],
+      "properties": {
+        "type": {
+          "const": "field"
+        },
+        "props": {
+          "ref": "layoutDetailFieldProps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutDetailFieldProps": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "A field of the table the layout is for: one it declares, by its key, or one every row has ('toolLayoutField'): 'name', 'created_by' (who made it), 'created_at', 'updated_at' or 'tags'."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "A person fills it in to add a row, and cannot empty it once it is filled. Only a field the table declares, and never a counter or a checkbox, which are never empty."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutOwnPart": {
+      "type": "object",
+      "description": "One of the parts every tool's page has ('toolDetailPart'): 'byline', who made it and when; 'notice', why the reader cannot change it; 'actions', the menu of what else can be done with it; 'relations', what it is linked to; 'comments'.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": "toolDetailPart"
         }
       },
       "additionalProperties": false
