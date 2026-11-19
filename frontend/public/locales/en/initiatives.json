@@ -72,7 +72,6 @@
     "projects": "Projects",
     "calendars": "Calendar",
     "dashboards": "Dashboards",
-    "counterGroups": "Counters",
     "posts": "Posts",
     "wikis": "Wikis",
     "contacts": "Contacts"
@@ -201,7 +200,6 @@
       "projects": "Projects",
       "calendars": "Events",
       "dashboards": "Dashboards",
-      "counterGroups": "Counters",
       "posts": "Posts",
       "wikis": "Wikis",
       "contacts": "Contacts"
@@ -215,8 +213,6 @@
       "createCalendars": "Create Events",
       "viewDashboards": "View Dashboards",
       "createDashboards": "Create Dashboards",
-      "viewCounterGroups": "View Counters",
-      "createCounterGroups": "Create Counters",
       "viewPosts": "View Posts",
       "createPosts": "Create Posts",
       "viewShort": "View",
@@ -265,8 +261,6 @@
   "calendarsFeatureDescription": "Things that happen at a time. RSVPs, reminders, and one place to look before anyone asks whether it's this Thursday.",
   "dashboardsFeature": "Dashboards",
   "dashboardsFeatureDescription": "How the work is going, for the person who keeps asking how the work is going. Charts and totals drawn from what's already here, read-only.",
-  "counterGroupsFeature": "Counters",
-  "counterGroupsFeatureDescription": "Numbers that move. Tallies, totals, scores, seats left, hit points — one number everyone in the room agrees on.",
   "postsFeature": "Posts",
   "postsFeatureDescription": "A noticeboard. Announcements, polls, who's read them — with the important one pinned to the top, so it isn't missed by four people.",
   "projectsFeature": "Projects",
@@ -318,7 +312,6 @@
       "dashboards": "dashboards",
       "files": "files",
       "posts": "posts",
-      "counterGroups": "counters",
       "wikis": "wikis",
       "projects": "projects"
     },

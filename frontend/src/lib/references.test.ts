@@ -18,14 +18,14 @@ describe("what [[ ]] can reach", () => {
   });
 
   it("leaves out a tool this initiative switched off", () => {
-    const types = linkableToolTypes(enabled({ counter_group: false }));
-    expect(types).not.toContain(SearchEntityType.counter_group);
+    const types = linkableToolTypes(enabled({ wiki: false }));
+    expect(types).not.toContain(SearchEntityType.wiki);
     // The rest are untouched.
     expect(types).toContain(SearchEntityType.calendar);
   });
 
   it("keeps the core tools, which have no switch to turn off", () => {
-    const types = linkableToolTypes(enabled({ counter_group: false, calendar: false }));
+    const types = linkableToolTypes(enabled({ wiki: false, calendar: false }));
     expect(types).toContain(SearchEntityType.project);
     expect(types).toContain(SearchEntityType.file);
   });

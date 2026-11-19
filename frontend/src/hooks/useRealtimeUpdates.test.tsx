@@ -291,10 +291,10 @@ describe("realtime resource frames", () => {
   });
 
   it("moves the counts only when a row arrives, leaves or changes where it counts", () => {
-    const list = seed([`/api/v1/c/${COMMUNITY}/counter-groups/`, { page: 1 }]);
+    const list = seed([`/api/v1/c/${COMMUNITY}/wikis/`, { page: 1 }]);
     const counts = seed([`/api/v1/c/${COMMUNITY}/tools/counts/by-initiative`]);
     const group = (action: string, changed: string[]) => ({
-      resource: { type: "counter_groups", id: ENTITY_ID },
+      resource: { type: "wikis", id: ENTITY_ID },
       parents: [],
       action,
       changed,
@@ -345,7 +345,7 @@ describe("realtime resource frames", () => {
     // A renamed or recoloured column changes what a status chip says, and the
     // change names the project, not the tasks in it.
     const status = seed(chipKey(COMMUNITY, `task:${ENTITY_ID}:status`));
-    const counter = seed(chipKey(COMMUNITY, "counter:4:value"));
+    const event = seed(chipKey(COMMUNITY, "calendar_event:4:when"));
 
     applyChanges(
       [
@@ -360,7 +360,7 @@ describe("realtime resource frames", () => {
     );
 
     expect(status(), "a task's status chip").toBe(true);
-    expect(counter(), "a counter's chip").toBe(false);
+    expect(event(), "an event's chip").toBe(false);
   });
 
   it("refreshes every task, listed or open, when a project's types change", () => {
@@ -369,7 +369,7 @@ describe("realtime resource frames", () => {
     const list = seed([`/api/v1/c/${COMMUNITY}/tasks/`, { project_id: 7 }]);
     const page = seed([`/api/v1/c/${COMMUNITY}/tasks/${ENTITY_ID}`]);
     const chip = seed(chipKey(COMMUNITY, `task:${ENTITY_ID}:status`));
-    const counter = seed(chipKey(COMMUNITY, "counter:4:value"));
+    const event = seed(chipKey(COMMUNITY, "calendar_event:4:when"));
 
     applyChanges(
       [
@@ -386,7 +386,7 @@ describe("realtime resource frames", () => {
     expect(list(), "a list of tasks").toBe(true);
     expect(page(), "a task's page").toBe(true);
     expect(chip(), "a task's chip").toBe(true);
-    expect(counter(), "a counter's chip").toBe(false);
+    expect(event(), "an event's chip").toBe(false);
   });
 
   it("refreshes a project's layouts when they change, and not on any other update", () => {

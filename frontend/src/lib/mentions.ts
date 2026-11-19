@@ -45,8 +45,8 @@ export const MENTIONABLE_TYPES: SearchEntityType[] = Object.values(SearchEntityT
 export const typeTrigger = (type: SearchEntityType): string => type.replaceAll("_", "-");
 
 /**
- * Trigger word -> type. Longest first, so `#counter-group` is not read as
- * `#counter` with a stray suffix.
+ * Trigger word -> type. Longest first, so `#calendar-event` is not read as
+ * `#calendar` with a stray suffix.
  */
 const TRIGGER_TYPES: [string, SearchEntityType][] = MENTIONABLE_TYPES.map(
   (type): [string, SearchEntityType] => [typeTrigger(type), type]

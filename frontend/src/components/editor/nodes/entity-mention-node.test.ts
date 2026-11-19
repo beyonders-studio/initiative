@@ -30,7 +30,7 @@ describe("a thing mentioned in a document", () => {
   it("survives being written down and read back", () => {
     // Read inside the editor: a node's own accessors need its state.
     const { serialized, entityType, entityId, text } = inEditor(() => {
-      const node = $createEntityMentionNode(SearchEntityType.counter_group, 12, "Summer fete");
+      const node = $createEntityMentionNode(SearchEntityType.wiki, 12, "Summer fete");
       const serialized = node.exportJSON() as SerializedEntityMentionNode;
       const restored = EntityMentionNode.importJSON(serialized);
       return {
@@ -43,11 +43,11 @@ describe("a thing mentioned in a document", () => {
 
     expect(serialized).toMatchObject({
       type: "entity-mention",
-      entityType: SearchEntityType.counter_group,
+      entityType: SearchEntityType.wiki,
       entityId: 12,
       text: "Summer fete",
     });
-    expect(entityType).toBe(SearchEntityType.counter_group);
+    expect(entityType).toBe(SearchEntityType.wiki);
     expect(entityId).toBe(12);
     expect(text).toBe("Summer fete");
   });

@@ -278,10 +278,6 @@
         "read": "Dateien lesen",
         "write": "Dateien lesen und ändern"
       },
-      "counter_groups": {
-        "read": "Zähler lesen",
-        "write": "Zähler lesen und ändern"
-      },
       "calendars": {
         "read": "Kalender lesen",
         "write": "Kalender lesen und ändern"

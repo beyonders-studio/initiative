@@ -167,9 +167,9 @@ describe("resolveEntityPath", () => {
   });
 
   it("recognises exactly the ref types it can resolve", () => {
-    expect(isEntityRefType("counter-group")).toBe(true);
+    expect(isEntityRefType("wiki")).toBe(true);
     expect(isEntityRefType("calendar-event")).toBe(true);
-    expect(isEntityRefType("counter_group")).toBe(false);
+    expect(isEntityRefType("calendar_event")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
     expect(isEntityRefType("collection")).toBe(true);
   });

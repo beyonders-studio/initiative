@@ -15,7 +15,6 @@ import { type InstalledTool, toolPluginListRoute, toolText } from "@/lib/toolPlu
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
 import { CalendarsView } from "@/pages/community/tools/calendars/CalendarsPage";
 import { ContactsView } from "@/pages/community/tools/contacts/ContactsPage";
-import { CounterGroupsView } from "@/pages/community/tools/counterGroups/CounterGroupsPage";
 import { DashboardsView } from "@/pages/community/tools/dashboards/DashboardsPage";
 import { FilesView } from "@/pages/community/tools/files/FilesPage";
 import { PostsView } from "@/pages/community/tools/posts/PostsPage";
@@ -39,7 +38,6 @@ type ToolViewProps = { fixedInitiativeId: number; canCreate: boolean };
 const TOOL_VIEWS: Record<Tool, ComponentType<ToolViewProps>> = {
   [Tool.project]: ProjectsView,
   [Tool.file]: FilesView,
-  [Tool.counter_group]: CounterGroupsView,
   [Tool.calendar]: CalendarsView,
   [Tool.dashboard]: DashboardsView,
   [Tool.post]: PostsView,
@@ -176,7 +174,7 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   }
 
   // Local Suspense fallback for tab content — keeps the placeholder below the
-  // tabs while a lazily-loaded i18n namespace (events/counters)
+  // tabs while a lazily-loaded i18n namespace (events)
   // resolves, instead of letting the suspension bubble up to a full-page
   // fallback.
   const tabFallback = (

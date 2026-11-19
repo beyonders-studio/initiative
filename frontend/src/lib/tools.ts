@@ -5,12 +5,12 @@
  * generated types). Every derived name follows one rule set, so a tool's
  * entry here is just its icon:
  *
- *   value            "counter_group"          (the enum / resource_type)
- *   plural           "counter_groups"         → permission keys, member flags
- *   kebab plural     "counter-groups"         → route segment, API path
- *   camel plural     "counterGroups"          → i18n namespace, palette group
- *   camel singular   "counterGroup"           → route param name
- *   pascal singular  "CounterGroup"           → nav create-label key
+ *   value            "calendar_event"         (the enum / resource_type)
+ *   plural           "calendar_events"        → permission keys, member flags
+ *   kebab plural     "calendar-events"        → route segment, API path
+ *   camel plural     "calendarEvents"         → i18n namespace, palette group
+ *   camel singular   "calendarEvent"          → route param name
+ *   pascal singular  "CalendarEvent"          → nav create-label key
  *
  * ## Adding a tool
  * 1. Backend: add the `Tool` enum member + wire the registries there
@@ -40,7 +40,6 @@ import {
   BookUser,
   CalendarDays,
   Files,
-  Gauge,
   LayoutDashboard,
   ListTodo,
   type LucideIcon,
@@ -58,7 +57,6 @@ import records from "@/api/generated/tools.json";
 export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.project]: ListTodo,
   [Tool.file]: Files,
-  [Tool.counter_group]: Gauge,
   [Tool.calendar]: CalendarDays,
   [Tool.dashboard]: LayoutDashboard,
   [Tool.post]: Megaphone,
@@ -118,8 +116,7 @@ export const fileTypeExportFormats = (type: FileType): readonly string[] =>
 /** What a report may write each type of file in, in the order offered. */
 export const FILE_TYPE_REPORT_FORMATS = records.tools.file.type_report_formats;
 
-/** The tools whose every instance lays out its own items (a project's, a
- *  counter group's). */
+/** The tools whose every instance lays out its own items (a project's). */
 export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set(
   TOOLS.filter((tool) => {
     const layouts = TOOL_RECORDS[tool].layouts;
@@ -217,7 +214,6 @@ export const SIDEBAR_TOOLS: Tool[] = [
   Tool.dashboard,
   Tool.file,
   Tool.post,
-  Tool.counter_group,
   Tool.wiki,
   Tool.project,
 ];
@@ -227,7 +223,7 @@ export const SIDEBAR_TOOLS: Tool[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * "counter_group" → "counter_groups", "collection" → "collections".
+ * "calendar_event" → "calendar_events", "collection" → "collections".
  *
  * One rule, mirrored from the backend's `Tool.plural`: a trailing `y` after a
  * consonant becomes `ies`, and everything else takes an `s`.
@@ -237,15 +233,15 @@ export const toolPlural = (tool: Tool | ChildKind): string =>
 
 /**
  * Inverse of {@link toolPlural} for any table-ish plural the bus names —
- * "collections" → "collection", "counter_groups" → "counter_group". The one
+ * "collections" → "collection", "calendar_events" → "calendar_event". The one
  * spelling rule, read backwards, so a resource type is never singularized by
  * chopping an `s` off.
  */
 export const singularOf = (plural: string): string =>
   plural.endsWith("ies") ? `${plural.slice(0, -3)}y` : plural.replace(/s$/, "");
 
-/** "counter_group" → "counter-groups" — route segment AND API path segment.
- *  A child kind's API path follows the same rule ("calendar_event" →
+/** "calendar" → "calendars" — route segment AND API path segment. A child
+ *  kind's API path follows the same rule ("calendar_event" →
  *  "calendar-events"). */
 export const toolRouteSegment = (tool: Tool | ChildKind): string =>
   toolPlural(tool).replaceAll("_", "-");
@@ -273,24 +269,25 @@ export const toolInPath = (pathname: string): { tool: Tool; id: number } | null 
   return null;
 };
 
-/** "counter_group" → "counterGroups" — i18n namespace, palette group key. */
+/** "calendar" → "calendars" — i18n namespace, palette group key. An
+ *  underscore starts a capital, as "calendar_event" → "calendarEvents". */
 export const toolCamelPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "counterGroup" — the stem of the route param name. */
+/** "calendar" → "calendar" — the stem of the route param name. */
 export const toolCamelSingular = (tool: Tool): string =>
   tool.replace(/_(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "CounterGroup" */
+/** "calendar" → "Calendar" */
 export const toolPascalSingular = (tool: Tool): string =>
   tool.replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "CounterGroups", "post" → "Posts" — the stem of
+/** "calendar" → "Calendars", "post" → "Posts" — the stem of
  *  the per-tool permission label keys. */
 export const toolPascalPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** Resource-relative API path (WITHOUT the `/c/{communityId}` segment), e.g. "/api/v1/counter-groups".
+/** Resource-relative API path (WITHOUT the `/c/{communityId}` segment), e.g. "/api/v1/calendars".
  *  Callers must prepend `/api/v1/c/${communityId}` when building community-scoped requests. */
 export const toolApiPath = (tool: Tool): string => `/api/v1/${toolRouteSegment(tool)}`;
 
@@ -311,7 +308,7 @@ export const initiativeRoute = (initiativeId: number): string =>
 
 /**
  * Community-relative list route for a tool inside one initiative — which is also
- * the initiative page with that tool's tab selected, e.g. "/i/12/counter-groups".
+ * the initiative page with that tool's tab selected, e.g. "/i/12/calendars".
  *
  * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars and contacts
  * are the tools that have any (one a community plug-in holds has no
@@ -323,11 +320,11 @@ export const toolListRoute = (tool: Tool, initiativeId: number | null): string =
     ? `/${toolRouteSegment(tool)}`
     : `${initiativeRoute(initiativeId)}/${toolRouteSegment(tool)}`;
 
-/** Community-relative detail route for one entity, e.g. "/i/12/counter-groups/3". */
+/** Community-relative detail route for one entity, e.g. "/i/12/calendars/3". */
 export const toolDetailRoute = (tool: Tool, initiativeId: number | null, id: number): string =>
   `${toolListRoute(tool, initiativeId)}/${id}`;
 
-/** Community-relative settings route, e.g. "/i/12/counter-groups/3/settings". */
+/** Community-relative settings route, e.g. "/i/12/calendars/3/settings". */
 export const toolSettingsRoute = (tool: Tool, initiativeId: number | null, id: number): string =>
   `${toolDetailRoute(tool, initiativeId, id)}/settings`;
 
@@ -349,7 +346,7 @@ export type ToolSettingsSection = (typeof TOOL_SETTINGS_SECTIONS)[number];
 const TOOL_SETTINGS_DEFAULT_SECTION: ToolSettingsSection = "details";
 
 /** Community-relative route for one section of a tool's settings, e.g.
- *  "/i/12/counter-groups/3/settings/access". */
+ *  "/i/12/calendars/3/settings/access". */
 export const toolSettingsSectionRoute = (
   tool: Tool,
   initiativeId: number | null,
@@ -362,7 +359,7 @@ export const toolSettingsSectionRoute = (
 
 // --- The tools with a child entity -----------------------------------------
 // Stated here once rather than left to each page: a task belongs to a project,
-// an event to a calendar, a counter to its group, a page to its wiki, and each
+// an event to a calendar, a page to its wiki, and each
 // child nests under its parent so the URL reads end to end.
 
 /** e.g. "/i/1/projects/2/tasks/5". */
@@ -375,13 +372,6 @@ export const eventRoute = (
   calendarId: number,
   eventId: number
 ): string => `${toolDetailRoute(Tool.calendar, initiativeId, calendarId)}/events/${eventId}`;
-
-/** e.g. "/i/1/counter-groups/3/counter/7". */
-export const counterRoute = (
-  initiativeId: number | null,
-  groupId: number,
-  counterId: number
-): string => `${toolDetailRoute(Tool.counter_group, initiativeId, groupId)}/counter/${counterId}`;
 
 /**
  * e.g. "/i/1/files/collections/5": a collection, which is in the initiative's
@@ -422,11 +412,11 @@ export const wikiFileRoute = (
  */
 export const entityRefRoute = (refType: string, id: number): string => `/go/${refType}/${id}`;
 
-/** "counter_group" → "counter-group". The KEBAB SINGULAR: envelope
+/** "calendar" → "calendar". The KEBAB SINGULAR: envelope
  * discriminator and entity-ref segment. */
 export const toolKebabSingular = (tool: Tool): string => tool.replaceAll("_", "-");
 
-/** Export endpoint (relative to /c/{communityId}), e.g. "/exports/counter_group".
+/** Export endpoint (relative to /c/{communityId}), e.g. "/exports/calendar".
  * It takes the selection as `ids`. */
 export const toolExportEndpoint = (tool: Tool): string => `/exports/${tool}`;
 
@@ -439,13 +429,13 @@ export const toolEnvelopeType = (tool: Tool): string => `initiative-${toolKebabS
 export const toolForEnvelopeType = (type: string): Tool | null =>
   BULK_EXPORT_TOOLS.find((tool) => toolEnvelopeType(tool) === type) ?? null;
 
-/** nav.json label key, e.g. "counterGroups". Typed against the nav namespace
+/** nav.json label key, e.g. "calendars". Typed against the nav namespace
  * so `t(toolNavLabelKey(tool))` satisfies typed i18next — the drift test
  * asserts the key actually exists for every tool. */
 export const toolNavLabelKey = (tool: Tool): ParseKeys<"nav"> =>
   toolCamelPlural(tool) as ParseKeys<"nav">;
 
-/** nav.json create-label key, e.g. "createCounterGroup". */
+/** nav.json create-label key, e.g. "createCalendar". */
 export const toolCreateLabelKey = (tool: Tool): ParseKeys<"nav"> =>
   `create${toolPascalSingular(tool)}` as ParseKeys<"nav">;
 
@@ -466,12 +456,12 @@ export const kindNames = (
 });
 
 /** Role permission key gating viewing a tool, by kind: a built-in tool's,
- *  e.g. "counter_groups_enabled", or a tool plug-in's, "<kind>:enabled". */
+ *  e.g. "calendars_enabled", or a tool plug-in's, "<kind>:enabled". */
 export const toolViewPermission = (kind: string): string =>
   isBuiltInTool(kind) ? `${toolPlural(kind)}_enabled` : `${kind}:enabled`;
 
 /** Role permission key gating creating in a tool, by kind: a built-in tool's,
- *  e.g. "create_counter_groups", or a tool plug-in's, "<kind>:create". */
+ *  e.g. "create_calendars", or a tool plug-in's, "<kind>:create". */
 export const toolCreatePermission = (kind: string): string =>
   isBuiltInTool(kind) ? `create_${toolPlural(kind)}` : `${kind}:create`;
 
@@ -506,8 +496,7 @@ export type ChildKind = keyof typeof records.child_kinds;
  * The tool an entity that is not one of its own is addressed inside.
  *
  * A link is cached against a TOOL, so writing one from a child has to refresh
- * the container's copy: a task's is its project, an event's its calendar, a
- * counter's its group.
+ * the container's copy: a task's is its project, an event's its calendar.
  */
 export const PARENT_TOOL = Object.fromEntries(
   Object.entries(records.child_kinds).map(([kind, { parent }]) => [kind, parent])

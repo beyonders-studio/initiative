@@ -66,10 +66,10 @@ export {
   resetCounter as resetPropertyCounter,
 } from "./properties";
 export {
-  buildRecentCounterGroupItem,
   buildRecentFileItem,
   buildRecentItem,
   buildRecentProjectItem,
+  buildRecentWikiItem,
   resetRecentCounter,
 } from "./recent.factory";
 export {

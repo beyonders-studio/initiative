@@ -334,11 +334,6 @@
       "this": "this file",
       "plural": "files"
     },
-    "counter_group": {
-      "name": "Counter group",
-      "this": "this counter group",
-      "plural": "counter groups"
-    },
     "calendar": {
       "name": "Calendar",
       "this": "this calendar",
@@ -373,11 +368,6 @@
       "name": "Event",
       "this": "this event",
       "plural": "events"
-    },
-    "counter": {
-      "name": "Counter",
-      "this": "this counter",
-      "plural": "counters"
     },
     "wiki_page": {
       "name": "Page",

@@ -231,24 +231,6 @@
   "sectionHelp": "Mit Titel lässt er sich auf- und zuklappen; ohne ist er eine Box.",
   "tab": "Layouts",
   "settingsDescription": "Wie es anordnet, was es enthält: jedes Layout, wann es zuletzt geändert wurde, und der Weg in den Editor. Alle, die es öffnen können, sehen sie; was jede Person filtert und sortiert, gehört ihr.",
-  "counterDetail": {
-    "name": "Zähler-Detailansicht",
-    "help": "Wie jeder Zähler dieser Gruppe beim Öffnen zum Bearbeiten angezeigt wird. Was es weglässt, ist ausgeblendet.",
-    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Gruppe.",
-    "titleHelp": "Jeder Zähler zeigt seinen Namen.",
-    "hiddenHelp": "Jeder Zähler kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
-    "parts": {
-      "actions": "Menü",
-      "relations": "Beziehungen",
-      "count": "Stand"
-    },
-    "partHelp": {
-      "actions": "Was sonst mit dem Zähler möglich ist: zurücksetzen.",
-      "relations": "Womit der Zähler verknüpft ist.",
-      "count": "Sein Stand, schrittweise oder gesetzt."
-    },
-    "noItems": "Füge der Gruppe einen Zähler hinzu, um hier sein Layout zu sehen."
-  },
   "fileDetail": {
     "name": "Dateiseite",
     "help": "Wie eine aus dieser Sammlung geöffnete Datei angezeigt wird, neben ihrem Bild oder neben der Sammlung, sobald die Sammlung eigene Eigenschaften hat. Was es weglässt, ist ausgeblendet.",

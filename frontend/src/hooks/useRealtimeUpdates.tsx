@@ -86,8 +86,6 @@ const RESOURCE_SPECS: Record<string, (id: number, recount: boolean) => Spec[]> =
   // moved is a question about the parent, below.
   comments: () => [q.recentComments()],
   calendar_events: (id) => [q.calendarEvent(id), q.allCalendarEvents()],
-  // Their own reads, which an opened item shows; the tool is named as parent.
-  counters: (id) => [q.counter(id)],
   // The wiki it is in is named as its parent, which refreshes the tree.
   wiki_pages: (id) => [q.wikiPage(id)],
   // A collection is in no one tool instance, so it names its own reads.

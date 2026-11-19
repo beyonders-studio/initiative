@@ -278,10 +278,6 @@
         "read": "Leer archivos",
         "write": "Leer y cambiar archivos"
       },
-      "counter_groups": {
-        "read": "Leer contadores",
-        "write": "Leer y cambiar contadores"
-      },
       "calendars": {
         "read": "Leer calendarios",
         "write": "Leer y cambiar calendarios"

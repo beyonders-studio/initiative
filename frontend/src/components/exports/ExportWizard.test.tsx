@@ -26,7 +26,7 @@ const ESTIMATE = {
   tools: {
     project: { count: 3, disabled: false },
     file: { count: 5, disabled: false },
-    counter_group: { count: 2, disabled: false },
+    dashboard: { count: 2, disabled: false },
     calendar: { count: 4, disabled: false },
     wiki: { count: 0, disabled: true },
   },
@@ -101,15 +101,15 @@ describe("ExportWizard", () => {
     // Uploads footprint from the estimate, human-formatted.
     expect(screen.getByText(/2\.4 MB/)).toBeInTheDocument();
 
-    // Exclude counters, keep uploads on.
-    await userEvent.click(screen.getByRole("switch", { name: /counters/i }));
+    // Exclude dashboards, keep uploads on.
+    await userEvent.click(screen.getByRole("switch", { name: /dashboards/i }));
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
 
     // The confirm summary matches the payload: the deselected tool AND the
     // disabled tool (Wikis) are absent from the "will export" list.
     const summary = screen.getByText(/files ·/i, { selector: "p" });
     expect(summary.textContent).not.toMatch(/wikis/i);
-    expect(summary.textContent).not.toMatch(/counters/i);
+    expect(summary.textContent).not.toMatch(/dashboards/i);
     expect(summary.textContent).toMatch(/projects/i);
 
     await userEvent.click(screen.getByRole("button", { name: /start export/i }));
@@ -121,7 +121,7 @@ describe("ExportWizard", () => {
     expect(JSON.parse(params.get("include")!)).toMatchObject({
       project: true,
       file: true,
-      counter_group: false,
+      dashboard: false,
       // Disabled tools submit as excluded — matching their locked-off switch.
       wiki: false,
     });
@@ -561,7 +561,7 @@ describe("ExportWizard", () => {
   it("goes from format to confirm for a tool whose content has no filter", async () => {
     let sent: URLSearchParams | null = null;
     server.use(
-      communityHttp.get("/exports/counter_group", ({ request }) => {
+      communityHttp.get("/exports/contact", ({ request }) => {
         sent = new URL(request.url).searchParams;
         return new HttpResponse("a,b", { headers: { "Content-Type": "text/csv" } });
       })
@@ -574,10 +574,10 @@ describe("ExportWizard", () => {
       <ExportWizard
         scope={{
           kind: "entities",
-          tool: Tool.counter_group,
+          tool: Tool.contact,
           ids: [7],
-          formats: TOOL_EXPORT_FORMATS[Tool.counter_group] ?? [],
-          filenameStem: "counter-groups",
+          formats: TOOL_EXPORT_FORMATS[Tool.contact] ?? [],
+          filenameStem: "contacts",
           extraActions: [{ labelKey: "export.formatPng", onSelect: drawPicture }],
         }}
         open

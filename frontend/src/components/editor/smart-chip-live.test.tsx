@@ -21,7 +21,7 @@ import { Editor } from "@/components/editor/editor";
 
 /** A document holding one chip. */
 const documentWithAChip = (
-  chipKind = "counter:value",
+  chipKind = "project:progress",
   entityId = 4,
   text = "Launch signups"
 ): SerializedEditorState =>
@@ -72,13 +72,13 @@ describe("a smart chip in a real document", () => {
       communityHttp.post("/smart-chips/", async ({ request }) => {
         const { refs } = (await request.json()) as { refs: string[] };
         // One reference per chip: the answer names its own thing.
-        expect(refs).toEqual(["counter:4:value"]);
+        expect(refs).toEqual(["project:4:progress"]);
         return HttpResponse.json({
           items: [
             {
-              ref: "counter:4:value",
-              entity_type: "counter",
-              aspect: "value",
+              ref: "project:4:progress",
+              entity_type: "project",
+              aspect: "progress",
               text: "42 / 100",
               title: "Launch signups",
               tone: "neutral",

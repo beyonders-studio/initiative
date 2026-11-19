@@ -54,15 +54,6 @@ import {
   updateContact,
 } from "@/api/generated/contacts/contacts";
 import {
-  createCounterGroup,
-  deleteCounterGroup,
-  duplicateCounterGroup,
-  getListCounterGroupsQueryOptions,
-  getReadCounterGroupQueryOptions,
-  setCounterGroupGrants,
-  updateCounterGroup,
-} from "@/api/generated/counters/counters";
-import {
   createDashboard,
   deleteDashboard,
   duplicateDashboard,
@@ -90,7 +81,6 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   getListMyCalendarsQueryOptions,
   getListMyContactsQueryOptions,
-  getListMyCounterGroupsQueryOptions,
   getListMyDashboardsQueryOptions,
   getListMyFilesQueryOptions,
   getListMyPostsQueryOptions,
@@ -448,18 +438,6 @@ const contactEndpoints = {
   tool: Tool.contact,
 };
 
-const counterGroupEndpoints = {
-  listQuery: getListCounterGroupsQueryOptions,
-  myListQuery: getListMyCounterGroupsQueryOptions,
-  detailQuery: getReadCounterGroupQueryOptions,
-  create: createCounterGroup,
-  update: updateCounterGroup,
-  remove: deleteCounterGroup,
-  setGrants: setCounterGroupGrants,
-  duplicate: duplicateCounterGroup,
-  tool: Tool.counter_group,
-};
-
 const dashboardEndpoints = {
   listQuery: getListDashboardsQueryOptions,
   myListQuery: getListMyDashboardsQueryOptions,
@@ -578,7 +556,6 @@ interface ToolQueries {
 export const TOOL_HOOKS = {
   [Tool.project]: makeToolHooks(projectEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.file]: fileHooks,
-  [Tool.counter_group]: makeToolHooks(counterGroupEndpoints),
   [Tool.calendar]: makeToolHooks(calendarEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.dashboard]: makeToolHooks(dashboardEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.post]: makeToolHooks(postEndpoints, {

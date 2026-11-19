@@ -100,8 +100,6 @@
     "resource_project_other": "projects",
     "resource_file_one": "file",
     "resource_file_other": "files",
-    "resource_counter_group_one": "counter group",
-    "resource_counter_group_other": "counter groups",
     "resource_calendar_one": "calendar",
     "resource_calendar_other": "calendars",
     "resource_dashboard_one": "dashboard",

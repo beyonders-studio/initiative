@@ -16,7 +16,6 @@ import type { ReactNode } from "react";
 import type {
   CalendarListResponse,
   ContactListResponse,
-  CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
   PostListResponse,
@@ -57,7 +56,6 @@ export interface ToolRow {
 export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.project]: true,
   [Tool.file]: true,
-  [Tool.counter_group]: false,
   [Tool.calendar]: true,
   [Tool.dashboard]: true,
   [Tool.post]: true,
@@ -79,7 +77,6 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
 export type ToolResponses = {
   [Tool.project]: ProjectListResponse | undefined;
   [Tool.file]: FileListResponse | undefined;
-  [Tool.counter_group]: CounterGroupListResponse | undefined;
   [Tool.calendar]: CalendarListResponse | undefined;
   [Tool.dashboard]: DashboardListResponse | undefined;
   [Tool.post]: PostListResponse | undefined;
@@ -167,17 +164,6 @@ export function buildToolRows(
         tags: file.tags,
         updatedAt: file.updated_at,
         detail: <Badge variant="secondary">{t(`detail.fileKind.${file.kind}`)}</Badge>,
-      }));
-    case Tool.counter_group:
-      return (data[Tool.counter_group]?.items ?? []).map((group) => ({
-        id: group.id,
-        communityId: group.community_id ?? fallbackCommunityId,
-        name: group.name,
-        href: href(group.id, group.initiative_id),
-        glyph: null,
-        initiativeId: group.initiative_id,
-        tags: group.tags,
-        updatedAt: group.updated_at,
       }));
     case Tool.calendar:
       return (data[Tool.calendar]?.items ?? []).map((calendar) => ({

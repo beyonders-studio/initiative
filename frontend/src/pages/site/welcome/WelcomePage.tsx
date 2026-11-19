@@ -58,7 +58,7 @@ const HERO_COMMUNITIES: ExampleCommunity[] = [
     initials: "TD",
     color: "#7c3aed",
     members: 6,
-    tools: [Tool.calendar, Tool.wiki, Tool.counter_group],
+    tools: [Tool.calendar, Tool.wiki, Tool.file],
     activity: Tool.calendar,
     centered: true,
   },
@@ -77,8 +77,8 @@ const HERO_COMMUNITIES: ExampleCommunity[] = [
     initials: "HP",
     color: "#dc2626",
     members: 38,
-    tools: [Tool.counter_group, Tool.post, Tool.project],
-    activity: Tool.counter_group,
+    tools: [Tool.project, Tool.post, Tool.calendar],
+    activity: Tool.project,
   },
 ];
 

@@ -21,7 +21,6 @@ import {
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadContactQueryKey, readContact } from "@/api/generated/contacts/contacts";
-import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
 import {
   getReadCollectionQueryKey,
@@ -79,10 +78,6 @@ const TOOL_READS: Record<
     key: getReadFileQueryKey,
     read: readFile,
   },
-  [Tool.counter_group]: {
-    key: getReadCounterGroupQueryKey,
-    read: readCounterGroup,
-  },
   [Tool.calendar]: {
     key: getReadCalendarQueryKey,
     read: readCalendar,
@@ -122,8 +117,7 @@ type Resolve = (read: Read, communityId: number, id: number) => Promise<string>;
 
 /**
  * The kinds that live inside a tool and can be read by their own id, keyed by
- * the child-kind registry ({@link PARENT_TOOL}). A counter is read by id
- * (`/counters/{id}`), but nothing links to one yet.
+ * the child-kind registry ({@link PARENT_TOOL}).
  */
 const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
   task: async (read, communityId, id) => {
@@ -160,7 +154,7 @@ const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
 
 /**
  * What `/go/{refType}/{id}` can resolve, by ref type: every tool and every
- * child kind above, each named by its kebab singular (`counter-group`,
+ * child kind above, each named by its kebab singular (`calendar`,
  * `calendar-event`). Derived from the tool registry and the child kinds, so a
  * new tool is addressable here the day it exists.
  */
@@ -226,7 +220,7 @@ export const isSearchEntityType = (value: string): value is SearchEntityType =>
 
 /**
  * The ref type addressing an entity of a given kind — its kebab singular — or
- * `null` for a kind that has no address of its own (a counter, a tag).
+ * `null` for a kind that has no address of its own (a tag).
  */
 export const entityRefTypeFor = (type: SearchEntityType): string | null => {
   const kebab = type.replaceAll("_", "-");

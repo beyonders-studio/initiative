@@ -8,8 +8,8 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 
 import { BookmarkButton } from "./BookmarkButton";
 
-const bookmarkedCounterGroup = {
-  entity_type: "counter_group",
+const bookmarkedWiki = {
+  entity_type: "wiki",
   entity_id: 7,
   community_id: 3,
   initiative_id: 2,
@@ -24,17 +24,17 @@ const bookmarkedCounterGroup = {
 describe("BookmarkButton", () => {
   it("reads its bookmark from the community's list and bookmarks a tool of any kind", async () => {
     const user = userEvent.setup();
-    let bookmarks: (typeof bookmarkedCounterGroup)[] = [];
+    let bookmarks: (typeof bookmarkedWiki)[] = [];
     const written: string[] = [];
     server.use(
       http.get("/api/v1/c/3/personal-items", () => HttpResponse.json(bookmarks)),
       http.put("/api/v1/c/3/personal-items/bookmark/:tool/:id", ({ params }) => {
         written.push(`${params.tool}/${params.id}`);
-        bookmarks = [bookmarkedCounterGroup];
+        bookmarks = [bookmarkedWiki];
         return new HttpResponse(null, { status: 204 });
       })
     );
-    renderWithProviders(<BookmarkButton tool="counter_group" entityId={7} name="Summer fete" />, {
+    renderWithProviders(<BookmarkButton tool="wiki" entityId={7} name="Summer fete" />, {
       communities: { activeCommunityId: 3 },
     });
 
@@ -47,7 +47,7 @@ describe("BookmarkButton", () => {
       "aria-pressed",
       "true"
     );
-    expect(written).toEqual(["counter_group/7"]);
+    expect(written).toEqual(["wiki/7"]);
   });
 
   it("puts the bookmark back when bookmarking fails", async () => {
@@ -92,7 +92,7 @@ describe("BookmarkButton", () => {
         return new HttpResponse(null, { status: 204 });
       })
     );
-    renderWithProviders(<BookmarkButton tool="counter_group" entityId={7} />, {
+    renderWithProviders(<BookmarkButton tool="wiki" entityId={7} />, {
       communities: { activeCommunityId: 3 },
     });
 

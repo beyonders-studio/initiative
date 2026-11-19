@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, counter groups or dashboards.
+ * projects, files, wikis or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -92,7 +92,6 @@ import {
   toolViews,
 } from "@/lib/tools";
 import { useContactColumns } from "@/pages/community/tools/contacts/contactColumns";
-import { CounterGroupCard } from "@/pages/community/tools/counterGroups/CounterGroupCard";
 import { DashboardCard } from "@/pages/community/tools/dashboards/DashboardCard";
 import { FileCard } from "@/pages/community/tools/files/FileCard";
 import { CreateProjectDialog } from "@/pages/community/tools/projects/CreateProjectDialog";
@@ -184,7 +183,7 @@ export type ToolIndexEntry = {
   /**
    * The keys this tool spells its own way — the page's and its create
    * dialog's. Kept per tool rather than folded into one generic string: "No
-   * counter groups match your filters" is written in four locales already, and
+   * dashboards match your filters" is written in four locales already, and
    * a shared wording would be a fifth thing to translate that says less.
    * They are in the tool's own namespace, `toolCamelPlural(tool)`.
    */
@@ -401,21 +400,6 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
         onDone={onDone}
       />
     ),
-  },
-
-  [Tool.counter_group]: {
-    useList: makeRows(
-      TOOL_HOOKS[Tool.counter_group].useList,
-      (group) => <CounterGroupCard group={group} />,
-      WITH_PREVIEW
-    ),
-    text: {
-      create: "createGroup",
-      createDescription: "noGroupsDescription",
-      noMatches: "filters.noMatchingGroups",
-      emptyTitle: "noGroups",
-      emptyBody: "noGroupsDescription",
-    },
   },
 
   [Tool.dashboard]: {

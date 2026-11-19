@@ -11,7 +11,6 @@ import { StatusMessage } from "@/ui/status-message";
 type AccessKeys =
   | "calendars:"
   | "contacts:"
-  | "counterGroups:"
   | "dashboards:"
   | "files:collections."
   | "files:detail."

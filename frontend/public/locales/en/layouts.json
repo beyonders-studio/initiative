@@ -231,24 +231,6 @@
   "sectionHelp": "With a title it opens and closes; without one it's a box.",
   "tab": "Layouts",
   "settingsDescription": "How it lays out what it holds: each layout, when it was last changed, and the way into the editor. Everyone who can open it sees them; what each person filters and sorts by is their own.",
-  "counterDetail": {
-    "name": "Counter detail",
-    "help": "How every counter in this group is shown when it's opened to edit. What it leaves out is hidden.",
-    "shipped": "This is the layout as shipped. Changing it makes it the group's own.",
-    "titleHelp": "Every counter shows its name.",
-    "hiddenHelp": "Every counter can show this. Taken off, it is hidden, and Add puts it back.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations",
-      "count": "Count"
-    },
-    "partHelp": {
-      "actions": "What else can be done with the counter: reset it.",
-      "relations": "What the counter is linked to.",
-      "count": "Its count, stepped or set."
-    },
-    "noItems": "Add a counter to the group to see its layout here."
-  },
   "fileDetail": {
     "name": "File page",
     "help": "How a file opened from this collection is shown, beside its picture or beside the collection, once the collection has properties of its own. What it leaves out is hidden.",

@@ -53,7 +53,7 @@ const renderSection = (arrived: ToolSettingsEntity) => {
         </button>
         <ToolSettingsProvider
           value={{
-            tool: Tool.counter_group,
+            tool: Tool.wiki,
             entity,
             update: noopMutation(),
             setGrants: noopMutation(),

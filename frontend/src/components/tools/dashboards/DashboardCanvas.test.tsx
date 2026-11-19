@@ -43,14 +43,14 @@ const catalog = {
       min_h: 2,
       default_w: 3,
       default_h: 2,
-      sources: ["counter"],
+      sources: ["query"],
       options: [],
     },
   ],
   presets: [],
 } as unknown as WidgetCatalog;
 
-const withStat = (): DashboardDefinition => addWidget(EMPTY_DEFINITION, catalog, "stat", "counter");
+const withStat = (): DashboardDefinition => addWidget(EMPTY_DEFINITION, catalog, "stat", "query");
 
 const render = (
   definition: DashboardDefinition,

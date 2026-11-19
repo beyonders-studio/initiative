@@ -2,7 +2,6 @@ import {
   CalendarClock,
   CircleDot,
   Flag,
-  Gauge,
   ListChecks,
   Mail,
   Phone,
@@ -52,11 +51,6 @@ export const SMART_CHIP_MENU: Record<
     labelKey: "smartChips.taskChecklist",
     icon: <SquareCheck className="size-4" />,
     keywords: ["checklist", "checkbox", "tick", "todo", "done", "attendance", "task", "chip"],
-  },
-  [SmartChipKind["counter:value"]]: {
-    labelKey: "smartChips.counterValue",
-    icon: <Gauge className="size-4" />,
-    keywords: ["counter", "count", "number", "value", "chip"],
   },
   [SmartChipKind["project:progress"]]: {
     labelKey: "smartChips.projectProgress",

@@ -334,11 +334,6 @@
       "this": "ce fichier",
       "plural": "fichiers"
     },
-    "counter_group": {
-      "name": "Groupe de compteurs",
-      "this": "ce groupe de compteurs",
-      "plural": "groupes de compteurs"
-    },
     "calendar": {
       "name": "Calendrier",
       "this": "ce calendrier",
@@ -373,11 +368,6 @@
       "name": "Événement",
       "this": "cet événement",
       "plural": "événements"
-    },
-    "counter": {
-      "name": "Compteur",
-      "this": "ce compteur",
-      "plural": "compteurs"
     },
     "wiki_page": {
       "name": "Page",

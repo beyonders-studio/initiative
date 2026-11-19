@@ -66,7 +66,7 @@ describe("ToolRelationsPanel", () => {
   it("draws nothing while the row is still arriving", () => {
     noLinks();
     const { container } = renderPage(
-      () => <ToolRelationsPanel tool={Tool.counter_group} entity={undefined} canEdit />,
+      () => <ToolRelationsPanel tool={Tool.dashboard} entity={undefined} canEdit />,
       { initialRoute: "/c/1" }
     );
 

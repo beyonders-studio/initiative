@@ -334,11 +334,6 @@
       "this": "este archivo",
       "plural": "archivos"
     },
-    "counter_group": {
-      "name": "Grupo de contadores",
-      "this": "este grupo de contadores",
-      "plural": "grupos de contadores"
-    },
     "calendar": {
       "name": "Calendario",
       "this": "este calendario",
@@ -373,11 +368,6 @@
       "name": "Evento",
       "this": "este evento",
       "plural": "eventos"
-    },
-    "counter": {
-      "name": "Contador",
-      "this": "este contador",
-      "plural": "contadores"
     },
     "wiki_page": {
       "name": "Página",

@@ -57,7 +57,7 @@ const catalog = {
       min_h: 2,
       default_w: 3,
       default_h: 2,
-      sources: ["counter"],
+      sources: ["query"],
       options: [],
     },
   ],
@@ -87,7 +87,7 @@ const setup = (canEdit = true) => {
     /** What a refetch after a successful save does. */
     refetch: () => rendered.rerender({ dashboard: asDashboard(server) }),
     settle: () => act(() => vi.advanceTimersByTime(SAVE_DEBOUNCE_MS)),
-    add: () => act(() => rendered.result.current.addWidget("stat", "counter")),
+    add: () => act(() => rendered.result.current.addWidget("stat", "query")),
     widgets: () => rendered.result.current.definition.widgets,
   };
 };

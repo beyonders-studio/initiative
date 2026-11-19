@@ -334,11 +334,6 @@
       "this": "diese Datei",
       "plural": "Dateien"
     },
-    "counter_group": {
-      "name": "Zählergruppe",
-      "this": "diese Zählergruppe",
-      "plural": "Zählergruppen"
-    },
     "calendar": {
       "name": "Kalender",
       "this": "diesen Kalender",
@@ -373,11 +368,6 @@
       "name": "Termin",
       "this": "diesen Termin",
       "plural": "Termine"
-    },
-    "counter": {
-      "name": "Zähler",
-      "this": "diesen Zähler",
-      "plural": "Zähler"
     },
     "wiki_page": {
       "name": "Seite",

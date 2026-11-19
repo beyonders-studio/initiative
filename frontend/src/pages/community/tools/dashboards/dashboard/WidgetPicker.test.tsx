@@ -107,8 +107,8 @@ describe("WidgetPicker", () => {
     await user.click(within(list()).getByRole("button", { name: /^Chart/ }));
     await user.click(screen.getByRole("button", { name: /^Add Chart$/ }));
 
-    // Not `counter_group`, which comes first alphabetically but would land the
-    // widget on "choose what this shows".
+    // Not the first source alphabetically, which would land the widget on
+    // "choose what this shows".
     expect(onAdd).toHaveBeenCalledWith("chart", "query", undefined);
   });
 

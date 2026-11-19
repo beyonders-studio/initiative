@@ -70,7 +70,7 @@ const noopMutation = () => ({ mutate: vi.fn(), isPending: false });
 const renderSection = (
   Section: React.ComponentType,
   entity: ToolSettingsEntity,
-  tool: Tool = Tool.counter_group,
+  tool: Tool = Tool.contact,
   template?: ToolMutation<{ is_template: boolean }>
 ) =>
   renderPage(() => (
@@ -318,7 +318,7 @@ describe("AdvancedPage", () => {
     resetFactories();
     let sent: { format: string | null; ids: string | null } | null = null;
     server.use(
-      communityHttp.get("/exports/counter_group", ({ request }) => {
+      communityHttp.get("/exports/contact", ({ request }) => {
         const url = new URL(request.url);
         sent = {
           format: url.searchParams.get("format"),
@@ -339,7 +339,7 @@ describe("AdvancedPage", () => {
 
   it("copies it into the initiative chosen, the suggested name following the choice", async () => {
     resetFactories();
-    const can = initiativeCan({ create: [Tool.counter_group] });
+    const can = initiativeCan({ create: [Tool.contact] });
     let sent: unknown = null;
     server.use(
       communityHttp.get("/initiatives/", () =>
@@ -348,12 +348,12 @@ describe("AdvancedPage", () => {
           buildInitiative({ id: 4, name: "There", can }),
         ])
       ),
-      communityHttp.post("/counter-groups/:groupId/duplicate", async ({ request }) => {
+      communityHttp.post("/contacts/:contactId/duplicate", async ({ request }) => {
         sent = await request.json();
         return HttpResponse.json({ id: 8, initiative_id: 4 }, { status: 201 });
       })
     );
-    renderSection(AdvancedPage, buildEntity(), Tool.counter_group);
+    renderSection(AdvancedPage, buildEntity(), Tool.contact);
 
     await userEvent.click(await screen.findByRole("button", { name: "Duplicate" }));
     const dialog = await screen.findByRole("dialog");
@@ -368,7 +368,7 @@ describe("AdvancedPage", () => {
 
   it("copies an initiative that keeps its content in only beside itself", async () => {
     resetFactories();
-    const can = initiativeCan({ create: [Tool.counter_group] });
+    const can = initiativeCan({ create: [Tool.contact] });
     const here = buildInitiative({ id: 3, name: "Here", can, keep_content_in: true });
     server.use(
       communityHttp.get("/initiatives/", () =>
@@ -376,7 +376,7 @@ describe("AdvancedPage", () => {
       ),
       communityHttp.get("/initiatives/:id", () => HttpResponse.json(here))
     );
-    renderSection(AdvancedPage, buildEntity(), Tool.counter_group);
+    renderSection(AdvancedPage, buildEntity(), Tool.contact);
 
     await userEvent.click(await screen.findByRole("button", { name: "Duplicate" }));
     const dialog = await screen.findByRole("dialog");

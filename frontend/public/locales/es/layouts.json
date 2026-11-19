@@ -231,24 +231,6 @@
   "sectionHelp": "Con título se abre y se cierra; sin él es una caja.",
   "tab": "Diseños",
   "settingsDescription": "Cómo dispone lo que contiene: cada diseño, cuándo cambió por última vez y el acceso al editor. Todos los que pueden abrirlo los ven; lo que cada persona filtra y ordena es suyo.",
-  "counterDetail": {
-    "name": "Detalle del contador",
-    "help": "Cómo se muestra cada contador de este grupo al abrirlo para editarlo. Lo que deja fuera queda oculto.",
-    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el del grupo.",
-    "titleHelp": "Cada contador muestra su nombre.",
-    "hiddenHelp": "Cada contador puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
-    "parts": {
-      "actions": "Menú",
-      "relations": "Relaciones",
-      "count": "Cuenta"
-    },
-    "partHelp": {
-      "actions": "Qué más se puede hacer con el contador: reiniciarlo.",
-      "relations": "Con qué está vinculado el contador.",
-      "count": "Su cuenta, a pasos o fijada."
-    },
-    "noItems": "Añade un contador al grupo para ver aquí su diseño."
-  },
   "fileDetail": {
     "name": "Página del archivo",
     "help": "Cómo se muestra un archivo abierto desde esta colección, junto a su imagen o junto a la colección, una vez que la colección tiene propiedades propias. Lo que deja fuera queda oculto.",

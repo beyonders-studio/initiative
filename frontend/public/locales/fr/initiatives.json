@@ -72,7 +72,6 @@
     "projects": "Projets",
     "calendars": "Calendrier",
     "dashboards": "Tableaux de bord",
-    "counterGroups": "Compteurs",
     "posts": "Publications",
     "wikis": "Wikis",
     "contacts": "Contacts"
@@ -201,7 +200,6 @@
       "projects": "Projets",
       "calendars": "Événements",
       "dashboards": "Tableaux de bord",
-      "counterGroups": "Compteurs",
       "posts": "Publications",
       "wikis": "Wikis",
       "contacts": "Contacts"
@@ -215,8 +213,6 @@
       "createCalendars": "Créer des événements",
       "viewDashboards": "Voir les tableaux de bord",
       "createDashboards": "Créer des tableaux de bord",
-      "viewCounterGroups": "Voir les compteurs",
-      "createCounterGroups": "Créer des compteurs",
       "viewPosts": "Voir les publications",
       "createPosts": "Créer des publications",
       "viewShort": "Voir",
@@ -265,8 +261,6 @@
   "calendarsFeatureDescription": "Ce qui se passe à une heure donnée. Réponses, rappels, et un seul endroit où regarder avant que quelqu'un demande si c'est ce jeudi.",
   "dashboardsFeature": "Tableaux de bord",
   "dashboardsFeatureDescription": "Où en est le travail, pour la personne qui demande sans cesse où en est le travail. Graphiques et totaux tirés de ce qui existe déjà, en lecture seule.",
-  "counterGroupsFeature": "Compteurs",
-  "counterGroupsFeatureDescription": "Des nombres qui bougent. Décomptes, totaux, scores, places restantes, points de vie — un seul nombre sur lequel toute la salle est d'accord.",
   "postsFeature": "Publications",
   "postsFeatureDescription": "Un panneau d'affichage. Annonces, sondages, qui les a lues — l'importante épinglée en haut, pour que quatre personnes ne la ratent pas.",
   "projectsFeature": "Projets",
@@ -318,7 +312,6 @@
       "dashboards": "tableaux de bord",
       "files": "fichiers",
       "posts": "publications",
-      "counterGroups": "compteurs",
       "wikis": "wikis",
       "projects": "projets"
     },
