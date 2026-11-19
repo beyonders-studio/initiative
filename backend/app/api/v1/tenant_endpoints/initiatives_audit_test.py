@@ -21,7 +21,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.initiative import InitiativeRoleModel
+from app.models.tenant.initiative import (
+    DEFAULT_PERMISSION_VALUES,
+    InitiativeRoleModel,
+)
 from app.testing import emitted
 from app.testing.factories import create_initiative
 
@@ -319,7 +322,12 @@ class TestRoles:
         assert detail["initiative_id"] == manager.initiative.id
         assert detail["name"] == "leads"
         assert detail["is_manager"] is True
-        assert detail["permissions"] == {"create_files": True}
+        # The role as written: what the request set, and the member role's
+        # answer for every key it left out.
+        assert detail["permissions"] == {
+            **{key.value: on for key, on in DEFAULT_PERMISSION_VALUES.items()},
+            "create_files": True,
+        }
 
     async def test_updating_a_role_records_the_permissions_that_moved(
         self, client: AsyncClient, acting_user, capfd
