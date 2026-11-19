@@ -52,7 +52,6 @@ from app.core.tools import plural_of
 from app.db import cohorts, gucs
 from app.db.base import MODELS_BY_TABLE
 from app.db.guild_standing import GuildContext
-from app.db.plugin_tools import provisioned_tools
 from app.db.query import ids_in
 from app.db.request_context import SystemGuild
 from app.db.session import (
@@ -411,7 +410,7 @@ async def place(
     report settled as held hands its reporters' words and files to one — and
     the hold is worked there rather than on a case of its own.
     """
-    tools = await provisioned_tools(guild_id)
+    tools = context.tools
     source = _source(tools, request.target_type)
     if request.reason is HoldReason.illegal_content and request.legal_basis is None:
         raise HoldError(HoldMessages.LEGAL_BASIS_REQUIRED)
@@ -566,7 +565,7 @@ async def release(
             raise HoldError(HoldMessages.ALREADY_RELEASED, status.HTTP_409_CONFLICT)
         await _community_stays(system, guild_id)
         await raise_flag(system, gucs.PURGING)
-        tools = await provisioned_tools(guild_id)
+        tools = context.tools
         await _unstamp(system, int(hold.id), tools)
         await _cover_again(system, int(hold.id), tools)
         await raise_flag(system, gucs.PURGING, False)

@@ -691,11 +691,18 @@ async def test_holding_a_case_in_the_operations_community_under_itself(
 
 
 async def test_a_tool_plugins_row_is_held_listed_and_released(
-    client, session, scene, operations, acting_user, reading_as
+    client, session, scene, operations, acting_user, reading_as, monkeypatch
 ):
     """A row of a tool plug-in's tool is held as a built-in tool's row is:
     with the item inside it, it reads as absent to the community, the
-    platform lists it by its name, and restoring it puts both back."""
+    platform lists it by its name, and restoring it puts both back, with one
+    system connection at a time."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from app.db import cohorts
+    from app.db import session as db_session
+
     guild = scene["guild"]
     seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
     await install_tool_plugin(client, session, seat)
@@ -727,6 +734,18 @@ async def test_a_tool_plugins_row_is_held_listed_and_released(
         group,
         "Scores",
     )
-    released = await _release(client, moderator, guild, listed["id"], "restore")
+    one = create_async_engine(
+        db_session.system_engine.url, pool_size=1, max_overflow=0, pool_timeout=3
+    )
+    maker = async_sessionmaker(
+        bind=one, autoflush=False, expire_on_commit=False, class_=AsyncSession
+    )
+    with monkeypatch.context() as patched:
+        patched.setattr(db_session, "system_engine", one)
+        patched.setattr(cohorts, "system_sessionmaker", lambda _guild_id: maker)
+        try:
+            released = await _release(client, moderator, guild, listed["id"], "restore")
+        finally:
+            await one.dispose()
     assert released.status_code == 200, released.text
     assert await rows_read() == 2
