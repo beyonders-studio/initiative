@@ -26,7 +26,7 @@ import { useHasFiledTickets } from "@/hooks/useTickets";
 import { Badge } from "@/ui/badge";
 
 export const HomeSidebarContent = () => {
-  const { t } = useTranslation("nav");
+  const { t } = useTranslation(["nav", "common"]);
   const pathname = useLocation({ select: (location) => location.pathname });
 
   // My Messages is a list of people and then one of them, so it drills rather
