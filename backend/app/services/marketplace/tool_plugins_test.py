@@ -33,6 +33,21 @@ def test_counters_registers_as_declared():
     assert stored["tool"] == counters_tool_manifest()["tool"]
 
 
+def test_a_layout_names_the_table_s_fields_and_every_row_s():
+    body = counters_tool_manifest()
+    _counter(body)["fields"].append(
+        {"key": "mood", "name": {"en": "Mood"}, "kind": "scale"}
+    )
+    _layouts(body)["list"] = {
+        "kind": "table",
+        "columns": ["name", "count", "mood", "created_by", "updated_at", "tags"],
+        "displays": {"count": "clock", "mood": "stars"},
+    }
+    _detail(body)["main"].append(_required("color"))
+    stored = _normalize(body)
+    assert _layouts(stored) == _layouts(body)
+
+
 def test_a_republish_stores_the_same_document():
     assert _normalize(_normalize(counters_tool_manifest())) == _normalize(
         counters_tool_manifest()
@@ -67,15 +82,20 @@ def _add_field(field: dict) -> Callable[[dict], None]:
     return lambda body: _counter(body)["fields"].append(field)
 
 
+#: An item's one field, and its layouts showing it.
+_NOTE = {
+    "fields": [{"key": "note", "name": {"en": "Note"}, "kind": "text"}],
+    "layouts": {
+        "list": {"kind": "table", "columns": ["name", "note"]},
+        "detail": {"main": [{"type": "field", "props": {"field": "note"}}]},
+    },
+}
+
+
 def _items(count: int) -> Callable[[dict], None]:
     def change(body: dict) -> None:
         body["tool"]["items"] = [
-            {
-                "key": f"item_{n}",
-                "name": {"en": "Item"},
-                "fields": [{"key": "note", "name": {"en": "Note"}, "kind": "text"}],
-            }
-            for n in range(count)
+            {"key": f"item_{n}", "name": {"en": "Item"}, **_NOTE} for n in range(count)
         ]
 
     return change
@@ -88,7 +108,7 @@ def _nested(body: dict) -> None:
             {
                 "key": key,
                 "name": {"en": key},
-                "fields": [{"key": "note", "name": {"en": "Note"}, "kind": "text"}],
+                **_NOTE,
                 **({"parent": parent} if parent else {}),
             }
         )
@@ -100,6 +120,39 @@ def _tool(body: dict) -> dict:
 
 def _open(condition: dict) -> Callable[[dict], None]:
     return _set(_counter, "open_while", condition)
+
+
+def _layouts(body: dict) -> dict:
+    """The counter's layouts."""
+    return _counter(body)["layouts"]
+
+
+def _list(body: dict) -> dict:
+    return _layouts(body)["list"]
+
+
+def _detail(body: dict) -> dict:
+    return _layouts(body)["detail"]
+
+
+def _place(part: dict) -> Callable[[dict], None]:
+    """Puts a part in the counter's page."""
+    return lambda body: _detail(body)["main"].append(part)
+
+
+def _on_card(part: dict) -> Callable[[dict], None]:
+    return lambda body: _list(body)["card"]["children"].append(part)
+
+
+def _required(key: str) -> dict:
+    return {"type": "field", "props": {"field": key, "required": True}}
+
+
+def _deep(depth: int) -> dict:
+    part: dict = {"type": "field", "props": {"field": "name"}}
+    for _ in range(depth - 1):
+        part = {"type": "section", "children": [part]}
+    return part
 
 
 REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
@@ -280,6 +333,88 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
     "an action asking for another table's field": (
         lambda body: _tool(body)["actions"][0].__setitem__("params", ["count"]),
         "not a field of 'counter_group'",
+    ),
+    # Layouts.
+    "no layouts": (_set(_tool, "layouts", None), "layouts must be an object"),
+    "an item with no page": (
+        lambda body: _layouts(body).pop("detail"),
+        "a list and a detail",
+    ),
+    "a field named tags": (
+        _add_field({"key": "tags", "name": {"en": "T"}, "kind": "text"}),
+        "a field every tool's rows have",
+    ),
+    "another table's field": (
+        _on_card({"type": "field", "props": {"field": "description"}}),
+        "'description' is not a field of this table",
+    ),
+    "a task's field": (
+        _set(
+            lambda b: _tool(b)["layouts"],
+            "list",
+            {"kind": "table", "columns": ["title"]},
+        ),
+        "'title' is not a field of this table",
+    ),
+    "a property": (
+        _place({"type": "field", "props": {"field": "property:3"}}),
+        "'property:3' is not a field of this table",
+    ),
+    "a board": (_set(_list, "kind", "board"), "kind must be one of"),
+    "a grid of columns": (
+        _set(_layouts, "list", {"kind": "grid", "columns": ["name"]}),
+        "a grid holds its card",
+    ),
+    "a table with no columns": (
+        _set(_layouts, "list", {"kind": "table", "columns": []}),
+        "a table holds its columns",
+    ),
+    "presets": (_set(_list, "presets", []), "a grid holds its card"),
+    "a plug-in's part on a card": (
+        _on_card({"type": "plugin", "props": {"plugin": 1, "part": "badge"}}),
+        "not a plug-in's parts",
+    ),
+    "a task's own part": (_place({"type": "status"}), "'status' is not a part"),
+    "a plug-in's part on a page": (
+        _place({"type": "plugin", "props": {"plugin": 1, "part": "badge"}}),
+        "'plugin' is not a part",
+    ),
+    "an own part's props": (
+        _place({"type": "byline", "props": {"required": True}}),
+        "'byline' is not a part",
+    ),
+    "a look on a number": (
+        _set(_list, "displays", {"min": "bar"}),
+        "'min' is not a scale or counter field",
+    ),
+    "a look on every row's field": (
+        _set(_list, "displays", {"name": "number"}),
+        "'name' is not a scale or counter field",
+    ),
+    "a look a counter lacks": (
+        _set(_list, "displays", {"count": "stars"}),
+        "a counter field is not drawn as 'stars'",
+    ),
+    "a look the kit lacks": (
+        _set(_list, "displays", {"count": "dial"}),
+        "displays.count",
+    ),
+    "requiring every row's field": (_place(_required("name")), "leave empty"),
+    "requiring a counter": (_place(_required("count")), "leave empty"),
+    "a page with nothing placed": (_set(_layouts, "detail", {}), "places its parts"),
+    "a fourth region": (_set(_detail, "footer", []), "Extra inputs"),
+    "a stack gap the kit lacks": (
+        _on_card({"type": "stack", "props": {"gap": "lg"}}),
+        "gap",
+    ),
+    "a section title over 100": (
+        _place({"type": "section", "props": {"title": "x" * 101}}),
+        "at most 100 characters",
+    ),
+    "a part 7 deep": (_place(_deep(7)), "nests them deeper"),
+    "301 parts": (
+        _set(_detail, "side", [{"type": "byline"}] * 296),
+        "more parts",
     ),
     "a write that does not parse": (
         lambda body: _tool(body)["actions"][0].__setitem__("write", '{"set": '),

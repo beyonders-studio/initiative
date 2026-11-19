@@ -16,6 +16,11 @@ carries the same vocabulary the renderer keys by. A property's field is named
 ``property:<definition id>``, so renaming it keeps every layout that shows it;
 a plug-in's is ``plugin:<install id>:<metadata key>``.
 
+A tool plug-in declares its tables' layouts in this same grammar, which the
+plug-in contract mirrors (``toolLayouts``), and names its own fields by key.
+Validated with ``{TOOL_FIELDS: <the table's field ids>}`` as context, a layout
+names those fields in place of a built-in tool's.
+
 A preset holds its tool's filter shape: ``TaskFilterSpec`` on a project's
 lists, ``CalendarFilterSpec`` on the initiative's calendar. Each mirrors what
 that list's filter controls show rather than the ``conditions`` DSL its
@@ -25,11 +30,22 @@ remap its status ids.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterable
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Literal, get_args
 
-from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    ValidatorFunctionWrapHandler,
+    WrapValidator,
+    field_validator,
+    model_validator,
+)
 
 from app.core.collection_shapes import FieldDisplay
 from app.core.tools import LAYOUT_KIND_TARGETS, Tool
@@ -47,9 +63,10 @@ from app.services.marketplace.manifest_values import (
 
 #: What one layout may hold. Every part of a tree counts as a
 #: node, as does every column.
-MAX_NODES = 300
-MAX_DEPTH = 6
-MAX_DEFINITION_BYTES = 64 * 1024
+MAX_NODES = contract.cap("layoutNodes")
+MAX_DEPTH = contract.cap("layoutDepth")
+MAX_DEFINITION_BYTES = contract.cap("layoutBytes")
+MAX_SECTION_TITLE_LENGTH = contract.cap("layoutTitleLength")
 #: One plug-in's parts on one task: on a card, or across its detail.
 MAX_PLUGIN_PARTS = contract.cap("partsPlacedPerItem")
 #: Presets on one list.
@@ -282,9 +299,30 @@ def _property_field(value: str) -> str:
     raise ValueError("a property's field is 'property:<id>'")
 
 
+#: The validation context key that names the fields a tool plug-in's table
+#: has: given, a layout names those and nothing else.
+TOOL_FIELDS = "tool_fields"
+
+
+def _tool_field(
+    value: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
+) -> Any:
+    """A field a tool plug-in's table has, where the context names them;
+    otherwise the id the type itself takes."""
+    fields = (info.context or {}).get(TOOL_FIELDS)
+    if fields is None:
+        return handler(value)
+    if isinstance(value, str) and value in fields:
+        return value
+    raise ValueError(f"{value!r} is not a field of this table")
+
+
+#: A field id that is a tool plug-in's field where the context names them.
+_ToolField = WrapValidator(_tool_field)
+
 NamedFieldId = Annotated[str, AfterValidator(_named_field)]
 PropertyFieldId = Annotated[str, AfterValidator(_property_field)]
-CardFieldId = TaskFieldId | FileFieldId | NamedFieldId
+CardFieldId = Annotated[TaskFieldId | FileFieldId | NamedFieldId, _ToolField]
 
 
 #: The characters a built-in field's name is written in.
@@ -344,15 +382,18 @@ TaskDetailFieldId = Enum(
     {f.name: f.value for f in TaskFieldId if f.value in _PAGE},
     type=str,
 )
-ColumnFieldId = TaskColumnFieldId | FileFieldId | NamedFieldId
-DetailFieldId = (
+ColumnFieldId = Annotated[TaskColumnFieldId | FileFieldId | NamedFieldId, _ToolField]
+DetailFieldId = Annotated[
     TaskDetailFieldId
     | EventDetailFieldId
     | CounterDetailFieldId
     | PostDetailFieldId
     | FileFieldId
-    | NamedFieldId
-)
+    | NamedFieldId,
+    _ToolField,
+]
+#: The field a list's look is for.
+DisplayFieldId = Annotated[PropertyFieldId, _ToolField]
 
 
 def _part_id(value: str) -> str:
@@ -445,7 +486,7 @@ class DetailFieldPart(_Strict):
 
 class SectionProps(_Strict):
     #: The initiative's own words, drawn as written.
-    title: str | None = Field(default=None, max_length=100)
+    title: str | None = Field(default=None, max_length=MAX_SECTION_TITLE_LENGTH)
     #: Drawn folded until the reader opens it.
     collapsed: bool | None = None
 
@@ -513,6 +554,25 @@ DetailPart = Annotated[
 
 SectionPart.model_rebuild()
 DetailStackPart.model_rebuild()
+
+
+def parts_of(part: Any, depth: int = 1) -> Iterable[tuple[Any, int]]:
+    """Every part in a tree, with its depth."""
+    yield part, depth
+    if isinstance(part, (CardPart, StackPart, DetailStackPart, SectionPart)):
+        for child in part.children:
+            yield from parts_of(child, depth + 1)
+
+
+def too_large(stored: dict[str, Any], roots: list[Any], loose: int) -> bool:
+    """Whether a layout holds more nodes, nests deeper or takes more bytes
+    than one may. ``loose`` is the nodes outside any tree (columns)."""
+    found = [each for root in roots for each in parts_of(root)]
+    return (
+        len(found) + loose > MAX_NODES
+        or max((depth for _, depth in found), default=0) > MAX_DEPTH
+        or len(json.dumps(stored).encode()) > MAX_DEFINITION_BYTES
+    )
 
 
 # -- Definitions --------------------------------------------------------------
@@ -605,7 +665,7 @@ class ListLayoutDefinition(_Strict):
     hidden: bool | None = None
     #: How each scale or counter it shows is drawn, by the field's
     #: ``property:<id>``. One with none is drawn as a number.
-    displays: dict[PropertyFieldId, FieldDisplay] | None = Field(
+    displays: dict[DisplayFieldId, FieldDisplay] | None = Field(
         default=None, max_length=MAX_NODES
     )
 
