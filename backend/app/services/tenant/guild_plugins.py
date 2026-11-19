@@ -74,6 +74,7 @@ from app.services.marketplace.service_plugins import (
     members_hold,
     surface_permission,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.platform import guilds as guilds_service
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import plugin_config as plugin_config_service
@@ -908,7 +909,9 @@ async def set_setting(
 # per initiative. An initiative with no row is one the plug-in is not placed in.
 # Placement is the seat's answer to "where does this belong", so it applies to
 # everyone including guild admins. Who reaches the plug-in where it appears is
-# the initiative's roles' answer (:func:`holds_permission`).
+# the initiative's roles' answer (:func:`holds_permission`). A tool plug-in's
+# tool is, where it is not placed, as a built-in tool switched off there
+# (``app.db.guild_standing``).
 
 
 class PlacementError(ValueError):
@@ -1399,14 +1402,15 @@ def initiative_surface_ids(definition: Any) -> set[str]:
 
 
 def has_initiative_surfaces(definition: Any) -> bool:
-    """Whether the plug-in has anything to place in an initiative: a page
-    rendering there, or fields, sections or actions on items, which are drawn
-    in the item's initiative to whoever its placement admits
+    """Whether the plug-in has anything to place in an initiative: a tool, a
+    page rendering there, or fields, sections or actions on items, which are
+    drawn in the item's initiative to whoever its placement admits
     (:data:`ITEM_SURFACE`)."""
     if not isinstance(definition, dict):
         return False
     return bool(
-        initiative_surface_ids(definition)
+        is_tool_plugin(definition)
+        or initiative_surface_ids(definition)
         or _declared(definition, "fields", "key")
         or _declared(definition, "parts", "id")
         or _declared(definition, "actions", "id")

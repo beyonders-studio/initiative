@@ -298,7 +298,7 @@ my_grants AS MATERIALIZED (
 
 def _tool_states(tools: ToolSet) -> str:
     """Each installed tool plug-in's state in the community, as ``tool_states``
-    rows of ``(kind, opens, writes, switched_on)``: its tool is there unless
+    rows of ``(kind, install_id, opens, writes, switched_on)``: its tool is there unless
     its install is suspended (by staff, by the platform suspending the
     plug-in, or by the community falling out of its reach), on hold or
     deleted; written unless its install is read-only too; and on in an
@@ -317,7 +317,7 @@ def _tool_states(tools: ToolSet) -> str:
     )
     return f""",
 tool_states AS MATERIALIZED (
-  SELECT t.kind, s.opens, s.opens AND s.status <> '{PluginInstallStatus.read_only.value}' AS writes,
+  SELECT t.kind, a.id AS install_id, s.opens, s.opens AND s.status <> '{PluginInstallStatus.read_only.value}' AS writes,
          s.opens AND a.enabled AS switched_on
   FROM (VALUES {installs}) AS t(listing_uid, kind)
   JOIN guild_plugins a ON a.listing_uid = t.listing_uid
@@ -342,7 +342,8 @@ def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
     """``app.enabled_tools``: each ``<initiative>:<tool>`` pair whose switch is
     on in an initiative of ``initiatives`` (a sub-select of ids). With tool
     plug-ins, a tool whose install the community switched off or whose
-    state hides it has no pair, and each that is there carries the pairs
+    state hides it has no pair, nor has one in an initiative its install is
+    not placed in, and each that is there carries the pairs
     ``app.db.initiative_rls.tool_present`` asks for (:data:`gucs.TOOL_OPEN`,
     :data:`gucs.TOOL_WRITES`)."""
     if not tools.installed:
@@ -365,7 +366,11 @@ def _enabled_tools(tools: ToolSet, initiatives: str) -> str:
       CROSS JOIN LATERAL {_tool_switches(tools)} AS t(tool, enabled)
       WHERE {_TOOL_ON}
         AND i.id IN ({initiatives})
-        AND t.tool NOT IN (SELECT ts.kind FROM tool_states ts WHERE NOT ts.switched_on)
+        AND t.tool NOT IN (
+          SELECT ts.kind FROM tool_states ts
+          WHERE NOT ts.switched_on OR NOT EXISTS (
+            SELECT 1 FROM plugin_placements pp
+            WHERE pp.install_id = ts.install_id AND pp.initiative_id = i.id))
       UNION ALL
       SELECT '{opens}' FROM tool_states ts WHERE ts.opens
       UNION ALL

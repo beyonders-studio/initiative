@@ -181,10 +181,13 @@ async def install_tool_plugin(
     *,
     uid: str = COUNTERS_UID,
     definition: dict[str, Any] | None = None,
+    placements: str | list[int] = "all",
 ) -> dict[str, Any]:
     """List a tool plug-in (Counters unless ``definition`` says otherwise),
     give its kinds their codes as registering it does, and install it as
-    ``seat``, the community's seat. Returns the install as the API reads it.
+    ``seat``, the community's seat, placed in ``placements`` (every
+    initiative there is, as the install dialog offers first). Returns the
+    install as the API reads it.
     ``session`` is committed first, so it holds nothing the provisioning of
     the tool's tables waits on."""
     from app.db.kind_codes import assign_plugin_kind_codes
@@ -206,7 +209,9 @@ async def install_tool_plugin(
     await assign_plugin_kind_codes(session, tool_kinds(declared, listing_uid=uid))
     await session.commit()
     response = await client.post(
-        seat.g("/plugins/"), headers=seat.headers, json={"listing_uid": uid}
+        seat.g("/plugins/"),
+        headers=seat.headers,
+        json={"listing_uid": uid, "placements": placements},
     )
     assert response.status_code == 201, response.text
     return response.json()

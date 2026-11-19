@@ -21,9 +21,11 @@ from app.models.tenant.initiative import InitiativeRule
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.export.guild_sections import SectionContext, _build_plugins
+from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
 from app.services.tenant.guild_plugins import (
     PlacementError,
     SurfaceAccess,
+    has_initiative_surfaces,
     is_placed,
     placed_initiative_ids,
     set_placed_initiatives,
@@ -33,6 +35,7 @@ from app.services.tenant.guild_plugins import (
 from app.services.tenant.initiatives import get_member_role
 from app.services.tenant.task_types import get_default_type
 from app.testing import (
+    counters_tool_manifest,
     create_guild,
     create_guild_plugin,
     create_initiative,
@@ -130,6 +133,11 @@ class TestIsPlaced:
         assert await is_placed(session, plugin.id, first.id) is True
         assert await is_placed(session, plugin.id, second.id) is False
         assert await placed_initiative_ids(session, plugin.id) == {first.id}
+
+    def test_a_tool_plugin_has_its_tool_to_place(self):
+        assert has_initiative_surfaces(
+            normalize_tool_plugin_definition(counters_tool_manifest())
+        )
 
     async def test_the_guild_wide_reading_is_always_placed(self, session: AsyncSession):
         user = await create_user(session)
