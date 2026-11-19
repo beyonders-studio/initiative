@@ -39,6 +39,7 @@ from app.core.messages import (
     ProjectMessages,
     SharingMessages,
 )
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool, ToolRefusals
 from app.db.authorization import standing_arg
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
@@ -55,7 +56,7 @@ from app.services import audit as audit_service
 
 
 def granted_scope_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     id_col: ColumnElement[int],
     user_id: int | None,
     *,
@@ -97,7 +98,7 @@ def granted_scope_clause(
 
 
 def listing_scope_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     id_col: ColumnElement[int],
     user_id: int | None,
     *,

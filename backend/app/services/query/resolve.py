@@ -50,12 +50,14 @@ from pglast.enums import A_Expr_Kind, SetOperation
 from pglast.parser import ParseError, scan
 from pglast.stream import RawStream
 from pglast.visitors import Visitor
+from sqlalchemy import Column
 from sqlalchemy import column as sql_column
 from sqlalchemy.dialects import postgresql
 
 from app.core.errors import CodedError
 from app.core.messages import QueryMessages
 from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
 from app.services.fields import dataset
@@ -337,6 +339,9 @@ class ResolvedQuery:
     #: The statement as written, kept while it has rows to read: once they are
     #: read it is resolved again with what they read.
     source: str = ""
+    #: The community's tools whose datasets it named, which it is resolved
+    #: again against.
+    tools: ToolSet = BUILTIN_TOOLS
 
     @property
     def unread(self) -> tuple[SheetCall | PluginCall, ...]:
@@ -509,10 +514,11 @@ def _name_parts(parts: Any) -> list[str]:
     return [part.sval for part in (parts or ()) if isinstance(part, ast.String)]
 
 
-def _physical_table(dataset_name: str) -> tuple[str | None, str]:
-    """The schema and name of the table behind a dataset. A community's own
-    tables carry no schema, and resolve to the routed one."""
-    table = dataset(dataset_name).model.__table__
+def _physical_table(source: Dataset) -> tuple[str | None, str]:
+    """The schema and name of the table behind a dataset: its model's, or a
+    tool plug-in's own. A community's own tables carry no schema, and resolve
+    to the routed one."""
+    table = getattr(source.model, "__table__", source.model)
     return table.schema, table.name
 
 
@@ -524,6 +530,7 @@ def _derived(source: Dataset, spec: Any) -> bool:
         not isinstance(source, Recordset)
         and spec.column is not None
         and not hasattr(spec.column, "property")
+        and not isinstance(spec.column, Column)
     )
 
 
@@ -537,7 +544,7 @@ def _physical_column(source: Dataset, field_name: str, handle: str) -> Any:
         raise QueryError(
             QueryMessages.FIELD_NOT_SELECTABLE, f"{source.name}.{field_name}"
         )
-    if isinstance(source, Recordset):
+    if isinstance(source, Recordset) or isinstance(spec.column, Column):
         return spec.column.name
     if not _derived(source, spec):
         return spec.column.property.columns[0].name
@@ -775,7 +782,7 @@ def _declared_handles(node: Any, found: dict[str, str]) -> None:
         found[node.alias.aliasname if node.alias else node.relname] = node.relname
 
 
-def _expand_relations(select: ast.SelectStmt) -> None:
+def _expand_relations(select: ast.SelectStmt, tools: ToolSet = BUILTIN_TOOLS) -> None:
     """Join in the datasets a statement reached through without saying so.
 
     A dataset declares what it can be read alongside, so ``assignee.display_name``
@@ -801,9 +808,10 @@ def _expand_relations(select: ast.SelectStmt) -> None:
     node = select.fromClause[0]
     for name in wanted:
         sources = [
-            (handle, dataset(known).by_relation[name])
+            (handle, dataset(known, tools).by_relation[name])
             for handle, known in handles.items()
-            if known in dataset_names() and name in dataset(known).by_relation
+            if known in dataset_names(tools)
+            and name in dataset(known, tools).by_relation
         ]
         if not sources:
             # Not a relation anybody declared. Left as it is, so the name is
@@ -817,7 +825,9 @@ def _expand_relations(select: ast.SelectStmt) -> None:
 
 
 def _relations(
-    select: ast.SelectStmt, recordsets: Mapping[int, Recordset] | None = None
+    select: ast.SelectStmt,
+    recordsets: Mapping[int, Recordset] | None = None,
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> dict[str, Dataset]:
     """The relations in scope, by the name a column may qualify with.
 
@@ -834,7 +844,7 @@ def _relations(
         # Relations listed side by side, which pairs every row with every row.
         raise QueryError(QueryMessages.JOIN_WITHOUT_CONDITION, "FROM")
 
-    known = set(dataset_names())
+    known = set(dataset_names(tools))
     scope: dict[str, Dataset] = {}
 
     # Each join, with the relations on either side of it. A join is bound by a
@@ -868,8 +878,8 @@ def _relations(
         if recordset is not None:
             scope[handle] = recordset
             return {handle}
-        scope[handle] = dataset(node.relname)
-        node.schemaname, node.relname = _physical_table(node.relname)
+        scope[handle] = dataset(node.relname, tools)
+        node.schemaname, node.relname = _physical_table(scope[handle])
         return {handle}
 
     visit(select.fromClause[0])
@@ -1423,13 +1433,16 @@ def _value(node: ast.A_Const) -> Any:
 
 
 def resolve(
-    sql: str, read: Mapping[SheetCall | PluginCall, Recordset] | None = None
+    sql: str,
+    read: Mapping[SheetCall | PluginCall, Recordset] | None = None,
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> ResolvedQuery:
     """Read *sql*, and return the statement this surface will run instead.
 
     *read* holds what each ``sheet()`` and ``plugin()`` call read. A call it
     does not hold is left unread: its columns are taken on trust and the
     statement is checked but not runnable (:attr:`ResolvedQuery.unread`).
+    *tools* are the community's, whose datasets the statement may name.
 
     Raises :class:`QueryError` naming what has to change.
     """
@@ -1437,8 +1450,8 @@ def resolve(
     calls = _take_calls(select)
     recordsets = {key: _read_by(read, call) for key, (_, call) in calls.items()}
     _check_nodes(select)
-    _expand_relations(select)
-    scope = _relations(select, recordsets)
+    _expand_relations(select, tools)
+    scope = _relations(select, recordsets, tools)
     column_types = _output_types(select, scope)
     column_grains = _output_grains(select)
     _check_viewer(select, scope)
@@ -1485,6 +1498,7 @@ def resolve(
         sheets=tuple(entry for entry in named if isinstance(entry[1], Sheet)),
         plugins=tuple(entry for entry in named if isinstance(entry[1], PluginRows)),
         source=sql if any(not entry.read for entry in recordsets.values()) else "",
+        tools=tools,
     )
 
 

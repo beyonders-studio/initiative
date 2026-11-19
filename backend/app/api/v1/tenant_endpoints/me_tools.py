@@ -46,6 +46,7 @@ from app.api.v1.tenant_endpoints.tool_lists import (
     TOOL_LISTS,
     ListParam,
     ListRequest,
+    counted_lists,
     list_conditions,
     page_param,
     page_size_param,
@@ -253,9 +254,13 @@ async def _conditions(
     spec = TOOL_LISTS[tool]
     conditions = await list_conditions(spec, request)
     if created_by_me:
-        conditions.append(spec.model.created_by_kind == ActorKind.member)
-        conditions.append(spec.model.created_by == user_id)
+        conditions += _written_by(spec.model, user_id)
     return conditions
+
+
+def _written_by(model: Any, user_id: int) -> list:
+    """The rows ``user_id`` wrote, as a member."""
+    return [model.created_by_kind == ActorKind.member, model.created_by == user_id]
 
 
 async def list_across_guilds(
@@ -433,27 +438,31 @@ async def get_my_tool_counts(
         description="Count only what the caller wrote, matching the list views.",
     ),
 ) -> MyToolCountsResponse:
-    """How much of each tool reaches the caller, across their communities.
+    """How much of each tool reaches the caller, across their communities:
+    every built-in tool, and each tool plug-in installed in one of them, by
+    kind.
 
     The My Tools page's tabs: a tool with nothing behind it gets none, so the
     page never offers a table of nothing. Each tool's figure is its list's
-    total, summed over the caller's communities, and each community answers
-    for every tool in one statement.
+    live view, counted as the tool's own counts count it (with what the
+    reader wrote, when asked) and summed over the caller's communities; each
+    community answers for every tool it has in one statement.
     """
-    totals: dict[Tool, int] = {tool: 0 for tool in Tool}
+    totals: dict[str, int] = {tool.value: 0 for tool in Tool}
 
     async def _count(guild_session: AsyncSession, _guild_id: int) -> list:
+        context = require_guild_context(guild_session)
         selects = []
-        for tool in Tool:
-            conditions = await _conditions(
-                _live_view(guild_session, current_user, tool),
-                tool,
-                created_by_me=created_by_me,
-                user_id=current_user.id,
+        for kind, counted in counted_lists(context.tools).items():
+            request = ListRequest(
+                guild_session, current_user, context, dict(counted.views["active"])
             )
-            selects.append(select(literal(tool.value), func.count()).where(*conditions))
-        for tool, count in (await guild_session.exec(union_all(*selects))).all():
-            totals[Tool(tool)] += count
+            conditions = await counted.conditions(request)
+            if created_by_me:
+                conditions += _written_by(counted.model, current_user.id)
+            selects.append(select(literal(kind), func.count()).where(*conditions))
+        for kind, count in (await guild_session.exec(union_all(*selects))).all():
+            totals[kind] = totals.get(kind, 0) + count
         # The tallies accumulate above; the merge itself carries nothing.
         return []
 
@@ -461,7 +470,7 @@ async def get_my_tool_counts(
         session, current_user.id, restrict_to=guild_ids
     )
     await gather_across_guilds(session, {current_user.id: target_guilds}, _count)
-    return MyToolCountsResponse(counts={tool.value: n for tool, n in totals.items()})
+    return MyToolCountsResponse(counts=totals)
 
 
 for _tool, _spec in MY_TOOL_LISTS.items():

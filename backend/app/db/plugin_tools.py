@@ -80,6 +80,7 @@ from app.services.marketplace.tool_plugins import (
 
 __all__ = [
     "DECLARED",
+    "TABULAR_FORMATS",
     "InstalledTool",
     "PluginKind",
     "PluginToolError",
@@ -102,6 +103,10 @@ DECLARED = "declared"
 
 #: The prefix of every table a tool plug-in has.
 TABLE_PREFIX = "p_"
+
+#: The formats a tool plug-in's tool writes a table of one row's items in,
+#: beside its JSON.
+TABULAR_FORMATS = ("csv", "xlsx")
 
 
 def _mixins_of(tables: Iterable[str]) -> tuple[type[SQLModel], ...]:
@@ -557,6 +562,7 @@ def build_tool(
     # Parents first, as they were built, so each table's key names a table
     # created before it.
     item_tables = tuple(table for item_key, table in tables.items() if item_key != key)
+    tabular = TABULAR_FORMATS if len(item_tables) == 1 else ()
     return ToolRecord(
         kind=kind,
         plural=own.name,
@@ -565,9 +571,11 @@ def build_tool(
             # Installing the tool switches it on in every initiative, and a
             # member may view it as a member may view a tool that is on.
             on_by_default=True,
-            # Exporting it is for the registries that read the community's
-            # tool set at request time, which do not read one yet.
-            export_formats=(),
+            # Its rows travel as JSON, and a tool with one item table as a
+            # table of each row's items too (``services.export.adapters.
+            # installed``).
+            export_formats=("json", *tabular),
+            report_formats=tabular,
             item_tables=tuple(table.name for table in item_tables),
         ),
         table=own,

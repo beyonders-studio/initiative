@@ -16,15 +16,20 @@ Datasets are built on first use rather than at import. A declaration reads model
 columns, and reading them at import time would tie this module's import order to
 the mappers being configured — a fragility with nothing to gain, since the set
 never changes within a process.
+
+A community's datasets are these and its installed tool plug-ins'
+(``tool_datasets.build_installed``), read from its tool set: each lookup takes
+the set, the built-in tools' where the caller names none.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Enum
-from functools import cache
+from functools import cache, lru_cache
 from typing import Any
 
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.schemas.query import FilterOp
 from app.services.fields import calendar_events as calendar_events_dataset
 from app.services.fields import members as members_dataset
@@ -80,14 +85,20 @@ def _built() -> dict[str, Dataset]:
     return {name: build() for name, build in _BUILDERS.items()}
 
 
-def dataset(name: str) -> Dataset:
-    """The named dataset, or ``KeyError`` — callers name a constant, not input."""
-    return _built()[name]
+@lru_cache(KEPT_TOOL_SETS)
+def _community(tools: ToolSet) -> dict[str, Dataset]:
+    return {**_built(), **tool_datasets.build_installed(tools)}
 
 
-def dataset_names() -> tuple[str, ...]:
-    """Every dataset a query may name."""
-    return tuple(_built())
+def dataset(name: str, tools: ToolSet = BUILTIN_TOOLS) -> Dataset:
+    """The named dataset of a community with ``tools``, or ``KeyError`` —
+    callers name a constant, not input."""
+    return _community(tools)[name]
+
+
+def dataset_names(tools: ToolSet = BUILTIN_TOOLS) -> tuple[str, ...]:
+    """Every dataset a query in a community with ``tools`` may name."""
+    return tuple(_community(tools))
 
 
 def allowed_fields(dataset_name: str, ctx: FieldContext) -> dict[str, Any]:

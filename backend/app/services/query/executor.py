@@ -44,7 +44,7 @@ from app.core.messages import QueryMessages
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.request_context import QUERYABLE, ContentGrantee, Member, RequestContext
-from app.db.session import set_rls_context
+from app.db.session import routed_tools, set_rls_context
 from app.services.fields.spec import FieldType
 from app.services.query import sheets
 from app.services.query.canvas import compile_canvas
@@ -318,6 +318,7 @@ async def _with_cells(
     return resolve(
         statement.source,
         {**statement.read, **await sheets.read(session, unread, guild_id)},
+        statement.tools,
     )
 
 
@@ -514,7 +515,9 @@ async def _run_compiled(
             shapes.append((columns, type_names))
 
         compiled = compile_canvas(
-            [statements[key] for key in keys], row_limit=QUERY_MAX_ROWS + 1
+            [statements[key] for key in keys],
+            row_limit=QUERY_MAX_ROWS + 1,
+            tools=routed_tools(session),
         )
         plan = await connection.fetchval(
             "EXPLAIN (FORMAT JSON) " + compiled.sql, *compiled.parameters

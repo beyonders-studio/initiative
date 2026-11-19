@@ -18,7 +18,9 @@ from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.core.tools import Tool, tool_envelope_type
+from app.db.session import routed_tools
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.dashboard import Dashboard
@@ -60,7 +62,9 @@ class DashboardImporter(NamesPeopleInPassing):
     ) -> EnvelopeImportResult:
         env: DashboardEnvelope = envelope  # ty: ignore[invalid-assignment] — validate() returned this model
 
-        definition, config = _normalized_canvas(env.definition, env.config)
+        definition, config = _normalized_canvas(
+            env.definition, env.config, routed_tools(session)
+        )
         listing_uid, listing_version = await _resolved_listing(
             session, env.listing_uid, env.listing_version
         )
@@ -113,9 +117,12 @@ class DashboardImporter(NamesPeopleInPassing):
 
 
 def _normalized_canvas(
-    raw_definition: dict[str, Any] | None, raw_config: dict[str, Any] | None
+    raw_definition: dict[str, Any] | None,
+    raw_config: dict[str, Any] | None,
+    tools: ToolSet,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """The envelope's definition and config, through the app's own validators.
+    """The envelope's definition and config, through the app's own validators,
+    for the community with ``tools``.
 
     A definition naming a widget or binding this build has no renderer for —
     an archive from a newer version, or one that referenced a plug-in that is not
@@ -132,7 +139,7 @@ def _normalized_canvas(
     )
 
     try:
-        definition = normalize_dashboard_definition(raw_definition or {})
+        definition = normalize_dashboard_definition(raw_definition or {}, tools)
     except DashboardDefinitionError:
         definition = normalize_dashboard_definition({})
     # Each widget's settings stand alone: one the definition refuses is
@@ -145,7 +152,7 @@ def _normalized_canvas(
         try:
             widgets.update(
                 normalize_dashboard_config(
-                    {"widgets": {widget_id: values}}, definition
+                    {"widgets": {widget_id: values}}, definition, tools
                 )["widgets"]
             )
         except DashboardDefinitionError:

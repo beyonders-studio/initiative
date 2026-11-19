@@ -28,13 +28,14 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
-from functools import cache
+from functools import lru_cache
 from typing import Any
 
 from pglast import ast, parse_sql
 from pglast.stream import RawStream
 from pglast.visitors import Visitor
 
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
 from app.services.query.resolve import ResolvedQuery
@@ -50,12 +51,14 @@ class CompiledCanvas:
     shared: tuple[str, ...]
 
 
-@cache
-def _table_columns() -> dict[str, frozenset[str]]:
-    """Every dataset's table, and the columns it has."""
+@lru_cache(KEPT_TOOL_SETS)
+def _table_columns(tools: ToolSet) -> dict[str, frozenset[str]]:
+    """Every dataset's table in a community with ``tools``, and the columns
+    it has."""
     columns: dict[str, set[str]] = {}
-    for name in dataset_names():
-        table = dataset(name).model.__table__
+    for name in dataset_names(tools):
+        model = dataset(name, tools).model
+        table = getattr(model, "__table__", model)
         columns.setdefault(table.name, set()).update(c.name for c in table.columns)
     return {table: frozenset(names) for table, names in columns.items()}
 
@@ -89,7 +92,9 @@ def _words(node: ast.ColumnRef) -> list[str]:
     return [part.sval for part in node.fields or () if isinstance(part, ast.String)]
 
 
-def _columns_read(select: ast.SelectStmt, nodes: _Nodes) -> dict[str, set[str]]:
+def _columns_read(
+    select: ast.SelectStmt, nodes: _Nodes, tables: dict[str, frozenset[str]]
+) -> dict[str, set[str]]:
     """Which columns of which tables a statement reads.
 
     A qualified column belongs to the relation its qualifier names. An
@@ -98,7 +103,6 @@ def _columns_read(select: ast.SelectStmt, nodes: _Nodes) -> dict[str, set[str]]:
     error. A name that is no table's column (an output alias an ``ORDER BY``
     names) belongs to nothing.
     """
-    tables = _table_columns()
     handles: dict[str, str] = {}
     for node in nodes.ranges:
         if node.relname is None:
@@ -124,7 +128,10 @@ def _quoted(name: str) -> str:
 
 
 def compile_canvas(
-    statements: Sequence[ResolvedQuery], *, row_limit: int
+    statements: Sequence[ResolvedQuery],
+    *,
+    row_limit: int,
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> CompiledCanvas:
     """One statement whose column ``w<i>`` holds statement *i*'s rows.
 
@@ -133,6 +140,7 @@ def compile_canvas(
     At most ``row_limit`` rows come back per widget, so a caller asking for one
     more than it returns can tell whether it truncated.
     """
+    tables = _table_columns(tools)
     readers: Counter[str] = Counter()
     wanted: dict[str, set[str]] = {}
     written: list[str] = []
@@ -142,7 +150,7 @@ def compile_canvas(
         select = _parsed(statement.sql)
         nodes = _Nodes()
         nodes(select)
-        for table, columns in _columns_read(select, nodes).items():
+        for table, columns in _columns_read(select, nodes, tables).items():
             readers[table] += 1
             wanted.setdefault(table, set()).update(columns)
         offset = len(parameters)
@@ -155,7 +163,7 @@ def compile_canvas(
     ctes = []
     for table in shared:
         # ``id`` keeps the list non-empty for a table read only by counts.
-        columns = sorted(wanted[table] | ({"id"} & _table_columns().get(table, set())))
+        columns = sorted(wanted[table] | ({"id"} & tables.get(table, set())))
         listed = ", ".join(_quoted(column) for column in columns)
         ctes.append(
             f"{_quoted(table)} AS MATERIALIZED (SELECT {listed} FROM {_quoted(table)})"

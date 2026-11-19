@@ -27,6 +27,7 @@ from sqlalchemy import (
     LargeBinary,
     Numeric,
     String,
+    Table,
     Text,
     case,
 )
@@ -151,7 +152,7 @@ def options_for(col: Any) -> tuple[str, ...]:
 
 
 def derive_fields(
-    model: type[DeclarativeBase],
+    model: type[DeclarativeBase] | Table,
     *,
     internal: frozenset[str] = frozenset(),
     references: Mapping[str, str] = MappingProxyType({}),
@@ -173,18 +174,23 @@ def derive_fields(
     something that holds none. It is still a derivation and not a control list:
     it says which table a column points at, and the same rules as everywhere
     else decide what that makes it.
+
+    *model* may be a table no model maps, a tool plug-in's
+    (``app.db.plugin_tools``): its fields are its columns.
     """
+    columns = model.c if isinstance(model, Table) else model.__table__.c
+    attributes: Any = columns if isinstance(model, Table) else model
     specs = []
-    for col in model.__table__.columns:
+    for col in columns:
         referenced = references.get(col.name)
         control = control_for(col, references=referenced)
         if control is None:
             continue
-        expression = getattr(model, col.name)
+        expression = getattr(attributes, col.name)
         if col.name == "created_by":
             # The author is a person only where its kind says so.
             expression = case(
-                (model.created_by_kind == ActorKind.member, model.created_by)  # type: ignore[attr-defined]
+                (attributes.created_by_kind == ActorKind.member, attributes.created_by)
             )
         specs.append(
             column(
@@ -209,7 +215,7 @@ def derive_fields(
     return tuple(specs) + ((tags,) if tags is not None else ())
 
 
-def _tag_field(model: type[DeclarativeBase]) -> FieldSpec | None:
+def _tag_field(model: type[DeclarativeBase] | Table) -> FieldSpec | None:
     """The ``tag_ids`` filter, for a model that has tags.
 
     Nearly everything is taggable and everything taggable binds the same way,

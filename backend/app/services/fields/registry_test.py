@@ -550,3 +550,39 @@ class TestWhatANewStatementLeavesOut:
                 ),
             )
             assert build(spec).startswith("SELECT count(*) AS count FROM ")
+
+
+def test_a_tool_plugins_tables_are_its_communitys_datasets():
+    """A community's installed tool and its items are datasets of their own
+    tables, their fields the declared ones beside every tool's, an item
+    reaching its tool as a counter reaches its group; a community without the
+    plug-in has none of them, and a statement naming one resolves only where
+    it is installed."""
+    from app.db.plugin_tools import InstalledTool, community_tool_set
+    from app.services.marketplace.tool_plugins import (
+        normalize_tool_plugin_definition,
+    )
+    from app.services.query.resolve import QueryError
+    from app.testing.tool_plugins import COUNTERS_UID, counters_tool_manifest
+
+    definition = normalize_tool_plugin_definition(counters_tool_manifest())
+    uid = COUNTERS_UID.lower()
+    codes = {f"counter_group.{uid}": 1024, f"counter.{uid}": 1025}
+    tools = community_tool_set([InstalledTool(COUNTERS_UID, definition)], codes)
+    (tool,) = tools.installed
+    (counters,) = tool.items
+
+    assert {tool.table.name, counters.name} <= set(dataset_names(tools))
+    assert counters.name not in dataset_names()
+    items = dataset(counters.name, tools)
+    assert {"count", "max", "view_mode", "name", "created_by", "archived_at"} <= set(
+        items.by_name
+    )
+    assert items.by_relation["counter_group"].dataset == tool.table.name
+    statement = resolve(
+        f"SELECT c.name, counter_group.description FROM {counters.name} AS c",
+        tools=tools,
+    )
+    assert statement.relations == tuple(sorted({counters.name, tool.table.name}))
+    with pytest.raises(QueryError):
+        resolve(f"SELECT name FROM {counters.name}")

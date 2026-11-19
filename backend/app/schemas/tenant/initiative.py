@@ -207,12 +207,13 @@ class InitiativeDefaultsUpdate(SanitizedBaseModel):
 
 
 class ToolCountsByInitiativeResponse(SanitizedBaseModel):
-    """Each tool's visible-row counts, by initiative (tool -> initiative_id ->
-    count) — what the sidebar and the initiative directory badge."""
+    """Each tool's visible-row counts, by initiative (kind -> initiative_id ->
+    count): every built-in tool and each installed tool plug-in — what the
+    sidebar and the initiative directory badge."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    counts: dict[Tool, dict[int, int]] = Field(default_factory=dict)
+    counts: dict[str, dict[int, int]] = Field(default_factory=dict)
 
 
 class ToolCountsResponse(SanitizedBaseModel):

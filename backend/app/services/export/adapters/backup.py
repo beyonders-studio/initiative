@@ -61,6 +61,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import settings
 from app.core.file_types import FileType, is_stored
 from app.core.messages import ExportMessages, InitiativeMessages
+from app.core.tool_set import ToolRecord
 from app.core.tools import (
     BULK_EXPORT_TOOLS,
     Tool,
@@ -70,6 +71,7 @@ from app.core.tools import (
 )
 from app.core.user_display import handle_of
 from app.core.user_input_validators import resolve_zone
+from app.db.session import routed_tools
 from app.models.platform.guild import CommunityJoinPolicy
 from app.models.platform.user import User
 from app.services.export import delivery
@@ -80,16 +82,14 @@ from app.services.export.adapters._common import (
     storage_key_of,
 )
 from app.services.export.adapters.file import file_type_of
+from app.services.export.adapters.installed import (
+    InstalledToolAdapter,
+    envelope_type,
+)
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
-from app.services.export.filters import narrow, parse_filters
 from app.services.platform.csv_export import safe_filename_component
 from app.services.tenant.initiative_tools import own_switch
-
-# Tool keys as they appear in the selector's include/formats maps. Derived:
-# a backup covers what the engine can export, so a ninth tool is carried by
-# registering it rather than by remembering this line.
-_TOOLS = tuple(t.value for t in BULK_EXPORT_TOOLS)
 
 # The rung an aggregate export reads each entity at: the initiative or
 # community backup reads what its scope reaches.
@@ -161,7 +161,7 @@ async def _resolve_scope(
     from app.services.membership import initiative_scope_clause
     from app.services.platform import guilds as guilds_service
 
-    _validate_params(params, scope_kind=scope_kind)
+    _validate_params(params, _sections(session))
 
     if scope_kind == "guild":
         membership = await guilds_service.get_membership(
@@ -206,26 +206,27 @@ async def _resolve_scope(
     return [initiative]
 
 
-def _validate_params(params: dict, *, scope_kind: str) -> None:
+def _validate_params(params: dict, sections: tuple[BackupSection, ...]) -> None:
+    by_key = {section.key: section for section in sections}
     mode = params.get("mode") or "backup"
     if mode not in ("backup", "report"):
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     include = params.get("include")
     if include is not None and (
         not isinstance(include, dict)
-        or not set(include) <= set(_TOOLS)
+        or not set(include) <= set(by_key)
         or not all(isinstance(v, bool) for v in include.values())
     ):
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     filters = params.get("filters")
     if filters is not None:
-        if not isinstance(filters, dict) or not set(filters) <= set(_TOOLS):
+        if not isinstance(filters, dict) or not set(filters) <= set(by_key):
             raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
         for tool, raw in filters.items():
-            parse_filters(Tool(tool), raw)
+            by_key[tool].adapter.filters_of(raw)
     if mode == "report":
         for tool, fmt in (params.get("formats") or {}).items():
-            section = _SECTIONS_BY_KEY.get(tool)
+            section = by_key.get(tool)
             spec = section.tool.spec if section is not None else None
             if spec is not None and spec.type_report_formats:
                 allowed = spec.type_report_formats
@@ -250,7 +251,7 @@ def _included(params: dict, tool: str) -> bool:
 
 
 def _filters(params: dict, section: BackupSection):
-    return parse_filters(section.tool, (params.get("filters") or {}).get(section.key))
+    return section.adapter.filters_of((params.get("filters") or {}).get(section.key))
 
 
 async def _section_ids(
@@ -262,10 +263,9 @@ async def _section_ids(
 ) -> list[int]:
     """One tool's entities in one initiative that the creator may export and
     the tool's filters leave."""
-    return await narrow(
+    return await section.adapter.narrow(
         session,
         user,
-        section.tool,
         _filters(params, section),
         await section.adapter.initiative_ids(session, initiative_id),
     )
@@ -289,9 +289,10 @@ async def _enumerate(
     session: AsyncSession, user: User, params: dict, initiatives
 ) -> dict[str, dict[int, list[int]]]:
     """Per tool, per initiative: the entity ids the creator may export."""
-    ids: dict[str, dict[int, list[int]]] = {tool: {} for tool in _TOOLS}
+    sections = _sections(session)
+    ids: dict[str, dict[int, list[int]]] = {section.key: {} for section in sections}
     for initiative in initiatives:
-        for section in _SECTIONS:
+        for section in sections:
             if not _included(params, section.key):
                 continue
             ids[section.key][initiative.id] = await _section_ids(
@@ -454,7 +455,7 @@ async def _build_scope(
                     name=i.name,
                     description=i.description,
                     color=i.color,
-                    tools=_initiative_tool_states(params, i),
+                    tools=_initiative_tool_states(params, i, _sections(session)),
                     join_policy=i.join_policy,
                 )
                 for i in initiatives
@@ -485,15 +486,17 @@ async def _build_scope(
     )
 
 
-def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
+def _initiative_tool_states(
+    params: dict, initiative, sections: tuple[BackupSection, ...]
+) -> dict[str, str]:
     states: dict[str, str] = {}
-    for tool in _TOOLS:
-        if not own_switch(initiative, Tool(tool)):
-            states[tool] = "disabled"
-        elif _included(params, tool):
-            states[tool] = "included"
+    for section in sections:
+        if not own_switch(initiative, section.tool):
+            states[section.key] = "disabled"
+        elif _included(params, section.key):
+            states[section.key] = "included"
         else:
-            states[tool] = "excluded"
+            states[section.key] = "excluded"
     return states
 
 
@@ -563,7 +566,7 @@ class _ScopeBuilder:
     async def add_initiative(self, initiative) -> None:
         await self._refresh_access(force=True)
         folder = f"initiatives/{_slug(initiative.id, initiative.name)}"
-        for section in _SECTIONS:
+        for section in _sections(self.session):
             await self._add_section(section, initiative, folder)
         await self._add_initiative_structure(initiative, folder)
         await self._add_initiative_properties(initiative, folder)
@@ -684,7 +687,7 @@ class _ScopeBuilder:
             item,
             path=path,
             tool=section.key,
-            type=tool_envelope_type(section.tool),
+            type=section.envelope_type,
             schema_version=item.data["schema_version"],
             entity_id=entity_id,
             title=title,
@@ -1553,7 +1556,9 @@ class BackupSection:
     in the report format chosen for it.
     """
 
-    tool: Tool
+    #: A built-in tool, or a tool plug-in's, which writes each row as its
+    #: envelope or in the report format chosen for it.
+    tool: Tool | ToolRecord
     #: Whether a report writes the initiative's entities of this tool as one
     #: file rather than one each: a spreadsheet of its contacts.
     one_report: bool = False
@@ -1591,17 +1596,28 @@ class BackupSection:
     def adapter(self) -> ToolExportAdapter:
         from app.services.export.adapters import ADAPTERS
 
+        if isinstance(self.tool, ToolRecord):
+            return cast(ToolExportAdapter, InstalledToolAdapter(self.tool.kind))
         return cast(ToolExportAdapter, ADAPTERS[tool_export_source(self.tool)])
 
     @property
     def folder(self) -> str:
-        """The folder an initiative's entries of this tool sit in."""
+        """The folder an initiative's entries of this tool sit in: an
+        installed tool's, its kind."""
+        if isinstance(self.tool, ToolRecord):
+            return self.tool.kind
         return plural_of(tool_export_source(self.tool))
+
+    @property
+    def envelope_type(self) -> str:
+        if isinstance(self.tool, ToolRecord):
+            return envelope_type(self.tool)
+        return tool_envelope_type(self.tool)
 
     @property
     def envelope_suffix(self) -> str:
         if self.type_in_filename:
-            return f".{tool_envelope_type(self.tool)}.json"
+            return f".{self.envelope_type}.json"
         return ".json"
 
 
@@ -1631,10 +1647,19 @@ _SECTIONS: tuple[BackupSection, ...] = (
 )
 _SECTIONS_BY_KEY: dict[str, BackupSection] = {s.key: s for s in _SECTIONS}
 
-if len(_SECTIONS_BY_KEY) != len(_SECTIONS) or set(_SECTIONS_BY_KEY) != set(_TOOLS):
+_EXPORTED = {tool.value for tool in BULK_EXPORT_TOOLS}
+if len(_SECTIONS_BY_KEY) != len(_SECTIONS) or set(_SECTIONS_BY_KEY) != _EXPORTED:
     raise RuntimeError(
         "every exportable tool needs exactly one backup section: "
-        f"{sorted(set(_TOOLS) ^ set(_SECTIONS_BY_KEY))}"
+        f"{sorted(_EXPORTED ^ set(_SECTIONS_BY_KEY))}"
+    )
+
+
+def _sections(session: AsyncSession) -> tuple[BackupSection, ...]:
+    """Every exportable tool's section in the community ``session`` is routed
+    into: the built-in tools', then each installed tool's."""
+    return _SECTIONS + tuple(
+        BackupSection(tool) for tool in routed_tools(session).installed
     )
 
 
@@ -1665,7 +1690,6 @@ async def estimate_backup(
         "include_uploads": include_uploads,
         "filters": filters,
     }
-    _validate_params(params, scope_kind=scope)
     initiatives = await _resolve_scope(
         session, user, guild_id, params, scope_kind=scope
     )
@@ -1673,10 +1697,10 @@ async def estimate_backup(
 
     tools: dict[str, BackupToolEstimate] = {}
     estimated_rows = 0
-    for tool in _TOOLS:
-        count = sum(len(v) for v in ids[tool].values())
-        disabled = all(not own_switch(i, Tool(tool)) for i in initiatives)
-        tools[tool] = BackupToolEstimate(count=count, disabled=disabled)
+    for section in _sections(session):
+        count = sum(len(v) for v in ids[section.key].values())
+        disabled = all(not own_switch(i, section.tool) for i in initiatives)
+        tools[section.key] = BackupToolEstimate(count=count, disabled=disabled)
         estimated_rows += count
 
     estimated_rows += await _task_rows(session, user, params, ids["project"])

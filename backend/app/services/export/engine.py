@@ -115,11 +115,16 @@ def get_backend() -> RenderBackend:
 
 def get_adapter(source: str, format: str) -> SourceAdapter:
     """Resolve a source×format combo against the registry, so unsupported
-    combinations are rejected centrally."""
+    combinations are rejected centrally. A tool plug-in's kind is its tool's
+    source, which the community it is asked in has or does not."""
     from app.core.messages import ExportMessages
+    from app.db.plugin_tools import is_plugin_kind
     from app.services.export.adapters import ADAPTERS
+    from app.services.export.adapters.installed import InstalledToolAdapter
 
-    adapter = ADAPTERS.get(source)
+    adapter = ADAPTERS.get(source) or (
+        InstalledToolAdapter(source) if is_plugin_kind(source) else None
+    )
     if adapter is None:
         raise ExportError(ExportMessages.EXPORT_UNKNOWN_SOURCE, status_code=404)
     if format not in adapter.formats:
