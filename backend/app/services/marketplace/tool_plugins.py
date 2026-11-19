@@ -440,14 +440,14 @@ def _list_layout(
     ):
         fail(f"{what}: a card draws the tool's fields, not a plug-in's parts")
     for key, look in (definition.displays or {}).items():
-        field = declared.get(key)
-        looks = _LOOKS.get(field["kind"]) if field else None
+        field_kind = declared[key]["kind"] if key in declared else ""
+        looks = _LOOKS.get(field_kind)
         if looks is None:
             fail(
                 f"{what} displays: {key!r} is not a scale or counter field it declares"
             )
         if look not in looks:
-            fail(f"{what} displays: a {field['kind']} field is not drawn as {look!r}")
+            fail(f"{what} displays: a {field_kind} field is not drawn as {look!r}")
     if too_large(stored, roots, len(definition.columns or ())):
         fail(f"{what} holds more parts, or nests them deeper, than a layout may")
     return {"kind": kind, **stored}
