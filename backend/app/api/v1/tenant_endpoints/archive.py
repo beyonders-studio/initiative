@@ -174,7 +174,8 @@ async def _authorize(
         # A tool plug-in's row answers to its tool's sharing, as a task does.
         located = locate(routed_tools(session), entity_type)
         assert located is not None
-        action = Action.unarchive if row.tool_archived_at is not None else Action.edit
+        archived = row.tool["archived_at"] is not None
+        action = Action.unarchive if archived else Action.edit
         require_access(
             DacResource(located.tool), row, context=guild_context, action=action
         )

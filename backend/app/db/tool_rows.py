@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -33,8 +32,8 @@ class ToolRow:
     values: Mapping[str, Any]
     #: What the request may do to the tool the row is in.
     actions: frozenset[str] = frozenset()
-    #: When that tool was archived, or None while it is live.
-    tool_archived_at: datetime | None = field(default=None)
+    #: The columns of that tool's own row: the row's own, for a tool's row.
+    tool: Mapping[str, Any] = field(default_factory=dict)
 
     def __getattr__(self, name: str) -> Any:
         try:
@@ -93,7 +92,7 @@ def _actions(kind: str, tool: sa.FromClause) -> sa.ColumnElement[Any]:
 
 def select_rows(located: Located, tools: ToolSet) -> sa.Select[Any]:
     """The rows of ``located``'s table, each with what the request may do to
-    the tool it is in and that tool's archive stamp."""
+    the tool it is in and that tool's own row."""
     table = located.table
     joined: sa.FromClause = table
     here: sa.FromClause = table
@@ -101,22 +100,22 @@ def select_rows(located: Located, tools: ToolSet) -> sa.Select[Any]:
         up = tools.tables[parent].alias(f"tool_hop_{i}")
         joined = joined.join(up, up.c.id == here.c[column])
         here = up
+    tool = [] if here is table else [c.label(f"_tool_{c.name}") for c in here.c]
     return sa.select(
-        table,
-        _actions(located.tool.kind, here).label("_actions"),
-        here.c.archived_at.label("_tool_archived_at"),
+        table, *tool, _actions(located.tool.kind, here).label("_actions")
     ).select_from(joined)
 
 
 def row_of(table: Table, found: Any) -> ToolRow:
     """A :class:`ToolRow` from a row :func:`select_rows` read."""
     mapping = found._mapping
-    return ToolRow(
-        table,
-        {column.name: mapping[column] for column in table.columns},
-        frozenset(mapping["_actions"] or ()),
-        mapping["_tool_archived_at"],
-    )
+    values = {column.name: mapping[column] for column in table.columns}
+    tool = {
+        key.removeprefix("_tool_"): value
+        for key, value in mapping.items()
+        if isinstance(key, str) and key.startswith("_tool_")
+    }
+    return ToolRow(table, values, frozenset(mapping["_actions"] or ()), tool or values)
 
 
 async def load_row(

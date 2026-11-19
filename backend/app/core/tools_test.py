@@ -24,10 +24,10 @@ def test_trash_listing_covers_every_soft_delete_model():
     # Every soft-deletable model must be listable in the trash can, else a trashed
     # row of that type is invisible (and unrestorable) to the user.
     from app.api.v1.tenant_endpoints.trash import ENTITY_REGISTRY
-    from app.db.soft_delete_filter import SOFT_DELETE_MODELS
+    from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 
-    listed = {model for model, _name_field in ENTITY_REGISTRY.values()}
-    assert set(SOFT_DELETE_MODELS) <= listed
+    listed = {table.name for table, _name_field in ENTITY_REGISTRY.values()}
+    assert set(SOFT_DELETE_TABLES) <= listed
 
 
 def test_every_builtin_role_answers_for_every_permission_key():
