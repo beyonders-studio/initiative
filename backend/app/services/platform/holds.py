@@ -526,7 +526,7 @@ async def release(
 ) -> ContentHold:
     """End hold ``hold_id`` with ``outcome``. The platform's alone."""
     from app.services.tenant.attachments import delete_blobs
-    from app.services.tenant.soft_delete import hard_purge_entity
+    from app.services.tenant.soft_delete import hard_purge_entities
 
     if not context.pam_moderate:
         raise HoldError(HoldMessages.NOT_FOUND, status.HTTP_404_NOT_FOUND)
@@ -569,7 +569,7 @@ async def release(
                 system, context, hold, target, released_by=released_by
             )
         elif target is not None and outcome is HoldRelease.purge:
-            released = await hard_purge_entity(system, target)
+            released = await hard_purge_entities(system, [target], tools=tools)
         now = datetime.now(UTC)
         hold.released_at = now
         hold.released_by = released_by
