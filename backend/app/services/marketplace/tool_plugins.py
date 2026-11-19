@@ -257,7 +257,9 @@ def _counter(raw: Any, *, numbers: set[str], what: str) -> dict[str, Any]:
             continue
         if isinstance(bound, str):
             if bound not in numbers:
-                fail(f"{what} counter {name}: {bound!r} is not a number field of its table")
+                fail(
+                    f"{what} counter {name}: {bound!r} is not a number field of its table"
+                )
         elif not _number(bound):
             fail(f"{what} counter {name}: a bound is a number or a number field's key")
         cleaned[name] = bound
@@ -300,7 +302,9 @@ def _operand(raw: Any, *, numbers: set[str], what: str) -> Any:
     if set(operand) != {"field"}:
         fail(f"{what} is a number or {{'field': key}}")
     if operand["field"] not in numbers:
-        fail(f"{what}: {operand['field']!r} is not a number or counter field of this item")
+        fail(
+            f"{what}: {operand['field']!r} is not a number or counter field of this item"
+        )
     return {"field": operand["field"]}
 
 
@@ -353,9 +357,7 @@ def _open_while(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[st
     return {"field": key, term: value}
 
 
-def _items(
-    raw: Any, *, tool_key: str
-) -> list[dict[str, Any]]:
+def _items(raw: Any, *, tool_key: str) -> list[dict[str, Any]]:
     """The item tables: each key once and never the tool's, each under the
     tool or under an item that is under the tool."""
     if raw is None:
@@ -396,7 +398,9 @@ def _items(
         if parent not in parents:
             fail(f"{what}: {parent!r} is not one of the tool's items")
         if parents[parent] is not None:
-            fail(f"{what}: {parent!r} sits under another item; items go two levels deep at most")
+            fail(
+                f"{what}: {parent!r} sits under another item; items go two levels deep at most"
+            )
     return items
 
 

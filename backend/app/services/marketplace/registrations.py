@@ -1226,7 +1226,9 @@ async def read_listing_registration(
     ):
         raise ListingRegistrationError(f"a {kind} plug-in runs no container")
     if tool and spec.get("scope_ceiling"):
-        raise ListingRegistrationError("a tool plug-in runs no code, so it holds no scopes")
+        raise ListingRegistrationError(
+            "a tool plug-in runs no code, so it holds no scopes"
+        )
     stated = [key for key in _DEPLOYMENT_KEYS if key in spec]
     if stated:
         raise ListingRegistrationError(
