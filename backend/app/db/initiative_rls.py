@@ -1252,7 +1252,7 @@ def tool_layouts_path() -> InitiativePath:
     )
 
 
-def relationships_path() -> InitiativePath:
+def relationships_path(tools: ToolSet) -> InitiativePath:
     """An edge is reached by whoever can reach BOTH of the things it connects.
 
     Polymorphic on both ends, so each end defers to :func:`render_entity_access_fn`
@@ -1278,6 +1278,10 @@ def relationships_path() -> InitiativePath:
       path read it out of a body, and the authority for it was the authority to
       put those words there, which that body's own gate already asked. READ on
       both, and the endpoint refuses to unlink one by hand at all.
+    * symmetric and asserted, with a tool plug-in's row on one end — the edge
+      is a response to that row, asked of it as a comment on it is: write on
+      the initiative, so a tool its install leaves read only takes none, and
+      read on its sharing.
     * a person on one end, whatever its type — the edge says something about
       the item on the other end, so making one is editing that item: WRITE on
       the item, whichever side it is on. The person's end asks nothing, and an
@@ -1289,6 +1293,12 @@ def relationships_path() -> InitiativePath:
     registry answers per command, and neither question is one a command can
     answer.
     """
+
+    installed = ", ".join(
+        f"'{kind}'"
+        for tool in tools.installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    )
 
     def build(t: str, w: bool) -> str:
         # A write asks write of the end the edge describes, where somebody is
@@ -1304,11 +1314,26 @@ def relationships_path() -> InitiativePath:
         target_write: WriteFlag = (
             f"({t}.source_type = {person} AND {asserted})" if w else False
         )
+
+        def responds(end: str, write: WriteFlag) -> WriteFlag:
+            if not w or not installed:
+                return write
+            return (
+                f"({write} OR ({t}.relationship_type IN ({_SYMMETRIC_SQL})"
+                f" AND {t}.{end}_type IN ({installed}) AND {asserted}))"
+            )
+
         source = _entity_call(
-            f"{t}.source_type", f"{t}.source_id", source_write, source_write
+            f"{t}.source_type",
+            f"{t}.source_id",
+            responds("source", source_write),
+            source_write,
         )
         target = _entity_call(
-            f"{t}.target_type", f"{t}.target_id", target_write, target_write
+            f"{t}.target_type",
+            f"{t}.target_id",
+            responds("target", target_write),
+            target_write,
         )
         if w:
             between_people = (
@@ -1814,7 +1839,7 @@ def paths_for(tools: ToolSet) -> dict[str, InitiativePath]:
         "comments": comments_path(tools),
         # Polymorphic over what it is on; gated by that thing's own path.
         "reactions": reactions_path(tools),
-        "relationships": relationships_path(),
+        "relationships": relationships_path(tools),
         # Per-user state, scoped via the entity it points at: a queued line is
         # gated like the task or the reacted-to thing it describes.
         "batched_notices": batched_notices_path(tools),

@@ -1825,17 +1825,21 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
     link = sa.text(
         "INSERT INTO relationships (source_type, source_id, relationship_type,"
         " target_type, target_id, provenance, created_at)"
-        " VALUES (:s, :si, 'depends_on', :t, :ti, 'manual', now())"
+        " VALUES (:s, :si, :ty, :t, :ti, 'manual', now())"
     )
+    # An edge that describes its source, and the two that describe neither
+    # end and are a response to each.
+    linked = ("depends_on", "related_to", "attached")
     ends = {
         "s": tool.kind,
         "si": rows[tool.kind],
         "t": item_kind,
         "ti": rows[item_kind],
     }
-    linking = await reading_as(moderator_a.user.id, guild.id)
-    assert await _attempt(linking, link.bindparams(**ends)) == 1
-    await linking.rollback()
+    for ty in linked:
+        linking = await reading_as(moderator_a.user.id, guild.id)
+        assert await _attempt(linking, link.bindparams(**ends, ty=ty)) == 1, ty
+        await linking.rollback()
 
     read_only = {"status": PluginInstallStatus.read_only.value}
     await session.exec(
@@ -1872,9 +1876,10 @@ async def test_sharing_holds_and_responses_keep_a_tool_plugins_rows_in_their_ini
             json={"emoji": "👍"},
         )
         assert response.status_code == 403, (kind, response.text)
-    linking = await reading_as(moderator_a.user.id, guild.id)
-    assert await _attempt(linking, link.bindparams(**ends)) == _REFUSED
-    await linking.rollback()
+    for ty in linked:
+        linking = await reading_as(moderator_a.user.id, guild.id)
+        assert await _attempt(linking, link.bindparams(**ends, ty=ty)) == _REFUSED, ty
+        await linking.rollback()
 
 
 async def test_notices_and_marks_keep_a_tool_plugins_rows_in_their_initiative(
