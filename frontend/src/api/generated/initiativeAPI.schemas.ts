@@ -8528,6 +8528,8 @@ export interface MarketplaceListingDetail {
   installable: boolean;
   unavailable: ListingUnavailable | null;
   beta: boolean;
+  paid: boolean;
+  included: boolean;
   updated_at: string;
   long_description: string | null;
   definition: MarketplaceListingDetailDefinition;
@@ -8560,6 +8562,8 @@ export interface MarketplaceListingSummary {
   installable: boolean;
   unavailable: ListingUnavailable | null;
   beta: boolean;
+  paid: boolean;
+  included: boolean;
   updated_at: string;
 }
 
@@ -8633,6 +8637,8 @@ export interface MarketplaceSharedListingRead {
   installable: boolean;
   unavailable: ListingUnavailable | null;
   beta: boolean;
+  paid: boolean;
+  included: boolean;
   updated_at: string;
   pending_versions: string[];
 }

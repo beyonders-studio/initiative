@@ -159,7 +159,6 @@ describe("when whoever runs the server manages plug-ins", () => {
       await screen.findByText("Whoever runs this server manages plug-ins for this community.")
     ).toBeInTheDocument();
     expect(screen.getByText("PaidCo")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Rename" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Turn off" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
     expect(screen.queryByText("Update waiting")).toBeNull();

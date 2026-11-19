@@ -9,6 +9,10 @@
     "installed": "Instalado",
     "version": "v{{version}}",
     "beta": "Beta",
+    "paid": "De pago",
+    "subscription": "Suscripción",
+    "oneTime": "Pago único",
+    "included": "Incluido con Initiative",
     "needsUpdate": "Necesita una app más reciente",
     "unavailable": "Aún no disponible",
     "request": "Bajo solicitud"
@@ -26,6 +30,8 @@
     "description": "Nada en el mercado coincide con «{{query}}»."
   },
   "detail": {
+    "screenshots": "Capturas de pantalla",
+    "screenshot": "{{name}}, captura {{number}}",
     "installs_one": "{{count}} instalación",
     "installs_other": "{{count}} instalaciones",
     "minimumAge": "Mayores de {{age}} años",

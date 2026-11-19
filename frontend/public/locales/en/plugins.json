@@ -12,7 +12,6 @@
     "disabled": "Turned off",
     "enable": "Turn on",
     "disable": "Turn off",
-    "rename": "Rename",
     "remove": "Remove",
     "removeTitle": "Remove {{name}}?",
     "removeBody": "What it created moves to the trash, where it can still be restored. Every credential it held — the community's and each member's — is deleted, and the plug-in is told to stop using them.",
@@ -25,7 +24,6 @@
     "saved": "Saved.",
     "needsConfig": "Needs setup",
     "configInvalid": "Setup problem",
-    "provided": "Comes with Initiative",
     "unavailable": "Not set up on this server",
     "readOnly": "Read-only",
     "configure": "Open settings",
@@ -61,8 +59,9 @@
   },
   "install": {
     "title": "Add {{name}}",
-    "description": "This adds something for the whole community. You can rename it now or later.",
-    "name": "Name",
+    "description": "This adds something for the whole community.",
+    "connectTitle": "Connect {{name}}",
+    "connectDescription": "Connect what it works with now, or later from Integrations in community settings.",
     "action": "Add to community",
     "done": "{{name}} added.",
     "adminOnly": "Ask your community's superadmin to add this plug-in.",
@@ -99,8 +98,6 @@
     "personalScope": "Your account",
     "set": "Set",
     "notSet": "Not set",
-    "accessHint": "Uses {{api}} — {{scopes}}",
-    "noScopes": "no permissions listed",
     "secretSet": "Already set — type to replace",
     "empty": "Not set",
     "choose": "Choose one",
@@ -197,8 +194,7 @@
   "settings": {
     "description": "Set up how this plug-in connects.",
     "open": "{{name}} settings",
-    "adminTitle": "Community settings",
-    "adminDescription": "What the community owns for this plug-in. Only the superadmin sees this."
+    "communitySettings": "Community settings for this plug-in"
   },
   "page": {
     "connecting": "Connecting…",

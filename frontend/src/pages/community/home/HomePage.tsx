@@ -27,7 +27,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useHeldSurfaces } from "@/hooks/useCustomRoles";
-import { liveInitiatives, useInitiativeAccess } from "@/hooks/useInitiativeAccess";
+import { liveInitiatives } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
 import { useLastVisit } from "@/hooks/useLastVisit";
 import { activityLastVisitKey } from "@/lib/activityLastVisit";
@@ -71,7 +71,6 @@ export function HomePage() {
   const initiativesQuery = useInitiatives();
   const directoryQuery = useInitiativeDirectory();
   const directoryEntries = directoryQuery.data ?? [];
-  const { isCommunityAdmin } = useInitiativeAccess();
 
   // Creating an initiative takes the community's initiatives surface (the
   // backend enforces it), and the affordance is threaded down as a callback:
@@ -214,7 +213,6 @@ export function HomePage() {
         {search.plugin ? (
           <PluginSettingsDialog
             pluginId={search.plugin}
-            isCommunityAdmin={isCommunityAdmin}
             open
             onOpenChange={(next) => {
               if (!next) {

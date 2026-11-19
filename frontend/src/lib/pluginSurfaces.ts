@@ -109,6 +109,13 @@ export const pluginPages = (
 export const pluginHasConnections = (definition?: Record<string, unknown> | null): boolean =>
   Array.isArray(definition?.connections) && definition.connections.length > 0;
 
+/** Whether the plug-in asks each member to connect an account of their own. */
+export const pluginHasMemberConnections = (definition?: Record<string, unknown> | null): boolean =>
+  Array.isArray(definition?.connections) &&
+  definition.connections.some(
+    (connection) => (connection as { scope?: string } | null)?.scope === "interactive"
+  );
+
 /**
  * Whether a plug-in has anything to place in an initiative: a page rendering
  * there, or fields, sections or actions on items, which the server draws in

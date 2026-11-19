@@ -12,7 +12,6 @@
     "disabled": "Desactivada",
     "enable": "Activar",
     "disable": "Desactivar",
-    "rename": "Cambiar el nombre",
     "remove": "Quitar",
     "removeTitle": "¿Quitar {{name}}?",
     "removeBody": "Lo que haya creado pasa a la papelera, desde donde aún puede restaurarse. Se borran todas las credenciales que tenía —las de la comunidad y las de cada miembro— y se le pide al complemento que deje de usarlas.",
@@ -25,7 +24,6 @@
     "saved": "Guardado.",
     "needsConfig": "Falta configurarla",
     "configInvalid": "Problema de configuración",
-    "provided": "Viene con Initiative",
     "unavailable": "No está configurada en este servidor",
     "readOnly": "Solo lectura",
     "configure": "Abrir los ajustes",
@@ -61,8 +59,9 @@
   },
   "install": {
     "title": "Añadir {{name}}",
-    "description": "Esto añade algo para todo la comunidad. Puedes cambiarle el nombre ahora o más tarde.",
-    "name": "Nombre",
+    "description": "Esto añade algo para toda la comunidad.",
+    "connectTitle": "Conectar {{name}}",
+    "connectDescription": "Conecta ahora aquello con lo que trabaja, o más tarde desde Integraciones en los ajustes de la comunidad.",
     "action": "Añadir a la comunidad",
     "done": "{{name}} añadida.",
     "adminOnly": "Pide al superadministrador de tu comunidad que añada este complemento.",
@@ -99,8 +98,6 @@
     "personalScope": "Tu cuenta",
     "set": "Configurada",
     "notSet": "Sin configurar",
-    "accessHint": "Usa {{api}} — {{scopes}}",
-    "noScopes": "no indica permisos",
     "secretSet": "Ya configurada: escribe para sustituirla",
     "empty": "Sin configurar",
     "choose": "Elige una",
@@ -197,8 +194,7 @@
   "settings": {
     "description": "Configura cómo se conecta este complemento.",
     "open": "Ajustes de {{name}}",
-    "adminTitle": "Ajustes de la comunidad",
-    "adminDescription": "Lo que la comunidad controla en este complemento. Solo lo ve el superadministrador."
+    "communitySettings": "Ajustes de la comunidad para este complemento"
   },
   "page": {
     "connecting": "Conectando…",

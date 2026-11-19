@@ -36,6 +36,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Plus,
+  Settings,
   Settings2,
   Store,
 } from "lucide-react";
@@ -53,9 +54,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/sidebar/sidebar";
+import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { communityPluginPath, pluginHasConnections } from "@/lib/pluginSurfaces";
+import { communityPluginPath, pluginHasMemberConnections } from "@/lib/pluginSurfaces";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
@@ -73,6 +75,8 @@ export function PluginsSection({ isCommunityAdmin, open, onOpenChange }: Plugins
   const { t } = useTranslation(["plugins", "nav"]);
   const gp = useCommunityPath();
   const pluginsQuery = useCommunityPlugins();
+  const { activeCommunity } = useCommunities();
+  const holdsTheSeat = Boolean(activeCommunity?.can.seat);
   const [showInert, setShowInert] = useState(false);
 
   // `available` is false when a plug-in's service is not set up on this server, or
@@ -87,7 +91,8 @@ export function PluginsSection({ isCommunityAdmin, open, onOpenChange }: Plugins
   // readable sidebar. A surface the server says this reader cannot open is not
   // somewhere they can go, so for them it does not count as one.
   const actionable = plugins.filter(
-    (plugin) => communityPluginPath(plugin) !== null || pluginHasConnections(plugin.definition)
+    (plugin) =>
+      communityPluginPath(plugin) !== null || pluginHasMemberConnections(plugin.definition)
   );
   const inert = plugins.filter((plugin) => !actionable.includes(plugin));
 
@@ -129,19 +134,11 @@ export function PluginsSection({ isCommunityAdmin, open, onOpenChange }: Plugins
             {plugins.length ? (
               <SidebarMenu>
                 {actionable.map((plugin) => (
-                  <PluginEntry
-                    key={plugin.id}
-                    plugin={plugin}
-                    isCommunityAdmin={isCommunityAdmin}
-                  />
+                  <PluginEntry key={plugin.id} plugin={plugin} holdsTheSeat={holdsTheSeat} />
                 ))}
                 {showInert &&
                   inert.map((plugin) => (
-                    <PluginEntry
-                      key={plugin.id}
-                      plugin={plugin}
-                      isCommunityAdmin={isCommunityAdmin}
-                    />
+                    <PluginEntry key={plugin.id} plugin={plugin} holdsTheSeat={holdsTheSeat} />
                   ))}
                 {inert.length > 0 && (
                   <SidebarMenuItem>
@@ -194,10 +191,11 @@ export function PluginsSection({ isCommunityAdmin, open, onOpenChange }: Plugins
 
 function PluginEntry({
   plugin,
-  isCommunityAdmin,
+  holdsTheSeat,
 }: {
   plugin: CommunityPluginRead;
-  isCommunityAdmin: boolean;
+  /** Holds the community's seat, which manages its plug-ins. */
+  holdsTheSeat: boolean;
 }) {
   const { t } = useTranslation(["plugins"]);
   const gp = useCommunityPath();
@@ -218,33 +216,44 @@ function PluginEntry({
     <Blocks className="h-4 w-4" />
   );
 
-  // Every plug-in has settings, so every entry carries the gear. It waits for a
-  // hover (or a keyboard focus) so a row reads as the plug-in's name rather than a
-  // pair of controls.
-  const settings = (
-    <>
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <SidebarMenuAction
-            showOnHover
-            onClick={() => setSettingsOpen(true)}
-            aria-label={t("plugins:settings.open", { name: plugin.name })}
-          >
-            <Settings2 className="h-4 w-4" aria-hidden />
-          </SidebarMenuAction>
-        </TooltipTrigger>
-        <TooltipContent side="right">
-          <p>{t("plugins:settings.open", { name: plugin.name })}</p>
-        </TooltipContent>
-      </Tooltip>
-      <PluginSettingsDialog
-        pluginId={plugin.id}
-        isCommunityAdmin={isCommunityAdmin}
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-      />
-    </>
-  );
+  // A plug-in that asks each member for an account opens its connections here.
+  // Without one there is nothing of the member's to set up: the seat's gear
+  // goes straight to the plug-in's community settings, and anyone else gets none.
+  // The two say which: sliders for something of the member's to connect or
+  // answer, which always shows so it reads as something to do; a gear for the
+  // seat's settings alone, which waits for a hover (or a keyboard focus).
+  const personal = pluginHasMemberConnections(plugin.definition);
+  const label = t("plugins:settings.open", { name: plugin.name });
+  const settings =
+    personal || holdsTheSeat ? (
+      <>
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            {personal ? (
+              <SidebarMenuAction onClick={() => setSettingsOpen(true)} aria-label={label}>
+                <Settings2 className="h-4 w-4" aria-hidden />
+              </SidebarMenuAction>
+            ) : (
+              <SidebarMenuAction showOnHover asChild aria-label={label}>
+                <Link to={gp("/settings/integrations")} search={{ plugin: plugin.id }}>
+                  <Settings className="h-4 w-4" aria-hidden />
+                </Link>
+              </SidebarMenuAction>
+            )}
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{label}</p>
+          </TooltipContent>
+        </Tooltip>
+        {personal && (
+          <PluginSettingsDialog
+            pluginId={plugin.id}
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+          />
+        )}
+      </>
+    ) : null;
 
   if (path) {
     return (
@@ -260,9 +269,9 @@ function PluginEntry({
     );
   }
 
-  // No surface, but something to connect: clicking the name opens the settings
-  // where the member stands rather than sending them to find the same form.
-  if (pluginHasConnections(plugin.definition)) {
+  // No surface, but an account of the member's to connect: clicking the name
+  // opens that where the member stands rather than sending them to find it.
+  if (personal) {
     return (
       <SidebarMenuItem>
         <SidebarMenuButton size="sm" onClick={() => setSettingsOpen(true)}>
@@ -276,9 +285,12 @@ function PluginEntry({
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton size="sm" className="cursor-default hover:bg-transparent">
-        {icon}
-        <span className="truncate">{plugin.name}</span>
+      {/* Nothing to open: a row that names it, not a button. */}
+      <SidebarMenuButton asChild size="sm" className="cursor-default hover:bg-transparent">
+        <div>
+          {icon}
+          <span className="truncate">{plugin.name}</span>
+        </div>
       </SidebarMenuButton>
       {settings}
     </SidebarMenuItem>
