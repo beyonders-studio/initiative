@@ -384,24 +384,16 @@ _NAMING = MetadataValue.property_id.not_in(
 )
 
 
-def _inside(tool: ToolRecord, table: Table) -> Callable[[int], ColumnElement[bool]]:
-    """Picks ``table``'s rows inside one row of the installed ``tool``: its own
-    table's row, or an item reaching it along its declared keys."""
+def _inside(tool: ToolRecord, table: Table) -> Callable[[int], Select]:
+    """The ids of ``table``'s rows inside one row of the installed ``tool``:
+    its own table's row, or the items reaching it along their keys."""
+    from app.core.tool_set import ToolSet
     from app.db.initiative_rls import item_path
+    from app.db.tool_rows import joined_up
 
-    if table is tool.table:
-        return lambda gid: table.c.id == gid
-    tables = {t.name: t for t in tool.items}
-    via = item_path(tool, table).dac.via
-    owners = [table, *(tables[name] for _, name in via[:-1])]
-
-    def within(gid: int) -> ColumnElement[bool]:
-        match = owners[-1].c[via[-1][0]] == gid
-        for owner, (column, parent) in reversed(list(zip(owners, via[:-1]))):
-            match = owner.c[column].in_(sa_select(tables[parent].c.id).where(match))
-        return match
-
-    return within
+    hops = () if table is tool.table else item_path(tool, table).dac.via
+    joined, here = joined_up(table, hops, ToolSet((tool,)))
+    return lambda gid: sa_select(table.c.id).select_from(joined).where(here.c.id == gid)
 
 
 def _installed_refs(tool: ToolRecord) -> tuple[PersonRef, ...]:
@@ -416,9 +408,7 @@ def _installed_refs(tool: ToolRecord) -> tuple[PersonRef, ...]:
             *(
                 and_(
                     MetadataValue.entity_type == kind,
-                    MetadataValue.entity_id.in_(
-                        sa_select(tables[name].c.id).where(inside[name](gid))
-                    ),
+                    MetadataValue.entity_id.in_(inside[name](gid)),
                 )
                 for kind, name in kinds
             )
@@ -426,8 +416,12 @@ def _installed_refs(tool: ToolRecord) -> tuple[PersonRef, ...]:
 
     return (
         *(
-            PersonRef(column, inside[name], clears=True)
-            for name, table in tables.items()
+            PersonRef(
+                column,
+                lambda gid, table=table: table.c.id.in_(inside[table.name](gid)),
+                clears=True,
+            )
+            for table in tables.values()
             for column in table.c
             if column.info.get("field") == "user_reference"
         ),
