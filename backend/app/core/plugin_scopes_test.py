@@ -21,6 +21,7 @@ from app.core.plugin_scopes import (
     plugin_scope,
     plugin_scope_target,
     tool_resource,
+    tool_scope_target,
     validate_scopes,
 )
 from app.core.tools import Tool
@@ -141,6 +142,41 @@ def test_plugin_scopes_follow_the_vocabulary_in_order():
     assert ordered_scopes(
         ["plugins:b.one", "tags:read", "plugins:a.two", "projects:read", "nope"]
     ) == ["projects:read", "tags:read", "plugins:a.two", "plugins:b.one"]
+
+
+#: A tool plug-in's kind (``app.db.plugin_tools``).
+_KIND = "counter_group.tsjvtcm0s7gv2x"
+
+
+def test_a_tool_plugins_scope_names_its_kind():
+    assert tool_scope_target(f"{_KIND}:write") == _KIND
+    assert parse_scope(f"{_KIND}:read") == (_KIND, PluginScopeAccess.read)
+    assert expand([f"{_KIND}:write", "tags:read"]) == (
+        {_KIND, PluginScopeResource("tags")},
+        {_KIND},
+    )
+    assert ordered_scopes(["plugins:a.b", f"{_KIND}:read", "tags:read"]) == [
+        "tags:read",
+        f"{_KIND}:read",
+        "plugins:a.b",
+    ]
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        f"{_KIND}:admin",
+        f"{_KIND}",
+        "counter_group:read",
+        "Counter_group.tsjvtcm0s7gv2x:read",
+        "counter_group.TSJVTCM0S7GV2X:read",
+        "counter_group.short:read",
+    ],
+)
+def test_what_is_not_a_tool_plugins_scope_is_refused(scope):
+    assert tool_scope_target(scope) is None
+    with pytest.raises(UnknownPluginScope):
+        validate_scopes([scope])
 
 
 def test_the_public_id_rule_is_the_contracts():

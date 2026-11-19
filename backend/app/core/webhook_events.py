@@ -123,7 +123,9 @@ def _read_scopes() -> dict[str, PluginScopeResource | None]:
         access = PLUGIN_TABLE_ACCESS.get(tables.get(resource, resource))
         scopes[resource] = (
             access.resource
-            if access is not None and access.kind is PluginTableKind.scoped
+            if access is not None
+            and access.kind is PluginTableKind.scoped
+            and isinstance(access.resource, PluginScopeResource)
             else None
         )
     return scopes

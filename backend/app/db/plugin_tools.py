@@ -464,6 +464,7 @@ def build_tool(
         view_permission=f"{kind}:enabled",
         create_permission=f"{kind}:create",
         scope=kind,
+        declaration=block,
     )
 
 

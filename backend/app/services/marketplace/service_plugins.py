@@ -41,7 +41,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.core.currencies import CURRENCY_CODES
-from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
+from app.core.plugin_scopes import ALL_SCOPES, is_known_scope
 from app.models.platform.plugin_service_registration import PluginAvailability
 from app.services.marketplace import contract, expressions, plugin_api
 from app.services.marketplace.manifest_values import (
@@ -3395,8 +3395,9 @@ def _requested_scopes(raw: Any, *, where: str) -> list[str]:
     """The scopes a plug-in asks a community to grant, canonically: a
     container's ``service.scopes``, or a declarative plug-in's ``scopes``.
 
-    Absent means none. Each must be in the vocabulary, or a ``plugins:`` scope
-    naming another plug-in's public id, and named once; stored sorted, so
+    Absent means none. Each must be in the vocabulary, a ``plugins:`` scope
+    naming another plug-in's public id, or a tool plug-in's scope, and named
+    once; stored sorted, so
     re-publishing the same manifest produces the same document.
     """
     if raw is None:
@@ -3411,10 +3412,10 @@ def _requested_scopes(raw: Any, *, where: str) -> list[str]:
         # hashable value.
         if not isinstance(entry, str):
             fail(f"service plug-in: {entry!r} is not a scope a plug-in may request")
-        if plugin_scope_target(entry) is not None:
+        if entry not in ALL_SCOPES:
+            if not is_known_scope(entry):
+                fail(f"service plug-in: {entry!r} is not a scope a plug-in may request")
             plugin_scopes += 1
-        elif entry not in ALL_SCOPES:
-            fail(f"service plug-in: {entry!r} is not a scope a plug-in may request")
         if entry in scopes:
             fail(f"service plug-in: {where} names {entry!r} twice")
         scopes.add(entry)

@@ -14,15 +14,15 @@ model metadata.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from dataclasses import dataclass
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
 from functools import cached_property
+from typing import Any
 
 from sqlalchemy import Table
 from sqlmodel import SQLModel
 
 import app.db.base  # noqa: F401  # every model on the metadata
-from app.core.plugin_scopes import tool_resource
 from app.core.tools import KINDS, Kind, Tool, ToolRefusals, ToolSpec
 
 
@@ -49,6 +49,9 @@ class ToolRecord(ToolRefusals):
     create_permission: str
     #: The resource its plug-in scopes name.
     scope: str
+    #: A tool plug-in's ``tool`` block, as its definition declares it: its
+    #: fields, items and actions. Empty for a built-in tool.
+    declaration: Mapping[str, Any] = field(default_factory=dict)
 
     @property
     def value(self) -> str:
@@ -168,7 +171,7 @@ def _builtin(tool: Tool) -> ToolRecord:
         children=tuple(kind for kind in KINDS.values() if kind.parent is tool),
         view_permission=tool.view_permission,
         create_permission=tool.create_permission,
-        scope=tool_resource(tool).value,
+        scope=tool.scope,
     )
 
 

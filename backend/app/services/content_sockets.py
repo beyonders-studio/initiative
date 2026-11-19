@@ -62,6 +62,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import GuildAccessError, establish_guild_access
 from app.core import auth_context
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db import post_commit
 from app.db import session as db_session
@@ -374,9 +375,14 @@ class ContentSockets:
                 self.enqueue(sub, payload)
 
     def signal(
-        self, guild_id: int | None, tool: Tool, resource_id: int, event: str
+        self,
+        guild_id: int | None,
+        tool: Tool | ToolRecord,
+        resource_id: int,
+        event: str,
     ) -> None:
-        """Tell a tool's room that it changed, and nothing else.
+        """Tell a tool's room that it changed, and nothing else: a built-in
+        tool's, or a tool plug-in's.
 
         The frame names the change and the resource, never its content: the
         client refetches through the REST path, which is where the reader's own

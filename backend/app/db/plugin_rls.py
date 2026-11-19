@@ -48,7 +48,9 @@ class PluginTableKind(str, Enum):
 @dataclass(frozen=True)
 class PluginTableAccess:
     kind: PluginTableKind
-    resource: PluginScopeResource | None = None
+    #: The scope's resource: a ``PluginScopeResource``, or a tool plug-in's
+    #: kind, which names its tool's scopes.
+    resource: PluginScopeResource | str | None = None
 
     @property
     def writable(self) -> bool:
@@ -126,18 +128,19 @@ _NAMED: dict[str, PluginTableAccess] = {
 
 def plugin_table_access(tools: ToolSet) -> dict[str, PluginTableAccess]:
     """What an installed plug-in reaches of each table, in a community with
-    ``tools``: a table a tool governs takes that tool's scope."""
+    ``tools``: a table a tool governs takes that tool's scope, a tool
+    plug-in's its kind's (``<kind>:read``, ``<kind>:write``)."""
     paths = paths_for(tools)
     access: dict[str, PluginTableAccess] = {}
     for table in paths:
         if table in _NOT_PLUGIN_SURFACE or table in _NAMED:
             continue
         governed = governing_walk(table, paths)
-        # A tool plug-in's tool has no scope a plug-in can be granted yet, so
-        # no installed plug-in reaches its tables.
-        if governed is not None and not governed[0].installed:
+        if governed is not None:
+            tool = governed[0]
             access[table] = PluginTableAccess(
-                PluginTableKind.scoped, PluginScopeResource(governed[0].scope)
+                PluginTableKind.scoped,
+                tool.scope if tool.installed else PluginScopeResource(tool.scope),
             )
     access.update(_NAMED)
     return access
@@ -157,7 +160,7 @@ def _search_entry_read_scopes() -> dict[str, PluginScopeResource]:
         if (
             access is not None
             and access.kind is PluginTableKind.scoped
-            and access.resource is not None
+            and isinstance(access.resource, PluginScopeResource)
         ):
             scopes[source.entity_type] = access.resource
     return scopes

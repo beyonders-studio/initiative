@@ -302,7 +302,9 @@ async def summarize_unowned_content(
 # ── Which plug-ins may own ───────────────────────────────────────────────────────
 
 
-def _written_resources(scopes: Iterable[str]) -> frozenset[PluginScopeResource]:
+def _written_resources(
+    scopes: Iterable[str],
+) -> frozenset[PluginScopeResource | str]:
     """The resources ``scopes`` let a plug-in write. A scope the vocabulary no
     longer names grants nothing."""
     known: list[str] = []

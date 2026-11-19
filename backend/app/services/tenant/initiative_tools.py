@@ -57,7 +57,7 @@ def _community(key: str):
     )
 
 
-def community_switch(context: ActorContext, tool: Tool) -> bool | None:
+def community_switch(context: ActorContext, tool: Tool | ToolRecord) -> bool | None:
     """The switch the community set for ``tool`` in every initiative, or
     ``None`` where each initiative sets its own."""
     if f"{tool.value}=on" in context.community_tools:
@@ -67,7 +67,7 @@ def community_switch(context: ActorContext, tool: Tool) -> bool | None:
     return None
 
 
-def own_switch(initiative: Any, tool: Tool) -> bool:
+def own_switch(initiative: Any, tool: Tool | ToolRecord) -> bool:
     """Whether ``initiative``'s own switch has ``tool`` on, beneath anything
     its community set."""
     return tool.view_permission in (initiative.switched_on or ())
@@ -163,7 +163,7 @@ async def forget_tool(session: AsyncSession, kinds: Sequence[str]) -> None:
     )
 
 
-def tool_on(context: ActorContext, initiative: Any, tool: Tool) -> bool:
+def tool_on(context: ActorContext, initiative: Any, tool: Tool | ToolRecord) -> bool:
     """Whether ``tool`` is on in ``initiative``, by the request's standing."""
     switch = community_switch(context, tool)
     if switch is None:

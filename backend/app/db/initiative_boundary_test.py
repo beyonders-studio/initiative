@@ -33,7 +33,9 @@ them) read as absent to A's moderator and to the community's admin, and every
 write is refused; read-only, they read and every write is refused; installed
 again, A's moderator reads and writes its row and nobody outside A reads it.
 A custom role made after the install adds the tool's row in A once given its
-create permission, and not before.
+create permission, and not before. Through the universal routes and the tool
+plug-in routes (``tenant_endpoints/plugin_tools.py``), the tool plug-in's row
+and its item answer A's moderator and are not found by the other two.
 
 A table the seeder cannot fill fails here; it is never skipped.
 """
@@ -1211,3 +1213,114 @@ async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative
         headers=moderator_a.headers,
     )
     assert response.status_code == 200, response.text
+
+
+async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
+    session: AsyncSession,
+    acting_user: Callable[..., Awaitable[Actor]],
+    reading_as: Callable[[int, int], Awaitable[AsyncSession]],
+    client: AsyncClient,
+) -> None:
+    """A tool plug-in's row and its item, in initiative A and shared by name
+    with a moderator of B and a member of no initiative, are read, listed,
+    changed, added to, copied, acted on and watched through the tool plug-in
+    routes by A's moderator, and by neither of the others: each is answered
+    404, or refused a new row in A, and lists nothing of A's."""
+    from app.api.content_socket import tool_authorizer
+
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    guild = admin.guild
+    initiative_b = await create_initiative(session, guild, admin.user)
+    moderator_a = await acting_user(
+        guild=guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    moderator_b = await acting_user(
+        guild=guild, initiative=initiative_b, initiative_role="moderator"
+    )
+    outsider = await acting_user(guild=guild)
+    await session.commit()
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(guild.id)
+    tool = tools.installed[0]
+    (item_kind,) = (child.value for child in tool.children)
+    await route_session_to_guild(session, guild.id)
+    seeder = _Seeder(
+        session,
+        await _Catalog.read(session),
+        admin.initiative.id,
+        grantor=moderator_a.user.id,
+        grantees=(moderator_b.user.id, outsider.user.id),
+        tools=tools,
+    )
+    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+    tool_id = item_row[f"{tool.kind.split('.')[0]}_id"]
+    rows = {tool.kind: tool_id, item_kind: item_row["id"]}
+    await session.commit()
+
+    def addressed(kind: str, row_id: int) -> list[tuple[str, str, Any]]:
+        """Every route that names one of A's rows, and its body."""
+        at = f"/plugin-tools/{kind}/{row_id}"
+        return [
+            ("GET", at, None),
+            ("PATCH", at, {"name": "Moved"}),
+            ("POST", f"{at}/duplicate", {}),
+            ("POST", f"{at}/actions/reset_all", {}),
+        ]
+
+    under = [
+        ("GET", f"/plugin-tools/{item_kind}/?parent_id={tool_id}", None),
+        ("POST", f"/plugin-tools/{item_kind}/", {"parent_id": tool_id, "name": "X"}),
+    ]
+    in_a = f"/plugin-tools/{tool.kind}/?initiative_id={admin.initiative.id}"
+    new_in_a = {"initiative_id": admin.initiative.id, "name": "Mine"}
+
+    for actor in (moderator_b, outsider):
+        for kind, row_id in rows.items():
+            for method, path, body in addressed(kind, row_id):
+                response = await client.request(
+                    method, actor.g(path), headers=actor.headers, json=body
+                )
+                assert response.status_code == 404, (method, path, response.text)
+        for method, path, body in under:
+            response = await client.request(
+                method, actor.g(path), headers=actor.headers, json=body
+            )
+            assert response.status_code == 404, (method, path, response.text)
+        response = await client.get(actor.g(in_a), headers=actor.headers)
+        assert response.status_code == 200, response.text
+        assert response.json()["items"] == []
+        response = await client.post(
+            actor.g(f"/plugin-tools/{tool.kind}/"), headers=actor.headers, json=new_in_a
+        )
+        assert response.status_code == 403, response.text
+        watching = await reading_as(actor.user.id, guild.id)
+        assert (
+            await tool_authorizer(guild.id, tool.kind, tool_id)(watching, None) is None
+        )
+        await watching.rollback()
+
+    for method, path, body in under:
+        response = await client.request(
+            method, moderator_a.g(path), headers=moderator_a.headers, json=body
+        )
+        assert response.status_code in (200, 201), (method, path, response.text)
+    for kind, row_id in rows.items():
+        for method, path, body in addressed(kind, row_id):
+            if path.endswith("reset_all") and kind == item_kind:
+                continue
+            response = await client.request(
+                method, moderator_a.g(path), headers=moderator_a.headers, json=body
+            )
+            assert response.status_code in (200, 201), (method, path, response.text)
+    response = await client.get(moderator_a.g(in_a), headers=moderator_a.headers)
+    assert tool_id in {row["id"] for row in response.json()["items"]}, response.text
+    response = await client.post(
+        moderator_a.g(f"/plugin-tools/{tool.kind}/"),
+        headers=moderator_a.headers,
+        json=new_in_a,
+    )
+    assert response.status_code == 201, response.text
+    watching = await reading_as(moderator_a.user.id, guild.id)
+    assert await tool_authorizer(guild.id, tool.kind, tool_id)(watching, None)
+    await watching.rollback()

@@ -107,6 +107,12 @@ class Tool(ToolRefusals, str, Enum):
         return TOOL_SPECS[self]
 
     @property
+    def scope(self) -> str:
+        """The resource its plug-in scopes name (``app.core.plugin_scopes``),
+        as a tool plug-in's record names its own."""
+        return self.plural
+
+    @property
     def route_segment(self) -> str:
         """The kebab plural every route for this tool is served under
         (``counter_group`` → ``counter-groups``). The frontend's

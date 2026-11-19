@@ -58,9 +58,11 @@ async def check_initiative_permission(
     *,
     initiative_id: int,
     user: User | None,
-    permission_key: PermissionKey,
+    permission_key: PermissionKey | str,
 ) -> bool:
-    """Whether ``user``'s role in the initiative permits ``permission_key``.
+    """Whether ``user``'s role in the initiative permits ``permission_key``: a
+    key :data:`PermissionKey` names, or a tool plug-in's, whose create key
+    defaults to no as a built-in tool's does.
 
     ``None`` is an installed plug-in, whose standing carries the keys its scopes
     allow in the initiatives it is placed in.
@@ -79,7 +81,7 @@ async def check_initiative_permission(
                     func.initiative_role_permits(
                         initiative_id,
                         user.id if user is not None else None,
-                        permission_key.value,
+                        getattr(permission_key, "value", permission_key),
                         default,
                         standing_arg(),
                     )

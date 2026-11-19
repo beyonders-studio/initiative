@@ -30,8 +30,14 @@ no resource of the community's, so :func:`expand` gives it nothing; it is
 parsed by its prefix and the public-id characters (:func:`plugin_scope_target`)
 rather than listed, and a grant holds it by exact name.
 
-Dependency-free apart from ``Tool``, so ``app.db``'s registry layer can import
-it.
+Beside them sits a second open family, one per installed tool plug-in: its
+tool's kind (``app.db.plugin_tools``) as the resource, ``<kind>:read`` and
+``<kind>:write``, which reach the tool's rows and its items as a built-in
+tool's scopes reach its own (:func:`tool_scope_target`). It names a tool only
+a community that installed it has; elsewhere it reaches nothing.
+
+Dependency-free apart from ``Tool`` at import, so ``app.db``'s registry layer
+can import it.
 """
 
 from __future__ import annotations
@@ -154,17 +160,35 @@ def plugin_scope_target(scope: str) -> str | None:
     return public_id
 
 
+def tool_scope_target(scope: str) -> str | None:
+    """The tool plug-in's kind a ``<kind>:read`` or ``<kind>:write`` scope
+    names, or ``None`` when ``scope`` is not one."""
+    from app.db.plugin_tools import is_plugin_kind
+
+    if not isinstance(scope, str):
+        return None
+    kind, _, access = scope.rpartition(":")
+    if access not in PluginScopeAccess._value2member_map_ or not is_plugin_kind(kind):
+        return None
+    return kind
+
+
 def is_known_scope(scope: str) -> bool:
-    """Whether ``scope`` is in the vocabulary or the ``plugins:`` family."""
-    return scope in _ALL_SCOPES or plugin_scope_target(scope) is not None
+    """Whether ``scope`` is in the vocabulary, the ``plugins:`` family or a
+    tool plug-in's."""
+    return (
+        scope in _ALL_SCOPES
+        or plugin_scope_target(scope) is not None
+        or tool_scope_target(scope) is not None
+    )
 
 
 def ordered_scopes(scopes: Iterable[str]) -> list[str]:
     """The known scopes among ``scopes``, each once: the vocabulary's in its
-    order, then the ``plugins:`` family sorted."""
+    order, then the open families' sorted."""
     asked = {scope for scope in scopes if isinstance(scope, str)}
     return [scope for scope in ALL_SCOPES if scope in asked] + sorted(
-        scope for scope in asked if plugin_scope_target(scope) is not None
+        scope for scope in asked - _ALL_SCOPES if is_known_scope(scope)
     )
 
 
@@ -176,10 +200,13 @@ class UnknownPluginScope(ValueError):
         self.scope = scope
 
 
-def parse_scope(scope: str) -> tuple[PluginScopeResource, PluginScopeAccess]:
+def parse_scope(scope: str) -> tuple[PluginScopeResource | str, PluginScopeAccess]:
     """Split a resource scope into its resource and access, or raise
-    :class:`UnknownPluginScope`. A standing scope names no resource and is not
-    one."""
+    :class:`UnknownPluginScope`. A tool plug-in's resource is its kind. A
+    standing scope names no resource and is not one."""
+    kind = tool_scope_target(scope)
+    if kind is not None:
+        return kind, PluginScopeAccess(scope.rpartition(":")[2])
     if scope not in _PARSEABLE:
         raise UnknownPluginScope(scope)
     resource, _, access = scope.partition(":")
@@ -198,14 +225,14 @@ def validate_scopes(scopes: Iterable[str]) -> frozenset[str]:
 
 def expand(
     scopes: Iterable[str],
-) -> tuple[frozenset[PluginScopeResource], frozenset[PluginScopeResource]]:
+) -> tuple[frozenset[PluginScopeResource | str], frozenset[PluginScopeResource | str]]:
     """The resources ``scopes`` let a plug-in read and write.
 
     Writing implies reading, so every written resource is in the read set too.
     A ``plugins:`` scope or a standing names no resource and adds nothing.
     """
-    read: set[PluginScopeResource] = set()
-    write: set[PluginScopeResource] = set()
+    read: set[PluginScopeResource | str] = set()
+    write: set[PluginScopeResource | str] = set()
     for scope in scopes:
         if plugin_scope_target(scope) is not None or is_standing_scope(scope):
             continue
