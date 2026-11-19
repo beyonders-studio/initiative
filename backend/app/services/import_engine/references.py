@@ -297,6 +297,25 @@ def _body_column(kind: SearchEntityType) -> tuple[type, str] | None:
     return BODY_COLUMNS.get(kind)
 
 
+def ref_resolver(context: ImportContext) -> Callable[[str], int | None]:
+    """What an exported reference names here: the row the job made of it,
+    or, for an export from this community, the row it named there."""
+
+    def resolve(ref: str) -> int | None:
+        parsed = parse_ref(ref)
+        if parsed is None:
+            return None
+        kind, source_id = parsed
+        endpoint = context.links.lookup(ref)
+        if endpoint is not None and endpoint.kind == kind:
+            return endpoint.id
+        # The export came from this community, so the id still names the
+        # thing it named; it just was not part of what was carried.
+        return source_id if context.same_community else None
+
+    return resolve
+
+
 async def resolve_references(
     session: AsyncSession, context: ImportContext, *, author_id: int | None
 ) -> int:
@@ -315,18 +334,7 @@ async def resolve_references(
     if not noted:
         return 0
 
-    def resolve(ref: str) -> int | None:
-        parsed = parse_ref(ref)
-        if parsed is None:
-            return None
-        kind, source_id = parsed
-        endpoint = context.links.lookup(ref)
-        if endpoint is not None and endpoint.kind == kind:
-            return endpoint.id
-        # The export came from this community, so the id still names the
-        # thing it named; it just was not part of what was carried.
-        return source_id if context.same_community else None
-
+    resolve = ref_resolver(context)
     changed = 0
     # What each rewritten body is about: a comment's edges belong to the thing
     # it is on, which is why a sync reads a body and its comments together.

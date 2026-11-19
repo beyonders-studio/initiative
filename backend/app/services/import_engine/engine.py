@@ -27,10 +27,10 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ImportEngineMessages
-from app.core.tools import tool_for_create_permission
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import gucs
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db.session import raise_flag, routed_guild_id
+from app.db.session import raise_flag, routed_guild_id, routed_tools
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
@@ -48,6 +48,7 @@ from app.services.import_engine.contract import (
     ImportEngineError,
     InlineImport,
 )
+from app.services.tenant.guild_plugins import tool_placed
 from app.services.tenant.initiative_tools import tool_on_in
 
 # Statuses that count against the per-user active-job cap.
@@ -70,10 +71,14 @@ def require_writable(guild_context: Any) -> None:
         raise ImportEngineError(ImportEngineMessages.IMPORT_WRITE_REQUIRED, 403)
 
 
-def get_importer(envelope_type: str) -> EnvelopeImporter:
-    from app.services.import_engine.importers import IMPORTERS
+def get_importer(
+    envelope_type: str, tools: ToolSet = BUILTIN_TOOLS
+) -> EnvelopeImporter:
+    """The importer of ``envelope_type`` in a community with ``tools``: a
+    built-in tool's, or an installed tool plug-in's."""
+    from app.services.import_engine.importers import importers_for
 
-    importer = IMPORTERS.get(envelope_type)
+    importer = importers_for(tools).get(envelope_type)
     if importer is None:
         raise ImportEngineError(ImportEngineMessages.IMPORT_UNKNOWN_TYPE)
     return importer
@@ -89,10 +94,9 @@ async def load_target_initiative(
 ) -> Initiative:
     """Resolve + authorize the import target: the initiative must be
     reachable under the caller's RLS (unreachable is indistinguishable from
-    absent — 404), its tool master switch must be on, and the caller must
-    hold the importer's create permission (guild admins bypass, like every
-    create path)."""
-    from app.models.tenant.initiative import PermissionKey
+    absent — 404), its tool master switch must be on (and a tool plug-in
+    placed there), and the caller must hold the importer's create permission
+    (guild admins bypass, like every create path)."""
     from app.services import rls as rls_service
     from app.services.platform import guilds as guilds_service
 
@@ -113,13 +117,18 @@ async def load_target_initiative(
             ImportEngineMessages.IMPORT_INVALID_PARAMS, status_code=404
         )
 
-    # Tool master switch, derived from the Tool enum (the single source of
-    # the create_*/​*_enabled naming) — never by string surgery on the
-    # permission key. Registry construction already proved the mapping exists
-    # (importers/__init__.py), so a miss here is impossible, not "default on".
-    permission = PermissionKey(importer.permission)
-    tool = tool_for_create_permission(permission.value)
-    if not await tool_on_in(session, initiative, tool):
+    # Tool master switch, from the community's tool whose create permission
+    # the importer names — never by string surgery on the permission key. The
+    # importer was built from that tool set, so a miss here is impossible,
+    # not "default on".
+    (tool,) = (
+        record
+        for record in routed_tools(session)
+        if record.create_permission == importer.permission
+    )
+    if not await tool_on_in(session, initiative, tool) or (
+        tool.installed and not await tool_placed(session, tool, initiative.id)
+    ):
         raise ImportEngineError(
             ImportEngineMessages.IMPORT_TOOL_DISABLED, status_code=400
         )
@@ -133,7 +142,7 @@ async def load_target_initiative(
             session,
             initiative_id=initiative.id,
             user=user,
-            permission_key=permission,
+            permission_key=tool.create_permission,
         )
         if not has_perm:
             raise ImportEngineError(
@@ -200,7 +209,7 @@ async def start_envelope_import(
     envelope_type = envelope.get("type")
     if not isinstance(envelope_type, str):
         raise ImportEngineError(ImportEngineMessages.IMPORT_UNKNOWN_TYPE)
-    importer = get_importer(envelope_type)
+    importer = get_importer(envelope_type, routed_tools(session))
     validated = importer.validate(envelope)
     initiative = await load_target_initiative(
         session,

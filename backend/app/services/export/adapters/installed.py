@@ -7,9 +7,12 @@ field's column its kind in ``info["field"]``. So one adapter exports any of
 them, its source the tool's kind, in the formats its record offers
 (``ToolSpec.export_formats``):
 
-* ``json`` is the row as its envelope: its name and declared fields, and
-  under each item table's key the items in it, each written the same way.
-  A person is named by handle, never by id.
+* ``json`` is the row as its envelope: its name, place and declared
+  ``fields``, the tags, property values and links it carries, and under
+  ``items``, by each item table's key, the items in it, each written the same
+  way. A person is named by handle and anything else by its ref
+  (``<kind>:<id>``), never by id, so ``importers/installed.py`` restores it
+  in any initiative.
 * ``csv`` and ``xlsx``, for a tool with one item table, are a table of one
   row's items: their name and declared fields, each cell written as its kind
   reads.
@@ -24,6 +27,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import date, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import sqlalchemy as sa
@@ -33,6 +37,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ExportMessages, KindMessages
+from app.core.relationships import node_of
 from app.core.tool_set import ToolRecord
 from app.core.tools import kind_refusal
 from app.core.user_display import display_name, handle_of
@@ -43,6 +48,7 @@ from app.db.tool_rows import ToolRow
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.initiative import Initiative
+from app.models.tenant.relationship import EntityRelationship
 from app.schemas.tenant.import_envelopes import CURRENT_SCHEMA_VERSION
 from app.services.export import values
 from app.services.export.adapters._common import (
@@ -53,14 +59,27 @@ from app.services.export.adapters._common import (
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
 from app.services.export.i18n import export_locale
+from app.services.export.property_values import exported_properties
+from app.services.import_engine.mentions import (
+    detach_markdown_mentions,
+    load_mention_handles,
+    markdown_mention_ids,
+)
+from app.services.import_engine.references import (
+    detach_envelope_references,
+    detach_markdown_references,
+)
 from app.services.marketplace.widget_meta import in_language
 from app.services.permissions import (
     EXPORT_ACCESS,
     DacResource,
     require_export_access,
 )
+from app.services.tenant import metadata as metadata_service
+from app.services.tenant import tags as tags_service
 from app.services.tenant.archive import archive_filter_clause
 from app.services.tenant.initiative_tools import tool_on_sql
+from app.services.tenant.project_export import EXPORTED_LINK_TYPES
 from app.services.tenant.tool_listing import initiative_switch_clause
 
 #: What every installed tool's export may be narrowed by: whether it is
@@ -75,18 +94,30 @@ InstalledFilters = create_model(
 @dataclass(frozen=True)
 class Prepared:
     """What a batch of one installed tool's rows is written from: the tool,
-    each row's live items by item table (and theirs under them), and the
-    people they name, by id."""
+    each row's live items by item table (and theirs under them), the people
+    they name and the handles of those their text mentions, by id, and what
+    each row and item carries beside its fields, by kind and id
+    (:func:`_carried`)."""
 
     tool: ToolRecord
     items: Mapping[int, Mapping[str, list[Mapping[str, Any]]]]
     people: Mapping[int, Any]
+    handles: Mapping[int, str]
+    carried: Mapping[tuple[str, int], Mapping[str, Any]]
 
 
 def envelope_type(tool: ToolRecord) -> str:
     """The ``type`` an installed tool's envelope carries, as a built-in
     tool's is ``initiative-<tool>``."""
     return f"initiative-{tool.kind}"
+
+
+def table_kinds(tool: ToolRecord) -> dict[str, str]:
+    """The kind of each of ``tool``'s tables, by table name: the tool's own
+    and each item's."""
+    return {tool.table.name: tool.kind} | {
+        child.table: child.value for child in tool.children
+    }
 
 
 def _fields(table: Table) -> list[Any]:
@@ -116,6 +147,51 @@ def _option_label(field: Mapping[str, Any], value: Any, locale: str) -> str:
         if option.get("value") == value:
             return in_language(option.get("label"), locale) or str(value)
     return str(value)
+
+
+async def _carried(
+    session: AsyncSession, ids: Mapping[str, list[int]]
+) -> dict[tuple[str, int], dict[str, Any]]:
+    """What each row of each kind in ``ids`` carries beside its fields: its
+    tags by name, its property values (``exported_properties``), and the
+    links it makes, each far end by its ref, as a task's are
+    (``project_export.EXPORTED_LINK_TYPES``)."""
+    tools = routed_tools(session)
+    taggable = tags_service.tag_links(tools)
+    carried: dict[tuple[str, int], dict[str, Any]] = {}
+    nodes: dict[int, tuple[str, int]] = {}
+    for kind, entity_ids in ids.items():
+        tags = await tags_service.tags_for(session, taggable[kind], entity_ids)
+        summaries = await metadata_service.summaries_by_id(session, kind, entity_ids)
+        for entity_id in entity_ids:
+            carried[(kind, entity_id)] = {
+                "tags": sorted(tag.name for tag in tags.get(entity_id, [])),
+                "properties": exported_properties(
+                    SimpleNamespace(properties=summaries.get(entity_id, []))
+                ),
+                "links": [],
+            }
+            nodes[node_of(tools.kind_codes[kind], entity_id)] = (kind, entity_id)
+    if nodes:
+        edges = await session.exec(
+            select(EntityRelationship)
+            .where(
+                EntityRelationship.source_node.in_(list(nodes)),
+                EntityRelationship.relationship_type.in_(
+                    [link.value for link in EXPORTED_LINK_TYPES]
+                ),
+                EntityRelationship.removed_at.is_(None),
+            )
+            .order_by(EntityRelationship.id)
+        )
+        for edge in edges:
+            carried[nodes[edge.source_node]]["links"].append(
+                {
+                    "type": edge.relationship_type,
+                    "target_external_ref": f"{edge.target_type}:{edge.target_id}",
+                }
+            )
+    return carried
 
 
 class InstalledToolAdapter:
@@ -262,7 +338,8 @@ class InstalledToolAdapter:
     async def prepare(
         self, session: AsyncSession, rows: list[ToolRow], ctx: BuildContext, /
     ) -> Prepared:
-        """The rows' items, and the people they and their items name."""
+        """The rows' items, the people they and their items name, and what
+        each carries beside its fields."""
         tool = self.tool(session)
         items = await self._items(session, tool, rows)
         by_name = {item.name: item for item in tool.items}
@@ -286,7 +363,24 @@ class InstalledToolAdapter:
             if people
             else ()
         )
-        return Prepared(tool, items, {profile.id: profile for profile in profiles})
+        mentioned = {
+            user_id
+            for table, row in cells
+            for column in _fields(table)
+            if column.info["field"] == "text"
+            for user_id in markdown_mention_ids(row[column.name])
+        }
+        kinds = table_kinds(tool)
+        ids: dict[str, list[int]] = {}
+        for table, row in cells:
+            ids.setdefault(kinds[table.name], []).append(row["id"])
+        return Prepared(
+            tool,
+            items,
+            {profile.id: profile for profile in profiles},
+            await load_mention_handles(session, mentioned),
+            await _carried(session, ids),
+        )
 
     async def prepared_reach(
         self, session: AsyncSession, ctx: BuildContext, /
@@ -304,29 +398,44 @@ class InstalledToolAdapter:
     ) -> dict[str, Any]:
         """A row, or an item, and the items under it, as the envelope holds
         them."""
-        written: dict[str, Any] = {"name": row["name"]}
+        kind = table_kinds(prepared.tool)[table.name]
+        fields: dict[str, Any] = {}
+        mentioned: list[str] = []
         for column in _fields(table):
             value = row[column.name]
-            kind = column.info["field"]
+            field_kind = column.info["field"]
             if value is None:
                 pass
-            elif kind == "user_reference":
+            elif field_kind == "user_reference":
                 profile = prepared.people.get(value)
                 value = handle_of(profile) if profile is not None else None
+            elif field_kind == "text":
+                value, named = detach_markdown_mentions(value, prepared.handles)
+                value = detach_markdown_references(value)
+                mentioned += [handle for handle in named if handle not in mentioned]
             elif isinstance(value, (datetime, date)):
                 value = value.isoformat()
-            elif kind in ("number", "counter", "currency"):
+            elif field_kind in ("number", "counter", "currency"):
                 value = values.number(value)
             elif isinstance(value, list):
                 value = list(value)
-            written[column.name] = value
-        for item, column in _under(prepared.tool, table):
-            written[item.info[DECLARED]["key"]] = [
-                self._json(item, child, items, prepared)
-                for child in items.get(item.name, [])
-                if child[column] == row["id"]
-            ]
-        return written
+            fields[column.name] = value
+        return {
+            "name": row["name"],
+            "position": values.number(row["position"]),
+            "external_ref": f"{kind}:{row['id']}",
+            "fields": fields,
+            "mention_handles": mentioned,
+            **prepared.carried[(kind, row["id"])],
+            "items": {
+                item.info[DECLARED]["key"]: [
+                    self._json(item, child, items, prepared)
+                    for child in items.get(item.name, [])
+                    if child[column] == row["id"]
+                ]
+                for item, column in _under(prepared.tool, table)
+            },
+        }
 
     def _cell(
         self, table: Table, column: Any, value: Any, prepared: Prepared, ctx: Any
@@ -358,14 +467,15 @@ class InstalledToolAdapter:
         tool = prepared.tool
         items = prepared.items.get(row.id, {})
         if ctx.format == "json":
+            data = {
+                "type": envelope_type(tool),
+                "schema_version": CURRENT_SCHEMA_VERSION,
+                **self._json(tool.table, row.values, items, prepared),
+            }
+            detach_envelope_references(data, guild_id=ctx.guild_id)
             return RenderItem(
                 key=f"{export_stem(row.name, ctx.date)}.{envelope_type(tool)}",
-                data={
-                    "type": envelope_type(tool),
-                    "schema_version": CURRENT_SCHEMA_VERSION,
-                    "external_ref": f"{tool.kind}:{row.id}",
-                    **self._json(tool.table, row.values, items, prepared),
-                },
+                data=data,
             )
         # A table of the row's items, the one item table a tabular tool has.
         (table,) = tool.items

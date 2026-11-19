@@ -20,7 +20,6 @@ from pydantic import (
 )
 
 from app.core import recurrence
-from app.core.relationships import RelationshipType
 from app.core.tools import (
     DETAIL_LAYOUTS,
     LAYOUT_DEFAULT,
@@ -34,6 +33,7 @@ from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.recurrence import validate_task_recurrence
 from app.schemas.tenant.import_envelopes import (
+    EnvelopeLink,
     EnvelopePropertyValue,
     _EnvelopeBase,
     envelope_literal,
@@ -155,19 +155,6 @@ class ProjectExportComment(SanitizedBaseModel):
     mention_handles: list[str] = []
 
 
-class ProjectExportTaskLink(SanitizedBaseModel):
-    """An edge this task asserts, named by the far end's ``external_ref``.
-
-    Refs rather than ids because the far end may not exist yet — it can be in
-    a later entry of the same backup, or in a different envelope entirely. The
-    job's deferred pass resolves every ref once the last entry has flushed
-    (``import_engine.links``), so the order entries apply in does not matter.
-    """
-
-    type: RelationshipType
-    target_external_ref: str
-
-
 class ProjectExportTask(SanitizedBaseModel):
     title: str
     description: str | None = None
@@ -218,7 +205,7 @@ class ProjectExportTask(SanitizedBaseModel):
     # Both default to empty: an envelope written before they existed is a
     # task with nothing said on it and nothing pointing anywhere, which is
     # exactly what an absent field means here.
-    links: list[ProjectExportTaskLink] = []
+    links: list[EnvelopeLink] = []
     comments: list[ProjectExportComment] = []
     # What the community called each assignee, beside ``assignee_handles``
     # (which an import matches on), for a reader of the file.

@@ -113,13 +113,19 @@ class LinkCollector:
         return noted
 
     def register(
-        self, ref: str | None, kind: SearchEntityType, entity_id: int | None
+        self,
+        ref: str | None,
+        kind: SearchEntityType | str,
+        entity_id: int | None,
+        *,
+        code: int | None = None,
     ) -> None:
         """Say that ``ref`` is now this row.
 
         A ref the envelope did not give, and a row that somehow has no id, are
         both nothing to record rather than something to fail over — a task
-        with no external ref is simply a task nothing can point at.
+        with no external ref is simply a task nothing can point at. ``code``
+        is a tool plug-in's kind's, from the community's tool set.
 
         A repeated ref keeps the **first** row it named. Two things claiming
         one name is the source's ambiguity, and picking the earlier one at
@@ -130,7 +136,7 @@ class LinkCollector:
         if ref in self._refs:
             logger.info("import link ref claimed twice ref=%s", ref)
             return
-        self._refs[ref] = Endpoint(kind=kind, id=entity_id)
+        self._refs[ref] = Endpoint(kind=kind, id=entity_id, code=code)
 
     def link(
         self,

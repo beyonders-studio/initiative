@@ -44,9 +44,10 @@ from app.core.messages import ImportEngineMessages
 from app.core.references import format_ref
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
 from app.db import gucs
-from app.db.session import raise_flag, routed_guild_id
+from app.db.session import raise_flag, routed_guild_id, routed_tools
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
@@ -234,6 +235,7 @@ def plan_backup(
     existing_initiative_names: set[str],
     member_ids_by_handle: dict[str, int] | None = None,
     fetched: bool = False,
+    tools: ToolSet = BUILTIN_TOOLS,
 ) -> BackupImportPlan:
     """The confirm-screen summary. Reads only the manifest — cheap enough to
     run inside the upload request.
@@ -247,8 +249,9 @@ def plan_backup(
     ``fetched`` is as for :func:`zip_bounds.json_cap`. Blocking; run it in a
     thread from async code.
     """
-    from app.services.import_engine.importers import IMPORTERS
+    from app.services.import_engine.importers import importers_for
 
+    importers = importers_for(tools)
     with open_zip(payload, bundle=True) as archive:
         manifest = read_manifest(archive, fetched=fetched)
 
@@ -258,7 +261,7 @@ def plan_backup(
             for entry in manifest.entries
             if entry.type != "file"
             and entry.type not in _STRUCTURAL_TYPES
-            and entry.type not in IMPORTERS
+            and entry.type not in importers
         }
     )
     # Suffix previews compound: two imported initiatives can collide with
@@ -341,6 +344,7 @@ async def stage_backup_job(
         payload,
         existing_initiative_names=existing_names,
         member_ids_by_handle=roster,
+        tools=routed_tools(session),
     )
     await import_engine.count_active_jobs_locked(session, user=user)
     if payload_ref is None:
@@ -421,7 +425,7 @@ async def apply_backup(
     the initiative's members to edit."""
     from app.api.deps import establish_guild_access
     from app.models.platform.guild import CommunityRole
-    from app.services.import_engine.importers import IMPORTERS
+    from app.services.import_engine.importers import importers_for
     from app.services.platform import guilds as guilds_service
     from app.services.tenant import initiatives as initiatives_service
 
@@ -496,6 +500,7 @@ async def apply_backup(
         for mi in manifest.initiatives:
             # System sentinel: user-attributed job, gate passed at enqueue.
             await establish_guild_access(session, user, guild_id, on_behalf=True)
+            importers = importers_for(routed_tools(session))
             entries_here = entries_by_initiative.get(mi.id, [])
             if mi.target_initiative_id is not None:
                 initiative = await _resolve_target_initiative(
@@ -559,7 +564,7 @@ async def apply_backup(
                     initiative=initiative,
                     user=user,
                     include=include,
-                    importers=IMPORTERS,
+                    importers=importers,
                     assets_by_key=assets_by_key,
                     result=result,
                     context=context,
@@ -669,8 +674,9 @@ async def _resolve_target_initiative(
     by the include map is not going to be written, and demanding a permission
     for it would refuse an import that was never going to need it.
     """
-    from app.services.import_engine.importers import IMPORTERS
+    from app.services.import_engine.importers import importers_for
 
+    importers = importers_for(routed_tools(session))
     initiative = None
     seen: set[str] = set()
     for entry in entries:
@@ -684,7 +690,7 @@ async def _resolve_target_initiative(
         if envelope_type in seen:
             continue
         seen.add(envelope_type)
-        importer = IMPORTERS.get(envelope_type)
+        importer = importers.get(envelope_type)
         if importer is None:
             # An unknown type is skipped at apply time with a code in the
             # report; it names no permission to check here.
@@ -704,7 +710,7 @@ async def _resolve_target_initiative(
             session,
             guild_id=guild_id,
             initiative_id=target_initiative_id,
-            importer=IMPORTERS[tool_envelope_type(Tool.file)],
+            importer=importers[tool_envelope_type(Tool.file)],
             user=user,
         )
     return initiative

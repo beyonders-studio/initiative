@@ -4,11 +4,13 @@ The single dispatch point for both the envelope endpoint and the backup
 orchestrator — an unknown discriminator is rejected centrally by
 ``engine.get_importer``. Every tool whose record exports
 (``BULK_EXPORT_TOOLS``) imports too, through the importer the module named
-after the tool declares.
+after the tool declares; and every tool plug-in a community has installed,
+through the one importer its declaration drives (:func:`importers_for`).
 """
 
 from importlib import import_module
 
+from app.core.tool_set import ToolSet
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
 from app.services.import_engine.contract import EnvelopeImporter
 
@@ -38,4 +40,16 @@ from app.core.tools import tool_for_create_permission as _tool_lookup
 for _importer in IMPORTERS.values():
     _tool_lookup(_importer.permission)
 
-__all__ = ["IMPORTERS"]
+
+def importers_for(tools: ToolSet) -> dict[str, EnvelopeImporter]:
+    """Every envelope type a community with ``tools`` imports: the built-in
+    tools', and each installed tool plug-in's."""
+    from app.services.import_engine.importers.installed import (
+        InstalledToolImporter,
+    )
+
+    installed = (InstalledToolImporter(tool, tools) for tool in tools.installed)
+    return IMPORTERS | {importer.envelope_type: importer for importer in installed}
+
+
+__all__ = ["IMPORTERS", "importers_for"]

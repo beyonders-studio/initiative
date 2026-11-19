@@ -47,6 +47,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import ImportEngineMessages
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace
+from app.db.session import routed_tools
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import UserStatus
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
@@ -412,8 +413,7 @@ async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dic
             )
             await user_session.commit()
         return result.model_dump(mode="json")
-    importer = import_engine.get_importer(job.source)
-    envelope = importer.validate(await asyncio.to_thread(json.loads, payload))
+    raw = await asyncio.to_thread(json.loads, payload)
 
     async with _open_user_session(guild_id) as user_session:
         # Resolve membership/PAM and route the session as the creator; raises
@@ -422,6 +422,8 @@ async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dic
         # property of apply time, not enqueue time. (System sentinel: the
         # enqueueing request already passed the guild auth-policy gate.)
         await establish_guild_access(user_session, user, guild_id, on_behalf=True)
+        importer = import_engine.get_importer(job.source, routed_tools(user_session))
+        envelope = importer.validate(raw)
         initiative = await import_engine.load_target_initiative(
             user_session,
             guild_id=guild_id,
