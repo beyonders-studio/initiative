@@ -11,7 +11,6 @@ presets they offer.
 
 from __future__ import annotations
 
-import json
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -43,20 +42,15 @@ from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.tool_layout import (
     ASSIGNEE_ME,
     ASSIGNEE_NONE,
-    MAX_DEFINITION_BYTES,
-    MAX_DEPTH,
-    MAX_NODES,
     MAX_PLUGIN_PARTS,
     PLUGIN_FIELD_PREFIX,
     PROPERTY_FIELD_PREFIX,
     CalendarFilterSpec,
-    CardPart,
     CounterDetailFieldId,
     DetailFieldPart,
     DetailLayoutDefinition,
     DetailLayoutRead,
     DetailLayoutWrite,
-    DetailStackPart,
     EventDetailFieldId,
     FieldPart,
     FileFieldId,
@@ -65,14 +59,14 @@ from app.schemas.tenant.tool_layout import (
     ListLayoutWrite,
     PluginPart,
     PostDetailFieldId,
-    SectionPart,
-    StackPart,
     TaskDetailFieldId,
     TaskFieldId,
     TaskFilterSpec,
     ToolLayoutDefaultWrite,
     ToolLayoutRead,
     ToolLayoutWrite,
+    parts_of,
+    too_large,
 )
 
 #: The parts any detail lays out with.
@@ -341,26 +335,16 @@ def read_set(
     return layouts
 
 
-def _parts(part: Any, depth: int) -> Iterable[tuple[Any, int]]:
-    """Every part in a tree, with its depth."""
-    yield part, depth
-    if isinstance(part, (CardPart, StackPart, DetailStackPart, SectionPart)):
-        for child in part.children:
-            yield from _parts(child, depth + 1)
-
-
 def _within_limits(stored: dict[str, Any], roots: list[Any], loose: int) -> None:
     """Refuse a layout past the node, depth, size or plug-in part limit.
     ``loose`` is the nodes outside any tree (columns)."""
-    parts = [found for root in roots for found in _parts(root, 1)]
-    if (
-        len(parts) + loose > MAX_NODES
-        or max((depth for _, depth in parts), default=0) > MAX_DEPTH
-        or len(json.dumps(stored).encode()) > MAX_DEFINITION_BYTES
-    ):
+    if too_large(stored, roots, loose):
         raise _bad_request(ToolLayoutMessages.TOO_LARGE)
     installs = Counter(
-        part.props.plugin for part, _ in parts if isinstance(part, PluginPart)
+        part.props.plugin
+        for root in roots
+        for part, _ in parts_of(root)
+        if isinstance(part, PluginPart)
     )
     if any(count > MAX_PLUGIN_PARTS for count in installs.values()):
         raise CodedError(
@@ -418,7 +402,7 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
         ]
         _within_limits(stored, roots, 0)
         if not all(
-            _drawn_on(part, write.kind) for root in roots for part, _ in _parts(root, 1)
+            _drawn_on(part, write.kind) for root in roots for part, _ in parts_of(root)
         ) or not all(_requireable(write.kind, key) for key in required_keys(stored)):
             raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     else:
@@ -457,7 +441,7 @@ def _check_list_fields(
     list holds whether it is shown and what it shows of each file — its table
     its columns, its other lists a card — and how its scales are drawn."""
     cards = [definition.card] if definition.card is not None else []
-    parts = [part for root in cards for part, _ in _parts(root, 1)]
+    parts = [part for root in cards for part, _ in parts_of(root)]
     shown = [
         getattr(field, "value", field)
         for field in (
