@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser, buildUserPublic } from "@/__tests__/factories/user.factory";
-import { renderWithProviders } from "@/__tests__/helpers/render";
+import { renderPage } from "@/__tests__/helpers/render";
+import type { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 
 const alice = buildUserPublic({ id: 101, display_name: "Alice" });
 // The sender, signed in, and as the search lists them.
@@ -31,6 +32,18 @@ vi.mock("@/hooks/useShareRequests", () => ({
 
 import { SendToDialog } from "./SendTo";
 
+/** Mounts the dialog in a router, which the link it copies reads, and waits for it. */
+const renderDialog = async (
+  props: { kind: ContentKind; entityId: number },
+  options: Parameters<typeof renderPage>[1] = {}
+) => {
+  renderPage(() => <SendToDialog open onOpenChange={vi.fn()} {...props} />, {
+    auth: { user: me },
+    ...options,
+  });
+  await screen.findByRole("dialog");
+};
+
 const pickAlice = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole("combobox", { name: "People" }));
   await user.click(await screen.findByText("Alice"));
@@ -44,9 +57,7 @@ describe("SendToDialog", () => {
 
   it("sends to the people picked, letting them in at the rung chosen, with the note", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<SendToDialog open onOpenChange={vi.fn()} kind="task" entityId={7} />, {
-      auth: { user: me },
-    });
+    await renderDialog({ kind: "task", entityId: 7 });
 
     await pickAlice(user);
     await user.click(screen.getByRole("radio", { name: "Edit" }));
@@ -71,14 +82,46 @@ describe("SendToDialog", () => {
   it("lets nobody in for a sender who may not share it", async () => {
     standing.level = "read";
     const user = userEvent.setup();
-    renderWithProviders(<SendToDialog open onOpenChange={vi.fn()} kind="task" entityId={7} />, {
-      auth: { user: me },
-    });
+    await renderDialog({ kind: "task", entityId: 7 });
 
     expect(screen.queryByRole("radio", { name: "Edit" })).not.toBeInTheDocument();
     await pickAlice(user);
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ level: null, note: null }));
+  });
+
+  it("copies the link the bell opens, on the server the app is signed in to", async () => {
+    const user = userEvent.setup();
+    await renderDialog(
+      { kind: "task", entityId: 7 },
+      {
+        communities: { activeCommunityId: 4 },
+        server: { getServerOrigin: () => "https://initiative.example.com" },
+      }
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+
+    expect(await navigator.clipboard.readText()).toBe(
+      "https://initiative.example.com/c/4/go/task/7"
+    );
+  });
+
+  it("copies the page it was sent from for a kind with no address of its own", async () => {
+    const user = userEvent.setup();
+    await renderDialog(
+      { kind: "counter", entityId: 9 },
+      {
+        initialRoute: "/c/4/counter/9",
+        server: { getServerOrigin: () => "https://initiative.example.com" },
+      }
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+
+    expect(await navigator.clipboard.readText()).toBe(
+      "https://initiative.example.com/c/4/counter/9"
+    );
   });
 });

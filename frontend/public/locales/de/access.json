@@ -162,6 +162,7 @@
   },
   "send": {
     "button": "Senden an…",
+    "copyLink": "Link kopieren",
     "title": "Senden an…",
     "description": "Sie bekommen es in ihren Benachrichtigungen und öffnen es auf dem Gerät, das sie gerade nutzen.",
     "people": "Personen",

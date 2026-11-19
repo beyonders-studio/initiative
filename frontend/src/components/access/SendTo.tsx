@@ -8,16 +8,22 @@
  * The server decides who is which and refuses anybody it may not tell.
  */
 
-import { Eye, MessageCircleQuestion, Pencil, Send, X } from "lucide-react";
+import { useLocation } from "@tanstack/react-router";
+import { Eye, Link2, MessageCircleQuestion, Pencil, Send, X } from "lucide-react";
 import { type FormEvent, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ContentKind, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { MemberAvatar, type MemberLike } from "@/components/members/MemberSearchSelect";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
+import { useCopyLink } from "@/hooks/useCopyLink";
 import { useSendTo, useShareStanding } from "@/hooks/useShareRequests";
 import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
+import { communityPath } from "@/lib/communityUrl";
+import { entityRefTypeFor } from "@/lib/entityResolver";
 import { toast } from "@/lib/mascotToast";
+import { entityRefRoute } from "@/lib/tools";
 import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
@@ -59,13 +65,26 @@ export const SendButton = ({ kind, entityId, className }: SendTarget & { classNa
         title={label}
         onClick={() => setOpen(true)}
       >
-        <Send className="size-5" aria-hidden />
+        <Send className="size-4" aria-hidden />
       </button>
       {open ? (
         <SendToDialog open={open} onOpenChange={setOpen} kind={kind} entityId={entityId} />
       ) : null}
     </>
   );
+};
+
+/**
+ * The address a sent thing opens at, as its bell line opens it: the `/go`
+ * resolver, which finds where it lives today wherever it has moved since. A
+ * kind with no address of its own (a counter) is sent from its own page, so
+ * that page is the link.
+ */
+const useSentLink = ({ kind, entityId }: SendTarget): string => {
+  const communityId = useActiveCommunityId();
+  const href = useLocation({ select: (location) => location.href });
+  const refType = entityRefTypeFor(kind as SearchEntityType);
+  return refType ? communityPath(communityId, entityRefRoute(refType, entityId)) : href;
 };
 
 const COMMUNITY_SCOPE: MemberSearchScope = { type: "community" };
@@ -79,6 +98,8 @@ export const SendToDialog = ({ open, onOpenChange, kind, entityId }: DialogProps
   const standing = useShareStanding(kind as SearchEntityType, entityId);
   const initiativeId = standing.data?.initiative_id;
   const mayLetIn = standing.data?.level === "owner";
+  const link = useSentLink({ kind, entityId });
+  const copyLink = useCopyLink();
 
   const [chosen, setChosen] = useState<MemberLike[]>([]);
   const [query, setQuery] = useState("");
@@ -211,7 +232,11 @@ export const SendToDialog = ({ open, onOpenChange, kind, entityId }: DialogProps
               disabled={sendTo.isPending}
             />
           </Field>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-between gap-2">
+            <Button type="button" variant="outline" onClick={() => void copyLink(link)}>
+              <Link2 />
+              {t("send.copyLink")}
+            </Button>
             <Button type="submit" pending={sendTo.isPending} disabled={chosen.length === 0}>
               <Send />
               {t("send.submit")}

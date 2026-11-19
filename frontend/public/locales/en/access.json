@@ -162,6 +162,7 @@
   },
   "send": {
     "button": "Send to…",
+    "copyLink": "Copy link",
     "title": "Send to…",
     "description": "They get it in their notifications and open it on whatever they're using.",
     "people": "People",

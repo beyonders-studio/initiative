@@ -1,10 +1,12 @@
-import { RotateCw } from "lucide-react";
+import { useLocation } from "@tanstack/react-router";
+import { type LucideIcon, RotateCw, Share2 } from "lucide-react";
 import { Suspense, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/icons/LogoIcon";
 import { HelpButton } from "@/components/support/HelpButton";
 import { UpdateButton } from "@/components/updates/UpdateButton";
+import { useCopyLink } from "@/hooks/useCopyLink";
 import { themeColor } from "@/lib/cssColor";
 import Desktop from "@/plugins/desktop";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
@@ -66,35 +68,65 @@ const useWindowButtonColors = (shown: boolean) => {
   }, [shown]);
 };
 
+/** One of the bar's icon buttons, named by its tooltip. */
+const TitleBarButton = ({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) => (
+  <TooltipProvider delayDuration={300}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+          aria-label={label}
+          onClick={onClick}
+        >
+          <Icon className="size-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{label}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
+
 /** Reloads the page, which a browser's own toolbar offers and the desktop app's window does not. */
 const ReloadButton = () => {
   const { t } = useTranslation("common");
-  const label = t("reloadPage");
+  return (
+    <TitleBarButton
+      icon={RotateCw}
+      label={t("reloadPage")}
+      onClick={() => window.location.reload()}
+    />
+  );
+};
+
+/**
+ * Copies the page's address, which a browser's address bar shows and the
+ * desktop app's window does not: the route on the server the app is signed in
+ * to, so the link opens the same page in a browser or another app.
+ */
+const ShareButton = () => {
+  const { t } = useTranslation("common");
+  const href = useLocation({ select: (location) => location.href });
+  const copyLink = useCopyLink();
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-            aria-label={label}
-            onClick={() => window.location.reload()}
-          >
-            <RotateCw className="size-4" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{label}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <TitleBarButton icon={Share2} label={t("copyPageLink")} onClick={() => void copyLink(href)} />
   );
 };
 
 /**
  * The desktop app's title bar, which the window leaves to the page: the app's
- * name, then the update it is waiting on, Reload and Help, with the computer's own
+ * name, then the update it is waiting on, Share, Reload and Help, with the computer's own
  * window buttons drawn at its end. The bar drags the window and a double click
  * maximizes it. Everything under it is sized by `--title-bar-height` (`h-app`,
  * `min-h-app`, `max-h-app`).
@@ -133,6 +165,7 @@ export const DesktopTitleBar = () => {
         <Suspense fallback={null}>
           <div className="ml-auto flex items-center gap-3 [app-region:no-drag]">
             <UpdateButton />
+            <ShareButton />
             <ReloadButton />
             <HelpButton />
           </div>
