@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 
 import { AgeUnansweredPanel } from "@/components/connections/UnreachableEmptyState";
 import { ConversationList } from "@/components/messages/ConversationList";
+import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
+import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { ratchetSupported } from "@/crypto/client";
 import {
   useCanUseDirectMessages,
@@ -211,6 +213,15 @@ export function MessagesPage() {
     [startMessages]
   );
 
+  // The app's create button starts a conversation here, wherever on the page
+  // one is open. Not while the page is refusing: nothing could be started.
+  const [starting, setStarting] = useState(false);
+  const canStart =
+    dmEnabled && ratchetSupported() && !device.isError && settingsLoaded && canMessage;
+  useRegisterPrimaryCreateAction(
+    canStart ? { run: () => setStarting(true), label: t("newConversation.trigger") } : null
+  );
+
   useEffect(() => {
     // A named thread is what is on screen, so the handle is not acted on: it
     // would open a conversation with somebody in the background, under a thread
@@ -319,6 +330,8 @@ export function MessagesPage() {
 
       {/* The other side of the same verification, on the device that asked. */}
       <HistoryAskNotice />
+
+      <NewConversationDialog open={starting} onOpenChange={setStarting} />
 
       {/* Who there is to talk to lives in the sidebar, which drills into this
           route -- so the page is only ever the one conversation. That is what

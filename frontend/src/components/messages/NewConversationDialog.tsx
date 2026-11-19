@@ -56,11 +56,23 @@ const SEARCH_SETTLES_MS = 250;
  * channel exists — most of the people it lists have never agreed to anything —
  * and the page it lands on is the one that already knows how to say so and
  * what to offer instead.
+ *
+ * Opened by its own button, or, given `open`, by whoever holds it — the
+ * app's create button on My Messages — and then it draws no button of its own.
  */
-export const NewConversationDialog = () => {
+export const NewConversationDialog = ({
+  open: heldOpen,
+  onOpenChange,
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+} = {}) => {
   const { t } = useTranslation(["messages", "connections", "settings"]);
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const held = heldOpen !== undefined;
+  const open = heldOpen ?? ownOpen;
+  const setOpen = onOpenChange ?? setOwnOpen;
   const [term, setTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
   /**
@@ -177,19 +189,21 @@ export const NewConversationDialog = () => {
           filled button. The name is inside it for a screen reader either way;
           the tooltip is for everybody else, since an icon alone says "add"
           without saying add what. */}
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-              <Button size="icon" className="size-8 shrink-0">
-                <MessageSquarePlus className="size-4" aria-hidden />
-                <span className="sr-only">{t("messages:newConversation.trigger")}</span>
-              </Button>
-            </DialogTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="top">{t("messages:newConversation.trigger")}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      {held ? null : (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button size="icon" className="size-8 shrink-0">
+                  <MessageSquarePlus className="size-4" aria-hidden />
+                  <span className="sr-only">{t("messages:newConversation.trigger")}</span>
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="top">{t("messages:newConversation.trigger")}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("messages:newConversation.title")}</DialogTitle>
