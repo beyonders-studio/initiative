@@ -8,11 +8,11 @@ from enum import Enum
 
 from pydantic import ConfigDict
 
-from app.core.tools import CONTENT_KINDS, Tool
+from app.core.tools import CONTENT_KINDS
 from app.models.tenant.personal_item import ViewSource
 from app.schemas.base import SanitizedBaseModel
 
-#: Every tool and everything inside one, as a str enum so a path parameter is
+#: Every built-in tool and everything inside one, as a str enum so a field is
 #: validated and OpenAPI lists the values.
 ContentKind = Enum("ContentKind", [(k, k) for k in CONTENT_KINDS], type=str)
 
@@ -29,7 +29,8 @@ class PersonalItemState(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    entity_type: ContentKind
+    #: A tool or anything inside one, a tool plug-in's among them.
+    entity_type: str
     entity_id: int
     viewed_at: datetime | None = None
     view_source: ViewSource | None = None
@@ -58,7 +59,8 @@ class PersonalItemRead(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    entity_type: Tool
+    #: A tool, a tool plug-in's among them.
+    entity_type: str
     entity_id: int
     community_id: int
     # The initiative it lives in, which its URL addresses. NULL for a

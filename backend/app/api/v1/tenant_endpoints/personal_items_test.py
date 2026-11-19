@@ -16,6 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import col, delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.messages import KindMessages
 from app.core.tools import CHILD_KINDS, KINDS, Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeMember
@@ -454,7 +455,8 @@ async def test_opening_something_inside_a_tool_is_recorded_and_never_a_tab(
     bookmark = await client.put(
         a.g(f"/personal-items/bookmark/{kind}/{entity.id}"), headers=a.headers
     )
-    assert bookmark.status_code == 422
+    assert bookmark.status_code == 404, bookmark.text
+    assert bookmark.json()["detail"] == KindMessages.NOT_FOUND
 
 
 async def test_any_tool_can_be_bookmarked_and_listed_newest_first(

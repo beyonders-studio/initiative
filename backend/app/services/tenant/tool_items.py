@@ -13,10 +13,12 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy import select as sa_select
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.db.session import routed_tools
 from app.models.tenant.file import File
 from app.services.tenant.tags import TOOL_TAG_LINKS
 
@@ -66,7 +68,8 @@ TOOL_ITEM_SPECS: dict[Tool, ToolItemSpec] = {
 class ToolItem:
     """One loaded tool, as a list shows it."""
 
-    tool: Tool
+    #: Its kind: a built-in tool's, or an installed tool plug-in's.
+    tool: str
     entity_id: int
     initiative_id: int | None
     name: str
@@ -76,8 +79,10 @@ class ToolItem:
 async def load_tool_items(
     session: AsyncSession, refs: Iterable[tuple[str, int]]
 ) -> dict[tuple[str, int], ToolItem]:
-    """The tools these pairs name that the reader may read, by pair. One query
-    per tool that appears; a pair whose tool is unknown or unreadable is absent."""
+    """The tools these pairs name that the reader may read, by pair: a
+    built-in tool's rows, and an installed tool plug-in's, named by their
+    ``name``, neither in the trash. One query per tool that appears; a pair whose tool is unknown or
+    unreadable is absent."""
     ids_by_type: dict[str, list[int]] = {}
     for entity_type, entity_id in refs:
         ids_by_type.setdefault(entity_type, []).append(entity_id)
@@ -91,10 +96,27 @@ async def load_tool_items(
         result = await session.exec(select(model).where(model.id.in_(ids)))  # type: ignore[attr-defined]
         for row in result.all():
             items[(tool.value, row.id)] = ToolItem(
-                tool=tool,
+                tool=tool.value,
                 entity_id=row.id,
                 initiative_id=getattr(row, "initiative_id", None),
                 name=getattr(row, spec.name_attr),
                 extra=spec.extra(row) if spec.extra else {},
+            )
+    for record in routed_tools(session).installed:
+        ids = ids_by_type.get(record.kind)
+        if not ids:
+            continue
+        table = record.table
+        result = await session.exec(
+            sa_select(table.c.id, table.c.initiative_id, table.c.name).where(
+                table.c.id.in_(ids), table.c.deleted_at.is_(None)
+            )
+        )
+        for row_id, initiative_id, name in result.all():
+            items[(record.kind, row_id)] = ToolItem(
+                tool=record.kind,
+                entity_id=row_id,
+                initiative_id=initiative_id,
+                name=name,
             )
     return items
