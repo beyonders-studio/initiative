@@ -329,6 +329,17 @@ tool plug-ins bring kinds of their own. A kind the community does not have is
 - POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `task` from the `path` request parameter `entity_type`
 - POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `wiki` from the `path` request parameter `entity_type`
 
+### A guest invite names any tool's row
+
+The item a guest invite gives is a row of any of the community's tools, a
+tool plug-in's among them, named by its kind as a string in place of the
+`Tool` enum. A kind the community does not have is 404
+`GUEST_GRANT_NOT_FOUND`, as a row it does not have was.
+
+- GET /api/v1/communities/{community_id}/invites added `subschema #1` to the `items/grants/items/resource_type` response property `anyOf` list for the response status `200`
+- POST /api/v1/communities/{community_id}/invites removed `#/components/schemas/Tool` from the `grants/items/resource_type` request property `anyOf` list
+- POST /api/v1/communities/{community_id}/invites added `subschema #1` to the `grants/items/resource_type` response property `anyOf` list for the response status `201`
+
 ### An initiative's tool switches are one map
 
 Each initiative's switch for each tool is a rule of the initiative's, read and
