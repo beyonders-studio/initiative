@@ -319,10 +319,13 @@ def _dac_via(
     return DacPath(tool=tool, via=((fk, parent),), predicate=build)
 
 
-def _dac_two_hop(mid: str, mid_fk: str, parent: str, fk: str) -> DacPath:
+def _dac_two_hop(
+    mid: str, mid_fk: str, parent: str, fk: str, tool: ToolRecord | None = None
+) -> DacPath:
     """Two hops to the governing resource: ``table.<fk> -> mid -> parent`` — a
-    task's tag link by its task's project, an attendee by its event's calendar."""
-    tool = BUILTIN_TOOLS.by_table[parent]
+    task's tag link by its task's project, an attendee by its event's calendar.
+    ``tool`` is the record of ``parent``, a built-in tool's when not given."""
+    tool = tool or BUILTIN_TOOLS.by_table[parent]
 
     def build(t: str, c: str, w: bool) -> str | None:
         if c == "SELECT" and parent_answers_for_reads(mid):
@@ -606,6 +609,34 @@ def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
     )
 
 
+def _via_item(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> InitiativePath:
+    """Two hops through another of a tool plug-in's items:
+    ``table.<fk> -> mid -> the tool's table``, the walk the built-in two-hop
+    paths make, written for any tool's tables."""
+    parent = tool.table.name
+
+    def walk(row: str) -> str:
+        return (
+            f"FROM {mid} dmid JOIN {parent} dpar ON dpar.id = dmid.{mid_fk} "
+            f"WHERE dmid.id = {row}.{fk}"
+        )
+
+    return InitiativePath(
+        predicate=lambda t, w: (
+            f"EXISTS (SELECT 1 {walk(t)} AND {_access('dpar.initiative_id', w)})"
+        ),
+        initiative_expr=lambda r: f"(SELECT dpar.initiative_id {walk(r)})",
+        parents=lambda r: _parent_chain(
+            f"{mid} dmid",
+            "dmid.id",
+            f"{r}.{fk}",
+            (mid, "dmid.id"),
+            (parent, f"dmid.{mid_fk}"),
+        ),
+        dac=_dac_two_hop(mid, mid_fk, parent, fk, tool),
+    )
+
+
 #: The two-hop paths, by the item table the walk goes through.
 _TWO_HOP: dict[str, Callable[[str], InitiativePath]] = {
     "tasks": via_task_project,
@@ -654,10 +685,13 @@ def item_path(tool: ToolRecord, item: Table) -> InitiativePath:
         )
     fk = through[0].parent.name
     mid = through[0].column.table.name
+    mid_fk = _keys_to(tables[mid], (parent,))[0].parent.name
+    if tool.install_id is not None:
+        # A tool plug-in's item under another of its items.
+        return _via_item(tool, mid, mid_fk, fk)
     if mid not in _TWO_HOP:
         raise ValueError(f"{table} walks through {mid}, which has no two-hop path")
     path = _TWO_HOP[mid](fk)
-    mid_fk = _keys_to(tables[mid], (parent,))[0].parent.name
     if path.dac is None or path.dac.via != ((fk, mid), (mid_fk, parent)):
         raise ValueError(f"{table}: the {mid} path does not walk {mid}.{mid_fk}")
     return path
