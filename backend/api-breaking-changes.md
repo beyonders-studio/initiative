@@ -147,6 +147,45 @@ so every response carrying a notification's type may hold it.
 - POST /api/v1/notifications/{notification_id}/read added the new `item_sent` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `item_sent` enum value to the `type` response property for the response status `200`
 
+### A layout draws what a tool plug-in declares
+
+A list's layout can now hold what a tool plug-in's tables are drawn with: a
+card's `tint`, an `items` part previewing a row's items, a look read off a
+row's select field (`displays: {field: {from}}`), and a preset named in each
+language. A layout read back may carry them, and a write takes them where the
+tool's table holds the fields they name; every value it took before it still
+takes.
+
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/DisplayFrom, subschema #1` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/` response property `oneOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #2: StackPart]/children/items/` response property `oneOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} response property `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/DisplayFrom, subschema #1` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/` response property `oneOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #2: StackPart]/children/items/` response property `oneOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ response property `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
+- GET /api/v1/c/{community_id}/layouts/ the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/DisplayFrom, subschema #1` to the `items/layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/ItemsPart` to the `items/layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/` response property `oneOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/ItemsPart` to the `items/layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #2: StackPart]/children/items/` response property `oneOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative response property `items/layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
+- GET /api/v1/c/{community_id}/layouts/initiative the `items/layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/DisplayFrom, subschema #1` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #2: StackPart]/children/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `bar` of the request property `oneOf[subschema #1: ListLayoutWrite]/definition/displays/anyOf[subschema #1]/additionalProperties/`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `clock` of the request property `oneOf[subschema #1: ListLayoutWrite]/definition/displays/anyOf[subschema #1]/additionalProperties/`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `number` of the request property `oneOf[subschema #1: ListLayoutWrite]/definition/displays/anyOf[subschema #1]/additionalProperties/`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `stars` of the request property `oneOf[subschema #1: ListLayoutWrite]/definition/displays/anyOf[subschema #1]/additionalProperties/`
+- PUT /api/v1/c/{community_id}/layouts/ response property `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
+- PUT /api/v1/c/{community_id}/layouts/ the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/DisplayFrom, subschema #1` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/ItemsPart` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #2: StackPart]/children/items/` response property `oneOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default response property `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/presets/anyOf[subschema #1]/items/name` list-of-types was widened by adding types `object` to media type `application/json` of response `200`
+- PUT /api/v1/c/{community_id}/layouts/default the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/displays/anyOf[subschema #1]/additionalProperties/` response's property `type` changed from `string` to `any` for status `200`
+
 ## After 0.79.0
 
 ### A plug-in is suspended, not switched off

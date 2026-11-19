@@ -15,11 +15,11 @@ import {
 import { useRecordOpen, useSubscription } from "@/hooks/usePersonalItems";
 import { useToolRealtime } from "@/hooks/useResourceRealtime";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getContrastingTextColor } from "@/lib/counter-color";
 import { counterShown } from "@/lib/counter-math";
 import { counterRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { CounterFocusSkeleton } from "@/ui/page-skeletons";
 import { CounterFocus } from "@/ui/properties/CounterFocus";
 

@@ -14,16 +14,26 @@ publisher's own check is never taken on trust:
 * **Caps**: at most ``toolFields`` fields per table, ``toolItems`` item
   tables, two levels deep, and ``toolActions`` actions.
 * **Fields** are of the contract's kinds, with options, a currency and a
-  counter only where the kind has one, and a default of the kind's own shape.
+  counter only where the kind has one, and a default of the kind's own shape
+  (a colour's may be ``random``). A required field has a default, and is
+  never a person.
 * **``open_while``** is one condition on one of the item's fields, of a kind
-  that condition reads.
+  that condition reads; a table's **``checks``** are comparisons in the same
+  grammar on its own number and counter fields, which the defaults a new row
+  starts with hold to.
 * **Actions** run on the tool's rows or an item's, ask only for that table's
   fields, and write an expression that parses.
-* **Layouts**: each table's list and item page, in the grammar the kit draws
+* **Layouts**: each table's lists and item page, in the grammar the kit draws
   and ``tool_layouts`` stores (:mod:`app.schemas.tenant.tool_layout`),
   validated by its own models with the table's fields as the ids a layout
-  names. A tool plug-in's lists are a grid or a table, its parts those every
-  tool has, its looks those its field's kind has, and its size the kit's.
+  names. A tool plug-in's lists are one to three of a grid, a masonry wall
+  and a table, its parts those every tool has, its looks those its field's
+  kind has (or a select field's whose every option is one), its tints colour
+  fields, its previews of items an item table directly under it, its presets
+  sorts by fields that sort, and its size the kit's.
+
+:func:`tool_row_problems` holds a row to its table's declaration: its
+required fields and its checks, as the table's constraints do.
 
 Beside the tool, a tool plug-in carries only the listing terms every plug-in
 has (:func:`~app.services.marketplace.service_plugins.listing_terms`); a term
@@ -33,19 +43,24 @@ that serves or calls is refused rather than dropped.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+import operator
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ValidationError
 
 from app.schemas.tenant.tool_layout import (
+    MAX_PRESETS,
     TOOL_FIELDS,
     CardPart,
     DetailFieldPart,
     DetailLayoutDefinition,
+    DisplayFrom,
+    ItemsPart,
     ListLayoutDefinition,
     OwnPart,
     PluginPart,
@@ -81,11 +96,12 @@ __all__ = [
     "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
     "ToolChanges",
-    "field_start",
+    "effective_defaults",
     "is_tool_plugin",
     "normalize_tool_plugin_definition",
     "tool_changes",
     "tool_kinds",
+    "tool_row_problems",
     "value_fits",
 ]
 
@@ -117,8 +133,22 @@ TOOL_LAYOUT_FIELDS: frozenset[str] = contract.enum("toolLayoutField")
 #: The page parts every tool has, which a tool plug-in's item page may place.
 TOOL_PAGE_PARTS: frozenset[str] = contract.enum("toolDetailPart")
 #: How a tool plug-in's table may be listed (``toolListKind``), and what each
-#: holds beside its kind and ``displays``: a grid its card, a table its columns.
-TOOL_LIST_LAYOUTS: dict[str, str] = {"grid": "card", "table": "columns"}
+#: holds beside its kind, ``displays`` and ``presets``: a grid and a masonry
+#: wall their card, a table its columns.
+TOOL_LIST_LAYOUTS: dict[str, str] = {
+    "grid": "card",
+    "masonry": "card",
+    "table": "columns",
+}
+#: The fields every tool row has that a preset sorts by.
+TOOL_SORT_FIELDS: frozenset[str] = contract.enum("toolSortField")
+#: The kinds of declared field a preset sorts by: those whose values have an
+#: order.
+_SORTABLE = frozenset(
+    {"number", "counter", "currency", "scale", "date", "datetime", "checkbox"}
+)
+#: A colour field's default that Initiative picks from its palette per row.
+RANDOM_COLOR = "random"
 #: The looks a list draws a scale and a counter field in.
 _LOOKS: dict[str, frozenset[str]] = {
     "scale": frozenset({"number", "stars", "bar"}),
@@ -132,12 +162,22 @@ MAX_TOOL_KEY_LENGTH = contract.cap("toolKeyLength")
 MAX_TOOL_FIELDS = contract.cap("toolFields")
 MAX_TOOL_ITEMS = contract.cap("toolItems")
 MAX_TOOL_ACTIONS = contract.cap("toolActions")
+MAX_TOOL_CHECKS = contract.cap("toolChecks")
+MAX_PRESET_SORTS = contract.cap("presetSorts")
 _KEY_CHARS = contract.charset("toolKey")
 _KEY_START = frozenset("abcdefghijklmnopqrstuvwxyz")
 
-#: The comparisons an open condition makes between a number or counter field
-#: and an operand, and the kinds they read.
-_COMPARISONS = ("below", "at_most", "above", "at_least", "equals", "not_equals")
+#: The comparisons an open condition or a check makes between a number or
+#: counter field and an operand, each with whether it holds of two numbers.
+COMPARISONS: dict[str, Callable[[Any, Any], bool]] = {
+    "below": operator.lt,
+    "at_most": operator.le,
+    "above": operator.gt,
+    "at_least": operator.ge,
+    "equals": operator.eq,
+    "not_equals": operator.ne,
+}
+_COMPARISONS = tuple(COMPARISONS)
 _NUMBER_KINDS = frozenset({"number", "counter"})
 _CONDITIONS = frozenset({*_COMPARISONS, "is", "in", "not_passed"})
 _COUNTER_BOUNDS = ("min", "max", "step", "initial")
@@ -364,19 +404,6 @@ def value_fits(field: dict[str, Any], raw: Any) -> bool:
     }[kind]()
 
 
-def field_start(field: Mapping[str, Any]) -> Any:
-    """What a new row's field holds when nothing is written to it: its
-    default, false for a checkbox, nothing otherwise; a counter starts at its
-    ``initial``, a number here, and one naming a field is read from the row
-    it is on."""
-    if field["kind"] == "counter":
-        start = (field.get("counter") or {}).get("initial")
-        return start if _number(start) else 0
-    if field.get("default") is not None:
-        return field["default"]
-    return False if field["kind"] == "checkbox" else None
-
-
 def _default(field: dict[str, Any], raw: Any, *, what: str) -> Any:
     """A field's default, of its kind's own shape."""
     kind = field["kind"]
@@ -384,7 +411,7 @@ def _default(field: dict[str, Any], raw: Any, *, what: str) -> Any:
         fail(f"{what}: a counter field starts at its counter's 'initial'")
     if kind == "user_reference":
         fail(f"{what}: a person is never a default")
-    if not value_fits(field, raw):
+    if not (kind == "color" and raw == RANDOM_COLOR) and not value_fits(field, raw):
         fail(f"{what}: the default is not a value of a {kind} field")
     return raw
 
@@ -422,6 +449,15 @@ def _field(raw: Any, *, what: str) -> dict[str, Any]:
         fail(f"{what}: only a counter field has a counter")
     if field.get("default") is not None:
         cleaned["default"] = _default(cleaned, field["default"], what=what)
+    required = field.get("required")
+    if required is not None and not isinstance(required, bool):
+        fail(f"{what} required: true or false")
+    if required:
+        if kind == "user_reference":
+            fail(f"{what}: a person is never a default, so it is never required")
+        if kind != "counter" and "default" not in cleaned:
+            fail(f"{what}: a required field has a default, which rows take")
+        cleaned["required"] = True
     return cleaned
 
 
@@ -472,9 +508,9 @@ def _fields(raw: Any, *, what: str, required: bool) -> list[dict[str, Any]]:
     return fields
 
 
-def _operand(raw: Any, *, numbers: set[str], what: str) -> Any:
+def _operand(raw: Any, *, numbers: set[str], what: str, noun: str) -> Any:
     """What a number or counter field is compared with: a number, or
-    ``{"field": key}``, another such field of the same item."""
+    ``{"field": key}``, another such field of the same table."""
     if _number(raw):
         return raw
     operand = require_mapping(raw, what)
@@ -482,18 +518,27 @@ def _operand(raw: Any, *, numbers: set[str], what: str) -> Any:
         fail(f"{what} is a number or {{'field': key}}")
     if not isinstance(operand["field"], str) or operand["field"] not in numbers:
         fail(
-            f"{what}: {operand['field']!r} is not a number or counter field of this item"
+            f"{what}: {operand['field']!r} is not a number or counter field of this {noun}"
         )
     return {"field": operand["field"]}
 
 
-def _open_while(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[str, Any]:
-    """One condition on one of the item's fields, of a kind it reads."""
+def _open_while(
+    raw: Any,
+    *,
+    fields: list[dict[str, Any]],
+    what: str,
+    noun: str = "item",
+    terms_allowed: frozenset[str] = _CONDITIONS,
+) -> dict[str, Any]:
+    """One condition on one of the ``noun``'s fields, of a kind it reads: an
+    item's open condition, or, with the comparisons alone, a table's
+    check."""
     condition = require_mapping(raw, what)
     by_key = {field["key"]: field for field in fields}
     terms = [term for term in condition if term != "field"]
     for term in terms:
-        if term not in _CONDITIONS:
+        if term not in terms_allowed:
             fail(f"{what}: {term!r} is not a condition")
     if len(terms) != 1:
         fail(f"{what} is one condition on its field")
@@ -501,7 +546,7 @@ def _open_while(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[st
     key = condition.get("field")
     field = by_key.get(key) if isinstance(key, str) else None
     if field is None:
-        fail(f"{what}: {key!r} is not a field of this item")
+        fail(f"{what}: {key!r} is not a field of this {noun}")
     kind = field["kind"]
     value = condition[term]
 
@@ -512,7 +557,7 @@ def _open_while(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[st
     if term in _COMPARISONS:
         reads(_NUMBER_KINDS, "a number or counter field")
         numbers = {k for k, f in by_key.items() if f["kind"] in _NUMBER_KINDS}
-        value = _operand(value, numbers=numbers, what=f"{what} {term}")
+        value = _operand(value, numbers=numbers, what=f"{what} {term}", noun=noun)
     elif term == "is":
         reads(frozenset({"checkbox"}), "a checkbox field")
         if not isinstance(value, bool):
@@ -536,6 +581,93 @@ def _open_while(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[st
     return {"field": key, term: value}
 
 
+def _checks(raw: Any, *, fields: list[dict[str, Any]], what: str) -> list[dict]:
+    """What every row of a table holds to: comparisons of its number and
+    counter fields, which the defaults a new row starts with hold to where
+    both sides have one."""
+    declared = require_list(raw, f"{what} checks", MAX_TOOL_CHECKS)
+    if not declared:
+        fail(f"{what} checks: leave 'checks' out for a table with none")
+    defaults = effective_defaults(fields)
+    checks = []
+    for index, entry in enumerate(declared):
+        at = f"{what} check {index}"
+        check = _open_while(
+            entry,
+            fields=fields,
+            what=at,
+            noun="table",
+            terms_allowed=frozenset(_COMPARISONS),
+        )
+        ((term, operand),) = ((t, v) for t, v in check.items() if t != "field")
+        left = defaults[check["field"]]
+        right = defaults[operand["field"]] if isinstance(operand, dict) else operand
+        if _number(left) and _number(right) and not COMPARISONS[term](left, right):
+            fail(f"{at}: a new row's defaults do not hold to it")
+        checks.append(check)
+    return checks
+
+
+def effective_defaults(
+    fields: Iterable[Mapping[str, Any]], given: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """What each of a table's declared fields holds on a new row when nothing
+    is written to it: its default, false for a checkbox, nothing otherwise. A
+    counter starts at its ``initial``: a number, or the number field it names
+    as the row holds it (``given``, the values written), else as that field
+    starts; 0 where that is nothing. The one answer a table's column defaults,
+    its checks at publish and a new row's values are read from."""
+    fields = list(fields)
+    written = given or {}
+    starts: dict[str, Any] = {
+        field["key"]: (
+            field["default"]
+            if field.get("default") is not None
+            else (False if field["kind"] == "checkbox" else None)
+        )
+        for field in fields
+        if field["kind"] != "counter"
+    }
+    counters: dict[str, Any] = {}
+    for field in fields:
+        if field["kind"] != "counter":
+            continue
+        start = (field.get("counter") or {}).get("initial")
+        if isinstance(start, str):
+            start = (
+                written[start] if written.get(start) is not None else starts.get(start)
+            )
+        counters[field["key"]] = 0 if start is None else start
+    return {**starts, **counters}
+
+
+def tool_row_problems(
+    table: Mapping[str, Any], row: Mapping[str, Any]
+) -> list[tuple[str, str]]:
+    """What is wrong with ``row``, a row of the declared ``table`` (the tool
+    block or one of its items) as it would be stored, by its fields' keys:
+    each required field it empties, as ``(key, "required")``, and each check
+    it breaks, as ``(key, <comparison>)``. A field ``row`` leaves out takes
+    its column's default, which a required field always has; a check whose
+    either side is empty holds, as the table's CHECK does."""
+    problems = [
+        (field["key"], "required")
+        for field in table.get("fields", ())
+        if field.get("required") and field["key"] in row and row[field["key"]] is None
+    ]
+    for check in table.get("checks", ()):
+        ((term, operand),) = ((t, v) for t, v in check.items() if t != "field")
+        left = row.get(check["field"])
+        right = row.get(operand["field"]) if isinstance(operand, dict) else operand
+        if (
+            left is not None
+            and right is not None
+            and not COMPARISONS[term](Decimal(str(left)), Decimal(str(right)))
+        ):
+            problems.append((check["field"], term))
+    return problems
+
+
 def _validated[M: BaseModel](
     model: type[M], raw: Any, *, fields: frozenset[str], what: str
 ) -> tuple[M, dict[str, Any]]:
@@ -555,29 +687,72 @@ def _validated[M: BaseModel](
     return definition, stored
 
 
+def _tint(field: str | None, declared: dict[str, dict[str, Any]], *, what: str) -> None:
+    if field is not None and declared.get(field, {}).get("kind") != "color":
+        fail(f"{what}: {field!r} is not a color field of its table")
+
+
+def _preview(
+    part: ItemsPart, under: dict[str, dict[str, dict[str, Any]]], *, what: str
+) -> None:
+    """An ``items`` part: an item table directly under the card's, its fields
+    each once and its tint a colour field of it."""
+    fields = under.get(part.props.item)
+    if fields is None:
+        fail(f"{what}: {part.props.item!r} is not an item table directly under it")
+    shown = part.props.fields
+    for field in shown:
+        if field not in fields and field not in TOOL_LAYOUT_FIELDS:
+            fail(f"{what}: {field!r} is not a field of {part.props.item!r}")
+    if len(set(shown)) != len(shown):
+        fail(f"{what}: a preview shows each field once")
+    _tint(part.props.tint, fields, what=what)
+
+
+def _presets(raw: Any, *, what: str) -> list[dict[str, Any]]:
+    """A list's presets as the kit reads them, each named in each language
+    it ships."""
+    presets = require_list(raw, f"{what} presets", MAX_PRESETS)
+    if not presets:
+        fail(f"{what} presets: leave 'presets' out for a list with none")
+    cleaned = []
+    for preset in presets:
+        preset = dict(require_mapping(preset, f"{what} preset"))
+        preset["name"] = _label(preset.get("name"), what=f"{what} preset name")
+        cleaned.append(preset)
+    return cleaned
+
+
 def _list_layout(
-    raw: Any, *, declared: dict[str, dict[str, Any]], names: frozenset[str], what: str
+    raw: Any,
+    *,
+    declared: dict[str, dict[str, Any]],
+    names: frozenset[str],
+    under: dict[str, dict[str, dict[str, Any]]],
+    what: str,
 ) -> dict[str, Any]:
-    """How a table's rows are listed: a grid of its card or a table of its
-    columns, with a look for each scale or counter field that has one."""
+    """One way a table's rows are listed: a grid or a masonry wall of its
+    card, or a table of its columns, with a look for each scale or counter
+    field that has one, and its presets."""
     layout = require_mapping(raw, what)
     kind = _choice(
         layout.get("kind"), frozenset(TOOL_LIST_LAYOUTS), what=f"{what} kind"
     )
     holds = TOOL_LIST_LAYOUTS[kind]
-    if set(layout) - {"kind", holds, "displays"} or not layout.get(holds):
-        fail(f"{what}: a {kind} holds its {holds}, and displays")
-    definition, stored = _validated(
-        ListLayoutDefinition,
-        {key: value for key, value in layout.items() if key != "kind"},
-        fields=names,
-        what=what,
-    )
+    if set(layout) - {"kind", holds, "displays", "presets"} or not layout.get(holds):
+        fail(f"{what}: a {kind} holds its {holds}, displays and presets")
+    body = {key: value for key, value in layout.items() if key != "kind"}
+    if layout.get("presets") is not None:
+        body["presets"] = _presets(layout["presets"], what=what)
+    definition, stored = _validated(ListLayoutDefinition, body, fields=names, what=what)
     roots: list[CardPart] = [definition.card] if definition.card is not None else []
-    if any(
-        isinstance(part, PluginPart) for root in roots for part, _ in parts_of(root)
-    ):
-        fail(f"{what}: a card draws the tool's fields, not a plug-in's parts")
+    for part, _ in (found for root in roots for found in parts_of(root)):
+        if isinstance(part, PluginPart):
+            fail(f"{what}: a card draws the tool's fields, not a plug-in's parts")
+        if isinstance(part, CardPart) and part.props is not None:
+            _tint(part.props.tint, declared, what=f"{what} card tint")
+        if isinstance(part, ItemsPart):
+            _preview(part, under, what=f"{what} items")
     for key, look in (definition.displays or {}).items():
         field_kind = declared[key]["kind"] if key in declared else ""
         looks = _LOOKS.get(field_kind)
@@ -585,8 +760,28 @@ def _list_layout(
             fail(
                 f"{what} displays: {key!r} is not a scale or counter field it declares"
             )
-        if look not in looks:
+        if isinstance(look, DisplayFrom):
+            select = declared.get(look.from_, {})
+            if select.get("kind") != "select":
+                fail(f"{what} displays: {look.from_!r} is not a select field")
+            if _options(select) - looks:
+                fail(
+                    f"{what} displays: {look.from_!r} offers an option a"
+                    f" {field_kind} field is not drawn as"
+                )
+        elif look not in looks:
             fail(f"{what} displays: a {field_kind} field is not drawn as {look!r}")
+    for preset in definition.presets or ():
+        sorted_by = [str(sort.field) for sort in preset.sort]
+        if not 0 < len(sorted_by) <= MAX_PRESET_SORTS:
+            fail(f"{what} preset {preset.slug!r} sorts by 1 to {MAX_PRESET_SORTS}")
+        if len(set(sorted_by)) != len(sorted_by):
+            fail(f"{what} preset {preset.slug!r} sorts by a field twice")
+        for field in sorted_by:
+            if declared.get(field, {}).get("kind") not in _SORTABLE and (
+                field in declared or field not in TOOL_SORT_FIELDS
+            ):
+                fail(f"{what} preset {preset.slug!r}: {field!r} does not sort")
     if too_large(stored, roots, len(definition.columns or ())):
         fail(f"{what} holds more parts, or nests them deeper, than a layout may")
     return {"kind": kind, **stored}
@@ -625,18 +820,42 @@ def _detail_layout(
     return stored
 
 
-def _layouts(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[str, Any]:
-    """What a table draws: its list and its item page, each naming the
-    table's fields and the fields every tool row has."""
+def _layouts(
+    raw: Any,
+    *,
+    fields: list[dict[str, Any]],
+    under: dict[str, list[dict[str, Any]]],
+    what: str,
+) -> dict[str, Any]:
+    """What a table draws: its lists, each of a different kind, and its item
+    page, each naming the table's fields and the fields every tool row has.
+    ``under`` is the fields of each item table directly under it."""
     layouts = require_mapping(raw, f"{what} layouts")
-    if set(layouts) != {"list", "detail"}:
-        fail(f"{what} layouts: a list and a detail")
+    if set(layouts) != {"lists", "detail"}:
+        fail(f"{what} layouts: lists and a detail")
     declared = {field["key"]: field for field in fields}
     names = frozenset(declared) | TOOL_LAYOUT_FIELDS
+    lists = require_list(layouts["lists"], f"{what} lists", len(TOOL_LIST_LAYOUTS))
+    if not lists:
+        fail(f"{what} layouts: lists one way at least")
+    cleaned = [
+        _list_layout(
+            entry,
+            declared=declared,
+            names=names,
+            under={
+                key: {field["key"]: field for field in item_fields}
+                for key, item_fields in under.items()
+            },
+            what=f"{what} list layout",
+        )
+        for entry in lists
+    ]
+    kinds = [entry["kind"] for entry in cleaned]
+    if len(set(kinds)) != len(kinds):
+        fail(f"{what} layouts: each list is of a different kind")
     return {
-        "list": _list_layout(
-            layouts["list"], declared=declared, names=names, what=f"{what} list layout"
-        ),
+        "lists": cleaned,
         "detail": _detail_layout(
             layouts["detail"],
             declared=declared,
@@ -668,10 +887,14 @@ def _items(raw: Any, *, tool_key: str) -> list[dict[str, Any]]:
             "key": key,
             "name": _label(item.get("name"), what=what),
             "fields": fields,
-            "layouts": _layouts(item.get("layouts"), fields=fields, what=what),
+            # Read once every item's parent is known: a layout previews the
+            # items directly under its own.
+            "layouts": item.get("layouts"),
         }
         if item.get("parent") is not None:
             cleaned["parent"] = _key(item["parent"], what=f"{what} parent")
+        if item.get("checks") is not None:
+            cleaned["checks"] = _checks(item["checks"], fields=fields, what=what)
         if item.get("open_while") is not None:
             cleaned["open_while"] = _open_while(
                 item["open_while"], fields=fields, what=f"{what} open_while"
@@ -691,7 +914,22 @@ def _items(raw: Any, *, tool_key: str) -> list[dict[str, Any]]:
             fail(
                 f"{what}: {parent!r} sits under another item; items go two levels deep at most"
             )
+    for item in items:
+        item["layouts"] = _layouts(
+            item["layouts"],
+            fields=item["fields"],
+            under=_under(items, item["key"]),
+            what=f"tool item {item['key']!r}",
+        )
     return items
+
+
+def _under(
+    items: list[dict[str, Any]], key: str | None
+) -> dict[str, list[dict[str, Any]]]:
+    """The fields of each item table directly under ``key``'s table, None
+    being the tool's own."""
+    return {item["key"]: item["fields"] for item in items if item.get("parent") == key}
 
 
 def _actions(raw: Any, *, tables: dict[str, set[str]]) -> list[dict[str, Any]]:
@@ -757,7 +995,11 @@ def _tool(raw: Any) -> dict[str, Any]:
     # Empty means absent, as for every block.
     if fields:
         cleaned["fields"] = fields
-    cleaned["layouts"] = _layouts(tool.get("layouts"), fields=fields, what="tool")
+    if tool.get("checks") is not None:
+        cleaned["checks"] = _checks(tool["checks"], fields=fields, what="tool")
+    cleaned["layouts"] = _layouts(
+        tool.get("layouts"), fields=fields, under=_under(items, None), what="tool"
+    )
     if items:
         cleaned["items"] = items
     actions = _actions(tool.get("actions"), tables=tables)

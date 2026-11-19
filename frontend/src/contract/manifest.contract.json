@@ -3,7 +3,7 @@
   "schema": {
     "$id": "https://initiativetasks.com/schemas/plugin-manifest-v1.json",
     "title": "Initiative plug-in manifest (the 'definition' body)",
-    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. A tool plug-in is neither: it declares one tool in its `tool` block, runs no code, and Initiative creates and serves the tool as it does its own. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, a part's size and depth, and the fields a tool's layouts name, the looks they draw them in and their size and depth are enforced by the platform on publish and are not expressible here."
+    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. A tool plug-in is neither: it declares one tool in its `tool` block, runs no code, and Initiative creates and serves the tool as it does its own. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, a part's size and depth, what a tool's checks and required fields hold, the fields a tool's layouts name, the looks they draw them in, the item tables they preview, the fields they tint and sort by, the kinds of a table's lists, the slugs of their presets, and their size and depth are enforced by the platform on publish and are not expressible here."
   },
   "charsets": {
     "identifier": "-0123456789_abcdefghijklmnopqrstuvwxyz",
@@ -19,7 +19,8 @@
     "queryName": "-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz~",
     "metadataKey": "._0123456789abcdefghijklmnopqrstuvwxyz",
     "uniqueSettingValue": "0123456789abcdefghijklmnopqrstuvwxyz",
-    "toolKey": "_0123456789abcdefghijklmnopqrstuvwxyz"
+    "toolKey": "_0123456789abcdefghijklmnopqrstuvwxyz",
+    "slug": "0123456789abcdefghijklmnopqrstuvwxyz"
   },
   "enums": {
     "feature": [
@@ -278,8 +279,14 @@
       "updated_at",
       "tags"
     ],
+    "toolSortField": [
+      "name",
+      "created_at",
+      "updated_at"
+    ],
     "toolListKind": [
       "grid",
+      "masonry",
       "table"
     ],
     "toolDetailPart": [
@@ -294,6 +301,10 @@
       "stars",
       "bar",
       "clock"
+    ],
+    "sortDir": [
+      "asc",
+      "desc"
     ],
     "tone": [
       "accent",
@@ -372,6 +383,7 @@
     "toolFields": 32,
     "toolItems": 4,
     "toolActions": 16,
+    "toolChecks": 8,
     "permissions": 16,
     "partNodes": 50,
     "partDepth": 4,
@@ -394,11 +406,16 @@
     "dashboardGridColumns": 12,
     "dashboardBindingParams": 12,
     "identifierLength": 64,
-    "toolKeyLength": 40,
+    "toolKeyLength": 17,
     "layoutNodes": 300,
     "layoutDepth": 6,
     "layoutBytes": 65536,
     "layoutTitleLength": 100,
+    "layoutPresets": 20,
+    "presetSorts": 4,
+    "slugLength": 64,
+    "previewItems": 8,
+    "previewFields": 4,
     "publicIdLength": 120,
     "pathLength": 200,
     "endpointIdLength": 200,
@@ -2097,7 +2114,7 @@
     },
     "tool": {
       "type": "object",
-      "description": "The tool a tool plug-in declares. Once a community installs the plug-in, the tool works as a built-in tool does and is offered in every initiative: Initiative creates its tables in that community, and every tool's rules (sharing, trash, archive, holds, comments, tags, links, search, export, its switch and its create permission) hold for it without being declared. So a tool declares only what is its own: its key, names and icon, the fields of its own rows and of each item table, which item tables sit under which, which items stay open, what each table draws, and its actions. What a table draws is its 'layouts', in the layout format Initiative's own tools are drawn in: they are the tool's starting layouts, which each community then changes in its layout editor. Every row holds the universal columns ('toolColumn') beside the fields it declares.",
+      "description": "The tool a tool plug-in declares. Once a community installs the plug-in, the tool works as a built-in tool does and is offered in every initiative: Initiative creates its tables in that community, and every tool's rules (sharing, trash, archive, holds, comments, tags, links, search, export, its switch and its create permission) hold for it without being declared. So a tool declares only what is its own: its key, names and icon, the fields of its own rows and of each item table, what their rows hold to, which item tables sit under which, which items stay open, what each table draws, and its actions. What a table draws is its 'layouts', in the layout format Initiative's own tools are drawn in: they are the tool's starting layouts, which each community then changes in its layout editor. Every row holds the universal columns ('toolColumn') beside the fields it declares.",
       "required": [
         "key",
         "name",
@@ -2130,6 +2147,15 @@
           },
           "description": "The fields of the tool's own rows, at most {toolFields}, each key at most once. Absent: its rows hold the universal columns alone."
         },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolChecks",
+          "items": {
+            "ref": "toolCheck"
+          },
+          "description": "What every row of the table holds to, at most {toolChecks}. Initiative refuses a change that breaks one."
+        },
         "layouts": {
           "ref": "toolLayouts",
           "description": "How the tool's own rows are listed, and how one of them is shown."
@@ -2161,7 +2187,7 @@
       "maxLength": "toolKeyLength",
       "patternFrom": "toolKey",
       "patternForm": "letterFirst",
-      "description": "A key a tool declares: a lower-case letter, then lower-case letters, digits and '_', at most {toolKeyLength} characters. Initiative builds table and column names from it, so a field's key is never a universal column's name ('toolColumn') nor a field every row has ('toolLayoutField'), and never ends in '_id', which Initiative's own keys to a parent end in."
+      "description": "A key a tool declares: a lower-case letter, then lower-case letters, digits and '_', at most {toolKeyLength} characters, so a kind (the key, '.', the plug-in's uid) fits Initiative's kind columns. Initiative builds table and column names from it, so a field's key is never a universal column's name ('toolColumn') nor a field every row has ('toolLayoutField'), and never ends in '_id', which Initiative's own keys to a parent end in."
     },
     "toolField": {
       "type": "object",
@@ -2199,7 +2225,11 @@
           "description": "A select or multi_select field's options, each value at most once. Required on one, and on no other kind."
         },
         "default": {
-          "description": "The value a new row starts with, of the field's kind: a string for text, url, date, datetime and color; a number for number, currency and scale; a boolean for checkbox; an option's value for select; a list of them for multi_select. A counter starts at its 'initial', and a person is never a default. Absent: no value."
+          "description": "The value a new row starts with, of the field's kind: a string for text, url, date and datetime; '#rrggbb' or 'random' for color, 'random' being a colour Initiative picks from its palette for each new row; a number for number, currency and scale; a boolean for checkbox; an option's value for select; a list of them for multi_select. A counter starts at its 'initial', and a person is never a default. Absent: no value."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "The field is never empty: its column is NOT NULL. A required field has a 'default', which a row added without the field takes, and which every row already there takes when a version adds the field or makes it required. A counter's default is its 'initial', so it needs none, and a person is never a default, so a user_reference field is never required. Absent: false."
         },
         "counter": {
           "ref": "toolCounter"
@@ -2311,6 +2341,15 @@
           },
           "description": "Its fields, at most {toolFields}, each key at most once."
         },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "toolChecks",
+          "items": {
+            "ref": "toolCheck"
+          },
+          "description": "What every row of the table holds to, at most {toolChecks}. Initiative refuses a change that breaks one."
+        },
         "layouts": {
           "ref": "toolLayouts",
           "description": "How the item is listed under the row it sits under, and how one is shown."
@@ -2372,8 +2411,41 @@
       },
       "additionalProperties": false
     },
+    "toolCheck": {
+      "type": "object",
+      "description": "One thing every row of a table holds to, in 'open_while''s comparison grammar: a number or counter field of the table, and exactly one comparison of it with a number or another such field ('below', 'at_most', 'above', 'at_least', 'equals', 'not_equals'). Initiative makes it a CHECK on the table, so a row where either side is empty passes. For example, {\"field\": \"min\", \"at_most\": {\"field\": \"max\"}} and {\"field\": \"step\", \"above\": 0}.",
+      "required": [
+        "field"
+      ],
+      "minProperties": 2,
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "The table's field the check reads."
+        },
+        "below": {
+          "ref": "toolOperand"
+        },
+        "at_most": {
+          "ref": "toolOperand"
+        },
+        "above": {
+          "ref": "toolOperand"
+        },
+        "at_least": {
+          "ref": "toolOperand"
+        },
+        "equals": {
+          "ref": "toolOperand"
+        },
+        "not_equals": {
+          "ref": "toolOperand"
+        }
+      },
+      "additionalProperties": false
+    },
     "toolOperand": {
-      "description": "What a number or counter field is compared with: a number, or {\"field\": key}, another number or counter field of the same item.",
+      "description": "What a number or counter field is compared with: a number, or {\"field\": key}, another number or counter field of the same table.",
       "anyOf": [
         {
           "type": "number"
@@ -2497,14 +2569,22 @@
     },
     "toolLayouts": {
       "type": "object",
-      "description": "What one of a tool's tables draws: how its rows are listed, and how one of them is shown on its own page. Both are written in the layout format Initiative stores and draws for its own tools, naming the table's fields. On install they become the community's layouts for the table, which its people change in the layout editor as they change any tool's.",
+      "description": "What one of a tool's tables draws: the lists its rows are listed in, and how one of them is shown on its own page. Both are written in the layout format Initiative stores and draws for its own tools, naming the table's fields. On install they become the community's layouts for the table, which its people change in the layout editor as they change any tool's.",
       "required": [
-        "list",
+        "lists",
         "detail"
       ],
       "properties": {
-        "list": {
-          "ref": "toolListLayout"
+        "lists": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": {
+            "wholeOf": "toolListKind"
+          },
+          "items": {
+            "ref": "toolListLayout"
+          },
+          "description": "The ways its rows are listed, each of a different kind. Each person picks one, and the first is the one a person starts on."
         },
         "detail": {
           "ref": "toolDetailLayout"
@@ -2514,7 +2594,7 @@
     },
     "toolListLayout": {
       "type": "object",
-      "description": "How a table's rows are listed: as a 'grid' of cards, each drawn as its 'card' says, or as a 'table', a column per field in 'columns'. At most {layoutNodes} parts and columns together, nested at most {layoutDepth} deep.",
+      "description": "One way a table's rows are listed: as a 'grid' of cards or a 'masonry' wall of them, each drawn as its 'card' says, or as a 'table', a column per field in 'columns'. At most {layoutNodes} parts and columns together, nested at most {layoutDepth} deep.",
       "required": [
         "kind"
       ],
@@ -2524,7 +2604,7 @@
         },
         "card": {
           "ref": "layoutCard",
-          "description": "What a grid's card shows of a row. A grid's only, and required on one."
+          "description": "What a grid's or a masonry wall's card shows of a row. Theirs only, and required on one."
         },
         "columns": {
           "type": "array",
@@ -2543,9 +2623,25 @@
             "ref": "toolKey"
           },
           "additionalProperties": {
-            "enum": "fieldDisplay"
+            "anyOf": [
+              {
+                "enum": "fieldDisplay"
+              },
+              {
+                "ref": "toolDisplayFrom"
+              }
+            ]
           },
-          "description": "How a scale or counter field the list shows is drawn, by its key: a scale as a 'number', 'stars' or a 'bar'; a counter as a 'number', a 'bar' or a 'clock'. A bar and a clock need the counter's 'min' and 'max', and a row missing one draws a number. Absent: a number."
+          "description": "How a scale or counter field the list shows is drawn, by its key: a scale as a 'number', 'stars' or a 'bar'; a counter as a 'number', a 'bar' or a 'clock'; or, as {\"from\": key}, in the look a select field of the row names, so each row keeps its own. A bar and a clock need the counter's 'min' and 'max', and a row missing one draws a number. Absent: a number."
+        },
+        "presets": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "layoutPresets",
+          "items": {
+            "ref": "layoutPreset"
+          },
+          "description": "Sorts a person can pick the list in, at most {layoutPresets}, each slug at most once. Picking one sorts what the person sees; the rows' own order, which people drag, stays as it is."
         }
       },
       "allOf": [
@@ -2553,7 +2649,10 @@
           "if": {
             "properties": {
               "kind": {
-                "const": "grid"
+                "enum": [
+                  "grid",
+                  "masonry"
+                ]
               }
             },
             "required": [
@@ -2596,6 +2695,73 @@
       ],
       "additionalProperties": false
     },
+    "toolDisplayFrom": {
+      "type": "object",
+      "description": "A look read from the row: the key of a select field of the same table, each of whose options' values is a look the drawn field's kind has.",
+      "required": [
+        "from"
+      ],
+      "properties": {
+        "from": {
+          "ref": "toolKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutPreset": {
+      "type": "object",
+      "description": "A named sort a list offers.",
+      "required": [
+        "slug",
+        "name",
+        "sort"
+      ],
+      "properties": {
+        "slug": {
+          "ref": "layoutSlug",
+          "description": "What a link to the preset carries."
+        },
+        "name": {
+          "ref": "localizedText",
+          "description": "The preset's name, in each reader's language."
+        },
+        "sort": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "presetSorts",
+          "items": {
+            "ref": "layoutPresetSort"
+          },
+          "description": "What the list is sorted by, first to last, at most {presetSorts}, each field at most once."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutPresetSort": {
+      "type": "object",
+      "required": [
+        "field"
+      ],
+      "properties": {
+        "field": {
+          "ref": "toolKey",
+          "description": "A field of the table: a number, counter, currency, scale, date, datetime or checkbox field it declares, or one every row has that sorts ('toolSortField'): 'name', 'created_at' or 'updated_at'."
+        },
+        "dir": {
+          "enum": "sortDir",
+          "description": "'asc', lowest first, or 'desc'. Absent: 'asc'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutSlug": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": "slugLength",
+      "patternFrom": "slug",
+      "patternForm": "hyphenated",
+      "description": "Lower-case letters and digits, words joined by single '-', at most {slugLength} characters: 'by-count'."
+    },
     "toolDetailLayout": {
       "type": "object",
       "description": "How one row is shown on its own page, in three regions, each its parts in order: 'header' across the top, 'main' and 'side' beside it. A region left out holds nothing, and what is placed nowhere is not shown. At most {layoutNodes} parts across the three, nested at most {layoutDepth} deep.",
@@ -2635,12 +2801,25 @@
         "type": {
           "const": "card"
         },
+        "props": {
+          "ref": "layoutCardProps"
+        },
         "children": {
           "type": "array",
           "maxItems": "layoutNodes",
           "items": {
             "ref": "layoutCardPart"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutCardProps": {
+      "type": "object",
+      "properties": {
+        "tint": {
+          "ref": "toolKey",
+          "description": "A color field of the table, which the card is drawn in. A row with no colour draws plain."
         }
       },
       "additionalProperties": false
@@ -2659,6 +2838,9 @@
         },
         {
           "ref": "layoutProperties"
+        },
+        {
+          "ref": "layoutItems"
         }
       ]
     },
@@ -2760,6 +2942,57 @@
       "properties": {
         "type": {
           "const": "properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutItems": {
+      "type": "object",
+      "description": "The row's first items of one item table, in their own order, each drawn small with the fields 'fields' names.",
+      "required": [
+        "type",
+        "props"
+      ],
+      "properties": {
+        "type": {
+          "const": "items"
+        },
+        "props": {
+          "ref": "layoutItemsProps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layoutItemsProps": {
+      "type": "object",
+      "required": [
+        "item",
+        "fields",
+        "limit"
+      ],
+      "properties": {
+        "item": {
+          "ref": "toolKey",
+          "description": "The key of an item table directly under the table the card is for."
+        },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "previewFields",
+          "items": {
+            "ref": "toolKey"
+          },
+          "description": "The item's fields each shows, in order, at most {previewFields}, each at most once: ones it declares, or ones every row has ('toolLayoutField'). Each is drawn as the item table's first list draws it."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": "previewItems",
+          "description": "How many it shows at most, up to {previewItems}."
+        },
+        "tint": {
+          "ref": "toolKey",
+          "description": "A color field of the item table, which each is drawn in."
         }
       },
       "additionalProperties": false

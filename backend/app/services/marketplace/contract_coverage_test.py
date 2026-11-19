@@ -442,7 +442,10 @@ def maximal_tool_manifest() -> dict:
                     "kind": "currency",
                     "currency": "EUR",
                     "default": 2.5,
+                    "required": True,
                 },
+                {"key": "budget", "name": {"en": "Budget"}, "kind": "number"},
+                {"key": "shade", "name": {"en": "Shade"}, "kind": "color"},
                 {
                     "key": "look",
                     "name": {"en": "Look"},
@@ -451,8 +454,29 @@ def maximal_tool_manifest() -> dict:
                     "default": "plain",
                 },
             ],
+            "checks": [{"field": "budget", "at_least": 0}],
             "layouts": {
-                "list": {"kind": "table", "columns": ["name", "price"]},
+                "lists": [
+                    {"kind": "table", "columns": ["name", "price"]},
+                    {
+                        "kind": "masonry",
+                        "card": {
+                            "type": "card",
+                            "props": {"tint": "shade"},
+                            "children": [
+                                {
+                                    "type": "items",
+                                    "props": {
+                                        "item": "tally",
+                                        "fields": ["count", "name"],
+                                        "limit": 3,
+                                        "tint": "hue",
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                ],
                 "detail": {"main": [{"type": "field", "props": {"field": "look"}}]},
             },
             "items": [
@@ -473,34 +497,67 @@ def maximal_tool_manifest() -> dict:
                         },
                         {"key": "ceiling", "name": {"en": "Ceiling"}, "kind": "number"},
                         {"key": "start", "name": {"en": "Start"}, "kind": "number"},
+                        {
+                            "key": "hue",
+                            "name": {"en": "Hue"},
+                            "kind": "color",
+                            "default": "random",
+                        },
+                        {
+                            "key": "mode",
+                            "name": {"en": "Mode"},
+                            "kind": "select",
+                            "options": [
+                                {"value": "bar", "label": {"en": "Bar"}},
+                                {"value": "clock", "label": {"en": "Clock"}},
+                            ],
+                        },
                     ],
+                    "checks": [{"field": "start", "at_most": {"field": "ceiling"}}],
                     "layouts": {
-                        "list": {
-                            "kind": "grid",
-                            "card": {
-                                "type": "card",
-                                "children": [
-                                    {
-                                        "type": "stack",
-                                        "props": {
-                                            "direction": "row",
-                                            "gap": "xs",
-                                            "wrap": True,
-                                            "align": "start",
-                                            "tone": "muted",
-                                        },
-                                        "children": [
-                                            {
-                                                "type": "field",
-                                                "props": {"field": "count"},
+                        "lists": [
+                            {
+                                "kind": "grid",
+                                "card": {
+                                    "type": "card",
+                                    "children": [
+                                        {
+                                            "type": "stack",
+                                            "props": {
+                                                "direction": "row",
+                                                "gap": "xs",
+                                                "wrap": True,
+                                                "align": "start",
+                                                "tone": "muted",
                                             },
-                                            {"type": "properties"},
+                                            "children": [
+                                                {
+                                                    "type": "field",
+                                                    "props": {"field": "count"},
+                                                },
+                                                {"type": "properties"},
+                                            ],
+                                        }
+                                    ],
+                                },
+                                "displays": {"count": "clock"},
+                                "presets": [
+                                    {
+                                        "slug": "by-count",
+                                        "name": {"en": "By count"},
+                                        "sort": [
+                                            {"field": "count", "dir": "desc"},
+                                            {"field": "updated_at"},
                                         ],
                                     }
                                 ],
                             },
-                            "displays": {"count": "clock"},
-                        },
+                            {
+                                "kind": "table",
+                                "columns": ["name", "count"],
+                                "displays": {"count": {"from": "mode"}},
+                            },
+                        ],
                         "detail": {
                             "header": [
                                 {
@@ -538,7 +595,7 @@ def maximal_tool_manifest() -> dict:
                     ],
                     "layouts": {
                         # Every row's fields alone, as its fields change below.
-                        "list": {"kind": "table", "columns": ["name"]},
+                        "lists": [{"kind": "table", "columns": ["name"]}],
                         "detail": {
                             "main": [{"type": "field", "props": {"field": "name"}}]
                         },
@@ -584,6 +641,17 @@ def _open_conditions() -> dict:
         stored = normalize_listing_definition("plugin", body)
         conditions.update(stored["tool"]["items"][1]["open_while"])
     return conditions
+
+
+def _checks() -> dict:
+    """Every comparison a check makes, as stored."""
+    checks: dict = {}
+    for term in tool_plugins.COMPARISONS:
+        body = maximal_tool_manifest()
+        body["tool"]["checks"] = [{"field": "budget", term: 1}]
+        stored = normalize_listing_definition("plugin", body)
+        checks.update(stored["tool"]["checks"][0])
+    return checks
 
 
 def maximal_declarative_manifest() -> dict:
@@ -917,10 +985,13 @@ def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, di
     field_node, stack, button = section["children"]
     value_node, text = stack["children"]
     declared = tool["tool"]
-    price, look = declared["fields"]
+    price, _budget, _shade, look = declared["fields"]
     tally, mark = declared["items"]
     count = tally["fields"][0]
-    grid, page = tally["layouts"]["list"], tally["layouts"]["detail"]
+    (grid, table), page = tally["layouts"]["lists"], tally["layouts"]["detail"]
+    masonry = declared["layouts"]["lists"][1]
+    preview = masonry["card"]["children"][0]
+    preset = grid["presets"][0]
     card_stack = grid["card"]["children"][0]
     card_field, properties = card_stack["children"]
     page_stack, section = page["header"][0], page["main"][0]
@@ -932,12 +1003,19 @@ def _nodes(published: dict, declarative: dict, tool: dict) -> list[tuple[str, di
         ("toolCounter", count["counter"]),
         ("toolItem", {**tally, **mark}),
         ("toolOpenWhile", _open_conditions()),
+        ("toolCheck", _checks()),
         ("toolAction", declared["actions"][0]),
         ("toolLayouts", tally["layouts"]),
         # A table lists by its columns, a grid by its card.
-        ("toolListLayout", {**declared["layouts"]["list"], **grid}),
+        ("toolListLayout", {**table, **grid}),
+        ("toolDisplayFrom", table["displays"]["count"]),
+        ("layoutPreset", preset),
+        ("layoutPresetSort", preset["sort"][0]),
+        ("layoutCardProps", masonry["card"]["props"]),
+        ("layoutItems", preview),
+        ("layoutItemsProps", preview["props"]),
         ("toolDetailLayout", page),
-        ("layoutCard", grid["card"]),
+        ("layoutCard", masonry["card"]),
         ("layoutCardStack", card_stack),
         ("layoutStackProps", card_stack["props"]),
         ("layoutCardField", card_field),
@@ -1126,8 +1204,18 @@ def test_a_tool_s_layouts_are_the_kit_s_grammar():
         ("layoutDetailFieldProps", tool_layout.DetailFieldProps),
         ("layoutSectionProps", tool_layout.SectionProps),
         ("toolDetailLayout", tool_layout.DetailLayoutDefinition),
+        ("layoutCardProps", tool_layout.CardProps),
+        ("layoutItemsProps", tool_layout.ItemsProps),
+        ("layoutPresetSort", tool_layout.PresetSort),
+        ("toolDisplayFrom", tool_layout.DisplayFrom),
     ):
-        assert set(contract.fields(name)) == set(model.model_fields), name
+        terms = {field.alias or key for key, field in model.model_fields.items()}
+        assert set(contract.fields(name)) == terms, name
+    # A tool's preset sorts; the filters beside it are a built-in tool's.
+    assert set(contract.fields("layoutPreset")) <= set(
+        tool_layout.LayoutPreset.model_fields
+    )
+    assert contract.enum("toolSortField") == tool_plugins.TOOL_SORT_FIELDS
     stack = contract.objects()["layoutStackProps"]["properties"]
     for prop, field in tool_layout.StackProps.model_fields.items():
         if prop != "wrap":

@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
-import { getContrastingTextColor } from "@/lib/counter-color";
+import { getContrastingTextColor } from "@/ui/lib/contrast";
 import { cn } from "@/ui/lib/utils";
 
 interface TagBadgeProps {

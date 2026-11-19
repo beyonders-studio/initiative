@@ -49,6 +49,9 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
         "reflected catalog identifiers from the Alembic-owned guild_template, "
         "quoted; no request data"
     ),
+    "app/db/plugin_tools.py::<module>": (
+        "the random colour default: the constant palette, compiled as literals"
+    ),
     "app/db/plugin_tools.py::drop_tool_tables": (
         "quoted catalog identifiers read from pg_class under the schema name"
     ),

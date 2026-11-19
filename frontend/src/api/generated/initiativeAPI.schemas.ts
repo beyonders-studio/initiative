@@ -2420,6 +2420,10 @@ export interface CaptchaSettingsUpdate {
   secret_key?: string | null;
 }
 
+export interface CardProps {
+  tint?: string | null;
+}
+
 export type StackPropsDirection =
   | (typeof StackPropsDirection)[keyof typeof StackPropsDirection]
   | null;
@@ -2511,26 +2515,86 @@ export interface PluginPart {
   props: PluginPartProps;
 }
 
+export interface ItemsProps {
+  /**
+   * @minLength 1
+   * @maxLength 82
+   */
+  item: string;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   * @items.minLength 1
+   * @items.maxLength 82
+   */
+  fields: string[];
+  /**
+   * @minimum 1
+   * @maximum 8
+   */
+  limit: number;
+  tint?: string | null;
+}
+
+/**
+ * The row's first items of one item table, in their own order, each drawn
+ * small with the fields ``fields`` names.
+ */
+export interface ItemsPart {
+  type: "items";
+  props: ItemsProps;
+}
+
 export interface StackPartInput {
   type: "stack";
   props?: StackProps | null;
-  children?: (CardPartInput | StackPartInput | FieldPart | PropertiesPart | PluginPart)[];
+  children?: (
+    | CardPartInput
+    | StackPartInput
+    | FieldPart
+    | PropertiesPart
+    | PluginPart
+    | ItemsPart
+  )[];
 }
 
 export interface CardPartInput {
   type: "card";
-  children?: (CardPartInput | StackPartInput | FieldPart | PropertiesPart | PluginPart)[];
+  props?: CardProps | null;
+  children?: (
+    | CardPartInput
+    | StackPartInput
+    | FieldPart
+    | PropertiesPart
+    | PluginPart
+    | ItemsPart
+  )[];
 }
 
 export interface StackPartOutput {
   type: "stack";
   props?: StackProps | null;
-  children?: (CardPartOutput | StackPartOutput | FieldPart | PropertiesPart | PluginPart)[];
+  children?: (
+    | CardPartOutput
+    | StackPartOutput
+    | FieldPart
+    | PropertiesPart
+    | PluginPart
+    | ItemsPart
+  )[];
 }
 
 export interface CardPartOutput {
   type: "card";
-  children?: (CardPartOutput | StackPartOutput | FieldPart | PropertiesPart | PluginPart)[];
+  props?: CardProps | null;
+  children?: (
+    | CardPartOutput
+    | StackPartOutput
+    | FieldPart
+    | PropertiesPart
+    | PluginPart
+    | ItemsPart
+  )[];
 }
 
 /**
@@ -6336,6 +6400,14 @@ export interface DirectoryCommunityPage {
   items: DirectoryCommunityRead[];
 }
 
+/**
+ * A look read from the row: a select field of it, each of whose options
+ * is a look the drawn field has, so each row keeps its own.
+ */
+export interface DisplayFrom {
+  from: string;
+}
+
 export interface DmConversationCreate {
   /** @minimum 1 */
   user_id: number;
@@ -7999,12 +8071,14 @@ export interface PresetSort {
   dir?: SortDir;
 }
 
+export type LayoutPresetName = string | { [key: string]: string } | null;
+
 /**
  * Filters, and for a table a sort, that a person can pick to start from.
  * Picking one makes them that person's own.
  */
 export interface LayoutPreset {
-  name?: string | null;
+  name?: LayoutPresetName;
   /**
    * @minLength 1
    * @maxLength 64
@@ -8031,7 +8105,7 @@ export interface LayoutGrouping {
 }
 
 export type ListLayoutDefinitionOutputDisplays = {
-  [key: string]: "number" | "stars" | "bar" | "clock";
+  [key: string]: "number" | "stars" | "bar" | "clock" | DisplayFrom;
 } | null;
 
 /**
@@ -8282,7 +8356,7 @@ export interface LinkedTaskRead {
 }
 
 export type ListLayoutDefinitionInputDisplays = {
-  [key: string]: "number" | "stars" | "bar" | "clock";
+  [key: string]: "number" | "stars" | "bar" | "clock" | DisplayFrom;
 } | null;
 
 /**
