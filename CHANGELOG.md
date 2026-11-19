@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Intake settings fit on one screen.** Platform → Intake picks the operations community first, then lists each kind of case on one line: where it lands, who to contact about it, and a switch for whether it's receiving. **Edit** opens the rest, and **Set up** routes a kind that isn't yet. The general contact sits under the list, and the switch that sends feedback to the Initiative team has its own section at the end.
-- **My Messages is out of alpha.** Its place in the sidebar no longer carries the **Alpha** tag.
+- **My Messages is in beta.** Its place in the sidebar carries a **Beta** tag where it said **Alpha**.
 - **Create on My Messages starts a conversation.** The button asks who to talk to, as **Start a conversation** does, instead of offering a task or a file.
 - **A plug-in whose vendor app is already set shows its values first.** Making a new app at the vendor, which would replace them, folds away under them instead of leading the page.
 - **Plug-in services are a list you can search.** Platform → Integrations shows each plug-in on one line, with its art, name, version and state, a page at a time, and searches by identifier or publisher. Beta and operations-only plug-ins are tagged in colour, a plug-in whose listing the registry signed is tagged **Verified**, and one Initiative publishes is tagged **Built by Initiative**. Each plug-in opens on a page of its own, wide enough to read, where creating the GitHub App comes first and typing the values in yourself is the other way, in the order it happens at the vendor.
