@@ -15,7 +15,8 @@ as it reads a built-in tool, and into the DDL that creates its tables.
   another plug-in's.
 * **Columns** are the ones a built-in tool's tables have, from the mixins
   their models are made of (a tool's own table as ``counter_groups``, an
-  item table as ``counters``), and one typed column per declared field.
+  item table as ``counters`` with the archive stamp beside them), and one
+  typed column per declared field, its kind in the column's ``info``.
 * **Permissions** are ``<kind>:enabled``, the tool's switch in each initiative
   and the role key for viewing it, and ``<kind>:create``. Their rows are the
   install's.
@@ -102,7 +103,12 @@ _TOOL_MIXINS: tuple[type[SQLModel], ...] = (
     ListingProvenanceMixin,
     SoftDeleteMixin,
 )
-_ITEM_MIXINS: tuple[type[SQLModel], ...] = (HoldMixin, CreatedByMixin, SoftDeleteMixin)
+_ITEM_MIXINS: tuple[type[SQLModel], ...] = (
+    HoldMixin,
+    CreatedByMixin,
+    ArchiveMixin,
+    SoftDeleteMixin,
+)
 
 _KEY_START = frozenset("abcdefghijklmnopqrstuvwxyz")
 _KEY_CHARS = _KEY_START | frozenset("0123456789_")
@@ -178,6 +184,20 @@ def tool_table_name(listing_uid: str, key: str) -> str:
 
 def _kind(listing_uid: str, key: str) -> str:
     return f"{_key(key, 'key')}.{_uid(listing_uid)}"
+
+
+def plugin_table_pattern() -> str:
+    """A ``LIKE`` pattern every tool plug-in's table name matches, and no
+    built-in table's."""
+    return TABLE_PREFIX.replace("_", "\\_") + "%"
+
+
+def plugin_kind_of_table(name: str) -> str:
+    """SQL reading the kind a tool plug-in's table holds off its name, the
+    SQL expression ``name``: ``p_<uid>_<key>`` holds ``<key>.<uid>``."""
+    uid_at = len(TABLE_PREFIX) + 1
+    key_at = uid_at + _UID_LENGTH + 1
+    return f"substr({name}, {key_at}) || '.' || substr({name}, {uid_at}, {_UID_LENGTH})"
 
 
 # --- columns ----------------------------------------------------------------
@@ -408,8 +428,16 @@ def build_tool(
         item_kind = _kind(uid, item_key)
         if item_kind not in codes:
             raise PluginToolError(f"{item_kind} has no kind code")
+        # Every item holds a conversation and is put away when finished
+        # with, as a tool does.
         children.append(
-            PluginKind(item_kind, codes[item_kind], table_name=tables[item_key].name)
+            PluginKind(
+                item_kind,
+                codes[item_kind],
+                commentable=True,
+                archivable=True,
+                table_name=tables[item_key].name,
+            )
         )
     # Parents first, as they were built, so each table's key names a table
     # created before it.

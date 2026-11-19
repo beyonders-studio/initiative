@@ -249,11 +249,14 @@ class ProvisioningBundle:
     #: The tools the parts were rendered from: the built-in ones, or a
     #: community's with its installed tool plug-ins (:meth:`for_tools`).
     tools: ToolSet = BUILTIN_TOOLS
+    #: The operator class the search index is built on, or None.
+    search_opclass: str | None = None
 
     def for_tools(self, tools: ToolSet) -> ProvisioningBundle:
         """This bundle for a community with ``tools``: the parts a tool set
-        renders (its tables' structure, the registry CHECKs, the grants and the
-        row security) rendered from it, the rest as they are. The bundle itself
+        renders (its tables' structure, the registry CHECKs, the grants, the
+        row security and the capture, search and timer triggers) rendered from
+        it, the rest as they are. The bundle itself
         for a community with no tool plug-in, so its render does not move.
         Rendered once per process per set, from the built-in bundle."""
         if tools is self.tools or not tools.installed:
@@ -264,21 +267,35 @@ class ProvisioningBundle:
         found = _community_bundles.get(key)
         if found is not None:
             return found
+        from app.db.event_capture import render_guild_capture_ddl
         from app.db.guild_ddl import render_guild_rls_ddl
         from app.db.plugin_tools import structure_ddl
         from app.db.registry_checks import render_guild_registry_check_ddl
+        from app.db.search_index import render_guild_search_ddl
+        from app.db.timers import render_guild_timer_ddl
 
         schema_ddl = f"{self.schema_ddl}\n-- installed tools\n{structure_ddl(tools)}"
         checks_ddl = _every_community(
             render_guild_registry_check_ddl(tools), self.operations["checks"]
         )
         rls_ddl = _every_community(render_guild_rls_ddl(tools), self.operations["rls"])
+        capture_ddl = _every_community(
+            render_guild_capture_ddl(tools), self.operations["capture"]
+        )
+        search_ddl = _every_community(
+            render_guild_search_ddl(self.search_opclass, tools),
+            self.operations["search"],
+        )
+        timer_ddl = render_guild_timer_ddl(tools)
         grants = _grant_statements("__stamp__", 0, tools)
         found = replace(
             self,
             schema_ddl=schema_ddl,
             checks_ddl=checks_ddl,
             rls_ddl=rls_ddl,
+            capture_ddl=capture_ddl,
+            search_ddl=search_ddl,
+            timer_ddl=timer_ddl,
             tools=tools,
             digests={
                 **self.digests,
@@ -286,6 +303,9 @@ class ProvisioningBundle:
                 "checks": _digest(checks_ddl, self.operations["checks"]),
                 "grants": _digest(*grants),
                 "rls": _digest(rls_ddl, self.operations["rls"]),
+                "capture": _digest(capture_ddl, self.operations["capture"]),
+                "search": _digest(search_ddl, self.operations["search"]),
+                "timers": _digest(timer_ddl, self.operations["timers"]),
             },
         )
         return _community_bundles.setdefault(key, found)
@@ -421,6 +441,7 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             search_ddl=search_ddl,
             timer_ddl=timer_ddl,
             operations=operations,
+            search_opclass=opclass,
             digests={
                 "schema": _digest(schema_ddl, operations["schema"]),
                 "checks": _digest(checks_ddl, operations["checks"]),
@@ -1485,8 +1506,10 @@ async def reindex_guild_search(
     if current == generation and not force:
         return 0
 
+    from app.db.plugin_tools import provisioned_tools
+
     written = 0
-    for _entity_type, statement in reindex_plan():
+    for _entity_type, statement in reindex_plan(await provisioned_tools(guild_id)):
         cursor = 0
         while True:
             conn = await session.connection()

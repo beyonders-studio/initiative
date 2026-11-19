@@ -1365,9 +1365,9 @@ def _plugin_search_read(tools: ToolSet) -> str:
     """
     held = IN_POLICY.field("install_read")
     kinds = " ".join(
-        f"WHEN '{kind.value}' THEN '{resource.value}'"
+        f"WHEN '{kind}' THEN '{resource.value}'"
         for kind, resource in sorted(
-            SEARCH_ENTRY_READ_SCOPE.items(), key=lambda item: item[0].value
+            SEARCH_ENTRY_READ_SCOPE.items(), key=lambda item: item[0]
         )
     )
     scopes = " ".join(f"WHEN '{tool.kind}' THEN '{tool.scope}'" for tool in tools)

@@ -48,8 +48,8 @@ from datetime import UTC, datetime, timedelta
 from functools import cache, partial
 from typing import Any
 
-from sqlalchemy import case, delete, exists, func, literal, or_, text
-from sqlmodel import col, select
+from sqlalchemy import Table, case, delete, exists, func, literal, or_, text
+from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import metrics
@@ -118,6 +118,9 @@ class Sweep:
     calls_out: bool = False
     #: The writes that give the sweep work.
     sources: tuple[TimerSource, ...] = ()
+    #: How a table no model declares, a tool plug-in's, gives the sweep work,
+    #: or ``None`` where that table gives it none.
+    table_source: Callable[[Table], TimerSource | None] | None = None
     #: ``(community, now)``: the sweep's next due time read outside the
     #: community's schema, for a sweep whose work is kept in ``public`` (where
     #: the community's role reads nothing). The reconcile asks this in place of
@@ -129,7 +132,7 @@ class Sweep:
 def sweeps() -> tuple[Sweep, ...]:
     """Every sweep that runs on timers, read once."""
     from app.core.intake import IntakeStream, meta
-    from app.db.soft_delete_filter import SOFT_DELETE_MODELS
+    from app.db.soft_delete_filter import SOFT_DELETE_MODELS, SOFT_DELETE_TABLES
     from app.models.tenant.batched_notice import BatchedNotice
     from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
     from app.models.tenant.content_hold import ContentHold
@@ -181,6 +184,17 @@ def sweeps() -> tuple[Sweep, ...]:
         return select(func.now()).where(condition)
 
     hour, minute = timedelta(hours=1), timedelta(minutes=1)
+
+    def binned(table: Table) -> TimerSource | None:
+        """A trashed row arms its purge, on a table with the trash."""
+        if "purge_at" not in table.c:
+            return None
+        return on_row(
+            table.name,
+            "{row}.purge_at",
+            events="INSERT OR UPDATE OF purge_at",
+            when="NEW.purge_at IS NOT NULL",
+        )
     dispatchers = (export_worker.jobs, import_worker.jobs)
 
     def job_is(direction: DataJobDirection, statuses: Iterable[DataJobStatus]) -> str:
@@ -422,15 +436,7 @@ def sweeps() -> tuple[Sweep, ...]:
                 ),
             ),
             sources=(
-                *(
-                    on_row(
-                        str(model.__tablename__),
-                        "{row}.purge_at",
-                        events="INSERT OR UPDATE OF purge_at",
-                        when="NEW.purge_at IS NOT NULL",
-                    )
-                    for model in SOFT_DELETE_MODELS
-                ),
+                *(binned(SQLModel.metadata.tables[name]) for name in SOFT_DELETE_TABLES),
                 on_row(
                     "uploads",
                     "{row}.created_at",
@@ -438,6 +444,7 @@ def sweeps() -> tuple[Sweep, ...]:
                     when=f"NEW.filename LIKE '{PASTED_IMAGE_PREFIX}%'",
                 ),
             ),
+            table_source=binned,
         ),
         # Resumable uploads nobody finished or took.
         Sweep(

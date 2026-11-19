@@ -101,5 +101,5 @@ def blocking_kinds() -> list[tuple[str, Table, ColumnElement]]:
     arms: list[tuple[str, Table, ColumnElement]] = []
     for table_name, rule in OPEN_WHEN.items():
         table = SQLModel.metadata.tables[table_name]
-        arms.append((SEARCH_SOURCES[table_name].entity_type.value, table, rule(table)))
+        arms.append((SEARCH_SOURCES[table_name].entity_type, table, rule(table)))
     return arms

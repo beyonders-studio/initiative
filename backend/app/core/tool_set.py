@@ -84,6 +84,22 @@ class ToolSet:
             for table in (record.table, *record.items)
         }
 
+    @cached_property
+    def installed_tables(self) -> tuple[Table, ...]:
+        """The installed tools' tables, each tool's own before its items."""
+        return tuple(
+            table for record in self.installed for table in (record.table, *record.items)
+        )
+
+    @cached_property
+    def tables(self) -> dict[str, Table]:
+        """Every table of the community by name: the models', then the
+        installed tools'."""
+        return {
+            **SQLModel.metadata.tables,
+            **{table.name: table for table in self.installed_tables},
+        }
+
     def tables_carrying(self, column: str) -> frozenset[str]:
         """Every tool's own table and item table that has ``column``: what a
         rule derived from a mixin reads of a tool built from no model."""
