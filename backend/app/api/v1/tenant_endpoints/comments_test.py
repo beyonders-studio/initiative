@@ -237,11 +237,16 @@ class TestToolComments:
         listed = await client.get(a.g("/comments/"), headers=a.headers, params=missing)
         assert listed.status_code == 404
 
-        for subject in ({}, {"subject_type": "tag", "subject_id": project.id}):
+        # A subject named not at all is malformed; a kind nothing is said on
+        # is not found.
+        for subject, status_code in (
+            ({}, 422),
+            ({"subject_type": "tag", "subject_id": project.id}, 404),
+        ):
             refused = await client.post(
                 a.g("/comments/"), headers=a.headers, json={**subject, "content": "Hi"}
             )
-            assert refused.status_code == 422, subject
+            assert refused.status_code == status_code, subject
 
     async def test_a_task_comment_reports_its_subject(
         self, client, session, acting_user
