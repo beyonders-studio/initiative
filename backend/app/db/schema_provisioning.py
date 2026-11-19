@@ -952,9 +952,8 @@ async def _apply_parts(
     validate_checks: bool = True,
     operations: bool | None = None,
     tools: ToolSet | None = None,
-) -> ProvisioningBundle:
-    """Apply ``parts`` of the bundle to ``guild_<id>``, then stamp the schema,
-    and return the bundle applied.
+) -> None:
+    """Apply ``parts`` of the bundle to ``guild_<id>``, then stamp the schema.
 
     The bundle is the community's (:meth:`ProvisioningBundle.for_tools`):
     ``tools``, or its installed tool plug-ins as they stand, read before any
@@ -1048,7 +1047,6 @@ async def _apply_parts(
     await _write_stamp(
         conn, schema, bundle.stamp_pending("checks") if pending else bundle.stamp
     )
-    return bundle
 
 
 async def provision_guild_schema(conn: AsyncConnection, guild_id: int) -> str:
@@ -1193,7 +1191,13 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
             bundle = bundle.for_tools(await provisioned_tools(guild_id))
         parts = PARTS if settings.FORCE_GUILD_BACKFILL else bundle.stale_parts(stamp)
         if parts:
-            bundle = await _apply_parts(conn, guild_id, parts, validate_checks=False)
+            # The installs as they stand now, which the stamp written below
+            # names.
+            tools = await provisioned_tools(guild_id)
+            bundle = bundle.for_tools(tools)
+            await _apply_parts(
+                conn, guild_id, parts, validate_checks=False, tools=tools
+            )
     if "checks" in parts:
         # After the replacement commits, so the scan holds no lock that stops
         # the guild's reads and writes. A failure leaves ``checks`` pending.
