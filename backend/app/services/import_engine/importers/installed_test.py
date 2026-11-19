@@ -1,21 +1,27 @@
 """The tool plug-in importer, over the Counters fixture: a group exported from
 its declaration comes back in another initiative with its counters, fields,
 tags, property values and links, and is refused where the tool is not
-installed, not placed, or not the importer's to create. Who outside an
+installed, not placed, or not the importer's to create. A backup restored
+into an initiative it makes places the tool there, or leaves its content out
+where the restorer may not place it. Who outside an
 initiative imports nothing into it is the boundary sweep's
 (``app.db.initiative_boundary_test``)."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import sqlalchemy as sa
 
 from app.core.messages import ImportEngineMessages
 from app.core.relationships import node_of
+from app.core.rules import SURFACE_PLUGINS, SetBy
 from app.db.plugin_tools import provisioned_tools
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.data_job import DataJobStatus
 from app.models.tenant.relationship import EntityRelationship
+from app.services.platform import rules
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.testing import COUNTERS_UID, install_tool_plugin
@@ -226,3 +232,93 @@ async def test_a_tool_plugins_envelope_is_refused_where_it_cannot_be_made(
         ImportEngineMessages.IMPORT_PERMISSION_REQUIRED,
     )
     assert (await _import(client, a, envelope, a.initiative.id)).status_code == 201
+
+
+async def _restore(
+    client: Any, seat: Any, monkeypatch: Any, role_session: Any
+) -> dict[str, Any]:
+    """A backup holding one Counters group, restored by ``seat`` into the new
+    initiative the restore makes: the finished job."""
+    from app.api.v1.tenant_endpoints.imports_test import (
+        _apply_backup,
+        _make_backup_zip,
+        _minimal_manifest,
+    )
+
+    envelope = {
+        "type": f"initiative-{GROUP}",
+        "schema_version": 1,
+        "name": "Party",
+        "items": {"counter": [{"name": "Gold", "fields": {"count": 12}}]},
+    }
+    entry = {
+        "path": f"initiatives/1-restored/{GROUP}/1-party.json",
+        "tool": GROUP,
+        "type": envelope["type"],
+        "schema_version": 1,
+        "entity_id": 1,
+        "title": "Party",
+        "initiative_id": 1,
+    }
+    archive = _make_backup_zip(
+        _minimal_manifest(entries=[entry]),
+        {entry["path"]: json.dumps(envelope).encode()},
+    )
+    job = await _apply_backup(client, seat, archive, monkeypatch, role_session)
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
+    return job
+
+
+async def test_a_restore_places_a_tool_plugin_in_the_initiative_it_makes(
+    client, session, acting_user, monkeypatch, role_session
+):
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(
+        client, session, seat, placements=[seat.initiative.id]
+    )
+
+    job = await _restore(client, seat, monkeypatch, role_session)
+    (made,) = job["result"]["initiatives"]
+    (entry,) = job["result"]["entries"]
+    assert entry["status"] == "created", entry
+
+    response = await client.get(
+        seat.g(f"/plugins/{install['id']}"), headers=seat.headers
+    )
+    assert response.json()["placed_initiative_ids"] == sorted(
+        [seat.initiative.id, made["initiative_id"]]
+    )
+    (tool,) = (await provisioned_tools(seat.guild.id)).installed
+    await route_session_to_guild(session, seat.guild.id)
+    (group,) = (
+        await session.exec(
+            sa.select(tool.table).where(
+                tool.table.c.initiative_id == made["initiative_id"]
+            )
+        )
+    ).all()
+    assert group.name == "Party"
+
+
+async def test_a_restore_leaves_out_a_tool_plugin_it_may_not_place(
+    client, session, acting_user, monkeypatch, role_session
+):
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    install = await install_tool_plugin(
+        client, session, seat, placements=[seat.initiative.id]
+    )
+    await rules.put(
+        session, SURFACE_PLUGINS, False, guild_id=seat.guild.id, set_by=SetBy.deployment
+    )
+    await session.commit()
+
+    job = await _restore(client, seat, monkeypatch, role_session)
+    (entry,) = job["result"]["entries"]
+    assert (entry["status"], entry["error"]) == (
+        "skipped",
+        ImportEngineMessages.IMPORT_TOOL_NOT_PLACED,
+    )
+    response = await client.get(
+        seat.g(f"/plugins/{install['id']}"), headers=seat.headers
+    )
+    assert response.json()["placed_initiative_ids"] == [seat.initiative.id]

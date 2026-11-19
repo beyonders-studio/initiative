@@ -334,6 +334,7 @@
   "IMPORT_JOB_NOT_FOUND": "Import not found.",
   "IMPORT_NOT_CANCELLABLE": "This import can no longer be cancelled.",
   "IMPORT_TOOL_DISABLED": "That tool isn't enabled in the chosen initiative.",
+  "IMPORT_TOOL_NOT_PLACED": "That plug-in's tool isn't placed in this initiative, so its content was left out.",
   "IMPORT_SOURCE_UNREACHABLE": "We couldn't reach that site. Check the address and try again.",
   "IMPORT_SOURCE_AUTH": "That site refused the sign-in details. Check the email address and API token.",
   "IMPORT_SOURCE_RATE_LIMITED": "That site asked us to slow down. Try again in a few minutes.",

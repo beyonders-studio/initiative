@@ -331,6 +331,7 @@
   "IMPORT_JOB_NOT_FOUND": "Import nicht gefunden.",
   "IMPORT_NOT_CANCELLABLE": "Dieser Import kann nicht mehr abgebrochen werden.",
   "IMPORT_TOOL_DISABLED": "Dieses Werkzeug ist in der gewählten Initiative nicht aktiviert.",
+  "IMPORT_TOOL_NOT_PLACED": "Das Werkzeug dieses Plug-ins ist in dieser Initiative nicht platziert, daher wurde sein Inhalt ausgelassen.",
   "IMPORT_SOURCE_UNREACHABLE": "Diese Website war nicht erreichbar. Prüfe die Adresse und versuche es erneut.",
   "IMPORT_SOURCE_AUTH": "Diese Website hat die Anmeldedaten abgelehnt. Prüfe E-Mail-Adresse und API-Token.",
   "IMPORT_SOURCE_RATE_LIMITED": "Diese Website hat uns gebeten, langsamer zu machen. Versuche es in ein paar Minuten erneut.",
