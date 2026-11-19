@@ -108,6 +108,7 @@ from app.testing.server import in_request_tasks
 from app.testing.tool_plugins import (
     COUNTERS_UID,
     add_counter,
+    convert_counters,
     counters_tool_manifest,
     install_tool_plugin,
 )
@@ -126,6 +127,7 @@ __all__ = [
     "captcha_switched_on",
     "checklist_items",
     "community_plan",
+    "convert_counters",
     "counters_tool_manifest",
     "create_access_grant",
     "create_auth_provider",

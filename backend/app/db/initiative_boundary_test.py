@@ -93,6 +93,7 @@ from app.testing import (
     COUNTERS_UID,
     Actor,
     add_counter,
+    convert_counters,
     create_initiative,
     create_property_definition,
     create_tag,
@@ -745,7 +746,9 @@ async def _tools_on(
     assert expected <= set(context.enabled_tools)
 
 
+@pytest.mark.parametrize("converted", [False, True], ids=["installed", "converted"])
 async def test_nobody_outside_an_initiative_reaches_its_rows(
+    converted: bool,
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
     reading_as: Callable[[int, int], Awaitable[AsyncSession]],
@@ -855,6 +858,12 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     for table in {case.table for case in cases.values()}:
         await _keep_only(session, table, initiative_a, paths)
     await session.commit()
+    if converted:
+        # Counters turned back into the built-in tool and converted again, as
+        # 20261119_0618 does in a community that uses it: every check below
+        # then holds for the converted tables.
+        install = {**install, "id": await convert_counters(session, guild.id)}
+        await route_session_to_guild(session, guild.id)
 
     await _tools_on(role_session, people.moderator_a, guild.id, initiative_a, tools)
     await _tools_on(role_session, people.moderator_b, guild.id, initiative_b_id, tools)

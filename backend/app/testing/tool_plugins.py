@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 __all__ = [
     "COUNTERS_UID",
     "add_counter",
+    "convert_counters",
+    "counters_conversion",
     "counters_tool_manifest",
     "install_tool_plugin",
 ]
@@ -295,3 +297,93 @@ async def add_counter(
     )
     await session.commit()
     return tools, group, row
+
+
+#: The revision that turns the built-in Counters into its plug-in.
+_CONVERSION = "20261119_0618_counters_become_a_plug_in.py"
+
+
+def counters_conversion() -> Any:
+    """The revision that turns the built-in Counters into its plug-in,
+    loaded by path."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "alembic" / "versions" / _CONVERSION
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def convert_counters(
+    session: AsyncSession, guild_id: int, *, between: Any = None
+) -> int | None:
+    """Turn ``guild_id``'s Counters back into the built-in tool and convert it
+    again, as the revision does in each community, then provision what a start
+    renders for it. ``between`` is awaited with ``session`` while the built-in
+    tool is back, before the conversion. Returns the install's id afterwards,
+    None where the community has none. ``session`` is committed."""
+    import sqlalchemy as sa
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from app.db import session as db_session
+    from app.db.kind_codes import ensure_kind_codes
+    from app.db.schema_provisioning import provision_community_tools
+
+    migration = counters_conversion()
+    builtin = {old: code for old, (_, code) in migration.KINDS.items()}
+    adopted = {new: old for old, (new, _) in migration.KINDS.items()}
+
+    def step(forward: bool) -> Any:
+        def apply(bind: Any) -> None:
+            with Operations.context(MigrationContext.configure(bind)):
+                if not forward:
+                    bind.exec_driver_sql(
+                        "DO $$ BEGIN CREATE TYPE public.counter_view_mode AS ENUM"
+                        " ('number', 'progress_bar', 'segmented_clock');"
+                        " EXCEPTION WHEN duplicate_object THEN NULL; END $$"
+                    )
+                    migration._add_kind_code_arms(builtin)
+                bind.execute(
+                    sa.text("SELECT set_config('search_path', :sp, true)"),
+                    {"sp": f"guild_{guild_id}, public"},
+                )
+                converted: list[int] = []
+                if forward:
+                    migration._upgrade_schema(converted)
+                else:
+                    migration._downgrade_schema(converted)
+                bind.execute(
+                    sa.text("SELECT set_config('search_path', 'public', true)")
+                )
+                if converted:
+                    migration._rewrite_public(
+                        converted,
+                        {v: k for k, v in adopted.items()} if forward else adopted,
+                    )
+                if forward:
+                    bind.exec_driver_sql("DROP TYPE IF EXISTS public.counter_view_mode")
+
+        return apply
+
+    # As a revision runs: on the provisioning connection, which owns the
+    # tables and is held to their row security.
+    await session.commit()
+    async with db_session.provisioning_engine.begin() as conn:
+        await conn.run_sync(step(forward=False))
+    if between is not None:
+        await between(session)
+        await session.commit()
+    async with db_session.provisioning_engine.begin() as conn:
+        await conn.run_sync(step(forward=True))
+    await ensure_kind_codes()
+    await provision_community_tools(guild_id)
+    found = await session.exec(
+        sa.text(
+            f'SELECT id FROM "guild_{guild_id}".guild_plugins WHERE listing_uid = :u'
+        ).bindparams(u=COUNTERS_UID)
+    )
+    return found.scalar()

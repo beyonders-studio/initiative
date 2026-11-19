@@ -835,6 +835,14 @@ def _grant_statements(schema: str, guild_id: int, tools: ToolSet) -> list[str]:
             f'"{schema}"."{table}" TO "{SYSTEM_LOGIN_ROLE}"'
             for table, privileges in system_maintenance_grants().items()
         ),
+        # A comment can hang off a tool plug-in's row or one of its items, as
+        # off a built-in tool's, so the guard reads them while the scrub
+        # rewrites that comment.
+        *(
+            f'GRANT SELECT ON TABLE "{schema}"."{table.name}" TO "{SYSTEM_LOGIN_ROLE}"'
+            for record in tools.installed
+            for table in (record.table, *record.items)
+        ),
         *(
             f"GRANT {', '.join(privileges)} ON SEQUENCE "
             f'"{schema}"."{sequence}" TO "{SYSTEM_LOGIN_ROLE}"'

@@ -60,36 +60,32 @@ async def _codes(session) -> dict[str, int]:
 async def test_registering_a_tool_gives_its_kinds_codes_the_database_packs_with(
     session,
 ):
+    # Counters' kinds keep the codes the built-in kinds they replaced had.
     await _register(session)
 
-    assert await _codes(session) == {
-        GROUP: FIRST_PLUGIN_KIND_CODE,
-        COUNTER: FIRST_PLUGIN_KIND_CODE + 1,
-    }
-    assert await _code(session, GROUP) == FIRST_PLUGIN_KIND_CODE
-    assert await _code(session, COUNTER) == FIRST_PLUGIN_KIND_CODE + 1
+    assert await _codes(session) == {GROUP: 4, COUNTER: 3}
+    assert await _code(session, GROUP) == 4
+    assert await _code(session, COUNTER) == 3
     assert await _code(session, "wiki") == 15
 
 
 async def test_a_kind_keeps_its_code_and_a_new_one_takes_the_next(session):
     await _register(session)
     await _register(session, version="1.1.0")
-    assert await _codes(session) == {
-        GROUP: FIRST_PLUGIN_KIND_CODE,
-        COUNTER: FIRST_PLUGIN_KIND_CODE + 1,
-    }
+    assert await _codes(session) == {GROUP: 4, COUNTER: 3}
 
-    # Another publisher's Counters declares the same keys under its own uid.
+    # Another publisher's Counters declares the same keys under its own uid,
+    # and its kinds take codes from the plug-in range.
     other = marketplace_uid("othercounters")
     await _register(session, uid=other, public_id="others.counters")
     assert await _codes(session) == {
-        GROUP: FIRST_PLUGIN_KIND_CODE,
-        COUNTER: FIRST_PLUGIN_KIND_CODE + 1,
-        f"counter_group.{other.lower()}": FIRST_PLUGIN_KIND_CODE + 2,
-        f"counter.{other.lower()}": FIRST_PLUGIN_KIND_CODE + 3,
+        GROUP: 4,
+        COUNTER: 3,
+        f"counter_group.{other.lower()}": FIRST_PLUGIN_KIND_CODE,
+        f"counter.{other.lower()}": FIRST_PLUGIN_KIND_CODE + 1,
     }
     assert (
-        await _code(session, f"counter.{other.lower()}") == FIRST_PLUGIN_KIND_CODE + 3
+        await _code(session, f"counter.{other.lower()}") == FIRST_PLUGIN_KIND_CODE + 1
     )
 
 
