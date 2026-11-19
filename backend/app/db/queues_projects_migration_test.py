@@ -22,11 +22,7 @@ from app.testing import (
     create_tag,
     create_user,
 )
-from app.testing.later_revisions import (
-    restate_kind_code,
-    step_comment_subjects,
-    step_newest,
-)
+from app.testing.later_revisions import restate_kind_code, step_newest
 
 _MIGRATION = (
     Path(__file__).resolve().parents[2]
@@ -75,12 +71,10 @@ def _runner(schema: str):
                 # 0581 ran before the newest revisions, so they come off
                 # around it.
                 if not forward:
-                    in_schema(lambda: step_comment_subjects(forward=False))
                     in_schema(lambda: step_newest(forward=False))
                 migration._convert(bind, forward, in_schema)
                 if forward:
                     in_schema(lambda: step_newest(forward=True))
-                    in_schema(lambda: step_comment_subjects(forward=True))
                     restate_kind_code(bind)
 
         return apply
