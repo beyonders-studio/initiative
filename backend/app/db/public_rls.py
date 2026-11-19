@@ -2223,6 +2223,15 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
         rls=FORCED_NO_POLICY,
         grants=Grants(app_admin=frozenset({SELECT, INSERT, UPDATE})),
     ),
+    # The code each tool plug-in's kind is given on this deployment, which
+    # ``relationship_kind_code`` is rendered from. Says nothing about any
+    # community. Given when a listing version is registered and read to render
+    # the function, both on the system engine; a code is never changed or taken
+    # back, so the engine may only add one.
+    "plugin_kind_codes": SharedTable(
+        rls=FORCED_NO_POLICY,
+        grants=Grants(app_admin=frozenset({SELECT, INSERT})),
+    ),
     # Which community holds which install, and the value a vendor webhook routes to it
     # by, with each install's status and suspension. An index over the guild schemas,
     # holding no content.

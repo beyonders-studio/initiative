@@ -1643,8 +1643,8 @@ class PluginServiceMessages:
     #: The registration's plug-in facts come from the registry, whose next refresh
     #: would bring it back, so it is switched off rather than removed.
     REGISTRY_MANAGED = "PLUGIN_SERVICE_REGISTRY_MANAGED"
-    #: An address, origin or key given for a declarative plug-in, whose calls
-    #: Initiative makes itself.
+    #: An address, origin or key given for a plug-in that runs no container: a
+    #: declarative one, whose calls Initiative makes itself, or a tool plug-in.
     DECLARATIVE_NOT_PLACED = "PLUGIN_SERVICE_DECLARATIVE_NOT_PLACED"
     #: A vendor value named a field the plug-in's manifest does not declare.
     UNKNOWN_VENDOR_FIELD = "PLUGIN_SERVICE_UNKNOWN_VENDOR_FIELD"

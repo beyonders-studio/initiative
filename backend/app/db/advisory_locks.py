@@ -58,6 +58,8 @@ class LockNamespace(IntEnum):
     MARKETPLACE_REFRESH = -0x307876F6777BC55F
     #: The demo deployment's pool pass, one process at a time.
     DEMO_POOL = 0x44454D4F504F4F4C
+    #: Giving tool plug-ins' kinds their codes, one registration at a time.
+    PLUGIN_KIND_CODES = 0x504B494E44434F44
 
     # -- keyed by a guild ---------------------------------------------------
     #: Provisioning a guild's schema; key 0 orders the shared trigger functions.

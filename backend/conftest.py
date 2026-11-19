@@ -43,6 +43,7 @@ from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace
 from app.db.guild_ddl import render_guild_schema_ddl
 from app.db.guild_migrations import GUILD_SCHEMA_REGEX
+from app.db.kind_codes import apply_kind_codes_if_changed
 from app.db.schema_provisioning import guild_schema_name
 from app.db.session import (
     clear_rls_context,
@@ -355,7 +356,6 @@ async def _apply_public_rls() -> None:
     before it. The shared trigger functions the guild back-fill re-renders
     and the kind codes (``app.db.kind_codes``) come along for the same
     reason."""
-    from app.db.kind_codes import apply_kind_codes_if_changed
     from app.db.public_rls import apply_public_rls_if_changed
     from app.db.schema_provisioning import apply_guild_trigger_functions
 
@@ -1044,6 +1044,9 @@ async def session(engine) -> AsyncGenerator[AsyncSession]:
             text(f"TRUNCATE TABLE {shared_tables} RESTART IDENTITY CASCADE")
         )
         await conn.execute(text("SET session_replication_role = 'origin'"))
+        # A tool plug-in a test registered gave its kinds codes, which the
+        # truncate took away: the function goes back to the codes as they stand.
+        await apply_kind_codes_if_changed(conn)
 
     if template_changed:
         pytest.fail(
