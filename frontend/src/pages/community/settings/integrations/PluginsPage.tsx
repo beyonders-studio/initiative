@@ -40,11 +40,8 @@ import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import { ListingTermsBadge } from "@/components/plugins/ListingTermsBadge";
-import { PluginMembersPanel } from "@/components/plugins/PluginMembersPanel";
 import { PluginPlanEnded } from "@/components/plugins/PluginOffer";
-import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel";
 import { PluginSettingsDialog } from "@/components/plugins/PluginSettingsDialog";
-import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -70,7 +67,10 @@ import { formatDate } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 
+import { PluginMembersPanel } from "./PluginMembersPanel";
+import { PluginPlacementPanel } from "./PluginPlacementPanel";
 import { PluginScopesPanel } from "./PluginScopesPanel";
+import { PluginSettingsPanel } from "./PluginSettingsPanel";
 import { PluginPendingUpdate, PluginUpdatesPanel } from "./PluginUpdatesPanel";
 
 export function PluginsPage() {
