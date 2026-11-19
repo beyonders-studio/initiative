@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import Select, and_, exists, false, func, or_, true, tuple_
+from sqlalchemy import Select, Table, and_, exists, false, func, or_, true, tuple_
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select as sa_select
 from sqlalchemy import update as sa_update
@@ -384,6 +384,57 @@ _NAMING = MetadataValue.property_id.not_in(
 )
 
 
+def _inside(tool: ToolRecord, table: Table) -> Callable[[int], ColumnElement[bool]]:
+    """Picks ``table``'s rows inside one row of the installed ``tool``: its own
+    table's row, or an item reaching it along its declared keys."""
+    from app.db.initiative_rls import item_path
+
+    if table is tool.table:
+        return lambda gid: table.c.id == gid
+    tables = {t.name: t for t in tool.items}
+    via = item_path(tool, table).dac.via
+    owners = [table, *(tables[name] for _, name in via[:-1])]
+
+    def within(gid: int) -> ColumnElement[bool]:
+        match = owners[-1].c[via[-1][0]] == gid
+        for owner, (column, parent) in reversed(list(zip(owners, via[:-1]))):
+            match = owner.c[column].in_(sa_select(tables[parent].c.id).where(match))
+        return match
+
+    return within
+
+
+def _installed_refs(tool: ToolRecord) -> tuple[PersonRef, ...]:
+    """Every person an installed ``tool``'s rows name: its declared person
+    fields, and a person-valued property on its own row or an item."""
+    tables = {table.name: table for table in (tool.table, *tool.items)}
+    inside = {name: _inside(tool, table) for name, table in tables.items()}
+    kinds = ((tool.kind, tool.table.name), *((k.value, k.table) for k in tool.children))
+
+    def property_within(gid: int) -> ColumnElement[bool]:
+        return _NAMING & or_(
+            *(
+                and_(
+                    MetadataValue.entity_type == kind,
+                    MetadataValue.entity_id.in_(
+                        sa_select(tables[name].c.id).where(inside[name](gid))
+                    ),
+                )
+                for kind, name in kinds
+            )
+        )
+
+    return (
+        *(
+            PersonRef(column, inside[name], clears=True)
+            for name, table in tables.items()
+            for column in table.c
+            if column.info.get("field") == "user_reference"
+        ),
+        PersonRef(MetadataValue.value_user_id, property_within, clears=True),
+    )
+
+
 def _property_ref(tool: Tool | ToolRecord) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
     itself and every sub-tool row inside it, read from the properties seam. A
@@ -420,6 +471,8 @@ def _property_ref(tool: Tool | ToolRecord) -> PersonRef | None:
 
 def person_refs(tool: Tool | ToolRecord) -> tuple[PersonRef, ...]:
     """Every person column on content inside ``tool``'s rows."""
+    if isinstance(tool, ToolRecord) and tool.installed:
+        return _installed_refs(tool)
     prop = _property_ref(tool)
     return (*PERSON_REFS.get(tool.value, ()), *((prop,) if prop is not None else ()))
 
@@ -495,7 +548,7 @@ async def sweep(session: AsyncSession, governing: Governing) -> set[int]:
     if not gone:
         return gone
     for ref in person_refs(governing.tool):
-        table = ref.column.class_
+        table = getattr(ref.column, "class_", ref.column.table)
         where = (ref.within(governing.resource_id), ref.column.in_(gone))
         await session.exec(
             sa_update(table).where(*where).values({ref.column.key: None})
