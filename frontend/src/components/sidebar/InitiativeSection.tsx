@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Blocks, CircleChevronRight, MoreVertical, Settings, ShieldAlert } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -11,11 +11,12 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
-import { ToolCreateButton } from "@/components/tools/ToolCreateButton";
+import { CreateLink, ToolCreateButton } from "@/components/tools/ToolCreateButton";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { communityPath } from "@/lib/communityUrl";
 import { initiativePluginPath } from "@/lib/pluginSurfaces";
 import { getItem, setItem } from "@/lib/storage";
+import { installedTools, toolPluginListRoute, toolText } from "@/lib/toolPlugins";
 import {
   initiativeRoute,
   SIDEBAR_TOOLS,
@@ -63,7 +64,7 @@ export const InitiativeSection = memo(
     activeCommunityId,
     collapseKey,
   }: InitiativeSectionProps) => {
-    const { t } = useTranslation("nav");
+    const { t, i18n } = useTranslation(["nav", "plugins"]);
     // The same signal the community rail carries, one level in and then one
     // more: a dot on the initiative, and on the tool inside it.
     const unread = useUnreadTree();
@@ -75,6 +76,37 @@ export const InitiativeSection = memo(
 
     /** Whether to surface a create affordance for a tool. */
     const canCreateTool = (tool: Tool): boolean => initiative.can.create.includes(tool);
+
+    // The tools the community's tool plug-ins declare that this reader may
+    // open here, which the server says as it says a built-in tool's.
+    const tools = useMemo(() => installedTools(plugins), [plugins]);
+    const pluginTools = tools.filter((tool) =>
+      (initiative.can.view as readonly string[]).includes(tool.kind)
+    );
+    const builtInTools = SIDEBAR_TOOLS.filter(showTool);
+
+    /** One built-in tool's row. */
+    const toolRow = (tool: Tool) => {
+      const Icon = TOOL_ICONS[tool];
+      const rowTo = toolListRoute(tool, initiative.id);
+      return (
+        <SidebarMenuItem key={tool}>
+          <div className="group/tool flex w-full min-w-0 items-center gap-1">
+            <SidebarMenuButton asChild size="sm" className="min-w-0 flex-1">
+              <Link to={gp(rowTo)} className="flex min-w-0 items-center gap-2">
+                <Icon className="h-4 w-4" />
+                <span className="min-w-0 flex-1 truncate">{t(toolNavLabelKey(tool))}</span>
+                {unread.hasTool(activeCommunityId, initiative.id, tool) ? <UnreadDot /> : null}
+                <span className="text-muted-foreground text-xs">{counts[tool] ?? 0}</span>
+              </Link>
+            </SidebarMenuButton>
+            {canCreateTool(tool) && (
+              <ToolCreateButton tool={tool} initiativeId={initiative.id} variant="icon" />
+            )}
+          </div>
+        </SidebarMenuItem>
+      );
+    };
 
     // Plug-ins offering this reader a surface inside *this* initiative, as the
     // server computed it for them.
@@ -257,33 +289,43 @@ export const InitiativeSection = memo(
                 </SidebarMenuItem>
               ))}
 
-              {/* One row per tool, in SIDEBAR_TOOLS order (projects last so
-                  the project list expands directly beneath their row). */}
-              {SIDEBAR_TOOLS.filter(showTool).map((tool) => {
-                const Icon = TOOL_ICONS[tool];
-                const rowTo = toolListRoute(tool, initiative.id);
+              {/* One row per tool, in SIDEBAR_TOOLS order, then the tools the
+                  community's plug-ins declare, and projects last, so the
+                  project list expands directly beneath their row. */}
+              {builtInTools.filter((tool) => tool !== Tool.project).map(toolRow)}
+
+              {pluginTools.map((tool) => {
+                const Icon = tool.icon;
+                const rowTo = toolPluginListRoute(initiative.id, tool.kind);
+                const instance = tool.tables.get(tool.kind);
                 return (
-                  <SidebarMenuItem key={tool}>
+                  <SidebarMenuItem key={tool.kind}>
                     <div className="group/tool flex w-full min-w-0 items-center gap-1">
                       <SidebarMenuButton asChild size="sm" className="min-w-0 flex-1">
                         <Link to={gp(rowTo)} className="flex min-w-0 items-center gap-2">
                           <Icon className="h-4 w-4" />
                           <span className="min-w-0 flex-1 truncate">
-                            {t(toolNavLabelKey(tool))}
+                            {toolText(tool.name, i18n.language)}
                           </span>
-                          {unread.hasTool(activeCommunityId, initiative.id, tool) ? (
-                            <UnreadDot />
-                          ) : null}
-                          <span className="text-muted-foreground text-xs">{counts[tool] ?? 0}</span>
                         </Link>
                       </SidebarMenuButton>
-                      {canCreateTool(tool) && (
-                        <ToolCreateButton tool={tool} initiativeId={initiative.id} variant="icon" />
-                      )}
+                      {instance &&
+                      (initiative.can.create as readonly string[]).includes(tool.kind) ? (
+                        <CreateLink
+                          to={gp(rowTo)}
+                          search={{ create: "true" }}
+                          label={t("plugins:tool.create", {
+                            name: toolText(instance.name, i18n.language),
+                          })}
+                          variant="icon"
+                        />
+                      ) : null}
                     </div>
                   </SidebarMenuItem>
                 );
               })}
+
+              {showTool(Tool.project) && toolRow(Tool.project)}
 
               {/* Projects List */}
               {showTool(Tool.project) &&

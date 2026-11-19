@@ -348,5 +348,15 @@
   "permissions": {
     "use": "Verwenden",
     "named": "{{plugin}}: {{permission}}"
+  },
+  "tool": {
+    "namePlaceholder": "Gib ihm einen Namen",
+    "readOnly": "Du kannst das lesen, aber nicht ändern.",
+    "byline": "Hinzugefügt {{added}} · geändert {{changed}}",
+    "fields": {
+      "createdAt": "Hinzugefügt",
+      "updatedAt": "Zuletzt geändert"
+    },
+    "create": "Neu: {{name}}"
   }
 }

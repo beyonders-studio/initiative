@@ -99,6 +99,13 @@ export {
 } from "./taskType.factory";
 export { buildSavedLayoutSet, buildToolLayoutSet } from "./toolLayout.factory";
 export {
+  buildToolPlugin,
+  buildToolRow,
+  resetCounter as resetToolPluginCounter,
+  shelfDefinition,
+  TOOL_PLUGIN_UID,
+} from "./toolPlugin.factory";
+export {
   buildOwnedDecoration,
   buildUser,
   buildUserCommunityMember,
@@ -131,6 +138,7 @@ import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory
 import { resetCounter as resetTagCounter } from "./tag.factory";
 import { resetCounter as resetTaskCounter } from "./task.factory";
 import { resetCounter as resetTaskTypeCounter } from "./taskType.factory";
+import { resetCounter as resetToolPluginCounter } from "./toolPlugin.factory";
 import { resetCounter as resetTrashCounter } from "./trash.factory";
 import { resetCounter as resetUserCounter } from "./user.factory";
 import { resetCounter as resetWikiCounter } from "./wiki.factory";
@@ -164,4 +172,5 @@ export function resetFactories(): void {
   resetShareRequestCounter();
   resetTrashCounter();
   resetIdeaCounter();
+  resetToolPluginCounter();
 }
