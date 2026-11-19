@@ -51,7 +51,7 @@ def referenceable_types() -> tuple[SearchEntityType, ...]:
     return tuple(
         sorted(
             (
-                source.entity_type
+                SearchEntityType(source.entity_type)
                 for source in SEARCH_SOURCES.values()
                 if source.entity_type not in NOT_REFERENCEABLE
             ),

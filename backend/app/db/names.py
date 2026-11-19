@@ -19,12 +19,13 @@ MAX_IDENTIFIER_LENGTH = 63
 
 def object_name(prefix: str, table: str, suffix: str) -> str:
     """``<prefix>_<table>_<suffix>``, or ``<prefix>_<digest>_<suffix>`` when
-    that would not fit."""
-    name = f"{prefix}_{table}_{suffix}"
+    that would not fit; an empty ``suffix`` leaves its part out."""
+    tail = f"_{suffix}" if suffix else ""
+    name = f"{prefix}_{table}{tail}"
     if len(name.encode()) <= MAX_IDENTIFIER_LENGTH:
         return name
     digest = hashlib.sha256(table.encode()).hexdigest()[:16]
-    shortened = f"{prefix}_{digest}_{suffix}"
+    shortened = f"{prefix}_{digest}{tail}"
     if len(shortened.encode()) > MAX_IDENTIFIER_LENGTH:
         raise ValueError(f"{shortened!r} is longer than an identifier can be")
     return shortened

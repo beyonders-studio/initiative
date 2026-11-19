@@ -32,10 +32,11 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.errors import CodedError
-from app.core.messages import PluginMessages
+from app.core.messages import KindMessages, PluginMessages
 from app.core.plugin_scopes import tool_resource
 from app.core.search import SearchEntityType
-from app.core.tools import Tool
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+from app.core.tools import Tool, kind_refusal
 from app.db.authorization import standing_arg
 from app.db.guild_standing import ActorContext, InstallContext
 from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
@@ -84,7 +85,7 @@ def writable_column(user_id: int | None, *, install: InstallContext | None = Non
             writable
             & SearchEntry.entity_type.in_(
                 [
-                    kind.value
+                    kind
                     for kind, resource in SEARCH_ENTRY_READ_SCOPE.items()
                     if resource.value in install.install_write
                 ]
@@ -110,8 +111,8 @@ class SearchScopeError(CodedError):
 
 
 def install_entity_types(
-    install: InstallContext, types: Sequence[SearchEntityType] | None
-) -> tuple[SearchEntityType, ...]:
+    install: InstallContext, types: Sequence[str] | None
+) -> tuple[str, ...]:
     """The kinds an installed plug-in's search reaches: those asked for (the
     default scope when none are) whose read scope it holds, per
     ``SEARCH_ENTRY_READ_SCOPE``. Writing implies reading.
@@ -329,7 +330,7 @@ class Filters:
     asks for ``False``; a template picker asks for ``True``.
     """
 
-    types: Sequence[SearchEntityType] | None = None
+    types: Sequence[str] | None = None
     initiative_id: int | None = None
     #: Archived work is indexed and left out unless it is asked for.
     include_archived: bool = False
@@ -337,13 +338,20 @@ class Filters:
     #: The thing being written in, which a reference may not name — see
     #: :meth:`clause`. A results page has no subject and leaves this unset.
     subject: tuple[SearchEntityType, int] | None = None
+    #: The community's tools, whose kinds are what it indexes.
+    tools: ToolSet = BUILTIN_TOOLS
 
     @property
-    def entity_types(self) -> tuple[SearchEntityType, ...]:
-        """The types to search — the default scope when none were named."""
-        return (
-            tuple(self.types) if self.types else entity_types(default_scope_only=True)
-        )
+    def entity_types(self) -> tuple[str, ...]:
+        """The types to search — the default scope when none were named.
+        Raises a 404 for a type the community does not index."""
+        if not self.types:
+            return entity_types(self.tools, default_scope_only=True)
+        indexed = entity_types(self.tools)
+        for kind in self.types:
+            if kind not in indexed:
+                raise kind_refusal(kind, KindMessages.NOT_FOUND, 404)
+        return tuple(self.types)
 
     def clause(self) -> ColumnElement[bool]:
         """This narrowing as a predicate."""

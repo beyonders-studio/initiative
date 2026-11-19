@@ -25,7 +25,7 @@ the tool (:func:`item_paths`), read off the model metadata.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, replace
 from functools import cache
 
@@ -317,7 +317,7 @@ def _dac_via(
         # question. Asking it again would consult ``resource_grants`` a second
         # time per row for the same answer. ``ANSWERED`` rather than nothing,
         # because a polymorphic path composes these arms per target type.
-        if c == "SELECT" and parent_answers_for_reads(parent):
+        if c == "SELECT" and parent_answers_for_reads(parent, tool):
             return ANSWERED
         return (
             f"EXISTS (SELECT 1 FROM {parent} {alias} "
@@ -345,7 +345,7 @@ def _dac_two_hop(
     tool = tool or BUILTIN_TOOLS.by_table[parent]
 
     def build(t: str, c: str, w: bool) -> str | None:
-        if c == "SELECT" and parent_answers_for_reads(mid):
+        if c == "SELECT" and parent_answers_for_reads(mid, tool):
             return ANSWERED
         return (
             f"EXISTS (SELECT 1 FROM {mid} dmid JOIN {parent} dpar "
@@ -513,18 +513,21 @@ def direct_or_guild(tool: ToolRecord) -> InitiativePath:
 ANSWERED = "true"
 
 
-def parent_answers_for_reads(parent: str) -> bool:
+def parent_answers_for_reads(parent: str, tool: ToolRecord | None = None) -> bool:
     """Whether walking to ``parent`` is, on its own, the read answer.
 
     A child's read leg is an ``EXISTS`` into its parent, and that inner scan
     runs the parent's own ``SELECT`` policy — which is the same question the
     child was about to ask a second time. So where the parent carries one, the
-    walk is the whole of it.
+    walk is the whole of it. A tool plug-in's tables, ``tool``'s when it is
+    one, carry the policies a built-in tool's do.
 
     A parent that carries none (the structural initiative tables, which are
     guild-scoped by the schema boundary) answers nothing, and a child of one
     keeps asking for itself.
     """
+    if tool is not None and tool.install_id is not None:
+        return parent in {table.name for table in (tool.table, *tool.items)}
     return parent in INITIATIVE_PATHS
 
 
@@ -535,7 +538,7 @@ def via(tool: ToolRecord, fk: str, *, parent_pk: str = "id") -> InitiativePath:
 
     def predicate(t: str, w: bool) -> str:
         walk = f"EXISTS (SELECT 1 FROM {parent} WHERE {parent}.{parent_pk} = {t}.{fk}"
-        if not w and parent_answers_for_reads(parent):
+        if not w and parent_answers_for_reads(parent, tool):
             return walk + ")"
         return f"{walk} AND {_access(f'{parent}.initiative_id', w)})"
 
@@ -638,10 +641,14 @@ def _via_item(tool: ToolRecord, mid: str, mid_fk: str, fk: str) -> InitiativePat
             f"WHERE dmid.id = {row}.{fk}"
         )
 
+    def predicate(t: str, w: bool) -> str:
+        if not w and parent_answers_for_reads(mid, tool):
+            # The middle item's own policy is what walks on to the tool.
+            return f"EXISTS (SELECT 1 FROM {mid} dmid WHERE dmid.id = {t}.{fk})"
+        return f"EXISTS (SELECT 1 {walk(t)} AND {_access('dpar.initiative_id', w)})"
+
     return InitiativePath(
-        predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 {walk(t)} AND {_access('dpar.initiative_id', w)})"
-        ),
+        predicate=predicate,
         initiative_expr=lambda r: f"(SELECT dpar.initiative_id {walk(r)})",
         parents=lambda r: _parent_chain(
             f"{mid} dmid",
@@ -814,12 +821,47 @@ _KIND_COMMENT_PARENTS: tuple[CommentParent, ...] = (
 )
 
 
+def _installed_comment_parents(tools: ToolSet) -> Iterator[CommentParent]:
+    """The items of each installed tool, each said on as a task is: reached
+    through the hops its path walks up to its tool, whose sharing governs it."""
+    for tool in tools.installed:
+        kinds = {kind.table: kind.value for kind in tool.children if kind.commentable}
+        for item in tool.items:
+            if item.name not in kinds:
+                continue
+            dac = item_path(tool, item).dac
+            assert dac is not None, item.name
+            aliases = ("ci", "cm", "ct")[: len(dac.via)] + ("ct",)
+            frm = f"{item.name} ci"
+            chain = [(item.name, "ci.id")]
+            for (fk, parent), here, there in zip(
+                dac.via, aliases, aliases[1:], strict=False
+            ):
+                frm += f" JOIN {parent} {there} ON {there}.id = {here}.{fk}"
+                chain.append((parent, f"{there}.id"))
+            yield CommentParent(
+                kinds[item.name],
+                frm,
+                "ci.id",
+                "ct.initiative_id",
+                tuple(chain),
+                table=item.name,
+                governed_by=tool,
+                tool_fk=dac.via[0][0] if len(dac.via) == 1 else None,
+            )
+
+
 def comment_parents(tools: ToolSet) -> dict[str, CommentParent]:
     """Every kind a comment is said on, keyed by the kind, in
     ``COMMENT_TARGETS`` order: the kinds inside a tool that take comments,
     then every tool."""
     return {
-        p.kind: p for p in (*_KIND_COMMENT_PARENTS, *map(_tool_comment_parent, tools))
+        p.kind: p
+        for p in (
+            *_KIND_COMMENT_PARENTS,
+            *_installed_comment_parents(tools),
+            *map(_tool_comment_parent, tools),
+        )
     }
 
 
@@ -1526,20 +1568,47 @@ def _named_tool_gate(t: str, write: bool, tools: ToolSet) -> str:
     )
 
 
-def _unstamped_leg(t: str, kind_column: str, id_column: str, tools: ToolSet) -> str:
-    """An entry that stamps no sharing, about a kind no sharing governs (a
-    collection) or a comment on one, is reached as the row it describes is:
-    that row's own policy decides."""
-    tables = {k.value: k.table for k in tools.child_kinds if k.standalone}
-    tables["comment"] = "comments"
+def _reached_as_its_row(
+    t: str, kind_column: str, id_column: str, tables: dict[str, str]
+) -> str:
+    """A row naming a kind of ``tables`` (kind to table) by ``kind_column``
+    and ``id_column`` is reached as the row it names is: that row's own policy
+    decides."""
     arms = " ".join(
         f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {table} sk"
         f" WHERE sk.id = {t}.{id_column})"
         for kind, table in tables.items()
     )
-    return (
-        f"({t}.dac_tool IS NOT NULL OR (CASE {t}.{kind_column} {arms} ELSE true END))"
-    )
+    return f"(CASE {t}.{kind_column} {arms} ELSE true END)"
+
+
+def plugin_row_tables(tools: ToolSet) -> dict[str, str]:
+    """Each kind the community's tool plug-ins bring, with its table."""
+    return {
+        kind: table
+        for tool in tools.installed
+        for kind, table in (
+            (tool.kind, tool.table.name),
+            *((child.value, child.table) for child in tool.children),
+        )
+    }
+
+
+def plugin_entry_written(t: str, tools: ToolSet) -> str:
+    """The community admin writes a search entry about a tool plug-in's row
+    only while that row reads as there."""
+    return _reached_as_its_row(t, "entity_type", "entity_id", plugin_row_tables(tools))
+
+
+def _unstamped_leg(t: str, kind_column: str, id_column: str, tools: ToolSet) -> str:
+    """An entry that stamps no sharing, about a kind no sharing governs (a
+    collection), a comment on one or a tool plug-in's row, is reached as the
+    row it describes is."""
+    tables = {k.value: k.table for k in tools.child_kinds if k.standalone}
+    tables["comment"] = "comments"
+    tables |= plugin_row_tables(tools)
+    reached = _reached_as_its_row(t, kind_column, id_column, tables)
+    return f"({t}.dac_tool IS NOT NULL OR {reached})"
 
 
 def named_tool_path(
@@ -2524,20 +2593,23 @@ EVENT_SOURCES["metadata_values"] = Emit(
 )
 
 
-def initiative_locator(table: str) -> RowLocator:
+def initiative_locator(
+    table: str, paths: Mapping[str, InitiativePath] = INITIATIVE_PATHS
+) -> RowLocator:
     """Row expression yielding the initiative an event about ``table`` belongs to.
 
     One question, answered from the registry that already knows: an
     initiative-scoped table reuses the very path that renders its RLS, so a row
     can never be gated by one initiative and have its events attributed to
-    another. Guild-level emitters say so themselves.
+    another. Guild-level emitters say so themselves. ``paths`` are the
+    community's (:func:`paths_for`).
     """
     source = event_source(table)
     if source.guild_wide:
         return lambda _row: "NULL::integer"
     if source.initiative is not None:
         return source.initiative
-    path = INITIATIVE_PATHS.get(table)
+    path = paths.get(table)
     if path is None:
         raise RuntimeError(
             f"{table} emits events but nothing resolves the initiative they "

@@ -209,6 +209,17 @@ _CODES: dict[str, int] = {
 NODE_ID_SHIFT = 32
 
 
+def endpoint_code(kind: str) -> int:
+    """The permanent code of an end ``kind`` names."""
+    return _CODES[kind]
+
+
+def node_of(code: int, entity_id: int) -> int:
+    """The node id of the thing of kind code ``code`` with ``entity_id``: a
+    built-in kind's (:func:`endpoint_code`) or a tool plug-in's."""
+    return code << NODE_ID_SHIFT | entity_id
+
+
 def node_id(kind: EndpointKind, entity_id: int) -> int:
     """One integer addressing one thing, derived rather than registered.
 
@@ -221,7 +232,7 @@ def node_id(kind: EndpointKind, entity_id: int) -> int:
     The database computes the same value in a generated column, so SQL and
     Python agree by construction rather than by convention.
     """
-    return _CODES[kind.value] << NODE_ID_SHIFT | entity_id
+    return node_of(_CODES[kind.value], entity_id)
 
 
 def decode_node_id(value: int) -> tuple[EndpointKind, int]:

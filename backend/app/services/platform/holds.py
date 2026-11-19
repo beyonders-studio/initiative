@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from fastapi import status
-from sqlalchemy import update
+from sqlalchemy import Table, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -45,10 +45,12 @@ from app.core.intake import IntakeStream
 from app.core.messages import HoldMessages
 from app.core.moderation import HoldReason, HoldRelease, HoldVia, LegalBasis
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.core.tools import plural_of
 from app.db import cohorts, gucs
 from app.db.base import MODELS_BY_TABLE
 from app.db.guild_standing import GuildContext
+from app.db.plugin_tools import provisioned_tools
 from app.db.query import ids_in
 from app.db.request_context import SystemGuild
 from app.db.session import raise_flag, routed_guild_id, set_rls_context
@@ -119,24 +121,36 @@ def _via(context: GuildContext, initiative_id: int | None) -> HoldVia:
 # -- What a hold covers ---------------------------------------------------------
 
 
-async def _covered(session: AsyncSession, target: HoldMixin) -> dict[type, list[int]]:
-    """The target and everything a hold on it covers, by model. A comment is
+async def _covered(
+    session: AsyncSession, target: HoldMixin, tools: ToolSet
+) -> dict[Table, list[int]]:
+    """The target and everything a hold on it covers, by table, in a
+    community with ``tools``: its tool plug-ins' tables too. A comment is
     held alone; anything else takes everything inside it."""
     from app.models.tenant.comment import Comment
-    from app.services.tenant.lifecycle_tree import subtree_levels
+    from app.services.tenant.lifecycle_tree import cascade_children, subtree_levels
 
     if isinstance(target, Comment):
-        return {Comment: [int(target.id)]}  # type: ignore[arg-type]
-    covered: dict[type, list[int]] = {}
-    for level in await subtree_levels(session, [target]):
-        for model, ids in level.items():
-            if issubclass(model, HoldMixin):
-                covered.setdefault(model, []).extend(ids)
+        return {Comment.__table__: [int(target.id)]}  # type: ignore[arg-type,dict-item]
+    covered: dict[Table, list[int]] = {}
+    tree = cascade_children(tools)
+    for level in await subtree_levels(session, [target], tree=tree):
+        for table, ids in level.items():
+            if "held_at" in table.c:
+                covered.setdefault(table, []).extend(ids)
     return covered
 
 
+def _held_tables(tools: ToolSet) -> tuple[Table, ...]:
+    """Every table a hold may cover in a community with ``tools``."""
+    return (
+        *(model.__table__ for model in hold_models()),  # type: ignore[attr-defined]
+        *(table for table in tools.installed_tables if "held_at" in table.c),
+    )
+
+
 async def _shown_uploads(
-    session: AsyncSession, covered: dict[type, list[int]]
+    session: AsyncSession, covered: dict[Table, list[int]]
 ) -> set[str]:
     """The stored names of the uploads anything ``covered`` shows."""
     from app.models.tenant.file import File, FileVersion
@@ -153,12 +167,12 @@ async def _shown_uploads(
     for model, column in _upload_columns():
         if model in parents:
             parent, key = parents[model]
-            ids = covered.get(parent)
+            ids = covered.get(parent.__table__)  # type: ignore[attr-defined]
             if not ids:
                 continue
             where = ids_in(getattr(model, key), ids)
         else:
-            ids = covered.get(model)
+            ids = covered.get(model.__table__)
             if not ids:
                 continue
             where = ids_in(model.id, ids)
@@ -172,20 +186,19 @@ async def _shown_uploads(
 
 async def _stamp(
     session: AsyncSession,
-    covered: dict[type, list[int]],
+    covered: dict[Table, list[int]],
     names: set[str],
     hold: ContentHold,
 ) -> None:
     from app.models.tenant.upload import Upload
 
     now = hold.placed_at
-    for model, ids in covered.items():
+    for table, ids in covered.items():
         await session.exec(
-            update(model)
-            .where(ids_in(model.id, ids))
-            .where(model.held_at.is_(None))
+            update(table)
+            .where(ids_in(table.c.id, ids))
+            .where(table.c.held_at.is_(None))
             .values(held_at=now, hold_id=hold.id)
-            .execution_options(synchronize_session=False)
         )
     if names:
         await session.exec(
@@ -197,17 +210,16 @@ async def _stamp(
         )
 
 
-async def _unstamp(session: AsyncSession, hold_id: int) -> None:
-    for model in hold_models():
+async def _unstamp(session: AsyncSession, hold_id: int, tools: ToolSet) -> None:
+    for table in _held_tables(tools):
         await session.exec(
-            update(model)
-            .where(model.hold_id == hold_id)
+            update(table)
+            .where(table.c.hold_id == hold_id)
             .values(held_at=None, hold_id=None)
-            .execution_options(synchronize_session=False)
         )
 
 
-async def _cover_again(session: AsyncSession, released_id: int) -> None:
+async def _cover_again(session: AsyncSession, released_id: int, tools: ToolSet) -> None:
     """Hold again, under the hold that covers it, whatever releasing
     ``released_id`` let go that another open hold still covers: a comment
     held on its own and then inside its task, or an upload two held things
@@ -231,7 +243,7 @@ async def _cover_again(session: AsyncSession, released_id: int) -> None:
         ).first()
         if target is None:
             continue
-        covered = await _covered(session, target)
+        covered = await _covered(session, target, tools)
         await _stamp(session, covered, await _shown_uploads(session, covered), other)
 
 
@@ -462,7 +474,7 @@ async def place(
             )
             system.add(hold)
             await system.flush()
-            covered = await _covered(system, target)
+            covered = await _covered(system, target, await provisioned_tools(guild_id))
             names = await _shown_uploads(system, covered)
             await _stamp(system, covered, names, hold)
             await raise_flag(system, gucs.PURGING, False)
@@ -514,7 +526,7 @@ async def release(
 ) -> ContentHold:
     """End hold ``hold_id`` with ``outcome``. The platform's alone."""
     from app.services.tenant.attachments import delete_blobs
-    from app.services.tenant.soft_delete import hard_purge_entity
+    from app.services.tenant.soft_delete import hard_purge_entities
 
     if not context.pam_moderate:
         raise HoldError(HoldMessages.NOT_FOUND, status.HTTP_404_NOT_FOUND)
@@ -532,8 +544,9 @@ async def release(
             raise HoldError(HoldMessages.ALREADY_RELEASED, status.HTTP_409_CONFLICT)
         await _community_stays(system, guild_id)
         await raise_flag(system, gucs.PURGING)
-        await _unstamp(system, int(hold.id))
-        await _cover_again(system, int(hold.id))
+        tools = await provisioned_tools(guild_id)
+        await _unstamp(system, int(hold.id), tools)
+        await _cover_again(system, int(hold.id), tools)
         await raise_flag(system, gucs.PURGING, False)
         model = model_for(hold.target_type)
         target = (
@@ -556,7 +569,7 @@ async def release(
                 system, context, hold, target, released_by=released_by
             )
         elif target is not None and outcome is HoldRelease.purge:
-            released = await hard_purge_entity(system, target)
+            released = await hard_purge_entities(system, [target], tools=tools)
         now = datetime.now(UTC)
         hold.released_at = now
         hold.released_by = released_by

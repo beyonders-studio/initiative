@@ -219,7 +219,7 @@ async def _erase_in_guild(
 
     ``guild_session`` is a system session routed into ``guild_id``.
     """
-    from app.core.relationships import PERSON, EndpointKind
+    from app.core.relationships import PERSON
     from app.models.platform.identity_ref import IdentityEntity
     from app.models.tenant.calendar_event import CalendarEventAttendee
     from app.models.tenant.custom_role import CustomRoleMember
@@ -321,7 +321,7 @@ async def _erase_in_guild(
     )
     # Every link with them on an end, from either side, tombstones included.
     await relationships_service.purge_for_entities(
-        guild_session, EndpointKind(PERSON.value), [user_id]
+        guild_session, PERSON.code, [user_id]
     )
 
 

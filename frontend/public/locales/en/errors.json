@@ -276,7 +276,6 @@
   "unableToSaveCommunityOrder": "Unable to save community order. Refreshing…",
   "TRASH_ITEM_NOT_FOUND": "That trashed item is no longer available.",
   "TRASH_PURGE_REQUIRES_ADMIN": "Only community admins can permanently delete items.",
-  "TRASH_UNKNOWN_ENTITY_TYPE": "Unknown trash item type.",
   "PROJECT_EXPORT_NO_TASK_STATUSES": "The project export has no task statuses, which is required for import.",
   "EXPORT_UNKNOWN_SOURCE": "This data can't be exported.",
   "EXPORT_INVALID_FORMAT": "This export format isn't supported for this data.",

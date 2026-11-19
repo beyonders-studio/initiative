@@ -4,6 +4,7 @@ community that installs it, and ruled as a built-in tool is."""
 from __future__ import annotations
 
 import copy
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -14,6 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import GuildPluginMessages
 from app.core.tool_set import BUILTIN_TOOLS
+from app.db.event_capture import render_guild_capture_ddl
 from app.db.guild_ddl import render_guild_rls_ddl
 from app.db.kind_codes import assign_plugin_kind_codes
 from app.db.plugin_tools import (
@@ -31,6 +33,8 @@ from app.db.schema_provisioning import (
     guild_schema_name,
     stamp_tools,
 )
+from app.db.search_index import render_guild_search_ddl
+from app.db.timers import render_guild_timer_ddl
 from app.models.platform.guild import CommunityRole
 from app.models.platform.plugin_install import PluginInstall, PluginInstallStatus
 from app.models.tenant._mixins import ActorKind
@@ -74,7 +78,7 @@ _UNIVERSAL_TOOL = {
 _UNIVERSAL_ITEM = {
     "id", "counter_group_id", "name", "position", "created_at", "updated_at",
     "created_by", "created_by_kind", "deleted_at", "deleted_by",
-    "deleted_by_kind", "purge_at", "held_at", "hold_id",
+    "deleted_by_kind", "purge_at", "archived_at", "held_at", "hold_id",
 }  # fmt: skip
 
 
@@ -155,6 +159,29 @@ def test_the_render_with_a_tool_rules_its_tables_and_without_one_names_none():
     assert "p_tsjvtcm0s7gv2x" not in render_guild_rls_ddl(BUILTIN_TOOLS)
 
 
+def test_a_tool_plugins_tables_are_captured_indexed_and_timed():
+    """Its tables take the change capture, search and timer triggers a
+    built-in tool's do, and a render without it names none of them."""
+    tools = _set(_counters())
+    for table in ("p_tsjvtcm0s7gv2x_counter_group", "p_tsjvtcm0s7gv2x_counter"):
+        assert f"CREATE TRIGGER capture_{table}\n" in render_guild_capture_ddl(tools)
+        assert f"  AFTER INSERT OR DELETE ON {table}\n" in render_guild_search_ddl(
+            None, tools
+        )
+        assert f"CREATE TRIGGER tr_{table}_timer_trash\n" in render_guild_timer_ddl(
+            tools
+        )
+    for render in (
+        render_guild_capture_ddl(BUILTIN_TOOLS),
+        render_guild_search_ddl(None, BUILTIN_TOOLS),
+        render_guild_timer_ddl(BUILTIN_TOOLS),
+    ):
+        assert "p_tsjvtcm0s7gv2x" not in render
+    # The change capture reads a tool plug-in's kind off its table's name, so
+    # no built-in table may be named like one.
+    assert not [name for name in BUILTIN_TOOLS.tables if name.startswith("p_")]
+
+
 async def test_a_community_with_no_tool_plugin_keeps_the_bundle():
     bundle = await get_provisioning_bundle()
     assert bundle.for_tools(BUILTIN_TOOLS) is bundle
@@ -229,6 +256,101 @@ async def test_install_creates_exactly_the_declared_tables(
             sa.text("SELECT has_table_privilege(:r, :t, 'SELECT, INSERT')"),
             {"r": plugin_role, "t": f'"{schema}".{table}'},
         )
+
+
+async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """An item's change is told under the sharing of its tool, as a task's is
+    under its project's; it is indexed under its own kind; and its trash arms
+    the community's purge."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    group = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter_group (initiative_id, name)"
+                " VALUES (:i, 'Scores') RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    counter = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter (counter_group_id, name)"
+                " VALUES (:g, 'Laps') RETURNING id"
+            ),
+            params={"g": group},
+        )
+    ).scalar_one()
+    events = (
+        await session.exec(
+            sa.text(
+                "SELECT resource_type, resource_id, initiative_id, dac_tool, dac_id"
+                " FROM event_outbox WHERE resource_type LIKE 'p\\_%' ORDER BY id"
+            )
+        )
+    ).all()
+    kind = f"counter_group.{COUNTERS_UID.lower()}"
+    initiative = seat.initiative.id
+    assert [tuple(e) for e in events] == [
+        ("p_tsjvtcm0s7gv2x_counter_group", group, initiative, kind, group),
+        ("p_tsjvtcm0s7gv2x_counter", counter, initiative, kind, group),
+    ]
+    entries = (
+        await session.exec(
+            sa.text(
+                "SELECT entity_type, entity_id, dac_tool, dac_id, title"
+                " FROM search_entries WHERE entity_type LIKE '%.%' ORDER BY entity_id"
+            )
+        )
+    ).all()
+    assert sorted(tuple(e) for e in entries) == sorted(
+        [
+            (kind, group, kind, group, "Scores"),
+            (f"counter.{COUNTERS_UID.lower()}", counter, kind, group, "Laps"),
+        ]
+    )
+    armed = await session.exec(
+        sa.text(
+            "SELECT tgname FROM pg_trigger WHERE tgrelid IN"
+            " (to_regclass('p_tsjvtcm0s7gv2x_counter_group'),"
+            " to_regclass('p_tsjvtcm0s7gv2x_counter')) AND tgname LIKE '%timer%'"
+        )
+    )
+    assert sorted(armed.scalars()) == [
+        "tr_p_tsjvtcm0s7gv2x_counter_group_timer_trash",
+        "tr_p_tsjvtcm0s7gv2x_counter_timer_trash",
+    ]
+    # The trash sweep's next visit, as a visit and the reconcile read it,
+    # counts the item in the bin.
+    from app.services.sweep_timers import _due, sweeps
+
+    purge_at = datetime(2030, 1, 1, tzinfo=UTC)
+    await session.exec(
+        sa.text(
+            "UPDATE p_tsjvtcm0s7gv2x_counter SET deleted_at = now(),"
+            " deleted_by_kind = 'system', purge_at = :at WHERE id = :c"
+        ),
+        params={"at": purge_at, "c": counter},
+    )
+    trash = next(sweep for sweep in sweeps() if sweep.kind == "trash")
+    tools = await provisioned_tools(seat.guild.id)
+    due = await session.exec(
+        _due(trash, datetime.now(UTC), tools).execution_options(include_deleted=True)
+    )
+    assert due.first() == purge_at
+    # Its retention past, the sweep purges it.
+    from app.services.tenant.trash_purge import _run_purge_pass
+
+    await _run_purge_pass(session, now=purge_at + timedelta(days=1), tools=tools)
+    gone = await session.scalar(
+        sa.text("SELECT count(*) FROM p_tsjvtcm0s7gv2x_counter WHERE id = :c"),
+        {"c": counter},
+    )
+    assert gone == 0
 
 
 async def test_the_tool_is_on_in_every_initiative_then_and_later(
@@ -668,6 +790,92 @@ async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
         )
     )
     assert refused.scalar_one() is True
+
+
+async def test_boot_brings_an_older_item_table_up_to_its_shape(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """An item table made before items were archived has no stamp column. The
+    back-fill of a community whose render moved adds it, and what reads it."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    schema = guild_schema_name(seat.guild.id)
+    counter = f'"{schema}".p_tsjvtcm0s7gv2x_counter'
+    stamp = await session.scalar(
+        sa.text("SELECT obj_description(to_regnamespace(:s), 'pg_namespace')"),
+        {"s": schema},
+    )
+    await session.exec(
+        sa.text(f"ALTER TABLE {counter} DROP COLUMN archived_at CASCADE")
+    )
+    behind = re.sub(r"schema=[^,]*", "schema=older", stamp)
+    await session.exec(sa.text(f"COMMENT ON SCHEMA \"{schema}\" IS '{behind}'"))
+    await session.commit()
+
+    assert await _backfill_guild(seat.guild.id, wait=True) is True
+
+    assert (
+        "archived_at" in (await _columns(session, schema))["p_tsjvtcm0s7gv2x_counter"]
+    )
+    frozen = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM pg_trigger WHERE tgrelid = to_regclass(:t)"
+            " AND tgname LIKE '%frozen%'"
+        ),
+        {"t": counter},
+    )
+    assert frozen > 0
+
+
+async def test_a_tool_plugins_search_is_current_by_its_own_sources(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A community whose tool plug-in's rows were written before they were
+    indexed is behind its own search generation, not the built-in one, and
+    the back-fill indexes them."""
+    from app.db.schema_provisioning import backfill_guild_search
+    from app.db.search_index import search_generation
+
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    schema = guild_schema_name(seat.guild.id)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(sa.text("SET LOCAL session_replication_role = replica"))
+    group = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter_group"
+                " (initiative_id, name, created_by_kind)"
+                " VALUES (:i, 'Unindexed', 'system') RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    await session.exec(
+        sa.text(
+            f"COMMENT ON TABLE \"{schema}\".search_entries IS '{search_generation()}'"
+        )
+    )
+    await session.commit()
+    tools = await provisioned_tools(seat.guild.id)
+    assert search_generation(tools) != search_generation()
+
+    await backfill_guild_search()
+
+    await route_session_to_guild(session, seat.guild.id)
+    found = await session.scalar(
+        sa.text(
+            "SELECT count(*) FROM search_entries WHERE entity_id = :g"
+            " AND entity_type = :k"
+        ),
+        {"g": group, "k": f"counter_group.{COUNTERS_UID.lower()}"},
+    )
+    assert found == 1
+    marker = await session.scalar(
+        sa.text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
+        {"t": f'"{schema}".search_entries'},
+    )
+    assert marker == search_generation(tools)
 
 
 async def test_boot_provisions_an_install_whose_provisioning_never_ran(

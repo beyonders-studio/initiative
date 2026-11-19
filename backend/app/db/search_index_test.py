@@ -384,7 +384,7 @@ def test_every_tool_is_searchable_without_being_listed():
     """
     for tool in BUILTIN_TOOLS:
         source = SEARCH_SOURCES[tool.table.name]
-        assert source.entity_type.value == tool.kind
+        assert source.entity_type == tool.kind
         assert source.dac_tool is tool
 
 

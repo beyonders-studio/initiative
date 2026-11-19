@@ -64,6 +64,7 @@ from app.db.initiative_rls import (
 )
 from app.db.plugin_tools import provisioned_tools
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
+from app.db.tool_rows import load_row, locate
 from app.models.platform.guild import CommunityRole
 from app.models.platform.plugin_install import PluginInstall, PluginInstallStatus
 from app.models.tenant._mixins import ActorKind
@@ -184,7 +185,22 @@ _ADMINISTERED: frozenset[str] = frozenset({"guest_invite_grants"})
 #: the first.
 _EVERY_SUBJECT: dict[str, tuple[str, Callable[[ToolSet], tuple[str, ...]]]] = {
     "comments": ("subject_type", lambda tools: tools.comment_targets),
+    # A built-in tool's entry, and an entry of each kind a tool plug-in brings.
+    "search_entries": (
+        "entity_type",
+        lambda tools: (Tool.project.value, *_installed_kinds(tools)),
+    ),
 }
+
+
+def _installed_kinds(tools: ToolSet) -> tuple[str, ...]:
+    """Every kind the community's tool plug-ins bring: each tool's, then its
+    items'."""
+    return tuple(
+        kind
+        for tool in tools.installed
+        for kind in (tool.kind, *(child.value for child in tool.children))
+    )
 
 
 def _variants(name: str, tools: ToolSet) -> list[tuple[str, dict[str, Any] | None]]:
@@ -785,7 +801,20 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         table.name for tool in tools.installed for table in (tool.table, *tool.items)
     }
     assert plugin_tables <= swept, plugin_tables - swept
-    assert f"comments on a {tools.installed[0].kind}" in cases
+    for kind in _installed_kinds(tools):
+        assert f"comments on a {kind}" in cases
+        assert f"search_entries on a {kind}" in cases
+    # The tool plug-in's rows were indexed as they were written, and those
+    # entries are among the rows the outsiders below read none of.
+    indexed = await session.exec(
+        sa.select(sa.func.count())
+        .select_from(seeder.table("search_entries"))
+        .where(
+            seeder.table("search_entries").c.entity_type.in_(_installed_kinds(tools)),
+            seeder.table("search_entries").c.chunk_ix == 0,
+        )
+    )
+    assert indexed.scalar_one() > 0
 
     misplaced = [
         name
@@ -1056,3 +1085,126 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         await reader.rollback()
 
     assert not failures, "\n".join(failures)
+
+
+async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative(
+    session: AsyncSession,
+    acting_user: Callable[..., Awaitable[Actor]],
+    reading_as: Callable[[int, int], Awaitable[AsyncSession]],
+    client: AsyncClient,
+) -> None:
+    """A tool plug-in's row and its item, in initiative A and shared by name
+    with a moderator of B and a member of no initiative, are archived,
+    commented on, found and taken out of the trash through the universal
+    routes by A's moderator, and by neither of the others."""
+    from app.services.tenant.soft_delete import trash
+
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    guild = admin.guild
+    initiative_b = await create_initiative(session, guild, admin.user)
+    moderator_a = await acting_user(
+        guild=guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    moderator_b = await acting_user(
+        guild=guild, initiative=initiative_b, initiative_role="moderator"
+    )
+    outsider = await acting_user(guild=guild)
+    await session.commit()
+    seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(guild.id)
+    tool = tools.installed[0]
+    (item_kind,) = (child.value for child in tool.children)
+    await route_session_to_guild(session, guild.id)
+    seeder = _Seeder(
+        session,
+        await _Catalog.read(session),
+        admin.initiative.id,
+        grantor=moderator_a.user.id,
+        grantees=(moderator_b.user.id, outsider.user.id),
+        tools=tools,
+    )
+    item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+    rows = {
+        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
+        item_kind: item_row["id"],
+    }
+    await session.commit()
+
+    for actor in (moderator_b, outsider):
+        for kind, row_id in rows.items():
+            for route in ("archive", "unarchive"):
+                response = await client.post(
+                    actor.g(f"/{route}/{kind}/{row_id}"), headers=actor.headers
+                )
+                assert response.status_code == 404, (route, kind, response.text)
+            response = await client.post(
+                actor.g("/comments/"),
+                headers=actor.headers,
+                json={"subject_type": kind, "subject_id": row_id, "content": "hi"},
+            )
+            assert response.status_code == 404, (kind, response.text)
+            response = await client.get(
+                actor.g("/comments/"),
+                headers=actor.headers,
+                params={"subject_type": kind, "subject_id": row_id},
+            )
+            assert response.status_code == 404, (kind, response.text)
+            response = await client.get(
+                actor.g("/search/"),
+                headers=actor.headers,
+                params={"search": "boundary", "types": [kind]},
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["items"] == [], kind
+
+    # A kind the community has not installed is not found.
+    response = await client.post(
+        moderator_a.g(f"/archive/stranger.{'x' * 14}/1"), headers=moderator_a.headers
+    )
+    assert response.status_code == 404, response.text
+
+    for kind, row_id in rows.items():
+        for route in ("archive", "unarchive"):
+            response = await client.post(
+                moderator_a.g(f"/{route}/{kind}/{row_id}"), headers=moderator_a.headers
+            )
+            assert response.status_code == 200, (route, kind, response.text)
+            assert response.json()["entity_type"] == kind
+        response = await client.post(
+            moderator_a.g("/comments/"),
+            headers=moderator_a.headers,
+            json={"subject_type": kind, "subject_id": row_id, "content": "hi"},
+        )
+        assert response.status_code == 201, (kind, response.text)
+        response = await client.get(
+            moderator_a.g("/search/"),
+            headers=moderator_a.headers,
+            params={"search": "boundary", "types": [kind]},
+        )
+        assert [hit["entity_id"] for hit in response.json()["items"]] == [row_id]
+
+    # Trashed by A's moderator, the item is theirs to take back out, and the
+    # others do not find it in the bin.
+    located = locate(tools, item_kind)
+    assert located is not None
+    mine = await reading_as(moderator_a.user.id, guild.id)
+    row = await load_row(mine, located, tools, rows[item_kind])
+    assert row is not None
+    await trash(mine, row, deleted_by_user_id=moderator_a.user.id)
+    await mine.commit()
+    for actor in (moderator_b, outsider):
+        response = await client.post(
+            actor.g(f"/trash/{item_kind}/{rows[item_kind]}/restore"),
+            headers=actor.headers,
+        )
+        assert response.status_code == 404, response.text
+    response = await client.get(admin.g("/trash/"), headers=admin.headers)
+    assert (item_kind, rows[item_kind]) in {
+        (item["entity_type"], item["entity_id"]) for item in response.json()["items"]
+    }, response.text
+    response = await client.post(
+        moderator_a.g(f"/trash/{item_kind}/{rows[item_kind]}/restore"),
+        headers=moderator_a.headers,
+    )
+    assert response.status_code == 200, response.text

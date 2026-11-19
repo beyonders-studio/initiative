@@ -39,7 +39,9 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.db import gucs
+from app.db.names import object_name
 
 #: How a row source's due time reads the written row: as ``$1`` in the
 #: trigger's EXECUTE, the way the capture triggers read theirs.
@@ -219,9 +221,12 @@ _HEADER = """\
 -- ============================================================================"""
 
 
-def _triggers(operations: bool) -> Iterator[tuple[str, str, TimerSource]]:
+def _triggers(
+    operations: bool, tools: ToolSet = BUILTIN_TOOLS
+) -> Iterator[tuple[str, str, TimerSource]]:
     """Each timer trigger's name, sweep and source: every community's, or with
-    ``operations`` those of the sweeps only the operations community runs."""
+    ``operations`` those of the sweeps only the operations community runs. A
+    community with ``tools`` has its installed tools' tables' too."""
     from app.services.guild_sweeps import Scope
     from app.services.sweep_timers import sweeps
 
@@ -229,8 +234,10 @@ def _triggers(operations: bool) -> Iterator[tuple[str, str, TimerSource]]:
     for sweep in sweeps():
         if (sweep.scope is Scope.OPERATIONS) != operations:
             continue
-        for source in sweep.sources:
-            name = f"tr_{source.table}_timer_{sweep.kind}"
+        found = sweep.table_source or (lambda _table: None)
+        installed = (found(table) for table in tools.installed_tables)
+        for source in (*sweep.sources, *(s for s in installed if s is not None)):
+            name = object_name("tr", source.table, f"timer_{sweep.kind}")
             # A second source on one table for one sweep is numbered.
             named[name] = named.get(name, 0) + 1
             if named[name] > 1:
@@ -238,11 +245,15 @@ def _triggers(operations: bool) -> Iterator[tuple[str, str, TimerSource]]:
             yield name, sweep.kind, source
 
 
-def render_guild_timer_ddl(*, operations: bool = False) -> str:
-    """Per-table timer triggers, applied inside each guild schema: every
-    community's, or with ``operations`` the operations community's own."""
+def render_guild_timer_ddl(
+    tools: ToolSet = BUILTIN_TOOLS, *, operations: bool = False
+) -> str:
+    """Per-table timer triggers, applied inside the schema of a community with
+    ``tools``: every community's, or with ``operations`` the operations
+    community's own."""
     blocks = [
-        _trigger(name, kind, source) for name, kind, source in _triggers(operations)
+        _trigger(name, kind, source)
+        for name, kind, source in _triggers(operations, tools)
     ]
     return _HEADER + "\n\n" + "\n\n".join(blocks) + "\n"
 

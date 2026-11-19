@@ -278,8 +278,12 @@ async def resolve_subject(
     ``only`` is the person the session is routed as, for a notice to them
     alone: the session reaching it is their own policies' answer, so neither
     rule is asked.
+
+    A tool plug-in's row resolves to nothing: nothing is told about one yet.
     """
     kind, entity_id = ref
+    if kind not in KINDS:
+        return None
     if KINDS[kind].standalone:
         # No sharing of its own: it is opened by whoever can open one of the
         # files in it.

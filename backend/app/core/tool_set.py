@@ -23,12 +23,13 @@ from sqlmodel import SQLModel
 
 import app.db.base  # noqa: F401  # every model on the metadata
 from app.core.plugin_scopes import tool_resource
-from app.core.tools import KINDS, Kind, Tool, ToolSpec
+from app.core.tools import KINDS, Kind, Tool, ToolRefusals, ToolSpec
 
 
 @dataclass(frozen=True, eq=False)
-class ToolRecord:
-    """One tool, as the renderers read it."""
+class ToolRecord(ToolRefusals):
+    """One tool, as the renderers read it, and as the refusals about it name
+    it."""
 
     #: Its kind, as a row names it (``resource_grants.resource_type``).
     kind: str
@@ -52,6 +53,11 @@ class ToolRecord:
     #: role rows are that install's (``initiative_rules.install_id``). None
     #: for a built-in tool.
     install_id: int | None = None
+
+    @property
+    def value(self) -> str:
+        """Its kind, as a refusal names it."""
+        return self.kind
 
 
 @dataclass(frozen=True, eq=False)
@@ -84,6 +90,24 @@ class ToolSet:
             for table in (record.table, *record.items)
         }
 
+    @cached_property
+    def installed_tables(self) -> tuple[Table, ...]:
+        """The installed tools' tables, each tool's own before its items."""
+        return tuple(
+            table
+            for record in self.installed
+            for table in (record.table, *record.items)
+        )
+
+    @cached_property
+    def tables(self) -> dict[str, Table]:
+        """Every table of the community by name: the models', then the
+        installed tools'."""
+        return {
+            **SQLModel.metadata.tables,
+            **{table.name: table for table in self.installed_tables},
+        }
+
     def tables_carrying(self, column: str) -> frozenset[str]:
         """Every tool's own table and item table that has ``column``: what a
         rule derived from a mixin reads of a tool built from no model."""
@@ -114,6 +138,13 @@ class ToolSet:
         return tuple(r.kind for r in self.records) + tuple(
             kind.value for kind in self.child_kinds
         )
+
+    @cached_property
+    def kind_codes(self) -> dict[str, int]:
+        """Every tool's kind and every kind inside one, and its code."""
+        return {r.kind: r.spec.code for r in self.records} | {
+            kind.value: kind.code for kind in self.child_kinds
+        }
 
     @cached_property
     def comment_targets(self) -> tuple[str, ...]:

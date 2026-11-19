@@ -118,8 +118,11 @@ async def sync_for_comment(
 
     Called when a comment is written, edited, trashed or restored — all four
     change what the conversation says, and none of them is a change to the
-    comment's own edges, because a comment has none.
+    comment's own edges, because a comment has none. A tool plug-in's row
+    is linked to nothing yet, so a comment on one moves no edge.
     """
+    if comment.subject_type not in SearchEntityType._value2member_map_:
+        return
     parent = comment_parent(comment)
     await sync_for_entity(
         session,

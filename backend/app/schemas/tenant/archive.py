@@ -7,16 +7,20 @@ archivable by joining the ``Tool`` enum rather than by being listed again here.
 
 from datetime import datetime
 from enum import Enum
+from typing import Annotated
 
 from pydantic import ConfigDict
 
 from app.core.tools import ARCHIVE_TARGETS
 from app.schemas.base import SanitizedBaseModel
+from app.schemas.kinds import WithInstalled
 
 ArchivableType = Enum(
     "ArchivableType", {name: name for name in ARCHIVE_TARGETS}, type=str
 )
 ArchivableType.__doc__ = "Things that can be archived."
+#: What was archived: a built-in kind, or a tool plug-in's.
+ArchivedKind = Annotated[str, WithInstalled(ArchivableType)]
 
 
 class ArchiveResponse(SanitizedBaseModel):
@@ -26,7 +30,7 @@ class ArchiveResponse(SanitizedBaseModel):
     wants the whole row reads it back from the route that already serves it.
     """
 
-    entity_type: ArchivableType
+    entity_type: ArchivedKind
     entity_id: int
     archived_at: datetime | None = None
 

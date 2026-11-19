@@ -29,6 +29,7 @@ from app.core import metrics
 from app.core.config import settings
 from app.core.identify import bearer_plugin_token
 from app.core.plugin_access_token import InstallAccessToken
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import (
     base,  # noqa: F401  # ensure models are imported for Alembic
@@ -615,6 +616,14 @@ def require_guild_context(session: AsyncSession) -> GuildContext:
             "must run before a decision is made from one"
         )
     return context
+
+
+def routed_tools(session: AsyncSession) -> ToolSet:
+    """The tools of the community this session is routed into, as its
+    standing carries them: the built-in tools for a request that is no
+    person's (an installed plug-in's, which reaches no tool plug-in's tables)."""
+    context = guild_context(session)
+    return context.tools if context is not None else BUILTIN_TOOLS
 
 
 def install_context(session: AsyncSession) -> InstallContext | None:

@@ -1582,7 +1582,7 @@ def remap_ids(sql: str, remap: Callable[[SearchEntityType, int], int]) -> str:
             )
             source = SEARCH_SOURCES.get(tables[0]) if len(tables) == 1 else None
             if source is not None:
-                after(node.lexpr.location, values, source.entity_type)
+                after(node.lexpr.location, values, SearchEntityType(source.entity_type))
 
     Ids()(select)
     for start, kind, value in sorted(found, key=lambda entry: entry[0], reverse=True):

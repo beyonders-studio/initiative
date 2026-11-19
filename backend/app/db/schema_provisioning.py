@@ -249,11 +249,14 @@ class ProvisioningBundle:
     #: The tools the parts were rendered from: the built-in ones, or a
     #: community's with its installed tool plug-ins (:meth:`for_tools`).
     tools: ToolSet = BUILTIN_TOOLS
+    #: The operator class the search index is built on, or None.
+    search_opclass: str | None = None
 
     def for_tools(self, tools: ToolSet) -> ProvisioningBundle:
         """This bundle for a community with ``tools``: the parts a tool set
-        renders (its tables' structure, the registry CHECKs, the grants and the
-        row security) rendered from it, the rest as they are. The bundle itself
+        renders (its tables' structure, the registry CHECKs, the grants, the
+        row security and the capture, search and timer triggers) rendered from
+        it, the rest as they are. The bundle itself
         for a community with no tool plug-in, so its render does not move.
         Rendered once per process per set, from the built-in bundle."""
         if tools is self.tools or not tools.installed:
@@ -264,21 +267,35 @@ class ProvisioningBundle:
         found = _community_bundles.get(key)
         if found is not None:
             return found
+        from app.db.event_capture import render_guild_capture_ddl
         from app.db.guild_ddl import render_guild_rls_ddl
         from app.db.plugin_tools import structure_ddl
         from app.db.registry_checks import render_guild_registry_check_ddl
+        from app.db.search_index import render_guild_search_ddl
+        from app.db.timers import render_guild_timer_ddl
 
         schema_ddl = f"{self.schema_ddl}\n-- installed tools\n{structure_ddl(tools)}"
         checks_ddl = _every_community(
             render_guild_registry_check_ddl(tools), self.operations["checks"]
         )
         rls_ddl = _every_community(render_guild_rls_ddl(tools), self.operations["rls"])
+        capture_ddl = _every_community(
+            render_guild_capture_ddl(tools), self.operations["capture"]
+        )
+        search_ddl = _every_community(
+            render_guild_search_ddl(self.search_opclass, tools),
+            self.operations["search"],
+        )
+        timer_ddl = render_guild_timer_ddl(tools)
         grants = _grant_statements("__stamp__", 0, tools)
         found = replace(
             self,
             schema_ddl=schema_ddl,
             checks_ddl=checks_ddl,
             rls_ddl=rls_ddl,
+            capture_ddl=capture_ddl,
+            search_ddl=search_ddl,
+            timer_ddl=timer_ddl,
             tools=tools,
             digests={
                 **self.digests,
@@ -286,6 +303,9 @@ class ProvisioningBundle:
                 "checks": _digest(checks_ddl, self.operations["checks"]),
                 "grants": _digest(*grants),
                 "rls": _digest(rls_ddl, self.operations["rls"]),
+                "capture": _digest(capture_ddl, self.operations["capture"]),
+                "search": _digest(search_ddl, self.operations["search"]),
+                "timers": _digest(timer_ddl, self.operations["timers"]),
             },
         )
         return _community_bundles.setdefault(key, found)
@@ -421,6 +441,7 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             search_ddl=search_ddl,
             timer_ddl=timer_ddl,
             operations=operations,
+            search_opclass=opclass,
             digests={
                 "schema": _digest(schema_ddl, operations["schema"]),
                 "checks": _digest(checks_ddl, operations["checks"]),
@@ -1473,10 +1494,12 @@ async def reindex_guild_search(
 
     Returns the number of entities rewritten; zero when already current.
     """
+    from app.db.plugin_tools import provisioned_tools
     from app.db.search_index import reindex_plan, search_generation
 
     schema = guild_schema_name(guild_id)
-    generation = search_generation()
+    tools = await provisioned_tools(guild_id)
+    generation = search_generation(tools)
     conn = await session.connection()
     current = await conn.scalar(
         text("SELECT obj_description(to_regclass(:t), 'pg_class')"),
@@ -1486,7 +1509,7 @@ async def reindex_guild_search(
         return 0
 
     written = 0
-    for _entity_type, statement in reindex_plan():
+    for _entity_type, statement in reindex_plan(tools):
         cursor = 0
         while True:
             conn = await session.connection()
@@ -1523,27 +1546,36 @@ async def backfill_guild_search() -> int:
     fills in progressively instead of holding one transaction open across the
     whole sweep. A guild that fails is logged and the others carry on.
     """
+    from app.db.plugin_tools import provisioned_tools
     from app.db.search_index import search_generation
     from app.services.guild_sweeps import Scope, each_guild
 
     async with db_session.provisioning_engine.connect() as conn:
-        stale = (
-            (
-                await conn.execute(
-                    text(
-                        "SELECT substr(n.nspname, 7)::int FROM pg_class c"
-                        " JOIN pg_namespace n ON n.oid = c.relnamespace"
-                        " WHERE c.relname = 'search_entries'"
-                        " AND n.nspname ~ '^guild_[0-9]+$'"
-                        " AND obj_description(c.oid, 'pg_class')"
-                        " IS DISTINCT FROM :generation"
-                    ),
-                    {"generation": search_generation()},
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT substr(n.nspname, 7)::int,"
+                    " obj_description(c.oid, 'pg_class'),"
+                    " obj_description(n.oid, 'pg_namespace')"
+                    " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+                    " WHERE c.relname = 'search_entries'"
+                    " AND n.nspname ~ '^guild_[0-9]+$'"
                 )
             )
-            .scalars()
-            .all()
+        ).all()
+    # A community with tool plug-ins, which its schema's stamp names, is
+    # current by the generation of its own sources.
+    builtin = search_generation()
+    stale = [
+        guild_id
+        for guild_id, marker, stamp in rows
+        if marker
+        != (
+            builtin
+            if stamp_tools(stamp) is None
+            else search_generation(await provisioned_tools(guild_id))
         )
+    ]
     if not stale:
         return 0
     total = 0

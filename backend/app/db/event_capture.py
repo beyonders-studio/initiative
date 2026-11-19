@@ -49,22 +49,26 @@ id in the outbox resolvable without owing new API surface per table.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import Column
-from sqlmodel import SQLModel
+from sqlalchemy import Column, Table
 
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
 from app.db.initiative_rls import (
     EVENTED_TABLES,
     INITIATIVE_PATHS,
     NO_PARENTS,
+    InitiativePath,
     event_source,
     initiative_locator,
+    paths_for,
 )
+from app.db.names import object_name
+from app.db.plugin_tools import plugin_kind_of_table, plugin_table_pattern
 
 #: How a row reaches the trigger's dynamic lookups: as ``$1`` in an EXECUTE, so
 #: every registry expression is rendered against this rather than NEW/OLD.
@@ -147,11 +151,15 @@ class CaptureSpec:
     #: The chain this report carries, read off the row, where it is not the
     #: resource's own. ``None`` borrows the resource's.
     own_parents: str | None = None
+    #: The paths of the community the trigger is rendered for
+    #: (``initiative_rls.paths_for``).
+    paths: Mapping[str, InitiativePath] = field(
+        default_factory=lambda: INITIATIVE_PATHS, compare=False
+    )
 
     @property
     def trigger_name(self) -> str:
-        suffix = f"_{self.label}" if self.label else ""
-        return f"capture_{self.table}{suffix}"
+        return object_name("capture", self.table, self.label or "")
 
     @property
     def static_resource_type(self) -> str:
@@ -185,6 +193,7 @@ class CaptureSpec:
             resource_types=self.resource_types,
             resource_id_expr=self.resource_id_expr,
             resource_type_expr=self.resource_type_expr,
+            paths=self.paths,
         )
 
 
@@ -251,17 +260,18 @@ def _parents_expr(
     resource_types: frozenset[str],
     resource_id_expr: str,
     resource_type_expr: str | None,
+    paths: Mapping[str, InitiativePath],
 ) -> str:
     """The chain an event from ``table`` carries, or "" for none."""
     if facet is None:
-        path = INITIATIVE_PATHS.get(table)
+        path = paths.get(table)
         own = path.parents(ROW) if path is not None else NO_PARENTS
         return "" if own == NO_PARENTS else own
 
     def chain_of(parent: str, alias: str) -> str:
-        if parent not in INITIATIVE_PATHS:
+        if parent not in paths:
             return ""
-        rendered = INITIATIVE_PATHS[parent].parents(alias)
+        rendered = paths[parent].parents(alias)
         return "" if rendered == NO_PARENTS else rendered
 
     borrowed = _borrowed(
@@ -310,8 +320,10 @@ def _quiet_expr(
     return " OR ".join(legs)
 
 
-def build_specs() -> list[CaptureSpec]:
-    """One spec per evented table.
+def build_specs(tools: ToolSet = BUILTIN_TOOLS) -> list[CaptureSpec]:
+    """One spec per evented table of a community with ``tools``: the built-in
+    ones and every installed tool's tables, which report as a built-in tool's
+    do.
 
     Three sources, tried in order: a declared ``ReportsAs`` (the explicit facet),
     a composite primary key (the derived facet), or the table's own primary key.
@@ -320,9 +332,11 @@ def build_specs() -> list[CaptureSpec]:
     otherwise install a trigger that emits rows naming no resource, and a
     silently unaddressable event is worse than a failed boot.
     """
+    paths = paths_for(tools)
     specs: list[CaptureSpec] = []
-    for table_name in sorted(EVENTED_TABLES):
-        table = SQLModel.metadata.tables.get(table_name)
+    evented = EVENTED_TABLES | {table.name for table in tools.installed_tables}
+    for table_name in sorted(evented):
+        table = tools.tables.get(table_name)
         if table is None:
             raise RuntimeError(
                 f"{table_name} is in EVENTED_TABLES but has no mapped model"
@@ -368,6 +382,7 @@ def build_specs() -> list[CaptureSpec]:
                         own_parents=(
                             report.parents(ROW) if report.parents is not None else None
                         ),
+                        paths=paths,
                     )
                 )
             continue
@@ -382,6 +397,7 @@ def build_specs() -> list[CaptureSpec]:
                     resource_types=frozenset({source.resource_type or table_name}),
                     resource_id_expr=f'{ROW}."{pk[0].name}"',
                     facet=None,
+                    paths=paths,
                 )
             )
             continue
@@ -400,6 +416,7 @@ def build_specs() -> list[CaptureSpec]:
                 resource_types=frozenset({owner}),
                 resource_id_expr=f'{ROW}."{owner_column.name}"',
                 facet=table_name.removeprefix(f"{_singular(owner)}_"),
+                paths=paths,
             )
         )
     return specs
@@ -413,6 +430,13 @@ def build_specs() -> list[CaptureSpec]:
 #: function makes from a change's resource and parents. From the enum, so a new
 #: tool is governed without an edit here.
 _GOVERNING_TOOLS = ", ".join(f"('{tool.plural}', '{tool.value}')" for tool in Tool)
+
+#: A tool plug-in's table names its tool's kind (``plugin_tools.TABLE_PREFIX``,
+#: the uid, the key), so the lookup reads the kind off the name. An item's
+#: own table reads as a kind too, and the chain ends at its tool's table, which
+#: the lookup takes as the outermost.
+_PLUGIN_TOOL = plugin_kind_of_table("x.type")
+_PLUGIN_TABLES = plugin_table_pattern()
 
 #: Rendered once into ``public``. Per-table knowledge arrives as TG_ARGV, where
 #: every "expression" is SQL text evaluated with the changed row as ``$1``:
@@ -587,7 +611,12 @@ BEGIN
             SELECT p ->> 'type', (p ->> 'id')::integer, o
               FROM jsonb_array_elements(v_parents) WITH ORDINALITY AS e(p, o)
            ) x
-      JOIN (VALUES {_GOVERNING_TOOLS}) AS m(tbl, tool) ON m.tbl = x.type
+      CROSS JOIN LATERAL (
+            SELECT b.tool FROM (VALUES {_GOVERNING_TOOLS}) AS b(tbl, tool)
+             WHERE b.tbl = x.type
+            UNION ALL
+            SELECT {_PLUGIN_TOOL} WHERE x.type LIKE '{_PLUGIN_TABLES}'
+           ) AS m(tool)
      ORDER BY x.ord DESC
      LIMIT 1;
 
@@ -624,9 +653,8 @@ $capture$;
 """
 
 
-def _housekeeping_literal(table_name: str) -> str:
+def _housekeeping_literal(table: Table) -> str:
     """SQL array literal of column names excluded from ``changed`` for a table."""
-    table = SQLModel.metadata.tables[table_name]
     excluded = sorted(
         c.name
         for c in table.columns
@@ -641,7 +669,7 @@ def _quoted(expr: str) -> str:
     return "'" + expr.replace("'", "''") + "'"
 
 
-def _trigger_block(spec: CaptureSpec) -> str:
+def _trigger_block(spec: CaptureSpec, tables: Mapping[str, Table]) -> str:
     source = event_source(spec.table)
     # A polymorphic facet resolves its type per row; everything else names one
     # constant, and passing that as a literal keeps the extra EXECUTE off the
@@ -651,11 +679,11 @@ def _trigger_block(spec: CaptureSpec) -> str:
     call = "\n".join(
         [
             f"  EXECUTE FUNCTION {CAPTURE_FUNCTION}(",
-            f"    {_quoted(spec.initiative_expr or initiative_locator(spec.table)(ROW))},",
+            f"    {_quoted(spec.initiative_expr or initiative_locator(spec.table, spec.paths)(ROW))},",
             f"    '{static_type}',",
             f"    {_quoted(spec.resource_id_expr)},",
             f"    '{spec.facet or ''}',",
-            f"    {_housekeeping_literal(spec.table)},",
+            f"    {_housekeeping_literal(tables[spec.table])},",
             f"    '{'guild' if source.guild_wide else ''}',",
             f"    {_quoted(type_expr or '')},",
             f"    {_quoted(spec.parents_expr)},",
@@ -708,7 +736,8 @@ _HEADER = """\
 -- ============================================================================"""
 
 
-def render_guild_capture_ddl() -> str:
-    """Per-table trigger DDL, applied inside each guild schema."""
-    blocks = [_trigger_block(spec) for spec in build_specs()]
+def render_guild_capture_ddl(tools: ToolSet = BUILTIN_TOOLS) -> str:
+    """Per-table trigger DDL, applied inside the schema of a community with
+    ``tools``."""
+    blocks = [_trigger_block(spec, tools.tables) for spec in build_specs(tools)]
     return _HEADER + "\n\n" + "\n\n".join(blocks) + "\n"

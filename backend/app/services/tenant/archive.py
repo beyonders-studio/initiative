@@ -11,10 +11,11 @@ as the row that started it, which is what lets unarchiving put back exactly what
 this archiving took: a child archived earlier, on its own, carries a different
 timestamp and keeps it. That mirrors ``soft_delete``'s ``deleted_at`` rule.
 
-The tree is derived — the trash can's ``CASCADE_CHILDREN`` narrowed to the
-models that can be archived — so a tool that becomes archivable joins the
-cascade by declaring the mixin, and the two lifecycles cannot disagree about
-what is inside what.
+The tree is derived — the trash can's tree narrowed to the tables that can be
+archived — so a tool that becomes archivable joins the cascade by declaring
+the mixin, and the two lifecycles cannot disagree about what is inside what.
+An entity is a model's instance or a tool plug-in's row
+(``app.db.tool_rows.ToolRow``).
 
 Both walks go a level at a time, shallowest first, with a flush between: a row
 may not clear a stamp the thing above it still carries, so a child written
@@ -25,38 +26,41 @@ flushed explicitly rather than assumed.
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from functools import cache
+from typing import Any
 
+from sqlalchemy import Table
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolSet
+from app.db.session import routed_tools
 from app.models.tenant._mixins import ArchiveMixin
 from app.services.tenant.lifecycle_tree import (
-    CASCADE_CHILDREN,
     Edge,
     Level,
+    cascade_children,
     set_columns,
     subtree_levels,
 )
 
 
-def _archivable_tree() -> dict[type[ArchiveMixin], list[Edge]]:
-    """The trash can's tree, narrowed to what can be archived."""
-    tree: dict[type[ArchiveMixin], list[Edge]] = {}
-    for parent, children in CASCADE_CHILDREN.items():
-        if not issubclass(parent, ArchiveMixin):
+@cache
+def archive_children(tools: ToolSet) -> dict[Table, list[Edge]]:
+    """The trash can's tree in a community with ``tools``, narrowed to what
+    can be archived: the tables that carry the stamp."""
+    tree: dict[Table, list[Edge]] = {}
+    for parent, children in cascade_children(tools).items():
+        if "archived_at" not in parent.c:
             continue
-        archivable = [edge for edge in children if issubclass(edge.model, ArchiveMixin)]
+        archivable = [edge for edge in children if "archived_at" in edge.table.c]
         if archivable:
             tree[parent] = archivable
     return tree
 
 
-#: parent model -> [edge to a child], for the archivable tree only.
-ARCHIVE_CHILDREN = _archivable_tree()
-
-
 async def _levels(
     session: AsyncSession,
-    entities: Sequence[ArchiveMixin],
+    entities: Sequence[Any],
     *,
     matching: datetime | None,
 ) -> list[Level]:
@@ -67,28 +71,29 @@ async def _levels(
     unarchiving brings back).
     """
 
-    def where(model: type):
-        column = model.archived_at
+    def where(table: Table) -> Any:
+        column = table.c.archived_at
         if matching is not None:
             return column == matching
         # A held row is left as it is when what it sits in is archived.
-        if hasattr(model, "held_at"):
-            return column.is_(None) & model.held_at.is_(None)
+        if "held_at" in table.c:
+            return column.is_(None) & table.c.held_at.is_(None)
         return column.is_(None)
 
-    return await subtree_levels(session, entities, tree=ARCHIVE_CHILDREN, where=where)
+    tree = archive_children(routed_tools(session))
+    return await subtree_levels(session, entities, tree=tree, where=where)
 
 
 async def _write(
     session: AsyncSession, levels: list[Level], archived_at: datetime | None
 ) -> None:
     for level in levels:
-        for model, ids in level.items():
-            await set_columns(session, model, ids, {"archived_at": archived_at})
+        for table, ids in level.items():
+            await set_columns(session, table, ids, {"archived_at": archived_at})
         await session.flush()
 
 
-async def archive_entity(session: AsyncSession, entity: ArchiveMixin) -> datetime:
+async def archive_entity(session: AsyncSession, entity: Any) -> datetime:
     """Archive it and everything inside it. Idempotent: an already-archived row
     keeps the stamp it has, so the date says when it was archived rather than
     when it was last asked about. The caller commits."""
@@ -97,9 +102,7 @@ async def archive_entity(session: AsyncSession, entity: ArchiveMixin) -> datetim
     return await archive_entities(session, [entity])
 
 
-async def archive_entities(
-    session: AsyncSession, entities: Sequence[ArchiveMixin]
-) -> datetime:
+async def archive_entities(session: AsyncSession, entities: Sequence[Any]) -> datetime:
     """Archive live rows and everything inside them, all under one stamp, so
     each one's unarchive puts back what this took. Rows already archived keep
     the stamp they have. The caller commits."""
@@ -111,7 +114,7 @@ async def archive_entities(
     return archived_at
 
 
-async def unarchive_entity(session: AsyncSession, entity: ArchiveMixin) -> None:
+async def unarchive_entity(session: AsyncSession, entity: Any) -> None:
     """Put it back, and with it everything this archiving took. Idempotent on a
     live row. The caller commits."""
     if entity.archived_at is None:

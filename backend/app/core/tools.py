@@ -17,6 +17,7 @@ plus one record. The frontend reads the records from the file
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from app.core.errors import CodedError
 from app.core.messages import KindMessages
@@ -36,7 +37,51 @@ def plural_of(stem: str) -> str:
     return stem + "s"
 
 
-class Tool(str, Enum):
+class ToolRefusals:
+    """The refusals every tool answers alike, each naming the tool by its
+    ``value``: a built-in tool's, and a tool plug-in's
+    (``app.core.tool_set.ToolRecord``). A method rather than a constant: each
+    call is a fresh exception to raise."""
+
+    if TYPE_CHECKING:
+
+        @property
+        def value(self) -> str: ...
+
+    def not_found(self, status_code: int = 404) -> CodedError:
+        """No such <tool>, or not one this reader can see."""
+        return kind_refusal(self.value, KindMessages.NOT_FOUND, status_code)
+
+    def no_access(self) -> CodedError:
+        """This <tool> is not shared with you."""
+        return kind_refusal(self.value, KindMessages.NO_ACCESS, 403)
+
+    def owner_required(self) -> CodedError:
+        """Only the <tool>'s owner may do that."""
+        return kind_refusal(self.value, KindMessages.OWNER_REQUIRED, 403)
+
+    def write_required(self) -> CodedError:
+        """You may read this <tool> but not change it."""
+        return kind_refusal(self.value, KindMessages.WRITE_ACCESS_REQUIRED, 403)
+
+    def create_denied(self) -> CodedError:
+        """Your initiative role may not create <tool>s."""
+        return kind_refusal(self.value, KindMessages.CREATE_PERMISSION_REQUIRED, 403)
+
+    def disabled(self) -> CodedError:
+        """This initiative has <tool>s switched off."""
+        return kind_refusal(self.value, KindMessages.TOOL_NOT_ENABLED, 403)
+
+    def grant_cannot_manage_members(self) -> CodedError:
+        """A temporary grant reaches this <tool>'s content, not who may see it."""
+        return kind_refusal(self.value, KindMessages.GRANT_CANNOT_MANAGE_MEMBERS, 403)
+
+    def grantee_lacks_access(self) -> CodedError:
+        """Sharing was addressed to somebody whose role does not reach <tool>s."""
+        return kind_refusal(self.value, KindMessages.GRANTEE_LACKS_ACCESS, 422)
+
+
+class Tool(ToolRefusals, str, Enum):
     project = "project"
     file = "file"
     counter_group = "counter_group"
@@ -79,41 +124,6 @@ class Tool(str, Enum):
     def create_permission(self) -> str:
         """The role ``PermissionKey`` value gating creating this tool."""
         return f"create_{self.plural}"
-
-    # The refusals every tool answers alike, each naming the tool. A method
-    # rather than a constant: each call is a fresh exception to raise.
-
-    def not_found(self, status_code: int = 404) -> CodedError:
-        """No such <tool>, or not one this reader can see."""
-        return kind_refusal(self.value, KindMessages.NOT_FOUND, status_code)
-
-    def no_access(self) -> CodedError:
-        """This <tool> is not shared with you."""
-        return kind_refusal(self.value, KindMessages.NO_ACCESS, 403)
-
-    def owner_required(self) -> CodedError:
-        """Only the <tool>'s owner may do that."""
-        return kind_refusal(self.value, KindMessages.OWNER_REQUIRED, 403)
-
-    def write_required(self) -> CodedError:
-        """You may read this <tool> but not change it."""
-        return kind_refusal(self.value, KindMessages.WRITE_ACCESS_REQUIRED, 403)
-
-    def create_denied(self) -> CodedError:
-        """Your initiative role may not create <tool>s."""
-        return kind_refusal(self.value, KindMessages.CREATE_PERMISSION_REQUIRED, 403)
-
-    def disabled(self) -> CodedError:
-        """This initiative has <tool>s switched off."""
-        return kind_refusal(self.value, KindMessages.TOOL_NOT_ENABLED, 403)
-
-    def grant_cannot_manage_members(self) -> CodedError:
-        """A temporary grant reaches this <tool>'s content, not who may see it."""
-        return kind_refusal(self.value, KindMessages.GRANT_CANNOT_MANAGE_MEMBERS, 403)
-
-    def grantee_lacks_access(self) -> CodedError:
-        """Sharing was addressed to somebody whose role does not reach <tool>s."""
-        return kind_refusal(self.value, KindMessages.GRANTEE_LACKS_ACCESS, 422)
 
 
 @dataclass(frozen=True)

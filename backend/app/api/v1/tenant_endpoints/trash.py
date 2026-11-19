@@ -14,12 +14,21 @@ resurfaces the children automatically (see ``soft_delete.py``).
 
 from __future__ import annotations
 
-from typing import Annotated
+from functools import cache
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import Subquery, Text, and_, cast, func, literal, select, union_all
-from sqlalchemy.orm import aliased
-from sqlmodel import SQLModel
+from sqlalchemy import (
+    Subquery,
+    Table,
+    Text,
+    and_,
+    cast,
+    func,
+    literal,
+    select,
+    union_all,
+)
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
@@ -31,11 +40,14 @@ from app.api.deps import (
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import TrashMessages
+from app.core.tool_set import ToolSet
 from app.core.tools import TRASH_TARGETS, plural_of
 from app.core.user_display import display_name
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import build_paginated_response
+from app.db.session import routed_tools
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
+from app.db.tool_rows import load_row, locate
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_profile_view import MemberProfile
@@ -44,8 +56,8 @@ from app.models.tenant.comment import Comment
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import Task
 from app.schemas.tenant.trash import (
-    EntityType,
     RestoreResponse,
+    TrashedKind,
     TrashItem,
     TrashListResponse,
 )
@@ -54,7 +66,7 @@ from app.services.platform import guilds as guilds_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import column_limits, content_references
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant.lifecycle_tree import CASCADE_PARENTS
+from app.services.tenant.lifecycle_tree import cascade_parents
 from app.services.tenant.soft_delete import (
     hard_purge_entity,
     restore_entity,
@@ -63,20 +75,33 @@ from app.services.tenant.soft_delete import (
 router = APIRouter()
 
 
-def _entry(target: str) -> tuple[type[SQLModel], str]:
+def _entry(target: str) -> tuple[Table, str]:
     model = MODELS_BY_TABLE[plural_of(target)]
     if model not in SOFT_DELETE_MODELS:  # pragma: no cover — a registry mistake
         raise RuntimeError(f"{target} names no model with a trash can")
-    return model, model.display_field()
+    return model.__table__, model.display_field()  # type: ignore[attr-defined]
 
 
-#: Wire name -> (model, the column that labels its rows). A target's table is
+#: Wire name -> (table, the column that labels its rows). A target's table is
 #: its own plural and its label is the model's ``display_field``, so neither is
 #: written down here; a target with no soft-deletable model behind it fails at
 #: import rather than at request time.
-ENTITY_REGISTRY: dict[str, tuple[type[SQLModel], str]] = {
+ENTITY_REGISTRY: dict[str, tuple[Table, str]] = {
     target: _entry(target) for target in TRASH_TARGETS
 }
+
+
+@cache
+def entity_registry(tools: ToolSet) -> dict[str, tuple[Table, str]]:
+    """:data:`ENTITY_REGISTRY` in a community with ``tools``: each of its
+    tool plug-ins' kinds too, labelled by its name."""
+    found = dict(ENTITY_REGISTRY)
+    for record in tools.installed:
+        for kind in (record.kind, *(child.value for child in record.children)):
+            located = locate(tools, kind)
+            if located is not None and "deleted_at" in located.table.c:
+                found[kind] = (located.table, "name")
+    return found
 
 
 #: A trash listing's page window.
@@ -92,30 +117,30 @@ def _truncate(value: str, *, limit: int = _NAME_LIMIT) -> str:
     return value[: limit - 1] + "…"
 
 
-def _trashed(only_deleted_by: int | None) -> Subquery:
-    """This guild's trash listing, one UNION ALL leg per trashable model.
+def _trashed(tools: ToolSet, only_deleted_by: int | None) -> Subquery:
+    """This guild's trash listing, one UNION ALL leg per trashable table of a
+    community with ``tools``.
 
     ``only_deleted_by`` narrows to one user's deletions (the personal view);
     ``None`` lists everything (the admin view).
     """
+    upwards = cascade_parents(tools)
     legs = []
-    for entity_type, (model, name_field) in ENTITY_REGISTRY.items():
+    for entity_type, (table, name_field) in entity_registry(tools).items():
         leg = select(
             literal(entity_type, Text).label("entity_type"),
-            model.id.label("entity_id"),
+            table.c.id.label("entity_id"),
             # One character past the limit is enough to tell a name was cut.
-            func.left(cast(getattr(model, name_field), Text), _NAME_LIMIT + 1).label(
-                "name"
-            ),
-            model.deleted_at,
-            model.deleted_by,
-            model.deleted_by_kind,
-            model.purge_at,
-        ).where(model.deleted_at.is_not(None))
+            func.left(cast(table.c[name_field], Text), _NAME_LIMIT + 1).label("name"),
+            table.c.deleted_at,
+            table.c.deleted_by,
+            table.c.deleted_by_kind,
+            table.c.purge_at,
+        ).where(table.c.deleted_at.is_not(None))
         if only_deleted_by is not None:
             leg = leg.where(
-                model.deleted_by_kind == ActorKind.member,
-                model.deleted_by == only_deleted_by,
+                table.c.deleted_by_kind == ActorKind.member,
+                table.c.deleted_by == only_deleted_by,
             )
 
         # Cascade dedup: exclude children whose parent (any of them) is also
@@ -125,12 +150,12 @@ def _trashed(only_deleted_by: int | None) -> Subquery:
         # the child (Comment threaded replies via parent_comment_id), otherwise
         # unaliased ``Comment.id == Comment.parent_comment_id`` references the
         # same row in both clauses.
-        for edge in CASCADE_PARENTS.get(model, []):
-            parent = aliased(edge.model)
+        for edge in upwards.get(table, []):
+            parent = edge.table.alias()
             leg = leg.where(
-                ~select(parent.id)
-                .where(edge.ties(model, parent))
-                .where(parent.deleted_at == model.deleted_at)
+                ~select(parent.c.id)
+                .where(edge.ties(table, parent))
+                .where(parent.c.deleted_at == table.c.deleted_at)
                 .exists()
             )
         legs.append(leg)
@@ -175,7 +200,7 @@ async def trash_page(
     The deleter's name is joined onto the window alone, read through the
     guild's own member view so it is named the way the guild names people.
     """
-    trashed = _trashed(only_deleted_by)
+    trashed = _trashed(routed_tools(session), only_deleted_by)
     window = (
         select(trashed)
         .order_by(*_newest_first(trashed))
@@ -262,10 +287,10 @@ async def list_community_trash(
 async def _load_trash_entity(
     session: AsyncSession,
     *,
-    entity_type: EntityType,
+    entity_type: str,
     entity_id: int,
     for_update: bool = False,
-) -> SQLModel:
+) -> Any:
     """Load a trashed entity (404 unless it's in this guild's trash and still
     soft-deleted).
 
@@ -277,18 +302,21 @@ async def _load_trash_entity(
     404 (deleted_at is NULL), or it blocks on the lock until the purge commits and
     the row is gone.
     """
-    spec = ENTITY_REGISTRY.get(entity_type)
-    if spec is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=TrashMessages.UNKNOWN_ENTITY_TYPE,
+    tools = routed_tools(session)
+    entry = entity_registry(tools).get(entity_type)
+    located = locate(tools, entity_type)
+    if entry is None:
+        entity = None
+    elif located is not None:
+        entity = await load_row(
+            session, located, tools, entity_id, for_update=for_update
         )
-    model, _ = spec
-    stmt = select_including_deleted(model).where(model.id == entity_id)
-    if for_update:
-        stmt = stmt.with_for_update()
-    result = await session.exec(stmt)
-    entity = result.one_or_none()
+    else:
+        model = MODELS_BY_TABLE[entry[0].name]
+        stmt = select_including_deleted(model).where(model.id == entity_id)  # type: ignore[attr-defined]
+        if for_update:
+            stmt = stmt.with_for_update()
+        entity = (await session.exec(stmt)).one_or_none()
     if entity is None or entity.deleted_at is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=TrashMessages.NOT_FOUND
@@ -302,7 +330,7 @@ async def _load_trash_entity(
     response_model=RestoreResponse,
 )
 async def restore_trash_entity(
-    entity_type: EntityType,
+    entity_type: TrashedKind,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -355,7 +383,7 @@ async def restore_trash_entity(
     response_class=Response,
 )
 async def purge_trash_entity(
-    entity_type: EntityType,
+    entity_type: TrashedKind,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -393,7 +421,7 @@ async def purge_trash_entity(
         event_type=AuditEventType.TRASH_PURGED,
         actor_user_id=current_user.id,
         guild_id=guild_context.guild_id,
-        target_type=entity_type.value,
+        target_type=entity_type,
         target_id=entity_id,
         detail={"via": "admin"},
     )

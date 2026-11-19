@@ -1470,7 +1470,6 @@ class CounterMessages:
 class TrashMessages:
     NOT_FOUND = "TRASH_ITEM_NOT_FOUND"
     PURGE_REQUIRES_ADMIN = "TRASH_PURGE_REQUIRES_ADMIN"
-    UNKNOWN_ENTITY_TYPE = "TRASH_UNKNOWN_ENTITY_TYPE"
 
 
 class GuildPluginMessages:

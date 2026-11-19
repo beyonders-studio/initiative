@@ -26,7 +26,6 @@ from app.core.plugin_scopes import (
     READ_ONLY_RESOURCES,
     PluginScopeResource,
 )
-from app.core.search import SearchEntityType
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.tools import Tool
 from app.db import gucs
@@ -148,11 +147,11 @@ def plugin_table_access(tools: ToolSet) -> dict[str, PluginTableAccess]:
 PLUGIN_TABLE_ACCESS: dict[str, PluginTableAccess] = plugin_table_access(BUILTIN_TOOLS)
 
 
-def _search_entry_read_scopes() -> dict[SearchEntityType, PluginScopeResource]:
+def _search_entry_read_scopes() -> dict[str, PluginScopeResource]:
     """Each kind the search index holds, and the read scope of the table it is
     indexed from. A kind whose table no plug-in reaches has no entry, and its
     entries are out of every plug-in's reach."""
-    scopes: dict[SearchEntityType, PluginScopeResource] = {}
+    scopes: dict[str, PluginScopeResource] = {}
     for table, source in SEARCH_SOURCES.items():
         access = PLUGIN_TABLE_ACCESS.get(table)
         if (
@@ -169,9 +168,7 @@ def _search_entry_read_scopes() -> dict[SearchEntityType, PluginScopeResource]:
 #: ``projects`` and ``tag`` to ``tags``. An entry that names a governing tool
 #: also needs that tool's read scope (a comment on a task needs ``projects``
 #: beside ``comments``), which the index's policy reads off the row.
-SEARCH_ENTRY_READ_SCOPE: dict[SearchEntityType, PluginScopeResource] = (
-    _search_entry_read_scopes()
-)
+SEARCH_ENTRY_READ_SCOPE: dict[str, PluginScopeResource] = _search_entry_read_scopes()
 
 #: Tables no plug-in reaches, whose policies refuse an installed plug-in outright
 #: beside the grant it does not hold: a reaction is one person's gesture, a
