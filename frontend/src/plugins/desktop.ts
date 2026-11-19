@@ -23,6 +23,11 @@ export interface DesktopPlugin {
     eventName: "notificationClicked",
     listener: (event: { tag: string }) => void
   ): Promise<{ remove: () => Promise<void> }>;
+  /** The computer saw input, to this app or any other. */
+  addListener(
+    eventName: "computerActive",
+    listener: () => void
+  ): Promise<{ remove: () => Promise<void> }>;
 }
 
 const Desktop = registerPlugin<DesktopPlugin>("Desktop");

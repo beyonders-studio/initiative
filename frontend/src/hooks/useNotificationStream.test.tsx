@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import type { InfiniteData } from "@tanstack/react-query";
 import { render, renderHook, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
@@ -26,6 +27,17 @@ vi.mock("@/api/query-keys", async (importOriginal) => ({
   invalidate: (...specs: unknown[]) => invalidations(...specs),
 }));
 
+// The desktop app's word that its computer saw input.
+const desktop = vi.hoisted(() => ({ computerActive: null as (() => void) | null }));
+vi.mock("@/plugins/desktop", () => ({
+  default: {
+    addListener: async (_event: string, listener: () => void) => {
+      desktop.computerActive = listener;
+      return { remove: async () => {} };
+    },
+  },
+}));
+
 /** How many batches named this. */
 const timesNamed = (spec: unknown) =>
   invalidations.mock.calls.filter((call: unknown[]) =>
@@ -33,6 +45,7 @@ const timesNamed = (spec: unknown) =>
   ).length;
 
 const MSG_AUTH = 5;
+const MSG_ACTIVE = 6;
 
 const Probe = () => {
   useNotificationStream();
@@ -71,6 +84,19 @@ describe("useNotificationStream", () => {
     expect(socket.url).not.toContain("token");
     expect(socket.sent[0][0]).toBe(MSG_AUTH);
     expect(socket.authPayload()).toEqual({ token: "test-token" });
+  });
+
+  it("in the desktop app, reports input anywhere on the computer as the person being here", async () => {
+    vi.spyOn(Capacitor, "getPlatform").mockReturnValue("electron");
+    renderWithProviders(<Probe />);
+    const socket = latestSocket();
+    socket.open();
+    await waitFor(() => expect(desktop.computerActive).not.toBeNull());
+
+    desktop.computerActive?.();
+
+    expect(socket.sent.at(-1)).toEqual(new Uint8Array([MSG_ACTIVE]));
+    vi.restoreAllMocks();
   });
 
   it("refetches the inbox when the server says it changed", () => {
