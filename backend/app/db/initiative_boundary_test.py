@@ -773,6 +773,13 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
         f"_Seeder or give the table a shape in _SHAPES: {unseeded}"
     )
 
+    swept = {case.table.name for case in cases.values()}
+    plugin_tables = {
+        table.name for tool in tools.installed for table in (tool.table, *tool.items)
+    }
+    assert plugin_tables <= swept, plugin_tables - swept
+    assert f"comments on a {tools.installed[0].kind}" in cases
+
     misplaced = [
         name
         for name, case in cases.items()

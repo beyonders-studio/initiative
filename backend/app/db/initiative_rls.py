@@ -1707,6 +1707,13 @@ def collection_files_path() -> InitiativePath:
     )
 
 
+@cache
+def _paths(tools: ToolSet) -> dict[str, InitiativePath]:
+    """:func:`paths_for`, once per tool set, for a path that walks to
+    another table's."""
+    return paths_for(tools)
+
+
 def content_kind_path(tools: ToolSet) -> InitiativePath:
     """A row about one piece of content, reached exactly like the content
     itself: ``(entity_type, entity_id)`` is the pair the entity function takes,
@@ -1719,7 +1726,8 @@ def content_kind_path(tools: ToolSet) -> InitiativePath:
     def locate(r: str) -> str:
         arms = " ".join(
             f"WHEN '{etype}' THEN "
-            f"(SELECT {initiative_of(tbl, 're')} FROM {tbl} re WHERE re.id = {r}.entity_id)"
+            f"(SELECT {initiative_of(tbl, 're', paths=_paths(tools))} FROM {tbl} re"
+            f" WHERE re.id = {r}.entity_id)"
             for etype, tbl in content_kind_tables(tools).items()
         )
         return f"(CASE {r}.entity_type {arms} END)"
