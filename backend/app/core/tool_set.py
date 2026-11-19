@@ -23,12 +23,13 @@ from sqlmodel import SQLModel
 
 import app.db.base  # noqa: F401  # every model on the metadata
 from app.core.plugin_scopes import tool_resource
-from app.core.tools import KINDS, Kind, Tool, ToolSpec
+from app.core.tools import KINDS, Kind, Tool, ToolRefusals, ToolSpec
 
 
 @dataclass(frozen=True, eq=False)
-class ToolRecord:
-    """One tool, as the renderers read it."""
+class ToolRecord(ToolRefusals):
+    """One tool, as the renderers read it, and as the refusals about it name
+    it."""
 
     #: Its kind, as a row names it (``resource_grants.resource_type``).
     kind: str
@@ -52,6 +53,11 @@ class ToolRecord:
     #: role rows are that install's (``initiative_rules.install_id``). None
     #: for a built-in tool.
     install_id: int | None = None
+
+    @property
+    def value(self) -> str:  # type: ignore[override]
+        """Its kind, as a refusal names it."""
+        return self.kind
 
 
 @dataclass(frozen=True, eq=False)
@@ -130,6 +136,13 @@ class ToolSet:
         return tuple(r.kind for r in self.records) + tuple(
             kind.value for kind in self.child_kinds
         )
+
+    @cached_property
+    def kind_codes(self) -> dict[str, int]:
+        """Every tool's kind and every kind inside one, and its code."""
+        return {r.kind: r.spec.code for r in self.records} | {
+            kind.value: kind.code for kind in self.child_kinds
+        }
 
     @cached_property
     def comment_targets(self) -> tuple[str, ...]:

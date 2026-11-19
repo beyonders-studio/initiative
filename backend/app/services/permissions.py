@@ -39,10 +39,11 @@ from app.core.messages import (
     ProjectMessages,
     SharingMessages,
 )
-from app.core.tools import Tool
+from app.core.tools import Tool, ToolRefusals
 from app.db.authorization import standing_arg
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import ActorContext, InstallContext
+from app.db.tool_rows import ToolRow
 from app.models.platform.guild import GuildMembership
 from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
 from app.models.tenant.project import Project
@@ -134,10 +135,10 @@ def listing_scope_clause(
 
 @dataclass(frozen=True)
 class DacResource:
-    """One tool's DAC identity. Its refusals come from the tool (``Tool``), so
-    a new member arrives with its full set."""
+    """One tool's DAC identity. Its refusals come from the tool (a ``Tool``,
+    or a tool plug-in's record), so a new member arrives with its full set."""
 
-    name: Tool
+    name: ToolRefusals
 
 
 #: Every tool, by construction — ``tools_test`` has nothing to catch up on.
@@ -606,8 +607,11 @@ def actions_of(row: Any) -> frozenset[str]:
     schema's ``resource_actions`` in the SELECT that loaded the row, so it was
     answered for the reader the session is routed as, under the standing the
     seam computed. A row loaded without it came through a loader that does not
-    decide or serialize, which is where to ask for it.
+    decide or serialize, which is where to ask for it. A tool plug-in's row
+    carries its tool's (``app.db.tool_rows``).
     """
+    if isinstance(row, ToolRow):
+        return row.actions
     if "actions" in inspect(row).unloaded:
         raise RuntimeError(
             f"{type(row).__name__} was loaded without its actions; "

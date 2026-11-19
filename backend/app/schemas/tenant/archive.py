@@ -12,11 +12,14 @@ from pydantic import ConfigDict
 
 from app.core.tools import ARCHIVE_TARGETS
 from app.schemas.base import SanitizedBaseModel
+from app.schemas.kinds import with_installed
 
 ArchivableType = Enum(
     "ArchivableType", {name: name for name in ARCHIVE_TARGETS}, type=str
 )
 ArchivableType.__doc__ = "Things that can be archived."
+#: What was archived: a built-in kind, or a tool plug-in's.
+ArchivedKind = with_installed(ArchivableType)
 
 
 class ArchiveResponse(SanitizedBaseModel):
@@ -26,7 +29,7 @@ class ArchiveResponse(SanitizedBaseModel):
     wants the whole row reads it back from the route that already serves it.
     """
 
-    entity_type: ArchivableType
+    entity_type: ArchivedKind
     entity_id: int
     archived_at: datetime | None = None
 

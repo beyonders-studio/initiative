@@ -965,7 +965,7 @@ async def _file(
             # An occurrence of a series, in the series' calendar.
             return await create_calendar_event(
                 session,
-                built[_first_way_up(CalendarEvent).model],
+                built[_model(_first_way_up(CalendarEvent).table)],
                 user,
                 **{edge.column: parent.id, "original_start": parent.start_at},
             )
@@ -983,8 +983,15 @@ async def _file(
     raise AssertionError(f"this test has no way to file a {model.__name__}")
 
 
+def _model(table: Any) -> type:
+    from app.db.base import MODELS_BY_TABLE
+
+    return MODELS_BY_TABLE[table.name]
+
+
 def _first_way_up(model: type) -> Edge:
-    return next(edge for edge in CASCADE_PARENTS[model] if edge.model is not model)
+    table = model.__table__  # type: ignore[attr-defined]
+    return next(edge for edge in CASCADE_PARENTS[table] if edge.table is not table)
 
 
 async def _build(
@@ -1000,7 +1007,7 @@ async def _build(
         built[Initiative] = initiative
         return initiative
     edge = _first_way_up(model)
-    parent_model = edge.model
+    parent_model = _model(edge.table)
     parent = built.get(parent_model) or await _build(
         session, parent_model, initiative, user, built
     )
@@ -1011,16 +1018,18 @@ async def _build(
 def _trash_kind(model: type) -> str:
     from app.api.v1.tenant_endpoints.trash import ENTITY_REGISTRY
 
-    return next(kind for kind, (m, _) in ENTITY_REGISTRY.items() if m is model)
+    return next(
+        kind for kind, (t, _) in ENTITY_REGISTRY.items() if t is model.__table__  # type: ignore[attr-defined]
+    )
 
 
 def _trash_edges() -> list:
     return [
         pytest.param(
-            parent,
-            edge.model,
+            _model(parent),
+            _model(edge.table),
             edge,
-            id=f"{edge.model.__name__}.{edge.kind or edge.column}",
+            id=f"{_model(edge.table).__name__}.{edge.kind or edge.column}",
         )
         for parent, children in CASCADE_CHILDREN.items()
         for edge in children
@@ -1030,7 +1039,7 @@ def _trash_edges() -> list:
 def _under_an_initiative() -> list:
     return [
         pytest.param(model, id=model.__name__)
-        for model in (Initiative, *CASCADE_PARENTS)
+        for model in (Initiative, *map(_model, CASCADE_PARENTS))
     ]
 
 

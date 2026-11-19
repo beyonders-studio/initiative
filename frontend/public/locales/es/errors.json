@@ -268,7 +268,6 @@
   "unableToSaveCommunityOrder": "No se pudo guardar el orden de las comunidades. Actualizando…",
   "TRASH_ITEM_NOT_FOUND": "Ese elemento de la papelera ya no está disponible.",
   "TRASH_PURGE_REQUIRES_ADMIN": "Solo los administradores de la comunidad pueden eliminar permanentemente.",
-  "TRASH_UNKNOWN_ENTITY_TYPE": "Tipo de elemento de papelera desconocido.",
   "PROJECT_EXPORT_NO_TASK_STATUSES": "La exportación del proyecto no tiene estados de tarea, que son obligatorios para importar.",
   "EXPORT_UNKNOWN_SOURCE": "Estos datos no se pueden exportar.",
   "EXPORT_INVALID_FORMAT": "Este formato de exportación no es compatible con estos datos.",

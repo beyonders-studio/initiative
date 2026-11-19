@@ -43,6 +43,7 @@ from app.core.relationships import (
     is_symmetric,
     is_transitive,
     node_id,
+    node_of,
 )
 from app.core.search import SearchEntityType
 from app.db import reference_targets
@@ -1022,7 +1023,7 @@ async def neighbourhood(
 
 async def purge_for_entities(
     session: AsyncSession,
-    kind: EndpointKind,
+    code: int,
     entity_ids: Iterable[int],
 ) -> None:
     """Drop every edge naming one of these, tombstones included.
@@ -1032,7 +1033,7 @@ async def purge_for_entities(
     explicitly. A tombstone goes too: what it remembers is a link between two
     things, and one of them is about to stop existing.
     """
-    nodes = [node_id(kind, entity_id) for entity_id in entity_ids]
+    nodes = [node_of(code, entity_id) for entity_id in entity_ids]
     if not nodes:
         return
     await session.exec(
