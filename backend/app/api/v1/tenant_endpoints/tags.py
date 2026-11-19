@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, literal, union_all
+from sqlalchemy import Table, func, literal, union_all
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
@@ -24,14 +24,18 @@ from app.api.deps import (
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS, view_conditions
 from app.core.messages import PluginMessages, TagMessages
 from app.core.plugin_scopes import tool_resource
-from app.core.tools import KINDS, Tool
+from app.core.tool_set import ToolSet
+from app.core.tools import KINDS, TAG_TARGETS, Tool
 from app.db.guild_standing import GuildContext, InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.query import build_paginated_response, paginated_query
+from app.db.session import routed_tools
+from app.db.tool_rows import joined_up, locate
 from app.models.platform.user import User
 from app.models.tenant._mixins import ArchiveMixin
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.tag import Tag
+from app.schemas.kinds import require_kind
 from app.schemas.tenant.tag import (
     TagBulkEditRequest,
     TagBulkEditResponse,
@@ -40,7 +44,6 @@ from app.schemas.tenant.tag import (
     TaggedEntitiesResponse,
     TaggedEntity,
     TagRead,
-    TagTarget,
     TagUpdate,
     serialize_tag,
 )
@@ -146,24 +149,26 @@ async def bulk_edit_tags(
     Every target is authorized with write on the tool that governs it, read
     from the registry its RLS policy is rendered from: a tool row asks itself,
     a sub-resource (a task, a counter, a wiki page, …) asks its parent tool.
-    Nothing is applied unless every target passes — one transaction, and a
-    parent tool's ``updated_at`` moves once for all of its sub-resources rather
-    than once per row.
+    A tool plug-in's row is read and refused by its tool's sharing, one at a
+    time. Nothing is applied unless every target passes — one transaction, and
+    a parent tool's ``updated_at`` moves once for all of its sub-resources
+    rather than once per row.
     """
-    target = payload.target_type.value
+    tools = routed_tools(session)
+    target = require_kind(tools, payload.target_type, TAG_TARGETS)
     _require_install_tagging_scopes(guild_context, target)
-    spec = tags_service.TAG_LINKS[target]
+    spec = tags_service.tag_links(tools)[target]
     add_ids = await tags_service.validate_guild_tag_ids(
         session, guild_context.guild_id, payload.add_tag_ids
     )
     remove_ids = list(dict.fromkeys(payload.remove_tag_ids))
     target_ids = list(dict.fromkeys(payload.target_ids))
 
-    if KINDS[target].standalone:
-        # Answers for itself: each is changed by its own rule.
+    if locate(tools, target) is not None or KINDS[target].standalone:
+        # Answers for itself, by its own rule, or to its tool's sharing.
         for entity_id in target_ids:
-            await resource_access.load_child(
-                session, spec.entity, entity_id, access="write"
+            await resource_access.load_kind(
+                session, target, entity_id, current_user, guild_context, access="write"
             )
     else:
         tool, chain = _governing(spec)
@@ -293,6 +298,21 @@ async def delete_tag(
     await session.commit()
 
 
+def _live_up(table: Table, hops: tuple[tuple[str, str], ...], tools: ToolSet) -> list:
+    """The rows of ``table`` neither archived nor in the trash, in a tool's
+    row up ``hops`` that is neither either."""
+    conditions = [table.c.deleted_at.is_(None), table.c.archived_at.is_(None)]
+    if hops:
+        (column, parent), *rest = hops
+        up = tools.tables[parent]
+        conditions.append(
+            table.c[column].in_(
+                select(up.c.id).where(*_live_up(up, tuple(rest), tools))
+            )
+        )
+    return conditions
+
+
 async def _tagged_conditions(
     kind: str,
     tag_id: int,
@@ -307,9 +327,16 @@ async def _tagged_conditions(
     narrows its ``active`` view, so a tab's count and the table under it agree.
     A sub-resource is shared as part of its tool, so it is listed only when its
     parent passes that same list, and leaves out its own archive where it has
-    one.
+    one. A tool plug-in's row is listed where its policies let the reader
+    read it, and neither it nor its tool's row is archived or in the trash.
     """
-    spec = tags_service.TAG_LINKS[kind]
+    spec = tags_service.tag_links(guild_context.tools)[kind]
+    located = locate(guild_context.tools, kind)
+    if located is not None:
+        return [
+            spec.table.c.id.in_(tags_service.tagged_entity_ids(spec, [tag_id])),
+            *_live_up(located.table, located.hops, guild_context.tools),
+        ]
     model = spec.entity
     if KINDS[kind].standalone:
         # No tool row to pass a list: the reader's policies on the row decide
@@ -368,13 +395,13 @@ async def get_tag_counts(
     tag = await _get_tag_or_404(session, tag_id, guild_context.guild_id)
     selects = [
         select(literal(kind), func.count())
-        .select_from(spec.entity)
+        .select_from(spec.table)
         .where(
             *await _tagged_conditions(
                 kind, tag.id, session, current_user, guild_context
             )
         )
-        for kind, spec in tags_service.TAG_LINKS.items()
+        for kind, spec in tags_service.tag_links(guild_context.tools).items()
     ]
     rows = (await session.exec(union_all(*selects))).all()
     return TagEntityCountsResponse(
@@ -388,7 +415,7 @@ async def get_tag_entities(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    kind: Annotated[TagTarget, Query(description="The taggable kind to list")],
+    kind: Annotated[str, Query(description="The taggable kind to list")],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> TaggedEntitiesResponse:
@@ -399,41 +426,61 @@ async def get_tag_entities(
     and the tool it lives in, the way a search hit does, which is everything a
     client needs to address it.
     """
+    tools = guild_context.tools
+    require_kind(tools, kind, TAG_TARGETS)
     tag = await _get_tag_or_404(session, tag_id, guild_context.guild_id)
-    spec = tags_service.TAG_LINKS[kind.value]
-    model = spec.entity
-    label = getattr(model, model.display_field())
-    standalone = KINDS[kind.value].standalone
-    if standalone:
-        # In no one instance of a tool: it names none.
-        tool, chain, parent = None, (), model
-        tool_id, parent_label = literal(None), literal("")
-    else:
-        tool, chain = _governing(spec)
-        parent = tags_service.TOOL_TAG_LINKS[tool].entity
-        tool_id = getattr(model, chain[0][0]) if chain else model.id
-        parent_label = getattr(parent, parent.display_field())
-    updated_at = getattr(model, "updated_at", None)
+    spec = tags_service.tag_links(tools)[kind]
     conditions = await _tagged_conditions(
-        kind.value, tag.id, session, current_user, guild_context
+        kind, tag.id, session, current_user, guild_context
     )
-
-    statement = (
-        select(
-            model.id,
-            label,
-            parent.initiative_id,
-            tool_id,
-            parent_label,
-            updated_at if updated_at is not None else literal(None),
+    located = locate(tools, kind)
+    if located is not None:
+        # Named and addressed by its tool's row, as a built-in tool's item is.
+        table = located.table
+        joined, top = joined_up(table, located.hops, tools)
+        tool: str | None = located.tool.kind
+        statement = (
+            select(
+                table.c.id,
+                table.c.name,
+                top.c.initiative_id,
+                top.c.id,
+                top.c.name,
+                table.c.updated_at,
+            )
+            .select_from(joined)
+            .where(*conditions)
+            .order_by(func.lower(table.c.name), table.c.id)
         )
-        .select_from(model)
-        .where(*conditions)
-        .order_by(func.lower(label), model.id)
-    )
-    if chain:
-        statement = statement.join(parent, parent.id == tool_id)
-    count_statement = select(func.count()).select_from(model).where(*conditions)
+    else:
+        model = spec.entity
+        label = getattr(model, model.display_field())
+        if KINDS[kind].standalone:
+            # In no one instance of a tool: it names none.
+            tool, chain, parent = None, (), model
+            tool_id, parent_label = literal(None), literal("")
+        else:
+            tool, chain = _governing(spec)
+            parent = tags_service.TOOL_TAG_LINKS[tool].entity
+            tool_id = getattr(model, chain[0][0]) if chain else model.id
+            parent_label = getattr(parent, parent.display_field())
+        updated_at = getattr(model, "updated_at", None)
+        statement = (
+            select(
+                model.id,
+                label,
+                parent.initiative_id,
+                tool_id,
+                parent_label,
+                updated_at if updated_at is not None else literal(None),
+            )
+            .select_from(model)
+            .where(*conditions)
+            .order_by(func.lower(label), model.id)
+        )
+        if chain:
+            statement = statement.join(parent, parent.id == tool_id)
+    count_statement = select(func.count()).select_from(spec.table).where(*conditions)
     rows, total_count, page = await paginated_query(
         session, statement, count_statement, page, page_size
     )

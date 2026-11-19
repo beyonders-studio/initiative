@@ -12,9 +12,11 @@ from app.core.search import SearchEntityType
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.relationship import EntityRelationship
 from app.testing import (
+    add_counter,
     create_initiative,
     create_tag,
     create_task,
+    install_tool_plugin,
 )
 
 
@@ -177,6 +179,74 @@ async def test_generic_tool_tags_route_covers_every_tool(
         assert [t["id"] for t in row["tags"]] == [tag.id], tool
 
 
+async def test_a_tool_plugins_rows_are_tagged_as_a_tools_are(
+    client: AsyncClient, acting_user, session
+):
+    """A tool plug-in's tool row is tagged and has its thread switched through
+    the generic routes, its item is tagged by the bulk edit, and both are
+    counted and listed on the tag's page, each addressed by its tool."""
+    import sqlalchemy as sa
+
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    tools, group, counter = await add_counter(
+        session, seat.guild.id, seat.initiative.id
+    )
+    (tool,) = tools.installed
+    (item_kind,) = (child.value for child in tool.children)
+    tag = await create_tag(session, seat.guild)
+
+    response = await client.put(
+        seat.g(f"/tools/{tool.kind}/{group}/tags"),
+        headers=seat.headers,
+        json={"tag_ids": [tag.id]},
+    )
+    assert response.status_code == 200, response.text
+    assert [t["id"] for t in response.json()] == [tag.id]
+    response = await client.put(
+        seat.g(f"/tools/{tool.kind}/{group}/comments"),
+        headers=seat.headers,
+        json={"comments_enabled": False},
+    )
+    assert response.json() == {"comments_enabled": False}, response.text
+    assert (
+        await session.exec(
+            sa.select(tool.table.c.comments_enabled).where(tool.table.c.id == group)
+        )
+    ).scalar_one() is False
+    # An item is not a tool.
+    response = await client.put(
+        seat.g(f"/tools/{item_kind}/{counter}/tags"),
+        headers=seat.headers,
+        json={"tag_ids": [tag.id]},
+    )
+    assert response.status_code == 404, response.text
+
+    response = await client.post(
+        seat.g("/tags/bulk"),
+        headers=seat.headers,
+        json={
+            "target_type": item_kind,
+            "target_ids": [counter],
+            "add_tag_ids": [tag.id],
+        },
+    )
+    assert response.json() == {"updated_count": 1}, response.text
+
+    counts = await client.get(seat.g(f"/tags/{tag.id}/counts"), headers=seat.headers)
+    assert counts.json()["counts"] == {tool.kind: 1, item_kind: 1}, counts.text
+    for kind, row_id in ((tool.kind, group), (item_kind, counter)):
+        listed = await client.get(
+            seat.g(f"/tags/{tag.id}/entities"),
+            headers=seat.headers,
+            params={"kind": kind},
+        )
+        assert [
+            (i["entity_type"], i["entity_id"], i["tool"], i["tool_id"], i["tool_title"])
+            for i in listed.json()["items"]
+        ] == [(kind, row_id, tool.kind, group, "Scores")], listed.text
+
+
 async def test_generic_tool_tags_route_rejects_unknown_tool(
     client: AsyncClient, acting_user
 ):
@@ -184,7 +254,7 @@ async def test_generic_tool_tags_route_rejects_unknown_tool(
     response = await client.put(
         a.g("/tools/task/1/tags"), headers=a.headers, json={"tag_ids": []}
     )
-    assert response.status_code == 422
+    assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +452,7 @@ async def test_a_tags_entities_need_a_taggable_kind(
     untaggable = await client.get(
         a.g(f"/tags/{tag.id}/entities"), headers=a.headers, params={"kind": "comment"}
     )
-    assert untaggable.status_code == 422
+    assert untaggable.status_code == 404
 
 
 async def test_bulk_edit_requires_an_operation(client: AsyncClient, acting_user):

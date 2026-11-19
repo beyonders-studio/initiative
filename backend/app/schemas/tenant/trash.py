@@ -10,9 +10,8 @@ from app.models.tenant._mixins import ActorKind
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import PageMeta
 
-# Derived from the Tool enum plus the non-tool trashable extras, exactly the way
-# TagTarget derives from TAG_TARGETS — a new tool reaches the trash can without
-# this being edited.
+# Derived from the Tool enum plus the non-tool trashable extras — a new tool
+# reaches the trash can without this being edited.
 EntityType = Enum("EntityType", {name: name for name in TRASH_TARGETS}, type=str)
 EntityType.__doc__ = "Entity types the trash can holds."
 

@@ -403,10 +403,10 @@ COMMENT_TARGETS: tuple[str, ...] = tuple(
 
 
 # Tag-assignment surfaces: EVERY tool is taggable, plus everything that lives
-# inside one but a counter. The assignment registry (app.services.tenant.tags.TAG_LINKS) and
-# the ``TagTarget`` schema enum both derive from TAG_TARGETS, so a new Tool is
-# taggable across every surface with no per-surface edit; tags_test.py fails if
-# any surface drifts.
+# inside one but a counter. The assignment registry
+# (app.services.tenant.tags.tag_links) and the bulk endpoint's check derive
+# from TAG_TARGETS, so a new Tool is taggable across every surface with no
+# per-surface edit; tags_test.py fails if any surface drifts.
 TAGGABLE_EXTRAS: tuple[str, ...] = tuple(k for k in CHILD_KINDS if k != "counter")
 TAG_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + TAGGABLE_EXTRAS
 
