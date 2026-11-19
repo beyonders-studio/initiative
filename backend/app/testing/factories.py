@@ -38,7 +38,7 @@ from app.core.file_types import FileType, type_of_media
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.login_methods import LoginMethod
 from app.core.reactions import ReactionTarget
-from app.core.relationships import EndpointKind, Provenance, RelationshipType
+from app.core.relationships import Provenance, RelationshipType
 from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
 from app.core.security import (
     get_password_hash,
@@ -2868,8 +2868,8 @@ async def create_relationship(
     session: AsyncSession,
     guild: Guild,
     *,
-    source: tuple[EndpointKind, int],
-    target: tuple[EndpointKind, int],
+    source: tuple[str, int],
+    target: tuple[str, int],
     relationship_type: RelationshipType = RelationshipType.attached,
     provenance: Provenance = Provenance.manual,
     created_by: int | None = None,
@@ -2877,7 +2877,7 @@ async def create_relationship(
 ) -> EntityRelationship:
     """Create one edge between two things.
 
-    Endpoints are ``(kind, id)`` pairs, a person's ``(EndpointKind.user, id)``,
+    Endpoints are ``(kind, id)`` pairs, a person's ``("user", id)``,
     and a symmetric type is stored in the order the constraint requires, so a test may name its two ends in whichever
     order reads better.
     """

@@ -33,7 +33,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.relationships import RelationshipType, decode_node_id, node_id
+from app.core.relationships import RelationshipType, node_id
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.core.user_display import display_name, handle_of
@@ -382,8 +382,8 @@ def task_ref(task_id: int | None) -> str | None:
     return f"task:{task_id}" if task_id is not None else None
 
 
-def _entity_ref(kind: SearchEntityType, entity_id: int) -> str:
-    return f"{kind.value}:{entity_id}"
+def _entity_ref(kind: str, entity_id: int) -> str:
+    return f"{kind}:{entity_id}"
 
 
 async def _load_comments(
@@ -459,17 +459,12 @@ async def _load_links(
     ).all()
     by_task: dict[int, list[ProjectExportTaskLink]] = {}
     for row in rows:
-        try:
-            target_kind, target_id = decode_node_id(row.target_node)
-        except ValueError:
-            # A kind this build has no code for: nothing here can name it.
-            continue
-        if target_kind not in _LINKABLE_TARGETS:
+        if row.target_type not in _LINKABLE_TARGETS:
             continue
         by_task.setdefault(row.source_id, []).append(
             ProjectExportTaskLink(
                 type=RelationshipType(row.relationship_type),
-                target_external_ref=_entity_ref(target_kind, target_id),
+                target_external_ref=_entity_ref(row.target_type, row.target_id),
             )
         )
     return by_task

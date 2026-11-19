@@ -109,6 +109,7 @@ from app.testing.schema_harness import guild_of, route_session_to_guild
 from app.testing.server import in_request_tasks
 from app.testing.tool_plugins import (
     COUNTERS_UID,
+    add_counter,
     counters_tool_manifest,
     install_tool_plugin,
 )
@@ -119,6 +120,7 @@ __all__ = [
     "NARROWED_VALUE",
     "TOOL_FACTORIES",
     "Actor",
+    "add_counter",
     "as_role",
     "assertion_for",
     "assign_tag",

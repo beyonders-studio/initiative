@@ -83,6 +83,7 @@ from app.testing import (
     COUNTERS_UID,
     Actor,
     create_initiative,
+    create_tag,
     install_tool_plugin,
     make_operations_community,
     route_as,
@@ -1285,6 +1286,7 @@ async def test_the_universal_routes_keep_a_tool_plugins_rows_in_their_initiative
     assert response.status_code == 200, response.text
 
 
+<<<<<<< HEAD
 async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     session: AsyncSession,
     acting_user: Callable[..., Awaitable[Actor]],
@@ -1298,6 +1300,17 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
     requests, A's list and a new row in A among them, is answered 404."""
     from app.api.content_socket import tool_authorizer
 
+=======
+async def test_tags_and_links_keep_a_tool_plugins_rows_in_their_initiative(
+    session: AsyncSession,
+    acting_user: Callable[..., Awaitable[Actor]],
+    client: AsyncClient,
+) -> None:
+    """A tool plug-in's row and its item, in initiative A and shared by name
+    with a moderator of B and a member of no initiative, are tagged, linked
+    and have their tags and links listed by A's moderator, and by neither of
+    the others. A kind the community does not have is not found."""
+>>>>>>> 4989e0449 (Link any kind in the community's tool set)
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     guild = admin.guild
     initiative_b = await create_initiative(session, guild, admin.user)
@@ -1324,6 +1337,7 @@ async def test_the_tool_plugin_routes_keep_its_rows_in_their_initiative(
         tools=tools,
     )
     item_row = await seeder.make(tool.items[0].name, moderator_a.user.id)
+<<<<<<< HEAD
     tool_id = item_row[f"{tool.kind.split('.')[0]}_id"]
     rows = {tool.kind: tool_id, item_kind: item_row["id"]}
     await session.commit()
@@ -1518,3 +1532,134 @@ async def test_exports_and_counts_keep_a_tool_plugins_rows_in_their_initiative(
         params={"scope": "initiative", "initiative_id": a},
     )
     assert response.json()["tools"][tool.kind]["count"] == 1, response.text
+=======
+    rows = {
+        tool.kind: item_row[f"{tool.kind.split('.')[0]}_id"],
+        item_kind: item_row["id"],
+    }
+    tag = await create_tag(session, guild)
+    await session.commit()
+    link = {
+        "source": {"type": item_kind, "id": rows[item_kind]},
+        "relationship_type": "related_to",
+        "target": {"type": tool.kind, "id": rows[tool.kind]},
+    }
+
+    async def tag_and_link(actor: Actor) -> list[int]:
+        """Every write's status for ``actor``, in one order."""
+        statuses = [
+            (
+                await client.put(
+                    actor.g(f"/tools/{tool.kind}/{rows[tool.kind]}/tags"),
+                    headers=actor.headers,
+                    json={"tag_ids": [tag.id]},
+                )
+            ).status_code,
+            (
+                await client.put(
+                    actor.g(f"/tools/{tool.kind}/{rows[tool.kind]}/comments"),
+                    headers=actor.headers,
+                    json={"comments_enabled": True},
+                )
+            ).status_code,
+            (
+                await client.post(
+                    actor.g("/relationships/"), headers=actor.headers, json=link
+                )
+            ).status_code,
+        ]
+        for kind, row_id in rows.items():
+            response = await client.post(
+                actor.g("/tags/bulk"),
+                headers=actor.headers,
+                json={
+                    "target_type": kind,
+                    "target_ids": [row_id],
+                    "add_tag_ids": [tag.id],
+                },
+            )
+            statuses.append(response.status_code)
+        return statuses
+
+    for actor in (moderator_b, outsider):
+        assert await tag_and_link(actor) == [404] * 5, actor
+    assert await tag_and_link(moderator_a) == [200, 200, 201, 200, 200]
+
+    for actor in (moderator_b, outsider):
+        for kind, row_id in rows.items():
+            for path in ("/relationships/", "/relationships/neighbourhood"):
+                response = await client.get(
+                    actor.g(path),
+                    headers=actor.headers,
+                    params={"entity": f"{kind}:{row_id}"},
+                )
+                assert response.status_code == 404, (path, kind, response.text)
+            response = await client.put(
+                actor.g("/relationships/"),
+                headers=actor.headers,
+                params={
+                    "entity": f"{kind}:{row_id}",
+                    "relationship_type": "related_to",
+                    "other_type": tool.kind,
+                },
+                json=[],
+            )
+            assert response.status_code == 404, (kind, response.text)
+            response = await client.get(
+                actor.g(f"/tags/{tag.id}/entities"),
+                headers=actor.headers,
+                params={"kind": kind},
+            )
+            assert response.json()["items"] == [], (kind, response.text)
+        response = await client.get(
+            actor.g(f"/tags/{tag.id}/counts"), headers=actor.headers
+        )
+        assert response.json()["counts"] == {}, response.text
+
+    for kind, row_id in rows.items():
+        response = await client.get(
+            moderator_a.g("/relationships/"),
+            headers=moderator_a.headers,
+            params={"entity": f"{kind}:{row_id}", "relationship_type": "related_to"},
+        )
+        assert [e["other"]["type"] for e in response.json()] == [
+            next(other for other in rows if other != kind)
+        ], response.text
+        response = await client.get(
+            moderator_a.g(f"/tags/{tag.id}/entities"),
+            headers=moderator_a.headers,
+            params={"kind": kind},
+        )
+        assert [i["entity_id"] for i in response.json()["items"]] == [row_id]
+
+    # A kind the community has not installed is not found.
+    stranger = f"stranger.{'x' * 14}"
+    for response in (
+        await client.put(
+            moderator_a.g(f"/tools/{stranger}/1/tags"),
+            headers=moderator_a.headers,
+            json={"tag_ids": [tag.id]},
+        ),
+        await client.post(
+            moderator_a.g("/tags/bulk"),
+            headers=moderator_a.headers,
+            json={"target_type": stranger, "target_ids": [1], "add_tag_ids": [tag.id]},
+        ),
+        await client.get(
+            moderator_a.g(f"/tags/{tag.id}/entities"),
+            headers=moderator_a.headers,
+            params={"kind": stranger},
+        ),
+        await client.get(
+            moderator_a.g("/relationships/"),
+            headers=moderator_a.headers,
+            params={"entity": f"{stranger}:1"},
+        ),
+        await client.post(
+            moderator_a.g("/relationships/"),
+            headers=moderator_a.headers,
+            json={**link, "target": {"type": stranger, "id": 1}},
+        ),
+    ):
+        assert response.status_code == 404, response.text
+>>>>>>> 4989e0449 (Link any kind in the community's tool set)

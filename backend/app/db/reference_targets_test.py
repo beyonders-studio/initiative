@@ -10,6 +10,7 @@ from sqlmodel import SQLModel
 
 import app.db.base  # noqa: F401 — registers every model
 from app.core.relationships import ENDPOINT_KINDS
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.reference_targets import VISUALS, Visual, _column, _table_for
 from app.db.search_index import SEARCH_SOURCES
 
@@ -64,7 +65,7 @@ def test_a_kind_declares_at_most_one_look():
 
 def test_visuals_only_describe_kinds_an_edge_can_name():
     """A look nothing reads is a look nobody maintains."""
-    linkable = {_table_for(kind) for kind in ENDPOINT_KINDS}
+    linkable = {_table_for(kind, BUILTIN_TOOLS) for kind in ENDPOINT_KINDS}
     assert set(VISUALS) <= linkable
 
 

@@ -20,7 +20,7 @@ where the resource and the caller's access to it are already in hand.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -33,21 +33,22 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import RelationshipMessages
 from app.core.relationships import (
     DERIVED_TYPES,
+    ENDPOINT_CODES,
     ENDPOINT_KINDS,
+    NODE_ID_SHIFT,
     PERSON,
     SPECS,
-    EndpointKind,
     Provenance,
     Related,
     RelationshipType,
     is_symmetric,
     is_transitive,
-    node_id,
     node_of,
 )
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.db import reference_targets
-from app.db.session import install_context, require_actor_context
+from app.db.session import install_context, require_actor_context, routed_tools
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import named_people
@@ -64,14 +65,37 @@ Direction = Literal["inbound", "outbound", "both"]
 
 @dataclass(frozen=True)
 class Endpoint:
-    """One end of an edge: what kind of thing, and which one."""
+    """One end of an edge: what kind of thing, and which one.
 
-    kind: EndpointKind
+    ``code`` is its kind's code: a built-in end's own where it is not given,
+    and a tool plug-in's kind's from the community's tool set (:meth:`of`), or
+    from the node id an edge stores (:meth:`stored`).
+    """
+
+    kind: str
     id: int
+    code: int | None = field(default=None, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        # A built-in kind handed in as its enum member is kept as the string
+        # an edge stores.
+        object.__setattr__(self, "kind", getattr(self.kind, "value", self.kind))
+
+    @classmethod
+    def of(cls, tools: ToolSet, kind: str, entity_id: int) -> Endpoint:
+        """An end of a kind the community with ``tools`` has."""
+        return cls(kind, entity_id, tools.endpoint_codes[kind])
+
+    @classmethod
+    def stored(cls, kind: str, entity_id: int, node: int) -> Endpoint:
+        """An end as an edge stores it: its kind, its id and its node id."""
+        return cls(kind, entity_id, node >> NODE_ID_SHIFT)
 
     @property
     def node(self) -> int:
-        return node_id(self.kind, self.id)
+        return node_of(
+            ENDPOINT_CODES[self.kind] if self.code is None else self.code, self.id
+        )
 
 
 def _ordered(
@@ -115,7 +139,7 @@ async def create(
     ``content``; only the accept path hands it ``inferred``.
     """
     if source.node == target.node:
-        raise SelfLoop(f"{source.kind.value}:{source.id} cannot relate to itself")
+        raise SelfLoop(f"{source.kind}:{source.id} cannot relate to itself")
 
     stored_source, stored_target = _ordered(source, target, relationship_type)
     existing = await find(
@@ -128,10 +152,10 @@ async def create(
         return None
 
     row = EntityRelationship(
-        source_type=stored_source.kind.value,
+        source_type=stored_source.kind,
         source_id=stored_source.id,
         relationship_type=relationship_type.value,
-        target_type=stored_target.kind.value,
+        target_type=stored_target.kind,
         target_id=stored_target.id,
         provenance=provenance.value,
         confidence=confidence,
@@ -271,19 +295,21 @@ async def _resolve_ends(
     session: AsyncSession, links: Sequence[Link], user_id: int | None
 ) -> dict[int, reference_targets.Resolved]:
     """Every end the reader may open, by node id: one query per kind."""
-    wanted: dict[EndpointKind, list[int]] = {}
+    wanted: dict[str, dict[int, int]] = {}
     for made in links:
         for end in (made.source, made.target):
-            wanted.setdefault(end.kind, []).append(end.id)
+            wanted.setdefault(end.kind, {})[end.id] = end.node
     found: dict[int, reference_targets.Resolved] = {}
-    for kind, ids in wanted.items():
-        for entity_id, row in (await _linkable(session, kind, ids, user_id)).items():
-            found[node_id(kind, entity_id)] = row
+    for kind, nodes in wanted.items():
+        for entity_id, row in (
+            await _linkable(session, kind, list(nodes), user_id)
+        ).items():
+            found[nodes[entity_id]] = row
     return found
 
 
 async def _linkable(
-    session: AsyncSession, kind: EndpointKind, ids: Sequence[int], user_id: int | None
+    session: AsyncSession, kind: str, ids: Sequence[int], user_id: int | None
 ) -> dict[int, reference_targets.Resolved]:
     """The ends of one kind a link made for this reader may name, by id.
 
@@ -301,19 +327,20 @@ async def _writable_ends(
 ) -> set[int]:
     """The ends these links change (:func:`_written_end`) that the reader may
     edit, by node id: one query per kind."""
-    wanted: dict[EndpointKind, set[int]] = {}
+    tools = routed_tools(session)
+    wanted: dict[str, dict[int, int]] = {}
     for made in links:
         written = _written_end(made)
         if written is not None:
-            wanted.setdefault(written.kind, set()).add(written.id)
+            wanted.setdefault(written.kind, {})[written.id] = written.node
     writable: set[int] = set()
-    for kind, ids in wanted.items():
+    for kind, nodes in wanted.items():
         rows = await session.exec(
-            reference_targets.visible_ids(kind, user_id, need_write=True).where(
-                reference_targets.id_column(kind).in_(ids)
-            )
+            reference_targets.visible_ids(
+                kind, user_id, tools=tools, need_write=True
+            ).where(reference_targets.id_column(kind, tools=tools).in_(list(nodes)))
         )
-        writable.update(node_id(kind, row[0]) for row in rows.all())
+        writable.update(nodes[row[0]] for row in rows.all())
     return writable
 
 
@@ -422,10 +449,10 @@ async def create_many(
     """
     rows = [
         {
-            "source_type": source.kind.value,
+            "source_type": source.kind,
             "source_id": source.id,
             "relationship_type": relationship_type.value,
-            "target_type": target.kind.value,
+            "target_type": target.kind,
             "target_id": target.id,
             "provenance": provenance.value,
             "created_at": datetime.now(UTC),
@@ -509,7 +536,7 @@ async def list_for_entity(
     entity: Endpoint,
     *,
     relationship_type: RelationshipType | None = None,
-    other_kind: EndpointKind | None = None,
+    other_kind: str | None = None,
     direction: Direction = "both",
 ) -> list[EntityRelationship]:
     """Every live edge touching this entity, from either side.
@@ -535,7 +562,7 @@ async def list_for_entity(
                 EntityRelationship.relationship_type == relationship_type.value
             )
         if other_kind is not None:
-            stmt = stmt.where(other_column == other_kind.value)
+            stmt = stmt.where(other_column == other_kind)
         return stmt
 
     rows: list[EntityRelationship] = []
@@ -554,11 +581,11 @@ async def list_for_entity(
 
 async def related_for_many(
     session: AsyncSession,
-    kind: SearchEntityType,
+    kind: str,
     entity_ids: Sequence[int],
     *,
     relationship_type: RelationshipType,
-    other_kind: SearchEntityType,
+    other_kind: str,
     model: type | None = None,
 ) -> dict[int, list[Related]]:
     """The far ends of one relation, for many entities at once.
@@ -574,7 +601,8 @@ async def related_for_many(
     passes through that kind's own policies. A far end the reader cannot open
     yields ``Related.entity is None`` and the caller renders nothing for it.
     """
-    nodes = [node_id(kind, entity_id) for entity_id in entity_ids]
+    code = routed_tools(session).endpoint_codes[kind]
+    nodes = [node_of(code, entity_id) for entity_id in entity_ids]
     if not nodes:
         return {}
 
@@ -590,7 +618,7 @@ async def related_for_many(
         return select(*columns).where(
             anchor.in_(nodes),
             EntityRelationship.relationship_type == relationship_type.value,
-            other_kind_column == other_kind.value,
+            other_kind_column == other_kind,
             EntityRelationship.removed_at.is_(None),  # type: ignore[union-attr]
         )
 
@@ -621,7 +649,7 @@ async def related_for_many(
         entities = {row.id: row for row in found.all()}
 
     grouped: dict[int, list[Related]] = {entity_id: [] for entity_id in entity_ids}
-    by_node = {node_id(kind, entity_id): entity_id for entity_id in entity_ids}
+    by_node = dict(zip(nodes, entity_ids, strict=True))
     for node, other_id, created_at in sorted(edges, key=lambda e: e[2]):
         grouped[by_node[node]].append(
             Related(id=other_id, entity=entities.get(other_id), linked_at=created_at)
@@ -631,7 +659,7 @@ async def related_for_many(
 
 async def counts_for_many(
     session: AsyncSession,
-    kind: SearchEntityType,
+    kind: str,
     entity_ids: Sequence[int],
     *,
     relationship_type: RelationshipType,
@@ -646,7 +674,8 @@ async def counts_for_many(
     Gated the same way: the policy ANDs both endpoints, so something the reader
     cannot open is not counted at them.
     """
-    nodes = [node_id(kind, entity_id) for entity_id in entity_ids]
+    code = routed_tools(session).endpoint_codes[kind]
+    nodes = [node_of(code, entity_id) for entity_id in entity_ids]
     counted = {entity_id: 0 for entity_id in entity_ids}
     if not nodes:
         return counted
@@ -667,7 +696,7 @@ async def counts_for_many(
         )
     ).all()
 
-    by_node = {node_id(kind, entity_id): entity_id for entity_id in entity_ids}
+    by_node = dict(zip(nodes, entity_ids, strict=True))
     for (node,) in rows:
         # A symmetric edge is stored once, so neither arm double-counts it —
         # but an edge between two of the entities asked about is one link for
@@ -681,7 +710,7 @@ async def related_for(
     entity: Endpoint,
     *,
     relationship_type: RelationshipType,
-    other_kind: SearchEntityType,
+    other_kind: str,
     model: type | None = None,
 ) -> list[Related]:
     """:func:`related_for_many` for one entity — the same two queries."""
@@ -701,7 +730,7 @@ async def related_ids(
     entity: Endpoint,
     *,
     relationship_type: RelationshipType,
-    other_kind: SearchEntityType,
+    other_kind: str,
 ) -> list[int]:
     """Ids of one kind connected to this entity by one type.
 
@@ -723,7 +752,7 @@ async def set_related(
     entity: Endpoint,
     *,
     relationship_type: RelationshipType,
-    other_kind: EndpointKind,
+    other_kind: str,
     ids: Sequence[int],
     user_id: int | None,
 ) -> None:
@@ -775,7 +804,7 @@ async def set_related(
             session,
             source=entity,
             relationship_type=relationship_type,
-            target=Endpoint(other_kind, other_id),
+            target=Endpoint.of(routed_tools(session), other_kind, other_id),
             created_by=user_id,
         )
 
@@ -981,21 +1010,24 @@ async def neighbourhood(
         crossings: list[Crossing] = []
         for row in await _edges_for_many(session, frontier, include_tags=include_tags):
             # An edge between two things on the same hop is crossed from both.
-            for anchor_node, kind, other_id in (
-                (row.source_node, row.target_type, row.target_id),
-                (row.target_node, row.source_type, row.source_id),
+            for anchor_node, kind, other_id, other_node in (
+                (row.source_node, row.target_type, row.target_id, row.target_node),
+                (row.target_node, row.source_type, row.source_id, row.source_node),
             ):
                 anchor = anchors.get(anchor_node)
                 if anchor is not None:
-                    other = Endpoint(EndpointKind(kind), other_id)
+                    other = Endpoint.stored(kind, other_id, other_node)
                     crossings.append(Crossing(row=row, anchor=anchor, other=other))
 
-        wanted: dict[EndpointKind, list[int]] = {}
+        wanted: dict[Endpoint, None] = {}
         for crossing in crossings:
             if crossing.other not in depths:
-                wanted.setdefault(crossing.other.kind, []).append(crossing.other.id)
-        for kind, ids in wanted.items():
-            unique = list(dict.fromkeys(ids))
+                wanted.setdefault(crossing.other)
+        by_kind: dict[str, dict[int, Endpoint]] = {}
+        for end in wanted:
+            by_kind.setdefault(end.kind, {})[end.id] = end
+        for kind, kind_ends in by_kind.items():
+            unique = list(kind_ends)
             for offset in range(0, len(unique), RESOLVE_CHUNK):
                 resolved = await reference_targets.resolve_many(
                     session,
@@ -1004,7 +1036,7 @@ async def neighbourhood(
                     user_id=user_id,
                 )
                 for entity_id, found in resolved.items():
-                    ends[Endpoint(kind, entity_id)] = found
+                    ends[kind_ends[entity_id]] = found
 
         frontier = []
         for crossing in crossings:
@@ -1088,7 +1120,7 @@ _UNCOPIED_TYPES = frozenset({RelationshipType.tagged_with}) | DERIVED_TYPES
 
 
 async def copy_links(
-    session: AsyncSession, kind: SearchEntityType, copies: Mapping[int, int]
+    session: AsyncSession, kind: str, copies: Mapping[int, int]
 ) -> None:
     """Carry the links of rows of ``kind`` onto their copies
     (``{source_id: copy_id}``).
@@ -1103,7 +1135,8 @@ async def copy_links(
     """
     if not copies or not records_edges(session):
         return
-    nodes = [node_id(kind, source_id) for source_id in copies]
+    code = routed_tools(session).endpoint_codes[kind]
+    nodes = [node_of(code, source_id) for source_id in copies]
     live = EntityRelationship.removed_at.is_(None)  # type: ignore[union-attr]
     rows = [
         *await session.exec(
@@ -1121,19 +1154,18 @@ async def copy_links(
     ]
     edges = {row.id: row for row in rows if row.id is not None}
 
-    def remapped(end_kind: str, entity_id: int) -> Endpoint:
-        resolved = EndpointKind(end_kind)
-        if resolved == kind:
+    def remapped(end_kind: str, entity_id: int, node: int) -> Endpoint:
+        if end_kind == kind:
             entity_id = copies.get(entity_id, entity_id)
-        return Endpoint(resolved, entity_id)
+        return Endpoint.stored(end_kind, entity_id, node)
 
     await link_many(
         session,
         [
             Link(
-                source=remapped(row.source_type, row.source_id),
+                source=remapped(row.source_type, row.source_id, row.source_node),
                 relationship_type=RelationshipType(row.relationship_type),
-                target=remapped(row.target_type, row.target_id),
+                target=remapped(row.target_type, row.target_id, row.target_node),
                 provenance=Provenance(row.provenance),
                 confidence=row.confidence,
             )

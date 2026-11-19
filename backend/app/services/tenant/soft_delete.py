@@ -294,8 +294,7 @@ async def _purge_references(
     The comments go last, once the reactions on them have gone with the rest.
     """
     from app.core.reactions import ReactionTarget
-    from app.core.relationships import ENDPOINT_KINDS, endpoint_code
-    from app.core.tools import LAYOUT_INSTANCE_TABLES
+    from app.core.tools import KINDS, LAYOUT_INSTANCE_TABLES
     from app.db.initiative_rls import comment_parents, content_kind_tables
     from app.services.tenant import (
         engagement_levels,
@@ -308,10 +307,11 @@ async def _purge_references(
 
     content_kinds = {table: kind for kind, table in content_kind_tables(tools).items()}
     installed = {table.name for table in tools.installed_tables}
+    # What an edge may name that has a row: everything in a tool, and a tag.
     edge_codes = {
-        endpoint.table: endpoint_code(kind.value)
-        for kind, endpoint in ENDPOINT_KINDS.items()
-    } | {table: tools.kind_codes[content_kinds[table]] for table in installed}
+        table: tools.endpoint_codes[kind]
+        for table, kind in {**content_kinds, KINDS["tag"].table: "tag"}.items()
+    }
     reaction_targets = {target.table: target for target in ReactionTarget}
     layout_tools = {table: target for target, table in LAYOUT_INSTANCE_TABLES.items()}
     layout_tools |= {tool.table.name: tool.kind for tool in tools.installed}

@@ -42,7 +42,7 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.relationships import EndpointKind, RelationshipType
+from app.core.relationships import RelationshipType
 from app.models.platform.guild import CommunityRole
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
@@ -313,9 +313,9 @@ async def test_links_to_them_go(session: AsyncSession, role_session):
     """Every link with them on an end, whichever end; one to somebody else
     stays."""
     s = await _seed(session)
-    task = relationships.Endpoint(EndpointKind.task, s.task_id)
-    victim = relationships.Endpoint(EndpointKind.user, s.victim_id)
-    keeper = relationships.Endpoint(EndpointKind.user, s.keeper_id)
+    task = relationships.Endpoint("task", s.task_id)
+    victim = relationships.Endpoint("user", s.victim_id)
+    keeper = relationships.Endpoint("user", s.keeper_id)
     await route_session_to_guild(session, s.guild_id)
     for source, relationship_type, target in (
         (task, RelationshipType.depends_on, victim),

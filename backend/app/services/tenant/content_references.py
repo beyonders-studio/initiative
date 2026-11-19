@@ -35,10 +35,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.references import references_in_body, references_in_text
-from app.core.relationships import PERSON, EndpointKind, Provenance, RelationshipType
+from app.core.relationships import PERSON, Provenance, RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.db import reference_targets
-from app.db.initiative_rls import COMMENT_PARENTS
+from app.db.plugin_tools import tool_set
+from app.db.session import actor_context, routed_tools
 from app.models.tenant.comment import Comment, said_on
 from app.models.tenant.file import File
 from app.models.tenant.post import Post
@@ -64,13 +66,6 @@ BODY_COLUMNS: dict[SearchEntityType, tuple[type, str]] = {
     SearchEntityType.task: (Task, "description"),
     SearchEntityType.wiki_page: (WikiPage, "content"),
 }
-
-#: The kinds comments are said on. Derived from the registry the comment
-#: policies are rendered from, so a new commentable tool is declared once and
-#: picked up here without an edit.
-_COMMENTED: frozenset[SearchEntityType] = frozenset(
-    SearchEntityType(kind) for kind in COMMENT_PARENTS
-)
 
 
 async def sync_for_entity(
@@ -100,7 +95,7 @@ async def sync_for_entity(
             if isinstance(body, str)
             else editor_mention_ids(body)
         )
-        live |= {(EndpointKind(PERSON.value), user_id) for user_id in people}
+        live |= {(PERSON.value, user_id) for user_id in people}
         await _reconcile(session, entity, live, author_id=author_id)
 
 
@@ -118,12 +113,16 @@ async def sync_for_comment(
 
     Called when a comment is written, edited, trashed or restored — all four
     change what the conversation says, and none of them is a change to the
-    comment's own edges, because a comment has none. A tool plug-in's row
-    is linked to nothing yet, so a comment on one moves no edge.
+    comment's own edges, because a comment has none. The thing it is about is
+    named in the community's tool set: the request's, or, where the system
+    routed this session itself, the one its installs make.
     """
-    if comment.subject_type not in SearchEntityType._value2member_map_:
-        return
-    parent = comment_parent(comment)
+    tools = (
+        routed_tools(session)
+        if actor_context(session) is not None
+        else await tool_set(session)
+    )
+    parent = comment_parent(comment, tools)
     await sync_for_entity(
         session,
         parent,
@@ -156,9 +155,10 @@ async def referencing_files(session: AsyncSession, file_id: int) -> list[File]:
     return list(rows.all())
 
 
-def comment_parent(comment: Comment) -> Endpoint:
-    """The thing a comment is about, as an edge would name it."""
-    return Endpoint(SearchEntityType(comment.subject_type), comment.subject_id)
+def comment_parent(comment: Comment, tools: ToolSet) -> Endpoint:
+    """The thing a comment is about, as an edge would name it, in the
+    community with ``tools``."""
+    return Endpoint.of(tools, comment.subject_type, comment.subject_id)
 
 
 async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
@@ -176,10 +176,8 @@ async def own_body(session: AsyncSession, entity: Endpoint) -> Any:
 
 async def _comment_bodies(session: AsyncSession, entity: Endpoint) -> Sequence[str]:
     """Every live comment written about this thing."""
-    if entity.kind not in _COMMENTED:
-        return ()
     rows = await session.exec(
-        select(Comment.content).where(said_on(entity.kind.value, entity.id))
+        select(Comment.content).where(said_on(entity.kind, entity.id))
     )
     return list(rows.all())
 
@@ -227,7 +225,7 @@ async def _by_kind(
 async def _reconcile(
     session: AsyncSession,
     entity: Endpoint,
-    wanted: set[tuple[EndpointKind, int]],
+    wanted: set[tuple[str, int]],
     *,
     author_id: int | None,
 ) -> None:
@@ -250,7 +248,7 @@ async def _reconcile(
         )
     ).all()
 
-    have = {(EndpointKind(row.target_type), row.target_id): row for row in existing}
+    have = {(row.target_type, row.target_id): row for row in existing}
 
     for key, row in have.items():
         if key not in wanted:
@@ -270,7 +268,7 @@ async def _reconcile(
             for kind, entity_id in sorted(
                 await _accepting_links(session, adding - people)
                 | {pair for pair in people if pair[1] in members},
-                key=lambda pair: (pair[0].value, pair[1]),
+                key=lambda pair: (pair[0], pair[1]),
             )
         ],
         provenance=Provenance.content,

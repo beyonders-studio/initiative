@@ -47,7 +47,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import CaseField, IntakeStream, meta, offered_streams
 from app.core.rate_limit import take_allowance
-from app.core.relationships import EndpointKind, RelationshipType
+from app.core.relationships import RelationshipType
 from app.core.version import __version__, compare_versions
 from app.db import cohorts, reference_targets
 from app.db.request_context import SystemGuild
@@ -767,7 +767,7 @@ async def joined_into(task_id: int) -> int | None:
                             Task, Task.id == EntityRelationship.source_id
                         )
                     )
-                    .where(EntityRelationship.source_type == EndpointKind("task").value)
+                    .where(EntityRelationship.source_type == "task")
                     .where(EntityRelationship.source_id == current)
                     .where(Task.project_id == _board_project())
                     .where(Task.archived_at.is_not(None))  # type: ignore[union-attr]
@@ -888,7 +888,7 @@ def _edges_into_board(query):
         query.where(
             EntityRelationship.relationship_type == RelationshipType.part_of.value
         )
-        .where(EntityRelationship.target_type == EndpointKind("task").value)
+        .where(EntityRelationship.target_type == "task")
         .where(EntityRelationship.removed_at.is_(None))  # type: ignore[union-attr]
         .where(
             EntityRelationship.target_id.in_(  # type: ignore[attr-defined]
@@ -999,7 +999,7 @@ async def _joins(session: AsyncSession, case_task_id: int) -> list[EntityRelatio
         (
             await session.exec(
                 _edges_into_board(select(EntityRelationship))
-                .where(EntityRelationship.source_type == EndpointKind("task").value)
+                .where(EntityRelationship.source_type == "task")
                 .where(EntityRelationship.source_id == case_task_id)
                 .order_by(EntityRelationship.id)
             )
@@ -1052,7 +1052,7 @@ async def _sender(session: AsyncSession, case_task_id: int) -> int | None:
 
 
 def _task(task_id: int) -> relationships.Endpoint:
-    return relationships.Endpoint(EndpointKind("task"), task_id)
+    return relationships.Endpoint("task", task_id)
 
 
 async def join(
@@ -1182,14 +1182,14 @@ async def join_into(
             .where(
                 EntityRelationship.relationship_type == RelationshipType.part_of.value
             )
-            .where(EntityRelationship.target_type == EndpointKind("task").value)
+            .where(EntityRelationship.target_type == "task")
             .where(EntityRelationship.target_id == source.id)
             .where(EntityRelationship.removed_at.is_(None))  # type: ignore[union-attr]
         )
     ).all()
     for edge in parts:
         part = await reference_targets.resolve_one(
-            session, EndpointKind(edge.source_type), edge.source_id, user_id=by
+            session, edge.source_type, edge.source_id, user_id=by
         )
         # What is archived keeps its links as they are: an idea joined into
         # this one before reaches the target through it.
@@ -1199,8 +1199,8 @@ async def join_into(
         if not (edge.source_type == "task" and edge.source_id == target.id):
             await relationships.create(
                 session,
-                source=relationships.Endpoint(
-                    EndpointKind(edge.source_type), edge.source_id
+                source=relationships.Endpoint.stored(
+                    edge.source_type, edge.source_id, edge.source_node
                 ),
                 relationship_type=RelationshipType.part_of,
                 target=_task(target.id),

@@ -10,9 +10,15 @@ if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
+    from app.core.tool_set import ToolSet
     from app.testing.actor import Actor
 
-__all__ = ["COUNTERS_UID", "counters_tool_manifest", "install_tool_plugin"]
+__all__ = [
+    "COUNTERS_UID",
+    "add_counter",
+    "counters_tool_manifest",
+    "install_tool_plugin",
+]
 
 #: The uid the SDK's example names Counters by.
 COUNTERS_UID = "TSJVTCM0S7GV2X"
@@ -256,3 +262,36 @@ async def install_tool_plugin(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+async def add_counter(
+    session: AsyncSession, guild_id: int, initiative_id: int, **counter: Any
+) -> tuple[ToolSet, int, int]:
+    """A counter group of the installed Counters in ``initiative_id``, and a
+    counter in it with ``counter``'s columns: the community's tool set, the
+    group's id and the counter's id. Committed."""
+    import sqlalchemy as sa
+
+    from app.db.plugin_tools import provisioned_tools
+    from app.testing.schema_harness import route_session_to_guild
+
+    tools = await provisioned_tools(guild_id)
+    (tool,) = tools.installed
+    (item,) = tool.items
+    await route_session_to_guild(session, guild_id)
+    group = (
+        await session.exec(
+            sa.insert(tool.table)
+            .values(initiative_id=initiative_id, name="Scores")
+            .returning(tool.table.c.id)
+        )
+    ).scalar_one()
+    row = (
+        await session.exec(
+            sa.insert(item)
+            .values(counter_group_id=group, name="Laps", **counter)
+            .returning(item.c.id)
+        )
+    ).scalar_one()
+    await session.commit()
+    return tools, group, row

@@ -19,7 +19,7 @@ Three joins, one per way a tool reaches the schema:
 import pytest
 from sqlalchemy import text
 
-from app.core.relationships import PERSON, EndpointKind, node_id
+from app.core.relationships import ENDPOINT_CODES, PERSON, node_id
 from app.core.tools import COMMENT_TARGETS, KINDS, Tool
 from app.db.kind_codes import apply_kind_codes_if_changed
 from app.db.schema_provisioning import (
@@ -139,16 +139,16 @@ async def test_the_database_packs_node_ids_the_way_python_does(engine):
     edge table by; Postgres builds the stored columns. They are the same
     expression written twice, so this checks they still agree."""
     async with engine.connect() as conn:
-        for kind in EndpointKind:
+        for kind in ENDPOINT_CODES:
             packed = (
                 await conn.execute(
                     text(
                         "SELECT (public.relationship_kind_code(:kind) << 32) | 7::bigint"
                     ),
-                    {"kind": kind.value},
+                    {"kind": kind},
                 )
             ).scalar()
             assert packed == node_id(kind, 7), (
-                f"node id for {kind.value}:7 is {node_id(kind, 7)} in Python and "
+                f"node id for {kind}:7 is {node_id(kind, 7)} in Python and "
                 f"{packed} in Postgres."
             )

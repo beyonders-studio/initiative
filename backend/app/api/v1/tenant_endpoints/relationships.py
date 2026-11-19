@@ -37,20 +37,22 @@ from app.api.deps import (
 )
 from app.core.messages import RelationshipMessages
 from app.core.relationships import (
-    ENDPOINT_KINDS,
+    ENDPOINT_CODES,
     PERSON,
-    EndpointKind,
     Provenance,
     RelationshipType,
     node_id,
 )
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.db import reference_targets
+from app.db.session import routed_tools
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.schemas.kinds import require_kind
 from app.schemas.tenant.relationship import (
     EndpointRef,
     LinkedTaskRead,
@@ -69,7 +71,19 @@ from app.services.tenant.relationships import Endpoint
 router = APIRouter()
 
 
-def _parse_ref(value: str) -> EndpointRef:
+def _end_kind(tools: ToolSet, kind: str) -> str:
+    """``kind`` where an edge in the community with ``tools`` may name it: a
+    built-in end, a person among them, or a kind of an installed tool
+    plug-in. Anything else is not found."""
+    return require_kind(tools, kind, ENDPOINT_CODES)
+
+
+def _end(tools: ToolSet, ref: EndpointRef) -> Endpoint:
+    """The end ``ref`` names, of a kind the community has."""
+    return Endpoint.of(tools, _end_kind(tools, ref.type), ref.id)
+
+
+def _parse_ref(tools: ToolSet, value: str) -> Endpoint:
     """``task:12`` as the reference vocabulary already spells it.
 
     The thing asked about is an item, never a person: nothing lists everything
@@ -77,23 +91,22 @@ def _parse_ref(value: str) -> EndpointRef:
     """
     kind, _, raw_id = value.partition(":")
     try:
-        entity_type = EndpointKind(kind)
         entity_id = int(raw_id)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=RelationshipMessages.BAD_ENDPOINT,
         ) from None
-    if entity_type not in ENDPOINT_KINDS:
+    if kind == PERSON.value:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=RelationshipMessages.BAD_ENDPOINT,
         )
-    return EndpointRef(type=entity_type, id=entity_id)
+    return Endpoint.of(tools, _end_kind(tools, kind), entity_id)
 
 
 def _related_end(
-    kind: EndpointKind, entity_id: int, found: reference_targets.Resolved
+    kind: str, entity_id: int, found: reference_targets.Resolved
 ) -> RelatedEnd:
     """A far end as the wire carries it."""
     return RelatedEnd(
@@ -140,7 +153,7 @@ def _render(
         id=row.id,
         relationship_type=RelationshipType(row.relationship_type),
         direction="outbound" if outbound else "inbound",
-        other=_related_end(EndpointKind(other_type), other_id, found),
+        other=_related_end(other_type, other_id, found),
         provenance=row.provenance,
         confidence=row.confidence,
         created_by=row.created_by,
@@ -170,7 +183,7 @@ async def _titles_for(
     found: dict[tuple[str, int], reference_targets.Resolved] = {}
     for kind, ids in wanted.items():
         resolved = await reference_targets.resolve_many(
-            session, EndpointKind(kind), ids, user_id=user_id
+            session, kind, ids, user_id=user_id
         )
         for entity_id, row in resolved.items():
             found[(kind, entity_id)] = row
@@ -184,7 +197,7 @@ async def list_relationships(
     guild_context: GuildContextDep,
     entity: str = Query(description="The thing to list edges for, as `kind:id`"),
     relationship_type: RelationshipType | None = Query(default=None),
-    other_type: EndpointKind | None = Query(default=None),
+    other_type: str | None = Query(default=None),
     direction: relationships_service.Direction = Query(default="both"),
 ) -> list[RelationshipRead]:
     """Every live edge touching one thing, rendered from its side.
@@ -192,8 +205,10 @@ async def list_relationships(
     ``direction=inbound`` is "what links here": the things naming this one,
     rather than the things it names.
     """
-    ref = _parse_ref(entity)
-    anchor = Endpoint(ref.type, ref.id)
+    tools = routed_tools(session)
+    anchor = _parse_ref(tools, entity)
+    if other_type is not None:
+        _end_kind(tools, other_type)
     await relationships_service.resolve(session, anchor, current_user.id)
 
     rows = await relationships_service.list_for_entity(
@@ -321,8 +336,7 @@ async def get_relations_neighbourhood(
     forty things, the earliest linked first, and every edge and far end is
     gated exactly as the per-entity list is.
     """
-    ref = _parse_ref(entity)
-    start = Endpoint(ref.type, ref.id)
+    start = _parse_ref(routed_tools(session), entity)
     await relationships_service.resolve(session, start, current_user.id)
 
     walked = await relationships_service.neighbourhood(
@@ -365,12 +379,14 @@ async def create_relationship(
     guild_context: GuildContextDep,
 ) -> RelationshipRead:
     """Record one edge. 409 if it is already there."""
+    tools = routed_tools(session)
+    anchor = _end(tools, body.source)
     row = await relationships_service.link(
         session,
         relationships_service.Link(
-            source=Endpoint(body.source.type, body.source.id),
+            source=anchor,
             relationship_type=body.relationship_type,
-            target=Endpoint(body.target.type, body.target.id),
+            target=_end(tools, body.target),
         ),
         user_id=current_user.id,
     )
@@ -381,7 +397,6 @@ async def create_relationship(
         )
     await session.commit()
 
-    anchor = Endpoint(body.source.type, body.source.id)
     titles = await _titles_for(session, [row], anchor, current_user.id)
     made = _render(row, anchor=anchor, titles=titles)
     if made is None:
@@ -402,7 +417,7 @@ async def replace_relationship_slice(
     guild_context: GuildContextDep,
     entity: str = Query(description="The thing whose edges are being set"),
     relationship_type: RelationshipType = Query(),
-    other_type: EndpointKind = Query(),
+    other_type: str = Query(),
 ) -> list[RelationshipRead]:
     """Replace one slice of an entity's edges — what a multi-select does.
 
@@ -411,8 +426,9 @@ async def replace_relationship_slice(
     remembered: a replace is the surface restating a set, not a person taking
     one link back.
     """
-    ref = _parse_ref(entity)
-    anchor = Endpoint(ref.type, ref.id)
+    tools = routed_tools(session)
+    anchor = _parse_ref(tools, entity)
+    _end_kind(tools, other_type)
 
     # A replace is a bulk removal, so everything it drops answers the same
     # question a single removal does. One edge the caller may not remove fails
@@ -506,21 +522,22 @@ async def _may_remove(
 
     Your own edge, or one on a thing you can edit. The single removal and the
     replace both ask this, so a slice cannot do what a DELETE refuses. A
-    person's end is never the thing you can edit.
+    person's end is never the thing you can edit, nor one of a kind the
+    community no longer has.
     """
     if row.created_by_kind == ActorKind.member and row.created_by == user_id:
         return True
+    tools = routed_tools(session)
     for kind, entity_id in (
         (row.source_type, row.source_id),
         (row.target_type, row.target_id),
     ):
-        if kind == PERSON.value:
+        if kind == PERSON.value or kind not in tools.endpoint_codes:
             continue
-        end = EndpointKind(kind)
         writable = await session.exec(
-            reference_targets.visible_ids(end, user_id, need_write=True).where(
-                reference_targets.id_column(end) == entity_id
-            )
+            reference_targets.visible_ids(
+                kind, user_id, tools=tools, need_write=True
+            ).where(reference_targets.id_column(kind, tools=tools) == entity_id)
         )
         if writable.first() is not None:
             return True
