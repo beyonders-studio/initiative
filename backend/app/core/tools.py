@@ -403,10 +403,10 @@ COMMENT_TARGETS: tuple[str, ...] = tuple(
 
 
 # Tag-assignment surfaces: EVERY tool is taggable, plus everything that lives
-# inside one but a counter. The assignment registry (app.services.tenant.tags.TAG_LINKS) and
-# the ``TagTarget`` schema enum both derive from TAG_TARGETS, so a new Tool is
-# taggable across every surface with no per-surface edit; tags_test.py fails if
-# any surface drifts.
+# inside one but a counter. The assignment registry
+# (app.services.tenant.tags.tag_links) and the bulk endpoint's check derive
+# from TAG_TARGETS, so a new Tool is taggable across every surface with no
+# per-surface edit; tags_test.py fails if any surface drifts.
 TAGGABLE_EXTRAS: tuple[str, ...] = tuple(k for k in CHILD_KINDS if k != "counter")
 TAG_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + TAGGABLE_EXTRAS
 
@@ -433,7 +433,7 @@ ARCHIVE_TARGETS: tuple[str, ...] = (
 # Property surfaces: EVERY tool carries custom properties, plus every sub-tool —
 # the rows inside a tool that are things in their own right. The properties
 # seam (app.services.tenant.metadata.PROPERTY_LINKS), the value table's
-# CHECK, its policies and the ``PropertyTarget`` schema enum all derive from
+# CHECK, its policies and the property route's kinds all derive from
 # PROPERTY_TARGETS, so a new Tool carries properties with no per-surface edit.
 PROPERTY_TARGETS: tuple[str, ...] = CONTENT_KINDS
 

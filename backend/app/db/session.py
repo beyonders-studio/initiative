@@ -650,6 +650,17 @@ def routed_tools(session: AsyncSession) -> ToolSet:
     return context.tools if context is not None else BUILTIN_TOOLS
 
 
+async def session_tools(session: AsyncSession) -> ToolSet:
+    """:func:`routed_tools` for a session routed with a standing; for one
+    routed with none (a sweep's, the system's own reads), the community's
+    tools as its installs stand."""
+    if actor_context(session) is not None:
+        return routed_tools(session)
+    from app.db.plugin_tools import tool_set
+
+    return await tool_set(session)
+
+
 def install_context(session: AsyncSession) -> InstallContext | None:
     """The installed plug-in's standing this session was routed with, or ``None``."""
     return _standing(session, InstallContext)

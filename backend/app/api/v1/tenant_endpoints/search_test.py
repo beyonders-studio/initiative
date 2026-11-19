@@ -302,14 +302,14 @@ async def test_suggest_narrows_to_the_types_it_is_given(
 async def test_an_unknown_type_is_refused_rather_than_ignored(
     client, session, acting_user: ActingUser
 ) -> None:
-    """The accepted set is declared, so a name that is not one of them is a bad
-    request — not a search that quietly returns everything."""
+    """A kind the community does not have is not found — not a search that
+    quietly returns everything."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
 
     response = await client.get(
         a.g("/search/"), headers=a.headers, params={"search": "x", "types": ["invoice"]}
     )
-    assert response.status_code == 422, response.text
+    assert response.status_code == 404, response.text
 
 
 async def test_the_last_word_matches_as_a_prefix(

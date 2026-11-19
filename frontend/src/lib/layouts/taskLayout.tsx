@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   ActorKind,
-  CommentSubject,
+  ContentKind,
   SearchEntityType,
   type TaskListRead,
   type TaskPriority,
@@ -840,7 +840,7 @@ const Case = ({ task }: { task: TaskRead }) => {
 const Comments = ({ task }: { task: TaskRead }) => {
   const { t } = useTranslation("tasks");
   const { initiativeId } = useTaskLayout();
-  const subject = { subject_type: CommentSubject.task, subject_id: task.id };
+  const subject = { subject_type: ContentKind.task, subject_id: task.id };
   const query = useComments(subject);
   const cache = useCommentsCache(subject);
   const thread = useCommentThreadState(subject);

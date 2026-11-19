@@ -33,8 +33,8 @@ from app.services.tenant.relationships import Endpoint
 
 #: What carries a description, and the kind it is named by.
 Described = Task
-_KINDS: dict[type, SearchEntityType] = {
-    Task: SearchEntityType.task,
+_KINDS: dict[type, str] = {
+    Task: SearchEntityType.task.value,
 }
 
 
@@ -86,7 +86,7 @@ async def description_saved(
     endpoint = _endpoint(row)
     await tell_mentioned(
         session,
-        (endpoint.kind.value, endpoint.id),
+        (endpoint.kind, endpoint.id),
         newly_mentioned(row.description, previous),
         title=getattr(row, row.display_field()) or "",
         author=author,

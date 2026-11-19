@@ -3906,3 +3906,121 @@ async def test_a_backup_says_which_wiki_page_a_file_is_filed_under(
         "ref": wiki_entry["path"],
         "page": page.slug,
     }
+
+
+async def test_a_tool_plugins_tool_exports_and_backs_up_from_its_declaration(
+    client: AsyncClient, acting_user, session, monkeypatch, role_session
+):
+    """An installed tool plug-in's row exports from what the plug-in
+    declared: as its envelope with its items under their key, and as a table
+    of its items in the formats a tool with one item table offers. An
+    initiative's backup and report carry it beside the built-in tools."""
+    import sqlalchemy as sa
+
+    from app.db.plugin_tools import provisioned_tools
+    from app.testing.tool_plugins import install_tool_plugin
+
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    seat = await acting_user(guild=a.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tool = (await provisioned_tools(a.guild.id)).installed[0]
+    (counters,) = tool.items
+    await route_session_to_guild(session, a.guild.id)
+    group_id = (
+        await session.exec(
+            sa.insert(tool.table)
+            .values(
+                initiative_id=a.initiative.id,
+                name="Party Gold",
+                description="Coins",
+                created_by=a.user.id,
+                created_by_kind="member",
+            )
+            .returning(tool.table.c.id)
+        )
+    ).scalar_one()
+    for position, (name, count) in enumerate((("Gold", 12), ("Silver", 3.5))):
+        await session.exec(
+            sa.insert(counters).values(
+                counter_group_id=group_id,
+                name=name,
+                count=count,
+                view_mode="progress_bar",
+                position=position,
+                created_by=a.user.id,
+                created_by_kind="member",
+            )
+        )
+    session.add(
+        ResourceGrant(
+            resource_type=tool.kind,
+            resource_id=group_id,
+            user_id=a.user.id,
+            level=ResourceAccessLevel.owner,
+            initiative_id=a.initiative.id,
+        )
+    )
+    await session.commit()
+
+    envelope = json.loads(
+        _assert_export(
+            await _export(client, a, tool.kind, ids=[group_id], format="json"),
+            "json",
+        )
+    )
+    assert envelope["type"] == f"initiative-{tool.kind}"
+    assert envelope["name"] == "Party Gold"
+    assert envelope["description"] == "Coins"
+    assert [(c["name"], c["count"], c["step"]) for c in envelope["counter"]] == [
+        ("Gold", 12, 1),
+        ("Silver", 3.5, 1),
+    ]
+    table = _assert_export(
+        await _export(client, a, tool.kind, ids=[group_id], format="csv"), "csv"
+    )
+    assert table.splitlines()[0].startswith("\ufeffCounter,Count,Minimum,Maximum")
+    assert "Gold,12" in table and "Progress bar" in table
+    sheet = await _export(client, a, tool.kind, ids=[group_id], format="xlsx")
+    assert sheet.status_code == 200, sheet.text
+    resp = await _export(client, a, tool.kind, ids=[group_id], format="pdf")
+    assert resp.status_code == 400, resp.text
+
+    # Shared to read, a member is refused the export in its own words.
+    reader = await acting_user(
+        guild=a.guild, initiative=a.initiative, initiative_role="member"
+    )
+    session.add(
+        ResourceGrant(
+            resource_type=tool.kind,
+            resource_id=group_id,
+            user_id=reader.user.id,
+            level=ResourceAccessLevel.read,
+            initiative_id=a.initiative.id,
+        )
+    )
+    await session.commit()
+    resp = await _export(client, reader, tool.kind, ids=[group_id], format="json")
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["detail"] == "EXPORT_OWNER_REQUIRED"
+
+    resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
+    archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
+    manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["initiatives"][0]["tools"][tool.kind] == "included"
+    (entry,) = (e for e in manifest["entries"] if e["tool"] == tool.kind)
+    assert entry["type"] == f"initiative-{tool.kind}"
+    assert f"/{tool.kind}/" in entry["path"]
+    assert json.loads(archive.read(entry["path"]))["counter"][0]["name"] == "Gold"
+
+    resp = await _export(
+        client,
+        a,
+        "initiative",
+        initiative_id=a.initiative.id,
+        mode="report",
+        formats=json.dumps({tool.kind: "csv"}),
+    )
+    archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
+    (report,) = (n for n in archive.namelist() if f"/{tool.kind}/" in n)
+    assert report.endswith(".csv")
+    assert "Silver" in archive.read(report).decode()

@@ -34,7 +34,7 @@
  * `matches()` below, the only code in the app that decides whether a cached key
  * belongs to the current community.
  */
-import { type PostRead, PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, type PostRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { queryClient } from "@/lib/queryClient";
 import { PARENT_TOOL, TOOLS, toolApiPath, toolRouteSegment } from "@/lib/tools";
 
@@ -628,15 +628,14 @@ const allContacts = (): Spec => toolList(Tool.contact);
  * reads, and for a row a tool holds, the tool's, whose pages show its rows. A
  * task also shows in the calendar's entries, which `allTasks` names.
  */
-const propertyHolder = (target: PropertyTarget): Spec => {
-  const own = target === PropertyTarget.task ? allTasks() : resourceAndMe(toolRouteSegment(target));
-  const parent: Tool | undefined = (PARENT_TOOL as Partial<Record<PropertyTarget, Tool>>)[target];
+const propertyHolder = (target: ContentKind): Spec => {
+  const own = target === ContentKind.task ? allTasks() : resourceAndMe(toolRouteSegment(target));
+  const parent: Tool | undefined = (PARENT_TOOL as Partial<Record<ContentKind, Tool>>)[target];
   return parent ? compose(own, toolLists(parent)) : own;
 };
 
 /** Every row that can carry property values — what a definition's change reaches. */
-const allPropertyHolders = (): Spec =>
-  compose(...Object.values(PropertyTarget).map(propertyHolder));
+const allPropertyHolders = (): Spec => compose(...Object.values(ContentKind).map(propertyHolder));
 
 // ── Everything this community shows (cross-tool) ─────────────────────────────────
 // Two callers, one description. Gaining (or losing) a membership row changes

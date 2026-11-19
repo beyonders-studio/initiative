@@ -39,6 +39,7 @@ from pglast.enums.parsenodes import (
 from pglast.stream import RawStream
 
 from app.core.messages import QueryMessages
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.schemas.query import FilterOp
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
@@ -292,13 +293,13 @@ def _running(reduced: ast.Node, keys: Sequence[ast.Node], name: str) -> ast.Func
     )
 
 
-def _viewer_value(dataset_name: str, condition: Condition) -> bool:
+def _viewer_value(dataset_name: str, condition: Condition, tools: ToolSet) -> bool:
     """Whether this condition is somebody picking themselves.
 
     Only against a field that holds a person: everywhere else ``"me"`` is the
     two-letter word, and a title is allowed to be it.
     """
-    if not _names_a_person(dataset_name, condition.field):
+    if not _names_a_person(dataset_name, condition.field, tools):
         return False
     values = (
         condition.value
@@ -308,17 +309,17 @@ def _viewer_value(dataset_name: str, condition: Condition) -> bool:
     return any(value == VIEWER for value in values)
 
 
-def _names_a_person(dataset_name: str, field_name: str) -> bool:
+def _names_a_person(dataset_name: str, field_name: str, tools: ToolSet) -> bool:
     if dataset_name in (SHEET, PLUGIN):
         return False
     relation_name, plain = _split(field_name)
     holder = dataset_name
     if relation_name is not None:
-        relation = dataset(dataset_name).by_relation.get(relation_name)
+        relation = dataset(dataset_name, tools).by_relation.get(relation_name)
         if relation is None:
             return False
         holder = relation.dataset
-    spec = dataset(holder).by_name.get(plain)
+    spec = dataset(holder, tools).by_name.get(plain)
     return spec is not None and spec.kind is ControlKind.member
 
 
@@ -330,9 +331,9 @@ def _value_node(is_viewer: bool, value: Any) -> ast.Node:
 
 
 def _predicate(
-    dataset_name: str, condition: Condition, base: str | None = None
+    dataset_name: str, condition: Condition, tools: ToolSet, base: str | None = None
 ) -> ast.Node:
-    viewer = _viewer_value(dataset_name, condition)
+    viewer = _viewer_value(dataset_name, condition, tools)
     left = _column_ref(condition.field, base, whole=dataset_name in (SHEET, PLUGIN))
     if condition.op is FilterOp.is_null:
         # The DSL's is_null carries whether it means null or not-null.
@@ -363,6 +364,7 @@ def _predicate(
 def _where(
     dataset_name: str,
     nodes: Sequence[Node],
+    tools: ToolSet,
     depth: int = 0,
     base: str | None = None,
 ) -> ast.Node | None:
@@ -374,7 +376,7 @@ def _where(
     predicates = tuple(
         held
         for node in nodes
-        for held in (_node(dataset_name, node, depth, base),)
+        for held in (_node(dataset_name, node, tools, depth, base),)
         if held is not None
     )
     if not predicates:
@@ -385,7 +387,11 @@ def _where(
 
 
 def _node(
-    dataset_name: str, node: Node, depth: int, base: str | None = None
+    dataset_name: str,
+    node: Node,
+    tools: ToolSet,
+    depth: int,
+    base: str | None = None,
 ) -> ast.Node | None:
     if depth > MAX_GROUP_DEPTH:
         raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, "group depth")
@@ -395,7 +401,7 @@ def _node(
         inner = tuple(
             held
             for entry in node.conditions
-            for held in (_node(dataset_name, entry, depth + 1, base),)
+            for held in (_node(dataset_name, entry, tools, depth + 1, base),)
             if held is not None
         )
         if not inner:
@@ -405,13 +411,13 @@ def _node(
         if len(inner) == 1:
             return inner[0]
         return ast.BoolExpr(boolop=_LOGIC[node.logic], args=inner)
-    predicate = _predicate(dataset_name, node, base)
+    predicate = _predicate(dataset_name, node, tools, base)
     if node.negate:
         return ast.BoolExpr(boolop=BoolExprType.NOT_EXPR, args=(predicate,))
     return predicate
 
 
-def _check_field(name: str, field_name: str) -> None:
+def _check_field(name: str, field_name: str, tools: ToolSet) -> None:
     """That a field exists, on this dataset or on one it declares a way to.
 
     A dotted name is read through the relation it prefixes, so a name that is
@@ -420,13 +426,13 @@ def _check_field(name: str, field_name: str) -> None:
     """
     relation_name, plain = _split(field_name)
     if relation_name is None:
-        if plain not in dataset(name).by_name:
+        if plain not in dataset(name, tools).by_name:
             raise QueryError(QueryMessages.UNKNOWN_FIELD, f"{name}.{plain}")
         return
-    relation = dataset(name).by_relation.get(relation_name)
+    relation = dataset(name, tools).by_relation.get(relation_name)
     if relation is None:
         raise QueryError(QueryMessages.UNKNOWN_RELATION, f"{name}.{relation_name}")
-    if plain not in dataset(relation.dataset).by_name:
+    if plain not in dataset(relation.dataset, tools).by_name:
         raise QueryError(QueryMessages.UNKNOWN_FIELD, f"{relation_name}.{plain}")
 
 
@@ -474,7 +480,7 @@ def _relations_named(spec: QuerySpec) -> list[str]:
     return named
 
 
-def _from(spec: QuerySpec, relations: Sequence[str]) -> ast.Node:
+def _from(spec: QuerySpec, relations: Sequence[str], tools: ToolSet) -> ast.Node:
     """The dataset, joined to everything the description reached through.
 
     Each hop is written as an ordinary inner join with a condition relating the
@@ -509,7 +515,7 @@ def _from(spec: QuerySpec, relations: Sequence[str]) -> ast.Node:
             ),
         )
         return reading
-    declared = dataset(spec.dataset).by_relation
+    declared = dataset(spec.dataset, tools).by_relation
     node: ast.Node = ast.RangeVar(relname=spec.dataset, inh=True)
     for name in relations:
         relation = declared.get(name)
@@ -545,8 +551,9 @@ def _from(spec: QuerySpec, relations: Sequence[str]) -> ast.Node:
     return node
 
 
-def build(spec: QuerySpec) -> str:
-    """The statement *spec* describes.
+def build(spec: QuerySpec, tools: ToolSet = BUILTIN_TOOLS) -> str:
+    """The statement *spec* describes, about a dataset of the community with
+    *tools*.
 
     Written in the registry's own vocabulary — the dataset and field names a
     reader sees — so what is stored is what they built, and resolution to
@@ -554,19 +561,19 @@ def build(spec: QuerySpec) -> str:
     """
     if sum(read is not None for read in (spec.dataset, spec.sheet, spec.plugin)) != 1:
         raise QueryError(QueryMessages.MISSING_RELATION)
-    if spec.dataset is not None and spec.dataset not in dataset_names():
+    if spec.dataset is not None and spec.dataset not in dataset_names(tools):
         raise QueryError(QueryMessages.UNKNOWN_RELATION, spec.dataset)
     if not spec.columns:
         raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, "no columns")
     for column in spec.columns:
         if column.field != "*" and spec.dataset is not None:
-            _check_field(spec.dataset, column.field)
+            _check_field(spec.dataset, column.field, tools)
         if column.running and column.aggregate not in RUNNING:
             raise QueryError(QueryMessages.UNSUPPORTED_FUNCTION, "running")
     _check_depth(spec.where)
     if spec.dataset is not None:
         for condition in _leaves(spec.where):
-            _check_field(spec.dataset, condition.field)
+            _check_field(spec.dataset, condition.field, tools)
 
     # A bare column is already named after itself, so an alias there would read
     # as "priority AS priority". Anything computed needs one, because Postgres
@@ -593,9 +600,12 @@ def build(spec: QuerySpec) -> str:
 
     select = ast.SelectStmt(
         targetList=targets,
-        fromClause=(_from(spec, _relations_named(spec)),),
+        fromClause=(_from(spec, _relations_named(spec), tools),),
         whereClause=_where(
-            spec.dataset or (SHEET if spec.sheet else PLUGIN), spec.where, base=base
+            spec.dataset or (SHEET if spec.sheet else PLUGIN),
+            spec.where,
+            tools,
+            base=base,
         ),
         op=0,
     )

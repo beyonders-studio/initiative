@@ -14,10 +14,10 @@ import { useTranslation } from "react-i18next";
 
 import {
   type CollectionFileSummary,
+  ContentKind,
   FileKind,
   type FileSummary,
   type ListLayoutDefinitionInput,
-  PropertyTarget,
   type PropertyValueInput,
   SearchEntityType,
   type TimelineBucket,
@@ -220,7 +220,7 @@ export function CollectionPage() {
   // The collection's metadata is the collection's to change; a file's own
   // properties are the file's.
   const stepCounter = useCounterSteps<CollectionFileSummary>(
-    PropertyTarget.file,
+    ContentKind.file,
     useCallback(
       (item, definition) => (definition.collection_id !== null ? canEdit : item.can.edit),
       [canEdit]
@@ -508,7 +508,7 @@ export function CollectionPage() {
               entity={collection}
               kind={{
                 archivable: "collection",
-                properties: propertySaves[PropertyTarget.collection],
+                properties: propertySaves[ContentKind.collection],
                 saveTags: (ids) => update.mutateAsync({ tag_ids: ids }),
               }}
             />

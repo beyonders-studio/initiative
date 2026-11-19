@@ -38,12 +38,13 @@ from app.core.file_types import FileType, type_of_media
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.login_methods import LoginMethod
 from app.core.reactions import ReactionTarget
-from app.core.relationships import EndpointKind, Provenance, RelationshipType
+from app.core.relationships import Provenance, RelationshipType
 from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
 from app.core.security import (
     get_password_hash,
     mint_access_token,
 )
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import CHILD_KINDS, Tool
 from app.db.plugin_tools import tool_set
 from app.models.platform.access_grant import AccessGrant
@@ -125,7 +126,6 @@ from app.services.tenant.initiative_tools import (
 )
 from app.services.tenant.initiatives import create_builtin_roles
 from app.services.tenant.names import slugify
-from app.services.tenant.ownership import tool_for_row
 from app.services.tenant.plugin_config import mint_connection_ref
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_statuses import ensure_default_statuses
@@ -831,7 +831,7 @@ async def create_resource_grant(
     every member of its initiative, or for an installed plug-in — exactly one."""
     await route_session_to_guild(session, guild_of(resource))
     grant = ResourceGrant(
-        resource_type=tool_for_row(resource),
+        resource_type=BUILTIN_TOOLS.by_table[resource.__tablename__].kind,
         resource_id=resource.id,
         user_id=user.id if user is not None else None,
         role_id=role_id,
@@ -855,7 +855,8 @@ async def strip_non_owner_grants(
     await route_session_to_guild(session, guild_of(resource))
     await session.exec(
         sa_delete(ResourceGrant).where(
-            ResourceGrant.resource_type == tool_for_row(resource),
+            ResourceGrant.resource_type
+            == BUILTIN_TOOLS.by_table[resource.__tablename__].kind,
             ResourceGrant.resource_id == resource.id,
             ResourceGrant.user_id.is_distinct_from(owner_id),
         )
@@ -2868,8 +2869,8 @@ async def create_relationship(
     session: AsyncSession,
     guild: Guild,
     *,
-    source: tuple[EndpointKind, int],
-    target: tuple[EndpointKind, int],
+    source: tuple[str, int],
+    target: tuple[str, int],
     relationship_type: RelationshipType = RelationshipType.attached,
     provenance: Provenance = Provenance.manual,
     created_by: int | None = None,
@@ -2877,7 +2878,7 @@ async def create_relationship(
 ) -> EntityRelationship:
     """Create one edge between two things.
 
-    Endpoints are ``(kind, id)`` pairs, a person's ``(EndpointKind.user, id)``,
+    Endpoints are ``(kind, id)`` pairs, a person's ``("user", id)``,
     and a symmetric type is stored in the order the constraint requires, so a test may name its two ends in whichever
     order reads better.
     """

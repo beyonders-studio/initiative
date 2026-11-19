@@ -29,10 +29,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import ShareRequestMessages
 from app.core.relationships import ENDPOINT_KINDS, RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db.authorization import standing_arg
 from app.db.base import MODELS_BY_TABLE
 from app.db.presence import entity_presence
+from app.db.session import routed_tools
+from app.db.tool_rows import locate
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant.collection import CollectionFile
@@ -418,15 +421,23 @@ async def answerable(
 async def names(
     session: AsyncSession, refs: list[tuple[str, int]]
 ) -> dict[tuple[str, int], str]:
-    """What each ``(kind, id)`` is called, as the session reads it."""
+    """What each ``(kind, id)`` is called, as the session reads it: a model's
+    row by its display field, a tool plug-in's by its name."""
     by_kind: dict[str, set[int]] = defaultdict(set)
     for kind, rid in refs:
         by_kind[kind].add(rid)
+    tools = routed_tools(session)
     out: dict[tuple[str, int], str] = {}
     for kind, ids in by_kind.items():
-        model = MODELS_BY_TABLE[ENDPOINT_KINDS[SearchEntityType(kind)].table]
-        column = getattr(model, model.display_field())
-        rows = await session.exec(select(model.id, column).where(model.id.in_(ids)))
+        located = locate(tools, kind)
+        if located is None:
+            model = MODELS_BY_TABLE[ENDPOINT_KINDS[SearchEntityType(kind)].table]
+            table, label = model.__table__, model.display_field()
+        else:
+            table, label = located.table, "name"
+        rows = await session.exec(
+            select(table.c.id, table.c[label]).where(table.c.id.in_(ids))
+        )
         out.update({(kind, rid): name or "" for rid, name in rows.all()})
     return out
 
@@ -583,7 +594,7 @@ def _reached(
 async def settle_reached(
     session: AsyncSession,
     *,
-    tool: Tool,
+    tool: Tool | ToolRecord,
     resource_id: int,
     sharing: dict[tuple[str, int | None], str],
     answerer: User,

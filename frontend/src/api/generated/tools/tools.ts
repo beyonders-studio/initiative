@@ -25,7 +25,6 @@ import type {
   HTTPValidationError,
   TagSetRequest,
   TagSummary,
-  Tool,
   ToolCommentSettings,
   ToolCountsByInitiativeResponse,
   ToolCountsResponse,
@@ -52,7 +51,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * Every tool's live rows, grouped by initiative.
+ * Every tool's live rows, grouped by initiative: the built-in tools' and
+ * each installed tool plug-in's, by kind.
  *
  * What the sidebar and the initiative directory badge: each tool's ``active``
  * view, counted by the same conditions as its list, in one statement for
@@ -201,12 +201,13 @@ export function useGetToolCountsByInitiative<
  * are for ``view`` after ``search`` and the tool's own filters, so the tree
  * and the list beside it agree; tags are not a filter here, because the tree
  * shows every one. A page with no tree leaves ``include_tags`` off and its
- * request runs the view counts alone.
+ * request runs the view counts alone. ``tool`` is a built-in tool or an
+ * installed tool plug-in's kind.
  * @summary Get Tool Counts
  */
 export const getToolCounts = (
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: GetToolCountsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
@@ -219,7 +220,7 @@ export const getToolCounts = (
 
 export const getGetToolCountsQueryKey = (
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: GetToolCountsParams
 ) => {
   return [`/api/v1/c/${communityId}/tools/${tool}/counts`, ...(params ? [params] : [])] as const;
@@ -230,7 +231,7 @@ export const getGetToolCountsQueryOptions = <
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: GetToolCountsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getToolCounts>>, TError, TData>>;
@@ -263,7 +264,7 @@ export function useGetToolCounts<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params: undefined | GetToolCountsParams,
   options: {
     query: Partial<UseQueryOptions<Awaited<ReturnType<typeof getToolCounts>>, TError, TData>> &
@@ -284,7 +285,7 @@ export function useGetToolCounts<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: GetToolCountsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getToolCounts>>, TError, TData>> &
@@ -305,7 +306,7 @@ export function useGetToolCounts<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: GetToolCountsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getToolCounts>>, TError, TData>>;
@@ -322,7 +323,7 @@ export function useGetToolCounts<
   TError = ErrorType<HTTPValidationError>,
 >(
   communityId: number,
-  tool: Tool,
+  tool: string,
   params?: GetToolCountsParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getToolCounts>>, TError, TData>>;
@@ -346,7 +347,7 @@ export function useGetToolCounts<
  */
 export const setToolTags = (
   communityId: number,
-  tool: Tool,
+  tool: string,
   toolId: number,
   tagSetRequest: BodyType<TagSetRequest>,
   options?: SecondParameter<typeof apiMutator>,
@@ -407,7 +408,7 @@ export type SetToolTagsMutationBody = BodyType<TagSetRequest>;
 export type SetToolTagsMutationError = ErrorType<HTTPValidationError>;
 export type SetToolTagsMutationVariables = {
   communityId: number;
-  tool: Tool;
+  tool: string;
   toolId: number;
   data: BodyType<TagSetRequest>;
 };
@@ -446,7 +447,7 @@ export const useSetToolTags = <TError = ErrorType<HTTPValidationError>, TContext
  */
 export const setToolCommentSettings = (
   communityId: number,
-  tool: Tool,
+  tool: string,
   toolId: number,
   toolCommentSettings: BodyType<ToolCommentSettings>,
   options?: SecondParameter<typeof apiMutator>,
@@ -509,7 +510,7 @@ export type SetToolCommentSettingsMutationBody = BodyType<ToolCommentSettings>;
 export type SetToolCommentSettingsMutationError = ErrorType<HTTPValidationError>;
 export type SetToolCommentSettingsMutationVariables = {
   communityId: number;
-  tool: Tool;
+  tool: string;
   toolId: number;
   data: BodyType<ToolCommentSettings>;
 };

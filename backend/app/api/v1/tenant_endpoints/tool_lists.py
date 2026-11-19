@@ -38,7 +38,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
-from functools import cache
+from functools import cache, partial
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -69,6 +69,7 @@ from app.api.v1.tenant_endpoints import wikis as wikis_endpoints
 from app.core.file_types import FileKind, FileType
 from app.core.messages import QueryMessages
 from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
+from app.core.tool_set import ToolRecord, ToolSet
 from app.core.tools import Tool
 from app.db.query import build_paginated_response
 from app.models.platform.user import User
@@ -82,6 +83,7 @@ from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
 from app.models.tenant.wiki import Wiki
+from app.schemas.kinds import require_kind
 from app.schemas.tenant.calendar import (
     CalendarListResponse,
     CalendarRead,
@@ -338,17 +340,13 @@ def list_filter_model(tool: Tool) -> type[BaseModel]:
     )
 
 
-def _list_filters(tool: Tool, raw: str | None) -> dict[str, Any]:
+def _list_filters(model: type[BaseModel], raw: str | None) -> dict[str, Any]:
     """The list filters a request sent as JSON, checked against the tool's
-    list; the ones it left out are not narrowing."""
+    list's ``model``; the ones it left out are not narrowing."""
     if not raw:
         return {}
     try:
-        return (
-            list_filter_model(tool)
-            .model_validate_json(raw)
-            .model_dump(exclude_unset=True)
-        )
+        return model.model_validate_json(raw).model_dump(exclude_unset=True)
     except ValidationError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1064,6 +1062,81 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
 
 
 # ---------------------------------------------------------------------------
+# What the counts read: every tool of the community
+# ---------------------------------------------------------------------------
+
+
+#: What an installed tool's list may be narrowed by beside its views: the
+#: search box, as every tool's list is.
+_INSTALLED_FILTERS = create_model(
+    "installed_list_filters",
+    __config__=ConfigDict(extra="forbid"),
+    search=(str | None, None),
+)
+
+
+async def _installed_conditions(tool: ToolRecord, req: ListRequest) -> list:
+    """The WHERE an installed tool's list answers ``req`` with: every tool's
+    shared set over its own table, its live rows, and the archive answer."""
+    table = tool.table.c
+    values = req.values
+    return [
+        *tool_listing.base_conditions(
+            tool,
+            table,
+            req.user_id,
+            context=req.guild_context,
+            initiative_id=values.get("initiative_id"),
+            search=values.get("search"),
+        ),
+        table.deleted_at.is_(None),
+        archive_service.archive_filter_clause(table, values.get("archived")),
+    ]
+
+
+@dataclass(frozen=True)
+class CountedList:
+    """One tool's list as a count reads it: a built-in tool's registry
+    entry, or an installed tool's own table under the views every tool has."""
+
+    kind: str
+    #: Its model, or an installed tool's columns.
+    model: Any
+    views: Mapping[str, Mapping[str, Any]]
+    #: (req) -> the WHERE its list answers ``req`` with.
+    conditions: Callable[[ListRequest], Awaitable[list]]
+    #: What its list may be narrowed by.
+    filters: type[BaseModel]
+
+
+def counted_lists(tools: ToolSet) -> dict[str, CountedList]:
+    """Every tool of the community with ``tools``, by kind: the built-in
+    ones, then each installed tool."""
+    return {
+        **{
+            tool.value: CountedList(
+                tool.value,
+                spec.model,
+                spec.views,
+                partial(list_conditions, spec),
+                list_filter_model(tool),
+            )
+            for tool, spec in TOOL_LISTS.items()
+        },
+        **{
+            tool.kind: CountedList(
+                tool.kind,
+                tool.table.c,
+                DEFAULT_VIEWS,
+                partial(_installed_conditions, tool),
+                _INSTALLED_FILTERS,
+            )
+            for tool in tools.installed
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Mounting
 # ---------------------------------------------------------------------------
 
@@ -1189,33 +1262,37 @@ async def get_tool_counts_by_initiative(
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
 ) -> ToolCountsByInitiativeResponse:
-    """Every tool's live rows, grouped by initiative.
+    """Every tool's live rows, grouped by initiative: the built-in tools' and
+    each installed tool plug-in's, by kind.
 
     What the sidebar and the initiative directory badge: each tool's ``active``
     view, counted by the same conditions as its list, in one statement for
     every tool rather than a request per tool. Rows belonging to the guild
     rather than an initiative fall outside every group.
     """
+    lists = counted_lists(guild_context.tools)
     selects = [
-        select(literal(spec.tool.value), spec.model.initiative_id, func.count())
+        select(literal(kind), counted.model.initiative_id, func.count())
         .where(
-            *await view_conditions(
-                spec, session, current_user, guild_context, **spec.views["active"]
+            *await counted.conditions(
+                ListRequest(
+                    session, current_user, guild_context, dict(counted.views["active"])
+                )
             )
         )
-        .group_by(spec.model.initiative_id)
-        for spec in TOOL_LISTS.values()
+        .group_by(counted.model.initiative_id)
+        for kind, counted in lists.items()
     ]
-    counts: dict[Tool, dict[int, int]] = {tool: {} for tool in TOOL_LISTS}
-    for tool, initiative_id, count in (await session.exec(union_all(*selects))).all():
+    counts: dict[str, dict[int, int]] = {kind: {} for kind in lists}
+    for kind, initiative_id, count in (await session.exec(union_all(*selects))).all():
         if initiative_id is not None:
-            counts[Tool(tool)][initiative_id] = count
+            counts[kind][initiative_id] = count
     return ToolCountsByInitiativeResponse(counts=counts)
 
 
 @router.get("/tools/{tool}/counts", response_model=ToolCountsResponse, tags=["tools"])
 async def get_tool_counts(
-    tool: Tool,
+    tool: str,
     session: RLSSessionDep,
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
@@ -1244,9 +1321,12 @@ async def get_tool_counts(
     are for ``view`` after ``search`` and the tool's own filters, so the tree
     and the list beside it agree; tags are not a filter here, because the tree
     shows every one. A page with no tree leaves ``include_tags`` off and its
-    request runs the view counts alone.
+    request runs the view counts alone. ``tool`` is a built-in tool or an
+    installed tool plug-in's kind.
     """
-    spec = TOOL_LISTS[tool]
+    spec = counted_lists(guild_context.tools)[
+        require_kind(guild_context.tools, tool, Tool, items=False)
+    ]
     if view not in spec.views:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1263,23 +1343,21 @@ async def get_tool_counts(
     }
     narrowing = {
         name: value
-        for name, value in _list_filters(tool, filters).items()
+        for name, value in _list_filters(spec.filters, filters).items()
         if name not in set_aside
     }
+
+    async def where(**values: Any) -> list:
+        return await spec.conditions(
+            ListRequest(session, current_user, guild_context, values)
+        )
 
     view_counts = (
         await session.exec(
             union_all(
                 *[
                     select(literal(name), func.count()).where(
-                        *await view_conditions(
-                            spec,
-                            session,
-                            current_user,
-                            guild_context,
-                            **scope,
-                            **params,
-                        )
+                        *await where(**scope, **params)
                     )
                     for name, params in spec.views.items()
                 ]
@@ -1290,17 +1368,9 @@ async def get_tool_counts(
         return ToolCountsResponse(views=dict(view_counts))
 
     shown = select(spec.model.id).where(
-        *await view_conditions(
-            spec,
-            session,
-            current_user,
-            guild_context,
-            **scope,
-            **narrowing,
-            **spec.views[view],
-        )
+        *await where(**scope, **narrowing, **spec.views[view])
     )
-    link = tags_service.TOOL_TAG_LINKS[tool]
+    link = tags_service.tag_links(guild_context.tools)[spec.kind]
     tag_rows = (await session.exec(tags_service.tag_counts_for(link, shown))).all()
     shown_subq = shown.subquery()
     untagged_count = await session.scalar(

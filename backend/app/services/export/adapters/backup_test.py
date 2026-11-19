@@ -24,7 +24,7 @@ def _report(formats: dict[str, Any]) -> dict[str, Any]:
     ],
 )
 def test_report_formats_a_section_offers_are_accepted(formats):
-    _validate_params(_report(formats), scope_kind="initiative")
+    _validate_params(_report(formats), _SECTIONS)
 
 
 @pytest.mark.parametrize(
@@ -48,7 +48,7 @@ def test_report_formats_a_section_offers_are_accepted(formats):
 )
 def test_report_formats_a_section_does_not_offer_are_refused(formats):
     with pytest.raises(ExportError) as exc:
-        _validate_params(_report(formats), scope_kind="initiative")
+        _validate_params(_report(formats), _SECTIONS)
     assert exc.value.code == ExportMessages.EXPORT_INVALID_FORMAT
 
 

@@ -1,9 +1,10 @@
-"""Generic per-tool endpoints — the ``Tool`` enum is the path parameter.
+"""Generic per-tool endpoints — a tool's kind is the path parameter.
 
-One route serves every tool, so a new ``Tool`` member gets the surface with no
-per-tool endpoint: loading + authorization go through the unified
-resource-access registry, tag assignment through the tag-link registry, and the
-comment switch through the column every tool carries.
+One route serves every tool in the community's tool set, built-in or a tool
+plug-in's, so a new tool gets the surface with no per-tool endpoint: loading
++ authorization go through the unified resource-access loader, tag assignment
+through the tag-link registry, and the comment switch through the column
+every tool carries.
 Only tasks keep hand-written tag routes — they are a tool's sub-resources,
 not tools themselves.
 """
@@ -21,20 +22,23 @@ from app.api.deps import (
     get_current_active_user,
 )
 from app.core.tools import Tool
+from app.db.tool_rows import table_of
 from app.models.platform.user import User
 from app.models.tenant.tag import Tag
+from app.schemas.kinds import require_kind
 from app.schemas.tenant.comment import ToolCommentSettings
 from app.schemas.tenant.tag import TagSetRequest, TagSummary
 from app.services.content_sockets import sockets
 from app.services.tenant import required_fields
 from app.services.tenant import tags as tags_service
+from app.services.tenant.lifecycle_tree import set_columns
 
 router = APIRouter()
 
 
 @router.put("/{tool}/{tool_id}/tags", response_model=list[TagSummary])
 async def set_tool_tags(
-    tool: Tool,
+    tool: str,
     tool_id: int,
     tags_in: TagSetRequest,
     session: RLSSessionDep,
@@ -43,28 +47,26 @@ async def set_tool_tags(
 ) -> list[TagSummary]:
     """Set tags on any tool entity. Replaces all existing tags with the
     provided list and returns the entity's new tags. Requires write access."""
-    row = await resource_access.load_authorized(
-        session,
-        tool,
-        tool_id,
-        current_user,
-        guild_context,
-        access="write",
+    tools = guild_context.tools
+    require_kind(tools, tool, Tool, items=False)
+    row = await resource_access.load_kind(
+        session, tool, tool_id, current_user, guild_context, access="write"
     )
     required = await required_fields.required_of(session, guild_context, row)
     tag_ids = await tags_service.set_entity_tags(
         session,
-        tags_service.TOOL_TAG_LINKS[tool],
+        tags_service.tag_links(tools)[tool],
         guild_id=guild_context.guild_id,
         entity_id=row.id,
         tag_ids=tags_in.tag_ids,
     )
-    row.updated_at = datetime.now(UTC)
-    session.add(row)
+    await set_columns(
+        session, table_of(row), [row.id], {"updated_at": datetime.now(UTC)}
+    )
     await required_fields.refuse_emptied(session, required)
     await session.commit()
 
-    sockets.signal(guild_context.guild_id, tool, row.id, "updated")
+    sockets.signal(guild_context.guild_id, tools.by_kind[tool], row.id, "updated")
 
     if not tag_ids:
         return []
@@ -86,7 +88,7 @@ async def set_tool_tags(
 
 @router.put("/{tool}/{tool_id}/comments", response_model=ToolCommentSettings)
 async def set_tool_comment_settings(
-    tool: Tool,
+    tool: str,
     tool_id: int,
     settings_in: ToolCommentSettings,
     session: RLSSessionDep,
@@ -101,19 +103,23 @@ async def set_tool_comment_settings(
     back on. A task's thread is its own and is never affected by its project's
     switch.
     """
-    row = await resource_access.load_authorized(
-        session,
-        tool,
-        tool_id,
-        current_user,
-        guild_context,
-        access="write",
+    require_kind(guild_context.tools, tool, Tool, items=False)
+    row = await resource_access.load_kind(
+        session, tool, tool_id, current_user, guild_context, access="write"
     )
-    row.comments_enabled = settings_in.comments_enabled
-    row.updated_at = datetime.now(UTC)
-    session.add(row)
+    await set_columns(
+        session,
+        table_of(row),
+        [row.id],
+        {
+            "comments_enabled": settings_in.comments_enabled,
+            "updated_at": datetime.now(UTC),
+        },
+    )
     await session.commit()
 
-    sockets.signal(guild_context.guild_id, tool, row.id, "updated")
+    sockets.signal(
+        guild_context.guild_id, guild_context.tools.by_kind[tool], row.id, "updated"
+    )
 
-    return ToolCommentSettings(comments_enabled=row.comments_enabled)
+    return ToolCommentSettings(comments_enabled=settings_in.comments_enabled)

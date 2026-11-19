@@ -14,8 +14,8 @@
 import { Archive, ArchiveRestore } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { ArchivableType, ToolCan } from "@/api/generated/initiativeAPI.schemas";
-import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
+import type { ToolCan } from "@/api/generated/initiativeAPI.schemas";
+import { type ArchivableType, useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";

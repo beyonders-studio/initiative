@@ -76,10 +76,13 @@
               },
               {
                 "$ref": "#/$defs/pluginScope"
+              },
+              {
+                "$ref": "#/$defs/toolScope"
               }
             ]
           },
-          "description": "The scopes this plug-in asks a community to grant: what its installation and member tokens act with. The fixed scopes, and 'plugins:<public_id>' for each plug-in this one uses, to call its public endpoints and read the values it shows on items (at most 24 of those). The community grants some or all of them when it installs the plug-in, and a token never carries more than was granted. Writing implies reading. Absent means none."
+          "description": "The scopes this plug-in asks a community to grant: what its installation and member tokens act with. The fixed scopes; 'plugins:<public_id>' for each plug-in this one uses, to call its public endpoints and read the values it shows on items; and '<kind>:read' or '<kind>:write' for each tool plug-in's tool it reaches (at most 24 of those two together). The community grants some or all of them when it installs the plug-in, and a token never carries more than was granted. Writing implies reading. Absent means none."
         },
         "calls_plugins": {
           "type": "boolean",
@@ -199,6 +202,9 @@
           },
           {
             "$ref": "#/$defs/pluginScope"
+          },
+          {
+            "$ref": "#/$defs/toolScope"
           }
         ]
       },
@@ -1268,6 +1274,11 @@
       "type": "string",
       "pattern": "^plugins:[\\-.0123456789_abcdefghijklmnopqrstuvwxyz]*\\.[\\-.0123456789_abcdefghijklmnopqrstuvwxyz]*$",
       "description": "'plugins:<public_id>': permission to call another plug-in's public endpoints through the deployment, as this community or as one of its members, and to read the values that plug-in shows on items this one can read. Not one of the fixed scopes: the family is open, one per plug-in, and the public id after the prefix is the plug-in being called. The deployment never lets a plug-in address another directly; the call goes through it, and the plug-in called is handed its own references for whoever the call is for."
+    },
+    "toolScope": {
+      "type": "string",
+      "pattern": "^[a-z][0123456789_abcdefghijklmnopqrstuvwxyz]{0,16}\\.[0123456789abcdefghjkmnpqrstvwxyz]{14}:(?:read|write)$",
+      "description": "'<kind>:read' or '<kind>:write': a tool plug-in's tool, reached as a built-in tool's scopes reach its own: its rows and its items. The kind is the tool's key, '.', and its plug-in's uid in lower case ('counter_group.tsjvtcm0s7gv2x'). Not one of the fixed scopes: the family is open, one per tool plug-in, and names a tool only a community that installed it has; elsewhere it reaches nothing."
     },
     "endpoint": {
       "type": "object",

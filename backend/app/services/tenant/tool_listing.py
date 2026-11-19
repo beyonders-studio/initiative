@@ -35,6 +35,7 @@ from sqlalchemy import ColumnElement, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
 from app.db.guild_standing import ActorContext
 from app.db.query import apply_pagination, clamp_page
@@ -88,7 +89,7 @@ def apply_tool_order(
 
 
 def initiative_switch_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     model,
     *,
     guild_level_rows: bool = False,
@@ -114,7 +115,7 @@ def initiative_switch_clause(
 
 
 def base_conditions(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     model,
     user_id: int | None,
     *,

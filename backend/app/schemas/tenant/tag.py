@@ -1,10 +1,8 @@
 from datetime import datetime
-from enum import Enum
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
 from app.core.identity_boundary import GuildId
-from app.core.tools import TAG_TARGETS
 from app.schemas.base import SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.search import SearchHit
@@ -101,17 +99,13 @@ class TagSetRequest(SanitizedBaseModel):
     tag_ids: list[int] = Field(default_factory=list, max_length=100)
 
 
-# Derived, never re-declared: every Tool value plus the content-level extras
-# (see TAG_TARGETS in app.core.tools). A new Tool lands here — and in the
-# OpenAPI spec / generated frontend types — automatically.
-TagTarget = Enum("TagTarget", {name: name for name in TAG_TARGETS}, type=str)
-TagTarget.__doc__ = "Entity types a bulk tag edit can address."
-
-
 class TagBulkEditRequest(SanitizedBaseModel):
-    """Add and/or remove tags across many entities of one type, atomically."""
+    """Add and/or remove tags across many entities of one type, atomically.
+    ``target_type`` is a taggable kind the community has: a tool, a built-in
+    tool's taggable item (``app.core.tools.TAG_TARGETS``), or a kind of an
+    installed tool plug-in."""
 
-    target_type: TagTarget
+    target_type: str
     target_ids: list[int] = Field(min_length=1, max_length=500)
     add_tag_ids: list[int] = Field(default_factory=list, max_length=100)
     remove_tag_ids: list[int] = Field(default_factory=list, max_length=100)

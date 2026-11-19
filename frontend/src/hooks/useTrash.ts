@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 
 import type {
-  EntityType,
+  ContentKind,
   ListCommunityTrashParams,
   ListMyTrashParams,
   RestoreResponse,
@@ -49,6 +49,10 @@ export const useCommunityTrashList = (
 };
 
 // ── Mutations ───────────────────────────────────────────────────────────────
+
+/** What the built-in trash holds: a tool, a kind inside one, or a comment,
+ * an initiative or a tag. */
+export type EntityType = ContentKind | "comment" | "initiative" | "tag";
 
 // Maps entity_type -> what a restore makes stale, so the row reappears in
 // active lists across the app without an explicit reload. Child entities (task,

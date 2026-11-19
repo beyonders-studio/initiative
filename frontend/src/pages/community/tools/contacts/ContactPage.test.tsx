@@ -10,13 +10,13 @@ import { renderPage } from "@/__tests__/helpers/render";
 import {
   ActorKind,
   type ContactRead,
-  EndpointKind,
   type RelatedEnd,
   type RelationshipCreate,
   type RelationshipRead,
   RelationshipType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { EndpointKind } from "@/lib/relationships";
 
 import { ContactPage } from "./ContactPage";
 

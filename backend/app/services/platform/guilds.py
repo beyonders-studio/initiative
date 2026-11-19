@@ -30,7 +30,6 @@ from app.core.rules import (
     SURFACE_PLUGINS,
     SetBy,
 )
-from app.core.tools import Tool
 from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_migrations import GUILD_SCHEMA_REGEX
@@ -1675,18 +1674,34 @@ async def create_guild_invite(
     return invite, code
 
 
+async def _granted_row(session: AsyncSession, grant: GuestInviteGrant) -> Any:
+    """The row of one of the community's tools a guest invite names, its
+    ``id`` and ``initiative_id``, or None where it has no such tool or row."""
+    from app.db.session import session_tools
+
+    tool = (await session_tools(session)).by_kind.get(grant.resource_type or "")
+    if tool is None:
+        return None
+    table = tool.table
+    return (
+        await session.exec(
+            select(table.c.id, table.c.initiative_id).where(
+                table.c.id == grant.resource_id, table.c.deleted_at.is_(None)
+            )
+        )
+    ).first()
+
+
 async def _assert_grantable(session: AsyncSession, grant: GuestInviteGrant) -> None:
     """Raise ``GuestGrantError`` unless the community holds the initiative a
     guest invite names, and the item, where it names one, in that initiative."""
-    from app.db.base import MODELS_BY_TABLE
     from app.models.tenant.initiative import Initiative
 
     if await session.get(Initiative, grant.initiative_id) is None:
         raise GuestGrantError(GuildMessages.GUEST_GRANT_NOT_FOUND)
     if grant.resource_type is None:
         return
-    model = MODELS_BY_TABLE[Tool(grant.resource_type).plural]
-    row = await session.get(model, grant.resource_id)
+    row = await _granted_row(session, grant)
     if row is None or row.initiative_id != grant.initiative_id:
         raise GuestGrantError(GuildMessages.GUEST_GRANT_NOT_FOUND)
 
@@ -1717,7 +1732,6 @@ def _give_guest_invite_grants(
     its level. Run in the community's cohort, as auto-join enrolment is, and
     recorded as its administrator's. Each is given on its own: one deleted or
     archived since is skipped, and the rest are still given."""
-    from app.db.base import MODELS_BY_TABLE
     from app.db.session import set_rls_context
     from app.models.tenant.initiative import Initiative
     from app.services import permissions as permissions_service
@@ -1755,13 +1769,12 @@ def _give_guest_invite_grants(
                     via="guest_invite",
                 )
             return
-        tool = Tool(grant.resource_type)
-        row = await guild_session.get(MODELS_BY_TABLE[tool.plural], grant.resource_id)
+        row = await _granted_row(guild_session, grant)
         if row is None or grant.level is None:
             return
         await permissions_service.share_with(
             guild_session,
-            resource_type=tool,
+            resource_type=grant.resource_type,
             resource_id=row.id,
             guild_id=guild_id,
             initiative_id=row.initiative_id,

@@ -10,9 +10,15 @@ if TYPE_CHECKING:
     from httpx import AsyncClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
+    from app.core.tool_set import ToolSet
     from app.testing.actor import Actor
 
-__all__ = ["COUNTERS_UID", "counters_tool_manifest", "install_tool_plugin"]
+__all__ = [
+    "COUNTERS_UID",
+    "add_counter",
+    "counters_tool_manifest",
+    "install_tool_plugin",
+]
 
 #: The uid the SDK's example names Counters by.
 COUNTERS_UID = "TSJVTCM0S7GV2X"
@@ -256,3 +262,36 @@ async def install_tool_plugin(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+async def add_counter(
+    session: AsyncSession, guild_id: int, initiative_id: int, **counter: Any
+) -> tuple[ToolSet, int, int]:
+    """A counter group of the installed Counters in ``initiative_id``, and a
+    counter in it with ``counter``'s columns: the community's tool set, the
+    group's id and the counter's id. Added on ``session`` as it is routed (a
+    request's, whose person then makes and owns them), or routed into the
+    community where it is not. Committed."""
+    from app.db.plugin_tools import provisioned_tools
+    from app.db.session import routed_guild_id
+    from app.db.tool_rows import locate
+    from app.services.tenant.plugin_tool_rows import insert
+    from app.testing.schema_harness import route_session_to_guild
+
+    tools = await provisioned_tools(guild_id)
+    (tool,) = tools.installed
+    (item,) = tool.children
+    if routed_guild_id(session) is None:
+        await route_session_to_guild(session, guild_id)
+    group = await insert(
+        session,
+        locate(tools, tool.kind),
+        {"initiative_id": initiative_id, "name": "Scores"},
+    )
+    row = await insert(
+        session,
+        locate(tools, item.value),
+        {"counter_group_id": group, "name": "Laps", **counter},
+    )
+    await session.commit()
+    return tools, group, row

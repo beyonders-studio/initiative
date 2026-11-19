@@ -42,7 +42,7 @@ export const CHIP_ENTITY_TYPES: SearchEntityType[] = [
 
 /** The facts offered about one kind of thing — what a picker asks after the
  *  thing itself has been chosen. */
-export const chipKindsFor = (entityType: SearchEntityType): SmartChipKind[] =>
+export const chipKindsFor = (entityType: string): SmartChipKind[] =>
   SMART_CHIP_KINDS.filter((kind) => chipEntityType(kind) === entityType);
 
 /** What a document stores for one chip: `task:12:status`. */

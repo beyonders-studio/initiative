@@ -23,6 +23,7 @@ from sqlalchemy import Table
 from sqlmodel import SQLModel
 
 import app.db.base  # noqa: F401  # every model on the metadata
+from app.core.relationships import ENDPOINT_CODES
 from app.core.tools import KINDS, Kind, Tool, ToolRefusals, ToolSpec
 
 
@@ -150,6 +151,13 @@ class ToolSet:
         return {r.kind: r.spec.code for r in self.records} | {
             kind.value: kind.code for kind in self.child_kinds
         }
+
+    @cached_property
+    def endpoint_codes(self) -> dict[str, int]:
+        """Everything an edge may name and its code: a built-in end
+        (``app.core.relationships.ENDPOINT_CODES``), and every kind of
+        :attr:`kind_codes`."""
+        return ENDPOINT_CODES | self.kind_codes
 
     @cached_property
     def comment_targets(self) -> tuple[str, ...]:

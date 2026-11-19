@@ -3,7 +3,11 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { SearchSuggestion, UserSummary } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  SearchEntityType,
+  SearchSuggestion,
+  UserSummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
@@ -150,7 +154,9 @@ export const MentionPopover = ({
   const rows: Row[] = useMemo(() => {
     if (active.user) return (members.data?.items ?? []).map(memberRow);
     const found = suggestions.items
-      .filter((suggestion) => !wanted || wanted.includes(suggestion.entity_type))
+      .filter(
+        (suggestion) => !wanted || wanted.includes(suggestion.entity_type as SearchEntityType)
+      )
       .map(suggestionRow);
     if (!active.canCreate || !active.query.trim()) return found;
     // `[[ ]]` is the trigger that can make what it cannot find. The option is

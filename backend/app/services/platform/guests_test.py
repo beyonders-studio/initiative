@@ -661,6 +661,57 @@ async def test_a_guest_invite_names_only_what_the_community_holds_there(
     assert made.json()["detail"] == GuildMessages.GUEST_GRANT_NOT_FOUND
 
 
+async def test_a_guest_invite_gives_a_tool_plugins_row(client, acting_user, session):
+    """An item a guest invite names may be a tool plug-in's row, shared as a
+    built-in tool's is; a kind the community does not have names nothing."""
+    from app.testing import add_counter, install_tool_plugin
+
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    joiner = await acting_user()
+    seat = await acting_user(guild=a.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools, group, _counter = await add_counter(session, a.guild.id, a.initiative.id)
+    kind = tools.installed[0].kind
+    await _platform(session)
+
+    async def invite(resource_type: str):
+        return await client.post(
+            f"/api/v1/communities/{a.guild.id}/invites",
+            json={
+                "guest_days": 7,
+                "grants": [
+                    {
+                        "initiative_id": a.initiative.id,
+                        "resource_type": resource_type,
+                        "resource_id": group,
+                        "level": "read",
+                    }
+                ],
+            },
+            headers=a.headers,
+        )
+
+    unknown = await invite(f"stranger.{'x' * 14}")
+    assert unknown.status_code == 404, unknown.text
+    assert unknown.json()["detail"] == GuildMessages.GUEST_GRANT_NOT_FOUND
+    made = await invite(kind)
+    assert made.status_code == 201, made.text
+    joined = await client.post(
+        "/api/v1/communities/invite/accept",
+        json={"code": made.json()["code"]},
+        headers=joiner.headers,
+    )
+    assert joined.status_code == 200, joined.text
+    await set_rls_context(session, SystemGuild(a.guild.id))
+    assert (
+        await session.exec(
+            select(ResourceGrant.resource_type, ResourceGrant.resource_id).where(
+                ResourceGrant.user_id == joiner.user.id
+            )
+        )
+    ).all() == [(kind, group)]
+
+
 async def test_what_an_invite_gives_is_its_administrations_alone(
     acting_user, session, role_session
 ):

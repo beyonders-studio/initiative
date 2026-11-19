@@ -16,7 +16,8 @@ NOTE_LENGTH = 2000
 class HoldCreate(SanitizedBaseModel):
     """Hold something for the platform."""
 
-    #: The kind of thing held — a ``SearchEntityType`` — and its id.
+    #: The kind of thing held — a ``SearchEntityType``, or a kind of a tool
+    #: plug-in the community has — and its id.
     target_type: str = PydanticField(min_length=1, max_length=32)
     target_id: int
     reason: HoldReason

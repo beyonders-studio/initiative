@@ -60,12 +60,15 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * How much of each tool reaches the caller, across their communities.
+ * How much of each tool reaches the caller, across their communities:
+ * every built-in tool, and each tool plug-in installed in one of them, by
+ * kind.
  *
  * The My Tools page's tabs: a tool with nothing behind it gets none, so the
  * page never offers a table of nothing. Each tool's figure is its list's
- * total, summed over the caller's communities, and each community answers
- * for every tool in one statement.
+ * live view, counted as the tool's own counts count it (with what the
+ * reader wrote, when asked) and summed over the caller's communities; each
+ * community answers for every tool it has in one statement.
  * @summary Get My Tool Counts
  */
 export const getMyToolCounts = (

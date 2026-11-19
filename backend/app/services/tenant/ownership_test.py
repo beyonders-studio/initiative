@@ -2,17 +2,23 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import delete
 from sqlmodel import select
 
+from app.core.tool_set import BUILTIN_TOOLS, ToolRecord
 from app.core.tools import Tool
+from app.db.plugin_tools import provisioned_tools
+from app.db.tool_rows import load_row, locate
 from app.models.platform.guild import CommunityRole, GuildMembership
-from app.models.tenant._mixins import CreatedByMixin
+from app.models.tenant._mixins import CreatedByMixin, tool_models
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import ownership as ownership_service
+from app.services.tenant.soft_delete import trash
 from app.testing import (
     TOOL_FACTORIES,
+    add_counter,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -21,24 +27,11 @@ from app.testing import (
     create_property_value,
     create_resource_grant,
     create_user,
+    install_tool_plugin,
     route_session_to_guild,
 )
 
 # ── Invariants over the Tool enum ───────────────────────────────────────────
-
-
-def test_every_tool_is_ownable():
-    """A tool is a thing someone can own, so every Tool needs an entry here.
-
-    Fails naming the newcomer rather than letting it ship with ownership that
-    silently does nothing.
-    """
-    missing = set(Tool) - set(ownership_service.OWNABLE)
-    extra = set(ownership_service.OWNABLE) - set(Tool)
-    assert not missing, (
-        f"tools with no OWNABLE entry: {sorted(t.value for t in missing)}"
-    )
-    assert not extra, f"OWNABLE entries that are not tools: {extra}"
 
 
 def test_no_tool_has_an_owner_column():
@@ -48,9 +41,8 @@ def test_no_tool_has_an_owner_column():
     access control actually reads, so no tool table may reintroduce one. The
     ``created_by`` column is a different fact and stays.
     """
-    for tool, spec in ownership_service.OWNABLE.items():
-        columns = set(spec.model.__table__.columns.keys())
-        assert "owner_id" not in columns, (
+    for tool in BUILTIN_TOOLS:
+        assert "owner_id" not in tool.table.c, (
             f"{tool.value} carries an owner_id column; ownership belongs in "
             f"resource_grants so there is one record of it"
         )
@@ -63,8 +55,8 @@ def test_every_tool_records_an_author():
     sweeps. ``CreatedByMixin`` supplies it; a tool that skipped the mixin would
     silently drop out of both.
     """
-    for tool, spec in ownership_service.OWNABLE.items():
-        assert issubclass(spec.model, CreatedByMixin), (
+    for tool in BUILTIN_TOOLS:
+        assert issubclass(tool_models()[tool.table.name], CreatedByMixin), (
             f"{tool.value} does not carry CreatedByMixin, so it records no author"
         )
 
@@ -128,7 +120,7 @@ def test_a_grantee_holds_one_grant_per_resource():
 # ── Behaviour ───────────────────────────────────────────────────────────────
 
 
-async def _owner_grant(session, tool: Tool, resource_id: int):
+async def _owner_grant(session, tool: Tool | ToolRecord, resource_id: int):
     return (
         await session.exec(
             select(ResourceGrant).where(
@@ -229,7 +221,7 @@ async def test_transfer_moves_every_tool(session):
     )
     await session.commit()
 
-    assert set(counts) == set(Tool)
+    assert {tool.kind for tool in counts} == set(Tool)
     for tool, row in rows.items():
         grant = await _owner_grant(session, tool, row.id)
         assert grant is not None and grant.user_id == admin.id
@@ -302,7 +294,7 @@ async def test_unowned_covers_released_and_orphaned(session):
     items = await ownership_service.summarize_unowned_content(
         session, guild_id=guild.id
     )
-    found = {(i.tool, i.id) for i in items}
+    found = {(i.tool.kind, i.id) for i in items}
     assert (Tool.project, released.id) in found
     assert (Tool.counter_group, orphaned.id) in found
 
@@ -367,6 +359,49 @@ async def test_restore_leaves_content_unowned_when_the_author_has_gone(session):
 
     assert claimed is False
     assert await _owner_grant(session, Tool.file, file.id) is None
+
+
+async def test_a_tool_plugins_row_goes_back_to_its_author_on_restore(
+    client, session, acting_user, reading_as
+):
+    """A tool plug-in's row taken out of the trash unowned goes back to its
+    author, as a built-in tool's does."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    author = await acting_user(
+        guild=admin.guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    await session.commit()
+    seat = await acting_user(guild=author.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(author.guild.id)
+    kind = tools.installed[0].kind
+    located = locate(tools, kind)
+    assert located is not None
+    mine = await reading_as(author.user.id, author.guild.id)
+    group, _counter = (await add_counter(mine, author.guild.id, author.initiative.id))[
+        1:
+    ]
+    row = await load_row(mine, located, tools, group)
+    assert row is not None
+    await trash(mine, row, deleted_by_user_id=author.user.id)
+    await mine.commit()
+    await route_session_to_guild(session, author.guild.id)
+    await session.exec(
+        delete(ResourceGrant).where(
+            ResourceGrant.resource_type == kind,
+            ResourceGrant.resource_id == group,
+            ResourceGrant.level == ResourceAccessLevel.owner,
+        )
+    )
+    await session.commit()
+
+    response = await client.post(
+        author.g(f"/trash/{kind}/{group}/restore"), headers=author.headers
+    )
+    assert response.status_code == 200, response.text
+    await route_session_to_guild(session, author.guild.id)
+    grant = await _owner_grant(session, tools.by_kind[kind], group)
+    assert grant is not None and grant.user_id == author.user.id
 
 
 async def test_a_projects_author_gets_it_back_on_restore(session):
@@ -513,14 +548,14 @@ async def test_a_role_held_owner_grant_is_claimable(session):
     items = await ownership_service.summarize_unowned_content(
         session, guild_id=guild.id
     )
-    assert (Tool.calendar, calendar.id) in {(i.tool, i.id) for i in items}
+    assert (Tool.calendar, calendar.id) in {(i.tool.kind, i.id) for i in items}
 
     counts = await ownership_service.claim_unowned_content(
         session, guild_id=guild.id, to=ownership_service.Owner(user_id=admin.id)
     )
     await session.commit()
 
-    assert counts.get(Tool.calendar) == 1
+    assert {tool.kind: n for tool, n in counts.items()}.get(Tool.calendar.value) == 1
     grant = await _owner_grant(session, Tool.calendar, calendar.id)
     assert grant is not None and grant.user_id == admin.id
 
@@ -577,3 +612,57 @@ async def test_releasing_content_clears_an_owner_row_that_names_no_user(session)
     await session.commit()
 
     assert await _owner_grant(session, Tool.calendar, calendar.id) is None
+
+
+async def test_a_tool_plugins_row_is_transferred_and_claimed(
+    client, session, acting_user, reading_as
+):
+    """A tool plug-in's row its author owns moves with the rest of what they
+    own, and once nobody owns it, it is listed and claimed as unowned."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    author = await acting_user(
+        guild=admin.guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    await session.commit()
+    seat = await acting_user(guild=author.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    mine = await reading_as(author.user.id, author.guild.id)
+    tools, group, _counter = await add_counter(
+        mine, author.guild.id, author.initiative.id
+    )
+    tool = tools.installed[0]
+    await route_session_to_guild(session, author.guild.id)
+
+    owned = await ownership_service.summarize_owned_content(session, author.user.id)
+    assert (tool.kind, group) in {(i.tool.kind, i.id) for i in owned}
+    moved = await ownership_service.transfer_content_ownership(
+        session,
+        from_user_id=author.user.id,
+        to=ownership_service.Owner(user_id=admin.user.id),
+    )
+    assert {t.kind: n for t, n in moved.items()} == {tool.kind: 1}
+    grant = await _owner_grant(session, tool, group)
+    assert grant is not None and grant.user_id == admin.user.id
+
+    own = tool.table
+    row = (
+        await session.exec(
+            select(own.c.id, own.c.initiative_id).where(own.c.id == group)
+        )
+    ).one()
+    await ownership_service.set_resource_owner(
+        session, tool=tool, row=row, new_owner=None
+    )
+    unowned = await ownership_service.summarize_unowned_content(
+        session, guild_id=author.guild.id
+    )
+    assert (tool.kind, group) in {(i.tool.kind, i.id) for i in unowned}
+    claimed = await ownership_service.claim_unowned_content(
+        session,
+        guild_id=author.guild.id,
+        to=ownership_service.Owner(user_id=author.user.id),
+    )
+    assert {t.kind: n for t, n in claimed.items()}.get(tool.kind) == 1
+    await session.commit()
+    grant = await _owner_grant(session, tool, group)
+    assert grant is not None and grant.user_id == author.user.id

@@ -862,25 +862,6 @@ export interface AppConfig {
   min_desktop_version: string;
 }
 
-/**
- * Things that can be archived.
- */
-export type ArchivableType = (typeof ArchivableType)[keyof typeof ArchivableType];
-
-export const ArchivableType = {
-  project: "project",
-  file: "file",
-  counter_group: "counter_group",
-  calendar: "calendar",
-  dashboard: "dashboard",
-  post: "post",
-  wiki: "wiki",
-  contact: "contact",
-  task: "task",
-  collection: "collection",
-  initiative: "initiative",
-} as const;
-
 export interface ArchiveDoneResponse {
   archived_count: number;
 }
@@ -892,7 +873,7 @@ export interface ArchiveDoneResponse {
  * wants the whole row reads it back from the route that already serves it.
  */
 export interface ArchiveResponse {
-  entity_type: ArchivableType;
+  entity_type: string;
   entity_id: number;
   archived_at?: string | null;
 }
@@ -3138,28 +3119,12 @@ export const CommentAudience = {
   filer: "filer",
 } as const;
 
-export type CommentSubject = (typeof CommentSubject)[keyof typeof CommentSubject];
-
-export const CommentSubject = {
-  task: "task",
-  wiki_page: "wiki_page",
-  collection: "collection",
-  project: "project",
-  file: "file",
-  counter_group: "counter_group",
-  calendar: "calendar",
-  dashboard: "dashboard",
-  post: "post",
-  wiki: "wiki",
-  contact: "contact",
-} as const;
-
 /**
  * A comment, and what it is said on.
  */
 export interface CommentCreate {
   content: string;
-  subject_type: CommentSubject;
+  subject_type: string;
   /** @exclusiveMinimum 0 */
   subject_id: number;
   parent_comment_id?: number | null;
@@ -3214,7 +3179,7 @@ export interface CommentRead {
   created_by_install: number | null;
   content: string;
   id: number;
-  subject_type: CommentSubject;
+  subject_type: string;
   subject_id: number;
   parent_comment_id: number | null;
   created_at: string;
@@ -3794,7 +3759,7 @@ export const CommunityInviteGrantLevel = {
  */
 export interface CommunityInviteGrant {
   initiative_id: number;
-  resource_type?: Tool | null;
+  resource_type?: string | null;
   resource_id?: number | null;
   level?: CommunityInviteGrantLevel;
 }
@@ -6806,57 +6771,15 @@ export interface EmbedRead {
   refs?: string[];
 }
 
-export type EndpointKind = (typeof EndpointKind)[keyof typeof EndpointKind];
-
-export const EndpointKind = {
-  calendar: "calendar",
-  calendar_event: "calendar_event",
-  collection: "collection",
-  contact: "contact",
-  counter: "counter",
-  counter_group: "counter_group",
-  dashboard: "dashboard",
-  file: "file",
-  post: "post",
-  project: "project",
-  tag: "tag",
-  task: "task",
-  user: "user",
-  wiki: "wiki",
-  wiki_page: "wiki_page",
-} as const;
-
 /**
- * One end of an edge: what kind of thing, and which one.
+ * One end of an edge: what kind of thing, and which one. The kind is a
+ * built-in one, a person (``user``), or a kind of a tool plug-in the
+ * community has installed.
  */
 export interface EndpointRef {
-  type: EndpointKind;
+  type: string;
   id: number;
 }
-
-/**
- * Entity types the trash can holds.
- */
-export type EntityType = (typeof EntityType)[keyof typeof EntityType];
-
-export const EntityType = {
-  project: "project",
-  file: "file",
-  counter_group: "counter_group",
-  calendar: "calendar",
-  dashboard: "dashboard",
-  post: "post",
-  wiki: "wiki",
-  contact: "contact",
-  task: "task",
-  calendar_event: "calendar_event",
-  counter: "counter",
-  wiki_page: "wiki_page",
-  collection: "collection",
-  comment: "comment",
-  initiative: "initiative",
-  tag: "tag",
-} as const;
 
 export type EnvelopeImportRequestEnvelope = { [key: string]: unknown };
 
@@ -8906,10 +8829,11 @@ export type MyToolCountsResponseCounts = { [key: string]: number };
 /**
  * How much of each tool reaches the caller across their communities.
  *
- * Keyed by the ``Tool`` value rather than fielded per tool, so a new member
- * of the enum is answered for without a schema edit. A tool the caller has
- * nothing of is present with a zero, not absent — the difference between
- * "none" and "not asked" matters to the page deciding which tabs to draw.
+ * Keyed by the tool's kind rather than fielded per tool: every built-in
+ * tool, and each tool plug-in installed in one of the caller's communities.
+ * A built-in tool the caller has nothing of is present with a zero, not
+ * absent — the difference between "none" and "not asked" matters to the
+ * page deciding which tabs to draw.
  */
 export interface MyToolCountsResponse {
   counts: MyToolCountsResponseCounts;
@@ -8973,12 +8897,12 @@ export interface NeighbourhoodEdge {
  * is called, what it looks like or where it lives.
  */
 export interface RelatedEnd {
-  type: EndpointKind;
+  type: string;
   id: number;
   title: string | null;
   initiative_id: number | null;
   updated_at: string | null;
-  tool: Tool | null;
+  tool: string | null;
   tool_id: number | null;
   tool_title: string | null;
   image_urls: string[];
@@ -9445,7 +9369,7 @@ export interface OperatorUsernameUpdate {
  * One thing someone owns, or that nobody does.
  */
 export interface OwnedContentItem {
-  tool: Tool;
+  tool: string;
   id: number;
   name: string;
 }
@@ -9455,7 +9379,7 @@ export type OwnedContentResponseCounts = { [key: string]: number };
 /**
  * What a user owns in this guild, or what no current member owns.
  *
- * ``counts`` is per tool, keyed by the ``Tool`` value, so the dialog can say
+ * ``counts`` is per tool, keyed by the tool's kind, so the dialog can say
  * "3 projects, 1 calendar" without walking the list. ``eligible_plugins`` are the
  * installed plug-ins that may own every item listed, which the dialog offers
  * beside the community's admins.
@@ -9763,7 +9687,7 @@ export interface PeopleSectionsResponse {
  * to it without a fetch per kind, and nothing of its content.
  */
 export interface PersonalItemRead {
-  entity_type: Tool;
+  entity_type: string;
   entity_id: number;
   community_id: number;
   initiative_id: number | null;
@@ -9791,7 +9715,7 @@ export const ViewSource = {
  * What the reader keeps about one item.
  */
 export interface PersonalItemState {
-  entity_type: ContentKind;
+  entity_type: string;
   entity_id: number;
   viewed_at: string | null;
   view_source: ViewSource | null;
@@ -10982,27 +10906,6 @@ export interface PropertyStep {
 }
 
 /**
- * What can carry custom property values: every tool and sub-tool.
- */
-export type PropertyTarget = (typeof PropertyTarget)[keyof typeof PropertyTarget];
-
-export const PropertyTarget = {
-  project: "project",
-  file: "file",
-  counter_group: "counter_group",
-  calendar: "calendar",
-  dashboard: "dashboard",
-  post: "post",
-  wiki: "wiki",
-  contact: "contact",
-  task: "task",
-  calendar_event: "calendar_event",
-  counter: "counter",
-  wiki_page: "wiki_page",
-  collection: "collection",
-} as const;
-
-/**
  * Payload for ``PUT /properties/{target}/{entity_id}``: replace-all, or
  * with ``merge`` only the properties it names.
  *
@@ -11547,10 +11450,11 @@ export interface ResolvedAISettingsResponse {
 /**
  * One tool's full target sharing state in a bulk request — the same ``grants``
  * body the per-resource ``PUT /{id}/grants`` takes, tagged with which tool it
- * applies to (the app-wide ``Tool`` enum).
+ * applies to: a built-in tool's kind, or a kind of a tool plug-in the
+ * community has installed (``app.schemas.kinds``).
  */
 export interface ResourceGrantBulkItem {
-  resource_type: Tool;
+  resource_type: string;
   resource_id: number;
   grants: ResourceGrantSchema[];
 }
@@ -11570,7 +11474,7 @@ export const ResourceGrantBulkItemResultStatus = {
  * blocking the rest.
  */
 export interface ResourceGrantBulkItemResult {
-  resource_type: Tool;
+  resource_type: string;
   resource_id: number;
   status: ResourceGrantBulkItemResultStatus;
   detail?: string | null;
@@ -11610,12 +11514,12 @@ export interface RestoreResponse {
  * tool's own row.
  */
 export interface SearchHit {
-  entity_type: SearchEntityType;
+  entity_type: string;
   entity_id: number;
   title: string;
   snippet?: string | null;
   initiative_id?: number | null;
-  tool?: Tool | null;
+  tool?: string | null;
   tool_id?: number | null;
 }
 
@@ -11633,11 +11537,11 @@ export interface SearchResults {
  * A jump-to target for the command palette: enough to render and route.
  */
 export interface SearchSuggestion {
-  entity_type: SearchEntityType;
+  entity_type: string;
   entity_id: number;
   title: string;
   initiative_id?: number | null;
-  tool?: Tool | null;
+  tool?: string | null;
   tool_id?: number | null;
   can_write?: boolean;
   tool_title?: string | null;
@@ -12040,30 +11944,13 @@ export interface SubjectReadResponse {
 }
 
 /**
- * Entity types a bulk tag edit can address.
- */
-export type TagTarget = (typeof TagTarget)[keyof typeof TagTarget];
-
-export const TagTarget = {
-  project: "project",
-  file: "file",
-  counter_group: "counter_group",
-  calendar: "calendar",
-  dashboard: "dashboard",
-  post: "post",
-  wiki: "wiki",
-  contact: "contact",
-  task: "task",
-  calendar_event: "calendar_event",
-  wiki_page: "wiki_page",
-  collection: "collection",
-} as const;
-
-/**
  * Add and/or remove tags across many entities of one type, atomically.
+ * ``target_type`` is a taggable kind the community has: a tool, a built-in
+ * tool's taggable item (``app.core.tools.TAG_TARGETS``), or a kind of an
+ * installed tool plug-in.
  */
 export interface TagBulkEditRequest {
-  target_type: TagTarget;
+  target_type: string;
   /**
    * @minItems 1
    * @maxItems 500
@@ -12131,12 +12018,12 @@ export interface TagUpdate {
  * tool it lives in and when it last changed, which a table of them shows.
  */
 export interface TaggedEntity {
-  entity_type: SearchEntityType;
+  entity_type: string;
   entity_id: number;
   title: string;
   snippet: string | null;
   initiative_id: number | null;
-  tool: Tool | null;
+  tool: string | null;
   tool_id: number | null;
   tool_title: string;
   updated_at: string | null;
@@ -12513,11 +12400,12 @@ export interface ToolCommentSettings {
   comments_enabled: boolean;
 }
 
-export type ToolCountsByInitiativeResponseCounts = Partial<Record<Tool, { [key: string]: number }>>;
+export type ToolCountsByInitiativeResponseCounts = { [key: string]: { [key: string]: number } };
 
 /**
- * Each tool's visible-row counts, by initiative (tool -> initiative_id ->
- * count) — what the sidebar and the initiative directory badge.
+ * Each tool's visible-row counts, by initiative (kind -> initiative_id ->
+ * count): every built-in tool and each installed tool plug-in — what the
+ * sidebar and the initiative directory badge.
  */
 export interface ToolCountsByInitiativeResponse {
   counts: ToolCountsByInitiativeResponseCounts;
@@ -12576,7 +12464,7 @@ export interface ToolLayoutSetRead {
 }
 
 export interface TrashItem {
-  entity_type: EntityType;
+  entity_type: string;
   entity_id: number;
   community_id: number;
   name: string;
@@ -14361,7 +14249,7 @@ export type ListHoldsParams = {
 };
 
 export type ListCommentsParams = {
-  subject_type: CommentSubject;
+  subject_type: string;
   /** @exclusiveMinimum 0 */
   subject_id: number;
   /**
@@ -14585,7 +14473,7 @@ export const ExportCommunityMode = {
 export type ExportToolParams = {
   /** What to export: one artifact per id, zipped when there is more than one */
   ids?: number[] | null;
-  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: pdf, md, docx, json, csv, xlsx, file; counter_group: pdf, csv, xlsx, md, json; calendar: ics, json; dashboard: json; post: json; wiki: pdf, md, docx, json; contact: json, csv). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
+  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: pdf, md, docx, json, csv, xlsx, file; counter_group: pdf, csv, xlsx, md, json; calendar: ics, json; dashboard: json; post: json; wiki: pdf, md, docx, json; contact: json, csv; an installed tool plug-in: json, and csv or xlsx when it has one item table). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
   format?: ExportToolFormat;
   /** Calendars only: with no ids, every calendar the caller may export in this initiative */
   initiative_id?: number | null;
@@ -14805,7 +14693,7 @@ export type ListRelationshipsParams = {
   /** The thing to list edges for, as `kind:id` */
   entity: string;
   relationship_type?: RelationshipType | null;
-  other_type?: EndpointKind | null;
+  other_type?: string | null;
   direction?: ListRelationshipsDirection;
 };
 
@@ -14822,7 +14710,7 @@ export type ReplaceRelationshipSliceParams = {
   /** The thing whose edges are being set */
   entity: string;
   relationship_type: RelationshipType;
-  other_type: EndpointKind;
+  other_type: string;
 };
 
 export type ListTaskEdgesParams = {
@@ -14850,7 +14738,7 @@ export type GetTagParams = {
 
 export type GetTagEntitiesParams = {
   /** The taggable kind to list */
-  kind: TagTarget;
+  kind: string;
   /** @minimum 1 */
   page?: number;
   /**
@@ -14907,7 +14795,7 @@ export type SearchCommunityParams = {
    */
   search: string;
   /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
-  types?: SearchEntityType[] | null;
+  types?: string[] | null;
   /** Restrict to one initiative. */
   initiative_id?: number | null;
   /** Include archived work. Left out by default, so a search answers with what is in play. */
@@ -14925,7 +14813,7 @@ export type SearchCommunityParams = {
 
 export type RecentCommunityParams = {
   /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
-  types?: SearchEntityType[] | null;
+  types?: string[] | null;
   /** Restrict to one initiative. */
   initiative_id?: number | null;
   /** Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes). */
@@ -14943,7 +14831,7 @@ export type SuggestCommunityParams = {
    */
   search: string;
   /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
-  types?: SearchEntityType[] | null;
+  types?: string[] | null;
   /** Restrict to one initiative. */
   initiative_id?: number | null;
   /** Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes). */

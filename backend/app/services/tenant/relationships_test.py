@@ -14,13 +14,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import (
+    ENDPOINT_CODES,
     ENDPOINT_KINDS,
+    NODE_ID_SHIFT,
     SPECS,
-    EndpointKind,
     Provenance,
     RelationshipType,
-    decode_node_id,
-    endpoint_code,
     node_id,
 )
 from app.core.search import SearchEntityType
@@ -45,17 +44,22 @@ from app.testing.schema_harness import route_session_to_guild
 # ---------------------------------------------------------------------------
 
 
-def test_node_ids_round_trip():
-    for kind in EndpointKind:
-        assert decode_node_id(node_id(kind, 4242)) == (kind, 4242)
+def test_node_ids_keep_kind_and_id_apart():
+    for kind, code in ENDPOINT_CODES.items():
+        node = node_id(kind, 4242)
+        assert (node >> NODE_ID_SHIFT, node & ((1 << NODE_ID_SHIFT) - 1)) == (
+            code,
+            4242,
+        )
 
 
 def test_every_kind_resolves_to_a_table():
+    from app.core.tool_set import BUILTIN_TOOLS
     from app.db.reference_targets import title_column
 
     for kind, endpoint in ENDPOINT_KINDS.items():
         assert endpoint.table
-        assert title_column(kind) is not None
+        assert title_column(kind, tools=BUILTIN_TOOLS) is not None
 
 
 def test_symmetric_types_declare_no_direction():
@@ -393,7 +397,7 @@ async def test_purging_an_endpoint_takes_its_edges_including_tombstones(
     await session.commit()
 
     await relationships.purge_for_entities(
-        session, endpoint_code(SearchEntityType.file.value), [file_id]
+        session, ENDPOINT_CODES[SearchEntityType.file], [file_id]
     )
     await session.commit()
 

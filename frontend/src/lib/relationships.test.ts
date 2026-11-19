@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  EndpointKind,
   type RelatedEnd,
   RelationshipType,
   SearchEntityType,
@@ -11,6 +10,7 @@ import {
   ASSERTABLE_GROUPS,
   canAssert,
   defaultGroupFor,
+  EndpointKind,
   edgeFor,
   groupEdges,
   groupOf,

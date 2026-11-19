@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   type CollectionFileSummary,
   type CollectionRead,
-  PropertyTarget,
+  ContentKind,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { collectionMetadataSaves } from "@/hooks/useCollections";
@@ -63,7 +63,7 @@ const FileProperty = ({
     />
   ) : (
     <PlacedPropertyField
-      saves={itemSaves(propertySaves[PropertyTarget.file], file.id)}
+      saves={itemSaves(propertySaves[ContentKind.file], file.id)}
       id={file.id}
       properties={file.properties}
       readOnly

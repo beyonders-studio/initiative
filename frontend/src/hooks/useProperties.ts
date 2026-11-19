@@ -12,7 +12,7 @@ import type {
   PropertyOption,
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { setProperties } from "@/api/generated/properties/properties";
 import {
   createPropertyDefinition,
@@ -263,21 +263,19 @@ type PropertyHolder = { properties: PropertySummary[] };
  * {@link useHeldItem} reads them.
  */
 export const propertySaves = Object.fromEntries(
-  Object.values(PropertyTarget).map(
-    (target): [PropertyTarget, FieldSaveKind<PropertyHolder, never>] => [
-      target,
-      {
-        name: `properties-${target}`,
-        readKey: (communityId, id) => heldKey(`properties-${target}`, communityId, id),
-        // Only its properties are saved this way.
-        patch: () => Promise.reject(new Error("a row's properties take no patch")),
-        properties: target,
-        lists: () => q.propertyHolder(target),
-        itself: () => ({}),
-      },
-    ]
-  )
-) as Record<PropertyTarget, FieldSaveKind<PropertyHolder, never>>;
+  Object.values(ContentKind).map((target): [ContentKind, FieldSaveKind<PropertyHolder, never>] => [
+    target,
+    {
+      name: `properties-${target}`,
+      readKey: (communityId, id) => heldKey(`properties-${target}`, communityId, id),
+      // Only its properties are saved this way.
+      patch: () => Promise.reject(new Error("a row's properties take no patch")),
+      properties: target,
+      lists: () => q.propertyHolder(target),
+      itself: () => ({}),
+    },
+  ])
+) as Record<ContentKind, FieldSaveKind<PropertyHolder, never>>;
 
 /** A counter on an item a list shows, stepped up or down. */
 export type CounterStep = { itemId: number; definition: PropertyDefinitionRead; up: boolean };
@@ -288,7 +286,7 @@ export type CounterStep = { itemId: number; definition: PropertyDefinitionRead; 
  * metadata is the collection's, so it is stepped through the collection.
  * Answers the item's values as the server then holds them.
  */
-export const useStepCounter = (target: PropertyTarget) =>
+export const useStepCounter = (target: ContentKind) =>
   useCommunityMutation<PropertySummary[], CounterStep>({
     mutationFn: (communityId, { itemId, definition, up }) => {
       const body = { merge: true, steps: [{ property_id: definition.id, up }] };
@@ -299,7 +297,7 @@ export const useStepCounter = (target: PropertyTarget) =>
     invalidate: () =>
       invalidate(
         q.propertyHolder(target),
-        ...(target === PropertyTarget.file ? [q.allCollections()] : [])
+        ...(target === ContentKind.file ? [q.allCollections()] : [])
       ),
     errorKey: "properties:manager.setValuesError",
   });

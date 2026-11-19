@@ -2,23 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated
 
 from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.tools import TRASH_TARGETS
 from app.models.tenant._mixins import ActorKind
 from app.schemas.base import SanitizedBaseModel
-from app.schemas.kinds import WithInstalled
 from app.schemas.query import PageMeta
 
-# Derived from the Tool enum plus the non-tool trashable extras, exactly the way
-# TagTarget derives from TAG_TARGETS — a new tool reaches the trash can without
-# this being edited.
+# Derived from the Tool enum plus the non-tool trashable extras — a new tool
+# reaches the trash can without this being edited.
 EntityType = Enum("EntityType", {name: name for name in TRASH_TARGETS}, type=str)
 EntityType.__doc__ = "Entity types the trash can holds."
-#: What a trashed row is: a built-in kind, or a tool plug-in's.
-TrashedKind = Annotated[str, WithInstalled(EntityType)]
 
 
 class TrashItem(SanitizedBaseModel):
@@ -26,7 +21,7 @@ class TrashItem(SanitizedBaseModel):
         from_attributes=True, json_schema_serialization_defaults_required=True
     )
 
-    entity_type: TrashedKind
+    entity_type: str
     entity_id: int
     # The guild the entity lives in. Within a single guild's trash this is
     # constant, but the cross-guild ``/me/trash`` view merges several guilds,

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { EndpointKind, RelationshipType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { RelationshipType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CreateToolDialog } from "@/components/tools/CreateToolDialog";
 import { useContactsList } from "@/hooks/useContacts";
 import { useRelate } from "@/hooks/useRelationships";
 import { type ContactDetails, filledDetails, NO_DETAILS } from "@/lib/contacts";
+import { EndpointKind } from "@/lib/relationships";
 import type { DialogProps } from "@/types/dialog";
 import { Combobox } from "@/ui/combobox";
 import { Field } from "@/ui/field";

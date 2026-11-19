@@ -71,6 +71,34 @@ async def _counters(
     return moderator, member
 
 
+async def test_an_initiatives_creator_adds_a_row_after_the_install(
+    client, session, acting_user
+):
+    """The member who made an initiative, who holds no share override, adds
+    a row of a tool installed after it was made, and an item inside it, and
+    reads them as their owner."""
+    creator = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    seat = await acting_user(guild=creator.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+
+    async def made(path: str, body: Any) -> dict[str, Any]:
+        response = await client.post(
+            creator.g(f"/plugin-tools/{path}"), headers=creator.headers, json=body
+        )
+        assert response.status_code == 201, (path, response.text)
+        return response.json()
+
+    group = await made(
+        f"{GROUP}/", {"initiative_id": creator.initiative.id, "name": "G"}
+    )
+    await made(f"{COUNTER}/", {"parent_id": group["id"], "name": "HP"})
+    response = await client.get(
+        creator.g(f"/plugin-tools/{GROUP}/{group['id']}"), headers=creator.headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["can"]["share"] is True
+
+
 async def test_a_new_row_starts_as_declared_and_actions_side_by_side_both_land(
     client, session, acting_user, reading_as
 ):

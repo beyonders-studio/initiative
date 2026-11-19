@@ -38,8 +38,9 @@ from app.core.messages import (
     MarketplaceMessages,
     PluginDataMessages,
 )
+from app.core.tool_set import ToolSet
 from app.core.tools import Tool
-from app.db.session import routed_context, routed_guild_id
+from app.db.session import routed_context, routed_guild_id, routed_tools
 from app.models.platform.marketplace import (
     MarketplaceListingVersion,
 )
@@ -88,11 +89,14 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _normalize_body(definition: dict, config: dict) -> tuple[dict, dict]:
-    """Validate a definition + its config together. Raises 422 with the
-    validator's machine code so the client can localize it."""
-    clean_definition = normalize_dashboard_definition(definition or {})
-    clean_config = normalize_dashboard_config(config or {}, clean_definition)
+def _normalize_body(
+    definition: dict, config: dict, tools: ToolSet
+) -> tuple[dict, dict]:
+    """Validate a definition + its config together, for the community with
+    ``tools``. Raises 422 with the validator's machine code so the client can
+    localize it."""
+    clean_definition = normalize_dashboard_definition(definition or {}, tools)
+    clean_config = normalize_dashboard_config(config or {}, clean_definition, tools)
     return clean_definition, clean_config
 
 
@@ -202,11 +206,11 @@ async def create_dashboard(
         # Validated again on the way in: the catalog validated it at publish
         # time, but this build decides what it can render *now*.
         definition, config = _normalize_body(
-            _listing_canvas(version), dashboard_in.config
+            _listing_canvas(version), dashboard_in.config, guild_context.tools
         )
     else:
         definition, config = _normalize_body(
-            dashboard_in.definition, dashboard_in.config
+            dashboard_in.definition, dashboard_in.config, guild_context.tools
         )
 
     dashboard = Dashboard(
@@ -282,7 +286,9 @@ async def update_dashboard(
     if "definition" in update_data or "config" in update_data:
         definition = update_data.get("definition", dashboard.definition)
         config = update_data.get("config", dashboard.config)
-        normalized, normalized_config = _normalize_body(definition, config)
+        normalized, normalized_config = _normalize_body(
+            definition, config, guild_context.tools
+        )
         if (normalized, normalized_config) != (dashboard.definition, dashboard.config):
             _check_view_mode_allows(dashboard, guild_context)
         dashboard.definition, dashboard.config = normalized, normalized_config
@@ -339,7 +345,9 @@ async def upgrade_dashboard(
             detail=MarketplaceMessages.ALREADY_LATEST_VERSION,
         )
 
-    definition, config = _normalize_body(_listing_canvas(version), dashboard.config)
+    definition, config = _normalize_body(
+        _listing_canvas(version), dashboard.config, guild_context.tools
+    )
     # A new version replaces what this dashboard asks, which is the same act as
     # editing it.
     _check_view_mode_allows(dashboard, guild_context)
@@ -482,7 +490,10 @@ async def canvas_widget_data(
         sql = (binding or {}).get("sql")
         try:
             if source == "query" and isinstance(sql, str) and sql.strip():
-                sources[widget_id] = (sql, query_service.resolve(sql))
+                sources[widget_id] = (
+                    sql,
+                    query_service.resolve(sql, tools=routed_tools(session)),
+                )
             elif source == "plugin" and binding is not None:
                 if installs is None:
                     installs = {

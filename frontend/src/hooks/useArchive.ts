@@ -10,10 +10,13 @@
  * broadly rather than by kind.
  */
 import { archiveEntity, unarchiveEntity } from "@/api/generated/archive/archive";
-import type { ArchivableType, ArchiveResponse } from "@/api/generated/initiativeAPI.schemas";
+import type { ArchiveResponse, ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
+
+/** What a built-in archive names: a tool, a kind inside one, or an initiative. */
+export type ArchivableType = ContentKind | "initiative";
 
 export type ArchiveTarget = { entityType: ArchivableType; entityId: number };
 

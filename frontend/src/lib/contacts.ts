@@ -9,12 +9,12 @@
 import {
   type ContactDetail,
   type ContactRead,
-  EndpointKind,
   type RelatedEnd,
   type RelationshipRead,
   RelationshipType,
   SmartChipAspect,
 } from "@/api/generated/initiativeAPI.schemas";
+import { EndpointKind } from "@/lib/relationships";
 
 /** The lists a contact holds, in the order a card shows them. */
 export const CONTACT_DETAILS = ["phones", "emails", "addresses", "websites"] as const;

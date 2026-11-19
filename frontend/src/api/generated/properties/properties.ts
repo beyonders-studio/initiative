@@ -15,7 +15,6 @@ import type {
 import type {
   HTTPValidationError,
   PropertySummary,
-  PropertyTarget,
   PropertyValuesSetRequest,
 } from "../initiativeAPI.schemas";
 
@@ -39,7 +38,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  */
 export const setProperties = (
   communityId: number,
-  target: PropertyTarget,
+  target: string,
   entityId: number,
   propertyValuesSetRequest: BodyType<PropertyValuesSetRequest>,
   options?: SecondParameter<typeof apiMutator>,
@@ -100,7 +99,7 @@ export type SetPropertiesMutationBody = BodyType<PropertyValuesSetRequest>;
 export type SetPropertiesMutationError = ErrorType<HTTPValidationError>;
 export type SetPropertiesMutationVariables = {
   communityId: number;
-  target: PropertyTarget;
+  target: string;
   entityId: number;
   data: BodyType<PropertyValuesSetRequest>;
 };

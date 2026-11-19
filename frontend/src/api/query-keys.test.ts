@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { type PostRead, PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ContentKind, type PostRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   invalidate,
   patchCachedPost,
@@ -93,7 +93,7 @@ describe("query-keys community scoping", () => {
     const calendarEntries = seed(["/api/v1/c/5/calendar-entries/"]);
 
     setInvalidationCommunity(5);
-    await invalidate(q.propertyHolder(PropertyTarget.wiki_page));
+    await invalidate(q.propertyHolder(ContentKind.wiki_page));
 
     expect(page()).toBe(true);
     expect(tree()).toBe(true);
@@ -101,7 +101,7 @@ describe("query-keys community scoping", () => {
     expect(calendarEntries()).toBe(false);
 
     // A task's values also show on the calendar's entries.
-    await invalidate(q.propertyHolder(PropertyTarget.task));
+    await invalidate(q.propertyHolder(ContentKind.task));
     expect(calendarEntries()).toBe(true);
   });
 

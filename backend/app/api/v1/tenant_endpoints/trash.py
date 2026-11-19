@@ -56,7 +56,6 @@ from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import Task
 from app.schemas.tenant.trash import (
     RestoreResponse,
-    TrashedKind,
     TrashItem,
     TrashListResponse,
 )
@@ -316,7 +315,7 @@ async def _load_trash_entity(
     response_model=RestoreResponse,
 )
 async def restore_trash_entity(
-    entity_type: TrashedKind,
+    entity_type: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -369,7 +368,7 @@ async def restore_trash_entity(
     response_class=Response,
 )
 async def purge_trash_entity(
-    entity_type: TrashedKind,
+    entity_type: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import {
   type CommentCreate,
   type CommentRead,
-  type CommentSubject,
+  type ContentKind,
   ModerationAct,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -34,7 +34,7 @@ export interface CommentWithReplies extends CommentRead {
 }
 
 interface CommentSectionProps {
-  entityType: CommentSubject;
+  entityType: ContentKind;
   entityId: number;
   comments?: CommentRead[];
   onCommentCreated?: (comment: CommentRead) => void;

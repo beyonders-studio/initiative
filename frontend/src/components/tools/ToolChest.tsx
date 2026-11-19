@@ -17,15 +17,14 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  type ArchivableType,
+  ContentKind,
   type PropertySummary,
-  PropertyTarget,
   type TagSummary,
   type Tool,
   type ToolCan,
 } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadge, TagPicker } from "@/components/tags";
-import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
+import { type ArchivableType, useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
 import { usePropertyEnv } from "@/hooks/usePropertyEnv";
@@ -61,7 +60,7 @@ export interface ToolChestTemplate {
  *  tags are saved. */
 export interface ToolChestKind {
   archivable: ArchivableType;
-  properties: (typeof propertySaves)[PropertyTarget];
+  properties: (typeof propertySaves)[ContentKind];
   saveTags: (tagIds: number[]) => Promise<unknown>;
 }
 
@@ -183,7 +182,7 @@ export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestP
       {hasProperties && propertiesOpen ? (
         <div className="border-t py-3 pr-[var(--chest-gutter-right,1rem)] pl-[var(--chest-gutter,1rem)]">
           <PropertiesField
-            saves={itemSaves(kind?.properties ?? propertySaves[PropertyTarget[tool]], entity.id)}
+            saves={itemSaves(kind?.properties ?? propertySaves[ContentKind[tool]], entity.id)}
             env={propertyEnv}
             id={entity.id}
             properties={entity.properties ?? []}

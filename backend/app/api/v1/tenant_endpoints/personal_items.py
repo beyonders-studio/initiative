@@ -9,7 +9,8 @@ Setting and clearing one is community-addressed
 only unique within a community. Opening and subscribing take read on the item,
 the same its own page takes; bookmarking takes it on a tool. Clearing asks
 nothing of the item, so a mark on something the reader has lost still comes
-off. A community's bookmarks serve its sidebar and the bookmarks on its pages;
+off. Each takes a kind the community has, a tool plug-in's among them, and a
+kind it does not have is not found. A community's bookmarks serve its sidebar and the bookmarks on its pages;
 ``/me/personal-items`` gathers every community's tabs or bookmarks, names and
 icons only, each community's read inside that community's routed session.
 
@@ -29,6 +30,7 @@ from app.core.tools import Tool
 from app.db.session import require_guild_context
 from app.models.platform.guild import GuildMembership
 from app.models.tenant.personal_item import ViewSource
+from app.schemas.kinds import require_kind
 from app.schemas.tenant.personal_item import (
     ContentKind,
     ListedMark,
@@ -97,7 +99,7 @@ async def _state(
         else None
     )
     return PersonalItemState(
-        entity_type=ContentKind(kind),
+        entity_type=kind,
         entity_id=entity_id,
         viewed_at=row.viewed_at if row else None,
         view_source=ViewSource(row.view_source) if row and row.view_source else None,
@@ -143,20 +145,20 @@ async def list_personal_items(
 
 @guild_router.get("/{kind}/{entity_id}", response_model=PersonalItemState)
 async def read_personal_item(
-    kind: ContentKind,
+    kind: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
 ) -> PersonalItemState:
     """What the reader keeps about one item: empty where they keep nothing."""
-    del guild_context
-    return await _state(session, current_user.id, kind.value, entity_id)
+    require_kind(guild_context.tools, kind, ContentKind)
+    return await _state(session, current_user.id, kind, entity_id)
 
 
 @guild_router.put("/view/{kind}/{entity_id}", response_model=PersonalItemState)
 async def record_view(
-    kind: ContentKind,
+    kind: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
@@ -166,40 +168,40 @@ async def record_view(
     """Record that the reader opened this: a tool, which becomes a tab, or
     something inside one, which does not. A platform grantee's browsing is
     transient and is not kept."""
+    require_kind(guild_context.tools, kind, ContentKind)
     row = await resource_access.load_kind(
-        session, kind.value, entity_id, current_user, guild_context
+        session, kind, entity_id, current_user, guild_context
     )
     viewed_at = await service.record_view(
         session,
         user_id=current_user.id,
-        entity_type=kind.value,
+        entity_type=kind,
         entity_id=row.id,
         source=source,
         persist=not guild_context.is_pam,
     )
-    state = await _state(
-        session, current_user.id, kind.value, row.id, subscription=False
-    )
+    state = await _state(session, current_user.id, kind, row.id, subscription=False)
     return state.model_copy(update={"viewed_at": viewed_at, "view_source": source})
 
 
 @guild_router.put("/bookmark/{tool}/{entity_id}", response_model=PersonalItemState)
 async def bookmark_item(
-    tool: Tool,
+    tool: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
 ) -> PersonalItemState:
     """Bookmark a tool. Bookmarking one already bookmarked keeps the first time."""
+    require_kind(guild_context.tools, tool, Tool, items=False)
     return await _set(
-        Mark.bookmark, tool.value, entity_id, session, current_user, guild_context
+        Mark.bookmark, tool, entity_id, session, current_user, guild_context
     )
 
 
 @guild_router.put("/subscribe/{kind}/{entity_id}", response_model=PersonalItemState)
 async def subscribe_item(
-    kind: ContentKind,
+    kind: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
@@ -207,8 +209,9 @@ async def subscribe_item(
 ) -> PersonalItemState:
     """Subscribe to a tool or anything inside one: its changes, and those of what is
     inside it, rise in the reader's feed and notify them."""
+    require_kind(guild_context.tools, kind, ContentKind)
     return await _set(
-        Mark.subscribe, kind.value, entity_id, session, current_user, guild_context
+        Mark.subscribe, kind, entity_id, session, current_user, guild_context
     )
 
 
@@ -256,37 +259,37 @@ async def _clear(mark: Mark, kind: str, entity_id: int, session, user_id: int) -
 
 @guild_router.delete("/view/{kind}/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def clear_view(
-    kind: ContentKind,
+    kind: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
 ) -> None:
     """Close a tab. Idempotent."""
-    del guild_context
-    await _clear(Mark.view, kind.value, entity_id, session, current_user.id)
+    require_kind(guild_context.tools, kind, ContentKind)
+    await _clear(Mark.view, kind, entity_id, session, current_user.id)
 
 
 @guild_router.delete(
     "/bookmark/{tool}/{entity_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def unbookmark_item(
-    tool: Tool,
+    tool: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
 ) -> None:
     """Remove a bookmark. Idempotent."""
-    del guild_context
-    await _clear(Mark.bookmark, tool.value, entity_id, session, current_user.id)
+    require_kind(guild_context.tools, tool, Tool, items=False)
+    await _clear(Mark.bookmark, tool, entity_id, session, current_user.id)
 
 
 @guild_router.delete(
     "/subscribe/{kind}/{entity_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def unsubscribe_item(
-    kind: ContentKind,
+    kind: str,
     entity_id: int,
     session: RLSSessionDep,
     current_user: CurrentUser,
@@ -297,17 +300,18 @@ async def unsubscribe_item(
     comes off something the reader has lost too; where they keep nothing about
     it yet, the item is loaded as its page does. A platform grantee is not a
     member, so nothing is kept."""
+    require_kind(guild_context.tools, kind, ContentKind)
     if guild_context.is_pam:
         return
     if await service.unsubscribe(
-        session, user_id=current_user.id, kind=kind.value, entity_id=entity_id
+        session, user_id=current_user.id, kind=kind, entity_id=entity_id
     ):
         return
     row = await resource_access.load_kind(
-        session, kind.value, entity_id, current_user, guild_context
+        session, kind, entity_id, current_user, guild_context
     )
     await service.unsubscribe(
-        session, user_id=current_user.id, kind=kind.value, entity_id=row.id, new=True
+        session, user_id=current_user.id, kind=kind, entity_id=row.id, new=True
     )
 
 

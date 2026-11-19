@@ -436,6 +436,21 @@ class ToolExportAdapter:
         many entities gains by loading them all before building any."""
         return type(self).prepare is not ToolExportAdapter.prepare
 
+    def filters_of(self, raw: Any) -> BaseModel | None:
+        """The tool's export filters from a job's params, or ``None``."""
+        return parse_filters(self.tool, raw)
+
+    async def narrow(
+        self,
+        session: AsyncSession,
+        user: User,
+        filters: BaseModel | None,
+        ids: list[int],
+    ) -> list[int]:
+        """The ids, in their order, that the tool's list answers with
+        ``filters`` (``export.filters.narrow``)."""
+        return await narrow(session, user, self.tool, filters, ids)
+
     # -- the shape every tool shares -----------------------------------------
 
     def selection(self, params: dict) -> list[int]:
@@ -463,12 +478,8 @@ class ToolExportAdapter:
             await self.fetch(session, user, guild_id, entity_id) for entity_id in ids
         ]
         kept = set(
-            await narrow(
-                session,
-                user,
-                self.tool,
-                parse_filters(self.tool, params.get("filters")),
-                ids,
+            await self.narrow(
+                session, user, self.filters_of(params.get("filters")), ids
             )
         )
         return [entity for entity_id, entity in zip(ids, entities) if entity_id in kept]
@@ -502,7 +513,7 @@ class ToolExportAdapter:
             # One clock read: the filename date and the subtitle timestamp
             # must not straddle midnight into disagreeing dates.
             now=datetime.now(resolve_zone(params.get("tz"))),
-            filters=parse_filters(self.tool, params.get("filters")),
+            filters=self.filters_of(params.get("filters")),
         )
         ctx = replace(ctx, prepared=await self.prepare(session, entities, ctx))
         batch = self.batch(entities, ctx)

@@ -90,16 +90,29 @@ def _actions(kind: str, tool: sa.FromClause) -> sa.ColumnElement[Any]:
     )
 
 
+def joined_up(
+    table: Table,
+    hops: tuple[tuple[str, str], ...],
+    tools: ToolSet,
+    *,
+    isouter: bool = False,
+) -> tuple[sa.FromClause, sa.FromClause]:
+    """``table`` joined along ``hops`` up to the row of the tool it is in, and
+    that row within the join: ``table`` itself where its row is the tool's."""
+    joined: sa.FromClause = table
+    here: sa.FromClause = table
+    for i, (column, parent) in enumerate(hops):
+        up = tools.tables[parent].alias(f"tool_hop_{i}")
+        joined = joined.join(up, up.c.id == here.c[column], isouter=isouter)
+        here = up
+    return joined, here
+
+
 def select_rows(located: Located, tools: ToolSet) -> sa.Select[Any]:
     """The rows of ``located``'s table, each with what the request may do to
     the tool it is in and that tool's own row."""
     table = located.table
-    joined: sa.FromClause = table
-    here: sa.FromClause = table
-    for i, (column, parent) in enumerate(located.hops):
-        up = tools.tables[parent].alias(f"tool_hop_{i}")
-        joined = joined.join(up, up.c.id == here.c[column])
-        here = up
+    joined, here = joined_up(table, located.hops, tools)
     tool = [] if here is table else [c.label(f"_tool_{c.name}") for c in here.c]
     return sa.select(
         table, *tool, _actions(located.tool.kind, here).label("_actions")

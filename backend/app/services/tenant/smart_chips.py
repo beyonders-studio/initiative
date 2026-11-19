@@ -37,6 +37,7 @@ from app.core.smart_chips import (
 )
 from app.core.user_display import display_name
 from app.db import reference_targets
+from app.db.session import routed_tools
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.calendar_event import CalendarEvent
@@ -409,8 +410,9 @@ async def _titles(
     answers with its name and a task with its title without either being
     written down here.
     """
-    table = reference_targets.id_column(entity_type).table
-    title = reference_targets.title_column(entity_type)
+    tools = routed_tools(session)
+    table = reference_targets.id_column(entity_type, tools=tools).table
+    title = reference_targets.title_column(entity_type, tools=tools)
     rows = (
         await session.exec(select(table.c["id"], title).where(table.c["id"].in_(ids)))
     ).all()
@@ -434,11 +436,12 @@ async def _visible(
     handed an id that did not come back from this, so a chip added later
     cannot forget it.
     """
+    tools = routed_tools(session)
     seen: dict[SearchEntityType, set[int]] = {}
     for entity_type, ids in wanted.items():
         statement = reference_targets.visible_ids(
-            entity_type, user_id, need_write=need_write
-        ).where(reference_targets.id_column(entity_type).in_(ids))
+            entity_type, user_id, tools=tools, need_write=need_write
+        ).where(reference_targets.id_column(entity_type, tools=tools).in_(ids))
         # A Core-column select yields rows, not scalars.
         rows = (await session.exec(statement)).all()
         seen[entity_type] = {row[0] for row in rows}
@@ -542,7 +545,7 @@ async def _descriptions(
 ) -> dict[int, str]:
     """What these things say about themselves — read from the kind's own
     ``description`` column, so a kind has one here exactly when its table does."""
-    table = reference_targets.id_column(entity_type).table
+    table = reference_targets.id_column(entity_type, tools=routed_tools(session)).table
     if "description" not in table.c:
         return {}
     rows = (
@@ -575,7 +578,7 @@ async def _bodies(
     prose = _PROSE.get(entity_type)
     if prose is None:
         return {}
-    table = reference_targets.id_column(entity_type).table
+    table = reference_targets.id_column(entity_type, tools=routed_tools(session)).table
     rows = (
         await session.exec(
             select(table.c["id"], table.c["content"]).where(

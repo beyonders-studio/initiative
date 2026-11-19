@@ -24,9 +24,9 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
 
 
-# Derived from the widget registry rather than restated, the way TagTarget
-# derives from TAG_TARGETS: a new primitive reaches the API — and, through the
-# generated types, the frontend's drift test — without an edit here.
+# Derived from the widget registry rather than restated: a new primitive
+# reaches the API — and, through the generated types, the frontend's drift
+# test — without an edit here.
 WidgetType = Enum("WidgetType", {name: name for name in sorted(WIDGET_SPECS)}, type=str)
 WidgetType.__doc__ = "Widget primitives this build has renderers for."
 

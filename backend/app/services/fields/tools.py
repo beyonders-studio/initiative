@@ -8,11 +8,19 @@ cannot say for itself.
 They live together rather than one module each because there is nothing to say
 about any of them individually. A dataset that grows a computed field or a
 relation worth explaining earns its own module then, the way tasks have.
+
+A tool plug-in's tool and each of its item tables are datasets too
+(:func:`build_installed`), named by their tables as a built-in's are, their
+fields their columns: the declared ones and those every tool's rows have.
 """
 
 from __future__ import annotations
 
+from sqlalchemy import Table
+
+from app.core.tool_set import ToolSet
 from app.core.tools import Tool
+from app.db.plugin_tools import DECLARED
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection
 from app.models.tenant.contact import Contact
@@ -155,3 +163,49 @@ def build_wiki_pages() -> Dataset:
             ),
         ),
     )
+
+
+def build_installed(tools: ToolSet) -> dict[str, Dataset]:
+    """The datasets of every tool in ``tools`` an installed tool plug-in
+    brings, by table: the tool's own, and each item table's, which reaches
+    the table it sits under as a counter reaches its group, each tagged as
+    its kind is."""
+    from app.services.tenant.tags import tag_links
+
+    tagged = {link.table.name: link for link in tag_links(tools).values()}
+
+    def build(table: Table) -> Dataset:
+        return Dataset(
+            model=table,
+            name_override=table.name,
+            # A declared person is an id with no key to ``users``: say so.
+            fields=derive_fields(
+                table,
+                references={
+                    column.name: "users"
+                    for column in table.c
+                    if column.info.get("field") == "user_reference"
+                },
+                tags=tagged.get(table.name),
+            ),
+            relations=tuple(
+                Relation(
+                    name=fk.column.table.info[DECLARED]["key"],
+                    hops=(
+                        Hop(
+                            dataset=fk.column.table.name,
+                            left=fk.parent.name,
+                            right=fk.column.name,
+                        ),
+                    ),
+                )
+                for fk in table.foreign_keys
+                if DECLARED in fk.column.table.info
+            ),
+        )
+
+    return {
+        table.name: build(table)
+        for tool in tools.installed
+        for table in (tool.table, *tool.items)
+    }

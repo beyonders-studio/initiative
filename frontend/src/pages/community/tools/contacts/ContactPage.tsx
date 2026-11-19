@@ -17,7 +17,6 @@ import { useTranslation } from "react-i18next";
 import {
   AdminSurface,
   type ContactRead,
-  EndpointKind,
   type RelatedEnd,
   type RelationshipRead,
   RelationshipType,
@@ -58,6 +57,7 @@ import {
   telHref,
 } from "@/lib/contacts";
 import { toast } from "@/lib/mascotToast";
+import { EndpointKind } from "@/lib/relationships";
 import { toolDetailRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";

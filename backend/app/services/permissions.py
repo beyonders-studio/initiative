@@ -39,6 +39,7 @@ from app.core.messages import (
     ProjectMessages,
     SharingMessages,
 )
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool, ToolRefusals
 from app.db.authorization import standing_arg
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
@@ -55,7 +56,7 @@ from app.services import audit as audit_service
 
 
 def granted_scope_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     id_col: ColumnElement[int],
     user_id: int | None,
     *,
@@ -97,7 +98,7 @@ def granted_scope_clause(
 
 
 def listing_scope_clause(
-    tool: Tool,
+    tool: Tool | ToolRecord,
     id_col: ColumnElement[int],
     user_id: int | None,
     *,
@@ -181,9 +182,10 @@ def serialize_grants(row: Any, *, context: ActorContext | None) -> list:
 
 
 async def audience(
-    session: Any, tool: Tool, rows: Iterable[Any]
+    session: Any, tool: Tool | ToolRecord, rows: Iterable[Any]
 ) -> dict[int, set[int]]:
-    """Who each of ``rows`` (``tool`` rows) is shared with and can open now, by
+    """Who each of ``rows`` (``tool`` rows, a built-in tool's or an installed
+    one's) is shared with and can open now, by
     id: the schema's ``resource_audience``, narrowed to
     :func:`named_people.readers_of`. The people a notification goes to and a
     notice is read by. Rows that reach nobody are absent.
@@ -406,15 +408,13 @@ async def replace_resource_grants(
                     reader,
                     initiative_id=initiative_id,
                     user_ids=valid_users,
-                    permission_key=tool.view_permission,
-                    default=tool.spec.on_by_default,
+                    tool=tool,
                 ),
                 await rls_service.roles_permitting(
                     reader,
                     initiative_id=initiative_id,
                     role_ids=valid_roles,
-                    permission_key=tool.view_permission,
-                    default=tool.spec.on_by_default,
+                    tool=tool,
                 ),
             )
 
@@ -512,7 +512,7 @@ async def replace_resource_grants(
 async def share_with(
     session: Any,
     *,
-    resource_type: Tool,
+    resource_type: str,
     resource_id: int,
     guild_id: int,
     initiative_id: int | None,
@@ -643,7 +643,7 @@ def _refusal(
     if action is Action.export:
         initiative = (
             None
-            if "initiative" in inspect(row).unloaded
+            if isinstance(row, ToolRow) or "initiative" in inspect(row).unloaded
             else getattr(row, "initiative", None)
         )
         return HTTPException(

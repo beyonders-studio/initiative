@@ -1867,7 +1867,7 @@ def _ownership_payload(
         counts[item.tool.value] = counts.get(item.tool.value, 0) + 1
     return OwnedContentResponse(
         items=[
-            OwnedContentItem(tool=item.tool, id=item.id, name=item.name)
+            OwnedContentItem(tool=item.tool.kind, id=item.id, name=item.name)
             for item in items
         ],
         counts=counts,

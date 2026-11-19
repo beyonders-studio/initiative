@@ -16,7 +16,7 @@
 
 import { useMemo } from "react";
 
-import type { CommentSubject, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
 import {
   type CommentThreadParams,
@@ -33,7 +33,7 @@ interface ToolCommentsPanelProps {
   /** The tool entity itself, as its read schema returns it. */
   entity: ToolCommentEntity;
   /** The thread itself, where it is not the tool entity's own — a wiki page. */
-  target?: { type: CommentSubject; id: number };
+  target?: { type: ContentKind; id: number };
   title?: string;
   /** Called with +1/-1 when the thread grows or shrinks, for a page that shows
    *  a comment count of its own. */
@@ -47,7 +47,7 @@ export const ToolCommentsPanel = ({
   title,
   onCountChange,
 }: ToolCommentsPanelProps) => {
-  const targetType: CommentSubject = target?.type ?? tool;
+  const targetType: ContentKind = target?.type ?? tool;
   const entityId = target?.id ?? entity.id;
   const enabled = entity.comments_enabled ?? true;
   // A community-level entity (an plugin-installed calendar) belongs to no initiative;

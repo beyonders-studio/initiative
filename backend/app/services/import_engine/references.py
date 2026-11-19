@@ -50,6 +50,7 @@ from app.core.references import (
 )
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
+from app.db.session import routed_tools
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.import_engine.context import ImportContext
@@ -360,7 +361,7 @@ async def resolve_references(
             )
             session.add(row)
         owner = (
-            content_references.comment_parent(row)
+            content_references.comment_parent(row, routed_tools(session))
             if kind == SearchEntityType.comment
             else Endpoint(kind, entity_id)
         )

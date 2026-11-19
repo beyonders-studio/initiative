@@ -12,11 +12,7 @@ import type {
   UseMutationResult,
 } from "@tanstack/react-query";
 
-import type {
-  ArchivableType,
-  ArchiveResponse,
-  HTTPValidationError,
-} from "../initiativeAPI.schemas";
+import type { ArchiveResponse, HTTPValidationError } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
 import type { ErrorType } from "../../mutator";
@@ -31,7 +27,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  */
 export const archiveEntity = (
   communityId: number,
-  entityType: ArchivableType,
+  entityType: string,
   entityId: number,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
@@ -85,7 +81,7 @@ export type ArchiveEntityMutationResult = NonNullable<Awaited<ReturnType<typeof 
 export type ArchiveEntityMutationError = ErrorType<HTTPValidationError>;
 export type ArchiveEntityMutationVariables = {
   communityId: number;
-  entityType: ArchivableType;
+  entityType: string;
   entityId: number;
 };
 
@@ -119,7 +115,7 @@ export const useArchiveEntity = <TError = ErrorType<HTTPValidationError>, TConte
  */
 export const unarchiveEntity = (
   communityId: number,
-  entityType: ArchivableType,
+  entityType: string,
   entityId: number,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
@@ -175,7 +171,7 @@ export type UnarchiveEntityMutationResult = NonNullable<
 export type UnarchiveEntityMutationError = ErrorType<HTTPValidationError>;
 export type UnarchiveEntityMutationVariables = {
   communityId: number;
-  entityType: ArchivableType;
+  entityType: string;
   entityId: number;
 };
 

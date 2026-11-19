@@ -39,6 +39,7 @@ from typing import Any, Literal
 
 from app.core.errors import CodedError
 from app.core.messages import DashboardMessages
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.models.platform.marketplace import UID_ALPHABET, UID_LENGTH
 from app.services.fields.spec import FieldType
 from app.services.marketplace.manifest_values import (
@@ -630,6 +631,7 @@ _DEFINITION_ONLY_KEYS = (
 def _normalize_binding(
     raw: Any,
     spec: WidgetSpec,
+    tools: ToolSet,
     *,
     plugin_listing_uid: str | None = None,
 ) -> dict[str, Any]:
@@ -653,14 +655,14 @@ def _normalize_binding(
         if key != "source" and key not in _CONTEXT_ONLY_PARAMS
     }
     if source == QUERY_SOURCE:
-        statement = _checked_statement(params.get("sql"))
+        statement = _checked_statement(params.get("sql"), tools)
         params.pop("sql", None)
         if statement is not None:
             params["sql"] = statement
     return {"source": source, **params}
 
 
-def _checked_statement(raw: Any) -> str | None:
+def _checked_statement(raw: Any, tools: ToolSet) -> str | None:
     """The statement, having been read the way the surface will read it.
 
     Checked here rather than at fetch time because a definition that cannot be
@@ -673,6 +675,8 @@ def _checked_statement(raw: Any) -> str | None:
     installed listing may ship one for its guild to fill in. It draws its own
     "not configured" panel rather than anything of anybody's, because there is
     nothing to run.
+
+    *tools* are the community's, whose datasets the statement may name.
     """
     if raw is None or (isinstance(raw, str) and not raw.strip()):
         return None
@@ -682,7 +686,7 @@ def _checked_statement(raw: Any) -> str | None:
     if len(raw) > MAX_SQL_LENGTH:
         _fail(DashboardMessages.BINDING_SQL_TOO_LONG)
     try:
-        resolve(raw)
+        resolve(raw, tools=tools)
     except QueryError as refused:
         raise DashboardDefinitionError(refused.code) from refused
     return raw
@@ -796,6 +800,7 @@ def _normalize_widget(
     raw: Any,
     index: int,
     seen_ids: set[str],
+    tools: ToolSet,
 ) -> dict[str, Any]:
     widget = _require_mapping(raw, DashboardMessages.WIDGET_INVALID)
     declared = widget.get("type")
@@ -831,6 +836,7 @@ def _normalize_widget(
         "binding": _normalize_binding(
             widget.get("binding"),
             spec,
+            tools,
             plugin_listing_uid=plugin_parts[0] if plugin_parts else None,
         ),
     }
@@ -849,8 +855,11 @@ def _normalize_widget(
     return cleaned
 
 
-def normalize_dashboard_definition(payload: Any) -> dict[str, Any]:
-    """Validate and canonicalize a dashboard definition.
+def normalize_dashboard_definition(
+    payload: Any, tools: ToolSet = BUILTIN_TOOLS
+) -> dict[str, Any]:
+    """Validate and canonicalize a dashboard definition, its statements
+    naming the datasets of a community with ``tools``.
 
     Raises ``DashboardDefinitionError`` with a machine code for a widget type or
     binding source this app has no renderer/fetcher for; returns a definition in
@@ -869,7 +878,8 @@ def normalize_dashboard_definition(payload: Any) -> dict[str, Any]:
 
     seen_ids: set[str] = set()
     widgets = [
-        _normalize_widget(raw, index, seen_ids) for index, raw in enumerate(raw_widgets)
+        _normalize_widget(raw, index, seen_ids, tools)
+        for index, raw in enumerate(raw_widgets)
     ]
 
     raw_layout = definition.get("layout")
@@ -887,7 +897,7 @@ def normalize_dashboard_definition(payload: Any) -> dict[str, Any]:
 
 
 def normalize_dashboard_config(
-    payload: Any, definition: dict[str, Any]
+    payload: Any, definition: dict[str, Any], tools: ToolSet = BUILTIN_TOOLS
 ) -> dict[str, Any]:
     """Validate instance config against a definition's widgets.
 
@@ -922,6 +932,7 @@ def normalize_dashboard_config(
         resolved = _normalize_binding(
             {**binding, **open_values},
             PLUGIN_WIDGET_SPEC if plugin_parts else WIDGET_SPECS[widget["type"]],
+            tools,
             plugin_listing_uid=plugin_parts[0] if plugin_parts else None,
         )
         kept = {key: resolved[key] for key in open_values if key in resolved}

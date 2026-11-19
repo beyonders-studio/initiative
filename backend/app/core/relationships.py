@@ -184,23 +184,16 @@ ENDPOINT_KINDS: dict[SearchEntityType, Kind] = {
 #: end.
 PERSON = Kind("user", 18)
 
-#: Everything that may sit on either end, as the API names it: the kinds, and
-#: the person.
-EndpointKind = Enum(
-    "EndpointKind",
-    {v: v for v in sorted([*(kind.value for kind in ENDPOINT_KINDS), PERSON.value])},
-    type=str,
-    module=__name__,
-)
-
-#: The CHECK constraint's vocabulary, in a stable order.
-ENDPOINT_KIND_VALUES: tuple[str, ...] = tuple(kind.value for kind in EndpointKind)
-
-#: Each end's permanent code, by its name.
-_CODES: dict[str, int] = {
+#: Each built-in end's permanent code, by its name: the kinds, and the person.
+#: A tool plug-in's kinds take theirs from the community's tool set
+#: (``ToolSet.endpoint_codes``).
+ENDPOINT_CODES: dict[str, int] = {
     **{kind.value: endpoint.code for kind, endpoint in ENDPOINT_KINDS.items()},
     PERSON.value: PERSON.code,
 }
+
+#: The CHECK constraint's vocabulary, in a stable order.
+ENDPOINT_KIND_VALUES: tuple[str, ...] = tuple(sorted(ENDPOINT_CODES))
 
 #: How many low bits of a node id hold the entity id. Entity ids are ``int4``,
 #: so 31 bits are in use and 32 is the natural boundary; the kind code occupies
@@ -209,19 +202,15 @@ _CODES: dict[str, int] = {
 NODE_ID_SHIFT = 32
 
 
-def endpoint_code(kind: str) -> int:
-    """The permanent code of an end ``kind`` names."""
-    return _CODES[kind]
-
-
 def node_of(code: int, entity_id: int) -> int:
     """The node id of the thing of kind code ``code`` with ``entity_id``: a
-    built-in kind's (:func:`endpoint_code`) or a tool plug-in's."""
+    built-in kind's (:data:`ENDPOINT_CODES`) or a tool plug-in's."""
     return code << NODE_ID_SHIFT | entity_id
 
 
-def node_id(kind: EndpointKind, entity_id: int) -> int:
-    """One integer addressing one thing, derived rather than registered.
+def node_id(kind: str, entity_id: int) -> int:
+    """One integer addressing one thing of a built-in kind, derived rather
+    than registered.
 
     Every graph algorithm — a recursive walk, a component pass, anything
     off-the-shelf — addresses nodes as integers, and ours are ``(kind, id)``
@@ -232,17 +221,7 @@ def node_id(kind: EndpointKind, entity_id: int) -> int:
     The database computes the same value in a generated column, so SQL and
     Python agree by construction rather than by convention.
     """
-    return node_of(_CODES[kind.value], entity_id)
-
-
-def decode_node_id(value: int) -> tuple[EndpointKind, int]:
-    """``node_id`` backwards: the kind and the id it was built from."""
-    code = value >> NODE_ID_SHIFT
-    entity_id = value & ((1 << NODE_ID_SHIFT) - 1)
-    for kind, kind_code in _CODES.items():
-        if kind_code == code:
-            return EndpointKind(kind), entity_id
-    raise ValueError(f"no endpoint kind has code {code}")
+    return node_of(ENDPOINT_CODES[kind], entity_id)
 
 
 @dataclass(frozen=True)

@@ -27,7 +27,7 @@ comparison of ids rather than a sharing check: a reader who can open little of
 a busy community does not pay for the rest of it.
 
 Whether the reader made an item or is assigned to it is asked of each kind's
-own table (``personal_items.NAMING``, the rule subscriptions are worked out by),
+own table (``personal_items.naming``, the rule subscriptions are worked out by),
 once per kind among the candidates, and the candidates are scored here: asked
 inside the statement, every kind's table and its policies would be planned on
 every request whichever kinds were there. Unsubscribing from an item takes back
@@ -51,11 +51,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
 from app.db.initiative_rls import CONTENT_KIND_TABLES
+from app.db.session import routed_tools
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.search_entry import SearchEntry
 from app.services.tenant.change_log import RETENTION
 from app.services.tenant.engagement_levels import boosted
-from app.services.tenant.personal_items import NAMING
+from app.services.tenant.personal_items import naming
 
 #: How far back the feed reads: the change log's own retention.
 WINDOW = RETENTION
@@ -357,8 +358,9 @@ async def _involved(
 ) -> set[tuple[str, int]]:
     """The items, of those given by kind, the reader made or is named on."""
     found: set[tuple[str, int]] = set()
+    tied_by = naming(routed_tools(session))
     for kind, ids in items.items():
-        for table, item_column, person_column, _tie in NAMING.get(kind, ()):
+        for table, item_column, person_column, _tie in tied_by.get(kind, ()):
             rows = await session.exec(
                 select(table.c[item_column]).where(  # type: ignore[call-overload]
                     table.c[item_column].in_(ids), table.c[person_column] == reader_id
