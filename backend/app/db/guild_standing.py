@@ -41,6 +41,7 @@ routing of one community and the standing of another.
 
 from __future__ import annotations
 
+import functools
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
@@ -228,6 +229,7 @@ _TOOL_ON = (
     "COALESCE((SELECT cd.enabled FROM community_defaults cd"
     f" WHERE cd.key = '{INITIATIVE_TOOL_PREFIX}' || t.tool), t.enabled)"
 )
+
 
 def _person_rows(tools: ToolSet) -> str:
     """The reader's own rows the person statement reads, each table once.
@@ -1478,8 +1480,16 @@ def standing_values(
     return {guc: getattr(context, guc.bind, None) for guc in gucs.STANDING}
 
 
-async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
-    """Run :data:`STANDING_SQL` and return the row it wrote.
+@functools.cache
+def _community_standing_sql(tools: ToolSet) -> str:
+    return standing_sql(tools)
+
+
+async def compute_guild_standing(
+    session: AsyncSession, tools: ToolSet = BUILTIN_TOOLS
+) -> dict[str, Any]:
+    """Run :data:`STANDING_SQL`, or the community's own where it has tool
+    plug-ins, and return the row it wrote.
 
     The routed session has just had every standing key cleared, so what this
     writes is the whole of it. It binds nothing: the user and the community are
@@ -1487,7 +1497,8 @@ async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
     """
     from sqlalchemy import text
 
-    row = (await session.exec(text(STANDING_SQL))).one()
+    statement = STANDING_SQL if not tools.installed else _community_standing_sql(tools)
+    row = (await session.exec(text(statement))).one()
     return dict(row._mapping)
 
 

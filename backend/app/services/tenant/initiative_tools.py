@@ -99,6 +99,65 @@ async def write_switches(
     )
 
 
+async def write_plugin_tool_rules(
+    session: AsyncSession, *, initiative_id: int | None = None
+) -> None:
+    """Give every installed tool plug-in's tool what a built-in tool has in an
+    initiative: its switch, on, and each role's keys, as a built-in role holds
+    a tool's (a manager both, anyone else viewing it and not creating it). In
+    ``initiative_id``, or in every initiative. The rows are the install's.
+    Rows already there are kept as they are."""
+    from app.models.tenant.guild_plugin import GuildPlugin
+    from app.models.tenant.initiative import Initiative, InitiativeRoleModel
+    from app.services.marketplace.tool_plugins import TOOL, tool_kinds
+
+    installs = (
+        await session.exec(
+            select(GuildPlugin.id, GuildPlugin.listing_uid, GuildPlugin.definition)
+            .where(GuildPlugin.plugin_kind == TOOL)
+            .order_by(GuildPlugin.id)
+        )
+    ).all()
+    if not installs:
+        return
+    initiatives = select(Initiative.id)
+    roles = select(
+        InitiativeRoleModel.id,
+        InitiativeRoleModel.initiative_id,
+        InitiativeRoleModel.is_manager,
+    )
+    if initiative_id is not None:
+        initiatives = initiatives.where(Initiative.id == initiative_id)
+        roles = roles.where(InitiativeRoleModel.initiative_id == initiative_id)
+    initiative_ids = (await session.exec(initiatives)).scalars().all()
+    role_rows = (await session.exec(roles)).all()
+    rows: list[dict[str, Any]] = []
+    for install_id, listing_uid, definition in installs:
+        kind = tool_kinds(definition, listing_uid=listing_uid)[0]
+        view, create = f"{kind}:enabled", f"{kind}:create"
+        rows += [
+            {"initiative_id": i, "key": view, "enabled": True, "install_id": install_id}
+            for i in initiative_ids
+        ]
+        rows += [
+            {
+                "initiative_id": role_initiative,
+                "initiative_role_id": role_id,
+                "key": key,
+                "enabled": enabled,
+                "install_id": install_id,
+            }
+            for role_id, role_initiative, is_manager in role_rows
+            for key, enabled in ((view, True), (create, bool(is_manager)))
+        ]
+    if rows:
+        await session.exec(
+            pg_insert(InitiativeRule)
+            .values(rows)
+            .on_conflict_do_nothing(constraint="uq_initiative_rules_subject")
+        )
+
+
 def tool_on(context: ActorContext, initiative: Any, tool: Tool) -> bool:
     """Whether ``tool`` is on in ``initiative``, by the request's standing."""
     switch = community_switch(context, tool)

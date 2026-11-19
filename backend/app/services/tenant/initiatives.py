@@ -49,7 +49,12 @@ from app.schemas.tenant.initiative import (
     PluginPermissionRule,
 )
 from app.services import audit as audit_service
-from app.services.tenant.initiative_tools import own_switch, switches, write_switches
+from app.services.tenant.initiative_tools import (
+    own_switch,
+    switches,
+    write_plugin_tool_rules,
+    write_switches,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +247,9 @@ async def create_builtin_roles(
             )
 
     await session.flush()
+    # Every installed tool plug-in's tool is on in a new initiative, as it is
+    # in every initiative there was when it was installed.
+    await write_plugin_tool_rules(session, initiative_id=initiative_id)
     return roles
 
 

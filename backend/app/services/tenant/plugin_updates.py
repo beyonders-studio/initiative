@@ -63,6 +63,7 @@ from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.platform import rules
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import metadata, plugin_schedules
@@ -204,7 +205,11 @@ async def update_offer(
     if version.version == plugin.listing_version:
         return None
     definition = dict(version.definition)
-    if definition.get("plugin_kind") not in GUILD_INSTALLABLE_PLUGIN_KINDS:
+    # A tool plug-in stays at the version it was installed at: updating its
+    # tables is not built yet.
+    if definition.get("plugin_kind") not in GUILD_INSTALLABLE_PLUGIN_KINDS or (
+        is_tool_plugin(plugin.definition)
+    ):
         return None
     asks = upgrade_asks(
         plugin,

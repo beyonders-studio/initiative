@@ -74,7 +74,9 @@ from app.services.marketplace.service_plugins import (
     members_hold,
     surface_permission,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 from app.services.platform import guilds as guilds_service
+from app.services.tenant import initiative_tools
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connections as connections_service
@@ -438,6 +440,10 @@ async def install_plugin(
     session.add(plugin)
     await session.flush()
     await create_plugin_artifacts(session, plugin, guild_id=guild_id)
+    if is_tool_plugin(definition):
+        # Its tool is switched on in every initiative. Its tables come once
+        # this commits (``schema_provisioning.provision_community_tools``).
+        await initiative_tools.write_plugin_tool_rules(session)
     # Staged in the caller's transaction, after the flush that gives the install
     # its id, so the record and the install land together or not at all.
     await audit_service.record(

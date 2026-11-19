@@ -383,9 +383,7 @@ def build_tool(
         if item_kind not in codes:
             raise PluginToolError(f"{item_kind} has no kind code")
         children.append(
-            PluginKind(
-                item_kind, codes[item_kind], table_name=tables[item_key].name
-            )
+            PluginKind(item_kind, codes[item_kind], table_name=tables[item_key].name)
         )
     item_tables = tuple(tables[item["key"]] for item in items)
     return ToolRecord(
@@ -490,3 +488,72 @@ def structure_ddl(tools: ToolSet) -> str:
         for statement in _structure(table, record)
     ]
     return "".join(f"{statement};\n" for statement in statements)
+
+
+# --- loading -----------------------------------------------------------------
+
+#: A community's installed tool plug-ins, by install. Read from the routed
+#: session of whoever asks: a member reads its community's installs.
+_INSTALLED = sa.text(
+    "SELECT id, listing_uid, md5(definition::text) AS digest FROM guild_plugins"
+    " WHERE plugin_kind = 'tool' ORDER BY id"
+)
+_DEFINITIONS = sa.text(
+    "SELECT id, listing_uid, definition FROM guild_plugins"
+    " WHERE plugin_kind = 'tool' ORDER BY id"
+)
+
+#: The sets read at request time, by what the installs' rows were.
+_BY_ROWS: dict[tuple[tuple[Any, ...], ...], ToolSet] = {}
+
+
+async def _codes() -> dict[str, int]:
+    """Every plug-in kind's code, read on the system engine: the table is the
+    deployment's, and no community's role reads it."""
+    from app.db import session as db_session
+    from app.db.kind_codes import plugin_kind_codes
+
+    async with db_session.system_engine.connect() as conn:
+        return await plugin_kind_codes(conn)
+
+
+async def _installed(session: Any) -> list[InstalledTool]:
+    rows = (await session.execute(_DEFINITIONS)).all()
+    return [InstalledTool(row.id, row.listing_uid, row.definition) for row in rows]
+
+
+async def community_tools(session: Any) -> ToolSet:
+    """The tool set of the community ``session`` is routed to. One read of
+    its installs; their declarations and the kind codes are read only the
+    first time this process sees them."""
+    rows = tuple(tuple(row) for row in (await session.execute(_INSTALLED)).all())
+    if not rows:
+        return BUILTIN_TOOLS
+    found = _BY_ROWS.get(rows)
+    if found is None:
+        found = community_tool_set(await _installed(session), await _codes())
+        _BY_ROWS[rows] = found
+    return found
+
+
+async def provisioned_tools(guild_id: int) -> ToolSet:
+    """The tool set of ``guild_id`` as its installs stand, read on the
+    system engine, for provisioning: :data:`BUILTIN_TOOLS` for a community
+    whose schema does not exist yet."""
+    from app.db import session as db_session
+    from app.db.request_context import SystemGuild
+    from app.db.schema_provisioning import guild_schema_name
+
+    async with db_session.SystemSessionLocal() as session:
+        exists = await session.scalar(
+            sa.text("SELECT to_regclass(:t) IS NOT NULL"),
+            {"t": f'"{guild_schema_name(guild_id)}".guild_plugins'},
+        )
+        if not exists:
+            return BUILTIN_TOOLS
+        await db_session.set_rls_context(session, SystemGuild(guild_id))
+        installed = await _installed(session)
+        await session.rollback()
+    if not installed:
+        return BUILTIN_TOOLS
+    return community_tool_set(installed, await _codes())

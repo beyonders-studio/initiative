@@ -51,10 +51,10 @@ from app.db.authorization import (
     sql_values,
 )
 from app.db.frozen import (
-    frozen_tables,
     LIFECYCLE_COLUMNS,
     freeze_leg,
     frozen_guard_trigger,
+    frozen_tables,
     frozen_write_triggers,
     render_frozen_ancestor_fn,
     render_frozen_guard_fn,
@@ -63,7 +63,6 @@ from app.db.frozen import (
     render_resource_frozen_for_grant_fn,
 )
 from app.db.guild_migrations import split_sql_statements
-from app.db.names import object_name
 from app.db.initiative_rls import (
     ANSWERED,
     COMMENT_PARENTS,
@@ -81,6 +80,7 @@ from app.db.initiative_rls import (
     render_entity_access_fn,
     render_entity_initiative_fn,
 )
+from app.db.names import object_name
 from app.db.plugin_rls import (
     PLUGIN_REFUSED_TABLES,
     SEARCH_ENTRY_READ_SCOPE,
