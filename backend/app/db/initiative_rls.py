@@ -1568,20 +1568,47 @@ def _named_tool_gate(t: str, write: bool, tools: ToolSet) -> str:
     )
 
 
-def _unstamped_leg(t: str, kind_column: str, id_column: str, tools: ToolSet) -> str:
-    """An entry that stamps no sharing, about a kind no sharing governs (a
-    collection) or a comment on one, is reached as the row it describes is:
-    that row's own policy decides."""
-    tables = {k.value: k.table for k in tools.child_kinds if k.standalone}
-    tables["comment"] = "comments"
+def _reached_as_its_row(
+    t: str, kind_column: str, id_column: str, tables: dict[str, str]
+) -> str:
+    """A row naming a kind of ``tables`` (kind to table) by ``kind_column``
+    and ``id_column`` is reached as the row it names is: that row's own policy
+    decides."""
     arms = " ".join(
         f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {table} sk"
         f" WHERE sk.id = {t}.{id_column})"
         for kind, table in tables.items()
     )
-    return (
-        f"({t}.dac_tool IS NOT NULL OR (CASE {t}.{kind_column} {arms} ELSE true END))"
-    )
+    return f"(CASE {t}.{kind_column} {arms} ELSE true END)"
+
+
+def plugin_row_tables(tools: ToolSet) -> dict[str, str]:
+    """Each kind the community's tool plug-ins bring, with its table."""
+    return {
+        kind: table
+        for tool in tools.installed
+        for kind, table in (
+            (tool.kind, tool.table.name),
+            *((child.value, child.table) for child in tool.children),
+        )
+    }
+
+
+def plugin_entry_written(t: str, tools: ToolSet) -> str:
+    """The community admin writes a search entry about a tool plug-in's row
+    only while that row reads as there."""
+    return _reached_as_its_row(t, "entity_type", "entity_id", plugin_row_tables(tools))
+
+
+def _unstamped_leg(t: str, kind_column: str, id_column: str, tools: ToolSet) -> str:
+    """An entry that stamps no sharing, about a kind no sharing governs (a
+    collection), a comment on one or a tool plug-in's row, is reached as the
+    row it describes is."""
+    tables = {k.value: k.table for k in tools.child_kinds if k.standalone}
+    tables["comment"] = "comments"
+    tables |= plugin_row_tables(tools)
+    reached = _reached_as_its_row(t, kind_column, id_column, tables)
+    return f"({t}.dac_tool IS NOT NULL OR {reached})"
 
 
 def named_tool_path(

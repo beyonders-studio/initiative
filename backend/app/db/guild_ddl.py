@@ -76,6 +76,7 @@ from app.db.initiative_rls import (
     initiative_of,
     managed_write,
     paths_for,
+    plugin_entry_written,
     render_content_item_fn,
     render_entity_access_fn,
     render_entity_initiative_fn,
@@ -457,6 +458,10 @@ _COMMANDS = (
     ("delete", "DELETE", "USING", True),
 )
 
+#: What writes the search index besides the community admin: its refresh
+#: trigger and the system engine.
+_INDEXERS = f"pg_trigger_depth() > 0 OR {IN_POLICY.system}"
+
 # Tables written only by a trigger or the system engine: the policy for each
 # command named here admits that writer instead of re-deciding the writer's
 # access.
@@ -471,9 +476,7 @@ _WRITTEN_BY: dict[str, dict[str, str]] = {
     # The search index is derived: rows arrive from the refresh trigger as a
     # consequence of a content write that already cleared its own table's gate.
     # The reindex sweep routes as the guild admin, which is the second leg.
-    "search_entries": {
-        "INSERT": f"pg_trigger_depth() > 0 OR {IN_POLICY.system} OR {IN_POLICY.admin}"
-    },
+    "search_entries": {"INSERT": f"{_INDEXERS} OR {IN_POLICY.admin}"},
     # A plug-in's events are written by the system engine, on the plug-in's behalf.
     "plugin_event_outbox": {"INSERT": IN_POLICY.system},
     # Levels are the hourly pass's alone to write, whatever the command: no
@@ -510,6 +513,11 @@ def _table_block(table: str, path: InitiativePath, tools: ToolSet) -> str:
                 pred = f"{pred} AND {sharing}"
         if (writer := _WRITTEN_BY.get(table, {}).get(command)) is not None:
             pred = writer
+            if table == "search_entries" and tools.installed:
+                pred = (
+                    f"{_INDEXERS} OR ({IN_POLICY.admin}"
+                    f" AND {plugin_entry_written(table, tools)})"
+                )
         name = f"initiative_member_{suffix}"
         lines.append(f"DROP POLICY IF EXISTS {name} ON {table};")
         lines.append(f"CREATE POLICY {name} ON {table} AS PERMISSIVE FOR {command}")
