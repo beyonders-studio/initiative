@@ -12,6 +12,22 @@ __all__ = ["COUNTERS_UID", "counters_tool_manifest"]
 COUNTERS_UID = "TSJVTCM0S7GV2X"
 
 
+def _field(key: str) -> dict[str, Any]:
+    """A layout's part drawing one field."""
+    return {"type": "field", "props": {"field": key}}
+
+
+def _header() -> list[dict[str, Any]]:
+    """An item page's name and its menu, across the top."""
+    return [
+        {
+            "type": "stack",
+            "props": {"direction": "row", "gap": "sm", "align": "start"},
+            "children": [_field("name"), {"type": "actions"}],
+        }
+    ]
+
+
 def counters_tool_manifest() -> dict[str, Any]:
     """A fresh copy of the Counters tool plug-in's manifest."""
     return {
@@ -26,6 +42,30 @@ def counters_tool_manifest() -> dict[str, Any]:
             "fields": [
                 {"key": "description", "name": {"en": "Description"}, "kind": "text"}
             ],
+            "layouts": {
+                "list": {
+                    "kind": "grid",
+                    "card": {
+                        "type": "card",
+                        "children": [
+                            _field("name"),
+                            {
+                                "type": "stack",
+                                "props": {"tone": "muted"},
+                                "children": [_field("description")],
+                            },
+                        ],
+                    },
+                },
+                "detail": {
+                    "header": _header(),
+                    "main": [_field("description"), {"type": "relations"}],
+                    "side": [
+                        {"type": "section", "children": [{"type": "properties"}]},
+                        {"type": "byline"},
+                    ],
+                },
+            },
             "items": [
                 {
                     "key": "counter",
@@ -75,6 +115,40 @@ def counters_tool_manifest() -> dict[str, Any]:
                             ],
                         },
                     ],
+                    "layouts": {
+                        "list": {
+                            "kind": "grid",
+                            "card": {
+                                "type": "card",
+                                "children": [_field("name"), _field("count")],
+                            },
+                            "displays": {"count": "bar"},
+                        },
+                        "detail": {
+                            "header": _header(),
+                            "main": [_field("count"), {"type": "relations"}],
+                            "side": [
+                                {
+                                    "type": "section",
+                                    "children": [
+                                        _field(key)
+                                        for key in (
+                                            "color",
+                                            "min",
+                                            "max",
+                                            "step",
+                                            "initial_count",
+                                            "view_mode",
+                                        )
+                                    ],
+                                },
+                                {
+                                    "type": "section",
+                                    "children": [{"type": "properties"}],
+                                },
+                            ],
+                        },
+                    },
                     "open_while": {"field": "count", "below": {"field": "max"}},
                 }
             ],

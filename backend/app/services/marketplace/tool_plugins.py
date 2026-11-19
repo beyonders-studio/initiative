@@ -19,6 +19,11 @@ publisher's own check is never taken on trust:
   that condition reads.
 * **Actions** run on the tool's rows or an item's, ask only for that table's
   fields, and write an expression that parses.
+* **Layouts**: each table's list and item page, in the grammar the kit draws
+  and ``tool_layouts`` stores (:mod:`app.schemas.tenant.tool_layout`),
+  validated by its own models with the table's fields as the ids a layout
+  names. A tool plug-in's lists are a grid or a table, its parts those every
+  tool has, its looks those its field's kind has, and its size the kit's.
 
 Beside the tool, a tool plug-in carries only the listing terms every plug-in
 has (:func:`~app.services.marketplace.service_plugins.listing_terms`); a term
@@ -32,6 +37,19 @@ from datetime import date, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
+from pydantic import BaseModel, ValidationError
+
+from app.schemas.tenant.tool_layout import (
+    TOOL_FIELDS,
+    CardPart,
+    DetailFieldPart,
+    DetailLayoutDefinition,
+    ListLayoutDefinition,
+    OwnPart,
+    PluginPart,
+    parts_of,
+    too_large,
+)
 from app.services.marketplace import contract
 from app.services.marketplace.manifest_values import (
     check_identifier,
@@ -56,6 +74,8 @@ __all__ = [
     "TOOL_COLUMNS",
     "TOOL_FIELD_KINDS",
     "TOOL_ICONS",
+    "TOOL_LAYOUT_FIELDS",
+    "TOOL_LIST_LAYOUTS",
     "TOOL_PLUGIN_TERMS",
     "is_tool_plugin",
     "normalize_tool_plugin_definition",
@@ -84,6 +104,21 @@ TOOL_FIELD_KINDS: frozenset[str] = contract.enum("toolFieldKind")
 TOOL_ICONS: frozenset[str] = contract.enum("toolIcon")
 #: The columns every tool row has, which no declared field may be named.
 TOOL_COLUMNS: frozenset[str] = contract.enum("toolColumn")
+#: The fields every tool row has, which a layout names beside the table's own
+#: and no declared field may be named.
+TOOL_LAYOUT_FIELDS: frozenset[str] = contract.enum("toolLayoutField")
+#: The page parts every tool has, which a tool plug-in's item page may place.
+TOOL_PAGE_PARTS: frozenset[str] = contract.enum("toolDetailPart")
+#: How a tool plug-in's table may be listed (``toolListKind``), and what each
+#: holds beside its kind and ``displays``: a grid its card, a table its columns.
+TOOL_LIST_LAYOUTS: dict[str, str] = {"grid": "card", "table": "columns"}
+#: The looks a list draws a scale and a counter field in.
+_LOOKS: dict[str, frozenset[str]] = {
+    "scale": frozenset({"number", "stars", "bar"}),
+    "counter": frozenset({"number", "bar", "clock"}),
+}
+#: The kinds of field that are never empty, so a layout never requires one.
+_NEVER_EMPTY = frozenset({"counter", "checkbox"})
 
 MAX_TOOL_KEY_LENGTH = contract.cap("toolKeyLength")
 MAX_TOOL_FIELDS = contract.cap("toolFields")
@@ -224,6 +259,8 @@ def _field(raw: Any, *, what: str) -> dict[str, Any]:
     what = f"{what} {key!r}"
     if key in TOOL_COLUMNS:
         fail(f"{what}: {key!r} is a column every tool's rows have")
+    if key in TOOL_LAYOUT_FIELDS:
+        fail(f"{what}: {key!r} is a field every tool's rows have")
     if key.endswith("_id"):
         fail(f"{what}: a field's key does not end in '_id', as a key to a parent does")
     kind = _choice(field.get("kind"), TOOL_FIELD_KINDS, what=f"{what} kind")
@@ -360,6 +397,116 @@ def _open_while(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[st
     return {"field": key, term: value}
 
 
+def _validated[M: BaseModel](
+    model: type[M], raw: Any, *, fields: frozenset[str], what: str
+) -> tuple[M, dict[str, Any]]:
+    """A layout read by the kit's own model, naming ``fields``, and the
+    definition as ``tool_layouts`` stores it: what it sets, and nothing unset."""
+    try:
+        definition = model.model_validate(raw, context={TOOL_FIELDS: fields})
+    except ValidationError as error:
+        first = error.errors()[0]
+        where = ".".join(str(step) for step in first["loc"])
+        fail(f"{what} {where}: {first['msg']}")
+    stored = {
+        key: value
+        for key, value in definition.model_dump(mode="json", exclude_unset=True).items()
+        if value is not None
+    }
+    return definition, stored
+
+
+def _list_layout(
+    raw: Any, *, declared: dict[str, dict[str, Any]], names: frozenset[str], what: str
+) -> dict[str, Any]:
+    """How a table's rows are listed: a grid of its card or a table of its
+    columns, with a look for each scale or counter field that has one."""
+    layout = require_mapping(raw, what)
+    kind = _choice(
+        layout.get("kind"), frozenset(TOOL_LIST_LAYOUTS), what=f"{what} kind"
+    )
+    holds = TOOL_LIST_LAYOUTS[kind]
+    if set(layout) - {"kind", holds, "displays"} or not layout.get(holds):
+        fail(f"{what}: a {kind} holds its {holds}, and displays")
+    definition, stored = _validated(
+        ListLayoutDefinition,
+        {key: value for key, value in layout.items() if key != "kind"},
+        fields=names,
+        what=what,
+    )
+    roots: list[CardPart] = [definition.card] if definition.card is not None else []
+    if any(
+        isinstance(part, PluginPart) for root in roots for part, _ in parts_of(root)
+    ):
+        fail(f"{what}: a card draws the tool's fields, not a plug-in's parts")
+    for key, look in (definition.displays or {}).items():
+        field = declared.get(key)
+        looks = _LOOKS.get(field["kind"]) if field else None
+        if looks is None:
+            fail(
+                f"{what} displays: {key!r} is not a scale or counter field it declares"
+            )
+        if look not in looks:
+            fail(f"{what} displays: a {field['kind']} field is not drawn as {look!r}")
+    if too_large(stored, roots, len(definition.columns or ())):
+        fail(f"{what} holds more parts, or nests them deeper, than a layout may")
+    return {"kind": kind, **stored}
+
+
+def _detail_layout(
+    raw: Any, *, declared: dict[str, dict[str, Any]], names: frozenset[str], what: str
+) -> dict[str, Any]:
+    """How one of a table's rows is shown: its parts in three regions, each
+    placing fields, the initiative's properties and the parts every tool's
+    page has."""
+    definition, stored = _validated(
+        DetailLayoutDefinition, require_mapping(raw, what), fields=names, what=what
+    )
+    if not stored:
+        fail(f"{what} places its parts in a header, main or side")
+    roots = [
+        part
+        for region in (definition.header, definition.main, definition.side)
+        for part in region or ()
+    ]
+    for part, _ in (found for root in roots for found in parts_of(root)):
+        if isinstance(part, PluginPart) or (
+            isinstance(part, OwnPart)
+            and (part.type not in TOOL_PAGE_PARTS or part.props is not None)
+        ):
+            fail(f"{what}: {part.type!r} is not a part every tool's page has")
+        if isinstance(part, DetailFieldPart) and part.props.required:
+            field = declared.get(str(part.props.field))
+            if field is None or field["kind"] in _NEVER_EMPTY:
+                fail(
+                    f"{what}: {part.props.field!r} is not a field it declares that a person can leave empty"
+                )
+    if too_large(stored, roots, 0):
+        fail(f"{what} holds more parts, or nests them deeper, than a layout may")
+    return stored
+
+
+def _layouts(raw: Any, *, fields: list[dict[str, Any]], what: str) -> dict[str, Any]:
+    """What a table draws: its list and its item page, each naming the
+    table's fields and the fields every tool row has."""
+    layouts = require_mapping(raw, f"{what} layouts")
+    if set(layouts) != {"list", "detail"}:
+        fail(f"{what} layouts: a list and a detail")
+    declared = {field["key"]: field for field in fields}
+    names = frozenset(declared) | TOOL_LAYOUT_FIELDS
+    return {
+        "list": _list_layout(
+            layouts["list"], declared=declared, names=names, what=f"{what} list layout"
+        ),
+        "detail": _detail_layout(
+            layouts["detail"],
+            declared=declared,
+            names=names,
+            what=f"{what} detail layout",
+        ),
+    }
+
+
 def _items(raw: Any, *, tool_key: str) -> list[dict[str, Any]]:
     """The item tables: each key once and never the tool's, each under the
     tool or under an item that is under the tool."""
@@ -382,6 +529,7 @@ def _items(raw: Any, *, tool_key: str) -> list[dict[str, Any]]:
             "key": key,
             "name": _label(item.get("name"), what=what),
             "fields": fields,
+            "layouts": _layouts(item.get("layouts"), fields=fields, what=what),
         }
         if item.get("parent") is not None:
             cleaned["parent"] = _key(item["parent"], what=f"{what} parent")
@@ -470,6 +618,7 @@ def _tool(raw: Any) -> dict[str, Any]:
     # Empty means absent, as for every block.
     if fields:
         cleaned["fields"] = fields
+    cleaned["layouts"] = _layouts(tool.get("layouts"), fields=fields, what="tool")
     if items:
         cleaned["items"] = items
     actions = _actions(tool.get("actions"), tables=tables)
