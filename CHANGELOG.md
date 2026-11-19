@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **What's new reads like a blog.** The latest release leads the page with its picture and its first few changes. Each release's post gives every change its own headline under New, Changed and Fixed.
 - **Intake settings fit on one screen.** Platform → Intake picks the operations community first, then lists each kind of case on one line: where it lands, who to contact about it, and a switch for whether it's receiving. **Edit** opens the rest, and **Set up** routes a kind that isn't yet. The general contact sits under the list, and the switch that sends feedback to the Initiative team has its own section at the end.
 - **My Messages is in beta.** Its place in the sidebar carries a **Beta** tag where it said **Alpha**.
 - **Create on My Messages starts a conversation.** The button asks who to talk to, as **Start a conversation** does, instead of offering a task or a file.
