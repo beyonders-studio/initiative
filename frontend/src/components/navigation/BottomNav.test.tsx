@@ -38,14 +38,14 @@ vi.mock("@/hooks/useInitiativeAccess", async (importOriginal) => ({
 
 import { BottomNav } from "./BottomNav";
 
-const setup = () =>
+const setup = (initialRoute = "/") =>
   renderPage(
     () => (
       <SidebarProvider>
         <BottomNav />
       </SidebarProvider>
     ),
-    { initialRoute: "/" }
+    { initialRoute }
   );
 
 beforeEach(() => {
@@ -99,5 +99,13 @@ describe("the bottom bar", () => {
     expect(
       messages.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+  });
+
+  it.each([true, false])("leaves itself out on My Messages (phone: %s)", async (mobile) => {
+    mocks.mobile.mockReturnValue(mobile);
+    setup("/messages");
+
+    await screen.findByRole("button", { name: "Create" });
+    expect(screen.queryByRole("button", { name: /My Messages/ })).toBeNull();
   });
 });
