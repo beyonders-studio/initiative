@@ -1,19 +1,17 @@
+import type { SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
-import {
-  type ToolListLayout,
-  type ToolRow,
-  type ToolTable,
-  toolPluginRowRoute,
-} from "@/lib/toolPlugins";
+import { type ToolRow, type ToolTable, toolPluginRowRoute } from "@/lib/toolPlugins";
 import type { TranslateFn } from "@/types/i18n";
 import { Card, CardContent } from "@/ui/card";
 import { DataTable } from "@/ui/data-table";
 import { fieldColumn } from "@/ui/layouts/columns";
 import { type LayoutEnv, withDisplays } from "@/ui/layouts/fields";
+import type { ListView } from "@/ui/layouts/layoutSet";
+import { sortedItems } from "@/ui/layouts/presets";
 import { type LayoutContext, type LayoutNode, LayoutTree } from "@/ui/layouts/tree";
 
 import { toolFields } from "./toolFields";
@@ -25,27 +23,33 @@ const NAME_CARD: LayoutNode = {
 };
 
 /**
- * A table's rows, drawn as one of its list layouts says: a grid of its card,
- * or a table of its columns, each field in its kind's look and each scale or
- * counter as the layout's `displays` say. A row's name opens its page. Which
- * layout is the page's to pick, as a built-in tool's list picks its view.
+ * A table's rows, drawn as one of its lists says: a grid or a masonry wall of
+ * its card, or a table of its columns, each field in its kind's look and each
+ * scale or counter as the list's `displays` say. A row's name opens its page.
+ * They are drawn in `sorting`'s order, a view that never moves the rows' own
+ * order; a table's headers change it.
  */
 export const ToolRows = ({
   table,
   list,
   rows,
   initiativeId,
+  sorting,
+  onSortingChange,
 }: {
   table: ToolTable;
-  list: ToolListLayout;
+  list: ListView;
   rows: ToolRow[];
   initiativeId: number;
+  sorting: SortingState;
+  onSortingChange: (sorting: SortingState) => void;
 }) => {
   const { t, i18n } = useTranslation(["plugins", "common", ...LAYOUT_NAMESPACES]);
   const communityPath = useCommunityPath();
+  const { displays, columns: columnIds, card } = list.definition;
   const fields = useMemo(
-    () => withDisplays(toolFields(table, i18n.language), list.displays),
-    [table, i18n.language, list.displays]
+    () => withDisplays(toolFields(table, i18n.language), displays),
+    [table, i18n.language, displays]
   );
   const env = useMemo<LayoutEnv<ToolRow>>(
     () => ({
@@ -55,16 +59,19 @@ export const ToolRows = ({
     }),
     [t, communityPath, initiativeId, table.kind]
   );
-
+  const sorted = useMemo(
+    () => sortedItems(rows, sorting, fields, i18n.language),
+    [rows, sorting, fields, i18n.language]
+  );
   const columns = useMemo(
     () =>
       list.kind === "table"
-        ? (list.columns ?? ["name"]).flatMap((id) => {
+        ? (columnIds ?? ["name"]).flatMap((id) => {
             const field = fields.get(id);
             return field ? [fieldColumn(field, env, { sortFn: "alphanumeric" })] : [];
           })
         : [],
-    [list.kind, list.columns, fields, env]
+    [list.kind, columnIds, fields, env]
   );
   const view = useMemo<LayoutContext<ToolRow>>(
     () => ({ fields, variant: "card", env }),
@@ -72,19 +79,38 @@ export const ToolRows = ({
   );
 
   if (list.kind === "table") {
-    return <DataTable columns={columns} data={rows} getRowId={(row) => String(row.id)} />;
+    return (
+      <DataTable
+        columns={columns}
+        data={sorted}
+        getRowId={(row) => String(row.id)}
+        manualSorting
+        sorting={sorting}
+        onSortingChange={onSortingChange}
+      />
+    );
   }
-  const card = (list.card as LayoutNode | null | undefined) ?? NAME_CARD;
-  return (
-    <ul className="grid grid-cols-fill-56/4 gap-3">
-      {rows.map((row) => (
-        <li key={row.id}>
-          <Card className="h-full">
-            <CardContent className="space-y-2 p-4">
-              <LayoutTree node={card} item={row} view={view} />
-            </CardContent>
-          </Card>
+  const node = (card as LayoutNode | null | undefined) ?? NAME_CARD;
+  const drawn = (row: ToolRow) => (
+    <Card className="h-full">
+      <CardContent className="space-y-2 p-4">
+        <LayoutTree node={node} item={row} view={view} />
+      </CardContent>
+    </Card>
+  );
+  // A wall lets each card stand as tall as it is; a grid lines them up.
+  return list.kind === "masonry" ? (
+    <ul className="columns-2xs gap-3">
+      {sorted.map((row) => (
+        <li key={row.id} className="mb-3 break-inside-avoid">
+          {drawn(row)}
         </li>
+      ))}
+    </ul>
+  ) : (
+    <ul className="grid grid-cols-fill-56/4 gap-3">
+      {sorted.map((row) => (
+        <li key={row.id}>{drawn(row)}</li>
       ))}
     </ul>
   );

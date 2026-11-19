@@ -71,7 +71,6 @@ import {
   CounterLook,
   type CurrencyCode,
   type DetailLayoutDefinitionInput,
-  type ListLayoutDefinitionInput,
   type MetadataType,
   type PluginToolRowRead,
   type PluginToolRowUpdate,
@@ -80,6 +79,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute } from "@/lib/tools";
 import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
+import type { ListLayoutDefinition } from "@/ui/layouts/layoutSet";
 
 /**
  * The icons a tool plug-in may name (the contract's `toolIcon`), each the
@@ -169,16 +169,14 @@ export interface ToolFieldDecl {
   counter?: { min?: ToolBound; max?: ToolBound; step?: ToolBound; initial?: ToolBound };
 }
 
-/** How a table's rows are listed: a grid of its card, or a table of its
- *  columns. */
-export type ToolListLayout = { kind: "grid" | "table" } & Pick<
-  ListLayoutDefinitionInput,
-  "card" | "columns" | "displays"
->;
+/** One way a table's rows are listed: a grid or a masonry wall of its card,
+ *  or a table of its columns, with its looks and its presets. */
+export type ToolListLayout = ListLayoutDefinition & { kind: "grid" | "masonry" | "table" };
 
-/** What one table draws: its list, and one row's page. */
+/** What one table draws: the lists its rows are listed in, the first the one
+ *  a person starts on, and one row's page. */
 export interface ToolLayoutsDecl {
-  list: ToolListLayout;
+  lists: ToolListLayout[];
   detail: DetailLayoutDefinitionInput;
 }
 

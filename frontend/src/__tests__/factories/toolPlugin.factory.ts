@@ -33,10 +33,17 @@ export const shelfDefinition = () => ({
     icon: "book",
     fields: [{ key: "about", name: { en: "About" }, kind: "text" }],
     layouts: {
-      list: {
-        kind: "grid",
-        card: { type: "card", children: [field("name"), field("about")] },
-      },
+      lists: [
+        {
+          kind: "grid",
+          card: { type: "card", children: [field("name"), field("about")] },
+          presets: [
+            { slug: "a_z", name: { en: "A to Z" }, sort: [{ field: "name", dir: "asc" }] },
+            { slug: "z_a", name: { en: "Z to A" }, sort: [{ field: "name", dir: "desc" }] },
+          ],
+        },
+        { kind: "table", columns: ["name", "about"] },
+      ],
       detail: {
         header: [
           {
@@ -73,11 +80,17 @@ export const shelfDefinition = () => ({
           },
         ],
         layouts: {
-          list: {
-            kind: "grid",
-            card: { type: "card", children: [field("name"), field("read")] },
-            displays: { read: "bar" },
-          },
+          lists: [
+            {
+              kind: "grid",
+              card: {
+                type: "card",
+                props: { tint: "cover" },
+                children: [field("name"), field("read")],
+              },
+              displays: { read: "bar" },
+            },
+          ],
           detail: {
             header: [field("name")],
             main: [field("read"), { type: "comments" }],
