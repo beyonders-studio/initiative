@@ -26,9 +26,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlmodel import col
+from sqlmodel import col, select
 
 from app.core.relationships import PERSON
 from app.core.tools import KINDS
@@ -39,7 +39,8 @@ from app.models.platform.plugin_kind_code import FIRST_PLUGIN_KIND_CODE, PluginK
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncConnection
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ async def assign_plugin_kind_codes(
     """
     wanted = list(dict.fromkeys(kinds))
     await advisory_lock(session, LockNamespace.PLUGIN_KIND_CODES)
-    rows = await session.execute(
+    rows = await session.exec(
         select(PluginKindCode.kind, PluginKindCode.code).where(
             col(PluginKindCode.kind).in_(wanted)
         )
@@ -141,10 +142,10 @@ async def assign_plugin_kind_codes(
     missing = [kind for kind in wanted if kind not in held]
     if not missing:
         return held
-    highest = await session.scalar(select(func.max(PluginKindCode.code)))
+    highest = (await session.exec(select(func.max(PluginKindCode.code)))).one()
     first = max(highest + 1 if highest is not None else 0, FIRST_PLUGIN_KIND_CODE)
     given = {kind: first + offset for offset, kind in enumerate(missing)}
-    await session.execute(
+    await session.exec(
         insert(PluginKindCode).values(
             [{"kind": kind, "code": code} for kind, code in given.items()]
         )

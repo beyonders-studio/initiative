@@ -107,8 +107,10 @@ from app.testing.routing import (
 )
 from app.testing.schema_harness import guild_of, route_session_to_guild
 from app.testing.server import in_request_tasks
+from app.testing.tool_plugins import COUNTERS_UID, counters_tool_manifest
 
 __all__ = [
+    "COUNTERS_UID",
     "NARROWED_CLAIM",
     "NARROWED_VALUE",
     "TOOL_FACTORIES",
@@ -120,6 +122,7 @@ __all__ = [
     "captcha_switched_on",
     "checklist_items",
     "community_plan",
+    "counters_tool_manifest",
     "create_access_grant",
     "create_auth_provider",
     "create_calendar",
