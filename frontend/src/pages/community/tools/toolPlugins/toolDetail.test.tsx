@@ -4,18 +4,27 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse } from "msw";
 import { useContext } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildToolPlugin, buildToolRow, TOOL_PLUGIN_UID } from "@/__tests__/factories";
+import {
+  buildToolPlugin,
+  buildToolRow,
+  buildToolRowRead,
+  TOOL_PLUGIN_UID,
+} from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
+import type { PluginToolRowUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { installedTool, type ToolRow, type ToolTable } from "@/lib/toolPlugins";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { ItemDraftContext, type ItemEdit } from "@/ui/layouts/editing";
 import type { ItemSaves } from "@/ui/layouts/fieldEditors";
 
 import { AddToolRowDialog, blankRow } from "./AddToolRowDialog";
-import { type ToolRowContext, type ToolRowUpdate, toolDetail } from "./toolDetail";
+import { type ToolRowContext, toolDetail } from "./toolDetail";
 
 const uid = TOOL_PLUGIN_UID.toLowerCase();
 
@@ -23,7 +32,7 @@ const bookTable = () => installedTool(buildToolPlugin())?.tables.get(`book.${uid
 
 /** Saves that take each change, as a page's do: into the draft of a row
  *  being added, and as sent on a row that is there. */
-const saves = (): ItemSaves<ToolRow, ToolRowUpdate> => ({
+const saves = (): ItemSaves<ToolRow, PluginToolRowUpdate> => ({
   useSave: () => {
     const draft = useContext(ItemDraftContext);
     return {
@@ -49,7 +58,7 @@ describe("toolDetail", () => {
   it("draws a row as its declared layout places it, each field in its kind's look", async () => {
     const row = buildToolRow({
       name: "Middlemarch",
-      values: { read: 40, pages: 300, status: "done", cover: "#336699" },
+      fields: { read: 40, pages: 300, status: "done", cover: "#336699" },
     });
     renderPage(() => (
       <DetailLayoutView detail={toolDetail(bookTable(), "en")} item={row} context={context(true)} />
@@ -64,7 +73,7 @@ describe("toolDetail", () => {
   });
 
   it("gives each declared field its kind's editor for someone who may change it", async () => {
-    const row = buildToolRow({ name: "Emma", values: { pages: 474, status: "unread" } });
+    const row = buildToolRow({ name: "Emma", fields: { pages: 474, status: "unread" } });
     renderPage(() => (
       <DetailLayoutView
         detail={toolDetail(bookTable(), "en")}
@@ -85,12 +94,18 @@ describe("AddToolRowDialog", () => {
     expect(blankRow(table, 4)).toMatchObject({
       initiative_id: 4,
       name: "",
-      values: { pages: null, read: 0, status: null },
+      fields: { pages: null, read: 0, status: null },
     });
   });
 
-  it("makes the row from what was filled in", async () => {
-    const create = vi.fn(async () => ({ id: 9 }));
+  it("makes the row from what was filled in, in its initiative", async () => {
+    let sent: unknown = null;
+    server.use(
+      communityHttp.post(`/plugin-tools/book.${uid}/`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(buildToolRowRead({ id: 9, name: "Persuasion" }));
+      })
+    );
     const onAdded = vi.fn();
     renderPage(() => (
       <AddToolRowDialog
@@ -98,8 +113,6 @@ describe("AddToolRowDialog", () => {
         onOpenChange={() => {}}
         table={bookTable()}
         initiativeId={4}
-        saves={saves()}
-        create={create}
         onAdded={onAdded}
       />
     ));
@@ -111,10 +124,12 @@ describe("AddToolRowDialog", () => {
     await waitFor(() => expect(add).toBeEnabled());
     await user.click(add);
 
-    await waitFor(() => expect(create).toHaveBeenCalled());
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Persuasion", values: expect.objectContaining({ read: 0 }) })
-    );
-    await waitFor(() => expect(onAdded).toHaveBeenCalledWith({ id: 9 }));
+    await waitFor(() => expect(onAdded).toHaveBeenCalled());
+    expect(sent).toMatchObject({
+      name: "Persuasion",
+      initiative_id: 4,
+      fields: expect.objectContaining({ read: 0 }),
+    });
+    expect(onAdded.mock.calls[0][0]).toMatchObject({ id: 9 });
   });
 });

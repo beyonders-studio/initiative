@@ -64,7 +64,7 @@ describe("fieldSummary", () => {
   it("reads a counter's bounds from the fields its row holds", () => {
     const book = installedTool(buildToolPlugin())?.tables.get(`book.${uid}`);
     const pages = book?.fields.find((field) => field.key === "read");
-    const row = buildToolRow({ values: { read: 40, pages: 300 } });
+    const row = buildToolRow({ fields: { read: 40, pages: 300 } });
     const summary = pages ? fieldSummary(pages, row, "en") : null;
     expect(summary?.value).toBe(40);
     expect(summary?.counter).toMatchObject({ min: 0, max: 300, step: 1, initial: 0 });

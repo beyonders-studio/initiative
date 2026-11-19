@@ -7,12 +7,14 @@
 import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { PluginToolRowUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { useSearchMembers } from "@/hooks/useUsers";
 import { type InitiativeDetail, useInitiativeExtension } from "@/lib/layouts/initiativeExtension";
 import {
+  fieldChange,
   fieldSummary,
+  fieldValue,
   type ToolFieldDecl,
   type ToolRow,
   type ToolTable,
@@ -31,26 +33,20 @@ import { isEmptyPropertyValue } from "@/ui/properties/propertyHelpers";
 
 import { toolFields } from "./toolFields";
 
-/** What a row's changes send: its name, or its declared fields' values. */
-export interface ToolRowUpdate {
-  name?: string;
-  values?: Record<string, unknown>;
-}
-
 /** What a row's page shares with its parts. */
 export interface ToolRowContext {
   /** The server says the reader cannot change the row. */
   readOnly: boolean;
   initiativeId: number;
   /** How its fields are saved, each on its own. */
-  saves: ItemSaves<ToolRow, ToolRowUpdate>;
+  saves: ItemSaves<ToolRow, PluginToolRowUpdate>;
   /** The menu of what else can be done with it. */
   actions: ReactNode;
 }
 
 type EditorProps = { item: ToolRow; label: string };
 
-const useRowHome = () => useItemHome() as ItemHome<ToolRow, ToolRowUpdate>;
+const useRowHome = () => useItemHome() as ItemHome<ToolRow, PluginToolRowUpdate>;
 
 const NameEditor = ({ item, label }: EditorProps) => {
   const { t } = useTranslation("plugins");
@@ -79,14 +75,19 @@ const DeclaredFieldEditor = ({ field, item, label }: EditorProps & { field: Tool
   const home = useRowHome();
   const searchMembers = useSearchMembers();
   const save = home.saves.useSave(label);
-  const saved: unknown = item.values[field.key] ?? null;
+  const saved = fieldValue(item, field);
   const draft = useFieldDraft<unknown>(
     saved,
-    (value) =>
-      save.save({
-        patch: { values: { [field.key]: value } },
-        shows: { values: { ...item.values, [field.key]: value } },
-      }),
+    (value) => {
+      const change = fieldChange(field, value);
+      return save.save({
+        patch: change,
+        shows: {
+          fields: { ...item.fields, ...change.fields },
+          people: { ...item.people, ...change.people },
+        },
+      });
+    },
     sameJson
   );
   const summary = fieldSummary(field, item, i18n.language);
@@ -180,7 +181,7 @@ const regionsOf = (table: ToolTable): Record<Region, LayoutNode[]> => {
 export const toolDetail = (
   table: ToolTable,
   language: string
-): InitiativeDetail<ToolRow, ToolRowContext, ToolRowUpdate> => ({
+): InitiativeDetail<ToolRow, ToolRowContext, PluginToolRowUpdate> => ({
   spec: detailLayoutSpec({
     kind: table.kind,
     shipped: regionsOf(table),
@@ -202,6 +203,8 @@ export const toolDetail = (
     byline: (_node, row) => <Byline row={row} />,
     notice: () => <Notice />,
     comments: (_node, row) => <Comments row={row} kind={table.kind} />,
+    // Its rows hold none of the initiative's properties.
+    properties: () => null,
   },
   home: (row, context) => ({
     saves: context.saves,

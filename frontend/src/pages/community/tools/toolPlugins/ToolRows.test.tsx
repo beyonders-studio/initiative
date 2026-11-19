@@ -18,7 +18,7 @@ const bookTable = (): ToolTable =>
 
 describe("ToolRows", () => {
   it("draws each row's card, its name opening the row and its counter in the declared look", async () => {
-    const row = buildToolRow({ name: "Middlemarch", values: { read: 40, pages: 300 } });
+    const row = buildToolRow({ name: "Middlemarch", fields: { read: 40, pages: 300 } });
     const table = bookTable();
     renderPage(() => (
       <ToolRows table={table} list={table.layouts.list} rows={[row]} initiativeId={3} />
@@ -35,7 +35,7 @@ describe("ToolRows", () => {
       <ToolRows
         table={bookTable()}
         list={{ kind: "table", columns: ["name", "status", "cover"] }}
-        rows={[buildToolRow({ name: "Emma", values: { status: "done", cover: "#336699" } })]}
+        rows={[buildToolRow({ name: "Emma", fields: { status: "done", cover: "#336699" } })]}
         initiativeId={3}
       />
     ));

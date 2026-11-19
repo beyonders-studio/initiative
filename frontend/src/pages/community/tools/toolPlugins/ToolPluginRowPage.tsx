@@ -1,0 +1,179 @@
+import { useParams } from "@tanstack/react-router";
+import { MoreHorizontal, SearchX } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
+import { itemSaves } from "@/hooks/useFieldSave";
+import {
+  pluginToolRowSaves,
+  useInstalledTools,
+  usePluginToolRow,
+  useRunPluginToolAction,
+} from "@/hooks/usePluginToolRows";
+import { useRouteId } from "@/hooks/useRouteId";
+import { useCommunityPath } from "@/lib/communityUrl";
+import {
+  type ToolActionDecl,
+  type ToolRow,
+  type ToolTable,
+  toolOfKind,
+  toolPluginListRoute,
+  toolPluginRowRoute,
+  toolRow,
+  toolText,
+} from "@/lib/toolPlugins";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import { Section } from "@/ui/layouts/section";
+import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+
+import { ToolTableRows } from "./ToolPluginView";
+import { toolDetail } from "./toolDetail";
+
+/** What can be run on a row: its table's actions, each asked first where it
+ *  says to. */
+const RowActions = ({
+  table,
+  row,
+  language,
+}: {
+  table: ToolTable;
+  row: ToolRow;
+  language: string;
+}) => {
+  const { t } = useTranslation("plugins");
+  const run = useRunPluginToolAction(table.kind, table.items);
+  const [asking, setAsking] = useState<ToolActionDecl | null>(null);
+  if (table.actions.length === 0 || !row.can.edit) return null;
+  const start = (action: ToolActionDecl) =>
+    action.confirm ? setAsking(action) : run.mutate({ rowId: row.id, actionId: action.id });
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon-sm" aria-label={t("tool.actions")}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {table.actions.map((action) => (
+            <DropdownMenuItem key={action.id} onSelect={() => start(action)}>
+              {toolText(action.name, language)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDialog
+        open={asking !== null}
+        onOpenChange={(open) => {
+          if (!open) setAsking(null);
+        }}
+        title={asking ? toolText(asking.name, language) : ""}
+        description={asking?.confirm ? toolText(asking.confirm, language) : undefined}
+        confirmLabel={asking ? toolText(asking.name, language) : ""}
+        onConfirm={() => {
+          if (!asking) return;
+          run.mutate({ rowId: row.id, actionId: asking.id }, { onSuccess: () => setAsking(null) });
+        }}
+      />
+    </>
+  );
+};
+
+/**
+ * One row of a tool plug-in, the tool's own or an item's, on its own page: its
+ * table's detail layout, then the rows of each item table under it, each as
+ * that table's list layout draws them.
+ */
+export function ToolPluginRowPage() {
+  const { t, i18n } = useTranslation("plugins");
+  const gp = useCommunityPath();
+  const { kind = "" } = useParams({ strict: false }) as { kind?: string };
+  const rowId = useRouteId("rowId");
+  const initiativeId = useRouteId("initiativeId");
+  const tools = useInstalledTools();
+  const found = tools ? toolOfKind(tools, kind) : null;
+  const query = usePluginToolRow(kind, found ? rowId : null);
+  const row = useMemo(() => (query.data ? toolRow(query.data) : null), [query.data]);
+  const table = found?.table;
+  const detail = useMemo(
+    () => (table ? toolDetail(table, i18n.language) : null),
+    [table, i18n.language]
+  );
+  const saves = useMemo(() => itemSaves(pluginToolRowSaves(kind), rowId ?? 0), [kind, rowId]);
+
+  if (tools === undefined || query.isLoading) {
+    return (
+      <SkeletonRegion>
+        <DetailPageSkeleton />
+      </SkeletonRegion>
+    );
+  }
+  if (!found || !table || !detail || !row || initiativeId === null) {
+    return (
+      <StatusMessage
+        icon={<SearchX />}
+        title={t("tool.notFound")}
+        description={t("tool.notFoundBody")}
+        backTo={initiativeId === null ? gp("/") : gp(`/i/${initiativeId}`)}
+        backLabel={t("tool.backToTool", {
+          name: found ? toolText(found.tool.name, i18n.language) : "",
+        })}
+      />
+    );
+  }
+
+  const { tool } = found;
+  // The row it is an item of, which its crumb leads back to.
+  const parent =
+    row.parent_id !== null && table.parent
+      ? {
+          label: toolText(tool.tables.get(table.parent)?.name ?? {}, i18n.language),
+          to: toolPluginRowRoute(row.initiative_id, table.parent, row.parent_id),
+        }
+      : null;
+  return (
+    <div className="space-y-6">
+      <ToolBreadcrumb
+        tool={{
+          label: toolText(tool.name, i18n.language),
+          to: toolPluginListRoute(row.initiative_id, tool.kind),
+        }}
+        initiativeId={row.initiative_id}
+        trail={parent ? [parent] : []}
+      />
+      <DetailLayoutView
+        detail={detail}
+        item={row}
+        context={{
+          readOnly: !row.can.edit,
+          initiativeId: row.initiative_id,
+          saves,
+          actions: <RowActions table={table} row={row} language={i18n.language} />,
+        }}
+      />
+      {table.items.map((itemKind) => {
+        const items = tool.tables.get(itemKind);
+        return items ? (
+          <Section key={itemKind} title={toolText(items.name, i18n.language)}>
+            <ToolTableRows
+              table={items}
+              initiativeId={row.initiative_id}
+              parentId={row.id}
+              canCreate={row.can.contribute}
+            />
+          </Section>
+        ) : null;
+      })}
+    </div>
+  );
+}

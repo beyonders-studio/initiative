@@ -101,6 +101,7 @@ export { buildSavedLayoutSet, buildToolLayoutSet } from "./toolLayout.factory";
 export {
   buildToolPlugin,
   buildToolRow,
+  buildToolRowRead,
   resetCounter as resetToolPluginCounter,
   shelfDefinition,
   TOOL_PLUGIN_UID,

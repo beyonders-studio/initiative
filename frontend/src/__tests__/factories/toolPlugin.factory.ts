@@ -1,5 +1,11 @@
-import type { CommunityPluginRead } from "@/api/generated/initiativeAPI.schemas";
-import type { ToolRow } from "@/lib/toolPlugins";
+import {
+  ActorKind,
+  type CommunityPluginRead,
+  type PluginToolRowRead,
+} from "@/api/generated/initiativeAPI.schemas";
+import { type ToolRow, toolRow } from "@/lib/toolPlugins";
+
+import { writerCan } from "./can";
 
 let counter = 0;
 
@@ -129,19 +135,32 @@ export function buildToolPlugin(
   } as CommunityPluginRead & { definition: Record<string, unknown> };
 }
 
-/** A row of a tool plug-in's table. */
-export function buildToolRow(overrides: Partial<ToolRow> = {}): ToolRow {
+/** A row of a tool plug-in's table, as the generic routes read it. */
+export function buildToolRowRead(overrides: Partial<PluginToolRowRead> = {}): PluginToolRowRead {
   counter++;
   return {
+    kind: `book.${TOOL_PLUGIN_UID.toLowerCase()}`,
     id: counter,
+    community_id: 1,
     initiative_id: 1,
+    parent_id: null,
     name: `Row ${counter}`,
+    position: counter,
+    fields: {},
+    people: {},
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
+    archived_at: null,
+    can: writerCan(),
+    comments_enabled: true,
+    grants: [],
     created_at: "2026-11-01T00:00:00.000Z",
     updated_at: "2026-11-02T00:00:00.000Z",
-    values: {},
-    properties: [],
-    tags: [],
     ...overrides,
   };
 }
+
+/** A row of a tool plug-in's table, as the kit draws it. */
+export const buildToolRow = (overrides: Partial<PluginToolRowRead> = {}): ToolRow =>
+  toolRow(buildToolRowRead(overrides));

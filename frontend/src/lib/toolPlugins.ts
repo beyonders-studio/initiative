@@ -73,8 +73,10 @@ import {
   type DetailLayoutDefinitionInput,
   type ListLayoutDefinitionInput,
   type MetadataType,
+  type PluginToolRowRead,
+  type PluginToolRowUpdate,
+  type PluginToolRowUpdateFields,
   type PropertySummary,
-  type TagSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { initiativeRoute } from "@/lib/tools";
 import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
@@ -338,28 +340,34 @@ export const toolPluginRowRoute = (initiativeId: number, kind: string, id: numbe
 
 // --- Rows -------------------------------------------------------------------
 
-/** A row of a plug-in's table, the tool's own or an item's: the columns every
- *  tool row has, and its declared fields' values by key. */
-export interface ToolRow {
-  id: number;
-  initiative_id: number;
-  name: string;
-  created_by: number;
-  created_at: string;
-  updated_at: string;
-  /** Its declared fields' values, by key. */
-  values: Record<string, unknown>;
-  /** The initiative's properties it holds. */
-  properties: PropertySummary[];
-  tags: TagSummary[];
-}
+/** A row of a plug-in's table, the tool's own or an item's, as the kit draws
+ *  an item. Its rows hold none of the initiative's properties. */
+export type ToolRow = PluginToolRowRead & { properties: PropertySummary[] };
+
+/** A row as read, drawn as an item. */
+export const toolRow = (read: PluginToolRowRead): ToolRow => ({ ...read, properties: [] });
+
+/** What a row holds for one of its declared fields: a person by id, any other
+ *  kind as its value. */
+export const fieldValue = (row: PluginToolRowRead, field: ToolFieldDecl): unknown =>
+  (field.kind === "user_reference" ? row.people[field.key] : row.fields[field.key]) ?? null;
+
+/** One field's value as a change sends it: a person among its people, any
+ *  other kind among its fields. */
+export const fieldChange = (
+  field: ToolFieldDecl,
+  value: unknown
+): Pick<PluginToolRowUpdate, "fields" | "people"> =>
+  field.kind === "user_reference"
+    ? { people: { [field.key]: value as number | null } }
+    : { fields: { [field.key]: value as PluginToolRowUpdateFields[string] } };
 
 /** A counter's bound as one row holds it: the number given, or the value of
  *  the field it names. */
-const boundOf = (row: ToolRow, bound: ToolBound | undefined): number | null => {
+const boundOf = (row: PluginToolRowRead, bound: ToolBound | undefined): number | null => {
   if (bound === undefined) return null;
   if (typeof bound === "number") return bound;
-  const value = row.values[bound];
+  const value = row.fields[bound];
   return value === null || value === undefined || value === "" ? null : Number(value);
 };
 
@@ -371,7 +379,7 @@ const boundOf = (row: ToolRow, bound: ToolBound | undefined): number | null => {
  */
 export const fieldSummary = (
   field: ToolFieldDecl,
-  row: ToolRow,
+  row: PluginToolRowRead,
   language: string
 ): PropertySummary => ({
   property_id: 0,
@@ -398,5 +406,5 @@ export const fieldSummary = (
           look: CounterLook.number,
         }
       : null,
-  value: row.values[field.key] ?? null,
+  value: fieldValue(row, field),
 });

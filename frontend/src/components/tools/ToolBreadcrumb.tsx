@@ -29,7 +29,8 @@ export interface ToolBreadcrumbSegment {
 }
 
 export interface ToolBreadcrumbProps {
-  tool: Tool;
+  /** A built-in tool, or a tool plug-in's name and the list it opens. */
+  tool: Tool | ToolBreadcrumbSegment;
   /** The initiative this entity lives in. Omit (or null) for a community-level
    *  entity (e.g. a calendar with no initiative) — that crumb is dropped. */
   initiativeId?: number | null;
@@ -45,6 +46,13 @@ export const ToolBreadcrumb = ({ tool, initiativeId, trail = [] }: ToolBreadcrum
   // A community-level entity (only calendars have any) belongs to no initiative, so
   // there is no tool tab to go back to — its crumb reads as plain text.
   const hasInitiative = initiativeId != null;
+  const crumb =
+    typeof tool === "string"
+      ? {
+          label: t(toolNavLabelKey(tool)),
+          to: hasInitiative ? toolListRoute(tool, initiativeId) : null,
+        }
+      : tool;
 
   return (
     <Breadcrumb>
@@ -60,14 +68,12 @@ export const ToolBreadcrumb = ({ tool, initiativeId, trail = [] }: ToolBreadcrum
           </>
         )}
         <BreadcrumbItem>
-          {hasInitiative ? (
+          {crumb.to ? (
             <BreadcrumbLink asChild>
-              <Link to={gp(toolListRoute(tool, initiativeId as number))}>
-                {t(toolNavLabelKey(tool))}
-              </Link>
+              <Link to={gp(crumb.to)}>{crumb.label}</Link>
             </BreadcrumbLink>
           ) : (
-            t(toolNavLabelKey(tool))
+            crumb.label
           )}
         </BreadcrumbItem>
         {trail.map((segment, index) => (

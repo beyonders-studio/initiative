@@ -357,6 +357,12 @@
       "createdAt": "Añadido",
       "updatedAt": "Último cambio"
     },
-    "create": "Crear: {{name}}"
+    "create": "Crear: {{name}}",
+    "loadError": "No se han podido cargar.",
+    "empty": "Aún no hay nada aquí.",
+    "notFound": "Esto no está aquí",
+    "notFoundBody": "Puede que se haya eliminado, o que la herramienta a la que pertenece no esté instalada en esta comunidad.",
+    "backToTool": "Volver a {{name}}",
+    "actions": "Acciones"
   }
 }

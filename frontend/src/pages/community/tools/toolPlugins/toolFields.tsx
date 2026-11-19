@@ -4,9 +4,9 @@
  */
 
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { TagBadgeList } from "@/components/tags/TagBadge";
 import {
   fieldSummary,
+  fieldValue,
   type ToolFieldDecl,
   type ToolRow,
   type ToolTable,
@@ -25,8 +25,6 @@ const ColorSwatch = ({ value }: FieldRendererProps<ToolRow>) => (
     <span className="sr-only">{String(value)}</span>
   </span>
 );
-
-const Tags = ({ item }: FieldRendererProps<ToolRow>) => <TagBadgeList tags={item.tags} />;
 
 /** The fields every tool row has, as a layout names them. */
 const universal = (): FieldDef<ToolRow>[] => [
@@ -57,15 +55,6 @@ const universal = (): FieldDef<ToolRow>[] => [
     requireable: false,
     value: (row) => row.updated_at,
   },
-  {
-    id: "tags",
-    render: Tags,
-    source: "builtin",
-    label: "common:toolSettings.tags",
-    hideable: true,
-    requireable: false,
-    value: (row) => row.tags,
-  },
 ];
 
 /** One declared field: a colour as its swatch, anything else as the kit draws
@@ -80,7 +69,7 @@ const declared = (field: ToolFieldDecl, language: string): FieldDef<ToolRow> => 
     requireable: field.kind !== "counter" && field.kind !== "checkbox",
   };
   if (field.kind === "color") {
-    return { ...base, render: ColorSwatch, value: (row) => row.values[field.key] ?? null };
+    return { ...base, render: ColorSwatch, value: (row) => fieldValue(row, field) };
   }
   return {
     ...base,
