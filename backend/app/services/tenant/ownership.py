@@ -53,8 +53,10 @@ from app.core.plugin_scopes import (
     expand,
     tool_resource,
 )
+from app.core.tool_set import ToolRecord, ToolSet
 from app.core.tools import Tool
-from app.db.session import install_context
+from app.db.session import install_context, routed_tools
+from app.db.tool_rows import table_of
 from app.models.platform.guild import GuildMembership
 from app.models.tenant._mixins import ActorKind, tool_models
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -91,17 +93,14 @@ OWNABLE: dict[Tool, OwnableSpec] = {
 }
 
 
-# Reverse of OWNABLE, so a row can name its own tool.
-TOOL_BY_MODEL: dict[Any, Tool] = {spec.model: tool for tool, spec in OWNABLE.items()}
-
-
-def tool_for_row(row: Any) -> Tool | None:
-    """The :class:`Tool` this row is an instance of, or None if it is not one.
+def tool_for_row(row: Any, tools: ToolSet) -> ToolRecord | None:
+    """The tool of ``tools`` this row is the own row of, a model's instance or
+    a tool plug-in's row, or None if it is not one.
 
     Tasks, comments and uploads land here as None — they have an author and no
     owner, and take their permissions from the tool that holds them.
     """
-    return TOOL_BY_MODEL.get(type(row))
+    return tools.by_table.get(table_of(row).name)
 
 
 @dataclass(frozen=True)
@@ -394,7 +393,9 @@ async def require_plugin_owner_eligible(
 # ── Changing it ──────────────────────────────────────────────────────────────
 
 
-async def _clear_owner_grants(session: AsyncSession, *, tool: Tool, row: Any) -> None:
+async def _clear_owner_grants(
+    session: AsyncSession, *, tool: Tool | ToolRecord, row: Any
+) -> None:
     """Leave the resource with no owner grant at all.
 
     Every one, whoever holds it. Two shapes turn up beyond the single user row
@@ -441,7 +442,11 @@ async def _clear_owner_grants(session: AsyncSession, *, tool: Tool, row: Any) ->
 
 
 async def set_resource_owner(
-    session: AsyncSession, *, tool: Tool, row: Any, new_owner: Owner | None
+    session: AsyncSession,
+    *,
+    tool: Tool | ToolRecord,
+    row: Any,
+    new_owner: Owner | None,
 ) -> None:
     """Make ``new_owner`` the resource's owner, or leave it unowned when None.
     Caller commits, and has decided the new owner may hold it (a plug-in, by
@@ -547,7 +552,7 @@ async def give_to_install(
 
 
 async def current_owner(
-    session: AsyncSession, *, tool: Tool, resource_id: int
+    session: AsyncSession, *, tool: Tool | ToolRecord, resource_id: int
 ) -> Owner | None:
     """Who owns this resource right now, straight from the grants.
 
@@ -579,7 +584,7 @@ async def restore_ownership_to_author(
 
     Returns whether an owner was set. Caller commits.
     """
-    tool = tool_for_row(row)
+    tool = tool_for_row(row, routed_tools(session))
     if tool is None:
         return False
 

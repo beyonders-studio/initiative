@@ -14,6 +14,7 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.file_types import FileType
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.schema_provisioning import guild_schema_name
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.db.tenancy import GUILD_SCOPED_TABLES
@@ -1118,7 +1119,7 @@ async def test_the_trash_works_inside_an_archive(session: AsyncSession, client, 
     )
     initiative = await create_initiative(session, guild, user)
     row = await _build(session, model, initiative, user, {})
-    tool = ownership_service.tool_for_row(row)
+    tool = ownership_service.tool_for_row(row, BUILTIN_TOOLS)
     if tool is not None:
         await route_session_to_guild(session, guild.id)
         await ownership_service.set_resource_owner(

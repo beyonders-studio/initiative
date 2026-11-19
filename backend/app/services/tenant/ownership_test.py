@@ -2,17 +2,23 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import delete
 from sqlmodel import select
 
+from app.core.tool_set import ToolRecord
 from app.core.tools import Tool
+from app.db.plugin_tools import provisioned_tools
+from app.db.tool_rows import load_row, locate
 from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.tenant._mixins import CreatedByMixin
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import ownership as ownership_service
+from app.services.tenant.soft_delete import trash
 from app.testing import (
     TOOL_FACTORIES,
+    add_counter_group,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -21,6 +27,7 @@ from app.testing import (
     create_property_value,
     create_resource_grant,
     create_user,
+    install_tool_plugin,
     route_session_to_guild,
 )
 
@@ -128,7 +135,7 @@ def test_a_grantee_holds_one_grant_per_resource():
 # ── Behaviour ───────────────────────────────────────────────────────────────
 
 
-async def _owner_grant(session, tool: Tool, resource_id: int):
+async def _owner_grant(session, tool: Tool | ToolRecord, resource_id: int):
     return (
         await session.exec(
             select(ResourceGrant).where(
@@ -367,6 +374,47 @@ async def test_restore_leaves_content_unowned_when_the_author_has_gone(session):
 
     assert claimed is False
     assert await _owner_grant(session, Tool.file, file.id) is None
+
+
+async def test_a_tool_plugins_row_goes_back_to_its_author_on_restore(
+    client, session, acting_user, reading_as
+):
+    """A tool plug-in's row taken out of the trash unowned goes back to its
+    author, as a built-in tool's does."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    author = await acting_user(
+        guild=admin.guild, initiative=admin.initiative, initiative_role="moderator"
+    )
+    await session.commit()
+    seat = await acting_user(guild=author.guild, guild_role=CommunityRole.superadmin)
+    await install_tool_plugin(client, session, seat)
+    tools = await provisioned_tools(author.guild.id)
+    kind = tools.installed[0].kind
+    located = locate(tools, kind)
+    assert located is not None
+    mine = await reading_as(author.user.id, author.guild.id)
+    group, _counter = await add_counter_group(mine, author.initiative.id)
+    row = await load_row(mine, located, tools, group)
+    assert row is not None
+    await trash(mine, row, deleted_by_user_id=author.user.id)
+    await mine.commit()
+    await route_session_to_guild(session, author.guild.id)
+    await session.exec(
+        delete(ResourceGrant).where(
+            ResourceGrant.resource_type == kind,
+            ResourceGrant.resource_id == group,
+            ResourceGrant.level == ResourceAccessLevel.owner,
+        )
+    )
+    await session.commit()
+
+    response = await client.post(
+        author.g(f"/trash/{kind}/{group}/restore"), headers=author.headers
+    )
+    assert response.status_code == 200, response.text
+    await route_session_to_guild(session, author.guild.id)
+    grant = await _owner_grant(session, tools.by_kind[kind], group)
+    assert grant is not None and grant.user_id == author.user.id
 
 
 async def test_a_projects_author_gets_it_back_on_restore(session):
