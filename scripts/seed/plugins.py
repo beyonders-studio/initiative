@@ -139,9 +139,10 @@ CONTACTS: dict[str, list[dict]] = {
 }
 
 
-async def _install(c: Community, public_id: str) -> GuildPlugin:
-    """Install a built-in plug-in as the community's admin would."""
-    admin = c.users[INSTALLER[c.key]]
+async def install(c: Community, public_id: str, installer: str) -> GuildPlugin:
+    """Install a plug-in the catalogue ships as ``installer``, one of the
+    community's admins, would."""
+    admin = c.users[installer]
     found = await catalog_service.get_listing(c.session, public_id)
     assert found is not None, f"{public_id} is not in the catalog"
     listing, version = await resolve_listing_install(
@@ -167,7 +168,7 @@ async def seed(c: Community) -> None:
         return
     admin = c.users[INSTALLER[c.key]]
 
-    calendar_install = await _install(c, "core.guild-calendar")
+    calendar_install = await install(c, "core.guild-calendar", INSTALLER[c.key])
     [calendar] = await guild_plugins_service.plugin_artifacts(
         c.session, calendar_install
     )
@@ -189,7 +190,7 @@ async def seed(c: Community) -> None:
         await c.session.flush()
         c.ids["calendar_events"].append(event.id)
 
-    contacts_install = await _install(c, "core.community-contacts")
+    contacts_install = await install(c, "core.community-contacts", INSTALLER[c.key])
     contacts: dict[str, Contact] = {}
     for d in CONTACTS[c.key]:
         contact = Contact(

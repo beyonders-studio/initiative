@@ -26,7 +26,7 @@ from seed.common import Community
 SEED_INITIATIVE_NAME = "Default Initiative"
 SEED_INITIATIVE_COLOR = "#2563eb"
 
-_SMALL_KIT = (Tool.counter_group, Tool.calendar, Tool.wiki)
+_SMALL_KIT = (Tool.calendar, Tool.wiki)
 
 #: Who makes each community's default initiative, and who else is in it on
 #: which built-in role.
@@ -117,7 +117,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
             ],
             "join_policy": InitiativeJoinPolicy.request,
             "tools": _SMALL_KIT,
-            "member_tools": (Tool.counter_group, Tool.calendar, Tool.wiki),
+            "member_tools": (Tool.calendar, Tool.wiki),
         },
     },
     "tides": {
@@ -152,7 +152,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
             ],
             "join_policy": InitiativeJoinPolicy.private,
             "tools": _SMALL_KIT,
-            "member_tools": (Tool.counter_group, Tool.calendar, Tool.wiki),
+            "member_tools": (Tool.calendar, Tool.wiki),
         },
     },
 }
