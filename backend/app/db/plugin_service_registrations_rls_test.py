@@ -54,7 +54,8 @@ async def _make_row(session, public_id: str = "acme.widgets") -> None:
 def test_registry_records_the_grant_decision():
     """The registries name this table for the system engine alone: it holds
     every verb, the bare pre-routing role and every tier hold nothing, and the
-    policies on the table are the install floor's and the billing log's reads."""
+    policies on the table are the install floor's, the guild floors' (a tool
+    plug-in's state) and the billing log's reads."""
     shared = SHARED_TABLE_REGISTRY[TABLE]
     assert shared.grants.app_admin == DML
     assert shared.grants.app_user is None
@@ -63,6 +64,7 @@ def test_registry_records_the_grant_decision():
     assert rls.enabled and rls.forced
     assert [(p.command, p.roles) for p in rls.policies] == [
         (SELECT, ("plugin_install_base",)),
+        (SELECT, ("app_guild_base", "app_guild_base_ro")),
         (SELECT, ("app_billing_log",)),
     ]
 

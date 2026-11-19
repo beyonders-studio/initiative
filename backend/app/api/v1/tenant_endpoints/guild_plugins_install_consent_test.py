@@ -475,6 +475,11 @@ class TestUpgradeConsent:
             "version": "1.1.0",
             "added_scopes": ["tags:read"],
             "added_surfaces": [{"id": "planner", "name": {"en": "Planner"}}],
+            "added_tables": [],
+            "added_fields": [],
+            "added_options": [],
+            "added_actions": [],
+            "dropped_fields": [],
             "declined": False,
         }
         assert read["update_refused"] is None
@@ -515,6 +520,11 @@ class TestUpgradeConsent:
             "version": "1.1.0",
             "added_scopes": ["tags:read"],
             "added_surfaces": [],
+            "added_tables": [],
+            "added_fields": [],
+            "added_options": [],
+            "added_actions": [],
+            "dropped_fields": [],
             "declined": False,
         }
         (plugin,) = await _installs(session, a.guild.id)
