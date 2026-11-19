@@ -213,6 +213,10 @@ async def test_values_and_places_are_held_to_the_declaration(
         {"count": None},
         {"color": "red"},
         {"count": 1e12},
+        # Its required fields and its checks.
+        {"step": None},
+        {"step": 0},
+        {"min": 5, "max": 1},
     ):
         assert await refused("POST", f"{COUNTER}/", {**item, "fields": fields}) == (
             invalid
