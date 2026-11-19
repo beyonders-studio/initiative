@@ -24,8 +24,6 @@ from app.core.messages import GuildMessages, GuildPluginMessages, MarketplaceMes
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar import Calendar
 from app.testing import (
-    COUNTERS_UID,
-    counters_tool_manifest,
     create_marketplace_listing,
     create_plugin_service_registration,
     marketplace_uid,
@@ -183,26 +181,6 @@ class TestInstall:
         )
         assert response.status_code == 404
         assert response.json()["detail"] == MarketplaceMessages.LISTING_NOT_FOUND
-
-    async def test_a_tool_plugin_is_not_installed_yet(
-        self, client: AsyncClient, acting_user, session: AsyncSession
-    ):
-        """A tool plug-in registers, and is refused by name until this build
-        creates a tool's tables in a community."""
-        await create_marketplace_listing(
-            session,
-            uid=COUNTERS_UID,
-            public_id="beyonders.counters",
-            kind="plugin",
-            name="Counters",
-            definition=counters_tool_manifest(),
-        )
-        a = await acting_user(guild_role=CommunityRole.superadmin)
-        response = await client.post(
-            a.g("/plugins/"), headers=a.headers, json={"listing_uid": COUNTERS_UID}
-        )
-        assert response.status_code == 409, response.text
-        assert response.json()["detail"] == GuildPluginMessages.KIND_NOT_INSTALLABLE
 
     async def test_installing_twice_is_refused(
         self, client: AsyncClient, acting_user, calendar_plugin
