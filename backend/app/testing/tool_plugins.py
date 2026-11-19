@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 __all__ = [
     "COUNTERS_UID",
     "add_counter",
-    "add_counter_group",
     "counters_tool_manifest",
     "install_tool_plugin",
 ]
@@ -270,16 +269,20 @@ async def add_counter(
 ) -> tuple[ToolSet, int, int]:
     """A counter group of the installed Counters in ``initiative_id``, and a
     counter in it with ``counter``'s columns: the community's tool set, the
-    group's id and the counter's id. Committed."""
+    group's id and the counter's id. Added on ``session`` as it is routed (a
+    request's, whose person then makes and owns them), or routed into the
+    community where it is not. Committed."""
     import sqlalchemy as sa
 
     from app.db.plugin_tools import provisioned_tools
+    from app.db.session import routed_guild_id
     from app.testing.schema_harness import route_session_to_guild
 
     tools = await provisioned_tools(guild_id)
     (tool,) = tools.installed
     (item,) = tool.items
-    await route_session_to_guild(session, guild_id)
+    if routed_guild_id(session) is None:
+        await route_session_to_guild(session, guild_id)
     group = (
         await session.exec(
             sa.insert(tool.table)
@@ -296,33 +299,3 @@ async def add_counter(
     ).scalar_one()
     await session.commit()
     return tools, group, row
-
-
-async def add_counter_group(
-    session: AsyncSession, initiative_id: int, *, uid: str = COUNTERS_UID
-) -> tuple[int, int]:
-    """A Counters group in ``initiative_id`` with one counter in it, added on
-    ``session``: a request's, so its person makes and owns them. Returns the
-    group's id and the counter's."""
-    from sqlalchemy import text
-
-    tables = f"p_{uid.lower()}_counter_group", f"p_{uid.lower()}_counter"
-    group = (
-        await session.exec(
-            text(
-                f"INSERT INTO {tables[0]} (initiative_id, name)"
-                " VALUES (:i, 'Scores') RETURNING id"
-            ),
-            params={"i": initiative_id},
-        )
-    ).scalar_one()
-    counter = (
-        await session.exec(
-            text(
-                f"INSERT INTO {tables[1]} (counter_group_id, name)"
-                " VALUES (:g, 'Laps') RETURNING id"
-            ),
-            params={"g": group},
-        )
-    ).scalar_one()
-    return group, counter

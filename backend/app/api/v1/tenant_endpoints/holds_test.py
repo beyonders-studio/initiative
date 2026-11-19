@@ -28,7 +28,7 @@ from app.models.tenant.task import Task
 from app.services.platform import holds as holds_service
 from app.testing import (
     COUNTERS_UID,
-    add_counter_group,
+    add_counter,
     create_collection,
     create_comment,
     create_file,
@@ -700,7 +700,7 @@ async def test_a_tool_plugins_row_is_held_listed_and_released(
     seat = await acting_user(guild=guild, guild_role=CommunityRole.superadmin)
     await install_tool_plugin(client, session, seat)
     adding = await reading_as(scene["mod"].user.id, guild.id)
-    group, counter = await add_counter_group(adding, scene["initiative"].id)
+    group, counter = (await add_counter(adding, guild.id, scene["initiative"].id))[1:]
     await adding.commit()
     kind = f"counter_group.{COUNTERS_UID.lower()}"
     seen = text(

@@ -13,7 +13,7 @@ from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
-from app.testing import COUNTERS_UID, add_counter_group, install_tool_plugin
+from app.testing import COUNTERS_UID, add_counter, install_tool_plugin
 from app.testing.factories import (
     create_counter_group,
     create_guild,
@@ -295,7 +295,9 @@ async def test_bulk_shares_a_tool_plugins_row(
     seat = await acting_user(guild=moderator.guild, guild_role=CommunityRole.superadmin)
     await install_tool_plugin(client, session, seat)
     adding = await reading_as(moderator.user.id, moderator.guild.id)
-    group, counter = await add_counter_group(adding, moderator.initiative.id)
+    group, counter = (
+        await add_counter(adding, moderator.guild.id, moderator.initiative.id)
+    )[1:]
     await adding.commit()
     kind, item_kind = (
         f"{key}.{COUNTERS_UID.lower()}" for key in ("counter_group", "counter")

@@ -18,7 +18,7 @@ from app.services.tenant import ownership as ownership_service
 from app.services.tenant.soft_delete import trash
 from app.testing import (
     TOOL_FACTORIES,
-    add_counter_group,
+    add_counter,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -393,7 +393,9 @@ async def test_a_tool_plugins_row_goes_back_to_its_author_on_restore(
     located = locate(tools, kind)
     assert located is not None
     mine = await reading_as(author.user.id, author.guild.id)
-    group, _counter = await add_counter_group(mine, author.initiative.id)
+    group, _counter = (await add_counter(mine, author.guild.id, author.initiative.id))[
+        1:
+    ]
     row = await load_row(mine, located, tools, group)
     assert row is not None
     await trash(mine, row, deleted_by_user_id=author.user.id)

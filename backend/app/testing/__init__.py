@@ -110,7 +110,6 @@ from app.testing.server import in_request_tasks
 from app.testing.tool_plugins import (
     COUNTERS_UID,
     add_counter,
-    add_counter_group,
     counters_tool_manifest,
     install_tool_plugin,
 )
@@ -122,7 +121,6 @@ __all__ = [
     "TOOL_FACTORIES",
     "Actor",
     "add_counter",
-    "add_counter_group",
     "as_role",
     "assertion_for",
     "assign_tag",

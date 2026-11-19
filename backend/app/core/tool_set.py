@@ -23,11 +23,7 @@ from sqlalchemy import Table
 from sqlmodel import SQLModel
 
 import app.db.base  # noqa: F401  # every model on the metadata
-<<<<<<< HEAD
-=======
-from app.core.plugin_scopes import tool_resource
 from app.core.relationships import ENDPOINT_CODES
->>>>>>> 4989e0449 (Link any kind in the community's tool set)
 from app.core.tools import KINDS, Kind, Tool, ToolRefusals, ToolSpec
 
 
