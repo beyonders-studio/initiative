@@ -234,9 +234,7 @@ def _triggers(
     for sweep in sweeps():
         if (sweep.scope is Scope.OPERATIONS) != operations:
             continue
-        found = sweep.table_source or (lambda _table: None)
-        installed = (found(table) for table in tools.installed_tables)
-        for source in (*sweep.sources, *(s for s in installed if s is not None)):
+        for source in sweep.sources_in(tools):
             name = object_name("tr", source.table, f"timer_{sweep.kind}")
             # A second source on one table for one sweep is numbered.
             named[name] = named.get(name, 0) + 1

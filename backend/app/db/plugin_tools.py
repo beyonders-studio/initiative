@@ -83,8 +83,6 @@ __all__ = [
     "installed_digest",
     "installed_tools",
     "is_plugin_kind",
-    "plugin_kind_of_table",
-    "plugin_table_pattern",
     "provisioned_tools",
     "rendered_tools",
     "structure_ddl",
@@ -196,20 +194,6 @@ def is_plugin_kind(value: str) -> bool:
         return bool(dot) and _key(key, "key") == key and _uid(uid.upper()) == uid
     except PluginToolError:
         return False
-
-
-def plugin_table_pattern() -> str:
-    """A ``LIKE`` pattern every tool plug-in's table name matches, and no
-    built-in table's."""
-    return TABLE_PREFIX.replace("_", "\\_") + "%"
-
-
-def plugin_kind_of_table(name: str) -> str:
-    """SQL reading the kind a tool plug-in's table holds off its name, the
-    SQL expression ``name``: ``p_<uid>_<key>`` holds ``<key>.<uid>``."""
-    uid_at = len(TABLE_PREFIX) + 1
-    key_at = uid_at + _UID_LENGTH + 1
-    return f"substr({name}, {key_at}) || '.' || substr({name}, {uid_at}, {_UID_LENGTH})"
 
 
 # --- columns ----------------------------------------------------------------

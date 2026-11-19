@@ -40,13 +40,12 @@ from app.api.deps import (
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import TrashMessages
-from app.core.tool_set import ToolSet
-from app.core.tools import TRASH_TARGETS, plural_of
+from app.core.tool_set import BUILTIN_TOOLS, ToolSet
 from app.core.user_display import display_name
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import build_paginated_response
 from app.db.session import routed_tools
-from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
+from app.db.soft_delete_filter import select_including_deleted
 from app.db.tool_rows import load_row, locate
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User, UserStatus
@@ -66,7 +65,7 @@ from app.services.platform import guilds as guilds_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import column_limits, content_references
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant.lifecycle_tree import cascade_parents
+from app.services.tenant.lifecycle_tree import cascade_parents, trash_kinds
 from app.services.tenant.soft_delete import (
     hard_purge_entity,
     restore_entity,
@@ -75,33 +74,20 @@ from app.services.tenant.soft_delete import (
 router = APIRouter()
 
 
-def _entry(target: str) -> tuple[Table, str]:
-    model = MODELS_BY_TABLE[plural_of(target)]
-    if model not in SOFT_DELETE_MODELS:  # pragma: no cover — a registry mistake
-        raise RuntimeError(f"{target} names no model with a trash can")
-    return model.__table__, model.display_field()  # type: ignore[attr-defined]
-
-
-#: Wire name -> (table, the column that labels its rows). A target's table is
-#: its own plural and its label is the model's ``display_field``, so neither is
-#: written down here; a target with no soft-deletable model behind it fails at
-#: import rather than at request time.
-ENTITY_REGISTRY: dict[str, tuple[Table, str]] = {
-    target: _entry(target) for target in TRASH_TARGETS
-}
-
-
 @cache
 def entity_registry(tools: ToolSet) -> dict[str, tuple[Table, str]]:
-    """:data:`ENTITY_REGISTRY` in a community with ``tools``: each of its
-    tool plug-ins' kinds too, labelled by its name."""
-    found = dict(ENTITY_REGISTRY)
-    for record in tools.installed:
-        for kind in (record.kind, *(child.value for child in record.children)):
-            located = locate(tools, kind)
-            if located is not None and "deleted_at" in located.table.c:
-                found[kind] = (located.table, "name")
-    return found
+    """Wire name -> (table, the column that labels its rows), for every kind
+    with the trash in a community with ``tools``: a model's
+    ``display_field``, and a tool plug-in's row its name."""
+    return {
+        kind: (table, model.display_field() if model else "name")  # type: ignore[attr-defined]
+        for kind, table in trash_kinds(tools).items()
+        for model in (MODELS_BY_TABLE.get(table.name),)
+    }
+
+
+#: :func:`entity_registry` of the built-in tools.
+ENTITY_REGISTRY: dict[str, tuple[Table, str]] = entity_registry(BUILTIN_TOOLS)
 
 
 #: A trash listing's page window.

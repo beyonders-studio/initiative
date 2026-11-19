@@ -32,6 +32,7 @@ from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+from app.core.tools import TRASHABLE_EXTRAS, plural_of
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import ids_in
 from app.db.session import routed_tools
@@ -83,6 +84,20 @@ def binned_tables(tools: ToolSet) -> tuple[Table, ...]:
         *(SQLModel.metadata.tables[name] for name in SOFT_DELETE_TABLES),
         *(table for table in tools.installed_tables if "deleted_at" in table.c),
     )
+
+
+def trash_kinds(tools: ToolSet) -> dict[str, Table]:
+    """What the trash calls the rows of each table with the trash, in a
+    community with ``tools``: the kind it keeps, or what else the trash holds
+    (a comment, an initiative)."""
+    from app.db.initiative_rls import content_kind_tables
+
+    named = content_kind_tables(tools) | {e: plural_of(e) for e in TRASHABLE_EXTRAS}
+    return {
+        kind: tools.tables[name]
+        for kind, name in named.items()
+        if "deleted_at" in tools.tables[name].c
+    }
 
 
 @cache

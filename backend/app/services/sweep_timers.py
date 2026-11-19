@@ -49,7 +49,7 @@ from functools import cache, partial
 from typing import Any
 
 from sqlalchemy import Table, case, delete, exists, func, literal, or_, text
-from sqlmodel import SQLModel, col, select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import metrics
@@ -119,24 +119,45 @@ class Sweep:
     calls_out: bool = False
     #: The writes that give the sweep work.
     sources: tuple[TimerSource, ...] = ()
-    #: How a table no model declares, a tool plug-in's, gives the sweep work,
-    #: or ``None`` where that table gives it none.
-    table_source: Callable[[Table], TimerSource | None] | None = None
-    #: The earliest such a table has work, as ``next_due`` reads it, or
-    #: ``None`` where it gives the sweep none.
-    table_due: Callable[[Table], Any] | None = None
+    #: A column whose value, on a row of any of the community's tables that
+    #: carries it, is when the sweep has work there: each such table is a
+    #: source, and its earliest value is a due time beside ``next_due``.
+    due_column: str | None = None
     #: ``(community, now)``: the sweep's next due time read outside the
     #: community's schema, for a sweep whose work is kept in ``public`` (where
     #: the community's role reads nothing). The reconcile asks this in place of
     #: ``next_due``, which such a sweep, answering its own, never has run.
     due_outside: Callable[[int, datetime], Awaitable[datetime | None]] | None = None
 
+    def due_tables(self, tools: ToolSet) -> list[Table]:
+        """The tables carrying :attr:`due_column` in a community with
+        ``tools``, by name."""
+        column = self.due_column
+        found = [t for t in tools.tables.values() if column and column in t.c]
+        return sorted(found, key=lambda t: t.name)
+
+    def sources_in(self, tools: ToolSet) -> tuple[TimerSource, ...]:
+        """The writes that give the sweep work in a community with ``tools``:
+        a row setting :attr:`due_column`, then :attr:`sources`."""
+        column = self.due_column
+        return (
+            *(
+                on_row(
+                    t.name,
+                    f"{{row}}.{column}",
+                    events=f"INSERT OR UPDATE OF {column}",
+                    when=f"NEW.{column} IS NOT NULL",
+                )
+                for t in self.due_tables(tools)
+            ),
+            *self.sources,
+        )
+
 
 @cache
 def sweeps() -> tuple[Sweep, ...]:
     """Every sweep that runs on timers, read once."""
     from app.core.intake import IntakeStream, meta
-    from app.db.soft_delete_filter import SOFT_DELETE_MODELS, SOFT_DELETE_TABLES
     from app.models.tenant.batched_notice import BatchedNotice
     from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
     from app.models.tenant.content_hold import ContentHold
@@ -188,17 +209,6 @@ def sweeps() -> tuple[Sweep, ...]:
         return select(func.now()).where(condition)
 
     hour, minute = timedelta(hours=1), timedelta(minutes=1)
-
-    def binned(table: Table) -> TimerSource | None:
-        """A trashed row arms its purge, on a table with the trash."""
-        if "purge_at" not in table.c:
-            return None
-        return on_row(
-            table.name,
-            "{row}.purge_at",
-            events="INSERT OR UPDATE OF purge_at",
-            when="NEW.purge_at IS NOT NULL",
-        )
 
     dispatchers = (export_worker.jobs, import_worker.jobs)
 
@@ -426,37 +436,21 @@ def sweeps() -> tuple[Sweep, ...]:
             scope=Scope.ACTIVE,
             every=hour,
             visit=trash_purge.purge_guild,
-            next_due=lambda _now: least(
-                *(
-                    select(func.min(model.purge_at)).where(  # type: ignore[attr-defined]
-                        model.purge_at.is_not(None)  # type: ignore[attr-defined]
-                    )
-                    for model in SOFT_DELETE_MODELS
-                ),
-                select(
-                    func.min(Upload.created_at) + UNCLAIMED_PASTED_IMAGE_GRACE
-                ).where(
-                    col(Upload.filename).startswith(PASTED_IMAGE_PREFIX),
-                    col(Upload.claimed_at).is_(None),
-                ),
+            # A trashed row arms its purge.
+            due_column="purge_at",
+            next_due=lambda _now: select(
+                func.min(Upload.created_at) + UNCLAIMED_PASTED_IMAGE_GRACE
+            ).where(
+                col(Upload.filename).startswith(PASTED_IMAGE_PREFIX),
+                col(Upload.claimed_at).is_(None),
             ),
             sources=(
-                *(
-                    binned(SQLModel.metadata.tables[name])
-                    for name in SOFT_DELETE_TABLES
-                ),
                 on_row(
                     "uploads",
                     "{row}.created_at",
                     after=UNCLAIMED_PASTED_IMAGE_GRACE,
                     when=f"NEW.filename LIKE '{PASTED_IMAGE_PREFIX}%'",
                 ),
-            ),
-            table_source=binned,
-            table_due=lambda table: (
-                select(func.min(table.c.purge_at)).where(table.c.purge_at.is_not(None))
-                if "purge_at" in table.c
-                else None
             ),
         ),
         # Resumable uploads nobody finished or took.
@@ -913,19 +907,22 @@ async def arm(session: AsyncSession, kind: str, due: datetime) -> None:
 
 
 def _due(sweep: Sweep, now: datetime, tools: ToolSet) -> Any:
-    """The sweep's ``next_due`` in a community with ``tools``: its installed
-    tools' tables' too, where the sweep reads them (``table_due``)."""
+    """The sweep's ``next_due`` in a community with ``tools``, and the
+    earliest :attr:`Sweep.due_column` of each table carrying it."""
     statement = sweep.next_due(now)
-    installed = [
-        due
-        for table in tools.installed_tables
-        if sweep.table_due is not None and (due := sweep.table_due(table)) is not None
-    ]
-    if not installed:
+    column = sweep.due_column
+    tables = sweep.due_tables(tools)
+    if not tables:
         return statement
     return select(
         func.least(
-            statement.scalar_subquery(), *(due.scalar_subquery() for due in installed)
+            statement.scalar_subquery(),
+            *(
+                select(func.min(t.c[column]))
+                .where(t.c[column].is_not(None))
+                .scalar_subquery()
+                for t in tables
+            ),
         )
     )
 
@@ -943,7 +940,7 @@ async def _next_due(
 
     tools = (
         await _tools(routed_guild_id(session))
-        if sweep.table_due is not None
+        if sweep.due_column is not None
         else BUILTIN_TOOLS
     )
     statement = _due(sweep, now, tools)

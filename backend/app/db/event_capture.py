@@ -49,6 +49,7 @@ id in the outbox resolvable without owing new API surface per table.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -56,7 +57,6 @@ from typing import Any
 from sqlalchemy import Column, Table
 
 from app.core.tool_set import BUILTIN_TOOLS, ToolSet
-from app.core.tools import Tool
 from app.db import gucs
 from app.db.initiative_rls import (
     EVENTED_TABLES,
@@ -65,10 +65,10 @@ from app.db.initiative_rls import (
     InitiativePath,
     event_source,
     initiative_locator,
+    parent_types,
     paths_for,
 )
 from app.db.names import object_name
-from app.db.plugin_tools import plugin_kind_of_table, plugin_table_pattern
 
 #: How a row reaches the trigger's dynamic lookups: as ``$1`` in an EXECUTE, so
 #: every registry expression is rendered against this rather than NEW/OLD.
@@ -344,6 +344,8 @@ def build_specs(tools: ToolSet = BUILTIN_TOOLS) -> list[CaptureSpec]:
 
         source = event_source(table_name)
         declared = source.reports_as
+        if callable(declared):
+            declared = declared(tools)
         if declared is not None:
             # A tuple reports the row against several resources — one trigger
             # each, so the capture function itself needs to know nothing about
@@ -426,18 +428,6 @@ def build_specs(tools: ToolSet = BUILTIN_TOOLS) -> list[CaptureSpec]:
 # The capture function
 # ---------------------------------------------------------------------------
 
-#: Each tool's table and the tool it is, for the governing-tool lookup the
-#: function makes from a change's resource and parents. From the enum, so a new
-#: tool is governed without an edit here.
-_GOVERNING_TOOLS = ", ".join(f"('{tool.plural}', '{tool.value}')" for tool in Tool)
-
-#: A tool plug-in's table names its tool's kind (``plugin_tools.TABLE_PREFIX``,
-#: the uid, the key), so the lookup reads the kind off the name. An item's
-#: own table reads as a kind too, and the chain ends at its tool's table, which
-#: the lookup takes as the outermost.
-_PLUGIN_TOOL = plugin_kind_of_table("x.type")
-_PLUGIN_TABLES = plugin_table_pattern()
-
 #: Rendered once into ``public``. Per-table knowledge arrives as TG_ARGV, where
 #: every "expression" is SQL text evaluated with the changed row as ``$1``:
 #:   0 — expression resolving the row's initiative id
@@ -452,6 +442,8 @@ _PLUGIN_TABLES = plugin_table_pattern()
 #:   9 — 'anonymous' when this table's events name no actor
 #:  10 — expression resolving the facet label, or '' when arg 3 is the answer;
 #:       it reads the row as ``$1`` and the operation (``TG_OP``) as ``$2``
+#:  11 — the tools among the types the event can name, as a JSON object of
+#:       each one's table to its kind, rendered from the community's tool set
 CAPTURE_FUNCTION_SQL = f"""
 CREATE OR REPLACE FUNCTION {CAPTURE_FUNCTION}() RETURNS trigger
     LANGUAGE plpgsql AS $capture$
@@ -604,19 +596,15 @@ BEGIN
     -- The tool whose sharing governs the change: the resource itself when it
     -- is a tool, else the outermost tool among its parents. None for a change
     -- under no tool, which the initiative gate alone answers.
-    SELECT m.tool, x.id INTO v_dac_tool, v_dac_id
+    SELECT m.tools ->> x.type, x.id INTO v_dac_tool, v_dac_id
       FROM (
             SELECT v_type AS type, v_resource AS id, 0::bigint AS ord
             UNION ALL
             SELECT p ->> 'type', (p ->> 'id')::integer, o
               FROM jsonb_array_elements(v_parents) WITH ORDINALITY AS e(p, o)
            ) x
-      CROSS JOIN LATERAL (
-            SELECT b.tool FROM (VALUES {_GOVERNING_TOOLS}) AS b(tbl, tool)
-             WHERE b.tbl = x.type
-            UNION ALL
-            SELECT {_PLUGIN_TOOL} WHERE x.type LIKE '{_PLUGIN_TABLES}'
-           ) AS m(tool)
+      CROSS JOIN (SELECT COALESCE(TG_ARGV[11], '{{}}')::jsonb AS tools) m
+     WHERE m.tools ? x.type
      ORDER BY x.ord DESC
      LIMIT 1;
 
@@ -669,7 +657,16 @@ def _quoted(expr: str) -> str:
     return "'" + expr.replace("'", "''") + "'"
 
 
-def _trigger_block(spec: CaptureSpec, tables: Mapping[str, Table]) -> str:
+def _tools_named(spec: CaptureSpec, tools: ToolSet) -> str:
+    """The tools among the types an event from ``spec`` can name, each
+    table to its kind: what the capture function reads the governing tool
+    from."""
+    named = spec.resource_types | parent_types(spec.parents_expr)
+    found = {t: tools.by_table[t].kind for t in sorted(named) if t in tools.by_table}
+    return _quoted(json.dumps(found, separators=(",", ":")))
+
+
+def _trigger_block(spec: CaptureSpec, tools: ToolSet) -> str:
     source = event_source(spec.table)
     # A polymorphic facet resolves its type per row; everything else names one
     # constant, and passing that as a literal keeps the extra EXECUTE off the
@@ -683,13 +680,14 @@ def _trigger_block(spec: CaptureSpec, tables: Mapping[str, Table]) -> str:
             f"    '{static_type}',",
             f"    {_quoted(spec.resource_id_expr)},",
             f"    '{spec.facet or ''}',",
-            f"    {_housekeeping_literal(tables[spec.table])},",
+            f"    {_housekeeping_literal(tools.tables[spec.table])},",
             f"    '{'guild' if source.guild_wide else ''}',",
             f"    {_quoted(type_expr or '')},",
             f"    {_quoted(spec.parents_expr)},",
             f"    {_quoted(spec.quiet_expr)},",
             f"    '{'anonymous' if source.anonymous else ''}',",
-            f"    {_quoted(spec.facet_expr or '')}",
+            f"    {_quoted(spec.facet_expr or '')},",
+            f"    {_tools_named(spec, tools)}",
             "  );",
         ]
     )
@@ -739,5 +737,5 @@ _HEADER = """\
 def render_guild_capture_ddl(tools: ToolSet = BUILTIN_TOOLS) -> str:
     """Per-table trigger DDL, applied inside the schema of a community with
     ``tools``."""
-    blocks = [_trigger_block(spec, tools.tables) for spec in build_specs(tools)]
+    blocks = [_trigger_block(spec, tools) for spec in build_specs(tools)]
     return _HEADER + "\n\n" + "\n\n".join(blocks) + "\n"
