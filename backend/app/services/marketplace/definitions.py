@@ -18,6 +18,7 @@ too large a vocabulary to read in one sitting:
 * ``widget_meta`` — the server-side reading of the rules the browser applies to
   a widget's own strings.
 * ``service_plugins`` — the ``plugin_kind: "service"`` manifest.
+* ``tool_plugins`` — the ``plugin_kind: "tool"`` manifest.
 
 Two rules span all of them. **Attribution is required**: a listing states who
 wrote it or it is not published. And **``core.*`` belongs to this repository**:
@@ -50,6 +51,7 @@ from app.services.marketplace.tool_listings import (
     normalize_tool_example,
     normalize_tool_listing,
 )
+from app.services.marketplace.tool_plugins import normalize_tool_plugin_definition
 
 __all__ = [
     "GUILD_INSTALLABLE_PLUGIN_KINDS",
@@ -147,12 +149,13 @@ LOCAL_SOURCE = "local"
 #: ``tool_instance`` mounts one of the plug-in's own tools at guild scope — the plug-in
 #: creates an ordinary row in an ordinary table and the existing UI renders it.
 #: ``service`` declares features a container the operator runs will
-#: serve.
-PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
+#: serve. ``tool`` declares a tool of its own, whose tables Initiative creates
+#: in each community that installs it.
+PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service", "tool"})
 
 #: The plug-in kinds the guild install path can mount.
 #:
-#: All three, now that a ``service`` plug-in has somewhere to land: the deployment's
+#: Both, now that a ``service`` plug-in has somewhere to land: the deployment's
 #: registration supplies the address, the secret and the powers, and the install
 #: is the pinned definition plus whatever the guild configures against it. A
 #: service plug-in creates no local content, so installing one is the row and
@@ -161,7 +164,8 @@ PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
 #: The set is still separate from :data:`PLUGIN_KINDS` because the two answer
 #: different questions — what a listing may *declare* versus what this build can
 #: *mount* — and a kind added to the vocabulary ahead of its machinery is
-#: refused by name rather than half-mounted.
+#: refused by name rather than half-mounted. ``tool`` is one: it registers, and
+#: is not installed until this build creates a tool's tables in a community.
 GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
 
 #: Tools a plug-in may mount at guild scope. A tool qualifies when its content is
@@ -250,6 +254,8 @@ def _normalize_plugin_definition(
 
     if plugin_kind == "service":
         return normalize_service_plugin_definition(definition, public_id=public_id)
+    if plugin_kind == "tool":
+        return normalize_tool_plugin_definition(definition)
 
     cleaned: dict[str, Any] = {"plugin_kind": plugin_kind}
     tool = definition.get("tool")

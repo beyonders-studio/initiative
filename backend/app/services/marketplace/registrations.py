@@ -106,6 +106,7 @@ from app.services.marketplace.registration_lookup import (
     live_registration_clause,
     service_public_id,
 )
+from app.services.marketplace.tool_plugins import is_tool_plugin
 
 logger = logging.getLogger(__name__)
 
@@ -738,12 +739,12 @@ async def update_registration(
     before = audit_service.snapshot(row, AUDITED_FIELDS)
     was_suspended, was_reach = row.suspended_at is not None, await _reach(session, row)
     placement = (base_url, page_origin, allowed_origins, jwks, jwks_uri)
-    if row.kind == RegistrationKind.DECLARATIVE and any(
+    if row.kind != RegistrationKind.CONTAINER and any(
         value is not None for value in placement
     ):
         raise _bad_request(
             PluginServiceMessages.DECLARATIVE_NOT_PLACED,
-            "a declarative plug-in has no address, origins or keys",
+            "a plug-in that runs no container has no address, origins or keys",
         )
     _write_placement(
         row,
@@ -1065,7 +1066,7 @@ class ListingRegistration:
     listing_uid: str
     #: The catalog source of the listing (``registry``, ``operator``, …).
     source: str
-    #: ``container`` or ``declarative`` (``RegistrationKind``).
+    #: ``container``, ``declarative`` or ``tool`` (``RegistrationKind``).
     kind: str
     image: str | None
     scope_ceiling: list[str]
@@ -1185,8 +1186,9 @@ async def read_listing_registration(
 ) -> ListingRegistration:
     """Read a listing's ``registration`` block, before the listing is written.
 
-    The block is the same from every source: ``kind`` — ``container``, or
-    ``declarative`` for a plug-in with no service block — an optional ``image``
+    The block is the same from every source: ``kind`` — ``container``,
+    ``declarative`` for a plug-in with no service block, or ``tool`` for a
+    tool plug-in, which holds no scopes — an optional ``image``
     pinned by digest and its Compose service (a container's only), the
     and the ``scope_ceiling``. It names no location and no keys. The registration it writes is
     the one for the plug-in the listing's definition names, under the listing's own
@@ -1194,9 +1196,20 @@ async def read_listing_registration(
     """
     if not isinstance(spec, Mapping):
         raise ListingRegistrationError("registration is not an object")
-    declarative = is_declarative(definition)
-    kind = RegistrationKind.DECLARATIVE if declarative else RegistrationKind.CONTAINER
-    service_id = service_public_id(definition, listing_public_id=listing_public_id)
+    tool = is_tool_plugin(definition)
+    kind = (
+        RegistrationKind.TOOL
+        if tool
+        else RegistrationKind.DECLARATIVE
+        if is_declarative(definition)
+        else RegistrationKind.CONTAINER
+    )
+    # A tool plug-in, like a declarative one, is named by its listing.
+    service_id = (
+        listing_public_id
+        if tool
+        else service_public_id(definition, listing_public_id=listing_public_id)
+    )
     if service_id is None:
         raise ListingRegistrationError("only a service plug-in carries a registration")
     try:
@@ -1208,8 +1221,12 @@ async def read_listing_registration(
         raise ListingRegistrationError("the service is published under another prefix")
     if spec.get("kind") != kind:
         raise ListingRegistrationError(f'registration.kind must be "{kind}"')
-    if declarative and any(key in spec for key in ("image", "compose")):
-        raise ListingRegistrationError("a declarative plug-in runs no container")
+    if kind != RegistrationKind.CONTAINER and any(
+        key in spec for key in ("image", "compose")
+    ):
+        raise ListingRegistrationError(f"a {kind} plug-in runs no container")
+    if tool and spec.get("scope_ceiling"):
+        raise ListingRegistrationError("a tool plug-in runs no code, so it holds no scopes")
     stated = [key for key in _DEPLOYMENT_KEYS if key in spec]
     if stated:
         raise ListingRegistrationError(
@@ -1278,7 +1295,7 @@ async def apply_listing_registration(
     before = {} if created else audit_service.snapshot(row, AUDITED_FIELDS)
     row.listing_uid = registration.listing_uid
     row.kind = registration.kind
-    if registration.kind == RegistrationKind.DECLARATIVE:
+    if registration.kind != RegistrationKind.CONTAINER:
         # Runs nowhere and signs nothing: a location and keys a container
         # version left behind go with it.
         row.base_url = row.page_origin = row.jwks = row.jwks_uri = None
@@ -1563,7 +1580,7 @@ def apply_deployment_facts(
         )
 
     was = state()
-    if row.kind == RegistrationKind.DECLARATIVE:
+    if row.kind != RegistrationKind.CONTAINER:
         # Runs nowhere and signs nothing: an entry's placement does not apply.
         facts = replace(facts, base_url=None, allowed_origins=None)
     _write_placement(
