@@ -20,6 +20,7 @@ from app.core.relationships import (
     Provenance,
     RelationshipType,
     decode_node_id,
+    endpoint_code,
     node_id,
 )
 from app.core.search import SearchEntityType
@@ -391,7 +392,9 @@ async def test_purging_an_endpoint_takes_its_edges_including_tombstones(
     await relationships.remove(session, tombstoned, removed_by=a.user.id)
     await session.commit()
 
-    await relationships.purge_for_entities(session, SearchEntityType.file, [file_id])
+    await relationships.purge_for_entities(
+        session, endpoint_code(SearchEntityType.file.value), [file_id]
+    )
     await session.commit()
 
     remaining = (
