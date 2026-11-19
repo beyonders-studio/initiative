@@ -16,6 +16,7 @@ from sqlalchemy.dialects import postgresql
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import establish_guild_access
+from app.core.tool_set import BUILTIN_TOOLS
 from app.db.authorization import GUILD_FUNCTION_SIGNATURES, READ_FUNCTIONS
 from app.db.schema_provisioning import guild_role_name, guild_schema_name
 from app.models.platform.guild import CommunityRole
@@ -293,7 +294,9 @@ async def test_a_list_reads_only_its_own_rows_edges(
         ),
         (
             "counting blockers",
-            select(task_queries._open_blocker_count_expression()).where(on_small),
+            select(task_queries._open_blocker_count_expression(BUILTIN_TOOLS)).where(
+                on_small
+            ),
         ),
     ):
         sql = str(

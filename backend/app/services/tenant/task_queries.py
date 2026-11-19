@@ -26,6 +26,7 @@ from app.core.identity_boundary import filter_people
 from app.core.messages import CalendarEventMessages, QueryMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tool_set import ToolSet
 from app.core.tools import Tool
 from app.core.user_input_validators import resolve_zone
 from app.db.blocking import blocking_kinds
@@ -41,7 +42,7 @@ from app.db.query import (
     parse_conditions,
     parse_sort_fields,
 )
-from app.db.session import require_guild_context, routed_guild_id
+from app.db.session import require_guild_context, routed_guild_id, routed_tools
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.models.tenant._mixins import ActorKind
@@ -231,18 +232,19 @@ def _comment_count_expression():
     )
 
 
-def _open_blocker_count_expression():
+def _open_blocker_count_expression(tools: ToolSet):
     """How many things are still holding this task up.
 
     Live outbound ``depends_on`` edges whose far end is still outstanding —
     "outbound" because the source of a dependency is the end that waits.
 
     What counts as outstanding is per kind and comes from
-    :data:`app.db.blocking.OPEN_WHEN`: a task not yet done, an event not yet
-    passed, a counter short of its target. A kind with no rule there is not
-    counted at all, which is the honest reading — nothing says when a file
-    stops blocking. One ``EXISTS`` arm per registered kind, built from the
-    registry, so a kind gains a count the day it gains a rule.
+    :func:`app.db.blocking.blocking_kinds`, in the community with ``tools``: a
+    task not yet done, an event not yet passed, a counter short of its target,
+    a tool plug-in's item while its declared ``open_while`` holds. A kind with
+    no rule is not counted at all, which is the honest reading — nothing says
+    when a file stops blocking. One ``EXISTS`` arm per such kind, so a kind
+    gains a count the day it gains a rule.
 
     Correlated on ``Task`` like :func:`_comment_count_expression`, so it rides
     along with the row instead of costing a query of its own. RLS does the rest:
@@ -259,7 +261,7 @@ def _open_blocker_count_expression():
                 .where(table.c["id"] == edge.target_id, open_when)
             ),
         )
-        for kind, table, open_when in blocking_kinds()
+        for kind, table, open_when in blocking_kinds(tools)
     ]
     return (
         select(func.count())
@@ -306,9 +308,9 @@ async def _annotate_tasks(
         comment_counts = dict((await session.exec(stmt)).all())
 
     if blocker_counts is None:
-        stmt = select(Task.id, _open_blocker_count_expression()).where(
-            Task.id.in_(tuple(task_ids))
-        )
+        stmt = select(
+            Task.id, _open_blocker_count_expression(routed_tools(session))
+        ).where(Task.id.in_(tuple(task_ids)))
         blocker_counts = dict((await session.exec(stmt)).all())
 
     await task_hierarchy.annotate(session, tasks)
@@ -501,7 +503,11 @@ async def load_tasks(session: AsyncSession, task_ids: list[int]) -> list[Task]:
     if not task_ids:
         return []
     statement = (
-        select(Task, _comment_count_expression(), _open_blocker_count_expression())
+        select(
+            Task,
+            _comment_count_expression(),
+            _open_blocker_count_expression(routed_tools(session)),
+        )
         .where(Task.id.in_(tuple(task_ids)))
         .options(
             joinedload(Task.project).joinedload(Project.initiative),
@@ -763,7 +769,7 @@ async def _gather_global_task_reads(
             select(
                 Task,
                 _comment_count_expression(),
-                _open_blocker_count_expression(),
+                _open_blocker_count_expression(routed_tools(guild_session)),
                 *_DESCRIPTION_COLUMNS,
             )
             .where(Task.id.in_(tuple(ids)))
