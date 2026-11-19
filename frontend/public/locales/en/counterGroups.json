@@ -49,10 +49,6 @@
   "backToGroup": "Back to group",
   "focus": {
     "openFocus": "Open full screen",
-    "exit": "Exit full screen",
-    "next": "Next counter",
-    "previous": "Previous counter",
-    "counterPosition": "{{current}} / {{total}}",
     "notFound": "Counter not found in this group"
   },
   "createFirst": "Create Your First Counter Group",

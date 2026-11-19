@@ -225,7 +225,7 @@ class MetadataDefinition(CreatedByMixin, table=True):
     currency: str | None = Field(
         default=None, sa_column=Column(String(length=3), nullable=True)
     )
-    #: A ``counter`` definition's ``{step, min, max, initial}``
+    #: A ``counter`` definition's ``{step, min, max, initial, look}``
     #: (``CounterSettings``); None for every other type.
     counter: dict | None = Field(
         default=None, sa_column=Column(JSONB(none_as_null=True), nullable=True)

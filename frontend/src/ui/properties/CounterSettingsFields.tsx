@@ -1,9 +1,10 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CounterSettingsInput } from "@/api/generated/initiativeAPI.schemas";
+import { CounterLook, type CounterSettingsInput } from "@/api/generated/initiativeAPI.schemas";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { numericValue } from "./propertyHelpers";
 
@@ -22,8 +23,9 @@ export const counterSettingsValid = (settings: CounterSettingsInput): boolean =>
   problemWith(settings) === null;
 
 /**
- * A counter's step, its bounds and the value a reset goes back to. A number
- * left empty is the default: a step of one, no bound, or zero.
+ * A counter's step, its bounds, the value a reset goes back to and how it is
+ * drawn. A number left empty is the default: a step of one, no bound, or
+ * zero. A bar or a clock needs both bounds, and says so without them.
  */
 export const CounterSettingsFields = ({
   value,
@@ -53,6 +55,7 @@ export const CounterSettingsFields = ({
     });
   };
   const problem = problemWith(value);
+  const look = value.look ?? CounterLook.number;
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-pair gap-2">
@@ -73,6 +76,30 @@ export const CounterSettingsFields = ({
             />
           </div>
         ))}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor={`${id}-look`} className="font-normal text-xs">
+          {t("counter.look")}
+        </Label>
+        <Select
+          value={look}
+          onValueChange={(next) => onChange({ ...value, look: next as CounterLook })}
+          disabled={disabled}
+        >
+          <SelectTrigger id={`${id}-look`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.values(CounterLook).map((each) => (
+              <SelectItem key={each} value={each}>
+                {t(`counter.looks.${each}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {look !== CounterLook.number && (value.min == null || value.max == null) ? (
+          <p className="text-muted-foreground text-xs">{t("counter.lookNeedsBounds")}</p>
+        ) : null}
       </div>
       {problem ? <p className="text-destructive text-xs">{t(`counter.${problem}`)}</p> : null}
     </div>

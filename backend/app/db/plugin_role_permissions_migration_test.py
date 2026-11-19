@@ -19,6 +19,7 @@ from app.testing import (
     create_user,
     route_session_to_guild,
 )
+from app.testing.later_revisions import step_newest
 
 migration = _load("20261110_0606_plug_ins_answer_to_the_communitys_roles.py")
 
@@ -40,6 +41,10 @@ async def test_every_non_manager_role_keeps_its_answer(session) -> None:
     assert member is not None
     schema = f"guild_{guild.id}"
 
+    # The revisions after it come off around it.
+    await session.run_sync(
+        _run(lambda: step_newest(forward=False, after=migration.revision), schema)
+    )
     await session.run_sync(_run(migration._downgrade, schema))
     await _sql(
         session,
@@ -49,6 +54,9 @@ async def test_every_non_manager_role_keeps_its_answer(session) -> None:
         {"role": member.id},
     )
     await session.run_sync(_run(migration._upgrade, schema))
+    await session.run_sync(
+        _run(lambda: step_newest(forward=True, after=migration.revision), schema)
+    )
     await session.commit()
 
     rows = (

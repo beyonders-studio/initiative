@@ -862,7 +862,7 @@ async def test_property_options_label_only_difference_matches(session: AsyncSess
 async def test_a_counter_matches_only_one_kept_to_its_settings(session: AsyncSession):
     """A counter of the same name that steps or stops otherwise is another
     counter: the import makes its own and keeps its count. One with the same
-    settings is the same counter."""
+    settings is the same counter, however it is drawn."""
     owner, _, guild, source_initiative, source_project = await _seed_populated_project(
         session
     )
@@ -883,7 +883,10 @@ async def test_a_counter_matches_only_one_kept_to_its_settings(session: AsyncSes
     )
     tight = await create_initiative(session, guild, owner, name="Tight")
     same = await create_initiative(session, guild, owner, name="Same")
-    for target, counter in ((tight, {**settings, "max": 5}), (same, settings)):
+    for target, counter in (
+        (tight, {**settings, "max": 5}),
+        (same, {**settings, "look": "clock"}),
+    ):
         await create_property_definition(
             session, target, name="Seats", type=MetadataType.counter, counter=counter
         )
@@ -904,7 +907,7 @@ async def test_a_counter_matches_only_one_kept_to_its_settings(session: AsyncSes
             MetadataDefinition.name == "Seats_counter",
         )
     )
-    assert kept.one() == (settings, Decimal(50))
+    assert kept.one() == ({**settings, "look": "number"}, Decimal(50))
 
 
 async def test_unmatched_assignees_reported(session: AsyncSession):

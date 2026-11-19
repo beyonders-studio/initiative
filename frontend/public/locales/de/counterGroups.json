@@ -49,10 +49,6 @@
   "backToGroup": "Zurück zur Gruppe",
   "focus": {
     "openFocus": "Vollbild öffnen",
-    "exit": "Vollbild verlassen",
-    "next": "Nächster Zähler",
-    "previous": "Vorheriger Zähler",
-    "counterPosition": "{{current}} / {{total}}",
     "notFound": "Zähler in dieser Gruppe nicht gefunden"
   },
   "createFirst": "Erstelle deine erste Zählergruppe",

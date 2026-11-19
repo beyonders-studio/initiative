@@ -162,6 +162,21 @@
     "maxPlaceholder": "None",
     "initialPlaceholder": "0",
     "stepPositive": "The step has to be more than zero",
-    "minAboveMax": "The minimum can't be more than the maximum"
+    "minAboveMax": "The minimum can't be more than the maximum",
+    "look": "Show as",
+    "looks": {
+      "number": "Number",
+      "bar": "Progress bar",
+      "clock": "Segmented clock"
+    },
+    "lookNeedsBounds": "A progress bar or a segmented clock needs a minimum and a maximum. Without both, it shows as a number.",
+    "focus": {
+      "open": "Open {{name}} full screen",
+      "exit": "Exit full screen",
+      "more": "More actions",
+      "previous": "Previous counter",
+      "next": "Next counter",
+      "position": "{{current}} / {{total}}"
+    }
   }
 }

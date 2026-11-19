@@ -73,7 +73,7 @@ describe("PropertyValueCell", () => {
   it("draws a counter as a number, a bar or a clock, from its initial value", () => {
     const counter = buildPropertySummary({
       type: MetadataType.counter,
-      counter: { step: 1, min: 0, max: 4, initial: 3 },
+      counter: { step: 1, min: 0, max: 4, initial: 3, look: "number" },
       value: null,
     });
     const { rerender } = renderWithProviders(<PropertyValueCell summary={counter} />);
@@ -89,13 +89,20 @@ describe("PropertyValueCell", () => {
     // One segment a step, three of the four filled.
     expect(clock.querySelectorAll("path")).toHaveLength(4);
     expect(clock.querySelectorAll("path.fill-primary")).toHaveLength(3);
+
+    // Where the list says nothing, in the field's own look.
+    const clocked = { ...counter, counter: { ...counter.counter!, look: "clock" as const } };
+    rerender(<PropertyValueCell summary={clocked} />);
+    expect(screen.getByRole("img", { name: "3 / 4" })).toBeInTheDocument();
+    rerender(<PropertyValueCell summary={clocked} display="number" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("steps a counter it may change, showing the step at once and then the server's", async () => {
     const counter = buildPropertySummary({
       type: MetadataType.counter,
       name: "Seats",
-      counter: { step: 1, min: 0, max: 4, initial: 3 },
+      counter: { step: 1, min: 0, max: 4, initial: 3, look: "number" },
       value: null,
     });
     let answer: (values: (typeof counter)[]) => void = () => undefined;

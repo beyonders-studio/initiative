@@ -1,5 +1,6 @@
-import { CounterValueInput } from "@/components/tools/counterGroups/CounterValueInput";
 import { cn } from "@/ui/lib/utils";
+
+import { CounterValueInput } from "./CounterValueInput";
 
 interface CounterSegmentedClockViewProps {
   count: string;
@@ -103,7 +104,7 @@ export const CounterSegmentedClockView = ({
             const isFilled = i < filledCount;
             return (
               <line
-                // biome-ignore lint/suspicious/noArrayIndexKey: segments are stable by index
+                // A clock's segments are its places.
                 key={i}
                 x1={x1}
                 y1={y1}

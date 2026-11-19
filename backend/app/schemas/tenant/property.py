@@ -57,10 +57,21 @@ class PropertyOption(SanitizedBaseModel):
     color: str | None = Field(default=None, pattern=_HEX_COLOR_PATTERN)
 
 
+class CounterLook(StrEnum):
+    """How a counter field is drawn: a number, a progress bar or a segmented
+    clock. A bar and a clock need both bounds; a counter without them is
+    drawn as a number."""
+
+    number = "number"
+    bar = "bar"
+    clock = "clock"
+
+
 class CounterSettings(SanitizedBaseModel):
     """How a counter field moves: by ``step`` a tap, never past ``min`` or
     ``max``, and back to ``initial`` on a reset. A counter with no value
-    holds ``initial``."""
+    holds ``initial``. ``look`` is how it is drawn wherever a list's layout
+    says nothing else."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
@@ -68,6 +79,7 @@ class CounterSettings(SanitizedBaseModel):
     min: float | None = Field(default=None, allow_inf_nan=False)
     max: float | None = Field(default=None, allow_inf_nan=False)
     initial: float = Field(default=0, allow_inf_nan=False)
+    look: CounterLook = CounterLook.number
 
     @model_validator(mode="after")
     def _ordered(self) -> CounterSettings:
