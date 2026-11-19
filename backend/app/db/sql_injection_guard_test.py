@@ -49,11 +49,7 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
         "reflected catalog identifiers from the Alembic-owned guild_template, "
         "quoted; no request data"
     ),
-    "app/db/plugin_tools.py::delete_tool_content": (
-        "quoted catalog identifiers: tables named from a checked key and uid, and"
-        " columns from the model metadata; the kinds are bound"
-    ),
-    "app/db/plugin_tools.py::drop_unclaimed_tables": (
+    "app/db/plugin_tools.py::drop_tool_tables": (
         "quoted catalog identifiers read from pg_class under the schema name"
     ),
     "app/db/schema_provisioning.py::_apply_parts": (

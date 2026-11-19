@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from functools import cache
+from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import Table, and_, delete, select, update
@@ -31,7 +31,7 @@ from sqlalchemy.sql import FromClause
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.core.tools import TRASHABLE_EXTRAS, plural_of
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import ids_in
@@ -100,7 +100,7 @@ def trash_kinds(tools: ToolSet) -> dict[str, Table]:
     }
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def cascade_children(tools: ToolSet) -> dict[Table, list[Edge]]:
     """parent table -> [edge to a child]: what a trashed row takes with it,
     in a community with ``tools``."""
@@ -125,7 +125,7 @@ def cascade_children(tools: ToolSet) -> dict[Table, list[Edge]]:
     return tree
 
 
-@cache
+@lru_cache(KEPT_TOOL_SETS)
 def cascade_parents(tools: ToolSet) -> dict[Table, list[Edge]]:
     """child table -> [edge to a parent]: the same edges read upwards."""
     parents: dict[Table, list[Edge]] = {}

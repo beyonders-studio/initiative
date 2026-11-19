@@ -158,11 +158,16 @@ def test_an_initiative_starts_with_projects_and_files_on():
     # Optional is not the same as off. An initiative created without an opinion
     # about its tools is the one people already had, so the two that used to be
     # unconditional keep arriving switched on and everything else stays opt-in.
+    from app.core.tool_set import BUILTIN_TOOLS
     from app.services.tenant.initiative_tools import switches
 
     assert {t for t in Tool if t.spec.on_by_default} == {Tool.project, Tool.file}
-    assert switches({}) == {tool: tool.spec.on_by_default for tool in Tool}
-    assert switches({Tool.post: True})[Tool.post] is True
+    assert {t.kind: on for t, on in switches({}, BUILTIN_TOOLS).items()} == {
+        tool.value: tool.spec.on_by_default for tool in Tool
+    }
+    assert switches({Tool.post: True}, BUILTIN_TOOLS)[
+        BUILTIN_TOOLS.by_kind[Tool.post.value]
+    ]
 
 
 def test_every_tool_is_commentable():

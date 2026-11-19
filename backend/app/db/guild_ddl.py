@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.dialects import postgresql
@@ -105,6 +105,7 @@ from app.db.tenancy import (
     SEAT_TABLES,
 )
 from app.models.platform.guild import AdminSurface, CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -197,6 +198,51 @@ def _trash_read_policy(table: str) -> list[str]:
             " EXECUTE FUNCTION public.fn_stamp_deleted_by();"
         ),
     ]
+
+
+def tool_table_rules(
+    table: str, columns: Collection[str], kind: str | None
+) -> tuple[dict[str, str], list[str]]:
+    """What a tool's table carries beside its columns, read off the columns it
+    has: who made a row and who put it in the trash, each held to its kind,
+    the author stamped as the row goes in, and, on a tool's own table
+    (``kind``), the owner grant a plug-in's new row takes. As ``(CHECKs by
+    name, trigger statements)``, schema-relative. A built-in tool's tables
+    have them from their migrations and a tool plug-in's from here;
+    ``tool_table_rules_test`` holds the two to each other."""
+    actors = ", ".join(f"'{actor.value}'" for actor in ActorKind)
+    system = ActorKind.system.value
+    checks: dict[str, str] = {}
+    triggers: list[str] = []
+    if "created_by_kind" in columns:
+        checks[object_name("ck", table, "created_by")] = (
+            f"(created_by_kind = '{system}') = (created_by IS NULL)"
+        )
+        checks[object_name("ck", table, "created_by_kind")] = (
+            f"created_by_kind IN ({actors})"
+        )
+        triggers.append(
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'set_created_by')}"
+            f" BEFORE INSERT ON {table} FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_set_author()"
+        )
+    if "deleted_by_kind" in columns:
+        checks[object_name("ck", table, "deleted_by")] = (
+            "CASE WHEN deleted_at IS NULL"
+            " THEN deleted_by IS NULL AND deleted_by_kind IS NULL"
+            " ELSE deleted_by_kind IS NOT NULL"
+            f" AND (deleted_by_kind = '{system}') = (deleted_by IS NULL) END"
+        )
+        checks[object_name("ck", table, "deleted_by_kind")] = (
+            f"deleted_by_kind IN ({actors})"
+        )
+    if kind is not None:
+        triggers.append(
+            f"CREATE OR REPLACE TRIGGER {object_name('tr', table, 'install_owns')}"
+            f" AFTER INSERT ON {table} FOR EACH ROW"
+            f" EXECUTE FUNCTION public.fn_install_owns_what_it_creates('{kind}')"
+        )
+    return checks, triggers
 
 
 # Reader-written SQL reports on live content only.

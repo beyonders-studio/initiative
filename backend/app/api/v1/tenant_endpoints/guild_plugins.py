@@ -373,22 +373,22 @@ async def _provision_tool(
 ) -> None:
     """Make a tool plug-in's tables as its version declares them and render
     its community's rules, once the install or its new version has
-    committed, then switch its tool on in every initiative and lay out each
-    of its tables: rows its community's rules admit once they are rendered
-    with it. Until then a new install's tool is off everywhere. ``drop`` is
-    what a new major version stops declaring, which the seat confirmed
-    (:func:`~app.db.plugin_tools.drop_ddl`). Where any of it fails, the install is taken back, and the
-    community rendered again, so no install stands without the tables its
-    version declares. A new version is put back on ``previous`` (its version
-    and definition) only where its tables were not brought up to it: once
-    they were, a field it dropped is gone, so it stays, and only rows for a
-    table it added can be missing, which its starting layouts are."""
-    guild_id, plugin_id = routed_guild_id(session), plugin.id
+    committed, then switch its tool on in every initiative: rows its
+    community's rules admit once they are rendered with it. Until then a new
+    install's tool is off everywhere. ``drop`` is what a new major version
+    stops declaring, which the seat confirmed
+    (:func:`~app.db.plugin_tools.drop_ddl`). Where any of it fails, the
+    install is taken back, and the community rendered again, so no install
+    stands without the tables its version declares. A new version is put
+    back on ``previous`` (its version and definition) only where its tables
+    were not brought up to it: once they were, a field it dropped is gone,
+    so it stays."""
+    guild_id, plugin_id, uid = routed_guild_id(session), plugin.id, plugin.listing_uid
     provisioned = False
     try:
-        await provision_community_tools(guild_id, drop=drop)
+        tools = await provision_community_tools(guild_id, drop=drop)
         provisioned = True
-        await initiative_tools.write_plugin_tool_rules(session)
+        await initiative_tools.write_installed_tools(session, tools)
         await session.commit()
     except Exception as exc:
         if provisioned and previous is not None:
@@ -407,7 +407,9 @@ async def _provision_tool(
             plugin.listing_version, plugin.definition = previous
             session.add(plugin)
         await session.commit()
-        await provision_community_tools(guild_id)
+        await provision_community_tools(
+            guild_id, uninstalled=uid if previous is None else None
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=GuildPluginMessages.TOOL_NOT_PROVISIONED,

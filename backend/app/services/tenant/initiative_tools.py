@@ -2,7 +2,8 @@
 
 Each initiative's own switch for a tool is one of its ``initiative_rules``
 rows: no role, no install, the tool's view key (``Initiative.switched_on``
-holds the keys whose row is on). A tool with no row is off.
+holds the keys whose row is on). A tool with no row is off. A tool plug-in's
+tool is one of the community's tools, and its rows are a built-in tool's.
 
 A community may set a tool's switch, and what the built-in member role may
 do, for every initiative in it (``COMMUNITY_DEFAULT_KEYS``, its
@@ -19,7 +20,6 @@ does not.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, case, func, not_, or_, select
@@ -28,11 +28,13 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import ToolRecord, ToolSet
 from app.core.tools import Tool
 from app.db.guild_standing import ActorContext
 from app.db.session import actor_context
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
+    BUILTIN_ROLES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_KEYS,
@@ -69,14 +71,17 @@ def own_switch(initiative: Any, tool: Tool) -> bool:
     return tool.view_permission in (initiative.switched_on or ())
 
 
-def switches(tools: Mapping[Tool, bool]) -> dict[Tool, bool]:
-    """Every tool's switch for a new initiative: ``tools`` where it names one,
-    the tool's record otherwise."""
-    return {tool: tools.get(tool, tool.spec.on_by_default) for tool in Tool}
+def switches(asked: Mapping[Tool, bool], tools: ToolSet) -> dict[ToolRecord, bool]:
+    """Every tool's switch for a new initiative in a community with
+    ``tools``: ``asked`` where it names one, the tool's record otherwise."""
+    named = {tool.value: on for tool, on in asked.items()}
+    return {tool: named.get(tool.kind, tool.spec.on_by_default) for tool in tools}
 
 
 async def write_switches(
-    session: AsyncSession, initiative_id: int, tools: Mapping[Tool, bool]
+    session: AsyncSession,
+    initiative_id: int,
+    tools: Mapping[Tool, bool] | Mapping[ToolRecord, bool],
 ) -> None:
     """Set ``initiative_id``'s own switch for each tool in ``tools``, leaving
     the others as they are."""
@@ -100,124 +105,61 @@ async def write_switches(
     )
 
 
-#: Rule rows per INSERT: five values each.
+#: Rule rows per INSERT, each of these values.
+_RULE_COLUMNS = ("initiative_id", "initiative_role_id", "key", "enabled")
 _RULE_ROWS_PER_INSERT = 1000
 
 
-async def write_plugin_tool_rules(
-    session: AsyncSession, *, initiative_id: int | None = None
-) -> None:
-    """Give every installed tool plug-in's tool what a built-in tool has in an
-    initiative: its switch, on, and each role's keys, as a built-in role holds
-    a tool's (a manager both, anyone else viewing it and not creating it). In
-    ``initiative_id``, or in every initiative. The rows are the install's.
-    Each of its tables also takes the layouts it declares as the initiative's
-    starting layouts for it, in an initiative that is neither archived nor in
-    the trash: how the table lists its rows and shows one. Rows already there
-    are kept as they are, so a layout somebody changed stays changed and a
-    table a later version adds takes its own."""
-    from app.db.plugin_tools import tool_table_name
-    from app.models.tenant.guild_plugin import GuildPlugin
-    from app.models.tenant.initiative import Initiative, InitiativeRoleModel
-    from app.models.tenant.tool_layout import PLUGIN_DETAIL, ToolLayout
-    from app.services.marketplace.tool_plugins import TOOL, tool_kinds
-
-    installs = (
+async def write_installed_tools(session: AsyncSession, tools: ToolSet) -> None:
+    """Give every initiative what it would hold of ``tools``' installed tools
+    had they been there when it was made: each tool's switch, on, and each
+    role's keys for it, a built-in role's as it holds every tool's
+    (``BuiltinRole.holds``) and a custom role's as the member role's. Rows
+    already there are kept, so a switch turned off stays off. Once the
+    community's rules are rendered with ``tools``, which admit the keys."""
+    if not tools.installed:
+        return
+    initiatives = (await session.exec(select(Initiative.id))).scalars().all()
+    roles = (
         await session.exec(
-            select(GuildPlugin.id, GuildPlugin.listing_uid, GuildPlugin.definition)
-            .where(GuildPlugin.plugin_kind == TOOL)
-            .order_by(GuildPlugin.id)
+            select(
+                InitiativeRoleModel.id,
+                InitiativeRoleModel.initiative_id,
+                InitiativeRoleModel.name,
+                InitiativeRoleModel.is_builtin,
+            )
         )
     ).all()
-    # Only an install whose tool's tables exist: they are made in the same
-    # transaction as the rules that admit its rows, so an install still being
-    # provisioned is left to the step that provisions it.
-    provisioned = []
-    for install_id, listing_uid, definition in installs:
-        table = tool_table_name(listing_uid, definition["tool"]["key"])
-        if await session.scalar(select(func.to_regclass(table))):
-            provisioned.append((install_id, listing_uid, definition))
-    if not provisioned:
-        return
-    initiatives = select(Initiative.id, Initiative.archived_at, Initiative.deleted_at)
-    roles = select(
-        InitiativeRoleModel.id,
-        InitiativeRoleModel.initiative_id,
-        InitiativeRoleModel.is_manager,
-    )
-    if initiative_id is not None:
-        initiatives = initiatives.where(Initiative.id == initiative_id)
-        roles = roles.where(InitiativeRoleModel.initiative_id == initiative_id)
-    initiative_rows = (await session.exec(initiatives)).all()
-    initiative_ids = [row.id for row in initiative_rows]
-    laid_out = [
-        row.id
-        for row in initiative_rows
-        if row.archived_at is None and row.deleted_at is None
+    holds = {role.name: role.holds(tools) for role in BUILTIN_ROLES}
+    keys = {
+        key
+        for tool in tools.installed
+        for key in (tool.view_permission, tool.create_permission)
+    }
+    member = holds[BUILTIN_MEMBER_ROLE]
+    rows = [
+        (initiative_id, None, tool.view_permission, True)
+        for initiative_id in initiatives
+        for tool in tools.installed
+    ] + [
+        (role.initiative_id, role.id, key, enabled)
+        for role in roles
+        for key, enabled in (
+            holds.get(role.name, member) if role.is_builtin else member
+        ).items()
+        if key in keys
     ]
-    role_rows = (await session.exec(roles)).all()
-    rows: list[dict[str, Any]] = []
-    layouts: list[dict[str, Any]] = []
-    now = datetime.now(UTC)
-    for install_id, listing_uid, definition in provisioned:
-        kinds = tool_kinds(definition, listing_uid=listing_uid)
-        tool = definition["tool"]
-        for table_kind, declared in zip(
-            kinds,
-            (tool["layouts"], *(item["layouts"] for item in tool.get("items", []))),
-            strict=True,
-        ):
-            listed = {k: v for k, v in declared["list"].items() if k != "kind"}
-            layouts += [
-                {
-                    "initiative_id": i,
-                    "tool": table_kind,
-                    "kind": kind,
-                    "definition": d,
-                    "created_at": now,
-                    "updated_at": now,
-                }
-                for i in laid_out
-                for kind, d in (
-                    (declared["list"]["kind"], listed),
-                    (PLUGIN_DETAIL, declared["detail"]),
-                )
-            ]
-        kind = kinds[0]
-        view, create = f"{kind}:enabled", f"{kind}:create"
-        rows += [
-            {
-                "initiative_id": i,
-                "initiative_role_id": None,
-                "key": view,
-                "enabled": True,
-                "install_id": install_id,
-            }
-            for i in initiative_ids
-        ]
-        rows += [
-            {
-                "initiative_id": role_initiative,
-                "initiative_role_id": role_id,
-                "key": key,
-                "enabled": enabled,
-                "install_id": install_id,
-            }
-            for role_id, role_initiative, is_manager in role_rows
-            for key, enabled in ((view, True), (create, bool(is_manager)))
-        ]
     # In batches, each well under the number of values a statement binds.
     for start in range(0, len(rows), _RULE_ROWS_PER_INSERT):
         await session.exec(
             pg_insert(InitiativeRule)
-            .values(rows[start : start + _RULE_ROWS_PER_INSERT])
+            .values(
+                [
+                    dict(zip(_RULE_COLUMNS, row, strict=True))
+                    for row in rows[start : start + _RULE_ROWS_PER_INSERT]
+                ]
+            )
             .on_conflict_do_nothing(constraint="uq_initiative_rules_subject")
-        )
-    for start in range(0, len(layouts), _RULE_ROWS_PER_INSERT):
-        await session.exec(
-            pg_insert(ToolLayout)
-            .values(layouts[start : start + _RULE_ROWS_PER_INSERT])
-            .on_conflict_do_nothing()
         )
 
 

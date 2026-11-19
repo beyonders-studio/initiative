@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Any
@@ -35,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
-from app.core.tool_set import BUILTIN_TOOLS, ToolSet
+from app.core.tool_set import BUILTIN_TOOLS, KEPT_TOOL_SETS, ToolSet
 from app.db import bootstrap
 from app.db import session as db_session
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -266,6 +267,7 @@ class ProvisioningBundle:
         key = (id(self), tools.digest)
         found = _community_bundles.get(key)
         if found is not None:
+            _community_bundles.move_to_end(key)
             return found
         from app.db.event_capture import render_guild_capture_ddl
         from app.db.guild_ddl import render_guild_rls_ddl
@@ -308,7 +310,10 @@ class ProvisioningBundle:
                 "timers": _digest(timer_ddl, self.operations["timers"]),
             },
         )
-        return _community_bundles.setdefault(key, found)
+        _community_bundles[key] = found
+        while len(_community_bundles) > KEPT_TOOL_SETS:
+            _community_bundles.popitem(last=False)
+        return found
 
     @property
     def stamp(self) -> str:
@@ -340,8 +345,11 @@ class ProvisioningBundle:
 
 _bundle: ProvisioningBundle | None = None
 _bundle_lock = asyncio.Lock()
-#: :meth:`ProvisioningBundle.for_tools`'s renders, by bundle and tool set.
-_community_bundles: dict[tuple[int, str | None], ProvisioningBundle] = {}
+#: :meth:`ProvisioningBundle.for_tools`'s renders, by bundle and tool set,
+#: the least recently used first.
+_community_bundles: OrderedDict[tuple[int, str | None], ProvisioningBundle] = (
+    OrderedDict()
+)
 
 #: The stamp's item naming the installed tool plug-ins its community's parts
 #: were rendered with, on a community that has any.
@@ -1098,16 +1106,19 @@ async def provision_guild_schema(conn: AsyncConnection, guild_id: int) -> str:
     return guild_schema_name(guild_id)
 
 
-async def provision_community_tools(guild_id: int, *, drop: str = "") -> None:
+async def provision_community_tools(
+    guild_id: int, *, drop: str = "", uninstalled: str | None = None
+) -> ToolSet:
     """Give ``guild_id``'s schema what its tool plug-ins, as they are
     installed now, need: their tables, as their versions declare them, and
-    every part rendered from the community's tool set; and take away the
-    tables of a tool no longer installed. ``drop`` is DDL run first: the
-    columns a new major version stops declaring, which its admin confirmed.
-    One transaction on the provisioning engine, under the guild's
-    provisioning lock, so a request routed into the community sees all of it
-    or none."""
-    from app.db.plugin_tools import drop_unclaimed_tables, provisioned_tools
+    every part rendered from the community's tool set, which it returns.
+    ``drop`` is DDL run first: the columns a new major version stops
+    declaring, which its admin confirmed. ``uninstalled`` is the listing of a
+    tool plug-in the deletion sweep removed, whose tables go unless it is
+    installed again by now. One transaction on the provisioning engine, under
+    the guild's provisioning lock, so a request routed into the community
+    sees all of it or none."""
+    from app.db.plugin_tools import drop_tool_tables, provisioned_tools
 
     schema = guild_schema_name(guild_id)
     async with db_session.provisioning_engine.begin() as conn:
@@ -1115,8 +1126,12 @@ async def provision_community_tools(guild_id: int, *, drop: str = "") -> None:
         tools = await provisioned_tools(guild_id)
         if drop:
             await _run_in_schema(conn, schema, drop)
-        await drop_unclaimed_tables(conn, schema, tools)
+        if uninstalled is not None and not any(
+            tool.kind.endswith(f".{uninstalled.lower()}") for tool in tools.installed
+        ):
+            await drop_tool_tables(conn, schema, uninstalled)
         await _apply_parts(conn, guild_id, PARTS, tools=tools)
+    return tools
 
 
 async def drop_guild_schema(conn: AsyncConnection, guild_id: int) -> None:
@@ -1220,12 +1235,10 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
     Returns whether anything was applied, or None when ``wait`` is False and
     another process holds the lock.
     """
-    from app.db.plugin_tools import (
-        drop_unclaimed_tables,
-        installed_tools,
-        provisioned_tools,
-        tools_digest,
-    )
+    from app.db import cohorts
+    from app.db.plugin_tools import provisioned_tools
+    from app.db.request_context import SystemGuild
+    from app.services.tenant.initiative_tools import write_installed_tools
 
     async with db_session.provisioning_engine.begin() as conn:
         if not await advisory_lock(
@@ -1240,19 +1253,19 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
         # Compared with the community's own render, from its installs as they
         # stand: an install whose provisioning never finished leaves a stamp
         # that names other tools, or none, and is provisioned here.
-        installed = await installed_tools(guild_id)
-        tools = await provisioned_tools(guild_id, installed)
+        tools = await provisioned_tools(guild_id)
         bundle = (await get_provisioning_bundle()).for_tools(tools)
         parts = PARTS if settings.FORCE_GUILD_BACKFILL else bundle.stale_parts(stamp)
-        if stamp_tools(stamp) != tools_digest(installed):
-            # A tool removed whose tables were not dropped with it.
-            await drop_unclaimed_tables(conn, guild_schema_name(guild_id), tools)
         if parts:
             await _apply_parts(
                 conn, guild_id, parts, validate_checks=False, tools=tools
             )
-    if stamp_tools(stamp) != tools_digest(installed):
-        await _switch_installed_tools_on(guild_id)
+    if stamp_tools(stamp) != tools.digest:
+        # What such an install did not get: its tool on in every initiative.
+        async with cohorts.system_session(guild_id) as session:
+            await db_session.set_rls_context(session, SystemGuild(guild_id))
+            await write_installed_tools(session, tools)
+            await session.commit()
     if "checks" in parts:
         # After the replacement commits, so the scan holds no lock that stops
         # the guild's reads and writes. A failure leaves ``checks`` pending.
@@ -1262,28 +1275,6 @@ async def _backfill_guild(guild_id: int, *, wait: bool) -> bool | None:
             await apply_guild_checks(conn, schema, replace=False, bundle=bundle)
             await _write_stamp(conn, schema, bundle.stamp)
     return bool(parts)
-
-
-async def _switch_installed_tools_on(guild_id: int) -> None:
-    """Write the switch and role rows of ``guild_id``'s tool plug-ins where
-    they are missing, once its rules admit them: what an install whose
-    provisioning never finished did not get. Rows already there are kept."""
-    from app.db import cohorts
-    from app.db.request_context import SystemGuild
-    from app.services.tenant.initiative_tools import write_plugin_tool_rules
-
-    async with cohorts.system_session(guild_id) as session:
-        await db_session.set_rls_context(session, SystemGuild(guild_id))
-        await write_plugin_tool_rules(session)
-        await session.commit()
-
-
-async def _tools_behind(guild_id: int, stamp: str | None) -> bool:
-    """Whether ``guild_id``'s installed tool plug-ins are other than the ones
-    its stamp says it was rendered with."""
-    from app.db.plugin_tools import installed_tools, tools_digest
-
-    return stamp_tools(stamp) != tools_digest(await installed_tools(guild_id))
 
 
 async def backfill_guild_schemas() -> BackfillSummary:
@@ -1327,11 +1318,17 @@ async def backfill_guild_schemas() -> BackfillSummary:
     # live in the RLS-forced public.guilds, and the provisioner is a pure DDL
     # actor — FORCE RLS filters its unrouted data reads to zero rows (by
     # design). Reading data is the system engine's job (BYPASSRLS).
+    # Each guild, its stamp, and whether it has a tool plug-in installed: an
+    # install of a listing whose kinds have codes.
     async with db_session.system_engine.connect() as conn:
         rows = (
             await conn.execute(
                 text(
-                    "SELECT g.id, obj_description(n.oid) "
+                    "SELECT g.id, obj_description(n.oid), EXISTS ("
+                    "SELECT 1 FROM public.plugin_installs pi"
+                    " JOIN public.plugin_kind_codes c"
+                    " ON split_part(c.kind, '.', 2) = lower(pi.listing_uid)"
+                    " WHERE pi.guild_id = g.id) "
                     "FROM public.guilds g "
                     "LEFT JOIN pg_namespace n ON n.nspname = 'guild_' || g.id "
                     "ORDER BY g.id"
@@ -1340,20 +1337,24 @@ async def backfill_guild_schemas() -> BackfillSummary:
         ).all()
     limit = asyncio.Semaphore(_BACKFILL_CONCURRENCY)
 
-    async def is_behind(guild_id: int, stamp: str | None) -> bool:
+    async def is_behind(guild_id: int, stamp: str | None, has_tools: bool) -> bool:
+        from app.db.plugin_tools import provisioned_tools
+
         if settings.FORCE_GUILD_BACKFILL or bundle.stale_parts(stamp):
             return True
-        # Current by the built-in render: behind only if it has tool
-        # plug-ins its stamp does not name, one read of its installs.
+        if not has_tools and stamp_tools(stamp) is None:
+            return False
+        # Current by the built-in render: behind only if its tool plug-ins
+        # are not the ones its stamp names, one read of its installs.
         async with limit:
             try:
-                return await _tools_behind(guild_id, stamp)
+                return stamp_tools(stamp) != (await provisioned_tools(guild_id)).digest
             except Exception:
                 logger.exception("reading the tool plug-ins of guild %s", guild_id)
                 return True
 
-    checked = await asyncio.gather(*(is_behind(gid, stamp) for gid, stamp in rows))
-    behind = [gid for (gid, _), late in zip(rows, checked, strict=True) if late]
+    checked = await asyncio.gather(*(is_behind(*row) for row in rows))
+    behind = [gid for (gid, *_), late in zip(rows, checked, strict=True) if late]
 
     failed_guild_ids: list[int] = []
 

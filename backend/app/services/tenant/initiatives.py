@@ -16,14 +16,13 @@ from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages, InitiativeMessages
 from app.core.tools import Tool
 from app.db.query import ids_in
-from app.db.session import routed_context, routed_guild_id
+from app.db.session import routed_context, routed_guild_id, routed_tools
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
-    BUILTIN_ROLE_PERMISSIONS,
     BUILTIN_ROLES,
     DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
@@ -52,7 +51,6 @@ from app.services import audit as audit_service
 from app.services.tenant.initiative_tools import (
     own_switch,
     switches,
-    write_plugin_tool_rules,
     write_switches,
 )
 
@@ -235,8 +233,9 @@ async def create_builtin_roles(
         roles[spec.name] = role
     await session.flush()
 
+    tools = routed_tools(session)
     for spec in BUILTIN_ROLES:
-        for perm_key, enabled in spec.permissions.items():
+        for perm_key, enabled in spec.holds(tools).items():
             session.add(
                 InitiativeRule(
                     initiative_id=initiative_id,
@@ -247,9 +246,6 @@ async def create_builtin_roles(
             )
 
     await session.flush()
-    # Every installed tool plug-in's tool is on in a new initiative, as it is
-    # in every initiative there was when it was installed.
-    await write_plugin_tool_rules(session, initiative_id=initiative_id)
     return roles
 
 
@@ -434,9 +430,10 @@ async def create_custom_role(
     name: str,
     display_name: str,
     is_manager: bool = False,
-    permissions: dict[PermissionKey, bool] | None = None,
+    permissions: Mapping[str, bool] | None = None,
 ) -> InitiativeRoleModel:
-    """Create a custom role for an initiative."""
+    """Create a custom role for an initiative, holding what the member role
+    holds of every tool in its community where ``permissions`` does not say."""
     # Get next position
     stmt = select(func.max(InitiativeRoleModel.position)).where(
         InitiativeRoleModel.initiative_id == initiative_id
@@ -455,8 +452,8 @@ async def create_custom_role(
     session.add(role)
     await session.flush()
 
-    # Add permissions (default to member permissions if not specified)
-    perms = permissions or dict(BUILTIN_ROLE_PERMISSIONS["member"])
+    member = next(spec for spec in BUILTIN_ROLES if spec.name == BUILTIN_MEMBER_ROLE)
+    perms = {**member.holds(routed_tools(session)), **(permissions or {})}
     for perm_key, enabled in perms.items():
         session.add(
             InitiativeRule(
@@ -1189,7 +1186,7 @@ async def create_imported_initiative(
     # default rather than to off: a backup written before projects and files
     # had switches names no state for them, and restoring it must not produce
     # an initiative with neither.
-    await write_switches(session, initiative.id, switches(tools))
+    await write_switches(session, initiative.id, switches(tools, routed_tools(session)))
 
     roles = await create_builtin_roles(session, initiative_id=initiative.id)
     session.add(

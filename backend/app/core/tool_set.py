@@ -49,15 +49,17 @@ class ToolRecord(ToolRefusals):
     create_permission: str
     #: The resource its plug-in scopes name.
     scope: str
-    #: The install whose tool this is, for a tool plug-in's: its switch and
-    #: role rows are that install's (``initiative_rules.install_id``). None
-    #: for a built-in tool.
-    install_id: int | None = None
 
     @property
     def value(self) -> str:
         """Its kind, as a refusal names it."""
         return self.kind
+
+    @property
+    def installed(self) -> bool:
+        """Whether a tool plug-in brings it: its tables are built from its
+        declaration rather than from a model."""
+        return self.table.metadata is not SQLModel.metadata
 
 
 @dataclass(frozen=True, eq=False)
@@ -66,8 +68,8 @@ class ToolSet:
 
     records: tuple[ToolRecord, ...]
     #: What the community's installed tool plug-ins are
-    #: (``app.db.plugin_tools.installed_digest``); None for the built-in
-    #: tools alone.
+    #: (``app.db.plugin_tools.tools_digest``); None for the built-in tools
+    #: alone.
     digest: str | None = None
 
     def __iter__(self) -> Iterator[ToolRecord]:
@@ -118,7 +120,7 @@ class ToolSet:
     @cached_property
     def installed(self) -> tuple[ToolRecord, ...]:
         """The tools an installed tool plug-in brings."""
-        return tuple(record for record in self.records if record.install_id is not None)
+        return tuple(record for record in self.records if record.installed)
 
     @cached_property
     def child_kinds(self) -> tuple[Kind, ...]:
@@ -169,6 +171,11 @@ def _builtin(tool: Tool) -> ToolRecord:
         scope=tool_resource(tool).value,
     )
 
+
+#: How many tool sets a process keeps, and how many renders of each thing
+#: rendered per set: communities whose tool plug-ins are the same versions
+#: share one set, so this bounds the variety, not the communities.
+KEPT_TOOL_SETS = 64
 
 #: The tools every community has.
 BUILTIN_TOOLS = ToolSet(tuple(_builtin(tool) for tool in Tool))

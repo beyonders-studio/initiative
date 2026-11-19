@@ -25,6 +25,8 @@ from app.testing import (
 
 GROUP = f"counter_group.{COUNTERS_UID.lower()}"
 COUNTER = f"counter.{COUNTERS_UID.lower()}"
+#: Kinds of the form a tool plug-in's take, named for the order they get codes.
+A, B, C = (f"{key}.{COUNTERS_UID.lower()}" for key in "abc")
 
 
 async def _register(
@@ -94,21 +96,21 @@ async def test_a_kind_keeps_its_code_and_a_new_one_takes_the_next(session):
 async def test_assigning_only_adds(session):
     """Assigning answers every kind's code, adding a row only for a kind that
     had none; a kind already given one keeps it whatever else is asked for."""
-    first = await assign_plugin_kind_codes(session, ["a.one", "b.one"])
-    again = await assign_plugin_kind_codes(session, ["c.one", "b.one", "c.one"])
+    first = await assign_plugin_kind_codes(session, [A, B])
+    again = await assign_plugin_kind_codes(session, [C, B, C])
     await session.commit()
     await post_commit.settle(session)
 
-    assert first == {"a.one": 1024, "b.one": 1025}
-    assert again == {"c.one": 1026, "b.one": 1025}
-    assert await _codes(session) == {"a.one": 1024, "b.one": 1025, "c.one": 1026}
-    assert await _code(session, "c.one") == 1026
+    assert first == {A: 1024, B: 1025}
+    assert again == {C: 1026, B: 1025}
+    assert await _codes(session) == {A: 1024, B: 1025, C: 1026}
+    assert await _code(session, C) == 1026
 
 
 async def test_a_render_waits_for_a_registration_giving_codes(session):
     """A render that starts while a registration is giving codes reads them
     once it commits, so it never writes the function without them."""
-    await assign_plugin_kind_codes(session, ["a.one"])
+    await assign_plugin_kind_codes(session, [A])
     render = asyncio.create_task(ensure_kind_codes())
     await asyncio.sleep(0.3)
     assert not render.done()
@@ -116,7 +118,7 @@ async def test_a_render_waits_for_a_registration_giving_codes(session):
     await session.commit()
     await render
     await post_commit.settle(session)
-    assert await _code(session, "a.one") == FIRST_PLUGIN_KIND_CODE
+    assert await _code(session, A) == FIRST_PLUGIN_KIND_CODE
 
 
 async def test_a_code_is_never_taken_back_or_moved(session):
@@ -139,8 +141,8 @@ async def test_a_code_is_never_taken_back_or_moved(session):
 
 
 def test_only_a_plug_in_kind_is_written_into_the_function():
-    assert "WHEN 'a.one' THEN 1024" in kind_code_body({"a.one": 1024})
-    for kind in ("a'b", "A.one", "a one"):
+    assert f"WHEN '{A}' THEN 1024" in kind_code_body({A: 1024})
+    for kind in ("a'b", "A.one", "a one", "a.one", f"{A}'"):
         try:
             kind_code_body({kind: 1024})
         except ValueError:

@@ -40,8 +40,9 @@ from app.models.platform.plugin_install import PluginInstall, PluginInstallStatu
 from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.models.tenant.initiative import InitiativeRule
+from app.models.tenant.initiative import InitiativeRoleModel, InitiativeRule
 from app.models.tenant.reaction import Reaction
+from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.marketplace.tool_plugins import (
     normalize_tool_plugin_definition,
@@ -93,9 +94,9 @@ def _kinds(definition: dict[str, Any], uid: str) -> list[str]:
     return [f"{key}.{str(uid).lower()}" for key in keys]
 
 
-def _set(definition: dict[str, Any], uid: str = COUNTERS_UID, install_id: int = 1):
+def _set(definition: dict[str, Any], uid: str = COUNTERS_UID):
     codes = {kind: 1024 + i for i, kind in enumerate(_kinds(definition, uid))}
-    return community_tool_set([InstalledTool(install_id, uid, definition)], codes)
+    return community_tool_set([InstalledTool(uid, definition)], codes)
 
 
 async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
@@ -123,6 +124,7 @@ async def _columns(session: AsyncSession, schema: str) -> dict[str, set[str]]:
         ("field", "view mode"),
         ("uid", "tsjvtcm0s7gv2x"),
         ("uid", "TSJVTCM0S7GV2'"),
+        ("option", "number'); DROP TABLE tasks; --"),
     ],
 )
 def test_the_builder_refuses_a_hostile_name(where: str, value: str):
@@ -134,6 +136,8 @@ def test_the_builder_refuses_a_hostile_name(where: str, value: str):
         definition["tool"]["key"] = value
     elif where == "field":
         definition["tool"]["items"][0]["fields"][1]["key"] = value
+    elif where == "option":
+        definition["tool"]["items"][0]["fields"][-1]["options"][0]["value"] = value
     else:
         uid = value
     with pytest.raises(PluginToolError):
@@ -356,10 +360,12 @@ async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
 async def test_the_tool_is_on_in_every_initiative_then_and_later(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Switched on, with each table's starting layouts, in every initiative
-    there is and every one made later: a list and an item page per table."""
+    """Switched on in every initiative there is and every one made later, by
+    rows a built-in tool's are: keyed by its kind, owned by no install, each
+    role holding its keys as it holds a built-in tool's. Its layouts are
+    drawn as declared, so none is stored."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    install = await install_tool_plugin(client, session, seat)
+    await install_tool_plugin(client, session, seat)
     made = await client.post(
         seat.g("/initiatives/"), headers=seat.headers, json={"name": "Later"}
     )
@@ -368,26 +374,38 @@ async def test_the_tool_is_on_in_every_initiative_then_and_later(
     await route_session_to_guild(session, seat.guild.id)
     rows = (
         await session.exec(
-            sa.select(InitiativeRule.initiative_id, InitiativeRule.enabled).where(
-                InitiativeRule.key == f"{_KIND}:enabled",
-                InitiativeRule.initiative_role_id.is_(None),
-                InitiativeRule.install_id == install["id"],
+            sa.select(
+                InitiativeRule.initiative_id,
+                InitiativeRoleModel.name,
+                InitiativeRule.key,
+                InitiativeRule.enabled,
+            )
+            .outerjoin(
+                InitiativeRoleModel,
+                InitiativeRoleModel.id == InitiativeRule.initiative_role_id,
+            )
+            .where(
+                InitiativeRule.key.startswith(_KIND),
+                InitiativeRule.install_id.is_(None),
             )
         )
     ).all()
-    assert dict(rows) == {seat.initiative.id: True, later: True}
-    layouts = (
-        await session.exec(
-            sa.select(ToolLayout.initiative_id, ToolLayout.tool, ToolLayout.kind).where(
-                ToolLayout.tool.endswith(COUNTERS_UID.lower())
-            )
-        )
-    ).all()
-    assert sorted(layouts) == sorted(
-        (initiative, f"{key}.{COUNTERS_UID.lower()}", kind)
+    expected = [
+        (initiative, role, f"{_KIND}:{key}", key == "enabled" or manager)
         for initiative in (seat.initiative.id, later)
-        for key in ("counter_group", "counter")
-        for kind in ("grid", "detail")
+        for role, manager in (
+            ("moderator", True),
+            ("project_manager", True),
+            ("member", False),
+        )
+        for key in ("enabled", "create")
+    ] + [
+        (initiative, None, f"{_KIND}:enabled", True)
+        for initiative in (seat.initiative.id, later)
+    ]
+    assert sorted(rows, key=str) == sorted(expected, key=str)
+    assert not await session.scalar(
+        sa.select(sa.func.count()).where(ToolLayout.tool.endswith(COUNTERS_UID.lower()))
     )
 
 
@@ -397,10 +415,11 @@ async def test_two_plugins_with_one_key_install_side_by_side(
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     first = await install_tool_plugin(client, session, seat)
     second = await install_tool_plugin(client, session, seat, uid=OTHER_UID)
+    assert first["id"] != second["id"]
     tools = await provisioned_tools(seat.guild.id)
-    assert [(tool.kind, tool.install_id) for tool in tools.installed] == [
-        (f"counter_group.{COUNTERS_UID.lower()}", first["id"]),
-        (f"counter_group.{OTHER_UID.lower()}", second["id"]),
+    assert [tool.kind for tool in tools.installed] == [
+        f"counter_group.{COUNTERS_UID.lower()}",
+        f"counter_group.{OTHER_UID.lower()}",
     ]
     columns = await _columns(session, guild_schema_name(seat.guild.id))
     assert set(columns) == {
@@ -410,20 +429,22 @@ async def test_two_plugins_with_one_key_install_side_by_side(
     }
     await route_session_to_guild(session, seat.guild.id)
     switches = (
-        await session.exec(
-            sa.select(InitiativeRule.key, InitiativeRule.install_id).where(
-                InitiativeRule.initiative_id == seat.initiative.id,
-                InitiativeRule.initiative_role_id.is_(None),
-                InitiativeRule.install_id.is_not(None),
+        (
+            await session.exec(
+                sa.select(InitiativeRule.key).where(
+                    InitiativeRule.initiative_id == seat.initiative.id,
+                    InitiativeRule.initiative_role_id.is_(None),
+                    InitiativeRule.key.startswith("counter_group."),
+                )
             )
         )
-    ).all()
-    assert sorted(switches) == sorted(
-        [
-            (f"counter_group.{COUNTERS_UID.lower()}:enabled", first["id"]),
-            (f"counter_group.{OTHER_UID.lower()}:enabled", second["id"]),
-        ]
+        .scalars()
+        .all()
     )
+    assert sorted(switches) == [
+        f"counter_group.{COUNTERS_UID.lower()}:enabled",
+        f"counter_group.{OTHER_UID.lower()}:enabled",
+    ]
     assert tool_kinds(_counters(), listing_uid=OTHER_UID)[0] == tools.installed[1].kind
 
 
@@ -482,7 +503,7 @@ async def test_uninstalling_keeps_the_tool_until_its_window_ends(
     assert row.uninstalled_at == row.status_changed_at
     await route_session_to_guild(session, seat.guild.id)
     rules = await session.scalar(
-        sa.select(sa.func.count()).where(InitiativeRule.install_id == install["id"])
+        sa.select(sa.func.count()).where(InitiativeRule.key.startswith(_KIND))
     )
     assert rules
     await session.commit()
@@ -529,10 +550,6 @@ async def test_the_window_ending_takes_the_tool_and_what_names_it(
     await session.commit()
     comment_id = comment.id
     await create_reaction(session, seat.user, comment=comment)
-    layouts = await session.scalar(
-        sa.select(sa.func.count()).where(ToolLayout.tool == _KIND)
-    )
-    assert layouts == 2
     removed = await client.delete(
         seat.g(f"/plugins/{install['id']}"),
         headers=seat.headers,
@@ -575,10 +592,10 @@ async def test_the_window_ending_takes_the_tool_and_what_names_it(
     await route_session_to_guild(session, seat.guild.id)
     for table, where in (
         (GuildPlugin, GuildPlugin.id == install["id"]),
-        (InitiativeRule, InitiativeRule.install_id == install["id"]),
+        (InitiativeRule, InitiativeRule.key.contains(COUNTERS_UID.lower())),
+        (ResourceGrant, ResourceGrant.resource_type == _KIND),
         (Comment, Comment.subject_type == _KIND),
         (Reaction, Reaction.target_id == comment_id),
-        (ToolLayout, ToolLayout.tool.startswith("counter")),
     ):
         assert not await session.scalar(
             sa.select(sa.func.count()).select_from(table).where(where)
@@ -626,7 +643,7 @@ async def test_a_version_adding_to_the_tool_waits_for_the_seat(
 ):
     """A version adding a field, an option, an item table and an action is
     held until the seat takes it; taking it adds the column and the table,
-    lays the new table out, and keeps every row."""
+    and keeps every row."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
     await route_session_to_guild(session, seat.guild.id)
@@ -680,13 +697,6 @@ async def test_a_version_adding_to_the_tool_waits_for_the_seat(
             f" SELECT id, 'Dial', 'dial' FROM {_GROUP}"
         )
     )
-    laid_out = await session.scalar(
-        sa.select(sa.func.count()).where(
-            ToolLayout.tool == f"tally.{COUNTERS_UID.lower()}",
-            ToolLayout.initiative_id == seat.initiative.id,
-        )
-    )
-    assert laid_out == 2
 
 
 async def test_the_sweep_takes_a_version_asking_nothing_and_holds_the_rest(
@@ -934,7 +944,7 @@ async def test_boot_provisions_an_install_whose_provisioning_never_ran(
         sa.select(InitiativeRule.enabled).where(
             InitiativeRule.initiative_id == seat.initiative.id,
             InitiativeRule.initiative_role_id.is_(None),
-            InitiativeRule.install_id == install.id,
+            InitiativeRule.key == f"{_KIND}:enabled",
         )
     )
     assert switch is True

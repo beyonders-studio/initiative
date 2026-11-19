@@ -47,17 +47,16 @@ logger = logging.getLogger(__name__)
 #: A plug-in's kinds and their codes, as ``plugin_kind_codes`` holds them.
 PluginCodes = dict[str, int]
 
-#: A plug-in's kind: a tool key, ``.`` and a uid in lower case.
-_PLUGIN_KIND_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789_.")
-
 
 def kind_code_body(plugin_codes: PluginCodes | None = None) -> str:
     """The function's body: one arm per kind, the person's and each plug-in
     kind's, by code. A plug-in's kind is written as a literal, so it is held
-    to the characters its kind is made of before it is."""
+    to the form of a plug-in's kind before it is."""
+    from app.db.plugin_tools import is_plugin_kind
+
     arms = [(kind.value, kind.code) for kind in (*KINDS.values(), PERSON)]
     for kind, code in (plugin_codes or {}).items():
-        if not set(kind) <= _PLUGIN_KIND_CHARS:
+        if not is_plugin_kind(kind):
             raise ValueError(f"{kind!r} is not a plug-in kind")
         arms.append((kind, code))
     spelled = " ".join(

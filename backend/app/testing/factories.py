@@ -45,6 +45,7 @@ from app.core.security import (
     mint_access_token,
 )
 from app.core.tools import CHILD_KINDS, Tool
+from app.db.plugin_tools import tool_set
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.federated_identity import FederatedIdentity
@@ -118,7 +119,10 @@ from app.services.tenant import relationships as relationships_service
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_definition,
 )
-from app.services.tenant.initiative_tools import write_switches
+from app.services.tenant.initiative_tools import (
+    write_installed_tools,
+    write_switches,
+)
 from app.services.tenant.initiatives import create_builtin_roles
 from app.services.tenant.names import slugify
 from app.services.tenant.ownership import tool_for_row
@@ -724,6 +728,9 @@ async def create_initiative(
 
         # Create built-in roles (moderator + PM + member)
         builtin_roles = await create_builtin_roles(session, initiative_id=initiative.id)
+        # Every installed tool plug-in's tool too, as an initiative made
+        # through the API has it.
+        await write_installed_tools(session, await tool_set(session))
         pm_role = builtin_roles["project_manager"]
         member_role = builtin_roles["member"]
 
