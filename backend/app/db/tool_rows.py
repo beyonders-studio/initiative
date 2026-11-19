@@ -131,5 +131,5 @@ async def load_row(
     statement = select_rows(located, tools).where(located.table.c.id == row_id)
     if for_update:
         statement = statement.with_for_update(of=located.table)
-    found = (await session.execute(statement)).first()
+    found = (await session.exec(statement)).first()
     return None if found is None else row_of(located.table, found)
