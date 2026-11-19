@@ -27,6 +27,8 @@ an id in that namespace is only ever claimed by a listing shipped in this build.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from enum import StrEnum
 from typing import Any
 
 from app.core.tools import BULK_EXPORT_TOOLS, Tool
@@ -175,6 +177,39 @@ GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset(
 #: and so is the guild's address book; a dashboard, which binds to one
 #: initiative's data, is not (and is not planned to be).
 MOUNTABLE_TOOLS: frozenset[str] = frozenset({"calendar", "contact"})
+
+
+class PluginTag(StrEnum):
+    """How a plug-in shows up for the people using it, in one word: what its
+    listing's tag says. Read off the definition, so no publisher states it."""
+
+    #: A tool of its own, used inside initiatives like a built-in one.
+    tool = "tool"
+    #: One of this build's tools, for the whole community.
+    community_tool = "community_tool"
+    #: A page of its own.
+    page = "page"
+    #: An account at another service to connect.
+    connection = "connection"
+    #: Things added to the tools a community already uses: fields, sections,
+    #: actions, widgets, dashboards.
+    add_on = "add_on"
+
+
+def plugin_tag(definition: Mapping[str, Any]) -> PluginTag:
+    """The tag for a plug-in definition. A service declaring several things
+    is tagged by the one a reader meets first: a page, then a connection."""
+    kind = definition.get("plugin_kind")
+    if kind == "tool":
+        return PluginTag.tool
+    if kind == "tool_instance":
+        return PluginTag.community_tool
+    if definition.get("pages"):
+        return PluginTag.page
+    if definition.get("connections"):
+        return PluginTag.connection
+    return PluginTag.add_on
+
 
 #: The namespace this repository's own listings publish under.
 RESERVED_PUBLIC_ID_PREFIX = "core."

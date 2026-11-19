@@ -77,5 +77,32 @@
   },
   "installedUnknown": "Couldn't check which of these you already have, so nothing below is marked as installed.",
   "subtitlePlugins": "Plug-ins add something the whole community shares. Only the community's superadmin can add them.",
-  "subtitleAuto": "Automations run in the background for the whole community."
+  "subtitleAuto": "Automations run in the background for the whole community.",
+  "tag": {
+    "tool": "New tool",
+    "community_tool": "Whole community",
+    "page": "Own page",
+    "connection": "Connects an account",
+    "add_on": "Adds to your tools"
+  },
+  "contents": {
+    "title": "What it adds",
+    "tool": "Tool",
+    "toolInitiatives": "{{name}}, used inside initiatives",
+    "toolCommunity": "{{name}}, for the whole community",
+    "pages": "Pages",
+    "pagesCommunity": "for the whole community",
+    "pagesInitiatives": "inside initiatives",
+    "pagesBoth": "for the whole community and inside initiatives",
+    "dashboards": "Dashboards",
+    "widgets": "Widgets",
+    "widgetsNote": "for any dashboard",
+    "fields": "Fields",
+    "parts": "Sections",
+    "actions": "Actions",
+    "on": "on {{kinds}}",
+    "connections": "Connections",
+    "connectionCommunity": "an admin connects it once",
+    "connectionMember": "each member connects their own"
+  }
 }

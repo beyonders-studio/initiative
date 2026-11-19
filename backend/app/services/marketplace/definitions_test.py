@@ -26,9 +26,11 @@ from app.services.marketplace.definitions import (
     LISTING_SOURCES,
     PLUGIN_KINDS,
     ListingDefinitionError,
+    PluginTag,
     kinds_for_audience,
     normalize_listing_definition,
     normalize_publisher,
+    plugin_tag,
     plugin_widget_type,
     published_by_us,
     reserved_prefix_problem,
@@ -2025,3 +2027,27 @@ class TestAPacksOwnArt:
     def test_a_pack_without_art_keeps_the_shape_it_was_published_in(self):
         stored = normalize_listing_definition("profile_pack", self._pack())
         assert "image" not in stored["decorations"][0]
+
+
+@pytest.mark.parametrize(
+    ("definition", "tag"),
+    [
+        ({"plugin_kind": "tool"}, PluginTag.tool),
+        (
+            {"plugin_kind": "tool_instance", "tool": "calendar"},
+            PluginTag.community_tool,
+        ),
+        (
+            {"plugin_kind": "service", "pages": [{"id": "p"}], "connections": [{}]},
+            PluginTag.page,
+        ),
+        (
+            {"plugin_kind": "service", "connections": [{}], "widgets": [{}]},
+            PluginTag.connection,
+        ),
+        ({"plugin_kind": "service", "fields": [{}]}, PluginTag.add_on),
+        ({"plugin_kind": "service"}, PluginTag.add_on),
+    ],
+)
+def test_plugin_tag_is_what_a_reader_meets_first(definition, tag):
+    assert plugin_tag(definition) is tag

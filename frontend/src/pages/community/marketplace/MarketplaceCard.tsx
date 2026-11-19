@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/ui/card";
 import { cn } from "@/ui/lib/utils";
 
 import { ListingProvenance } from "./ListingProvenance";
+import { PluginTagBadge } from "./PluginContents";
 
 export interface MarketplaceCardProps {
   listing: MarketplaceListingSummary;
@@ -62,7 +63,8 @@ export function MarketplaceCard({ listing, installedCount = 0 }: MarketplaceCard
             <p className="mt-1.5 line-clamp-2 text-muted-foreground text-sm">
               {listing.description}
             </p>
-            <div className={cn("mt-auto flex items-center gap-2 pt-2")}>
+            <div className={cn("mt-auto flex flex-wrap items-center gap-2 pt-2")}>
+              <PluginTagBadge tag={listing.plugin_tag} className="text-xs" />
               {listing.latest_version && (
                 <span className="text-muted-foreground text-xs">
                   {t("card.version", { version: listing.latest_version.version })}
