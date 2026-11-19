@@ -10,7 +10,6 @@ from sqlalchemy import (
 )
 from sqlmodel import Field
 
-from app.core.tools import Tool
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.tenant._mixins import CreatedByMixin
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -52,8 +51,9 @@ class GuestInviteGrant(CreatedByMixin, table=True):
             nullable=False,
         )
     )
-    #: The item, with ``level``; all three NULL for the whole initiative.
-    resource_type: Tool | None = Field(
+    #: The item, with ``level``; all three NULL for the whole initiative. A
+    #: tool's kind: a built-in tool's, or an installed tool plug-in's.
+    resource_type: str | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
     resource_id: int | None = Field(

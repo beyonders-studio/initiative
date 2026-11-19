@@ -512,7 +512,7 @@ async def replace_resource_grants(
 async def share_with(
     session: Any,
     *,
-    resource_type: Tool,
+    resource_type: str,
     resource_id: int,
     guild_id: int,
     initiative_id: int | None,

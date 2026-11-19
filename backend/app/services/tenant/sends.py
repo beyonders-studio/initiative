@@ -175,7 +175,7 @@ async def _let_in(
     for user_id in user_ids:
         await permissions_service.share_with(
             session,
-            resource_type=subject.tool,
+            resource_type=subject.tool.value,
             resource_id=subject.resource_id,
             guild_id=context.guild_id,
             initiative_id=subject.initiative_id,
