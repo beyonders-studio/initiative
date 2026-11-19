@@ -26,7 +26,7 @@ const counts = Object.fromEntries(TOOLS.map((tool) => [tool, 0])) as Record<Tool
 const render = (view: string[], create: string[] = []) => {
   const initiative = buildInitiative({
     id: 3,
-    can: initiativeCan({ view, create } as never),
+    can: initiativeCan({ view, create }),
   });
   return renderPage(() => (
     <TooltipProvider>

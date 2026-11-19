@@ -98,7 +98,7 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
   // then the tools the community's plug-ins declare.
   const tabs = useMemo<ToolTab[]>(() => {
     if (!initiative) return [];
-    const viewable = initiative.can.view as readonly string[];
+    const viewable = initiative.can.view;
     return [
       ...TOOL_TABS.map(([tabTool, View]) => ({
         kind: tabTool as string,
@@ -290,7 +290,7 @@ export const InitiativePage = ({ tool }: InitiativeDetailPageProps = {}) => {
               <tab.view
                 key={`${tab.kind}-${initiative.id}`}
                 fixedInitiativeId={initiative.id}
-                canCreate={(initiative.can.create as readonly string[]).includes(tab.kind)}
+                canCreate={initiative.can.create.includes(tab.kind)}
               />
             </Suspense>
           </TabsContent>

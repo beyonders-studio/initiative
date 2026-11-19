@@ -80,9 +80,7 @@ export const InitiativeSection = memo(
     // The tools the community's tool plug-ins declare that this reader may
     // open here, which the server says as it says a built-in tool's.
     const tools = useMemo(() => installedTools(plugins), [plugins]);
-    const pluginTools = tools.filter((tool) =>
-      (initiative.can.view as readonly string[]).includes(tool.kind)
-    );
+    const pluginTools = tools.filter((tool) => initiative.can.view.includes(tool.kind));
     const builtInTools = SIDEBAR_TOOLS.filter(showTool);
 
     /** One built-in tool's row. */
@@ -309,8 +307,7 @@ export const InitiativeSection = memo(
                           </span>
                         </Link>
                       </SidebarMenuButton>
-                      {instance &&
-                      (initiative.can.create as readonly string[]).includes(tool.kind) ? (
+                      {instance && initiative.can.create.includes(tool.kind) ? (
                         <CreateLink
                           to={gp(rowTo)}
                           search={{ create: "true" }}
