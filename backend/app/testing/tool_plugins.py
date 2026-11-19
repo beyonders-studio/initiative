@@ -272,30 +272,26 @@ async def add_counter(
     group's id and the counter's id. Added on ``session`` as it is routed (a
     request's, whose person then makes and owns them), or routed into the
     community where it is not. Committed."""
-    import sqlalchemy as sa
-
     from app.db.plugin_tools import provisioned_tools
     from app.db.session import routed_guild_id
+    from app.db.tool_rows import locate
+    from app.services.tenant.plugin_tool_rows import insert
     from app.testing.schema_harness import route_session_to_guild
 
     tools = await provisioned_tools(guild_id)
     (tool,) = tools.installed
-    (item,) = tool.items
+    (item,) = tool.children
     if routed_guild_id(session) is None:
         await route_session_to_guild(session, guild_id)
-    group = (
-        await session.exec(
-            sa.insert(tool.table)
-            .values(initiative_id=initiative_id, name="Scores")
-            .returning(tool.table.c.id)
-        )
-    ).scalar_one()
-    row = (
-        await session.exec(
-            sa.insert(item)
-            .values(counter_group_id=group, name="Laps", **counter)
-            .returning(item.c.id)
-        )
-    ).scalar_one()
+    group = await insert(
+        session,
+        locate(tools, tool.kind),
+        {"initiative_id": initiative_id, "name": "Scores"},
+    )
+    row = await insert(
+        session,
+        locate(tools, item.value),
+        {"counter_group_id": group, "name": "Laps", **counter},
+    )
     await session.commit()
     return tools, group, row
