@@ -418,6 +418,8 @@
   "COMMUNITY_PLUGIN_LISTING_NOT_A_PLUGIN": "Cette fiche ne peut pas être installée en tant que plug-in.",
   "COMMUNITY_PLUGIN_ALREADY_INSTALLED": "Cette communauté a déjà installé ce plug-in.",
   "COMMUNITY_PLUGIN_KIND_NOT_INSTALLABLE": "Ce type de plug-in ne peut pas encore être installé sur cette version d'Initiative.",
+  "COMMUNITY_PLUGIN_TOOL_UNCHANGEABLE": "Un plug-in d'outil ne peut pas encore être retiré, désactivé ou mis à jour sur cette version d'Initiative.",
+  "COMMUNITY_PLUGIN_TOOL_NOT_PROVISIONED": "L'outil n'a pas pu être ajouté à cette communauté, le plug-in n'a donc pas été installé. Réessayez.",
   "PLUGIN_SERVICE_NOT_FOUND": "Ce service de plug-in n'est plus enregistré.",
   "PLUGIN_SIGN_IN_UNKNOWN_CLIENT": "Le plug-in qui vous a envoyé ici n'est pas connu de ce serveur.",
   "PLUGIN_SIGN_IN_NOT_OFFERED": "Le plug-in qui vous a envoyé ici ne propose pas la connexion avec Initiative.",

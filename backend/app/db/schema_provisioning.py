@@ -27,8 +27,9 @@ import hashlib
 import logging
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import func, literal, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -325,6 +326,15 @@ _community_bundles: dict[tuple[int, str | None], ProvisioningBundle] = {}
 #: The stamp's item naming the installed tool plug-ins its community's parts
 #: were rendered with, on a community that has any.
 TOOLS_ITEM = "tools"
+
+
+def schema_stamp(guild_id: int) -> Any:
+    """``guild_id``'s schema stamp as a column, for a read that runs anyway:
+    a schema comment is a catalog row any role reads."""
+    return func.obj_description(
+        func.to_regnamespace(literal(guild_schema_name(guild_id))),
+        literal("pg_namespace"),
+    )
 
 
 def stamp_tools(stamp: str | None) -> str | None:

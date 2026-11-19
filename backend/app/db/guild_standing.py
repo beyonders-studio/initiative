@@ -1045,6 +1045,9 @@ class GuildContext:
     content_hold: bool = False
     #: The community's tools, which its rules were rendered from.
     tools: ToolSet = BUILTIN_TOOLS
+    #: What its schema's stamp names those tools by (its ``tools=`` item), read
+    #: with the membership; None for a community with no tool plug-in.
+    rendered_tools: str | None = None
 
     # --- Identity ------------------------------------------------------------
 

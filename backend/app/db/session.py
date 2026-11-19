@@ -534,14 +534,16 @@ async def apply_guild_standing(
     returned row completes ``context``, which replaces the one the stored shape
     carries, so the replay hook re-applies routing and standing together.
     """
-    from app.db.plugin_tools import community_tools
+    from app.db.plugin_tools import rendered_tools
     from app.models.platform.guild import CommunityRole
 
-    # The community's tools, its tool plug-ins' among them, which its rules
-    # were rendered from. A guest's role reads no install, and reaches no
-    # tool plug-in's tables.
+    # The tools the community's rules were rendered with, its tool plug-ins'
+    # among them, named by its schema's stamp. A guest's role reads no
+    # install, and reaches no tool plug-in's tables.
     if context.guild_role != CommunityRole.guest.value:
-        context = replace(context, tools=await community_tools(session))
+        context = replace(
+            context, tools=await rendered_tools(session, context.rendered_tools)
+        )
     completed = context.with_standing(
         await compute_guild_standing(session, context.tools)
     )

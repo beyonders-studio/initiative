@@ -65,10 +65,10 @@ __all__ = [
     "PluginToolError",
     "build_tool",
     "community_tool_set",
-    "community_tools",
     "installed_digest",
     "installed_tools",
     "provisioned_tools",
+    "rendered_tools",
     "structure_ddl",
     "tool_table_name",
     "tools_digest",
@@ -499,19 +499,12 @@ def structure_ddl(tools: ToolSet) -> str:
 
 # --- loading -----------------------------------------------------------------
 
-#: A community's installed tool plug-ins, by install. Read from the routed
-#: session of whoever asks: a member reads its community's installs.
-_INSTALLED = sa.text(
-    "SELECT id, listing_uid, md5(definition::text) AS digest FROM guild_plugins"
-    " WHERE plugin_kind = 'tool' ORDER BY id"
-)
+#: A community's installed tool plug-ins, read from the routed session of
+#: whoever asks: a member reads its community's installs.
 _DEFINITIONS = sa.text(
     "SELECT id, listing_uid, definition FROM guild_plugins"
     " WHERE plugin_kind = 'tool' ORDER BY id"
 )
-
-#: The sets read at request time, by what the installs' rows were.
-_BY_ROWS: dict[tuple[tuple[Any, ...], ...], ToolSet] = {}
 
 
 async def _codes() -> dict[str, int]:
@@ -529,18 +522,18 @@ async def _installed(session: Any) -> list[InstalledTool]:
     return [InstalledTool(row.id, row.listing_uid, row.definition) for row in rows]
 
 
-async def community_tools(session: Any) -> ToolSet:
-    """The tool set of the community ``session`` is routed to. One read of
-    its installs; their declarations and the kind codes are read only the
-    first time this process sees them."""
-    rows = tuple(tuple(row) for row in (await session.exec(_INSTALLED)).all())
-    if not rows:
+async def rendered_tools(session: Any, digest: str | None) -> ToolSet:
+    """The tool set a community's rules were rendered with, by the digest its
+    schema's stamp names (``schema_provisioning.stamp_tools``): the built-in
+    tools where it names none, with no query, and otherwise the set this
+    process built for that digest. Only the first request to name a digest
+    reads the community's installs and the kind codes."""
+    if digest is None:
         return BUILTIN_TOOLS
-    found = _BY_ROWS.get(rows)
-    if found is None:
-        found = community_tool_set(await _installed(session), await _codes())
-        _BY_ROWS[rows] = found
-    return found
+    found = _SETS.get(digest)
+    if found is not None:
+        return found
+    return community_tool_set(await _installed(session), await _codes())
 
 
 def tools_digest(installed: Sequence[InstalledTool]) -> str | None:
