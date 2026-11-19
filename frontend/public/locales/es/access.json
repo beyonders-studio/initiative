@@ -162,6 +162,7 @@
   },
   "send": {
     "button": "Enviar a…",
+    "copyLink": "Copiar enlace",
     "title": "Enviar a…",
     "description": "Lo reciben en sus notificaciones y lo abren en lo que estén usando.",
     "people": "Personas",

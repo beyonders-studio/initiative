@@ -10,10 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **A plug-in can check the values you give its vendor before they are saved.** A plug-in that declares a vendor check (plug-in kit 11) has its values asked about at the vendor when you save them on its settings page. Values the vendor doesn't know together, such as an app name that isn't the app the ID and key belong to, are not saved: the fields to fix are marked, with what the vendor has instead. When the vendor can't be reached, the values save and the page says they weren't checked.
-- **Send something to someone, in the app.** **Send to…** beside the bell on a project, file, task, event or page puts it in their notifications, with a note if you add one, and tapping it opens it on whichever device they are using. Somebody who can't open it yet is let in if you can share it, or can ask for access.
+- **Send something to someone, in the app.** **Send to…** beside the bell on a project, file, task, event or page puts it in their notifications, with a note if you add one, and tapping it opens it on whichever device they are using. Somebody who can't open it yet is let in if you can share it, or can ask for access. **Copy link** in the same dialog copies a link to it instead.
 - **Giving someone access tells them.** Adding a person in a thing's Access settings sends them a notification, with an optional note, and answers any request for access the new sharing covers, including sharing with their role or the whole initiative.
 - **See Community calendar and Community contacts before you install them.** Their marketplace pages picture what each adds to a community, in your light or dark theme.
 - **Counter fields can show as a progress bar or a segmented clock, and open full screen.** Pick the look in the field's settings; a list draws it that way unless its layout says otherwise. On an item, the full-screen button beside a counter field opens it the way the Counters tool does, with big buttons to step it.
+- **Copy a page's link from the desktop app.** The share button beside Reload in the title bar copies the address of the page you're on, ready to open in a browser or send to someone.
 - **Quit the desktop app from its taskbar button on Windows.** Right-click it and choose **Quit Initiative**. Closing the window only tucks the app into the tray.
 
 ### Changed
