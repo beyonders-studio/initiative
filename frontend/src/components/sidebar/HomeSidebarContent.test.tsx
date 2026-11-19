@@ -85,6 +85,14 @@ describe("the home sidebar", () => {
     expect(screen.queryByRole("button", { name: /back to navigation/i })).toBeNull();
   });
 
+  it("marks My Messages as beta, and nothing else", async () => {
+    setup("/");
+
+    const badges = await screen.findAllByText("Beta");
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest("a")).toHaveTextContent("My Messages");
+  });
+
   it("drills into the conversations on My Messages", async () => {
     setup("/messages");
 

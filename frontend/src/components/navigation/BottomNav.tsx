@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { FilePlus, Home, Menu, MessageSquare, Plus, Search, SquareCheckBig } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -53,7 +53,11 @@ export function BottomNav() {
   const messagesWaiting = useMessagesWaiting();
   // Both message buttons below are the same affordance at two sizes, so the
   // deployment's switch is read once for the pair.
-  const dmEnabled = useDirectMessagesEnabled();
+  // Neither is drawn on My Messages itself, where it would lead nowhere.
+  const onMessages = useLocation({
+    select: (location) => location.pathname.startsWith("/messages"),
+  });
+  const showMessages = useDirectMessagesEnabled() && !onMessages;
   // The count belongs in the name rather than beside it: a label wins over
   // what is inside the button, so a badge nobody can read is a number only
   // some people get. Both buttons below say it the same way.
@@ -109,7 +113,7 @@ export function BottomNav() {
               >
                 <Home className="h-5 w-5" />
               </Button>
-              {dmEnabled && (
+              {showMessages && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -138,7 +142,7 @@ export function BottomNav() {
             anywhere are starting something and seeing who has written. The
             quieter of the two is on the left, so the primary action stays where
             it has always been. */}
-          {!isMobile && dmEnabled && (
+          {!isMobile && showMessages && (
             <Button
               variant="secondary"
               size="icon"
