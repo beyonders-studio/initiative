@@ -3352,6 +3352,38 @@ class TestPlatformConnection:
         assert read.json()["platform_connections"][0]["removed"] is True
         assert await _events(session, seat.guild.id) == []
 
+    async def test_a_removal_is_kept_with_no_community_installed(
+        self, client: AsyncClient, acting_user, session, vendor, declarative
+    ):
+        """The platform's account is marked removed though no community has
+        the plug-in, and a report about another installation changes
+        nothing."""
+        await _declarative_listing(session)
+        owner = await acting_user()
+        vendor.api_answers = [_installations((42, "acme"))]
+        landing = await _connect_for_every_community(
+            client, owner, declarative.id, vendor
+        )
+        assert landing["outcome"] == "connected"
+
+        async def removed_after(serial: int, installation: int) -> bool:
+            body, headers = vendor.webhook(
+                {"action": "deleted", "installation": {"id": installation}},
+                delivery=f"delivery-{serial}",
+            )
+            headers["X-GitHub-Event"] = "installation"
+            response = await client.post(
+                DECLARATIVE_HOOKS, content=body, headers=headers
+            )
+            assert response.status_code == 202, response.text
+            read = await client.get(
+                f"/api/v1/plugin-services/{declarative.id}", headers=owner.headers
+            )
+            return read.json()["platform_connections"][0]["removed"]
+
+        assert await removed_after(0, 7) is False
+        assert await removed_after(1, 42) is True
+
     async def test_only_an_operator_who_may_manage_plug_ins_connects_for_everyone(
         self, client: AsyncClient, acting_user, session, vendor, declarative
     ):

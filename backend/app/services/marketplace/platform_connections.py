@@ -318,9 +318,13 @@ async def disconnect(
     return row
 
 
-async def set_state(public_id: str, connection_id: str, state: str) -> None:
+async def set_state(
+    public_id: str, connection_id: str, state: str, *, about: Mapping[str, Any]
+) -> None:
     """Write what the vendor said of a platform connection's account: marked
-    removed on ``removed``, unmarked on ``ok``. Any other state leaves it."""
+    removed on ``removed``, unmarked on ``ok``. Any other state leaves it, and
+    so does a report ``about`` an account the connection no longer holds: the
+    values it was read for, each compared as text."""
     if state not in ("ok", "removed"):
         return
     async with db_session.SystemSessionLocal() as session:
@@ -330,6 +334,8 @@ async def set_state(public_id: str, connection_id: str, state: str) -> None:
         if not isinstance(entry, dict) or not isinstance(entry.get("values"), dict):
             return
         values = dict(entry["values"])
+        if any(str(values.get(key)) != str(value) for key, value in about.items()):
+            return
         removed = state == "removed"
         if (plugin_config_service.REMOVED_AT in values) == removed:
             return
@@ -351,7 +357,16 @@ async def _due(now: datetime) -> list[tuple[str, str, dict, dict[str, Any]]]:
                 )
             )
         ).all()
-        rows = [row for row in rows if row.platform_connections]
+        live = await registration_lookup.load_registrations()
+        # A suspended plug-in, or one whose publisher is switched off, calls
+        # no vendor.
+        rows = [
+            row
+            for row in rows
+            if row.platform_connections
+            and (snapshot := live.get(row.public_id)) is not None
+            and snapshot.live
+        ]
         definitions = await listing_definitions(
             session, [row.listing_uid for row in rows]
         )
@@ -429,4 +444,4 @@ async def check_health() -> None:
             entries[connection_id] = {**current, "failures": failures}
             await _write(session, row, entries, audit=None, actor_user_id=None)
         if state == "ok" or failures >= 2:
-            await set_state(public_id, connection_id, state)
+            await set_state(public_id, connection_id, state, about=fields)

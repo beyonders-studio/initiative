@@ -58,7 +58,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import httpx2
 import jwt
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -1416,7 +1416,9 @@ async def _store_community(
     """The community's own connection: the managed values, and the token set
     unless the flow is installation-style, whose person's token is not kept.
     Answers the landing outcome. The install's row in the install index is
-    written once they are stored, so the vendor's webhooks reach it."""
+    written with them, while the install is held, so the vendor's webhooks
+    reach it; a store that fails after it has the index sweep write the row
+    again from what the community holds."""
     plugin = await guild_plugins_service.lock_install(session, plugin_id)
     if plugin is None:
         return "not_recorded"
@@ -1433,17 +1435,24 @@ async def _store_community(
     )
     if tokens is not None:
         config, secrets = seal_tokens(tokens, config=config, secrets=secrets)
-    plugin.config = _replace_entry(plugin.config, connection_id, config)
-    plugin_config_service.guild_connection_ref(plugin, connection_id)
-    plugin.config_state = "unverified"
-    plugin.config_state_detail = None
-    plugin.updated_at = datetime.now(UTC)
-    session.add(plugin)
-    await guild_plugins_service.store_secrets(
-        session, plugin, _replace_entry(all_secrets, connection_id, secrets)
-    )
-    await session.commit()
-    await plugin_installs.record(guild_id, plugin)
+    try:
+        plugin.config = _replace_entry(plugin.config, connection_id, config)
+        plugin_config_service.guild_connection_ref(plugin, connection_id)
+        plugin.config_state = "unverified"
+        plugin.config_state_detail = None
+        plugin.updated_at = datetime.now(UTC)
+        session.add(plugin)
+        await guild_plugins_service.store_secrets(
+            session, plugin, _replace_entry(all_secrets, connection_id, secrets)
+        )
+        # Written while the install is held, so two connects write their
+        # routes in the order they store their values.
+        await plugin_installs.record(guild_id, plugin)
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        await _arm_index_sweep(session)
+        raise
     return "connected"
 
 
@@ -1454,6 +1463,17 @@ def _replace_entry(
     if values:
         kept[connection_id] = dict(values)
     return kept
+
+
+async def _arm_index_sweep(session: AsyncSession) -> None:
+    """Have the index sweep write the install's row again from what the
+    community holds, after a route was written for values not stored."""
+    await session.exec(
+        text("SELECT arm_timer(:kind, now())").bindparams(
+            kind=plugin_installs.INDEX_SWEEP
+        )
+    )
+    await session.commit()
 
 
 # --- a typed connection the plug-in checks ------------------------------------
@@ -1721,12 +1741,13 @@ async def check_typed(
             connection_ids=[typed.connection_id],
             actor_user_id=actor_user_id,
         )
+        await plugin_installs.record(guild_id, plugin)
         await session.commit()
     except Exception:
         await session.rollback()
+        await _arm_index_sweep(session)
         await _not_kept(session, typed, config, secrets)
         raise
-    await plugin_installs.record(guild_id, plugin)
 
 
 async def _not_kept(

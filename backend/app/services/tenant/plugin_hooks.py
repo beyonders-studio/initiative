@@ -184,13 +184,54 @@ def _vendor_headers(headers: Mapping[str, str], signature: str) -> dict[str, str
     }
 
 
-async def _webhooks(registration: RegistrationSnapshot) -> dict[str, Any] | None:
-    """The ``webhooks`` block of the listing's current definition, which
-    checks and routes a delivery before any install is known."""
+async def _current(registration: RegistrationSnapshot) -> dict[str, Any]:
+    """The listing's current definition, whose ``webhooks`` check and route a
+    delivery before any install is known."""
     async with db_session.SystemSessionLocal() as session:
         definitions = await listing_definitions(session, [registration.listing_uid])
-    webhooks = definitions.get(registration.listing_uid or "", {}).get("webhooks")
-    return webhooks if isinstance(webhooks, dict) else None
+    return definitions.get(registration.listing_uid or "", {})
+
+
+async def _platform_status(
+    registration: RegistrationSnapshot,
+    definition: Mapping[str, Any],
+    headers: Mapping[str, str],
+    body: bytes,
+) -> None:
+    """What a delivery for the connection the platform holds says of its
+    account, mapped by the listing's current definition and kept once for
+    every community, whether or not any community has the plug-in."""
+    route = definition["webhooks"]["route"]
+    held = registration.platform_connections.get(str(route.get("connection")))
+    value = (held or {}).get(str(route.get("field")))
+    if value is None or _route_value(route, headers, body) != str(value):
+        return
+    try:
+        payload: Any = json.loads(body)
+    except ValueError:
+        payload = None
+    try:
+        delivered = await declarative.map_delivery(
+            definition,
+            headers=headers,
+            payload=payload,
+            connection=without_tokens(held),
+            installed={"settings": {}, "aliases": {}},
+        )
+    except ExpressionError as exc:
+        logger.warning(
+            "plug-in hooks: %s could not map a delivery for the platform's "
+            "connection (%s)",
+            registration.public_id,
+            type(exc).__name__,
+        )
+        return
+    if delivered.status is not None and delivered.status[0] == route.get("connection"):
+        await platform_connections.set_state(
+            registration.public_id,
+            *delivered.status,
+            about={str(route.get("field")): value},
+        )
 
 
 def _route_spec(route: Any) -> tuple[str, str] | None:
@@ -627,13 +668,12 @@ async def _map(
                 install.guild_id,
                 exc.code,
             )
-    if delivered.status is not None and (
-        delivered.status[0] in registration.platform_connections
+    if (
+        delivered.status is not None
+        # The platform's connection's state is kept once, as the delivery
+        # arrives (:func:`_platform_status`).
+        and delivered.status[0] not in registration.platform_connections
     ):
-        # The platform's connection: what the vendor said of it is kept once,
-        # for every community.
-        await platform_connections.set_state(registration.public_id, *delivered.status)
-    elif delivered.status is not None:
         locked = await guild_plugins_service.lock_install(session, plugin.id)
         if (
             locked is not None
@@ -653,8 +693,9 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     registration = (await registration_lookup.load_registrations()).get(public_id)
     if registration is None or not registration.live or not registration.listing_uid:
         return 404
-    webhooks = await _webhooks(registration)
-    if webhooks is None:
+    definition = await _current(registration)
+    webhooks = definition.get("webhooks")
+    if not isinstance(webhooks, dict):
         return 404
     verify = webhooks["verify"]
     vendor = await load_vendor_values(public_id)
@@ -672,6 +713,9 @@ async def receive(public_id: str, headers: Mapping[str, str], body: bytes) -> in
     current = _route_spec(webhooks["route"])
     if current is not None:
         specs.add(current)
+    if registration.declarative and not by_connection:
+        # Checked under the vendor's secret above.
+        await _platform_status(registration, definition, headers, body)
     installs = [
         install
         for install in await _routed(
