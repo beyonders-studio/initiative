@@ -57,6 +57,7 @@ const asks = (overrides: Partial<CommunityPluginUpgradeAsks>): CommunityPluginUp
   added_options: [],
   added_actions: [],
   dropped_fields: [],
+  dropped_options: [],
   declined: false,
   ...overrides,
 });
@@ -142,17 +143,18 @@ describe("PluginUpdatesPanel", () => {
 
     screen.getByRole("button", { name: "Accept and update" }).click();
     expect(upgraded).toHaveBeenCalledWith(
-      { version: "1.2.0", add_scopes: ["files:write"], drop_fields: [] },
+      { version: "1.2.0", add_scopes: ["files:write"], drop_fields: [], drop_options: [] },
       expect.anything()
     );
   });
 
-  it("lists what a tool plug-in's version changes, and confirms the fields it drops", async () => {
+  it("lists what a tool plug-in's version changes, and confirms what it drops", async () => {
     const wanted = asks({
       version: "2.0.0",
       added_scopes: [],
       added_fields: ["counter.unit"],
       dropped_fields: ["counter.color"],
+      dropped_options: ["counter.view_mode.clock"],
     });
     renderPage(() => <PluginPendingUpdate pluginId={7} asks={wanted} />);
 
@@ -160,9 +162,19 @@ describe("PluginUpdatesPanel", () => {
     expect(
       screen.getByText("Remove the field “counter.color” and delete what it holds")
     ).toBeInTheDocument();
-    screen.getByRole("button", { name: "Accept, update and delete those fields" }).click();
+    expect(
+      screen.getByText(
+        "Stop offering the choice “counter.view_mode.clock”, emptying it wherever it was picked"
+      )
+    ).toBeInTheDocument();
+    screen.getByRole("button", { name: "Accept, update and delete what it drops" }).click();
     expect(upgraded).toHaveBeenCalledWith(
-      { version: "2.0.0", add_scopes: [], drop_fields: ["counter.color"] },
+      {
+        version: "2.0.0",
+        add_scopes: [],
+        drop_fields: ["counter.color"],
+        drop_options: ["counter.view_mode.clock"],
+      },
       expect.anything()
     );
   });

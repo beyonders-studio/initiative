@@ -404,13 +404,15 @@ class CommunityPluginUpgradeAsks(SanitizedBaseModel):
     added_surfaces: list[PluginSurfaceSummary] = []
     #: A tool plug-in's version: the tables (by key), fields
     #: (``<table>.<field>``), options (``<table>.<field>.<option>``) and
-    #: actions it adds to the tool, and the fields it drops, each of whose
-    #: column goes with what it holds once the seat confirms it.
+    #: actions it adds to the tool; the fields it drops, each of whose column
+    #: goes with what it holds; and the options it drops, each emptied from
+    #: the cells holding it. What it drops goes once the seat confirms it.
     added_tables: list[str] = []
     added_fields: list[str] = []
     added_options: list[str] = []
     added_actions: list[str] = []
     dropped_fields: list[str] = []
+    dropped_options: list[str] = []
     declined: bool = False
 
 
@@ -435,10 +437,12 @@ class CommunityPluginUpgrade(SanitizedBaseModel):
 
     version: str = Field(max_length=32)
     add_scopes: list[str] = Field(default_factory=list, max_length=64)
-    #: A tool plug-in's new major version: the fields it drops, each named as
-    #: the version's asks name it, which the seat confirms go with what they
-    #: hold. Every field it drops, or nothing is applied.
+    #: A tool plug-in's new major version: the fields and the options it
+    #: drops, each named as the version's asks name it, which the seat
+    #: confirms go with what they hold. Every one it drops, or nothing is
+    #: applied.
     drop_fields: list[str] = Field(default_factory=list, max_length=160)
+    drop_options: list[str] = Field(default_factory=list, max_length=1024)
 
 
 class CommunityPluginDecline(SanitizedBaseModel):
@@ -887,6 +891,7 @@ def upgrade_asks_read(version: str, asks: Any, *, declined: bool = False):
         added_options=list(tool.added_options) if tool else [],
         added_actions=list(tool.added_actions) if tool else [],
         dropped_fields=list(tool.dropped_fields) if tool else [],
+        dropped_options=list(tool.dropped_options) if tool else [],
         added_scopes=list(asks.added_scopes),
         added_surfaces=[
             PluginSurfaceSummary(

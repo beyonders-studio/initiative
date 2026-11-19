@@ -727,13 +727,13 @@ async def _require_tool_compatible(
                 f"{public_id} {newer[0]}: a version never removes an item table"
                 f" or moves it under another ({', '.join(changes.removed_tables)})"
             )
-        if changes.dropped_fields and (
+        if changes.drops and (
             _version_tuple(older[0])[:1] == _version_tuple(newer[0])[:1]
         ):
             raise CatalogError(
                 f"{public_id} {newer[0]}: within a major version a field is never"
                 " removed, given another kind or offered fewer options"
-                f" ({', '.join(changes.dropped_fields)})"
+                f" ({', '.join((*changes.dropped_fields, *changes.dropped_options))})"
             )
 
 

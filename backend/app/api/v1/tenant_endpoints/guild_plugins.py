@@ -76,7 +76,7 @@ from app.core.rate_limit import limiter
 from app.core.rules import SURFACE_PLUGINS
 from app.db import post_commit
 from app.db.guild_standing import GuildContext
-from app.db.plugin_tools import drop_fields_ddl
+from app.db.plugin_tools import drop_ddl
 from app.db.query import build_paginated_response, paginated_query
 from app.db.schema_provisioning import provision_community_tools
 from app.db.session import routed_guild_id
@@ -376,8 +376,8 @@ async def _provision_tool(
     committed, then switch its tool on in every initiative and lay out each
     of its tables: rows its community's rules admit once they are rendered
     with it. Until then a new install's tool is off everywhere. ``drop`` is
-    the columns a new major version stops declaring, which the seat
-    confirmed. Where any of it fails, the install is taken back, and the
+    what a new major version stops declaring, which the seat confirmed
+    (:func:`~app.db.plugin_tools.drop_ddl`). Where any of it fails, the install is taken back, and the
     community rendered again, so no install stands without the tables its
     version declares. A new version is put back on ``previous`` (its version
     and definition) only where its tables were not brought up to it: once
@@ -773,10 +773,11 @@ async def upgrade_community_plugin(
     for; so is a consent naming a version the catalog no longer offers.
 
     A tool plug-in's version asks for what it adds to the tool (tables,
-    fields, options, actions) the same way. One that drops fields, which only
-    a new major may, is applied only with ``drop_fields`` naming each: their
-    columns go, with what they hold, when the tool's tables are brought up to
-    the version.
+    fields, options, actions) the same way. One that drops fields or options,
+    which only a new major may, is applied only with ``drop_fields`` and
+    ``drop_options`` naming each: a dropped field's column goes with what it
+    holds, and a dropped option is emptied from the cells holding it, when
+    the tool's tables are brought up to the version.
     """
     # Upgrading prunes both configuration maps to the new definition, so it
     # takes the row: a plug-in writing a flow's result back at the same moment
@@ -812,8 +813,14 @@ async def upgrade_community_plugin(
         or (payload is None and asks.asks_more)
         or (
             asks.tool is not None
-            and set(asks.tool.dropped_fields)
-            != set(payload.drop_fields if payload is not None else ())
+            and (
+                set(asks.tool.dropped_fields),
+                set(asks.tool.dropped_options),
+            )
+            != (
+                set(payload.drop_fields if payload is not None else ()),
+                set(payload.drop_options if payload is not None else ()),
+            )
         )
     ):
         raise HTTPException(
@@ -876,7 +883,7 @@ async def upgrade_community_plugin(
             session,
             plugin,
             previous=(previous_version, previous_definition),
-            drop=drop_fields_ddl(plugin.listing_uid, asks.tool.dropped_fields),
+            drop=drop_ddl(plugin.listing_uid, previous_definition, asks.tool),
         )
     await session.refresh(plugin)
     await guild_plugins_service.assign_settings(

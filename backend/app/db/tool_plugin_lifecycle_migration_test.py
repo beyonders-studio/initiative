@@ -1,9 +1,6 @@
-"""Migrations 20261118_0617 and 20261118_0618, down and up again.
-
-0617 gives ``plugin_installs`` the stamp of a community's uninstall and the
-guild floors their reads of a tool plug-in's state; 0618 widens a layout's
-target for a tool plug-in's kinds. Run in one transaction rolled back at the
-end, on a community the test builds.
+"""Migration 20261118_0617, down and up again: ``plugin_installs`` takes the
+stamp of a community's uninstall and the guild floors their reads of a tool
+plug-in's state. Run in one transaction rolled back at the end.
 """
 
 from __future__ import annotations
@@ -15,9 +12,6 @@ from types import ModuleType
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
-
-from app.db.schema_provisioning import guild_schema_name
-from app.testing import create_guild
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 
@@ -38,18 +32,10 @@ def _step(migration: ModuleType, forward: bool):
     return apply
 
 
-async def _state(session, schema: str) -> tuple:
-    """The layout target's width, whether the install index has the stamp,
-    and whether the guild floor reads an install's status."""
+async def _state(session) -> tuple:
+    """Whether the install index has the stamp, and whether the guild floor
+    reads an install's status."""
     return (
-        await session.scalar(
-            text(
-                "SELECT character_maximum_length FROM information_schema.columns"
-                " WHERE table_schema = :s AND table_name = 'tool_layouts'"
-                " AND column_name = 'tool'"
-            ),
-            {"s": schema},
-        ),
         await session.scalar(
             text(
                 "SELECT count(*) FROM information_schema.columns"
@@ -67,17 +53,12 @@ async def _state(session, schema: str) -> tuple:
 
 
 async def test_down_and_up_again(session) -> None:
-    guild = await create_guild(session)
-    schema = guild_schema_name(guild.id)
     uninstalls = _load("20261118_0617_a_community_uninstalls_a_tool_plugin")
-    layouts = _load("20261118_0618_a_layout_names_a_tool_plugins_kind")
-    assert await _state(session, schema) == (64, 1, True)
+    assert await _state(session) == (1, True)
 
-    await session.run_sync(_step(layouts, forward=False))
     await session.run_sync(_step(uninstalls, forward=False))
-    assert await _state(session, schema) == (32, 0, False)
+    assert await _state(session) == (0, False)
 
     await session.run_sync(_step(uninstalls, forward=True))
-    await session.run_sync(_step(layouts, forward=True))
-    assert await _state(session, schema) == (64, 1, True)
+    assert await _state(session) == (1, True)
     await session.rollback()

@@ -4226,6 +4226,7 @@ export interface CommunityPluginUpgradeAsks {
   added_options: string[];
   added_actions: string[];
   dropped_fields: string[];
+  dropped_options: string[];
   declined: boolean;
 }
 
@@ -4557,6 +4558,8 @@ export interface CommunityPluginUpgrade {
   add_scopes?: string[];
   /** @maxItems 160 */
   drop_fields?: string[];
+  /** @maxItems 1024 */
+  drop_options?: string[];
 }
 
 /**

@@ -141,7 +141,7 @@ class ToolLayout(CreatedByMixin, table=True):
             index=True,
         )
     )
-    tool: str = Field(sa_column=Column(String(64), nullable=False))
+    tool: str = Field(sa_column=Column(String(32), nullable=False))
     tool_id: int | None = Field(default=None, sa_column=Column(Integer))
     kind: str = Field(sa_column=Column(String(32), nullable=False))
     #: The type of task a project's task page is for; None for every other

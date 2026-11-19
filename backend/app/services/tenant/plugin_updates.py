@@ -22,8 +22,8 @@ consents to, or declines it, which stops the asking until a newer version is
 published. A version asking for nothing new applies as before.
 
 **A tool plug-in's version asks for what it adds to its tool**: a table, a
-field, a select's option or an action waits as a scope does, and a field a
-new major drops waits for the seat to confirm it. Taking one brings the
+field, a select's option or an action waits as a scope does, and a field or
+an option a new major drops waits for the seat to confirm it. Taking one brings the
 community's tables up to it once it is pinned (``provision_community_tools``),
 which a version asking nothing gets from the sweep too.
 
@@ -130,7 +130,7 @@ class UpgradeAsks:
     added_surfaces: tuple[dict[str, Any], ...] = field(default=())
     #: For a tool plug-in, what the version changes in its tool. One that
     #: adds a table, a field, an option or an action asks the seat, and one
-    #: that drops a field (a new major) asks it to confirm each.
+    #: that drops a field or an option (a new major) asks it to confirm each.
     tool: ToolChanges | None = None
 
     @property
@@ -138,7 +138,7 @@ class UpgradeAsks:
         return bool(
             self.added_scopes
             or self.added_surfaces
-            or (self.tool and (self.tool.adds or self.tool.dropped_fields))
+            or (self.tool and (self.tool.adds or self.tool.drops))
         )
 
 

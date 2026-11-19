@@ -598,15 +598,32 @@ async def test_the_sweep_takes_a_version_asking_nothing_and_holds_the_rest(
     assert "notes" not in (await _columns(session, guild_schema_name(guild_id)))[_GROUP]
 
 
-async def test_a_major_drops_a_field_once_the_seat_confirms_it(
+async def test_a_major_drops_what_the_seat_confirms_and_keeps_the_rest(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
+    """A new major dropping a field and a select's option is applied once the
+    seat names both: the field's column goes, the cells holding the option are
+    emptied, and every other value stays."""
     seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
     install = await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    await session.exec(
+        sa.text(
+            f"WITH g AS (INSERT INTO {_GROUP} (initiative_id, name)"
+            " VALUES (:i, 'Looks') RETURNING id)"
+            f" INSERT INTO {_COUNTER} (counter_group_id, name, view_mode, color)"
+            " SELECT g.id, v.name, v.mode, '#112233' FROM g, (VALUES"
+            " ('Clock', 'segmented_clock'), ('Bar', 'progress_bar')) AS v(name, mode)"
+        ),
+        params={"i": seat.initiative.id},
+    )
+    await session.commit()
 
     def shed(tool: dict[str, Any]) -> None:
         counter = tool["items"][0]
         counter["fields"] = [f for f in counter["fields"] if f["key"] != "color"]
+        view_mode = next(f for f in counter["fields"] if f["key"] == "view_mode")
+        view_mode["options"].pop()
         detail = counter["layouts"]["detail"]["side"][0]
         detail["children"] = [
             part for part in detail["children"] if part["props"]["field"] != "color"
@@ -614,22 +631,43 @@ async def test_a_major_drops_a_field_once_the_seat_confirms_it(
 
     await _publish(session, "2.0.0", shed)
     path = seat.g(f"/plugins/{install['id']}")
-    unconfirmed = await client.post(
-        f"{path}/upgrade", headers=seat.headers, json={"version": "2.0.0"}
-    )
-    assert unconfirmed.status_code == 409, unconfirmed.text
-    assert unconfirmed.json()["detail"]["dropped_fields"] == ["counter.color"]
+    for partial in (
+        {"version": "2.0.0"},
+        {"version": "2.0.0", "drop_fields": ["counter.color"]},
+    ):
+        unconfirmed = await client.post(
+            f"{path}/upgrade", headers=seat.headers, json=partial
+        )
+        assert unconfirmed.status_code == 409, unconfirmed.text
+    asks = unconfirmed.json()["detail"]
+    assert asks["dropped_fields"] == ["counter.color"]
+    assert asks["dropped_options"] == ["counter.view_mode.segmented_clock"]
     columns = await _columns(session, guild_schema_name(seat.guild.id))
     assert "color" in columns[_COUNTER]
 
     taken = await client.post(
         f"{path}/upgrade",
         headers=seat.headers,
-        json={"version": "2.0.0", "drop_fields": ["counter.color"]},
+        json={
+            "version": "2.0.0",
+            "drop_fields": ["counter.color"],
+            "drop_options": ["counter.view_mode.segmented_clock"],
+        },
     )
     assert taken.status_code == 200, taken.text
     columns = await _columns(session, guild_schema_name(seat.guild.id))
     assert "color" not in columns[_COUNTER]
+    await route_session_to_guild(session, seat.guild.id)
+    looks = dict(
+        (await session.exec(sa.text(f"SELECT name, view_mode FROM {_COUNTER}"))).all()
+    )
+    assert looks == {"Clock": None, "Bar": "progress_bar"}
+    refused = await session.exec(
+        sa.text(
+            f"SELECT relforcerowsecurity FROM pg_class WHERE oid = '{_COUNTER}'::regclass"
+        )
+    )
+    assert refused.scalar_one() is True
 
 
 async def test_boot_provisions_an_install_whose_provisioning_never_ran(

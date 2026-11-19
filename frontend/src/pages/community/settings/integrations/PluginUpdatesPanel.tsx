@@ -120,6 +120,7 @@ export function PluginPendingUpdate({
   const upgrade = useUpgradePlugin(pluginId);
   const decline = useDeclinePluginUpgrade(pluginId);
   const busy = upgrade.isPending || decline.isPending;
+  const drops = asks.dropped_fields.length + asks.dropped_options.length > 0;
 
   /** A refusal because the offer moved says so; the panel then refreshes. */
   const failed = (error: unknown) => {
@@ -134,6 +135,7 @@ export function PluginPendingUpdate({
         add_scopes: asks.added_scopes,
         // Listed below: accepting is confirming they go.
         drop_fields: asks.dropped_fields,
+        drop_options: asks.dropped_options,
       },
       {
         onSuccess: (updated) =>
@@ -169,6 +171,7 @@ export function PluginPendingUpdate({
             ["newOption", asks.added_options],
             ["newAction", asks.added_actions],
             ["dropsField", asks.dropped_fields],
+            ["dropsOption", asks.dropped_options],
           ] as const
         ).flatMap(([sentence, keys]) =>
           keys.map((key) => (
@@ -184,14 +187,12 @@ export function PluginPendingUpdate({
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          variant={asks.dropped_fields.length ? "destructive" : "default"}
+          variant={drops ? "destructive" : "default"}
           disabled={busy}
           pending={upgrade.isPending}
           onClick={accept}
         >
-          {asks.dropped_fields.length
-            ? t("plugins:updates.acceptDropping")
-            : t("plugins:updates.accept")}
+          {drops ? t("plugins:updates.acceptDropping") : t("plugins:updates.accept")}
         </Button>
         {!asks.declined && (
           <Button

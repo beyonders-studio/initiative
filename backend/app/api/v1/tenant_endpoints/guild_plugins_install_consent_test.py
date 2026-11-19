@@ -480,6 +480,7 @@ class TestUpgradeConsent:
             "added_options": [],
             "added_actions": [],
             "dropped_fields": [],
+            "dropped_options": [],
             "declined": False,
         }
         assert read["update_refused"] is None
@@ -525,6 +526,7 @@ class TestUpgradeConsent:
             "added_options": [],
             "added_actions": [],
             "dropped_fields": [],
+            "dropped_options": [],
             "declined": False,
         }
         (plugin,) = await _installs(session, a.guild.id)

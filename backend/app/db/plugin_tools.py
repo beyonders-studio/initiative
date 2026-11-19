@@ -22,8 +22,8 @@ as it reads a built-in tool, and into the DDL that creates its tables.
 
 * **Versions** only add to the tables: the structure brings a table up to
   its declaration (new columns, a select's new options, a field's default)
-  and takes nothing away. A field a new major drops goes by
-  :func:`drop_fields_ddl`, once the community's admin confirms it.
+  and takes nothing away. A field or an option a new major drops goes by
+  :func:`drop_ddl`, once the community's admin confirms it.
 * **Removal**: an uninstalled tool keeps its tables and every row naming it
   until its install's deletion window ends; then
   :func:`delete_tool_content` deletes what names it, and the community's
@@ -77,7 +77,7 @@ __all__ = [
     "build_tool",
     "community_tool_set",
     "delete_tool_content",
-    "drop_fields_ddl",
+    "drop_ddl",
     "drop_unclaimed_tables",
     "installed_digest",
     "installed_tools",
@@ -577,14 +577,55 @@ async def drop_unclaimed_tables(conn: Any, schema: str, tools: ToolSet) -> list[
     return unclaimed
 
 
-def drop_fields_ddl(listing_uid: str, fields: Sequence[str]) -> str:
-    """The DDL that drops ``fields`` (``<table key>.<field key>``, as
-    :func:`~app.services.marketplace.tool_plugins.tool_changes` names them)
-    from a tool plug-in's tables: what a new major version stops declaring,
-    once the community's admin confirms it. Schema-relative."""
+def drop_ddl(listing_uid: str, before: Mapping[str, Any], changes: Any) -> str:
+    """The DDL that takes from a tool plug-in's tables what a new major
+    version stops declaring, once the community's admin confirms it:
+    ``changes`` (``tool_plugins.ToolChanges``) against the definition
+    ``before``. A dropped field's column goes, with whatever reads it; a
+    dropped option is emptied from the cells holding it (a select's set to
+    NULL, a multi-select's without it) and the rest keep their values. A cell
+    the platform holds is never emptied: the version is refused instead.
+    Schema-relative; the parts rendered after it put back what reads the
+    tables and their row security."""
     quote = _DIALECT.identifier_preparer.quote
-    statements = []
-    for name in fields:
+    tool = before["tool"]
+    kinds = {
+        (table["key"], field["key"]): field["kind"]
+        for table in (tool, *tool.get("items", []))
+        for field in table.get("fields", [])
+    }
+    emptied: dict[tuple[str, str], list[str]] = {}
+    for name in changes.dropped_options:
+        table_key, field_key, value = name.split(".", 2)
+        emptied.setdefault((table_key, field_key), []).append(value)
+    statements: list[str] = []
+    for (table_key, field_key), values in emptied.items():
+        table = quote(tool_table_name(listing_uid, table_key))
+        column = quote(_field_key(field_key))
+        listed = ", ".join(
+            str(sa.literal(value).compile(compile_kwargs={"literal_binds": True}))
+            for value in values
+        )
+        if kinds[(table_key, field_key)] == "select":
+            holding, kept = f"{column} IN ({listed})", "NULL"
+        else:
+            holding = f"{column} && ARRAY[{listed}]::text[]"
+            kept = (
+                f"ARRAY(SELECT v FROM unnest({column}) AS v WHERE v NOT IN ({listed}))"
+            )
+        statements += [
+            (
+                f"DO $$ BEGIN IF EXISTS (SELECT 1 FROM {table}"
+                f" WHERE held_at IS NOT NULL AND {holding}) THEN"
+                " RAISE EXCEPTION 'a held row holds a dropped option'; END IF; END $$"
+            ),
+            f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
+            f"ALTER TABLE {table} DISABLE TRIGGER USER",
+            f"UPDATE {table} SET {column} = {kept} WHERE {holding}",
+            f"ALTER TABLE {table} ENABLE TRIGGER USER",
+            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
+        ]
+    for name in changes.dropped_fields:
         table_key, _, field_key = name.partition(".")
         table = quote(tool_table_name(listing_uid, table_key))
         # What reads the column goes with it, and the parts rendered after

@@ -1606,10 +1606,11 @@ export const useUninstallCommunityPlugin = <
  * for; so is a consent naming a version the catalog no longer offers.
  *
  * A tool plug-in's version asks for what it adds to the tool (tables,
- * fields, options, actions) the same way. One that drops fields, which only
- * a new major may, is applied only with ``drop_fields`` naming each: their
- * columns go, with what they hold, when the tool's tables are brought up to
- * the version.
+ * fields, options, actions) the same way. One that drops fields or options,
+ * which only a new major may, is applied only with ``drop_fields`` and
+ * ``drop_options`` naming each: a dropped field's column goes with what it
+ * holds, and a dropped option is emptied from the cells holding it, when
+ * the tool's tables are brought up to the version.
  * @summary Upgrade Community Plugin
  */
 export const upgradeCommunityPlugin = (

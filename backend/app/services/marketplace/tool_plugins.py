@@ -160,19 +160,27 @@ def tool_kinds(definition: dict[str, Any], *, listing_uid: str) -> list[str]:
 @dataclass(frozen=True)
 class ToolChanges:
     """What one version of a tool plug-in changes in its tool against another,
-    each named ``<table key>`` or ``<table key>.<field key>``.
+    each named ``<table key>``, ``<table key>.<field key>`` or, for an option,
+    ``<table key>.<field key>.<option>``.
 
-    A field a version stops declaring, or declares as another kind, or whose
-    options it narrows, is ``dropped``: its column goes, and a field declared
-    again under the same key comes back empty. An item table it stops
-    declaring, or puts under another table, is ``removed``."""
+    A field a version stops declaring, or declares as another kind, is
+    ``dropped``: its column goes, and a field declared again under the same
+    key comes back empty. An option it stops offering is ``dropped_options``:
+    the cells holding it are emptied, and the rest keep their values. An item
+    table it stops declaring, or puts under another table, is ``removed``."""
 
     added_tables: tuple[str, ...] = ()
     added_fields: tuple[str, ...] = ()
     added_options: tuple[str, ...] = ()
     added_actions: tuple[str, ...] = ()
     dropped_fields: tuple[str, ...] = ()
+    dropped_options: tuple[str, ...] = ()
     removed_tables: tuple[str, ...] = ()
+
+    @property
+    def drops(self) -> bool:
+        """Whether the version takes away anything a row holds."""
+        return bool(self.dropped_fields or self.dropped_options)
 
     @property
     def adds(self) -> bool:
@@ -212,6 +220,7 @@ def tool_changes(before: dict[str, Any], after: dict[str, Any]) -> ToolChanges:
     ]
     added_fields: list[str] = []
     added_options: list[str] = []
+    dropped_options: list[str] = []
     dropped: list[str] = []
     for key, (_, fields) in new.items():
         if key not in old or key in removed:
@@ -221,12 +230,16 @@ def tool_changes(before: dict[str, Any], after: dict[str, Any]) -> ToolChanges:
             was = held.get(field_key)
             if was is None:
                 added_fields.append(f"{key}.{field_key}")
-            elif was["kind"] != field["kind"] or _options(was) - _options(field):
+            elif was["kind"] != field["kind"]:
                 dropped.append(f"{key}.{field_key}")
             else:
                 added_options += [
                     f"{key}.{field_key}.{value}"
                     for value in sorted(_options(field) - _options(was))
+                ]
+                dropped_options += [
+                    f"{key}.{field_key}.{value}"
+                    for value in sorted(_options(was) - _options(field))
                 ]
         dropped += [
             f"{key}.{field_key}" for field_key in held if field_key not in fields
@@ -242,6 +255,7 @@ def tool_changes(before: dict[str, Any], after: dict[str, Any]) -> ToolChanges:
             if action["id"] not in actions
         ),
         dropped_fields=tuple(sorted(dropped)),
+        dropped_options=tuple(dropped_options),
         removed_tables=tuple(removed),
     )
 
