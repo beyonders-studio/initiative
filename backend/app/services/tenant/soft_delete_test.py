@@ -5,6 +5,8 @@ the needs-reassignment branch, and the upload-preservation invariants for
 uploaded and native files.
 """
 
+from typing import Any
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import undefer
