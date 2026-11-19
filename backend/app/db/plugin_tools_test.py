@@ -14,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import GuildPluginMessages
 from app.core.tool_set import BUILTIN_TOOLS
+from app.db.event_capture import render_guild_capture_ddl
 from app.db.guild_ddl import render_guild_rls_ddl
 from app.db.kind_codes import assign_plugin_kind_codes
 from app.db.plugin_tools import (
@@ -31,6 +32,8 @@ from app.db.schema_provisioning import (
     guild_schema_name,
     stamp_tools,
 )
+from app.db.search_index import render_guild_search_ddl
+from app.db.timers import render_guild_timer_ddl
 from app.models.platform.guild import CommunityRole
 from app.models.platform.plugin_install import PluginInstall, PluginInstallStatus
 from app.models.tenant._mixins import ActorKind
@@ -155,6 +158,29 @@ def test_the_render_with_a_tool_rules_its_tables_and_without_one_names_none():
     assert "p_tsjvtcm0s7gv2x" not in render_guild_rls_ddl(BUILTIN_TOOLS)
 
 
+def test_a_tool_plugins_tables_are_captured_indexed_and_timed():
+    """Its tables take the change capture, search and timer triggers a
+    built-in tool's do, and a render without it names none of them."""
+    tools = _set(_counters())
+    for table in ("p_tsjvtcm0s7gv2x_counter_group", "p_tsjvtcm0s7gv2x_counter"):
+        assert f"CREATE TRIGGER capture_{table}\n" in render_guild_capture_ddl(tools)
+        assert f"  AFTER INSERT OR DELETE ON {table}\n" in render_guild_search_ddl(
+            None, tools
+        )
+        assert f"CREATE TRIGGER tr_{table}_timer_trash\n" in render_guild_timer_ddl(
+            tools
+        )
+    for render in (
+        render_guild_capture_ddl(BUILTIN_TOOLS),
+        render_guild_search_ddl(None, BUILTIN_TOOLS),
+        render_guild_timer_ddl(BUILTIN_TOOLS),
+    ):
+        assert "p_tsjvtcm0s7gv2x" not in render
+    # The change capture reads a tool plug-in's kind off its table's name, so
+    # no built-in table may be named like one.
+    assert not [name for name in BUILTIN_TOOLS.tables if name.startswith("p_")]
+
+
 async def test_a_community_with_no_tool_plugin_keeps_the_bundle():
     bundle = await get_provisioning_bundle()
     assert bundle.for_tools(BUILTIN_TOOLS) is bundle
@@ -229,6 +255,74 @@ async def test_install_creates_exactly_the_declared_tables(
             sa.text("SELECT has_table_privilege(:r, :t, 'SELECT, INSERT')"),
             {"r": plugin_role, "t": f'"{schema}".{table}'},
         )
+
+
+async def test_a_tool_plugins_rows_are_heard_found_and_purged_on_time(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """An item's change is told under the sharing of its tool, as a task's is
+    under its project's; it is indexed under its own kind; and its trash arms
+    the community's purge."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    await install_tool_plugin(client, session, seat)
+    await route_session_to_guild(session, seat.guild.id)
+    group = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter_group (initiative_id, name)"
+                " VALUES (:i, 'Scores') RETURNING id"
+            ),
+            params={"i": seat.initiative.id},
+        )
+    ).scalar_one()
+    counter = (
+        await session.exec(
+            sa.text(
+                "INSERT INTO p_tsjvtcm0s7gv2x_counter (counter_group_id, name)"
+                " VALUES (:g, 'Laps') RETURNING id"
+            ),
+            params={"g": group},
+        )
+    ).scalar_one()
+    events = (
+        await session.exec(
+            sa.text(
+                "SELECT resource_type, resource_id, initiative_id, dac_tool, dac_id"
+                " FROM event_outbox WHERE resource_type LIKE 'p\\_%' ORDER BY id"
+            )
+        )
+    ).all()
+    kind = f"counter_group.{COUNTERS_UID.lower()}"
+    initiative = seat.initiative.id
+    assert [tuple(e) for e in events] == [
+        ("p_tsjvtcm0s7gv2x_counter_group", group, initiative, kind, group),
+        ("p_tsjvtcm0s7gv2x_counter", counter, initiative, kind, group),
+    ]
+    entries = (
+        await session.exec(
+            sa.text(
+                "SELECT entity_type, entity_id, dac_tool, dac_id, title"
+                " FROM search_entries WHERE entity_type LIKE '%.%' ORDER BY entity_id"
+            )
+        )
+    ).all()
+    assert sorted(tuple(e) for e in entries) == sorted(
+        [
+            (kind, group, kind, group, "Scores"),
+            (f"counter.{COUNTERS_UID.lower()}", counter, kind, group, "Laps"),
+        ]
+    )
+    armed = await session.exec(
+        sa.text(
+            "SELECT tgname FROM pg_trigger WHERE tgrelid IN"
+            " (to_regclass('p_tsjvtcm0s7gv2x_counter_group'),"
+            " to_regclass('p_tsjvtcm0s7gv2x_counter')) AND tgname LIKE '%timer%'"
+        )
+    )
+    assert sorted(armed.scalars()) == [
+        "tr_p_tsjvtcm0s7gv2x_counter_group_timer_trash",
+        "tr_p_tsjvtcm0s7gv2x_counter_timer_trash",
+    ]
 
 
 async def test_the_tool_is_on_in_every_initiative_then_and_later(
