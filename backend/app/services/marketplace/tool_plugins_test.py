@@ -4,6 +4,7 @@ Every key becomes a table or column name once a community installs the tool,
 so a refusal here is the deployment's own check, not the publisher's."""
 
 from collections.abc import Callable
+from decimal import Decimal
 
 import pytest
 
@@ -65,6 +66,28 @@ def test_a_row_is_held_to_its_required_fields_and_checks():
         ("min", "at_most"),
     ]
     assert tool_row_problems(counter, {**row, "step": 0}) == [("step", "above")]
+
+
+def test_a_fraction_is_checked_as_the_database_checks_it():
+    """A stored number is a Decimal and a declared operand a float: they are
+    compared as decimals, so 0.1 equals 0.1 and 0.3 is at most 0.3."""
+    table = {
+        "fields": [{"key": "rate", "kind": "number"}, {"key": "cap", "kind": "number"}],
+        "checks": [
+            {"field": "rate", "equals": 0.1},
+            {"field": "cap", "at_most": 0.3},
+            {"field": "rate", "below": {"field": "cap"}},
+        ],
+    }
+    assert (
+        tool_row_problems(table, {"rate": Decimal("0.1"), "cap": Decimal("0.3")}) == []
+    )
+    assert tool_row_problems(
+        table, {"rate": Decimal("0.2"), "cap": Decimal("0.31")}
+    ) == [
+        ("rate", "equals"),
+        ("cap", "at_most"),
+    ]
 
 
 def test_a_republish_stores_the_same_document():

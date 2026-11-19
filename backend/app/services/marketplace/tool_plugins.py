@@ -47,6 +47,7 @@ import operator
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -661,7 +662,7 @@ def tool_row_problems(
         if (
             left is not None
             and right is not None
-            and not COMPARISONS[term](left, right)
+            and not COMPARISONS[term](Decimal(str(left)), Decimal(str(right)))
         ):
             problems.append((check["field"], term))
     return problems
