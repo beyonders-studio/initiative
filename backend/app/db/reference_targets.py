@@ -161,13 +161,13 @@ def visible_ids(
             )
         )
 
-    resource = SQLModel.metadata.tables[source.dac_tool.plural]
+    resource = source.dac_tool.table
     if resource is table:
         # The row IS the shared resource — a project, a file. Nothing to
         # join to; it answers for itself.
         return statement.where(
             func.resource_access(
-                source.dac_tool.value,
+                source.dac_tool.kind,
                 table.c["id"],
                 user_id,
                 table.c["initiative_id"],
@@ -181,7 +181,7 @@ def visible_ids(
     local = table.c[source.dac_id] if source.dac_id else table.c["id"]
     return statement.select_from(table.join(resource, resource.c["id"] == local)).where(
         func.resource_access(
-            source.dac_tool.value,
+            source.dac_tool.kind,
             resource.c["id"],
             user_id,
             resource.c["initiative_id"],
@@ -300,7 +300,7 @@ def _governing_tool(table_name: str, table: Table):
     if source.dac_tool is None or source.dac_sql is not None:
         return None, null()
     local = table.c[source.dac_id] if source.dac_id else table.c["id"]
-    return source.dac_tool, local
+    return Tool(source.dac_tool.kind), local
 
 
 def _container_title(table_name: str, table: Table, tool: Tool | None):

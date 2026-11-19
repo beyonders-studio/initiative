@@ -1,4 +1,5 @@
 import builtins
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -26,7 +27,7 @@ from sqlmodel import Enum as SQLEnum
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.tools import INSTALL_METADATA_KIND, PROPERTY_TARGETS
-from app.db.registry_checks import FROM_REGISTRY
+from app.db.registry_checks import FROM_REGISTRY, listed
 from app.models.tenant._mixins import CreatedByMixin
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -250,9 +251,10 @@ class MetadataDefinition(CreatedByMixin, table=True):
         )
 
 
-_TARGET_VALUES = ", ".join(
-    f"'{target}'" for target in (*PROPERTY_TARGETS, INSTALL_METADATA_KIND)
-)
+def _target_check(kinds: Iterable[str]) -> str:
+    """A value is on a tool, a kind inside one, or an install."""
+    return f"entity_type IN ({listed((*kinds, INSTALL_METADATA_KIND))})"
+
 
 #: The longest ``ref`` a plug-in list's element is named by.
 REF_LENGTH = 255
@@ -311,9 +313,9 @@ class MetadataValue(SQLModel, table=True):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     __table_args__ = (
         CheckConstraint(
-            f"entity_type IN ({_TARGET_VALUES})",
+            _target_check(PROPERTY_TARGETS),
             name="ck_metadata_values_entity_type",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: lambda tools: _target_check(tools.content_kinds)},
         ),
         *(
             Index(

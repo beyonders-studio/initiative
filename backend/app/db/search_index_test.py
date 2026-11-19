@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, select
 
 from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import Tool
 from app.db.request_context import SystemGuild
 from app.db.search_index import (
@@ -90,7 +91,7 @@ def test_entity_types_are_unique():
 def test_update_trigger_carries_a_when_clause():
     """The clause is the write-path design: an update touching none of the
     indexed columns never enters the function."""
-    ddl = render_guild_search_ddl()
+    ddl = render_guild_search_ddl(None, BUILTIN_TOOLS)
     block = next(b for b in ddl.split("\n\n") if "search_task_upd" in b)
     assert "FOR EACH ROW WHEN (" in block
     assert "OLD.title IS DISTINCT FROM NEW.title" in block
@@ -381,9 +382,9 @@ def test_every_tool_is_searchable_without_being_listed():
     The six entries are derived from ``Tool``, so this fails the moment a
     seventh is added and its table is not reachable under the same rule.
     """
-    for tool in Tool:
-        source = SEARCH_SOURCES[tool.plural]
-        assert source.entity_type.value == tool.value
+    for tool in BUILTIN_TOOLS:
+        source = SEARCH_SOURCES[tool.table.name]
+        assert source.entity_type.value == tool.kind
         assert source.dac_tool is tool
 
 

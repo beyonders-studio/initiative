@@ -11,6 +11,7 @@ governed by its project, a calendar event by its calendar — so the query filte
 on the sharing decision without re-walking those joins.
 """
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import (
@@ -28,9 +29,16 @@ from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlmodel import Field, SQLModel
 
 from app.core.search import SearchEntityType
-from app.db.registry_checks import FROM_REGISTRY
+from app.core.tools import CONTENT_KINDS
+from app.db.registry_checks import FROM_REGISTRY, listed
 
-_ENTITY_TYPE_VALUES = ", ".join(f"'{kind.value}'" for kind in SearchEntityType)
+#: What is indexed beside the tools and the kinds inside them: the guild's
+#: vocabulary, and comments.
+_NOT_CONTENT = {kind.value for kind in SearchEntityType} - set(CONTENT_KINDS)
+
+
+def _kind_check(kinds: Iterable[str]) -> str:
+    return f"entity_type IN ({listed(sorted({*kinds, *_NOT_CONTENT}))})"
 
 
 class SearchEntry(SQLModel, table=True):
@@ -44,9 +52,9 @@ class SearchEntry(SQLModel, table=True):
     __tablename__ = "search_entries"
     __table_args__ = (
         CheckConstraint(
-            f"entity_type IN ({_ENTITY_TYPE_VALUES})",
+            _kind_check(CONTENT_KINDS),
             name="ck_search_entries_entity_type",
-            info={FROM_REGISTRY: True},
+            info={FROM_REGISTRY: lambda tools: _kind_check(tools.content_kinds)},
         ),
     )
 

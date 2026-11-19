@@ -20,6 +20,7 @@ import enum
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import partial
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, Enum, MetaData
@@ -28,8 +29,9 @@ from sqlmodel import SQLModel
 from app.core.file_types import FileType
 from app.core.identity_boundary import STORED_MENTION
 from app.core.search import SearchEntityType
+from app.core.tool_set import BUILTIN_TOOLS, ToolRecord, ToolSet
 from app.core.tools import KINDS, Tool
-from app.db.initiative_rls import COMMENT_PARENTS, initiative_locator
+from app.db.initiative_rls import comment_parents, initiative_locator
 
 #: How a row reaches the trigger's dynamic lookups: as ``$1`` in an EXECUTE.
 ROW = "($1)"
@@ -161,7 +163,7 @@ class SearchSource:
     #: The tool whose sharing governs this row, and the column naming the
     #: resource id to test. ``dac_id=None`` means the row's own ``id``.
     #: ``dac_tool=None`` means the row carries no sharing gate (a tag).
-    dac_tool: Tool | None = None
+    dac_tool: ToolRecord | None = None
     dac_id: str | None = None
     #: Builds ``(tool, id)`` from a row alias, for a source whose governing tool
     #: differs per row. Takes precedence over the pair above.
@@ -307,18 +309,18 @@ def _comment_preview(row: str) -> str:
     )
 
 
-def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
+def _comment_archive_parents(tools: ToolSet) -> tuple[ArchiveParent, ...]:
     """What archiving takes a comment with: the thing it is on, or, where that
     cannot be archived itself, the tool it is part of (a wiki page's wiki)."""
     parents: list[ArchiveParent] = []
     tables = SQLModel.metadata.tables
-    for kind, parent in COMMENT_PARENTS.items():
+    for kind, parent in comment_parents(tools).items():
         if "archived_at" in tables[parent.table].columns:
             parents.append(ArchiveParent(parent.table, "subject_id", kind=kind))
         elif parent.tool_fk is not None and parent.governed_by is not None:
             parents.append(
                 ArchiveParent(
-                    parent.governed_by.plural,
+                    parent.governed_by.table.name,
                     "subject_id",
                     through=(parent.table, parent.tool_fk),
                     kind=kind,
@@ -327,7 +329,7 @@ def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
     return tuple(parents)
 
 
-def _comment_dac(row: str) -> tuple[str, str]:
+def _comment_dac(row: str, tools: ToolSet) -> tuple[str, str]:
     """Which tool's sharing governs a comment, and which of its entities.
 
     A comment is said on one subject, and the subjects are declared once for
@@ -335,9 +337,9 @@ def _comment_dac(row: str) -> tuple[str, str]:
     restated here. A subject that is not itself a tool row names the tool it is
     shared as part of: a task by its project, a wiki page by its wiki.
     """
-    tools: list[str] = []
+    governing: list[str] = []
     ids: list[str] = []
-    for kind, parent in COMMENT_PARENTS.items():
+    for kind, parent in comment_parents(tools).items():
         if parent.governed_by is None:
             # No sharing to stamp: the entry is reached as the comment is.
             continue
@@ -347,10 +349,10 @@ def _comment_dac(row: str) -> tuple[str, str]:
             else f"(SELECT {parent.tool_fk} FROM {parent.table} "
             f"WHERE id = {row}.subject_id)"
         )
-        tools.append(f"WHEN '{kind}' THEN '{parent.governed_by.value}'")
+        governing.append(f"WHEN '{kind}' THEN '{parent.governed_by.kind}'")
         ids.append(f"WHEN '{kind}' THEN {ident}")
     return (
-        f"(CASE {row}.subject_type {' '.join(tools)} END)",
+        f"(CASE {row}.subject_type {' '.join(governing)} END)",
         f"(CASE {row}.subject_type {' '.join(ids)} END)",
     )
 
@@ -396,7 +398,7 @@ def archive_parents(table: str, source: SearchSource) -> tuple[ArchiveParent, ..
         source.dac_tool and source.dac_id
     ):
         return ()
-    tool = source.dac_tool.plural
+    tool = source.dac_tool.table.name
     if "archived_at" not in tables[tool].columns:
         return ()
     return (ArchiveParent(tool, source.dac_id),)
@@ -470,9 +472,9 @@ def _body_expr(source: SearchSource, row: str = ROW) -> str:
 #: How a tool indexes when it says nothing: its own name and description, gated
 #: by its own sharing. Stated once and applied to every member of ``Tool``, so a
 #: seventh tool is searchable the day its table exists.
-def _tool_source(tool: Tool) -> SearchSource:
+def _tool_source(tool: ToolRecord) -> SearchSource:
     return SearchSource(
-        SearchEntityType(tool.value),
+        SearchEntityType(tool.kind),
         title="name",
         body=("description",),
         dac_tool=tool,
@@ -483,37 +485,33 @@ def _inside(kind: SearchEntityType, **fields: Any) -> SearchSource:
     """A row inside a tool, gated by the sharing of the tool it lives in."""
     inside = KINDS[kind.value]
     return SearchSource(
-        kind, dac_tool=inside.parent, dac_id=inside.parent_column, **fields
+        kind,
+        dac_tool=BUILTIN_TOOLS.by_kind[inside.tool.value],
+        dac_id=inside.parent_column,
+        **fields,
     )
 
 
 #: Where a tool's text is not simply its name and description. A tool absent
 #: from here is not an omission — it is a tool that takes the shape above.
-TOOL_OVERRIDES: dict[Tool, dict[str, object]] = {
-    Tool.file: {
+TOOL_OVERRIDES: dict[str, dict[str, object]] = {
+    Tool.file.value: {
         "body": ("content", "file_type", "current_version_id"),
         "body_sql": _file_text,
     },
     # A post's text is what it says, not a summary of it: the headline is the
     # title and the Lexical body is the body. There is no `description`.
-    Tool.post: {"body": ("body",), "body_sql": _post_text},
+    Tool.post.value: {"body": ("body",), "body_sql": _post_text},
     # A contact is found by its name. How to reach one is not text somebody
     # writes in, which is what a body is (``written_columns``).
-    Tool.contact: {"body": ()},
+    Tool.contact.value: {"body": ()},
 }
 
-#: table -> how its rows are indexed.
-#:
-#: The six tools are derived; what is written out is what a tool does not
-#: describe — the entities that live INSIDE one, the guild's vocabulary, and
-#: comments. Those differ from each other in ways no rule covers, like which
-#: column is the title; which tool's sharing governs one inside a tool is its
-#: kind's (``KINDS``).
-SEARCH_SOURCES: dict[str, SearchSource] = {
-    **{
-        tool.plural: replace(_tool_source(tool), **TOOL_OVERRIDES.get(tool, {}))
-        for tool in Tool
-    },
+#: What a tool does not describe — the entities that live INSIDE one and the
+#: guild's vocabulary — by table. Those differ from each other in ways no rule
+#: covers, like which column is the title; which tool's sharing governs one
+#: inside a tool is its kind's (``KINDS``).
+_WRITTEN_OUT: dict[str, SearchSource] = {
     "tasks": _inside(
         SearchEntityType.task,
         title="title",
@@ -547,26 +545,48 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
     # Guild-level vocabulary: no initiative, no sharing gate. Reaching the query
     # at all means being in the guild, which is the whole gate for a tag.
     "tags": SearchSource(SearchEntityType.tag, title="name"),
-    # What people said on the content above. Out of the default scope: it is the
-    # highest-volume table in a busy guild, and a caller that wants it says so —
-    # which is what the results page's own tab does.
-    "comments": SearchSource(
-        SearchEntityType.comment,
-        title="content",
-        title_sql=_comment_preview,
-        body=("content",),
-        dac_sql=_comment_dac,
-        in_default_scope=False,
-        # A comment on a task is governed by the task's project, and a task can
-        # move between projects. Nothing about the comment changes when it does,
-        # so the entry is rewritten from the table that moved. Every other
-        # parent names its own initiative and cannot move between them.
-        depends_on=(
-            SearchDependency("tasks", "project_id", "subject_id", local_kind="task"),
-        ),
-        archive_parents=_comment_archive_parents,
-    ),
 }
+
+
+def search_sources(tools: ToolSet) -> dict[str, SearchSource]:
+    """table -> how its rows are indexed, in a community with ``tools``: every
+    tool's own table, derived; what :data:`_WRITTEN_OUT` declares; and the
+    comments on any of them."""
+    return {
+        **{
+            tool.table.name: replace(
+                _tool_source(tool), **TOOL_OVERRIDES.get(tool.kind, {})
+            )
+            for tool in tools
+        },
+        **_WRITTEN_OUT,
+        # What people said on the content above. Out of the default scope: it
+        # is the highest-volume table in a busy guild, and a caller that wants
+        # it says so — which is what the results page's own tab does.
+        "comments": SearchSource(
+            SearchEntityType.comment,
+            title="content",
+            title_sql=_comment_preview,
+            body=("content",),
+            dac_sql=partial(_comment_dac, tools=tools),
+            in_default_scope=False,
+            # A comment on a task is governed by the task's project, and a task
+            # can move between projects. Nothing about the comment changes when
+            # it does, so the entry is rewritten from the table that moved.
+            # Every other parent names its own initiative and cannot move
+            # between them.
+            depends_on=(
+                SearchDependency(
+                    "tasks", "project_id", "subject_id", local_kind="task"
+                ),
+            ),
+            archive_parents=partial(_comment_archive_parents, tools),
+        ),
+    }
+
+
+#: :func:`search_sources` of the built-in tools.
+SEARCH_SOURCES: dict[str, SearchSource] = search_sources(BUILTIN_TOOLS)
 
 
 def written_columns() -> dict[type[SQLModel], tuple[str, ...]]:
@@ -850,7 +870,7 @@ def _dac_exprs(source: SearchSource) -> tuple[str, str]:
     if source.dac_tool is None:
         return "", ""
     dac_id = f"{ROW}.{source.dac_id}" if source.dac_id else f"{ROW}.id"
-    return f"'{source.dac_tool.value}'::text", dac_id
+    return f"'{source.dac_tool.kind}'::text", dac_id
 
 
 DEPENDENT_FUNCTION = "public.refresh_search_dependents"
@@ -1073,24 +1093,22 @@ def _index_block(opclass: str | None) -> str:
     )
 
 
-def render_guild_search_ddl(opclass: str | None = None) -> str:
+def render_guild_search_ddl(opclass: str | None, tools: ToolSet) -> str:
     """Per-table trigger DDL plus the index, applied inside each guild schema.
 
     ``opclass`` is the operator class the index is built on, or ``None`` for the
     stock one.
     """
-    blocks = [
-        _trigger_block(table, source)
-        for table, source in sorted(SEARCH_SOURCES.items())
-    ]
+    sources = sorted(search_sources(tools).items())
+    blocks = [_trigger_block(table, source) for table, source in sources]
     blocks.extend(
         _dependency_block(table, source, dependency)
-        for table, source in sorted(SEARCH_SOURCES.items())
+        for table, source in sources
         for dependency in source.depends_on
     )
     blocks.extend(
         _archive_block(table, source, parent)
-        for table, source in sorted(SEARCH_SOURCES.items())
+        for table, source in sources
         for parent in archive_parents(table, source)
     )
     blocks.append(_index_block(opclass))

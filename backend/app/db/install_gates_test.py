@@ -20,6 +20,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
 from app.core.file_types import FileType
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import Tool
 from app.db.authorization import IN_POLICY
 from app.db.guild_ddl import PLUGIN_POLICY_TABLES, render_guild_rls_ddl
@@ -66,7 +67,9 @@ _POLICY = re.compile(
 def _policies() -> dict[str, list[tuple[str, str, str]]]:
     """table -> (kind, command, predicate) for every rendered policy."""
     out: dict[str, list[tuple[str, str, str]]] = {}
-    for _name, table, kind, command, body in _POLICY.findall(render_guild_rls_ddl()):
+    for _name, table, kind, command, body in _POLICY.findall(
+        render_guild_rls_ddl(BUILTIN_TOOLS)
+    ):
         out.setdefault(table, []).append((kind, command, body))
     return out
 
@@ -125,7 +128,9 @@ def test_the_refused_tables_refuse_every_command():
 def test_the_plugin_policies_are_restrictive():
     """They narrow what the table's own policies admit, and admit nothing."""
     found: dict[str, set[str]] = {}
-    for name, table, kind, _command, _body in _POLICY.findall(render_guild_rls_ddl()):
+    for name, table, kind, _command, _body in _POLICY.findall(
+        render_guild_rls_ddl(BUILTIN_TOOLS)
+    ):
         if name.startswith("plugin_scope_"):
             assert kind == "RESTRICTIVE", (table, name)
             found.setdefault(table, set()).add(name)

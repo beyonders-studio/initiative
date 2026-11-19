@@ -119,11 +119,12 @@ async def governing_of(
     from sqlalchemy import column as sa_column
     from sqlalchemy import table as sa_table
 
+    from app.core.tool_set import BUILTIN_TOOLS
     from app.db.initiative_rls import entity_tables, governing_path
     from app.models.tenant._mixins import tool_models
 
     kind, entity_id = ref
-    table = entity_tables()[kind]
+    table = entity_tables(BUILTIN_TOOLS)[kind]
     walk = governing_path(table)
     if walk is None:
         raise ValueError(f"no tool governs {kind!r}")

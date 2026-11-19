@@ -83,6 +83,7 @@ from app.core.messages import (
     QueryMessages,
 )
 from app.core.plugin_scopes import tool_resource
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import (
     INSTALL_METADATA_KIND,
     ITEM_KINDS,
@@ -190,7 +191,7 @@ _CHANGED: dict[str, ValuesChanged] = {"calendar_event": _occurrences_follow}
 
 
 def _link(target: str, models: dict[str, type[SQLModel]]) -> PropertyLinkSpec:
-    table = entity_tables()[target]
+    table = entity_tables(BUILTIN_TOOLS)[target]
     kind = KINDS[target]
     if kind.standalone:
         return PropertyLinkSpec(

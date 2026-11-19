@@ -44,12 +44,13 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tool_set import BUILTIN_TOOLS
 from app.core.tools import COMMENT_TARGETS, Tool
 from app.db.guild_ddl import _WRITTEN_BY
 from app.db.initiative_rls import (
     INITIATIVE_PATHS,
     entity_tables,
-    governing_path,
+    governing_walk,
     initiative_of,
 )
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
@@ -95,8 +96,6 @@ _SET_ASIDE_FREEZE_GUARDS = sa.text(
     $$
     """
 )
-
-_TOOL_BY_TABLE: dict[str, Tool] = {tool.plural: tool for tool in Tool}
 
 
 @dataclass(frozen=True)
@@ -294,7 +293,7 @@ class _Seeder:
         allowed = self.catalog.allowed.get((table, column))
         if allowed is None or Tool.project.value in allowed:
             return Tool.project.value
-        return next(kind for kind in allowed if kind in entity_tables())
+        return next(kind for kind in allowed if kind in entity_tables(BUILTIN_TOOLS))
 
     def _fill(self, table: sa.Table, column: sa.Column) -> Any:
         """A value for a NOT NULL column nothing else decided: the first its
@@ -395,7 +394,9 @@ class _Seeder:
             kind = values[kind_column]
             # A grant is made on a subject nobody holds one on yet.
             subject = await self.make(
-                entity_tables().get(kind, kind), owner, share=name != "resource_grants"
+                entity_tables(BUILTIN_TOOLS).get(kind, kind),
+                owner,
+                share=name != "resource_grants",
             )
             values[id_column] = subject["id"]
 
@@ -421,7 +422,7 @@ class _Seeder:
         if name in _SEEN_WITH:
             child, column = _SEEN_WITH[name]
             await self.make(child, owner, inherit={column: row["id"]})
-        tool = _TOOL_BY_TABLE.get(name)
+        tool = BUILTIN_TOOLS.by_table.get(name)
         if tool is not None and share:
             grants = self.table("resource_grants")
             for person in self.grantees:
@@ -429,7 +430,7 @@ class _Seeder:
                     "resource_grants",
                     self.grantor,
                     inherit={
-                        "resource_type": tool.value,
+                        "resource_type": tool.kind,
                         "resource_id": row["id"],
                         "user_id": person,
                         "level": "write",
@@ -628,7 +629,7 @@ async def _tools_on(
     session = await role_session("app_user")
     context = await route_as(session, user_id=person, guild_id=guild_id)
     await session.rollback()
-    expected = {f"{initiative_id}:{tool.value}" for tool in Tool}
+    expected = {f"{initiative_id}:{tool.kind}" for tool in BUILTIN_TOOLS}
     assert expected <= set(context.enabled_tools)
 
 
@@ -810,12 +811,13 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
     governed = {
         name: governing[0]
         for name, case in cases.items()
-        if (governing := governing_path(case.table.name)) is not None
+        if (governing := governing_walk(case.table.name, INITIATIVE_PATHS)) is not None
     }
-    assert set(governed.values()) == set(Tool)
-    for off in [{tool} for tool in Tool] + [set(Tool)]:
+    every = {tool.kind for tool in BUILTIN_TOOLS}
+    assert {tool.kind for tool in governed.values()} == every
+    for off in [{tool.kind} for tool in BUILTIN_TOOLS] + [every]:
         await route_session_to_guild(session, guild.id)
-        if off == set(Tool):
+        if off == every:
             await session.exec(
                 sa.delete(InitiativeRule).where(
                     InitiativeRule.initiative_id == initiative_a,
@@ -825,13 +827,15 @@ async def test_nobody_outside_an_initiative_reaches_its_rows(
             )
         else:
             await write_switches(
-                session, initiative_a, {tool: tool not in off for tool in Tool}
+                session,
+                initiative_a,
+                {Tool(tool.kind): tool.kind not in off for tool in BUILTIN_TOOLS},
             )
         await session.commit()
-        state = "no switch rows" if len(off) > 1 else f"{next(iter(off)).value} off"
+        state = "no switch rows" if len(off) > 1 else f"{next(iter(off))} off"
         reader = await reading_as(people.moderator_a, guild.id)
         for name, tool in governed.items():
-            if tool not in off:
+            if tool.kind not in off:
                 continue
             case = cases[name]
             if (seen := await _count(reader, case.table, case.counted())) != 0:
