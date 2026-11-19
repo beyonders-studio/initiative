@@ -134,11 +134,14 @@ def _key(raw: Any, *, what: str) -> str:
 
 
 def _number(raw: Any) -> bool:
-    return (
-        isinstance(raw, int | float)
-        and not isinstance(raw, bool)
-        and math.isfinite(raw)
-    )
+    """Whether ``raw`` is a finite number a float holds: an integer too large
+    for one is not."""
+    if not isinstance(raw, int | float) or isinstance(raw, bool):
+        return False
+    try:
+        return math.isfinite(raw)
+    except OverflowError:
+        return False
 
 
 def _is_date(raw: Any) -> bool:
@@ -301,7 +304,7 @@ def _operand(raw: Any, *, numbers: set[str], what: str) -> Any:
     operand = require_mapping(raw, what)
     if set(operand) != {"field"}:
         fail(f"{what} is a number or {{'field': key}}")
-    if operand["field"] not in numbers:
+    if not isinstance(operand["field"], str) or operand["field"] not in numbers:
         fail(
             f"{what}: {operand['field']!r} is not a number or counter field of this item"
         )

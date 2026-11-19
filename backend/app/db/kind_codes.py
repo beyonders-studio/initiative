@@ -90,7 +90,12 @@ async def apply_kind_codes_if_changed(
 ) -> bool:
     """Write the function when its stored body differs from the render, with
     the plug-in kinds' codes read on ``reader`` (``conn`` when not given).
-    Returns whether it was written."""
+    Returns whether it was written.
+
+    Takes turns with :func:`assign_plugin_kind_codes` and with itself, from
+    before the read until ``conn`` commits: a code given meanwhile is read by
+    the next render, and an older render never lands after a newer one."""
+    await advisory_lock(conn, LockNamespace.PLUGIN_KIND_CODES)
     plugin_codes = await plugin_kind_codes(reader or conn)
     stored = (
         await conn.execute(

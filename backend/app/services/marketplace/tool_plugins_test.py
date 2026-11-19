@@ -251,6 +251,18 @@ REFUSALS: dict[str, tuple[Callable[[dict], None], str]] = {
         _open({"field": "count", "below": {"field": "color"}}),
         "not a number or counter field",
     ),
+    "a comparison with a field that is not a key": (
+        _open({"field": "count", "below": {"field": []}}),
+        "not a number or counter field",
+    ),
+    "a bound too large for a number": (
+        lambda body: _field(body, "count")["counter"].__setitem__("max", 10**400),
+        "a bound is a number",
+    ),
+    "a default too large for a number": (
+        lambda body: _field(body, "step").__setitem__("default", 10**400),
+        "not a value",
+    ),
     "'is' on a number": (_open({"field": "count", "is": True}), "reads a checkbox"),
     "'in' an option that is not one": (
         _open({"field": "view_mode", "in": ["dial"]}),

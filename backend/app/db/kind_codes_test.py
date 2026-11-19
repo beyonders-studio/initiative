@@ -5,10 +5,16 @@ so a kind keeps the code it was first given, a code is never given twice, and
 the database function packs node ids with it as soon as the registration that
 gave it commits."""
 
+import asyncio
+
 from sqlalchemy import text
 
 from app.db import post_commit
-from app.db.kind_codes import assign_plugin_kind_codes, kind_code_body
+from app.db.kind_codes import (
+    assign_plugin_kind_codes,
+    ensure_kind_codes,
+    kind_code_body,
+)
 from app.models.platform.plugin_kind_code import FIRST_PLUGIN_KIND_CODE
 from app.testing import (
     COUNTERS_UID,
@@ -97,6 +103,20 @@ async def test_assigning_only_adds(session):
     assert again == {"c.one": 1026, "b.one": 1025}
     assert await _codes(session) == {"a.one": 1024, "b.one": 1025, "c.one": 1026}
     assert await _code(session, "c.one") == 1026
+
+
+async def test_a_render_waits_for_a_registration_giving_codes(session):
+    """A render that starts while a registration is giving codes reads them
+    once it commits, so it never writes the function without them."""
+    await assign_plugin_kind_codes(session, ["a.one"])
+    render = asyncio.create_task(ensure_kind_codes())
+    await asyncio.sleep(0.3)
+    assert not render.done()
+
+    await session.commit()
+    await render
+    await post_commit.settle(session)
+    assert await _code(session, "a.one") == FIRST_PLUGIN_KIND_CODE
 
 
 async def test_a_code_is_never_taken_back_or_moved(session):
