@@ -1620,9 +1620,23 @@ export const CurrencyCode = {
 } as const;
 
 /**
+ * How a counter field is drawn: a number, a progress bar or a segmented
+ * clock. A bar and a clock need both bounds; a counter without them is
+ * drawn as a number.
+ */
+export type CounterLook = (typeof CounterLook)[keyof typeof CounterLook];
+
+export const CounterLook = {
+  number: "number",
+  bar: "bar",
+  clock: "clock",
+} as const;
+
+/**
  * How a counter field moves: by ``step`` a tap, never past ``min`` or
  * ``max``, and back to ``initial`` on a reset. A counter with no value
- * holds ``initial``.
+ * holds ``initial``. ``look`` is how it is drawn wherever a list's layout
+ * says nothing else.
  */
 export interface CounterSettingsOutput {
   /** @exclusiveMinimum 0 */
@@ -1630,6 +1644,7 @@ export interface CounterSettingsOutput {
   min: number | null;
   max: number | null;
   initial: number;
+  look: CounterLook;
 }
 
 /**
@@ -5365,7 +5380,8 @@ export interface CounterSetCountRequest {
 /**
  * How a counter field moves: by ``step`` a tap, never past ``min`` or
  * ``max``, and back to ``initial`` on a reset. A counter with no value
- * holds ``initial``.
+ * holds ``initial``. ``look`` is how it is drawn wherever a list's layout
+ * says nothing else.
  */
 export interface CounterSettingsInput {
   /** @exclusiveMinimum 0 */
@@ -5373,6 +5389,7 @@ export interface CounterSettingsInput {
   min?: number | null;
   max?: number | null;
   initial?: number;
+  look?: CounterLook;
 }
 
 export type CounterSortDirection = (typeof CounterSortDirection)[keyof typeof CounterSortDirection];

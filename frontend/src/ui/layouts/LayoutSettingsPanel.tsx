@@ -23,6 +23,7 @@ import type { LayoutNode } from "@/ui/layouts/tree";
 import { listFormat } from "@/ui/lib/intl";
 import {
   COUNTER_DISPLAYS,
+  counterSettings,
   type FieldDisplay,
   type PropertyDefinition,
   SCALE_DISPLAYS,
@@ -150,7 +151,10 @@ export const ListLayoutSettings = ({
       {selectedField !== null && drawn !== null ? (
         <DisplaySetting
           type={drawn}
-          value={layout.definition.displays?.[selectedField] ?? "number"}
+          value={
+            layout.definition.displays?.[selectedField] ??
+            counterSettings(fields.get(selectedField)?.property?.counter).look
+          }
           onChange={(display) => edits.changeDisplay(selectedField, display)}
         />
       ) : null}

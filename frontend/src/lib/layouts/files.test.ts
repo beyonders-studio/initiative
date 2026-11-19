@@ -16,7 +16,7 @@ const stock = buildPropertyDefinition({
   id: 23,
   name: "Stock",
   type: MetadataType.counter,
-  counter: { step: 1, min: 0, max: null, initial: 4 },
+  counter: { step: 1, min: 0, max: null, initial: 4, look: "number" },
 });
 const fields = collectionFileFields([caption], [price, stock]);
 

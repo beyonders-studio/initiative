@@ -49,10 +49,6 @@
   "backToGroup": "Volver al grupo",
   "focus": {
     "openFocus": "Abrir pantalla completa",
-    "exit": "Salir de la pantalla completa",
-    "next": "Contador siguiente",
-    "previous": "Contador anterior",
-    "counterPosition": "{{current}} / {{total}}",
     "notFound": "Contador no encontrado en este grupo"
   },
   "createFirst": "Crea tu primer grupo de contadores",

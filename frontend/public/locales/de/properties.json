@@ -162,6 +162,21 @@
     "maxPlaceholder": "Keins",
     "initialPlaceholder": "0",
     "stepPositive": "Die Schrittweite muss größer als null sein",
-    "minAboveMax": "Das Minimum darf nicht größer als das Maximum sein"
+    "minAboveMax": "Das Minimum darf nicht größer als das Maximum sein",
+    "look": "Anzeigen als",
+    "looks": {
+      "number": "Zahl",
+      "bar": "Fortschrittsbalken",
+      "clock": "Kreis (Uhr)"
+    },
+    "lookNeedsBounds": "Ein Fortschrittsbalken oder ein Kreis braucht ein Minimum und ein Maximum. Ohne beide wird eine Zahl angezeigt.",
+    "focus": {
+      "open": "{{name}} im Vollbild öffnen",
+      "exit": "Vollbild verlassen",
+      "more": "Weitere Aktionen",
+      "previous": "Vorheriger Zähler",
+      "next": "Nächster Zähler",
+      "position": "{{current}} / {{total}}"
+    }
   }
 }

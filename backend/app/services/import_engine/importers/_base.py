@@ -338,11 +338,16 @@ class PropertyRestore:
                 )
                 # Amounts in one currency are not amounts in another.
                 and found.currency == currency
-                # Nor is a count kept to one step and bounds kept to others.
+                # Nor is a count kept to one step and bounds kept to others;
+                # how it is drawn is not what it counts.
                 and (
                     declared is None
                     or found.counter is None
-                    or CounterSettings.model_validate(found.counter) == counter
+                    or counter is None
+                    or CounterSettings.model_validate(found.counter).model_dump(
+                        exclude={"look"}
+                    )
+                    == counter.model_dump(exclude={"look"})
                 )
             ):
                 self.matched += 1
@@ -366,7 +371,7 @@ class PropertyRestore:
             ),
             color=declared.color if declared is not None else None,
             currency=currency,
-            counter=counter.model_dump() if counter is not None else None,
+            counter=counter.model_dump(mode="json") if counter is not None else None,
             options=(
                 declared.options
                 if declared is not None

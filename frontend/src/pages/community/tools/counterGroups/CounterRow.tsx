@@ -15,9 +15,8 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type { CounterRead } from "@/api/generated/initiativeAPI.schemas";
-import { CounterView } from "@/components/tools/counterGroups/views/CounterView";
 import { getContrastingTextColor } from "@/lib/counter-color";
-import { isAtMax, isAtMin } from "@/lib/counter-math";
+import { counterShown, isAtMax, isAtMin } from "@/lib/counter-math";
 import { Button } from "@/ui/button";
 import {
   DropdownMenu,
@@ -26,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { cn } from "@/ui/lib/utils";
+import { CounterView } from "@/ui/properties/CounterView";
 
 export type CounterLayout = "row" | "grid";
 
@@ -77,7 +77,8 @@ export const CounterRow = ({
 
   const viewElement = (
     <CounterView
-      counter={counter}
+      counter={counterShown(counter)}
+      name={counter.name}
       disabled={!canWrite}
       textColor={fg}
       onCommit={onSetCount}

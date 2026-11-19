@@ -1,5 +1,6 @@
-import { CounterValueInput } from "@/components/tools/counterGroups/CounterValueInput";
 import { cn } from "@/ui/lib/utils";
+
+import { CounterValueInput } from "./CounterValueInput";
 
 interface CounterNumberViewProps {
   count: string;
